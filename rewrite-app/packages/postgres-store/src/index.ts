@@ -3,6 +3,7 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import {
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
+  prepareWorkspaceFilePublication,
   prepareApplicationAssetDeletion,
   validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
@@ -2645,6 +2646,35 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
     },
     reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    async publishWorkspaceFiles(input) {
+      input=structuredClone(input);
+      const source=input.sourcePackage,job=input.importJob,release=input.contentRelease;
+      const client=await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const scope=[source.tenantId,source.workspaceId];
+        const workspace=(await client.query(`SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE`,scope)).rows[0];
+        const sourcePackages=((await client.query(`SELECT * FROM source_packages WHERE tenant_id=$1 AND workspace_id=$2`,scope)).rows).map(row=>mapSourcePackage(row as Row)).filter(Boolean) as SourcePackage[];
+        const activityEvents=((await client.query(`SELECT * FROM workspace_activity_events WHERE tenant_id=$1 AND workspace_id=$2`,scope)).rows).map(row=>mapWorkspaceActivityEvent(row as Row)).filter(Boolean) as WorkspaceActivityEvent[];
+        const contentReleases=((await client.query(`SELECT * FROM content_releases WHERE tenant_id=$1 AND workspace_id=$2`,scope)).rows).map(row=>mapContentRelease(row as Row)).filter(Boolean) as ContentRelease[];
+        const occupiedSource=(await client.query(`SELECT source_package_id FROM source_packages WHERE source_package_id=$1`,[source.sourcePackageId])).rows[0];
+        const occupiedJob=(await client.query(`SELECT import_job_id FROM import_jobs WHERE import_job_id=$1`,[job.importJobId])).rows[0];
+        const occupiedRelease=release ? (await client.query(`SELECT content_release_id FROM content_releases WHERE content_release_id=$1`,[release.contentReleaseId])).rows[0] : null;
+        let occupiedEvent=false;
+        for(const event of input.activityEvents)if((await client.query(`SELECT activity_event_id FROM workspace_activity_events WHERE activity_event_id=$1`,[event.activityEventId])).rows[0])occupiedEvent=true;
+        const superseded=prepareWorkspaceFilePublication(input,{workspaceExists:!!workspace,
+          identitiesAvailable:!occupiedSource && !occupiedJob && !occupiedRelease && !occupiedEvent,
+          sourcePackages,activityEvents,contentReleases});
+        if(!superseded){await client.query("ROLLBACK");return false;}
+        await client.query(`INSERT INTO source_packages (source_package_id,tenant_id,workspace_id,file_name,media_type,content_structure_json,source_document_text,status,uploaded_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[source.sourcePackageId,source.tenantId,source.workspaceId,source.fileName,source.mediaType,source.contentStructure?JSON.stringify(source.contentStructure):null,source.sourceDocument,source.status,source.uploadedAt]);
+        await client.query(`INSERT INTO import_jobs (import_job_id,tenant_id,workspace_id,source_package_id,status,created_at,finished_at,diagnostics_json) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,[job.importJobId,job.tenantId,job.workspaceId,job.sourcePackageId,job.status,job.createdAt,job.finishedAt,JSON.stringify(job.diagnostics)]);
+        for(const previous of superseded){await client.query(`UPDATE content_releases SET status='superseded' WHERE content_release_id=$1`,[previous.contentReleaseId]);}
+        if(release){await client.query(`INSERT INTO content_releases (content_release_id,tenant_id,workspace_id,import_job_id,release_label,runtime_snapshot_json,status,created_at,activated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[release.contentReleaseId,release.tenantId,release.workspaceId,release.importJobId,release.releaseLabel,JSON.stringify(release.runtimeSnapshot),release.status,release.createdAt,release.activatedAt]);}
+        for(const event of input.activityEvents){await client.query(`INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[event.activityEventId,event.tenantId,event.workspaceId,event.eventType,event.actorId,event.subjectType,event.subjectId,event.occurredAt,event.summary,JSON.stringify(event.details)]);}
+        await client.query("COMMIT");
+        return true;
+      }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+    },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,
       expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),

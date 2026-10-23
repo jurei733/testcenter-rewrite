@@ -1,3 +1,6 @@
+import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
+import type {WorkspaceFilePublicationInput} from "./workspace-file-publication.js";
+export {createWorkspaceFilePublicationRevision,prepareWorkspaceFilePublication} from "./workspace-file-publication.js";
 export {createContentReleaseActivationRevision,prepareContentReleaseActivation} from "./content-release-activation.js";
 import type {ContentReleaseActivationCommit} from "./content-release-activation.js";
 import { workspaceFileReplacementConflict } from './workspace-file-replacement.js';
@@ -345,6 +348,7 @@ export type ContentIntakePort = {
 };
 
 export type UploadWorkspaceFileResult = {
+  workspaceAvailability?: WorkspaceFileAvailability;
   sourcePackage: SourcePackage;
   replacedSourcePackageId: string | null;
   importJob: ImportJob | null;
@@ -352,7 +356,7 @@ export type UploadWorkspaceFileResult = {
   participantRosterImport?: CreateImportJobResult['participantRosterImport'];
 };
 
-export type ReplaceWorkspaceFileResult = Omit<Awaited<ReturnType<ContentIntakePort['replaceSourcePackage']>>, 'importJob'> & {importJob: ImportJob | null};
+export type ReplaceWorkspaceFileResult = Omit<Awaited<ReturnType<ContentIntakePort['replaceSourcePackage']>>, 'importJob'> & {importJob: ImportJob | null; workspaceAvailability?: WorkspaceFileAvailability};
 
 export type WorkspaceAdminReadPort = {
   getWorkspaceOverview(input: {
@@ -1448,6 +1452,7 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     assemblyActivityEvent: WorkspaceActivityEvent;
     expectedWorkspaceSourcePackageReferenceRevision: string;
   }): Promise<boolean>;
+  publishWorkspaceFiles(input: WorkspaceFilePublicationInput): Promise<boolean>;
   reserveWorkspaceFileUpload(input: {
     sourcePackage: SourcePackage;
     createdActivityEvent: WorkspaceActivityEvent;
@@ -6490,7 +6495,9 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
   workspaceId: string;
   activeContentRelease: ContentRelease;
   timestamp: string;
+  resolveRelease?: (release: ContentRelease) => Promise<ContentRelease>;
 }): Promise<OpenMonitorRun[]> => {
+  const activeContentRelease = input.resolveRelease ? await input.resolveRelease(input.activeContentRelease) : input.activeContentRelease;
   const [
     participantSessions,
     participantRosterEntries,
@@ -6516,7 +6523,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
       .filter(
         participantSession =>
           participantSession.contentReleaseId ===
-          input.activeContentRelease.contentReleaseId
+          activeContentRelease.contentReleaseId
       )
       .map(participantSession => participantSession.participantSessionId)
   );
@@ -6536,18 +6543,18 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
     .map(testRun => {
       const normalizedTestRun = normalizeTestRun(testRun);
       const bookletError = resolveOpenMonitorBookletError(
-        input.activeContentRelease,
+        activeContentRelease,
         normalizedTestRun
       );
       const testletTimers = bookletError
         ? []
         : buildMonitorTestletTimers(
-            input.activeContentRelease,
+            activeContentRelease,
             normalizedTestRun,
             input.timestamp
           );
       const location = resolveOpenMonitorRunLocation(
-        input.activeContentRelease,
+        activeContentRelease,
         normalizedTestRun,
         testletTimers
       );
@@ -24195,6 +24202,20 @@ export const createFirstSliceServices = (
     lastTimestampMs = nextTimestampMs;
     return new Date(nextTimestampMs).toISOString();
   };
+  const workspaceFiles = createWorkspaceFileRuntime({repository, now, id: idGenerator,
+    project: source => projectWorkspaceFile(source),
+    compile: (sources, scope) => {
+      const {archive, members} = assembleSourcePackageArchive(sources);
+      const sourcePackage: SourcePackage = {sourcePackageId: idGenerator(), ...scope,
+        fileName: 'workspace-files.zip', mediaType: 'application/zip', contentStructure: null,
+        sourceDocument: 'data:application/zip;base64,' + archive.toString('base64'), status: 'accepted', uploadedAt: now()};
+      return {sourcePackage, ...buildRuntimeSnapshot(sourcePackage, xmlValidationContext),
+        members: members.map(member => ({sourcePackageId: member.sourcePackageId, fileName: member.fileName, sizeBytes: member.bytes.length}))};
+    }});
+  const requireRuntimeContentRelease = async (repo: FirstSliceRepository, releaseId: string): Promise<ContentRelease> =>
+    workspaceFiles.projectRelease(await requireContentRelease(repo, releaseId));
+  const listRuntimeContentReleases = async (tenantId: string, workspaceId: string): Promise<ContentRelease[]> =>
+    Promise.all((await repository.listContentReleasesByWorkspace(tenantId, workspaceId)).map(workspaceFiles.projectRelease));
   const testRunMutationTails = new Map<string, Promise<void>>();
   const serializeTestRunMutation = async <Result>(
     testRunId: string,
@@ -25052,7 +25073,7 @@ export const createFirstSliceServices = (
         `Execution mode '${executionMode.mode}' does not allow participant reviews.`
       );
     }
-    const contentRelease = await requireContentRelease(
+    const contentRelease = await requireRuntimeContentRelease(
       repository,
       testRun.contentReleaseId
     );
@@ -25188,7 +25209,7 @@ export const createFirstSliceServices = (
     const unfinished = buildParticipantRuntimeBooklets({ contentRelease: input.contentRelease,
       participantRosterEntry: input.participantRosterEntry, participantCode: parent.participantCode, testRuns })
       .some(booklet => booklet.status !== "completed");
-    return { ...parent, status: unfinished ? "signed_in" : "closed" };
+    return { ...parent, status: unfinished || input.contentRelease.runtimeSnapshot.workspaceFilePublication ? "signed_in" : "closed" };
   };
 
   const mutateRuntimeRun = async (
@@ -25204,7 +25225,7 @@ export const createFirstSliceServices = (
     options: { reconcileBefore?: boolean; activateController?: boolean; participantAccess?: boolean } = {}
   ): Promise<ParticipantRunMutationResult> => {
     const parent = await requireParticipantSession(repository, storedRun.participantSessionId);
-    const contentRelease = await requireContentRelease(repository, storedRun.contentReleaseId);
+    const contentRelease = await requireRuntimeContentRelease(repository, storedRun.contentReleaseId);
     const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository, parent.tenantId, parent.workspaceId, parent.loginKey);
     let completionError: unknown;
     let result: ParticipantRunMutationResult | null;
@@ -25947,6 +25968,23 @@ export const createFirstSliceServices = (
     };
   };
 
+  const currentSystemCheckFiles = (sources: SourcePackage[], events: WorkspaceActivityEvent[]) => {
+    const physical = selectCurrentWorkspaceFiles(sources, events).filter(source => source.status !== 'rejected' && /\.xml$/i.test(source.fileName) && projectWorkspaceFile(source).fileType === 'SysCheck');
+    const metadata = buildWorkspaceFileCatalog(physical.map(projectWorkspaceFile)).items;
+    return physical.map(source => ({source, metadata: metadata.find(file => file.sourcePackageId === source.sourcePackageId)!.metadata}));
+  };
+  const liveSystemCheckPackages = async (workspace: Workspace, sources: SourcePackage[], events: WorkspaceActivityEvent[]) => {
+    const files = currentSystemCheckFiles(sources, events);
+    if (!files.length) return {files, packages: [] as SourcePackage[]};
+    const current = await workspaceFiles.read(workspace);
+    const snapshot = current.compilation?.runtimeSnapshot;
+    const packages = files.flatMap(({source,metadata}) => {
+      const definition = snapshot?.systemCheckEntries?.find(check => check.checkId.toUpperCase() === metadata.identifier.toUpperCase());
+      return definition ? [{...source, contentStructure: {bookletEntries: [],
+        playerEntries: snapshot?.playerEntries, systemCheckEntries: [definition]}}] : [];
+    });
+    return {files, packages};
+  };
   const listWorkspaceSystemChecks = async (input: {
     tenantKey: string;
     workspaceKey: string;
@@ -25956,24 +25994,18 @@ export const createFirstSliceServices = (
       input.tenantKey,
       input.workspaceKey
     );
-    const sourcePackages = (
-      await repository.listSourcePackagesByWorkspace(
-        workspace.tenantId,
-        workspace.workspaceId
-      )
-    )
-      .filter(sourcePackage => sourcePackage.status === "accepted")
-      .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
-    const releases = (
-      await repository.listContentReleasesByWorkspace(
-        workspace.tenantId,
-        workspace.workspaceId
-      )
-    ).sort((left, right) =>
-      (right.activatedAt ?? right.createdAt).localeCompare(
-        left.activatedAt ?? left.createdAt
-      )
-    );
+    const [allSources, events] = await Promise.all([
+      repository.listSourcePackagesByWorkspace(workspace.tenantId, workspace.workspaceId),
+      repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId, workspace.workspaceId)
+    ]);
+    const live = await liveSystemCheckPackages(workspace, allSources, events);
+    const liveIds = new Set(live.files.map(file => file.metadata.identifier.toUpperCase()));
+    const sourcePackages = [...live.packages, ...allSources.filter(source => source.status === 'accepted')
+      .sort((left,right) => right.uploadedAt.localeCompare(left.uploadedAt)).map(source => ({...source,
+        contentStructure: source.contentStructure ? {...source.contentStructure,
+          systemCheckEntries: source.contentStructure.systemCheckEntries?.filter(check => !liveIds.has(check.checkId.toUpperCase()))} : null}))];
+    const releases = (await listRuntimeContentReleases(workspace.tenantId, workspace.workspaceId))
+      .sort((left,right) => (right.activatedAt ?? right.createdAt).localeCompare(left.activatedAt ?? left.createdAt));
     const resolveUnit = (
       systemCheck: SourcePackageSystemCheckEntry,
       sourcePackage: SourcePackage
@@ -26603,7 +26635,7 @@ export const createFirstSliceServices = (
         throw error;
       }
     };
-    const contentRelease = await requireContentRelease(
+    const contentRelease = await requireRuntimeContentRelease(
       repository,
       participantSession.contentReleaseId
     );
@@ -26996,7 +27028,7 @@ export const createFirstSliceServices = (
     const file = projectWorkspaceFile(source);
     const effective = selectCurrentWorkspaceFiles(sources,events)
       .filter(value=>value.status!=='rejected' && value.sourcePackageId!==excludedId);
-    const catalog = buildWorkspaceFileCatalog([...effective.map(projectWorkspaceFile),file]);
+    const catalog = buildWorkspaceFileCatalog([...effective.map(projectWorkspaceFile),file], {requireDependencies:true});
     const unresolved = catalog.items.find(value=>value.sourcePackageId===source.sourcePackageId)?.unresolvedReferences ?? [];
     if (unresolved.length) throw new FirstSliceError(409,'workspace_file_dependencies_unresolved',
       'The workspace file has missing or ambiguous dependencies.',{unresolvedReferences:unresolved});
@@ -27041,7 +27073,7 @@ export const createFirstSliceServices = (
       const result = await replaceSourcePackageInternal({...input,sourcePackageId:sameName.sourcePackageId},true,
         createWorkspaceSourcePackageReferenceRevision({sourcePackages:[sameName],activityEvents:[]}));
       return {sourcePackage:result.replacementSourcePackage,replacedSourcePackageId:sameName.sourcePackageId,
-        importJob:result.importJob,stagedContentRelease:result.stagedContentRelease,
+        importJob:result.importJob,stagedContentRelease:result.stagedContentRelease,workspaceAvailability:result.workspaceAvailability,
         ...(result.participantRosterImport ? {participantRosterImport:result.participantRosterImport} : {})};
     }
     assertWorkspaceFileIdentity(sourcePackage,sourcePackages,activityEvents);
@@ -27057,11 +27089,11 @@ export const createFirstSliceServices = (
       expectedWorkspaceSourcePackageReferenceRevision:createWorkspaceSourcePackageReferenceRevision({sourcePackages,activityEvents})})) {
       throw new FirstSliceError(409,'workspace_file_upload_conflict','Workspace files changed during upload. Refresh and retry.');
     }
-    if (independent) return {sourcePackage,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null};
+    if (independent) return {sourcePackage,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null, workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
     const result = await createImportJobWithRelease({tenantKey:input.tenantKey,workspaceKey:input.workspaceKey,
       sourcePackageId:sourcePackage.sourcePackageId},{currentWorkspaceFilesOnly:true});
     return {...result,sourcePackage:(await repository.getSourcePackageById(sourcePackage.sourcePackageId)) ?? sourcePackage,
-      replacedSourcePackageId:null};
+      replacedSourcePackageId:null, workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
   };
 
   function replaceSourcePackageInternal(input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile: true, expectedSourceRevision?: string): Promise<ReplaceWorkspaceFileResult>;
@@ -27206,7 +27238,7 @@ export const createFirstSliceServices = (
       );
     }
     if (independentWorkspaceFile) return {replacedSourcePackage, replacementSourcePackage,
-      importJob:null, stagedContentRelease:null};
+      importJob:null, stagedContentRelease:null,workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
     const result = await createImportJobWithRelease({
       tenantKey: input.tenantKey,
       workspaceKey: input.workspaceKey,
@@ -27232,6 +27264,7 @@ export const createFirstSliceServices = (
     return {
       replacedSourcePackage,
       replacementSourcePackage: persistedReplacement,
+      ...(workspaceFile ? {workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)} : {}),
       importJob: result.importJob,
       stagedContentRelease: result.stagedContentRelease,
       ...(result.participantRosterImport
@@ -28920,7 +28953,7 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const contentReleases = await repository.listContentReleasesByWorkspace(
+        const contentReleases = await listRuntimeContentReleases(
           workspace.tenantId,
           workspace.workspaceId
         );
@@ -29007,7 +29040,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -29057,7 +29090,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -29117,7 +29150,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -29178,7 +29211,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -29233,7 +29266,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -29288,7 +29321,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -29356,7 +29389,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -30148,7 +30181,7 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const contentReleases = await repository.listContentReleasesByWorkspace(
+        const contentReleases = await listRuntimeContentReleases(
           workspace.tenantId,
           workspace.workspaceId
         );
@@ -30595,6 +30628,7 @@ export const createFirstSliceServices = (
                 tenantId: workspace.tenantId,
                 workspaceId: workspace.workspaceId,
                 activeContentRelease: activeRelease,
+                resolveRelease: workspaceFiles.projectRelease,
                 timestamp: now()
               })
             : [];
@@ -31019,7 +31053,7 @@ export const createFirstSliceServices = (
         const normalizedUnitKey = normalizeOptionalUnitKey(input.unitKey);
         let originalUnitId: string | null = null;
         if (normalizedUnitKey) {
-          const contentRelease = await requireContentRelease(
+          const contentRelease = await requireRuntimeContentRelease(
             repository,
             testRun.contentReleaseId
           );
@@ -31154,7 +31188,7 @@ export const createFirstSliceServices = (
             );
           }
 
-          const contentRelease = await requireContentRelease(
+          const contentRelease = await requireRuntimeContentRelease(
             repository,
             testRun.contentReleaseId
           );
@@ -31781,6 +31815,7 @@ export const createFirstSliceServices = (
                 tenantId: workspace.tenantId,
                 workspaceId: workspace.workspaceId,
                 activeContentRelease: activeRelease,
+                resolveRelease: workspaceFiles.projectRelease,
                 timestamp: activatedAt
               })
             : [];
@@ -32155,7 +32190,7 @@ export const createFirstSliceServices = (
           participantSession.workspaceId,
           participantSession.loginKey
         );
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           participantSession.contentReleaseId
         );
@@ -32279,7 +32314,7 @@ export const createFirstSliceServices = (
             input.terminationNoop !== undefined && (input.terminationNoop !== true || input.controllerStatus !== "TERMINATED")) {
           throw new FirstSliceError(400, "participant_command_controller_status_invalid", "The observed controller status is invalid.");
         }
-        const contentRelease = await requireContentRelease(repository, selected.contentReleaseId);
+        const contentRelease = await requireRuntimeContentRelease(repository, selected.contentReleaseId);
         const executedAt = now();
         try {
           const result = await serializeTestRunMutation(selected.testRunId, () => repository.applyParticipantRunCommand({
@@ -32407,7 +32442,7 @@ export const createFirstSliceServices = (
         if (selected.contentReleaseId !== request.contentReleaseId || selected.bookletKey !== request.bookletKey) {
           throw new FirstSliceError(409, "test_run_scope_changed", "The timer interruption belongs to another immutable content snapshot.");
         }
-        const release = await requireContentRelease(repository, selected.contentReleaseId);
+        const release = await requireRuntimeContentRelease(repository, selected.contentReleaseId);
         if (release.tenantId !== selected.tenantId || release.workspaceId !== selected.workspaceId) {
           throw new FirstSliceError(404, "test_run_not_found", "The selected Run's content was not found.");
         }
@@ -32479,7 +32514,7 @@ export const createFirstSliceServices = (
         if (selected.contentReleaseId !== request.contentReleaseId || selected.bookletKey !== request.bookletKey) {
           throw new FirstSliceError(409, "test_run_scope_changed", "The native command belongs to another immutable content snapshot.");
         }
-        const release = await requireContentRelease(repository, selected.contentReleaseId);
+        const release = await requireRuntimeContentRelease(repository, selected.contentReleaseId);
         if (release.tenantId !== selected.tenantId || release.workspaceId !== selected.workspaceId) {
           throw new FirstSliceError(404, "test_run_not_found", "The selected Run's content was not found.");
         }
@@ -32670,7 +32705,7 @@ export const createFirstSliceServices = (
         }
 
         const storedCurrentTestRun = normalizeTestRun(latestTestRun);
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           storedCurrentTestRun.contentReleaseId
         );
@@ -32787,7 +32822,7 @@ export const createFirstSliceServices = (
                 )
               }
             : {}),
-          ...(contentRelease.runtimeSnapshot.resourceEntries?.length
+          ...((contentRelease.runtimeSnapshot.resourceEntries?.length || contentRelease.runtimeSnapshot.workspaceFilePublication)
             ? {
                 resourceBasePath: `/api/v1/participant/sessions/${encodeURIComponent(participantSessionId)}/resources`
               }
@@ -32833,7 +32868,7 @@ export const createFirstSliceServices = (
         const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
         const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
         if (!selected) throw new FirstSliceError(404, "test_run_not_found", "The selected Run was not found.");
-        const release = await requireContentRelease(repository, selected.contentReleaseId);
+        const release = await requireRuntimeContentRelease(repository, selected.contentReleaseId);
         if (release.tenantId !== selected.tenantId || release.workspaceId !== selected.workspaceId) {
           throw new FirstSliceError(404, "test_run_not_found", "The selected Run's content was not found.");
         }
@@ -33262,10 +33297,21 @@ export const createFirstSliceServices = (
             "Participant resource path is invalid."
           );
         }
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           participantSession.contentReleaseId
         );
+        if (contentRelease.runtimeSnapshot.workspaceFilePublication) {
+          const [sources, events] = await Promise.all([
+            repository.listSourcePackagesByWorkspace(participantSession.tenantId,participantSession.workspaceId),
+            repository.listWorkspaceActivityEventsByWorkspace(participantSession.tenantId,participantSession.workspaceId)
+          ]);
+          const source = selectCurrentWorkspaceFiles(sources,events).find(value => value.status !== 'rejected' &&
+            value.fileName.startsWith('Resource/') && projectWorkspaceFile(value).fileType === 'Resource' &&
+            [value.fileName, value.fileName.replace(/^Resource\//,'')].some(name => name.toLowerCase() === resourcePath.toLowerCase()));
+          const decoded = source ? decodePersistedSourceDocument(source) : null;
+          if (decoded) return {resourcePath,mediaType:decoded.mediaType,dataBase64:decoded.bytes.toString('base64')};
+        }
         const resourceEntry = contentRelease.runtimeSnapshot.resourceEntries?.find(
           entry => entry.resourcePath.toLowerCase() === resourcePath.toLowerCase()
         );
@@ -33356,7 +33402,7 @@ export const createFirstSliceServices = (
         const parent = await requireAccessibleParticipantSession(storedTestRun.participantSessionId);
         const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository, parent.tenantId, parent.workspaceId, parent.loginKey);
 
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           storedTestRun.contentReleaseId
         );
@@ -33762,7 +33808,7 @@ export const createFirstSliceServices = (
         await requireAccessibleParticipantSession(
           storedTestRun.participantSessionId
         );
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           storedTestRun.contentReleaseId
         );
@@ -34636,7 +34682,7 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const contentReleases = await repository.listContentReleasesByWorkspace(
+        const contentReleases = await listRuntimeContentReleases(
           workspace.tenantId,
           workspace.workspaceId
         );
@@ -35197,7 +35243,12 @@ export const createFirstSliceServices = (
           const packages = (await repository.listSourcePackagesByWorkspace(workspace.tenantId, workspace.workspaceId))
             .filter(item => item.status === "accepted")
             .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
+          const events = await repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId,workspace.workspaceId);
           const seen = new Set<string>();
+          for (const {metadata} of currentSystemCheckFiles(packages, events)) {
+            seen.add(metadata.identifier.toUpperCase());
+            choices.push({...scope,checkId:metadata.identifier,displayLabel:metadata.label || metadata.identifier,description:metadata.description});
+          }
           for (const source of packages) {
             for (const check of source.contentStructure?.systemCheckEntries ?? []) {
               const key = check.checkId.toUpperCase();
@@ -35237,7 +35288,13 @@ export const createFirstSliceServices = (
           repository,
           systemCheck.sourcePackageId
         );
-        const storedDefinition = sourcePackage.contentStructure?.systemCheckEntries?.find(
+        const [currentSources, currentEvents] = await Promise.all([
+          repository.listSourcePackagesByWorkspace(workspace.tenantId,workspace.workspaceId),
+          repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId,workspace.workspaceId)
+        ]);
+        const live = await liveSystemCheckPackages(workspace,currentSources,currentEvents);
+        const definitionSource = live.packages.find(source => source.sourcePackageId === systemCheck.sourcePackageId) ?? sourcePackage;
+        const storedDefinition = definitionSource.contentStructure?.systemCheckEntries?.find(
           entry => entry.checkId.toUpperCase() === systemCheck.checkId.toUpperCase()
         );
         if (

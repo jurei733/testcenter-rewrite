@@ -1,5 +1,44 @@
 # Optional Original UI
 
+### Current workspace files and stable participant tests (2026-10-23)
+
+Native uploads now make ready Booklets and Syschecks available without an
+operator activation. One durable workspace origin anchors Source sessions;
+private runtime views resolve current Booklet, Unit, Player and resource files.
+Leaf edits do not create replacement tests, sessions, releases or import jobs.
+Saved answers, field timestamps, assignments and testlet clocks survive edits;
+later Booklets join the same workspace and completed tests retain their identities
+after sign-in. Canonical sessions continue to use their immutable snapshots,
+including when a later native edit restores the existing Source origin.
+
+The first publication commits its archive, job, release statuses and matching
+audit together in all four stores. Captured file and active-release revisions
+reject intervening edits or manual reactivation. Tests cover competing writers,
+foreign identities, late clone/audit/manifest failures and durable reopen.
+The private compilation cache is scoped to a service/schema context, bounded
+to 16 workspaces and 64 MiB, and does not retain temporary archive bytes.
+Runtime dependency resolution remains enabled above the public file view's
+1,000-file size-calculation threshold. Participant resource access accepts
+current Resource files only; roster XML and unrelated canonical JSON remain
+unavailable. Syscheck choices contain metadata only and report validation uses
+the current private save key. Upload reports distinguish saved files from failed
+or conflicting runtime availability without displaying raw compiler details.
+
+Qualification uses the actual Original-19 XSD validator in Memory, File, SQLite
+and owned PostgreSQL. The production native-file browser matrix additionally
+signs participants in through real HTTP, verifies missing-token rejection and
+roster-resource rejection, then overwrites a UTF-16 Unit while retaining the run
+and exact saved answer. All existing themes, widths, read-only, held-logout
+download and lazy recovery checks remain. Production entry remains 468.39 kB
+under the unchanged 470 kB budget.
+
+This supersedes the automatic-availability gap below. Full four-tab workspace,
+ZIP materialization/order/progress, complete reports/revalidation, physical file
+deletion, large-workspace archive limits and Source/Rewrite file pixels remain
+open. The monitor still represents an unstarted roster entry's primary Booklet;
+complete pre-start counts for additional assigned Booklets need qualification.
+Formal status remains **29 done / 20 partial; all eight broad visual rows open**.
+
 ### Native workspace file view (2026-10-22)
 
 The published parent `d4e592cf` completes all **86 Linux jobs** in

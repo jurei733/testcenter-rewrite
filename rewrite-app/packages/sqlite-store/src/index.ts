@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
+  prepareWorkspaceFilePublication,
   prepareApplicationAssetDeletion,
   validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
@@ -2791,6 +2792,34 @@ export const createSqliteFirstSliceStorage = (
         );
     },
     reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    async publishWorkspaceFiles(input) {
+      input=structuredClone(input);
+      const source=input.sourcePackage,job=input.importJob,release=input.contentRelease;
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const scope=[source.tenantId,source.workspaceId];
+        const workspace=database.prepare(`SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?`).get(...scope);
+        const sourcePackages=(database.prepare(`SELECT * FROM source_packages WHERE tenant_id=? AND workspace_id=?`).all(...scope)).map(row=>mapSourcePackage(row as Record<string,unknown>)).filter(Boolean) as SourcePackage[];
+        const activityEvents=(database.prepare(`SELECT * FROM workspace_activity_events WHERE tenant_id=? AND workspace_id=?`).all(...scope)).map(row=>mapWorkspaceActivityEvent(row as Record<string,unknown>)).filter(Boolean) as WorkspaceActivityEvent[];
+        const contentReleases=(database.prepare(`SELECT * FROM content_releases WHERE tenant_id=? AND workspace_id=?`).all(...scope)).map(row=>mapContentRelease(row as Record<string,unknown>)).filter(Boolean) as ContentRelease[];
+        const occupiedSource=database.prepare(`SELECT source_package_id FROM source_packages WHERE source_package_id=?`).get(...[source.sourcePackageId]);
+        const occupiedJob=database.prepare(`SELECT import_job_id FROM import_jobs WHERE import_job_id=?`).get(...[job.importJobId]);
+        const occupiedRelease=release ? database.prepare(`SELECT content_release_id FROM content_releases WHERE content_release_id=?`).get(...[release.contentReleaseId]) : null;
+        let occupiedEvent=false;
+        for(const event of input.activityEvents)if(database.prepare(`SELECT activity_event_id FROM workspace_activity_events WHERE activity_event_id=?`).get(...[event.activityEventId]))occupiedEvent=true;
+        const superseded=prepareWorkspaceFilePublication(input,{workspaceExists:!!workspace,
+          identitiesAvailable:!occupiedSource && !occupiedJob && !occupiedRelease && !occupiedEvent,
+          sourcePackages,activityEvents,contentReleases});
+        if(!superseded){database.exec("ROLLBACK");return false;}
+        database.prepare(`INSERT INTO source_packages (source_package_id,tenant_id,workspace_id,file_name,media_type,content_structure_json,source_document_text,status,uploaded_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(...[source.sourcePackageId,source.tenantId,source.workspaceId,source.fileName,source.mediaType,source.contentStructure?JSON.stringify(source.contentStructure):null,source.sourceDocument,source.status,source.uploadedAt]);
+        database.prepare(`INSERT INTO import_jobs (import_job_id,tenant_id,workspace_id,source_package_id,status,created_at,finished_at,diagnostics_json) VALUES (?,?,?,?,?,?,?,?)`).run(...[job.importJobId,job.tenantId,job.workspaceId,job.sourcePackageId,job.status,job.createdAt,job.finishedAt,JSON.stringify(job.diagnostics)]);
+        for(const previous of superseded){database.prepare(`UPDATE content_releases SET status='superseded' WHERE content_release_id=?`).run(...[previous.contentReleaseId]);}
+        if(release){database.prepare(`INSERT INTO content_releases (content_release_id,tenant_id,workspace_id,import_job_id,release_label,runtime_snapshot_json,status,created_at,activated_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(...[release.contentReleaseId,release.tenantId,release.workspaceId,release.importJobId,release.releaseLabel,JSON.stringify(release.runtimeSnapshot),release.status,release.createdAt,release.activatedAt]);}
+        for(const event of input.activityEvents){database.prepare(`INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(...[event.activityEventId,event.tenantId,event.workspaceId,event.eventType,event.actorId,event.subjectType,event.subjectId,event.occurredAt,event.summary,JSON.stringify(event.details)]);}
+        database.exec("COMMIT");
+        return true;
+      }catch(error){database.exec("ROLLBACK");throw error;}
+    },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,
       expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),

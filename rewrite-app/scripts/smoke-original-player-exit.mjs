@@ -342,6 +342,7 @@ try {
     const returnPath=`/api/v1/participant/test-runs/${initial.testRun.testRunId}/return-to-starter`,writes=[];
     page.on("request",r=>{if(new URL(r.url()).pathname===returnPath&&r.method()==="POST")writes.push(r.method());});
     await page.locator("#participantApplicationLogoButton").click();
+    await waitForMaterialDialog(page);
     await page.locator("#participantConfirmationContinueButton").click();
     const starter=page.locator("#originalParticipantStarter");await starter.waitFor();assert.equal(writes.length,1);
     const blocked=Promise.withResolvers(),release=Promise.withResolvers(),routes=createSmokeRouteFailureGate();let holding=true;

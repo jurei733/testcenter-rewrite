@@ -1,6 +1,7 @@
 import {
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
+  prepareWorkspaceFilePublication,
   prepareApplicationAssetDeletion,
   validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
@@ -493,6 +494,27 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       state.sourcePackages.set(sourcePackage.sourcePackageId, sourcePackage);
     },
     reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    async publishWorkspaceFiles(input) {
+      input=structuredClone(input);
+      const source=input.sourcePackage,job=input.importJob,release=input.contentRelease;
+      const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===source.tenantId && value.workspaceId===source.workspaceId;
+      const superseded=prepareWorkspaceFilePublication(input,{
+        workspaceExists:Array.from(state.workspacesByScope.values()).some(scoped),
+        identitiesAvailable:!state.sourcePackages.has(source.sourcePackageId) && !state.importJobs.has(job.importJobId) &&
+          (!release || !state.contentReleases.has(release.contentReleaseId)) &&
+          input.activityEvents.every(event=>!state.workspaceActivityEvents.has(event.activityEventId)),
+        sourcePackages:Array.from(state.sourcePackages.values()).filter(scoped),
+        activityEvents:Array.from(state.workspaceActivityEvents.values()).filter(scoped),
+        contentReleases:Array.from(state.contentReleases.values()).filter(scoped)
+      });
+      if(!superseded)return false;
+      state.sourcePackages.set(source.sourcePackageId,structuredClone(source));
+      state.importJobs.set(job.importJobId,structuredClone(job));
+      for(const value of superseded)state.contentReleases.set(value.contentReleaseId,structuredClone(value));
+      if(release)state.contentReleases.set(release.contentReleaseId,structuredClone(release));
+      for(const event of input.activityEvents)state.workspaceActivityEvents.set(event.activityEventId,structuredClone(event));
+      return true;
+    },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,
       expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),

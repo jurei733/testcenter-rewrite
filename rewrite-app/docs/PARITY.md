@@ -1,5 +1,39 @@
 # Testcenter parity checklist
 
+### Current native runtime and CI stability checkpoint (2026-10-23)
+
+Native Source files now resolve at runtime through one fixed workspace origin;
+later edits retain participant/test identities, answers and clocks, while
+canonical sessions stay pinned. Initial publication and its audit are atomic
+in all four stores. Current Syschecks, private save-key replacement and protected
+Resource reads are covered with real Original-19 XSD validation. The detailed
+scope and remaining gaps are in `ORIGINAL-UI-PARITY.md`.
+
+Local qualification passes **3,811 unit/frontend cases** (121 / 324 / 1,358 /
+2,008), **19 owned PostgreSQL cases**, the complete production Player-exit and
+native-file browser suites, typecheck, production build, Actionlint and diff
+checks. CI policy passes 189 portable cases with two explicitly Linux-only
+checks skipped on macOS. The owned PostgreSQL cluster and both browser/API
+fixtures are stopped after qualification. Initial entry remains 468.39 kB.
+
+Published parent `20f1fa38` finishes
+[run 39961652300](https://github.com/jurei733/testcenter-rewrite/actions/runs/39961652300)
+with **84 successful and 3 failed jobs**. Production-secret Compose stalls on
+its first external readiness connection while internal readiness remains healthy;
+Player exit passes all 36 matrix cases but loses a confirmation click in the
+additional resumed-context case. Acceptance correctly fails these prerequisites.
+The downloaded browser diagnostic records no trusted confirmation click and a
+still-open dialog. That case now awaits Material's existing opening barrier;
+the whole local production Player-exit suite passes, including the resumed gap.
+Readiness polling bounds each connection/body attempt inside the unchanged
+absolute deadline. Real stalled-connection recovery and fatal overall deadline
+tests pass; local Docker is unavailable, so the Compose change still requires
+its Linux run. No overall pipeline speedup is claimed from these fixes.
+
+The complete goal remains active: **29 done / 20 partial**, with all eight broad
+visual rows open. These bounded qualifications do not establish full Original
+backend authorization or whole-product parity.
+
 ### Current settings and directory checkpoint (2026-10-21)
 
 Published `8935ff5e` passes the complete Linux administration settings reference

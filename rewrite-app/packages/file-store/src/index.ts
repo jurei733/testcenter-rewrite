@@ -17,6 +17,7 @@ import { dirname, join } from "node:path";
 import {
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
+  prepareWorkspaceFilePublication,
   prepareApplicationAssetDeletion,
   validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
@@ -1264,6 +1265,36 @@ const createFileRepository = (
       });
     },
     reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    async publishWorkspaceFiles(input) {
+      input=structuredClone(input);
+      return mutate(state=>{
+        const source=input.sourcePackage,job=input.importJob,release=input.contentRelease;
+        const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===source.tenantId && value.workspaceId===source.workspaceId;
+        const superseded=prepareWorkspaceFilePublication(input,{
+          workspaceExists:Object.values(state.workspacesByScope).some(scoped),
+          identitiesAvailable:!state.sourcePackages[source.sourcePackageId] && !state.importJobs[job.importJobId] &&
+            (!release || !state.contentReleases[release.contentReleaseId]) &&
+            input.activityEvents.every(event=>!state.workspaceActivityEvents[event.activityEventId]),
+          sourcePackages:Object.values(state.sourcePackages).filter(scoped),
+          activityEvents:Object.values(state.workspaceActivityEvents).filter(scoped),
+          contentReleases:Object.values(state.contentReleases).filter(scoped)
+        });
+        if(!superseded)return false;
+        dirtySourcePackageIds.add(source.sourcePackageId);
+        state.sourcePackages[source.sourcePackageId]=structuredClone(source);
+        state.importJobs[job.importJobId]=structuredClone(job);
+        for(const value of superseded){
+          dirtyContentReleaseIds.add(value.contentReleaseId);
+          state.contentReleases[value.contentReleaseId]=structuredClone(value);
+        }
+        if(release){
+          dirtyContentReleaseIds.add(release.contentReleaseId);
+          state.contentReleases[release.contentReleaseId]=structuredClone(release);
+        }
+        for(const event of input.activityEvents)state.workspaceActivityEvents[event.activityEventId]=structuredClone(event);
+        return true;
+      });
+    },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,
       expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),

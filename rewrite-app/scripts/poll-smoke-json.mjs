@@ -4,8 +4,9 @@ import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 // A loop's Date.now() condition cannot bound an individual fetch/body await.
 // Keep a referenced deadline until every byte is parsed, then dispose it.
 export async function pollSmokeJson(url, {fetcher = globalThis.fetch, timeoutMs = 40_000,
-  intervalMs = 1_000, onPhase = () => {}} = {}) {
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || !Number.isSafeInteger(intervalMs) || intervalMs < 0) {
+  intervalMs = 1_000, attemptTimeoutMs = 5_000, onPhase = () => {}} = {}) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || !Number.isSafeInteger(intervalMs) || intervalMs < 0 ||
+      !Number.isSafeInteger(attemptTimeoutMs) || attemptTimeoutMs <= 0) {
     throw Error('Polling deadlines must be positive integer milliseconds');
   }
   const controller = new AbortController(), path = new URL(url).pathname;
@@ -15,8 +16,15 @@ export async function pollSmokeJson(url, {fetcher = globalThis.fetch, timeoutMs 
     const work = (async () => {
       while (!controller.signal.aborted) {
         attempt++; report('request');
+        // A published Docker port can accept a connection before its backend
+        // is reachable. Bound that connection as well as the entire poll;
+        // otherwise the first SYN/body can consume every remaining attempt.
+        const attemptController = new AbortController();
+        const timer = setTimeout(() => attemptController.abort(Error(`HTTP JSON attempt timed out for ${path}; phase=${phase}`)), attemptTimeoutMs);
+        const clearAttemptTimer = () => clearTimeout(timer);
+        controller.signal.addEventListener('abort', clearAttemptTimer, {once:true});
         try {
-          const response = await fetcher(url, {signal: controller.signal});
+          const response = await fetcher(url, {signal: AbortSignal.any([controller.signal, attemptController.signal])});
           report('headers', response.status);
           if (!response.ok) {
             await response.body?.cancel();
@@ -28,7 +36,7 @@ export async function pollSmokeJson(url, {fetcher = globalThis.fetch, timeoutMs 
           if (controller.signal.aborted) throw error;
           lastError = error; report('retry');
           await delay(intervalMs, undefined, {signal: controller.signal});
-        }
+        } finally {clearAttemptTimer();controller.signal.removeEventListener('abort',clearAttemptTimer);}
       }
       throw controller.signal.reason;
     })();
