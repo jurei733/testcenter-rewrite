@@ -316,10 +316,20 @@ try{
  for(const row of labelCases){
   const group='ORACLE.LABEL.'+row.id,loginName='owned-label-'+row.id.toLowerCase();
   await uploadGroups(groupRoster(group,row.attribute,loginName),'label-'+row.id.toLowerCase()+'.xml');
-  await openGroupTest(await groupLogin(loginName));
-  const observed=(await groups()).find(value=>value.groupName===group);assert.ok(observed);
-  assert.equal(observed.groupLabel,row.expected);
-  check('native XML group label preserves '+row.id.toLowerCase(),{groupName:group,rawAttribute:row.attribute,groupLabel:observed.groupLabel});
+  if(row.id==='EMPTY'){
+   await request('PUT','/session/login',{body:{name:loginName,password:'owned-group-secret'},status:500});
+   await request('PUT','/session/login',{body:{name:loginName,password:'wrong'},status:500});
+   await uploadGroups(groupRoster(group,'  Recovered empty Ω  ',loginName),'label-empty.xml');
+   await openGroupTest(await groupLogin(loginName));
+   const repaired=(await groups()).find(value=>value.groupName===group);
+   assert.equal(repaired.groupLabel,'  Recovered empty Ω  ');
+   check('native empty XML group label fails login before password validation and captures no snapshot',{groupName:group,rawAttribute:row.attribute,validPasswordStatus:500,wrongPasswordStatus:500,recoveredLabel:repaired.groupLabel});
+  }else{
+   await openGroupTest(await groupLogin(loginName));
+   const observed=(await groups()).find(value=>value.groupName===group);assert.ok(observed);
+   assert.equal(observed.groupLabel,row.expected);
+   check('native XML group label preserves '+row.id.toLowerCase(),{groupName:group,rawAttribute:row.attribute,groupLabel:observed.groupLabel});
+  }
  }
  const monitorGroup='ORACLE.MONITOR-FIRST';
  const monitorRoster=label=>`<Group id="${monitorGroup}" label="${label}"><Login name="owned-monitor-first" pw="owned-group-secret" mode="monitor-group"/><Login name="owned-monitor-person" pw="owned-group-secret" mode="run-hot-return"><Booklet codes="abc">ORACLE.BOOK.A</Booklet></Login></Group>`;
