@@ -57,8 +57,12 @@ Consumer failures do not retry into a different environment.
 Local policy passes 227 cases with one explicit GNU-timeout-only macOS skip;
 Actionlint and diff checks pass. The four actual Debian/local-APT controls and the complete seven browser capture
 controls pass the second corrected Linux probe, with no skips. That probe also
-passes all 229 preceding Linux policy cases. The composite consumer migration
-requires its own Linux workflow qualification before complete acceptance.
+passes all 229 preceding Linux policy cases. The actual production composite
+also passes [probe 39976776791](https://github.com/jurei733/testcenter-rewrite/actions/runs/39976776791):
+all 228 current Linux policy cases, four native Debian/APT controls, verified
+offline restore in 8.123 s and all seven headed capture controls. It performs
+no browser-system repository downloads in the consumer. Complete 89-job
+new-publication qualification remains required before complete CI acceptance.
 The broad application build remains at its preceding qualified 468.39 kB under
 the unchanged 470 kB budget: this change affects CI setup only.
 
