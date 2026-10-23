@@ -2,10 +2,12 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {constants} from 'node:fs';
-import {chmod,copyFile,lstat,mkdir,mkdtemp,readFile,readdir,writeFile} from 'node:fs/promises';
+import {appendFile,chmod,copyFile,lstat,mkdir,mkdtemp,readFile,readdir,writeFile} from 'node:fs/promises';
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {preferOfficialUbuntuArchive} from './ci-apt-mirrors.mjs';
+import {validateRuntimeMaterial} from './ci-browser-material-contract.mjs';
+import {runSupervisedSmoke} from './supervised-smoke.mjs';
 
 const require=createRequire(import.meta.url),maxBytes=256*1024*1024;
 const authenticatedAptOptions=['-o','Acquire::AllowInsecureRepositories=false','-o','APT::Get::AllowUnauthenticated=false'];
@@ -70,6 +72,7 @@ export async function nativeContext(root,env=process.env){
   assert(env.ImageOS==='ubuntu24'&&/^[A-Za-z0-9._-]{1,80}$/.test(env.ImageVersion??''),'An exact hosted runner image is required');
   assert(/^[a-f0-9]{40}$/.test(env.GITHUB_SHA??'')&&/^[1-9][0-9]*$/.test(env.GITHUB_RUN_ID??'')&&/^[1-9][0-9]*$/.test(env.GITHUB_RUN_ATTEMPT??''),'Exact workflow identity is required');
   assert(native('git',['rev-parse','HEAD'],{cwd:root}).trim()===env.GITHUB_SHA,'Browser system checkout mismatch');
+  assert(native('git',['status','--porcelain','--untracked-files=no'],{cwd:root}).trim()==='','Browser system checkout has tracked mutations');
   assert(process.versions.node.split('.')[0]==='22','Unqualified browser system Node');
   assert(native('dpkg',['--audit']).trim()==='','Runner has incomplete package operations');
   const deps=lockedBrowserDependencies(root);
@@ -88,8 +91,24 @@ export function expectedProducerContext(consumer,producerAttempt){
   return {...consumer,runAttempt:producerAttempt};
 }
 
-export function validateManifest(value,expected,before){
-  assert(value?.version===2&&JSON.stringify(value.context)===JSON.stringify(expected),'Browser system workflow/lock/image mismatch');
+export function browserSystemFormat(value='2'){
+  assert(value==='2'||value==='3','Unsupported browser system profile format');return Number(value);
+}
+// The producer image is a trusted, immutable job output. It never replaces the
+// observed consumer context, and only v3 can defer image-label equality to bytes.
+export function expectedBrowserArtifact(consumer,producerAttempt,{format='2',producerImageVersion,materialSha256}={}){
+  const version=browserSystemFormat(format),context=expectedProducerContext(consumer,producerAttempt);
+  if(version===3){
+    assert(typeof producerImageVersion==='string'&&/^[A-Za-z0-9._-]{1,80}$/.test(producerImageVersion),'Invalid producer browser image version');
+    assert(typeof materialSha256==='string'&&/^[a-f0-9]{64}$/.test(materialSha256),'Invalid producer browser material digest');
+    return {context:{...context,imageVersion:producerImageVersion},policy:{format:version,materialSha256}};
+  }
+  if(producerImageVersion!==undefined&&producerImageVersion!=='')assert(producerImageVersion===consumer.imageVersion,'Legacy browser image mismatch');
+  return {context,policy:{format:version}};
+}
+
+export function validateManifest(value,expected,before,policy={format:2}){
+  assert([2,3].includes(policy.format)&&value?.version===policy.format&&JSON.stringify(value.context)===JSON.stringify(expected),'Browser system workflow/lock/image mismatch');
   assert(value.beforeInventory===before,'Browser system initial dpkg inventory mismatch');
   assert(/^[a-f0-9]{64}$/.test(value.fontInventorySha256??''),'Invalid native font inventory digest');
   const initial=parseInventory(value.beforeInventory),after=parseInventory(value.afterInventory);
@@ -112,6 +131,15 @@ export function validateManifest(value,expected,before){
   for(const [id,row]of initial)assert(after.has(id),'Browser snapshot removes a base package');
   for(const [id,row]of after)if(row.row!==initial.get(id)?.row)assert(identities.has(id)&&row.status==='ii ','Browser snapshot has an unrepresented package change');
   for(const name of expected.requested)assert([...after.values()].some(row=>row.name===name&&row.status==='ii '),'A locked browser dependency is absent');
+  if(policy.format===3){
+    assert(JSON.stringify(Object.keys(value).sort())===JSON.stringify(['version','context','beforeInventory','afterInventory','fontInventorySha256','packages','timings','runtimeMaterial'].sort()),'Unexpected v3 browser manifest fields');
+    const profile=validateRuntimeMaterial(value.runtimeMaterial);
+    assert(JSON.stringify(profile.context)===JSON.stringify(expected),'Browser material producer context mismatch');
+    assert(/^[a-f0-9]{64}$/.test(policy.collectorSha256??'')&&profile.material.scriptSha256===policy.collectorSha256,'Browser material collector mismatch');
+    assert(/^[a-f0-9]{64}$/.test(policy.materialSha256??'')&&profile.materialSha256===policy.materialSha256,'Browser material producer output mismatch');
+    assert(profile.material.packageInventorySha256===sha(value.afterInventory),'Browser material package inventory mismatch');
+    assert(profile.material.fontCatalogSha256===value.fontInventorySha256,'Browser material font inventory mismatch');
+  }
   return {files:[...files],bytes};
 }
 
@@ -123,10 +151,10 @@ const inspectPackage=path=>{
   return {name:fields.Package,version:fields.Version,arch:fields.Architecture};
 };
 
-export async function verifyArtifact(directory,expected,before,inspect=inspectPackage){
+export async function verifyArtifact(directory,expected,before,inspect=inspectPackage,policy={format:2}){
   assert((await lstat(directory)).isDirectory()&&!(await lstat(directory)).isSymbolicLink(),'Unsafe browser system directory');
   const manifest=JSON.parse((await regular(join(directory,'manifest.json'),3*1024*1024)).toString('utf8'));
-  const {files,bytes}=validateManifest(manifest,expected,before);
+  const {files,bytes}=validateManifest(manifest,expected,before,policy);
   assert(JSON.stringify((await readdir(directory)).sort())===JSON.stringify(['manifest.json',...files].sort()),'Unexpected browser system artifact member');
   for(const entry of manifest.packages){
     const path=join(directory,entry.file),body=await regular(path,entry.bytes);
@@ -159,13 +187,36 @@ async function configureApt(staging){
   assert(lines.every(line=>actual.includes(line.toLowerCase())),'APT network bounds are ineffective');
 }
 
+async function collectRuntimeMaterial(root,expectedContext,expectedInventory,artifactDirectory){
+  const output=await mkdtemp(join(dirname(artifactDirectory),'browser-material-'));
+  await runSupervisedSmoke({entry:join(root,'scripts/ci-browser-material-worker.mjs'),artifactDirectory:output,
+    env:{...process.env,UI_SMOKE_HEADFUL:'true',CI_BROWSER_MATERIAL_DIR:output},phaseTimeoutMs:180000,totalTimeoutMs:180000});
+  const profile=validateRuntimeMaterial(JSON.parse((await regular(join(output,'profile.json'),3*1024*1024)).toString('utf8')));
+  assert(JSON.stringify(profile.context)===JSON.stringify(expectedContext),'Observed browser material context mismatch');
+  assert(profile.material.packageInventorySha256===sha(expectedInventory)&&inventory()===expectedInventory,'Observed browser material package inventory mismatch');
+  assert(JSON.stringify(await nativeContext(root))===JSON.stringify(expectedContext),'Browser context changed during material verification');
+  return profile;
+}
+export function verifyRuntimeObservation(observed,consumer,manifest,policy){
+  validateRuntimeMaterial(observed);validateRuntimeMaterial(manifest.runtimeMaterial);
+  assert(JSON.stringify(manifest.runtimeMaterial.context)===JSON.stringify(manifest.context),'Browser material producer context mismatch');
+  assert(JSON.stringify(observed.context)===JSON.stringify(consumer),'Observed browser material context mismatch');
+  assert(observed.materialSha256===policy.materialSha256&&observed.materialSha256===manifest.runtimeMaterial.materialSha256,'Actual browser material or Original pixels differ from producer');
+  return {producerImageVersion:manifest.context.imageVersion,consumerImageVersion:consumer.imageVersion,materialSha256:observed.materialSha256};
+}
+
 export async function browserSystem(mode,root,directory){
   assert(['pack','restore'].includes(mode),'Expected pack or restore');
+  const format=browserSystemFormat(process.env.CI_BROWSER_SYSTEM_FORMAT);
   const started=Date.now(),consumer=await nativeContext(root);
-  const context=mode==='restore'?expectedProducerContext(consumer,process.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT):consumer;
+  const artifact=mode==='restore'?expectedBrowserArtifact(consumer,process.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT,{
+    format:String(format),producerImageVersion:process.env.CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION,materialSha256:process.env.CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256})
+    :{context:consumer,policy:{format}};
+  const {context,policy}=artifact;
+  if(format===3)policy.collectorSha256=sha(await readFile(join(root,'scripts/ci-browser-material-profile.mjs')));
   const before=inventory();parseInventory(before);
   const report=(phase,values={})=>console.log(JSON.stringify({ciBrowserSystem:{mode,phase,elapsedMs:Date.now()-started,...values}}));
-  report('base_verified',{inventorySha256:sha(before),imageVersion:context.imageVersion});
+  report('base_verified',{inventorySha256:sha(before),imageVersion:consumer.imageVersion,producerImageVersion:context.imageVersion,format});
   if(mode==='pack'){
     await mkdir(directory);
     const staging=await mkdtemp(join(dirname(directory),'browser-system-apt-')),cache=join(staging,'archives');
@@ -193,14 +244,19 @@ export async function browserSystem(mode,root,directory){
     report('native_apt_oracle',{downloadMs,packages:packages.length});
     install(['apt-get',...options,...cacheOptions,'install','-y','--no-remove','--no-install-recommends','--no-download',...context.requested]);
     assert(native('dpkg',['--audit']).trim()==='','Native APT left incomplete package operations');
-    const manifest={version:2,context,beforeInventory:before,afterInventory:inventory(),fontInventorySha256:fontDigest(),packages,
+    const manifest={version:format,context,beforeInventory:before,afterInventory:inventory(),fontInventorySha256:fontDigest(),packages,
       timings:{downloadMs,aptInstallMs:Date.now()-installStarted}};
-    validateManifest(manifest,context,before);
+    if(format===3){
+      const captureStarted=Date.now();manifest.runtimeMaterial=await collectRuntimeMaterial(root,context,manifest.afterInventory,directory);
+      manifest.timings.materialCaptureMs=Date.now()-captureStarted;policy.materialSha256=manifest.runtimeMaterial.materialSha256;
+    }
+    validateManifest(manifest,context,before,policy);
     await writeFile(join(directory,'manifest.json'),JSON.stringify(manifest)+'\n',{flag:'wx'});
-    const verified=await verifyArtifact(directory,context,before);
+    const verified=await verifyArtifact(directory,context,before,undefined,policy);
+    if(format===3&&process.env.GITHUB_OUTPUT)await appendFile(process.env.GITHUB_OUTPUT,'profile-format=3\nmaterial-sha256='+policy.materialSha256+'\n');
     console.log(JSON.stringify({ciBrowserSystem:{mode,elapsedMs:Date.now()-started,packages:packages.length,bytes:verified.bytes,...manifest.timings}}));
   }else if(mode==='restore'){
-    const verified=await verifyArtifact(directory,context,before);
+    const verified=await verifyArtifact(directory,context,before,undefined,policy);
     const installStarted=Date.now();
     report('offline_install',{packages:verified.paths.length,bytes:verified.bytes,
       producerRunAttempt:context.runAttempt,consumerRunAttempt:consumer.runAttempt});
@@ -219,7 +275,14 @@ export async function browserSystem(mode,root,directory){
       : ['/usr/bin/dpkg','--audit'])]);
     assert(native('dpkg',['--audit']).trim()===''&&inventory()===verified.manifest.afterInventory,'Offline dpkg result differs from native APT');
     assert(fontDigest()===verified.manifest.fontInventorySha256,'Offline native font inventory differs from native APT');
-    console.log(JSON.stringify({ciBrowserSystem:{mode,elapsedMs:Date.now()-started,offlineInstallMs:Date.now()-installStarted,
+    const offlineInstallMs=Date.now()-installStarted;let materialCaptureMs=0;
+    if(format===3){
+      const captureStarted=Date.now();
+      const observed=await collectRuntimeMaterial(root,consumer,verified.manifest.afterInventory,directory);
+      report('material_verified',verifyRuntimeObservation(observed,consumer,verified.manifest,policy));
+      materialCaptureMs=Date.now()-captureStarted;
+    }
+    console.log(JSON.stringify({ciBrowserSystem:{mode,elapsedMs:Date.now()-started,offlineInstallMs,materialCaptureMs,
       packages:verified.paths.length,bytes:verified.bytes,inventorySha256:sha(inventory())}}));
   }else throw Error('Expected pack or restore');
 }
