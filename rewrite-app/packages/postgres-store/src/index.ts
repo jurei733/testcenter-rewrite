@@ -1,6 +1,8 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
 import {
+  createContentReleaseActivationRevision,
+  prepareContentReleaseActivation,
   prepareApplicationAssetDeletion,
   validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
@@ -1731,6 +1733,16 @@ const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun,
 };
 
 const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
+  const readActivationState=async(client:Pool|PoolClient,tenantId:string,workspaceId:string,lock=false)=>{
+    const scope=[tenantId,workspaceId],suffix=lock?" ORDER BY participant_session_id FOR UPDATE":"";
+    // Parent first, matching Run creation/mutation; lock rows before reading
+    // the state used to reject stale open-run checks.
+    const participantSessions=(await client.query("SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2"+suffix,scope)).rows.map(row=>mapParticipantSession(row as Row)).filter((value):value is ParticipantSession=>value!==null);
+    const testRuns=(await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE tenant_id=$1 AND workspace_id=$2`+(lock?" ORDER BY test_run_id FOR UPDATE":""),scope)).rows.map(row=>mapTestRun(row as Row)).filter((value):value is TestRun=>value!==null);
+    const contentReleases=(await client.query("SELECT * FROM content_releases WHERE tenant_id=$1 AND workspace_id=$2",scope)).rows.map(row=>mapContentRelease(row as Row)).filter((value):value is ContentRelease=>value!==null);
+    return {contentReleases,participantSessions,testRuns};
+  };
+
   const one = async <T>(
     sql: string,
     values: unknown[],
@@ -2931,6 +2943,24 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [tenantId, workspaceId],
         mapContentRelease
       );
+    },
+    async getContentReleaseActivationRevision(tenantId,workspaceId) {
+      return createContentReleaseActivationRevision(await readActivationState(pool,tenantId,workspaceId));
+    },
+    async commitContentReleaseActivation(input) {
+      const client=await pool.connect();
+      try{
+        await client.query("BEGIN");
+        const workspace=(await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE",[input.tenantId,input.workspaceId])).rows[0];
+        const occupied=(await client.query("SELECT activity_event_id FROM workspace_activity_events WHERE activity_event_id=$1",[input.activityEvent.activityEventId])).rows[0];
+        const prepared=prepareContentReleaseActivation(input,{...await readActivationState(client,input.tenantId,input.workspaceId,true),workspaceExists:!!workspace,eventIdAvailable:!occupied});
+        if(!prepared){await client.query("ROLLBACK");return false;}
+        for(const release of prepared.contentReleases)await client.query("UPDATE content_releases SET status=$1,activated_at=$2 WHERE content_release_id=$3",[release.status,release.activatedAt,release.contentReleaseId]);
+        const event=prepared.activityEvent;
+        await client.query("INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[event.activityEventId,event.tenantId,event.workspaceId,event.eventType,event.actorId,event.subjectType,event.subjectId,event.occurredAt,event.summary,JSON.stringify(event.details)]);
+        await client.query("COMMIT");return true;
+      }catch(error){await client.query("ROLLBACK");throw error;}
+      finally{client.release();}
     },
     async saveContentRelease(contentRelease) {
       await pool.query(

@@ -1,3 +1,5 @@
+export {createContentReleaseActivationRevision,prepareContentReleaseActivation} from "./content-release-activation.js";
+import type {ContentReleaseActivationCommit} from "./content-release-activation.js";
 import { workspaceFileReplacementConflict } from './workspace-file-replacement.js';
 import { FirstSliceError } from "./first-slice-error.js";
 import { buildWorkspaceFileCatalog, selectCurrentWorkspaceFiles, normalizeWorkspacePlayerResourceId, workspaceFileReplacementIdentity } from './workspace-file-catalog.js';
@@ -1477,6 +1479,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     workspaceId: string
   ): Promise<ContentRelease[]>;
   saveContentRelease(contentRelease: ContentRelease): Promise<void>;
+  getContentReleaseActivationRevision(tenantId: string, workspaceId: string): Promise<string>;
+  commitContentReleaseActivation(input: ContentReleaseActivationCommit): Promise<boolean>;
   getParticipantSessionById(
     participantSessionId: string
   ): Promise<ParticipantSession | null>;
@@ -31745,6 +31749,7 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
+        const expectedRevision = await repository.getContentReleaseActivationRevision(workspace.tenantId, workspace.workspaceId);
         const targetRelease = await requireContentRelease(
           repository,
           input.contentReleaseId
@@ -31811,41 +31816,25 @@ export const createFirstSliceServices = (
           );
         }
 
-        for (const release of workspaceReleases) {
-          if (release.contentReleaseId === targetRelease.contentReleaseId) {
-            continue;
-          }
-
-          if (release.status === "active") {
-            await repository.saveContentRelease({
-              ...release,
-              status: "superseded"
-            });
-          }
-        }
-
-        const activatedRelease: ContentRelease = {
-          ...targetRelease,
-          status: "active",
-          activatedAt
-        };
-        await repository.saveContentRelease(activatedRelease);
+        const activatedRelease: ContentRelease = {...targetRelease, status: "active", activatedAt};
         const activation: ContentReleaseActivationSummary = {
           forced: Boolean(input.forceActivation),
           previousActiveContentReleaseId: activeRelease?.contentReleaseId ?? null,
           supersededOpenRunCount: supersededOpenRuns.length,
           supersededOpenRuns
         };
-        await recordWorkspaceActivity({
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "content_release_activated",
-          actorId: input.activatedByActorId,
-          subjectType: "content_release",
-          subjectId: activatedRelease.contentReleaseId,
-          summary: `Content release '${activatedRelease.contentReleaseId}' activated.`,
-          details: activation
+        const committed = await repository.commitContentReleaseActivation({
+          tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+          contentReleaseId: targetRelease.contentReleaseId, activatedAt, expectedRevision,
+          activityEvent: {
+            activityEventId: idGenerator(), tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+            eventType: "content_release_activated", actorId: input.activatedByActorId ?? null,
+            subjectType: "content_release", subjectId: targetRelease.contentReleaseId, occurredAt: activatedAt,
+            summary: `Content release '${targetRelease.contentReleaseId}' activated.`, details: activation
+          }
         });
+        if (!committed) throw new FirstSliceError(409, "content_release_activation_conflict",
+          "Workspace content or participant state changed during activation. Reload and try again.");
         return {
           contentRelease: activatedRelease,
           activation

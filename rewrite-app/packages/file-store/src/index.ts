@@ -15,6 +15,8 @@ import {
 import { dirname, join } from "node:path";
 
 import {
+  createContentReleaseActivationRevision,
+  prepareContentReleaseActivation,
   prepareApplicationAssetDeletion,
   validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
@@ -1409,6 +1411,29 @@ const createFileRepository = (
           contentRelease.tenantId === tenantId &&
           contentRelease.workspaceId === workspaceId
       );
+    },
+    async getContentReleaseActivationRevision(tenantId, workspaceId) {
+      const state=await getState();
+      const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===tenantId && value.workspaceId===workspaceId;
+      return createContentReleaseActivationRevision({contentReleases:Object.values(state.contentReleases).filter(scoped),
+          participantSessions:Object.values(state.participantSessions).filter(scoped),
+          testRuns:Object.values(state.testRuns).filter(scoped)});
+    },
+    async commitContentReleaseActivation(input) {
+      return mutate(state=>{
+        const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===input.tenantId && value.workspaceId===input.workspaceId;
+        const prepared=prepareContentReleaseActivation(input,{
+          workspaceExists:Object.values(state.workspacesByScope).some(scoped),
+          eventIdAvailable:!state.workspaceActivityEvents[input.activityEvent.activityEventId],
+          contentReleases:Object.values(state.contentReleases).filter(scoped),
+          participantSessions:Object.values(state.participantSessions).filter(scoped),
+          testRuns:Object.values(state.testRuns).filter(scoped)
+        });
+        if(!prepared)return false;
+        for(const release of prepared.contentReleases){dirtyContentReleaseIds.add(release.contentReleaseId);state.contentReleases[release.contentReleaseId]=release;}
+        state.workspaceActivityEvents[prepared.activityEvent.activityEventId]=prepared.activityEvent;
+        return true;
+      });
     },
     async saveContentRelease(contentRelease) {
       await mutate(state => {

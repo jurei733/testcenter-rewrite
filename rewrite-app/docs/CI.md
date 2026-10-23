@@ -1,6 +1,68 @@
 # CI iteration and complete acceptance
 
 
+## Atomic release activation (2026-10-23)
+
+Manual activation now commits the target status, every superseded active status
+and its matching activity event in one Memory/File/SQLite/PostgreSQL write
+boundary. PostgreSQL shares the existing workspace-row lock used by source-file
+reference mutations; parents are locked before Runs. File storage marks all
+changed release sidecars dirty, so reopening retains the same active release.
+The application no longer performs separate status/audit saves.
+
+A captured revision detects intervening release edits, session changes and new
+or changed Run lifecycles. A conflict returns 409 without partial activation.
+The revision deliberately excludes answer autosaves and timer progress: these
+remain independently writable and their committed bytes survive activation.
+Existing open-run refusal, explicit force, immutable runtime snapshots, legacy
+null actors and recovery from multiple previously active releases remain.
+All clone preparation happens before Memory mutates its collections.
+
+Fresh local validation passes **121 + 323 + 1,305 + 2,006 = 3,755 unit/frontend
+cases**, with zero failures/skips/cancellations. Owned PostgreSQL passes all
+**13** activation cases, including two independently connected writers actually
+queued on the workspace lock and a late activation-audit trigger failure.
+The owned cluster is stopped afterwards. Four existing HTTP activation/
+re-entry journeys pass separately in Memory, File and SQLite (**12** total).
+The production entry stays at **468.39 kB** under the unchanged 470 kB limit.
+All **187 portable CI controls** and Actionlint pass; the two real-Linux controls
+remain explicit macOS skips and mandatory Linux checks. The unchanged
+`smoke:ui:activation-blocking-runtime:built` completes its entire existing prefix
+through `open-blocking-run-in-runtime` and shuts down its owned browser/API.
+This targeted prefix is not the later full-UI journey; new-head Linux
+qualification remains separate.
+
+This is a prerequisite for workspace-wide automatic Source-file publication.
+Loose-file imports still produce staged releases. Live workspace compilation,
+stable Source test identities, current monitors/Systemchecks and full native
+workspace pages still require their own implementation and qualification.
+Formal parity remains **29 done / 20 partial**, with all eight broad visual rows
+open; this transaction change closes no broad parity row.
+
+## Linux route fix passes; two dependency installations still time out (2026-10-23)
+
+Published `1cbea314` [run 39803228626](https://github.com/jurei733/testcenter-rewrite/actions/runs/39803228626)
+finishes with **84 successful jobs and three failures**. The participant-console
+job `119912947437` passes all **44 loading markers** plus its five selected-
+context compatibility cases. All five Source reference families, the native
+file view, **3,719 Linux unit/frontend cases**, **188/188 Linux policy controls**,
+PostgreSQL and deployment checks pass. This qualifies the bounded route fix;
+the complete workflow fails.
+
+Original exit-completeness job `119912945508` and participant-entry job
+`119912945814` both exit **124** during the unchanged five-minute browser
+dependency installer, before application tests start. Both use the selected
+HTTPS Ubuntu archive and effective zero download limits. Their logged font
+transfers still take tens of seconds per package; no configured cap or definitive
+cause is established. Final acceptance correctly rejects these unexecuted tests.
+Actual job timestamps measure **35:06 full / 6:06 Fast feedback / 449.62 runner-
+minutes**. These are failed-run observations, not a complete-pipeline speedup.
+
+Repeated native dependency downloads remain the next pipeline bottleneck. Any
+same-run dependency snapshot must preserve the exact runner base, locked
+Playwright version, package bytes and provenance, and prove offline installation
+plus the unchanged browser/Source gates before replacing consumer setup.
+
 ## Resolve a cancelled-route cleanup stall (2026-10-22)
 
 The native file-view publication `25425aa3` passes its new required browser row,
