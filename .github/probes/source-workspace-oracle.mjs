@@ -103,9 +103,12 @@ try{
   min:row.numUnitsMin,max:row.numUnitsMax,total:row.numUnitsTotal,average:row.numUnitsAvg}));
  const login=(await request('PUT','/session/login',{body:{name:'owned-source-participant',password:'owned-source-participant-secret'}})).value;
  assert.ok(typeof login.token==='string'&&login.token.length>10);
- const person=(await request('PUT','/session/person',{token:login.token,body:{code:''}})).value;
- assert.ok(typeof person.token==='string'&&person.token.length>10);
- const personToken=person.token;
+ // Source's no-code sign-in already returns a person AccessSet. Its frontend
+ // skips the second login step when codeRequired is absent.
+ assert.ok(Array.isArray(login.flags)&&!login.flags.includes('codeRequired'));
+ assert.deepEqual([...(login.access?.test??[])].sort(),['ORACLE.BOOK.A','ORACLE.BOOK.B']);
+ const personToken=login.token;
+ check('native no-code sign-in directly establishes the real person and both Booklet assignments');
  const createTest=async name=>Number((await request('PUT','/test',{token:personToken,body:{bookletName:name},status:201})).value);
  const first=await createTest('ORACLE.BOOK.A');assert.ok(first>0);
  assert.deepEqual(await groups(),[]);assert.deepEqual(await sessions(),[]);
