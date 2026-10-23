@@ -74,8 +74,10 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
         if (operatorToken && request.url().includes("/api/v1/participant/") &&
             request.headers().authorization === `Bearer ${operatorToken}`) operatorLeaks++;
       });
+      // The login controls below and the real Player assertions establish
+      // readiness; unrelated live requests need no half-second idle barrier.
       await page.goto(`${baseUrl}/app/participant?${new URLSearchParams({ ui, tenantKey, workspaceKey })}`, {
-        waitUntil: "networkidle"
+        waitUntil: "domcontentloaded"
       });
       const loginKey = `labels-${item.key}-${ui}-${width}`;
       if (ui === "original") await page.getByLabel("Anmeldename", { exact: true }).fill(loginKey);
