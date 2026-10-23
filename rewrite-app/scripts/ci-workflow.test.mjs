@@ -12,7 +12,52 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
-test('same-run browser system qualification is mandatory without changing existing browser installers or fast feedback',()=>{
+test('every actual browser consumer waits for the authenticated same-run package producer',()=>{
+ const consumers=Object.entries(workflow.jobs).filter(([,job])=>job.steps?.some(step=>
+  step.uses==='./.github/actions/rewrite-runtime' && step.with?.playwright && step.with.playwright!=='false'));
+ assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','quick','quick-extended','verify-memory-sqlite','verify-postgres-ui'].sort());
+ for(const [name,job]of consumers)assert.ok(job.needs.includes('browser-system-dependencies'),name);
+ const download=action.runs.steps.find(step=>step.name==='Restore authenticated same-run browser system packages');
+ assert.equal(download.if,"inputs.playwright == 'true'");assert.equal(download.with.name,'browser-system-${{ github.sha }}');
+ assert.equal(download.with['digest-mismatch'],'error');assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
+ const restore=action.runs.steps.find(step=>step.name==='Verify and install browser system packages offline');
+ assert.equal(restore.if,download.if);assert.equal(restore.env.CI_BROWSER_SYSTEM_DIR,download.with.path);
+ assert.equal(restore.run,'timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore');
+ assert.ok(action.runs.steps.indexOf(download)<action.runs.steps.indexOf(restore));
+ assert.ok(action.runs.steps.indexOf(restore)<action.runs.steps.findIndex(step=>step.run?.includes('playwright install')));
+ assert.ok(!action.runs.steps.some(step=>/apt-get|--with-deps|\/etc\/apt|sudo/.test(step.run??'')));
+});
+test('the actual browser restore and Chromium commands preserve every nonzero child status',()=>{
+ const directory=mkdtempSync(join(tmpdir(),'owned-offline-browser-status-'));
+ try{
+  writeFileSync(join(directory,'timeout'),'#!/bin/sh\n[ "$1" = --signal=TERM ] && [ "$2" = --kill-after=15s ] && [ "$3" = 5m ] || exit 65\nshift 3\nexec "$@"\n');
+  writeFileSync(join(directory,'node'),'#!/bin/sh\n[ "$#" = 2 ] && [ "$1" = scripts/ci-browser-system.mjs ] && [ "$2" = restore ] || exit 65\n[ "$CI_BROWSER_SYSTEM_DIR" = "$OWNED_PACKAGE_DIRECTORY" ] || exit 66\nexit "$OWNED_STATUS"\n');
+  writeFileSync(join(directory,'npx'),'#!/bin/sh\n[ "$#" = 4 ] && [ "$1" = --no-install ] && [ "$2" = playwright ] && [ "$3" = install ] && [ "$4" = chromium ] || exit 65\nexit "$OWNED_STATUS"\n');
+  for(const name of ['timeout','node','npx'])chmodSync(join(directory,name),0o755);
+  const scripts=action.runs.steps.filter(step=>step.run?.startsWith('timeout '));assert.equal(scripts.length,2);
+  for(const step of scripts)for(const status of [0,37,51,100]){
+   const result=spawnSync('bash',['--noprofile','--norc','-e','-o','pipefail','-c',step.run],{encoding:'utf8',
+    env:{...process.env,PATH:directory+':'+process.env.PATH,CI_BROWSER_SYSTEM_DIR:directory,OWNED_PACKAGE_DIRECTORY:directory,OWNED_STATUS:String(status)}});
+   assert.equal(result.status,status,result.stderr);
+  }
+ }finally{rmSync(directory,{recursive:true,force:true});}
+});
+test('real Linux supervision terminates a stuck offline restore and Chromium installer',{
+ skip:process.platform!=='linux'?'Real GNU timeout qualification requires Linux.':false
+},()=>{
+ const directory=mkdtempSync(join(tmpdir(),'owned-offline-browser-timeout-'));
+ try{
+  for(const name of ['node','npx']){
+   writeFileSync(join(directory,name),'#!/bin/sh\nexec "$OWNED_NODE" -e \'process.on("SIGTERM",()=>{});setInterval(()=>{},1000)\'\n');chmodSync(join(directory,name),0o755);
+  }
+  for(const step of action.runs.steps.filter(step=>step.run?.startsWith('timeout '))){
+   const result=spawnSync('bash',['-e','-o','pipefail','-c',step.run.replace('--kill-after=15s 5m','--kill-after=0.2s 0.2s')],{
+    encoding:'utf8',timeout:5000,env:{...process.env,PATH:directory+':'+process.env.PATH,OWNED_NODE:process.execPath}});
+   assert.equal(result.error,undefined);assert.ok([124,137].includes(result.status??(result.signal==='SIGKILL'?137:null)));
+  }
+ }finally{rmSync(directory,{recursive:true,force:true});}
+});
+test('same-run browser system qualification is mandatory and retains independent early application feedback',()=>{
   const producer=workflow.jobs['browser-system-dependencies'],consumer=workflow.jobs['browser-system-qualification'];
   assert.equal(producer['runs-on'],'ubuntu-24.04');assert.equal(consumer['runs-on'],'ubuntu-24.04');
   assert.deepEqual(consumer.needs,['build','browser-system-dependencies']);
@@ -32,142 +77,6 @@ test('same-run browser system qualification is mandatory without changing existi
     assert.ok(workflow.jobs.acceptance.needs.includes(id));assert.ok(!workflow.jobs['fast-feedback'].needs.includes(id));
   }
   assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/ci-browser-system.test.mjs'));
-});
-test('browser archive preference stages before root installation and preserves preparation/install/verification failures', () => {
-  const step = action.runs.steps.find(step => step.name === 'Prefer existing official HTTPS Ubuntu archive');
-  assert.equal(step.if, "inputs.playwright == 'true'"); assert.equal(step.shell, 'bash');
-  assert.ok(action.runs.steps.indexOf(step) < action.runs.steps.findIndex(value => value.run?.includes('playwright install')));
-  assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/ci-apt-mirrors.test.mjs'));
-  const directory = mkdtempSync(join(tmpdir(), 'owned-archive-preference-'));
-  const destination = join(directory, 'installed');
-  try {
-    writeFileSync(join(directory, 'node'), `#!/bin/sh
-      [ "$#" = 1 ] && [ "$1" = rewrite-app/scripts/ci-apt-mirrors.mjs ] || exit 65
-      [ "$OWNED_MIRROR_PREPARE_FAIL" != 1 ] || exit 37
-      printf 'https://archive.ubuntu.com/ubuntu/\\tpriority:1\\n'
-    `);
-    writeFileSync(join(directory, 'sudo'), `#!/bin/sh
-      [ "$#" = 5 ] && [ "$1" = install ] && [ "$2" = -m ] && [ "$3" = 644 ] && [ "$4" = "$RUNNER_TEMP/rewrite-apt-mirrors.txt" ] && [ "$5" = /etc/apt/apt-mirrors.txt ] || exit 65
-      [ "$OWNED_MIRROR_INSTALL_FAIL" != 1 ] || exit 51
-      cp "$4" "$OWNED_MIRROR_DESTINATION"
-    `);
-    writeFileSync(join(directory, 'cmp'), `#!/bin/sh
-      [ "$#" = 3 ] && [ "$1" = --silent ] && [ "$2" = "$RUNNER_TEMP/rewrite-apt-mirrors.txt" ] && [ "$3" = /etc/apt/apt-mirrors.txt ] || exit 65
-      [ "$OWNED_MIRROR_VERIFY_FAIL" != 1 ] || exit 1
-      /usr/bin/cmp -s "$2" "$OWNED_MIRROR_DESTINATION"
-    `);
-    for (const name of ['node', 'sudo', 'cmp']) chmodSync(join(directory, name), 0o755);
-    const run = env => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run], {
-      encoding: 'utf8', env: {...process.env, PATH: directory + ':' + process.env.PATH, RUNNER_TEMP: directory,
-        OWNED_MIRROR_DESTINATION: destination, ...env}
-    });
-    assert.equal(run({}).status, 0);
-    const retained = readFileSync(destination, 'utf8');
-    assert.equal(run({OWNED_MIRROR_PREPARE_FAIL: '1'}).status, 37);
-    assert.equal(readFileSync(destination, 'utf8'), retained);
-    assert.equal(run({OWNED_MIRROR_INSTALL_FAIL: '1'}).status, 51);
-    assert.equal(run({OWNED_MIRROR_VERIFY_FAIL: '1'}).status, 1);
-  } finally { rmSync(directory, {recursive: true, force: true}); }
-});
-test('browser setup bounds APT mirror stalls, verifies effective configuration and preserves installer checks', () => {
-  const step = action.runs.steps.find(step => step.name === 'Bound browser dependency mirror waits');
-  assert.equal(step.if, "inputs.playwright == 'true'"); assert.equal(step.shell, 'bash');
-  const install = action.runs.steps.findIndex(step => step.run === 'timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install --with-deps chromium');
-  assert.ok(install > action.runs.steps.indexOf(step));
-  const directory = mkdtempSync(join(tmpdir(), 'owned-apt-policy-'));
-  const capture = join(directory, 'capture.conf');
-  try {
-    writeFileSync(capture, 'Acquire::http::Dl-Limit "128";\nAcquire::https::Dl-Limit "128";\n');
-    writeFileSync(join(directory, 'sudo'), `#!/bin/sh
-      [ "$1" = tee ] && [ "$2" = /etc/apt/apt.conf.d/zz-testcenter-ci-network ] || exit 65
-      [ "$OWNED_APT_DENY" != 1 ] || exit 51
-      cat > "$OWNED_APT_CAPTURE"
-    `);
-    writeFileSync(join(directory, 'apt-config'), `#!/bin/sh
-      [ "$1" = dump ] || exit 65
-      if [ "$OWNED_APT_WRONG" = 1 ]; then printf 'Acquire::http::Timeout "120";\\n'; else cat "$OWNED_APT_CAPTURE"; fi
-      printf 'Acquire::http::Proxy "http://owned:OWNED_APT_SECRET@proxy";\\n'
-    `);
-    for (const name of ['sudo', 'apt-config']) chmodSync(join(directory, name), 0o755);
-    const run = env => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run], {
-      encoding: 'utf8', env: {...process.env, PATH: directory + ':' + process.env.PATH, OWNED_APT_CAPTURE: capture, ...env}
-    });
-    const success = run({}); assert.equal(success.status, 0, success.stderr);
-    assert.equal(readFileSync(capture, 'utf8'), 'Acquire::http::Timeout "15";\nAcquire::https::Timeout "15";\nAcquire::Retries "1";\nAcquire::http::Dl-Limit "0";\nAcquire::https::Dl-Limit "0";\n');
-    assert.deepEqual(JSON.parse(success.stdout.trim()), {ciAptPreviousDownloadLimitKbps:{http:128,https:128}});
-    const denied = run({OWNED_APT_DENY: '1'}); assert.equal(denied.status, 51);
-    const ineffective = run({OWNED_APT_WRONG: '1'}); assert.equal(ineffective.status, 1);
-    assert.ok(![success, denied, ineffective].some(value => (value.stdout + value.stderr).includes('OWNED_APT_SECRET')));
-  } finally { rmSync(directory, {recursive: true, force: true}); }
-});
-test('real Linux APT merges runner files before the CI bounds and rejects a later override', {
-  skip: process.platform !== 'linux' ? 'Real apt-config qualification requires Linux.' : false
-}, () => {
-  const step = action.runs.steps.find(step => step.name === 'Bound browser dependency mirror waits');
-  const directory = mkdtempSync(join(tmpdir(), 'owned-real-apt-policy-'));
-  const parts = join(directory, 'parts'), configuration = join(directory, 'apt.conf');
-  mkdirSync(parts);
-  const bounds = 'zz-testcenter-ci-network';
-  const runner = 'Acquire::http::Timeout "15";\nAcquire::https::Timeout "15";\nAcquire::Retries "1";\nAcquire::http::Dl-Limit "128";\nAcquire::https::Dl-Limit "128";\n';
-  try {
-    // APT_CONFIG is read before Parts. All files, including the tee target,
-    // belong to this fixture; neither sudo nor the system configuration runs.
-    writeFileSync(configuration, `Dir::Etc::Parts "${parts}";\nDir::Etc::main "/dev/null";\n`);
-    writeFileSync(join(parts, 'zz-retries'), runner);
-    writeFileSync(join(directory, 'sudo'), `#!/bin/sh
-      [ "$1" = tee ] && [ "$2" = /etc/apt/apt.conf.d/${bounds} ] || exit 65
-      cat > "$OWNED_REAL_APT_TARGET"
-    `);
-    chmodSync(join(directory, 'sudo'), 0o755);
-    const run = (target, script = step.run) => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
-      encoding: 'utf8', env: {...process.env, PATH: directory + ':' + process.env.PATH,
-        APT_CONFIG: configuration, OWNED_REAL_APT_TARGET: target}
-    });
-    const old = run(join(parts, '80-testcenter-ci-network'),
-      step.run.replaceAll('15', '20').replaceAll('Retries "1"', 'Retries "2"')
-        .replaceAll(String.raw`Retries \"1\"`, String.raw`Retries \"2\"`));
-    assert.equal(old.status, 1, 'The pre-fix file must be superseded by actual APT merging: ' + old.stderr);
-    const qualified = run(join(parts, bounds));
-    assert.equal(qualified.status, 0, qualified.stderr);
-    assert.deepEqual(JSON.parse(qualified.stdout.trim()), {ciAptPreviousDownloadLimitKbps:{http:128,https:128}});
-    writeFileSync(join(parts, 'zzzz-owned-override'), 'Acquire::https::Dl-Limit "512";\n');
-    const downloadOverride = run(join(parts,bounds));
-    assert.equal(downloadOverride.status,1,'A later effective download limit must remain fatal.');
-    writeFileSync(join(parts, 'zzzz-owned-override'), 'Acquire::Retries "9";\n');
-    const overridden = run(join(parts, bounds));
-    assert.equal(overridden.status, 1, 'A later effective override must remain fatal.');
-  } finally { rmSync(directory, {recursive: true, force: true}); }
-});
-test('real Linux installer supervision preserves failures and bounds a stuck child', {
-  skip: process.platform !== 'linux' ? 'Real GNU timeout qualification requires Linux.' : false
-}, () => {
-  const installer = action.runs.steps.find(step => step.run?.includes('playwright install --with-deps chromium'));
-  assert.equal(installer.run, 'timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install --with-deps chromium');
-  const directory = mkdtempSync(join(tmpdir(), 'owned-installer-policy-'));
-  try {
-    writeFileSync(join(directory, 'npx'), `#!/bin/sh
-      [ "$1" = --no-install ] && [ "$2" = playwright ] && [ "$3" = install ] && [ "$4" = --with-deps ] && [ "$5" = chromium ] && [ "$#" = 5 ] || exit 65
-      if [ "$OWNED_INSTALL_HANG" = 1 ]; then
-        exec "$OWNED_INSTALL_NODE" -e 'process.on("SIGTERM",()=>{});setInterval(()=>{},1000);'
-      fi
-      exit "$OWNED_INSTALL_STATUS"
-    `);
-    chmodSync(join(directory, 'npx'), 0o755);
-    const run = (script, env = {}) => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
-      encoding: 'utf8', timeout: 5000, env: {...process.env, PATH: directory + ':' + process.env.PATH,
-        OWNED_INSTALL_NODE: process.execPath, OWNED_INSTALL_STATUS: '0', ...env}
-    });
-    assert.equal(run(installer.run).status, 0);
-    assert.equal(run(installer.run, {OWNED_INSTALL_STATUS: '37'}).status, 37);
-    // Exercise the exact production wrapper with shortened fixture deadlines;
-    // no package installer or system mutation is launched by this control.
-    const timed = run(installer.run.replace('--kill-after=15s 5m', '--kill-after=0.2s 0.2s'), {OWNED_INSTALL_HANG: '1'});
-    // Bash may exec its final command. GNU timeout's group KILL then appears
-    // as a native signal rather than a shell's numeric 128 + SIGKILL status.
-    const status = timed.status ?? (timed.signal === 'SIGKILL' ? 137 : null);
-    assert.equal(timed.error, undefined);
-    assert.ok([124, 137].includes(status), `Stuck installer did not fail through GNU timeout: ${timed.status}, ${timed.signal}`);
-  } finally { rmSync(directory, {recursive: true, force: true}); }
 });
 test('workspace file catalog HTTP authorization and projection qualify in unit and real PostgreSQL gates', () => {
   const suite = 'scripts/workspace-file-catalog-api.test.mjs';
@@ -270,7 +179,7 @@ test("the early browser set is bounded and retains real authentication, isolatio
   assert.deepEqual(workflow.jobs.quick.strategy.matrix.include.map(item=>item.check).sort(),
     ["bug-report","original-login","original-login-protected","original-admin-login","proof-of-work","system-check","participant-variant","ib-player"].sort());
   assert.equal(workflow.jobs["quick-extended"].strategy.matrix.include.length,20);
-  assert.deepEqual(workflow.jobs["quick-extended"].needs,["build","fast-feedback"]);
+  assert.deepEqual(workflow.jobs["quick-extended"].needs,["build","fast-feedback","browser-system-dependencies"]);
   assert.ok(!workflow.jobs["fast-feedback"].needs.includes("quick-extended"));
 });
 test("extended dispatch avoids the measured long tail without adding slots or dropping journeys", () => {
@@ -390,7 +299,7 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
   const upload = producer.steps.find(step => step.uses?.startsWith("actions/upload-artifact@"));
   assert.equal(upload.with["include-hidden-files"], true, "The official compiled assets include .browserslistrc; its digest must survive upload.");
   const consumer = workflow.jobs["original-browser-reference"];
-  assert.deepEqual(consumer.needs, ["build", "original-reference-build"]);
+  assert.deepEqual(consumer.needs, ["build", "original-reference-build", "browser-system-dependencies"]);
   assert.deepEqual(consumer.strategy.matrix.family, ["entry", "dialogs", "starter", "administration", "directory"]);
   const runtime = consumer.steps.find(step => step.uses === "./.github/actions/rewrite-runtime");
   assert.equal(runtime.with.prebuilt, "true", "Paired Source/Rewrite pages require the verified same-run application build.");
@@ -479,13 +388,15 @@ test("test jobs use the same-run build and cannot compile a replacement producti
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);
   for (const id of ["unit", "quick", "quick-extended", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {
     const job = workflow.jobs[id];
-    if (["unit", "quick"].includes(id)) assert.equal(job.needs, "build");
+    if (id === "unit") assert.equal(job.needs, "build");
+    else if(id === "quick") assert.deepEqual(job.needs,["build","browser-system-dependencies"]);
+    else if(["quick-extended","verify-memory-sqlite","verify-postgres-ui"].includes(id)) assert.deepEqual(job.needs,["build","fast-feedback","browser-system-dependencies"]);
     else assert.deepEqual(job.needs, ["build", "fast-feedback"]);
     const setup = job.steps.find(step => step.uses === "./.github/actions/rewrite-runtime");
     assert.equal(setup.with.prebuilt, "true");
   }
   for (const item of matrix) assert.ok(!/npm run (?:build|typecheck)(?:\s|$)/.test(item.command));
-  const download = action.runs.steps.find(step => step.uses?.startsWith("actions/download-artifact@"));
+  const download = action.runs.steps.find(step => step.with?.name === "rewrite-build-${{ github.sha }}");
   assert.equal(download.with.name, "rewrite-build-${{ github.sha }}");
   assert.equal(download.with["run-id"], undefined);
   assert.equal(download.with["github-token"], undefined);

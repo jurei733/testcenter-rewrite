@@ -1,47 +1,66 @@
 # CI iteration and complete acceptance
 
-## Shared native-package qualification (2026-10-23)
+## Shared authenticated browser-system packages (2026-10-23)
 
-Repeated browser-system downloads are being replaced only after a separate
-native Linux round trip proves the resulting environment. Two new required
-jobs prepare and qualify a same-run package artifact; the existing 87 jobs and
-their installers remain unchanged during this qualification stage. Fast feedback
-does not depend on the new jobs. Complete acceptance requires both, bringing
-the proposed workflow to 89 jobs. This preparation is not a measured overall
-speedup or evidence that the offline installation has already passed Linux.
+The Linux round trips in [probe 39975668866](https://github.com/jurei733/testcenter-rewrite/actions/runs/39975668866)
+and [probe 39976348906](https://github.com/jurei733/testcenter-rewrite/actions/runs/39976348906)
+pass on independent Ubuntu 24.04 runners. The producer installs the locked
+33 Chromium/tools requirements through normal authenticated APT and retains its
+17 downloaded Debian packages (25,937,806 bytes). The fresh consumer reproduces
+the exact dpkg and native font catalogs without a network interface; locked
+Chromium starts and all seven existing headed capture controls pass. Measured
+preparation is 30.902 s / 18.344 s; offline restore is 10.344 s / 7.700 s,
+including 10.135 s / 7.444 s native installation. These are setup observations, not a complete pipeline speedup.
 
-The producer reads the 33 Chromium/tools packages from the actual lockfile
-installation's Ubuntu 24.04 x64 Playwright profile. It downloads through normal
-authenticated APT indexes with the existing official archive preference and
-transport bounds, explicitly rejects unauthenticated/insecure repositories, and
-records a native APT installation as the oracle. No base packages may be removed.
-`--download-only`, `--no-download`, `--no-remove` and fatal update errors follow
-the [APT command contracts](https://manpages.debian.org/bookworm/apt/apt-get.8.en.html).
-Individual files use SHA256-derived basenames instead of an extracted archive.
+The first full-run consumer fails with APT status 100 before any installation.
+The corrected version retains the producer's original cache filenames as well
+as each artifact's SHA256 basename, rechecks copied bytes and isolates APT's
+repository sources/lists. APT can then resolve only verified local files and the
+installed base, without competing repository entries. A new synthetic native
+APT control initially assumed every empty cache would reproduce the first
+failure; Linux disproves that assumption with isolated lists. The final control
+verifies local-only URI acquisition and successful staged-cache resolution
+without installing its fixture package. The exact first-run repository-selection
+cause is not claimed independently proven.
 
-The fresh consumer checks commit, run ID/attempt, lockfile, Playwright native
-dependency bytes, Node/architecture, exact hosted image and initial dpkg inventory.
-Every artifact member must be declared, regular, bounded and hash/size matched;
-the actual `dpkg-deb` reader must agree on package/version/architecture. Symlinks,
-extra files, duplicate identities, omitted changes and mismatched initial state
-remain fatal. Native APT orders the verified local packages, retaining its
-Pre-Depends/configuration rules; an empty private archive cache, `--no-download`
-and a new network namespace exclude other payloads. Installation must reproduce
-the producer's complete dpkg inventory and native font-catalog digest. Privileged
-commands use absolute paths, noninteractive environment and nonprompting sudo.
-Native failures retain their exit status without attaching potentially private
-raw `apt-config` output to errors. Phase/timing records contain only scoped
-public counts, inventory hashes and the runner image version.
+All CI browser consumers now download the same-run artifact and restore the
+qualified system environment before installing only locked Chromium. They no
+longer repeat archive-index updates or remote OS-package downloads. The existing
+87 application/reference jobs and all commands remain; two required package
+producer/qualification jobs bring full acceptance to 89 jobs. The producer runs
+parallel to the shared application build and gates browser consumers, including
+Quick. Fast feedback does not wait for the separate offline qualification or
+long browser matrix. Full new-head Linux qualification and a controlled complete
+speed/cost comparison remain required.
 
-The producer also runs three real Debian-archive inspection controls without
-installing fixture packages. After restoring the offline environment, the fresh
-consumer installs only locked Chromium and runs the existing actual headed
-capture controls. Artifacts use the current run, strict download digest checks,
-one-day retention and no cross-run fallback. Both native jobs still require their
-first Linux proof. Local qualification passes 222 portable policy controls with
-the two existing real-Linux controls explicitly skipped on macOS; Actionlint and
-diff checks pass. Migration of other browser consumers and a controlled complete
-pipeline speed comparison remain subsequent work.
+The package profile comes from this lockfile installation's exact Playwright
+Ubuntu 24.04 x64 native-dependency module. APT retains authenticated indexes,
+existing official archive preference, fatal update errors and transport bounds;
+no base packages may be removed. The [APT command contracts](https://manpages.debian.org/bookworm/apt/apt-get.8.en.html)
+define download-only, no-download and no-remove behavior. Artifact verification
+binds commit, run/attempt, lockfile, module bytes, Node/architecture, exact hosted
+image and the entire initial dpkg inventory. Declared regular files, bounded
+sizes, per-file hashes and actual Debian package/version/architecture must agree.
+Symlinks, extra files, duplicate identities/cache names and unrepresented package
+changes remain fatal. There is no cross-run or malformed-artifact fallback.
+
+A fresh private APT cache receives only reverified declared files under the
+producer's exact original basenames. Empty private source/list directories,
+`--no-download` and a new network namespace exclude competing payloads. Native
+APT retains its Pre-Depends/configuration ordering. Final dpkg state and native
+font-catalog hash must equal the native oracle. Absolute privileged commands,
+nonprompting sudo and a noninteractive environment retain fatal native status
+without exporting raw credential-bearing configuration. Referenced five-minute
+supervision plus fifteen-second kill grace covers both restore and Chromium.
+Consumer failures do not retry into a different environment.
+
+Local policy passes 227 cases with one explicit GNU-timeout-only macOS skip;
+Actionlint and diff checks pass. The four actual Debian/local-APT controls and the complete seven browser capture
+controls pass the second corrected Linux probe, with no skips. That probe also
+passes all 229 preceding Linux policy cases. The composite consumer migration
+requires its own Linux workflow qualification before complete acceptance.
+The broad application build remains at its preceding qualified 468.39 kB under
+the unchanged 470 kB budget: this change affects CI setup only.
 
 ## Native/canonical Systemcheck correction (2026-10-23)
 
