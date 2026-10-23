@@ -2687,14 +2687,16 @@ export const createSqliteFirstSliceStorage = (
         rollbackAfterFailure(database, error);
       }
     },
-    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId, eventTypes) {
+      if (eventTypes?.length === 0) return [];
+      const typeClause = eventTypes === undefined ? "" : ` AND event_type IN (${eventTypes.map(() => "?").join(",")})`;
       const rows = database
         .prepare(
           `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
            FROM workspace_activity_events
-           WHERE tenant_id = ? AND workspace_id = ?`
+           WHERE tenant_id = ? AND workspace_id = ?${typeClause}`
         )
-        .all(tenantId, workspaceId) as Record<string, unknown>[];
+        .all(tenantId, workspaceId, ...(eventTypes ?? [])) as Record<string, unknown>[];
       return rows
         .map(row => mapWorkspaceActivityEvent(row))
         .filter(Boolean) as WorkspaceActivityEvent[];

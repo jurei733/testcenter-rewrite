@@ -1,0 +1,4 @@
+﻿"groupname";"loginname";"code";"bookletname";"unitname";"priority";"category_accuracy";"category_quality";"reviewtime";"page";"pagelabel";"originalUnitId";"userAgent";"reviewer";"entry";"unitlabel";"bookletlabel"
+"ORACLE.REVIEWS";"owned-source-reviewer";"";"ORACLE.BOOK.B";"ORACLE.UNIT2";"2";"TRUE";"TRUE";"2026-10-23 20:39:43";"2";"Owned page";"ORACLE.UNIT2";"Owned Oracle browser";"Owned Reviewer Ω";"Owned Unit review Ω
+""; exact";"Owned second unit";"Owned booklet B"
+"ORACLE.REVIEWS";"owned-source-reviewer";"";"ORACLE.BOOK.B";"";"1";"TRUE";"FALSE";"2026-10-23 20:39:43";;;"";"Owned Oracle browser";"Owned Reviewer Ω";"Owned Booklet review Ω";"";"Owned booklet B"

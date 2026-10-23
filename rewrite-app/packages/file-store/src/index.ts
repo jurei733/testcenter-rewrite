@@ -1221,12 +1221,13 @@ const createFileRepository = (
         return counts;
       });
     },
-    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId, eventTypes) {
       const state = await getState();
       return Object.values(state.workspaceActivityEvents).filter(
         activityEvent =>
           activityEvent.tenantId === tenantId &&
-          activityEvent.workspaceId === workspaceId
+          activityEvent.workspaceId === workspaceId &&
+          (eventTypes === undefined || eventTypes.includes(activityEvent.eventType))
       );
     },
     async saveWorkspaceActivityEvent(activityEvent) {

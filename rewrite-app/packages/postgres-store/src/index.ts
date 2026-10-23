@@ -2540,12 +2540,14 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         client.release();
       }
     },
-    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId, eventTypes) {
+      if (eventTypes?.length === 0) return [];
       return many(
         `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
          FROM workspace_activity_events
-         WHERE tenant_id = $1 AND workspace_id = $2`,
-        [tenantId, workspaceId],
+         WHERE tenant_id = $1 AND workspace_id = $2
+           AND ($3::text[] IS NULL OR event_type = ANY($3::text[]))`,
+        [tenantId, workspaceId, eventTypes ?? null],
         mapWorkspaceActivityEvent
       );
     },

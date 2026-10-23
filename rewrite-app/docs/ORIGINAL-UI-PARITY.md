@@ -1,5 +1,81 @@
 # Optional Original UI
 
+### Qualified Original result lifecycle (2026-10-23)
+
+[Source run 40004889342](https://github.com/jurei733/testcenter-rewrite/actions/runs/40004889342)
+passes all **27** real HTTP groups against unchanged pinned Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`, with production Apache,
+PostgreSQL/Redis, actual XSD uploads and administrator/person authentication.
+Test mode stays disabled; no SQL seeding, fabricated token or production patch
+is used. Source diff verification passes and owned containers/volumes retire.
+The independently downloaded artifact `12524041027` verifies ZIP SHA256
+`6af6c76d91850874958aebc430b7484922085dfbb05d2803befd69ea955ed002`.
+The public receipt, runtime metadata and exact source-file hashes are retained in
+[test-fixtures/original-testcenter/source-workspace-results/manifest.json](../test-fixtures/original-testcenter/source-workspace-results/manifest.json).
+
+The native Results and Tests pages must preserve these distinct rules:
+
+- No-code sign-in already returns the person token and Booklet assignments.
+- Creating a Test without opening its Booklet produces no result row. Opening
+  it produces a started Booklet with zero Units, even while Test state is `{}`.
+- The detailed Test deletion list excludes empty `{}` Test state. A stateful
+  but unopened Test can be listed there while still absent from Results.
+- A Unit definition read does not initialize a saved Unit. Raw Unit logs before
+  initialization fail with Source's actual 500 and leave zero saved Units.
+  Initializing Unit state then logging counts one Unit even without answers.
+- Two opened Booklets with one and two saved Units produce minimum 1, maximum 2,
+  total 3 and average 1.5. Count persisted Units, rather than answers or arbitrary
+  Unit-scoped log events.
+- RO selected-Test deletion returns 403 and preserves results and the detailed
+  listing. RW deletion removes only the selected Test; the other Booklet's exact
+  answer remains. The existing person token and Booklet assignment survive, so
+  launching the selected Booklet again creates a new empty Test.
+- Access to the deleted Test ID returns 403 from `IsTestOwner` before the
+  controller's 404 path. This is actual middleware behavior, not an auth bypass.
+
+The extended fixture also proves a Unit review initializes a saved Unit without
+answers or nonempty Test state. Deleting that review retains the saved Unit,
+its response report and group counts. Actual response reports include both state-only
+and review-only Units with `responses: []`; a review-only Unit has null laststate.
+Four real selected CSV/JSON pairs are retained before the final review deletion
+control: responses, logs, legacy reviews and enhanced reviews. All CSVs preserve the UTF-8 BOM and semicolon dialect;
+an unknown group yields zero bytes. Legacy reviews use `category: NAME` with
+`X`/null and omit reviewer/labels. Enhanced reviews use boolean `category_NAME`,
+retain reviewer and resolve actual Unit/Booklet labels. Review text preserves
+Unicode, embedded newline, quote and semicolon. These are authored fixture data,
+not private participant records. Source review times use the configured Europe/
+Berlin display time; the current Rewrite UTC conversion needs native alignment.
+
+The Rewrite archive correction now projects current review Units and exact
+scoped server review journal entries alongside captured Unit response keys.
+Thus a comment-only Unit remains exported after the comment is deleted and the
+store is reopened. A captured Verona state without `dataParts` produces an empty
+response array, while an intentional empty legacy answer remains an `all` entry.
+Comment-only rows retain null `laststate`. Arbitrary Unit logs do not create
+report rows. Only matching tenant/workspace/Run/session review evidence qualifies;
+Booklet-level comments, unknown events and foreign/mismatched identities do not.
+Reading the archive leaves the exact stored Run and answers untouched.
+
+The archive requests only the three review event types at the store boundary;
+SQL filters them before decoding event details. File storage retains its existing
+whole-snapshot read. Omitted event kinds
+retain existing complete scoped reads; an explicit empty list reads no events.
+These corrections improve the existing canonical ZIP, **not the missing native
+Results table or its four individual downloads**. Native Unit state key/time
+projection and initialization without any response or review evidence remain
+separate work. Source review display times and current-file label semantics also
+still need their native projection.
+
+These are Source requirements, **not qualified Rewrite parity**. The Rewrite's
+canonical group summary currently counts all Runs and Unit response keys;
+reusing it unchanged would contradict this Oracle. Native opened-Test and saved
+Unit projection, exact test-time semantics, all four selected CSV actions and
+selected-Test deletion still require implementation/qualification. All eight
+broad visual rows remain open. This Source27 audit reopens the previously done
+Result group administration and Original result report archive rows: the current
+formal ledger is **27 done / 22 partial**. Older counts below are historical
+checkpoints, superseded by this audit.
+
 ### Native report page and remaining workspace tabs (2026-10-23)
 
 Files and Systemcheck Reports are now implemented native pages. Material tab

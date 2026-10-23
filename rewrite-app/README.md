@@ -358,7 +358,10 @@ The full four-tab shell, the other native workspace pages, complete upload/
 validation behavior, ZIP extraction and automatic activation remain open.
 Run `npm run smoke:ui:original-workspace-files` for the complete owned browser
 journey, or select `verify/ui-original-workspace-files` through
-`npm run ci:focus -- --list`. This is functional qualification, not a full-page
+`npm run ci:focus -- --list`. For focused Original result export work,
+`npm run test:original-results` freshly builds the core and runs archive,
+authenticated HTTP and Source-fixture regression without an Angular build.
+These same cases remain mandatory in the complete unit/PostgreSQL gates. This is functional qualification, not a full-page
 Original pixel-match claim.
 
 
