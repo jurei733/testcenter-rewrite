@@ -47,7 +47,7 @@ test('the native package identity must agree with both the manifest and the expe
     await assert.rejects(verifyArtifact(f.directory,f.context,f.before),/metadata mismatch/);
   });
 });
-test('real APT rejects an empty offline cache and accepts its verified native basename without installing a fixture package',async()=>{
+test('real APT accepts only local package sources with the staged native basename without installing a fixture package',async()=>{
   await ownedArtifact(async f=>{
     const cache=join(f.root,'cache'),parts=join(f.root,'parts'),lists=join(f.root,'lists'),status=join(f.root,'status');
     for(const path of [cache,parts,lists])await mkdir(path);await writeFile(status,'');
@@ -56,9 +56,13 @@ test('real APT rejects an empty offline cache and accepts its verified native ba
       '-o','Dir::Cache::archives='+cache,'-o','Dir::Cache::pkgcache=','-o','Dir::Cache::srcpkgcache=',
       '-o','Dir::Log='+f.root,'-o','APT::Get::AllowUnauthenticated=false',
       'install','-y','--no-remove','--no-install-recommends','--download-only','--no-download',join(f.directory,f.entry.file)];
-    assert.throws(()=>execFileSync('/usr/bin/apt-get',options,{stdio:'pipe'}),error=>error.status===100);
-    // The first APT pass creates its owned lock/partial entries. Use a fresh
-    // directory for production staging's deliberately empty-cache invariant.
+    // Isolated lists can resolve the explicit local file even with an empty
+    // cache. Do not claim this reproduces the first runner's repository-index
+    // collision. Verify that no network URI enters the actual acquisition.
+    const uris=execFileSync('/usr/bin/apt-get',[...options,'--print-uris'],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
+    assert.ok(!/https?:\/\//.test(uris));
+    // This APT pass creates its owned lock/partial entries. Stage into a fresh
+    // directory, as required by the production empty-cache invariant.
     const staged=join(f.root,'staged');await mkdir(staged);
     const verified=await verifyArtifact(f.directory,f.context,f.before);await stageAptCache(verified,staged);
     const actual=options.map(value=>value==='Dir::Cache::archives='+cache?'Dir::Cache::archives='+staged:value);
