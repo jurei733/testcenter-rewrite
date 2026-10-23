@@ -25969,7 +25969,12 @@ export const createFirstSliceServices = (
   };
 
   const currentSystemCheckFiles = (sources: SourcePackage[], events: WorkspaceActivityEvent[]) => {
-    const physical = selectCurrentWorkspaceFiles(sources, events).filter(source => source.status !== 'rejected' && /\.xml$/i.test(source.fileName) && projectWorkspaceFile(source).fileType === 'SysCheck');
+    const nativeIds = new Set(events.flatMap(event =>
+      event.eventType === 'source_package_created' && event.details.intakeMode === 'workspace_file' ? [event.subjectId] :
+      event.eventType === 'source_package_replaced' && event.details.replacementMode === 'workspace_file' &&
+        typeof event.details.replacementSourcePackageId === 'string' ? [event.details.replacementSourcePackageId] : []));
+    const physical = selectCurrentWorkspaceFiles(sources, events).filter(source => nativeIds.has(source.sourcePackageId) &&
+      source.status !== 'rejected' && /\.xml$/i.test(source.fileName) && projectWorkspaceFile(source).fileType === 'SysCheck');
     const metadata = buildWorkspaceFileCatalog(physical.map(projectWorkspaceFile)).items;
     return physical.map(source => ({source, metadata: metadata.find(file => file.sourcePackageId === source.sourcePackageId)!.metadata}));
   };

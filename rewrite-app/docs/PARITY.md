@@ -1,5 +1,26 @@
 # Testcenter parity checklist
 
+### Canonical and native Syscheck boundary (2026-10-23)
+
+The complete Linux run for `347b0746` exposes one common regression in Memory,
+File, SQLite, PostgreSQL and the compatibility gate: current physical XML was
+also treated as native when uploaded through the canonical package endpoint.
+That changed a canonical Syscheck's returned source-package ID from its imported
+artifact to its raw input. Native resolution now requires the actual native
+upload/replacement audit marker. Canonical imports retain their imported ID and
+pinned definition even alongside native Syschecks and later native Unit edits.
+The existing official-corpus assertions stay unchanged; a new all-store mixed
+workspace case catches the distinction earlier in the unit gate.
+
+Fresh local qualification passes **3,814 unit/frontend cases** (121 / 324 /
+1,361 / 2,008), **172 complete API integrations each in Memory, File and SQLite**,
+and the complete **1,940-case PostgreSQL integration group**, with no failures,
+skips or cancellations. The owned PostgreSQL schema/cluster are retired. A fresh
+production build remains 468.39 kB. The actual Systemcheck browser prefix through
+`system-check-report` and the complete native-file browser matrix pass and stop
+their owned processes. Complete new-publication Linux qualification remains
+required; no broad parity row closes.
+
 ### Current native runtime and CI stability checkpoint (2026-10-23)
 
 Native Source files now resolve at runtime through one fixed workspace origin;

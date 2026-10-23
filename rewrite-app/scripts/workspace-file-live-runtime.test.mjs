@@ -148,5 +148,26 @@ for(const kind of kinds)test(kind+': Source files become live without manual act
   const choices=await services.systemCheck.listSystemCheckChoices({scopes:[scope]});assert.equal(choices.length,1);
   assert.ok(!JSON.stringify(choices).includes('private-replaced-key'));
  });
+ await t.test('canonical Syschecks retain their imported identity and definition alongside native current files',async()=>{
+  await services.platform.createWorkspace({tenantKey:scope.tenantKey,workspaceKey:'canonical',displayName:'Owned canonical checks'});
+  const other={tenantKey:scope.tenantKey,workspaceKey:'canonical'};
+  for(const [fileName,sourceDocument,mediaType]of [['player.html',player('Pinned canonical Player'),'text/html'],
+   ['unit.xml',unit('Pinned canonical Unit'),'application/xml']]){
+    await services.contentIntake.createSourcePackage({...other,fileName,sourceDocument,mediaType});
+  }
+  const source=await services.contentIntake.createSourcePackage({...other,fileName:'canonical.xml',mediaType:'application/xml',
+   sourceDocument:xml('SysCheck','CANONICAL.CHECK','<Config unit="LIVE.UNIT" savekey="canonical-private-key" skipnetwork="true"/>')});
+  const imported=await services.contentIntake.createImportJob({...other,sourcePackageId:source.sourcePackageId});
+  assert.equal(imported.status,'completed');assert.notEqual(imported.sourcePackageId,source.sourcePackageId);
+  const pinned=await services.systemCheck.getSystemCheck({...other,checkId:'CANONICAL.CHECK'});
+  assert.equal(pinned.sourcePackageId,imported.sourcePackageId);assert.equal(pinned.unit.unitDefinition,'Pinned canonical Unit');
+  const native=await services.contentIntake.uploadWorkspaceFile({...other,fileName:'native.xml',mediaType:'application/xml',
+   sourceDocument:xml('SysCheck','NATIVE.OTHER','<Config unit="LIVE.UNIT" savekey="native-private-key" skipnetwork="true"/>')});
+  assert.equal(native.workspaceAvailability.status,'available');
+  await services.contentIntake.uploadWorkspaceFile({...other,fileName:'unit.xml',mediaType:'application/xml',sourceDocument:unit('Current native Unit')});
+  assert.deepEqual(await services.systemCheck.getSystemCheck({...other,checkId:'CANONICAL.CHECK'}),pinned);
+  const current=await services.systemCheck.getSystemCheck({...other,checkId:'NATIVE.OTHER'});
+  assert.equal(current.sourcePackageId,native.sourcePackage.sourcePackageId);assert.equal(current.unit.unitDefinition,'Current native Unit');
+ });
  }finally{if(storage)await storage.shutdown();if(pool){await pool.query('DROP SCHEMA \"'+schema+'\" CASCADE');await pool.end();}await rm(folder,{recursive:true,force:true});}
 });
