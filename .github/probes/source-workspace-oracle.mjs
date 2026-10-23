@@ -159,7 +159,10 @@ try{
  detailed=await sessions();assert.deepEqual(detailed.map(row=>row.bookletName),['ORACLE.BOOK.B']);
  assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:2,max:2,total:2,average:2}]);
  assert.deepEqual((await request('GET',`/test/${second}/unit/ORACLE.UNIT`,{token:personToken})).value,beforeResponse);
- await request('GET','/test/'+first,{token:personToken,status:404});
+ // IsTestOwner resolves ownership before the controller's not-found check.
+ // Deleting this Test therefore denies its stale ID with 403, while the same
+ // actual person token retains ownership of the unrelated Booklet below.
+ await request('GET','/test/'+first,{token:personToken,status:403});
  const recreated=await createTest('ORACLE.BOOK.A');assert.ok(recreated>0&&recreated!==first&&recreated!==second);
  assert.deepEqual((await sessions()).map(row=>row.bookletName),['ORACLE.BOOK.B']);
  assert.deepEqual((await groups()).map(row=>row.bookletsStarted),[1]);
