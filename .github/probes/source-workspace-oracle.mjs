@@ -90,7 +90,7 @@ try{
   ['unit-two.xml',xml('Unit','unit-xml','17.6','<Metadata><Id>ORACLE.UNIT2</Id><Label>Owned second unit</Label></Metadata><Definition player="owned-oracle-player@6.0.4">Owned second definition</Definition>')],
   ['booklet-one.xml',xml('Booklet','testcenter-booklet-xml','18.0','<Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet A</Label></Metadata><Units><Unit id="ORACLE.UNIT" label="Owned unit"/></Units>')],
   ['booklet-two.xml',xml('Booklet','testcenter-booklet-xml','18.0','<Metadata><Id>ORACLE.BOOK.B</Id><Label>Owned booklet B</Label></Metadata><Units><Unit id="ORACLE.UNIT" label="Owned unit"/><Unit id="ORACLE.UNIT2" label="Owned second unit"/></Units>')],
-  ['people.xml',xml('Testtakers','testcenter-testtaker-xml','18.0','<Metadata/><Group id="ORACLE.GROUP" label="Owned source group"><Login name="owned-source-participant" pw="owned-source-participant-secret" mode="run-hot-return"><Booklet>ORACLE.BOOK.A</Booklet><Booklet>ORACLE.BOOK.B</Booklet></Login></Group>')]
+  ['people.xml',xml('Testtakers','testcenter-testtaker-xml','18.0','<Metadata/><Group id="ORACLE.GROUP" label="Owned source group"><Login name="owned-source-participant" pw="owned-source-participant-secret" mode="run-hot-return"><Booklet>ORACLE.BOOK.A</Booklet><Booklet>ORACLE.BOOK.B</Booklet></Login><Login name="owned-source-monitor" pw="owned-source-monitor-secret" mode="monitor-group"/></Group>')]
  ];
  for(const [name,document,type='application/xml']of files){
   const form=new FormData();form.append('fileforvo[]',new Blob([document],{type}),name);
@@ -113,10 +113,28 @@ try{
  const first=await createTest('ORACLE.BOOK.A');assert.ok(first>0);
  assert.deepEqual(await groups(),[]);assert.deepEqual(await sessions(),[]);
  check('creating a Test without opening its Booklet creates no result row or stateful Test-Session');
+ const monitor=(await request('PUT','/session/login',{body:{name:'owned-source-monitor',password:'owned-source-monitor-secret'}})).value;
+ assert.ok(typeof monitor.token==='string'&&monitor.token.length>10);
+ const setLock=locked=>request('POST','/monitor/group/ORACLE.GROUP/tests/'+(locked?'lock':'unlock'),{token:monitor.token,body:{testIds:[first]}});
+ await setLock(true);assert.deepEqual(await groups(),[]);assert.deepEqual(await sessions(),[]);
+ await setLock(false);assert.deepEqual(await groups(),[]);assert.deepEqual(await sessions(),[]);
  const opened=(await request('GET','/test/'+first,{token:personToken})).value;assert.equal(opened.firstStart,true);
  assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:0,max:0,total:0,average:0}]);
  assert.deepEqual(await sessions(),[]);
  check('opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing');
+ const openedTime=(await groups())[0].lastChange;
+ assert.ok(Number.isSafeInteger(openedTime)&&openedTime>0);
+ await new Promise(done=>setTimeout(done,25));await setLock(true);
+ const lockedTime=(await groups())[0].lastChange;assert.ok(lockedTime>openedTime);
+ assert.deepEqual(await sessions(),[]);
+ await new Promise(done=>setTimeout(done,25));await setLock(true);
+ const relockedTime=(await groups())[0].lastChange;assert.ok(relockedTime>lockedTime);
+ assert.deepEqual(await sessions(),[]);
+ await new Promise(done=>setTimeout(done,25));await setLock(false);
+ const unlockedTime=(await groups())[0].lastChange;assert.ok(unlockedTime>relockedTime);
+ assert.deepEqual(await sessions(),[]);
+ assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:0,max:0,total:0,average:0}]);
+ check('locking and same-value relocking advance Test time without nonempty Test state or Unit rows',{openedTime,lockedTime,relockedTime,unlockedTime,unopenedRemainedAbsent:true,emptyStateRemainedAbsent:true});
  const emptyUnit=(await request('GET',`/test/${first}/unit/ORACLE.UNIT`,{token:personToken})).value;
  assert.deepEqual(Object.keys(emptyUnit.dataParts),[]);assert.equal((await groups())[0].numUnitsTotal,0);
  await request('PUT',`/test/${first}/unit/ORACLE.UNIT/log`,{token:personToken,status:500,
@@ -131,6 +149,8 @@ try{
  assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:1,max:1,total:1,average:1}]);
  assert.deepEqual(await sessions(),[]);
  assert.deepEqual(Object.keys((await request('GET',`/test/${first}/unit/ORACLE.UNIT`,{token:personToken})).value.dataParts),[]);
+ assert.equal((await groups())[0].lastChange,unlockedTime);
+ check('actual Unit definition/state/log writes leave Test-level result time unchanged',{testTime:unlockedTime});
  check('a persisted state-and-log Unit counts without answers or a stateful Test-Session');
  await request('PATCH',`/test/${first}/state`,{token:personToken,body:[{key:'CURRENT_UNIT_ID',content:'ORACLE.UNIT',timeStamp:Date.now()}]});
  let detailed=await sessions();assert.equal(detailed.length,1);assert.equal(detailed[0].bookletName,'ORACLE.BOOK.A');

@@ -1,7 +1,7 @@
-name: Pinned Original results and selected-Test Oracle
+name: Pinned Original lock and result clocks Oracle
 on:
   push:
-    branches: [codex/source-results-oracle-20261023]
+    branches: [codex/source-result-lock-clock-20261023]
 permissions:
   contents: read
 concurrency:
