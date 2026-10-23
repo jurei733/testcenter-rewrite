@@ -22786,6 +22786,8 @@ const buildStudyMonitorUnitProgress = (input: {
   participantRosterEntries?: ParticipantRosterEntry[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
+  /** Booklet detail passes scoped Runs; retain that scope for roster-only Units. */
+  bookletKey?: string;
 }): WorkspaceStudyMonitorUnitProgress[] => {
   const contentReleasesById = new Map(
     input.contentReleases.map(contentRelease => [
@@ -22884,6 +22886,7 @@ const buildStudyMonitorUnitProgress = (input: {
   }
   for (const rosterEntry of input.participantRosterEntries ?? []) {
     for (const bookletKey of getParticipantRosterBookletKeys(rosterEntry)) {
+      if (input.bookletKey !== undefined && bookletKey !== input.bookletKey) continue;
       if (runLoginKeysByBookletKey.get(bookletKey)?.has(rosterEntry.loginKey)) {
         continue;
       }
@@ -23822,7 +23825,7 @@ const buildStudyMonitorBookletDetail = (input: {
       .map(participantSession => participantSession.loginKey)
   );
   const bookletRosterEntries = input.participantRosterEntries
-    .filter(rosterEntry => rosterEntry.bookletKey?.trim() === bookletKey)
+    .filter(rosterEntry => getParticipantRosterBookletKeys(rosterEntry).includes(bookletKey))
     .sort(
       (left, right) =>
         left.loginKey.localeCompare(right.loginKey) ||
@@ -23903,7 +23906,8 @@ const buildStudyMonitorBookletDetail = (input: {
       participantSessions: input.participantSessions,
       participantRosterEntries: bookletRosterEntries,
       testRuns: bookletTestRuns,
-      contentReleases: input.contentReleases
+      contentReleases: input.contentReleases,
+      bookletKey
     })
   };
 };

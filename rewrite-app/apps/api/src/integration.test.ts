@@ -11,6 +11,7 @@ import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 import iconv from "iconv-lite";
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName } from "pdf-lib";
 import { CodingSchemeFactory } from "@iqb/responses";
+import { Pool } from "pg";
 import { CodingScheme } from "@iqbspecs/coding-scheme";
 import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
 import {
@@ -46777,6 +46778,89 @@ test("study monitor counts saved roster participants before sign-in", async () =
       { loginKey: "monitor-b", displayName: "Monitor Beta" }
     ]
   );
+});
+
+test("protected monitor booklet details include every assigned booklet before a run exists and scope Unit counts to that booklet", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "owned-monitor-detail-"));
+  const schema = "owned_monitor_detail_" + randomUUID().replaceAll("-", "");
+  let isolated: Awaited<ReturnType<typeof createIsolatedServer>> | undefined;
+  let pool: Pool | undefined, created = false;
+  try {
+    let postgresUrl: string | undefined;
+    if (process.env.FIRST_SLICE_STORE === "postgres") {
+      pool = new Pool({connectionString: process.env.FIRST_SLICE_POSTGRES_URL});
+      await pool.query(`CREATE SCHEMA "${schema}"`); created = true;
+      const url = new URL(process.env.FIRST_SLICE_POSTGRES_URL!);
+      url.searchParams.set("options", "-c search_path=" + schema); postgresUrl = url.toString();
+    }
+    isolated = await createIsolatedServer({
+      FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+      FIRST_SLICE_FILE: join(directory, "owned.json"), FIRST_SLICE_SQLITE_FILE: join(directory, "owned.sqlite"),
+      ...(postgresUrl ? {FIRST_SLICE_POSTGRES_URL: postgresUrl} : {})
+    });
+    const ownedBaseUrl = isolated.baseUrl;
+    const signedIn = await requestJsonAt<AdminSignInResponse>(ownedBaseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST", body: {username: "demo-admin", password: "demo-admin-password"}
+    });
+    assert.equal(signedIn.status, 200);
+    const headers = {authorization: `Bearer ${signedIn.body.sessionToken}`};
+    const post = (path: string, body: unknown, participantToken?: string) => requestJsonAt<any>(ownedBaseUrl, path, {
+      method: "POST", headers: participantToken ? {authorization: `Bearer ${participantToken}`} : headers, body
+    });
+    const workspaceKey = `owned-monitor-assignments-${randomUUID()}`;
+    assert.equal((await post("/api/v1/tenants/demo-tenant/workspaces", {workspaceKey, displayName: "Owned monitor assignments"})).status, 201);
+    const scope = `/api/v1/tenants/demo-tenant/workspaces/${workspaceKey}`;
+    const source = await post(scope + "/source-packages", {fileName: "owned-monitor.json", mediaType: "application/json", contentStructure: {
+      bookletEntries: [
+        {bookletKey: "OWN.A", displayLabel: "First booklet", unitEntries: [
+          {unitKey: "SHARED", displayLabel: "Shared Unit"}, {unitKey: "ONLY.A", displayLabel: "Only first"}]},
+        {bookletKey: "OWN.B", displayLabel: "Additional booklet", unitEntries: [
+          {unitKey: "SHARED", displayLabel: "Shared Unit"}, {unitKey: "ONLY.B", displayLabel: "Only additional"}]},
+        {bookletKey: "UNASSIGNED", displayLabel: "Unassigned", unitEntries: [{unitKey: "OTHER", displayLabel: "Other"}]}
+      ]
+    }});
+    assert.equal(source.status, 201);
+    const imported = await post(scope + "/import-jobs", {sourcePackageId: source.body.sourcePackage.sourcePackageId});
+    assert.equal(imported.body.importJob.status, "completed");
+    assert.equal((await post(scope + `/content-releases/${imported.body.stagedContentRelease.contentReleaseId}/activate`, {})).status, 200);
+    const roster = await post(scope + "/participant-roster", {rosterText: JSON.stringify({metadata: {}, groups: [{id: "owned", label: "Owned group", logins: [
+      {name: "owned-multi", mode: "run-hot-return", booklets: [{id: "OWN.A"}, {id: "OWN.B", state: "variant:one"}, {id: "OWN.B", state: "variant:two"}]},
+      {name: "owned-first-only", mode: "run-hot-return", booklets: [{id: "OWN.A"}]},
+      {name: "owned-primary-b", mode: "run-hot-return", booklets: [{id: "OWN.B"}]},
+      {name: "owned-preview", mode: "run-review", booklets: [{id: "OWN.B"}]}
+    ]}]})});
+    assert.equal(roster.status, 201, JSON.stringify(roster.body));
+    const detailPath = scope + "/study-monitor/booklets/OWN.B";
+    assert.equal((await requestJsonAt(ownedBaseUrl, detailPath)).status, 401);
+    const read = (path: string) => requestJsonAt<any>(ownedBaseUrl, path, {headers});
+    const detail = await read(detailPath), summary = await read(scope + "/study-monitor/summary");
+    assert.equal(detail.status, 200);
+    const before = detail.body.studyMonitorBooklet;
+    const progress = summary.body.studyMonitorSummary.bookletProgress.find((row: {bookletKey: string}) => row.bookletKey === "OWN.B");
+    assert.equal(before.expectedParticipantCount, progress.expectedParticipantCount);
+    assert.equal(before.expectedParticipantCount, 2); assert.equal(before.rosterEntryCount, 2);
+    assert.equal(before.notStartedCount, 2); assert.equal(before.participantSessionCount, 0); assert.equal(before.testRunCount, 0);
+    assert.deepEqual(before.rosterEntries.map((row: {loginKey: string}) => row.loginKey), ["owned-multi", "owned-primary-b"]);
+    assert.deepEqual(before.unitProgress.map((row: {unitKey: string; rosterExpectedCount: number; missingResponseCount: number}) =>
+      [row.unitKey, row.rosterExpectedCount, row.missingResponseCount]), [["ONLY.B", 2, 2], ["SHARED", 2, 2]]);
+    assert.equal((await read(scope + "/study-monitor/booklets/UNASSIGNED")).status, 404);
+    const identity = await post("/api/v1/participant/auth/sign-in", {tenantKey: "demo-tenant", workspaceKey, loginKey: "owned-multi"});
+    assert.equal(identity.status, 200);
+    const launched = await post("/api/v1/participant/starter:launch", {participantSessionId: identity.body.participantSession.participantSessionId,
+      bookletKey: "OWN.B#variant:one"}, identity.body.sessionToken);
+    assert.equal(launched.status, 200);
+    const after = (await read(detailPath)).body.studyMonitorBooklet;
+    assert.equal(after.expectedParticipantCount, 2); assert.equal(after.rosterEntryCount, 2);
+    assert.equal(after.notStartedCount, 1); assert.equal(after.participantSessionCount, 1); assert.equal(after.testRunCount, 1);
+    assert.deepEqual(after.unitProgress.map((row: {unitKey: string; expectedRunCount: number; rosterExpectedCount: number}) =>
+      [row.unitKey, row.expectedRunCount, row.rosterExpectedCount]), [["ONLY.B", 2, 1], ["SHARED", 2, 1]]);
+  } finally {
+    try {if (isolated) await closeServer(isolated.server);}
+    finally {
+      try {if (created) await pool!.query(`DROP SCHEMA "${schema}" CASCADE`);}
+      finally {try {await pool?.end();} finally {rmSync(directory, {recursive: true, force: true});}}
+    }
+  }
 });
 
 test("participant session launch can target a specific booklet", async () => {
