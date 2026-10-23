@@ -1,5 +1,35 @@
 # CI iteration and complete acceptance
 
+## Remove an idle-network barrier from functional label checks (2026-10-23)
+
+Completed Linux qualification job `120497596787` in
+[run 39977337416](https://github.com/jurei733/testcenter-rewrite/actions/runs/39977337416)
+takes 809 seconds, including 169.599 seconds between the current-label/config
+marker and its next operator-session marker. These are complete functional
+matrices, not an idle hang. The synthetic label matrix still waits for an initial
+500 ms quiet-network interval before accessing the real login controls.
+
+That initial navigation now waits for `domcontentloaded`. Existing Playwright
+form actions, actual sign-in/resume responses, Player readiness, exact label
+assertions, real native input, durable answers, navigation and reload checks
+continue to establish readiness. All eight cases, both interfaces and both widths
+remain. Headed cases remain serial; no focus concurrency, retry, skipped assertion,
+longer deadline or reference-image change is introduced.
+
+A local sequential comparison uses the same current helper, production API and
+visible Chromium, with separate owned SQLite workspaces and fresh contexts for
+every case. The baseline overrides only initial navigation back to `networkidle`.
+Both arms pass **32/32 cases**: **77.649 s** baseline and **57.871 s** candidate
+(**19.778 s / 25.5%** shorter for this matrix). Owned browser/API resources close.
+This one local pair is a phase observation, not a controlled whole-pipeline or
+Linux speed claim. The complete published package-migration run continues before
+this navigation change is published; new-head Linux qualification remains required.
+
+The five related helper tests, syntax and diff checks pass. CI policy again
+passes 227 cases, with its one explicit Linux-only GNU-timeout macOS skip. This
+change affects the smoke runner only; the previously qualified application,
+production build and 468.39 kB entry are unchanged.
+
 ## Shared authenticated browser-system packages (2026-10-23)
 
 Parent `b74d789e` completes
