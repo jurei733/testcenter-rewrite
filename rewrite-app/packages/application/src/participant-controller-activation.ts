@@ -1,3 +1,4 @@
+import { withOriginalResultState } from "./original-result-state.js";
 import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 import { withParticipantControllerEntry } from "./participant-controller-entry.js";
 import { withParticipantRunRevision } from "./participant-run-revision.js";
@@ -48,8 +49,9 @@ export const prepareParticipantControllerActivation = (
   if (testRun.status === "completed") throw new ParticipantControllerActivationError(
     409, "booklet_already_completed", "A completed Run cannot open a controller.");
   const enteredRun = withParticipantRunRevision(testRun,
-    withParticipantControllerDispatch(testRun, withParticipantControllerEntry(testRun, testRun, true)));
-  const entryChanged = enteredRun.controllerEntry?.revision !== testRun.controllerEntry?.revision;
+    withParticipantControllerDispatch(testRun, withOriginalResultState(testRun, withParticipantControllerEntry(testRun, testRun, true), {openedAt: input.activatedAt})));
+  const entryChanged = enteredRun.controllerEntry?.revision !== testRun.controllerEntry?.revision ||
+    enteredRun.originalResultState?.lastOpenedAt !== testRun.originalResultState?.lastOpenedAt;
   return { participantSession: structuredClone({ ...participantSession, status: "launched" }),
     activated: participantSession.status !== "launched", testRun: structuredClone(enteredRun),
     entryChanged };

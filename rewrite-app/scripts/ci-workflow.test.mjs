@@ -27,6 +27,48 @@ test('every actual browser consumer waits for the authenticated same-run package
  assert.ok(action.runs.steps.indexOf(restore)<action.runs.steps.findIndex(step=>step.run?.includes('playwright install')));
  assert.ok(!action.runs.steps.some(step=>/apt-get|--with-deps|\/etc\/apt|sudo/.test(step.run??'')));
 });
+test('an incompatible browser cohort fails before Node setup, npm, build and browser artifact downloads',()=>{
+ const first=action.runs.steps[0];
+ assert.equal(first.name,'Reject incompatible browser runner before installation');
+ assert.equal(first.if,"inputs.playwright == 'true'");
+ assert.equal(first['working-directory'],'${{ github.workspace }}');
+ assert.equal(first.env.CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION,'${{ inputs.browser-system-image-version }}');
+ assert.equal(first.run,'bash rewrite-app/scripts/ci-browser-cohort.sh check');
+ assert.equal(action.inputs['browser-system-image-version'].default,'');
+ const producer=workflow.jobs['browser-system-dependencies'];
+ assert.equal(producer.outputs['image-version'],'${{ steps.cohort.outputs.image-version }}');
+ const record=producer.steps.find(step=>step.id==='cohort');
+ assert.equal(record.run,'bash scripts/ci-browser-cohort.sh record');
+ assert.ok(producer.steps.indexOf(record)<producer.steps.findIndex(step=>step.uses==='./.github/actions/rewrite-runtime'));
+ const qualification=workflow.jobs['browser-system-qualification'];
+ const check=qualification.steps.find(step=>step.run==='bash scripts/ci-browser-cohort.sh check');
+ assert.equal(check.env.CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION,'${{ needs.browser-system-dependencies.outputs.image-version }}');
+ assert.ok(qualification.steps.indexOf(check)<qualification.steps.findIndex(step=>step.uses==='./.github/actions/rewrite-runtime'));
+});
+test('the actual early cohort command rejects the observed rollout and malformed metadata without evaluating or echoing it',()=>{
+ const directory=mkdtempSync(join(tmpdir(),'owned-browser-cohort-'));
+ try{
+  const output=join(directory,'outputs'),canary=join(directory,'executed');writeFileSync(output,'previous=kept\n');
+  const env={...process.env,ImageOS:'ubuntu24',ImageVersion:'20261012.334.1',
+    CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION:'20261012.334.1',GITHUB_OUTPUT:output};
+  const run=(mode,patch={})=>spawnSync('bash',['scripts/ci-browser-cohort.sh',mode],{env:{...env,...patch},encoding:'utf8'});
+  assert.equal(run('record').status,0);assert.equal(readFileSync(output,'utf8'),'previous=kept\nimage-version=20261012.334.1\n');
+  assert.equal(run('check').status,0);
+  const mismatch=run('check',{ImageVersion:'20261023.334.3'});
+  assert.equal(mismatch.status,1);assert.match(mismatch.stderr,/producer=20261012\.334\.1 consumer=20261023\.334\.3/);
+  for(const bad of ['', '20261012.334.1\n', 'a'.repeat(81), `$(touch ${canary})`, 'https://user:OWNED_SECRET@proxy']){
+   for(const key of ['ImageVersion','CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION']){
+    const result=run('check',{[key]:bad});assert.equal(result.status,1);assert.ok(!result.stderr.includes('OWNED_SECRET'));
+   }
+   assert.equal(run('record',{ImageVersion:bad}).status,1);
+  }
+  for(const ImageOS of ['ubuntu22','', 'ubuntu24\n'])assert.equal(run('check',{ImageOS}).status,1);
+  assert.equal(run('check',{CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION:undefined}).status,1);
+  assert.equal(run('record',{GITHUB_OUTPUT:''}).status,1);assert.equal(run('unknown').status,1);
+  assert.equal(readFileSync(output,'utf8'),'previous=kept\nimage-version=20261012.334.1\n');
+  assert.throws(()=>readFileSync(canary),{code:'ENOENT'});
+ }finally{rmSync(directory,{recursive:true,force:true});}
+});
 test('reruns retain exact producer attempts and immutable evidence without a cross-run artifact lookup',()=>{
  for(const id of ['build','browser-system-dependencies','original-reference-build'])
   assert.equal(workflow.jobs[id].outputs.attempt,'${{ github.run_attempt }}');
@@ -44,6 +86,7 @@ test('reruns retain exact producer attempts and immutable evidence without a cro
   if(step.with?.playwright&&step.with.playwright!=='false'){
    assert.ok(needs.includes('browser-system-dependencies'),id);
    assert.equal(step.with['browser-system-attempt'],'${{ needs.browser-system-dependencies.outputs.attempt }}',id);
+   assert.equal(step.with['browser-system-image-version'],'${{ needs.browser-system-dependencies.outputs.image-version }}',id);
   }
  }
  const restore=action.runs.steps.find(step=>step.name==='Verify and install browser system packages offline');
@@ -120,7 +163,9 @@ test('Original result export iteration retains the complete archive suite in uni
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
  assert.equal(scripts['test:original-results'],'npm run build:core && npm run test:original-results:built');
- assert.equal(scripts['test:original-results:built'],'node --test '+suite);
+ assert.equal(scripts['test:original-results:built'],'node --test '+suite+' scripts/original-result-state.test.mjs scripts/participant-run-creation-api.test.mjs');
+ assert.ok(scripts['test:unit:built'].split(/\s+/).includes('scripts/original-result-state.test.mjs'));
+ assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify('scripts/original-result-state.test.mjs')));
 });
 test('complete selected Systemcheck exports qualify in unit and real PostgreSQL groups',()=>{
  const suite='scripts/system-check-report-selection.test.mjs';

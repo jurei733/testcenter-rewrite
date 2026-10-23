@@ -50,8 +50,8 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
     const source=await request('POST',workspace+'/source-packages',{fileName:'own-creation.json',mediaType:'application/json',contentStructure:content},operator,201);
     const imported=await request('POST',workspace+'/import-jobs',{sourcePackageId:source.sourcePackage.sourcePackageId},operator,201);
     await request('POST',workspace+`/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`,{activatedByActorId:'owned'},operator);
-    await request('POST',workspace+'/participant-roster',{rosterText:JSON.stringify(['log','audit','activation','foreign','concurrent','browser-resume','browser-launch','browser-credentials','browser-invalid'].map(loginKey=>({
-      loginKey,groupKey:'owned',executionMode:'run-hot-return',booklets:[{id:bookletKey}]})))},operator,201);
+    await request('POST',workspace+'/participant-roster',{rosterText:JSON.stringify(['log','audit','activation','foreign','concurrent','browser-resume','browser-launch','browser-credentials','browser-invalid','result-clock','result-review'].map(loginKey=>({
+      loginKey,groupKey:'owned',executionMode:loginKey==='result-review'?'run-review':'run-hot-return',booklets:[{id:bookletKey}]})))},operator,201);
     const login=loginKey=>request('POST',routes.participant.signIn,{tenantKey,workspaceKey,loginKey});
     const snapshot=async identity=>{
       const parent=await repository.getParticipantSessionById(identity.participantSession.participantSessionId);
@@ -81,6 +81,45 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       }
     });
 
+    await t.test('protected API keeps Original Test time separate from Unit answers and logs, ignores forged evidence and persists explicit same-unit state writes',async()=>{
+      const identity=await login('result-clock'),entered=(await resume(identity)).testRun;
+      const path=resolveRoutePath(routes.participant.saveProgress,{testRunId:entered.testRunId});
+      const original=structuredClone(entered.originalResultState);
+      assert.equal(original.hasTestState,true);assert.ok(original.lastOpenedAt);assert.ok(original.lastTestStateAt);
+      const before=(await snapshot(identity)).runs[0];
+      const body={deliveryId:randomUUID(),status:'running',responseOnly:true,responseUnitKey:entered.currentUnitKey,
+        unitResponse:'Owned exact answer Ä/β',responseTimestamp:Date.now(),
+        originalResultState:{lastOpenedAt:'2099-01-01T00:00:00.000Z',lastTestStateAt:'2099-01-01T00:00:00.000Z',hasTestState:false}};
+      await request('POST',path,body,undefined,401);assert.deepEqual((await snapshot(identity)).runs[0],before);
+      const saved=(await request('POST',path,body,identity.sessionToken)).testRun,savedStored=(await snapshot(identity)).runs[0];
+      assert.deepEqual(JSON.parse(JSON.stringify(savedStored)),saved);
+      assert.equal(saved.unitResponses[entered.currentUnitKey],body.unitResponse);assert.deepEqual(saved.originalResultState,original);
+      await request('POST',path,body,identity.sessionToken);assert.deepEqual((await snapshot(identity)).runs[0],savedStored);
+      await request('POST',resolveRoutePath(routes.participant.saveTestLogs,{testRunId:entered.testRunId}),{
+        deliveryId:randomUUID(),logs:[{entries:[{key:'CURRENT_UNIT_ID',content:entered.currentUnitKey,timeStamp:Date.now()}]}]},identity.sessionToken);
+      assert.deepEqual((await snapshot(identity)).runs[0],savedStored);
+      const stateWritten=(await request('POST',path,{currentUnitKey:entered.currentUnitKey,status:'running'},identity.sessionToken)).testRun;
+      const stateWrittenStored=(await snapshot(identity)).runs[0];
+      assert.equal(stateWritten.originalResultState.lastOpenedAt,original.lastOpenedAt);
+      assert.ok(Date.parse(stateWritten.originalResultState.lastTestStateAt)>Date.parse(original.lastTestStateAt));
+      assert.deepEqual(stateWritten.unitResponses,saved.unitResponses);
+      await request('POST',path,{currentUnitKey:'nonexistent-owned-unit',status:'running'},identity.sessionToken,404);
+      assert.deepEqual((await snapshot(identity)).runs[0],stateWrittenStored);
+      const reopened=(await resume(identity)).testRun;
+      assert.ok(Date.parse(reopened.originalResultState.lastOpenedAt)>Date.parse(original.lastOpenedAt));
+      assert.equal(reopened.originalResultState.lastTestStateAt,stateWritten.originalResultState.lastTestStateAt);
+      assert.deepEqual(reopened.unitResponses,saved.unitResponses);
+    });
+    await t.test('non-saving authenticated review opens a Test without creating saved Test state or answers',async()=>{
+      const identity=await login('result-review'),entered=(await resume(identity)).testRun;
+      assert.equal(entered.originalResultState.hasTestState,false);assert.equal(entered.originalResultState.lastTestStateAt,null);
+      assert.ok(entered.originalResultState.lastOpenedAt);
+      const saved=(await request('POST',resolveRoutePath(routes.participant.saveProgress,{testRunId:entered.testRunId}),{
+        currentUnitKey:entered.currentUnitKey,status:'running',unitResponse:'Must remain transient',originalResultState:{hasTestState:true}},identity.sessionToken)).testRun;
+      assert.deepEqual(saved.originalResultState,entered.originalResultState);assert.deepEqual(saved.unitResponses,{});
+      const state=await snapshot(identity);assert.deepEqual(state.runs[0].originalResultState,entered.originalResultState);assert.deepEqual(state.logs,[]);
+    });
+
     for(const [name,table,operation] of [['log','participant_test_logs','INSERT'],['audit','workspace_activity_events','INSERT'],['activation','participant_sessions','UPDATE']]) {
       await t.test(`${name} failure returns 500 without partial initialization, then the same authenticated session starts exactly once`,async()=>{
         const identity=await login(name),before=await snapshot(identity),id=identity.participantSession.participantSessionId;
@@ -94,7 +133,10 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
         assert.equal(state.runs.length,1);assert.equal(state.runs[0].testRunId,resumed.testRun.testRunId);assert.equal(state.parent.status,'launched');
         assert.equal(state.logs.filter(log=>log.logKey==='CONTROLLER').length,1);assert.equal(state.logs.filter(log=>log.logKey==='CURRENT_UNIT_ID').length,1);
         assert.equal(state.events.filter(event=>event.eventType==='participant_session_resumed').length,1);
-        await resume(identity);assert.deepEqual(await snapshot(identity),state);
+        await resume(identity);const reopened=await snapshot(identity);
+        assert.ok(Date.parse(reopened.runs[0].originalResultState.lastOpenedAt)>Date.parse(state.runs[0].originalResultState.lastOpenedAt));
+        assert.deepEqual(reopened,{...state,runs:[{...state.runs[0],stateRevision:state.runs[0].stateRevision+1,
+          originalResultState:{...state.runs[0].originalResultState,lastOpenedAt:reopened.runs[0].originalResultState.lastOpenedAt}}]});
       });
     }
     await t.test('concurrent fresh resume requests keep one identity and one initial artifact set',async()=>{

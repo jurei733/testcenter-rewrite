@@ -1132,6 +1132,14 @@ export type ParticipantProgressDelivery = {
   acceptedAt: string;
 };
 
+/** Original's opened-Test and Test-state evidence is independent of Run.updatedAt.
+ * Missing fields on legacy rows mean unknown; null is an observed absent write. */
+export type OriginalTestResultState = {
+  lastOpenedAt?: string | null;
+  lastTestStateAt?: string | null;
+  hasTestState?: boolean;
+};
+
 export type TestRun = {
   testRunId: string;
   participantSessionId: string;
@@ -1149,6 +1157,8 @@ export type TestRun = {
   status: TestRunStatus;
   /** Server-owned entry/termination evidence for this exact Run, independent of its parent session. */
   controllerEntry?: { active: boolean; revision: number };
+  /** Server-owned Original result inclusion and test-wide timestamp evidence. */
+  originalResultState?: OriginalTestResultState;
   /** Optional for legacy rows; orders committed projections of this Run. */
   stateRevision?: number;
   /** Server-owned high-water marks for state effects from each controller document. */
@@ -1425,6 +1435,9 @@ export type ParticipantRunCommandEffect = {
   testRun: TestRun;
   /** Applied under the Run lock; response-only mutations cannot replace entry evidence. */
   controllerEntryActive?: boolean;
+  /** Server timestamps only; never taken from a participant packet's clock. */
+  originalResultOpenedAt?: string;
+  originalResultTestStateAt?: string;
   testLogs: ParticipantTestLog[];
   activityEvents: WorkspaceActivityEvent[];
   participantSession?: ParticipantSession;
