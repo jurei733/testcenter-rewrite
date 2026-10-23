@@ -12,58 +12,15 @@ import {captureStableViewport} from './stable-viewport-capture.mjs';
 import {compareScreenshots} from './exact-rgba-comparison.mjs';
 import {waitForOriginalSampleResource} from './original-sample-readiness.mjs';
 
-// Diagnostic evidence only. No production restore or cohort check calls this module.
-export const materialProfileSource={commit:'eedae41840cbe90e5547c0211da818bdf620f5aa',
- playerSha256:'bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3',
- definitionSha256:'532310b1f4bf1eab6eaaa1603962a39566919b5669974f7b1a7dc2de4316d202',
- resourceZipSha256:'da2ae859b77f8a6ba09b3f61cab38ea0c5d6de5f08b9fcefef9d263aef187f4e'};
+import {materialProfileSource,canonicalMaterial,validateDiagnosticProfile,validateRuntimeMaterial} from './ci-browser-material-contract.mjs';
+export {materialProfileSource,canonicalMaterial,validateDiagnosticProfile,compareDiagnosticProfiles} from './ci-browser-material-contract.mjs';
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
-const hashPattern=/^[a-f0-9]{64}$/;
 const native=(command,args)=>execFileSync('/usr/bin/'+command,args,{encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024,env:{...process.env,LC_ALL:'C'}});
 const inventory=()=>native('dpkg-query',['-W','-f=${Package}\t${Version}\t${Architecture}\t${db:Status-Abbrev}\n']).split('\n').filter(Boolean).sort().join('\n')+'\n';
-export function canonicalMaterial(value){
- const encode=value=>{
-  if(value===null||typeof value==='boolean')return value;
-  if(typeof value==='number'){assert.ok(Number.isFinite(value));return value;}
-  if(typeof value==='string'){assert.ok(value.length<=1024*1024);return value;}
-  if(Array.isArray(value)){assert.ok(value.length<=8192);return value.map(encode);}
-  assert.ok(value&&Object.getPrototypeOf(value)===Object.prototype,'Profile values must be plain JSON.');
-  assert.ok(!Object.hasOwn(value,'__proto__'));
-  return Object.fromEntries(Object.keys(value).sort().map(key=>[key,encode(value[key])]));
- };
- const result=JSON.stringify(encode(value));assert.ok(Buffer.byteLength(result)<=4*1024*1024);return result;
-}
-export function validateDiagnosticProfile(profile){
- assert.equal(profile?.version,1);assert.equal(profile.qualification,'diagnostic-only');
- const context=profile.context;
- assert.match(context?.commit??'',/^[a-f0-9]{40}$/);
- for(const key of ['runId','runAttempt'])assert.match(context[key]??'',/^[1-9][0-9]*$/);
- assert.match(context.imageVersion??'',/^[A-Za-z0-9._-]{1,80}$/);assert.equal(context.imageOS,'ubuntu24');
- assert.match(context.lockSha256??'',hashPattern);
- assert.deepEqual(profile.material?.source,materialProfileSource);
- assert.match(profile.material.scriptSha256??'',hashPattern);
- assert.ok(Array.isArray(profile.material.files)&&profile.material.files.length>0);
- const names=[];
- for(const file of profile.material.files){assert.ok(typeof file.name==='string'&&file.name.length>0);assert.match(file.sha256??'',hashPattern);assert.ok(Number.isSafeInteger(file.bytes)&&file.bytes>0);names.push(file.name);}
- assert.deepEqual(names,[...new Set(names)].sort(),'Material files must be unique and sorted.');
- const views=profile.material.views;
- assert.deepEqual(views?.map(view=>view.name),['desktop-empty','desktop-input','mobile-empty','mobile-input']);
- for(const view of views){assert.match(view.pixelSha256??'',hashPattern);assert.ok(view.width>0&&view.height>0);}
- assert.equal(profile.materialSha256,digest(canonicalMaterial(profile.material)),'Material profile digest mismatch.');
- return profile;
-}
-export function compareDiagnosticProfiles(left,right){
- validateDiagnosticProfile(left);validateDiagnosticProfile(right);
- const {imageVersion:leftImage,...leftContext}=left.context,{imageVersion:rightImage,...rightContext}=right.context;
- assert.equal(canonicalMaterial(leftContext),canonicalMaterial(rightContext),'Diagnostic profiles must share the exact workflow, lock and platform.');
- return {qualification:'diagnostic-only',productionAdmission:false,leftImage,rightImage,
-  sameImageVersion:leftImage===rightImage,materialEqual:left.materialSha256===right.materialSha256,
-  leftMaterialSha256:left.materialSha256,rightMaterialSha256:right.materialSha256};
-}
 async function fileRow(name,path){
  const entry=await stat(path);assert.ok(entry.isFile()&&entry.size>0&&entry.size<=512*1024*1024,'Invalid material file.');
  const hash=createHash('sha256');for await(const bytes of createReadStream(path))hash.update(bytes);
- return {name,bytes:entry.size,mode:entry.mode&0o777,sha256:hash.digest('hex')};
+ return {name,bytes:entry.size,mode:entry.mode&0o7777,sha256:hash.digest('hex')};
 }
 async function treeFiles(root,logical,files){
  for(const name of (await readdir(root)).sort()){
@@ -172,12 +129,14 @@ export async function captureOriginalMaterialViews(browser,root,output,observe=a
   return {views,screen};
  }finally{await new Promise(done=>server.close(done));}
 }
-export async function captureDiagnosticProfile(root,output){
+async function captureProfile(root,output,qualification){
  assert.equal(process.env.UI_SMOKE_HEADFUL,'true');await mkdir(output,{recursive:true});
  const context=await nativeContext(root),before=inventory();
- const nativeManifest=JSON.parse(await readFile(process.env.CI_BROWSER_NATIVE_MANIFEST,'utf8'));
- assert.deepEqual(nativeManifest.context,context,'Each diagnostic job must qualify its own exact image through authenticated native APT.');
- assert.equal(nativeManifest.afterInventory,before,'Native APT result must match the actual profile host.');
+ if(qualification==='diagnostic-only'){
+  const nativeManifest=JSON.parse(await readFile(process.env.CI_BROWSER_NATIVE_MANIFEST,'utf8'));
+  assert.deepEqual(nativeManifest.context,context,'Each diagnostic job must qualify its own exact image through authenticated native APT.');
+  assert.equal(nativeManifest.afterInventory,before,'Native APT result must match the actual profile host.');
+ }
  const {chromium}=await import('playwright');let browser;
  try{
   browser=await chromium.launch({headless:false});
@@ -195,14 +154,20 @@ export async function captureDiagnosticProfile(root,output){
    nodeVersion:process.version,browserVersion:browser.version(),packageInventorySha256:digest(before),
    fontCatalogSha256:digest(native('fc-list',['--format','%{file}\t%{family}\t%{style}\n']).split('\n').filter(Boolean).sort().join('\n')+'\n'),
    screen:source.screen,files,views:source.views};
-  const profile={version:1,qualification:'diagnostic-only',context,material,materialSha256:digest(canonicalMaterial(material))};
-  validateDiagnosticProfile(profile);assert.equal(inventory(),before,'Capturing diagnostic material must not change packages.');
+  const profile={version:1,qualification,context,material,materialSha256:digest(canonicalMaterial(material))};
+  if(qualification==='diagnostic-only')validateDiagnosticProfile(profile);else validateRuntimeMaterial(profile);
+ assert.equal(inventory(),before,'Capturing diagnostic material must not change packages.');
   await writeFile(join(output,'profile.json'),JSON.stringify(profile,null,2)+'\n');
   console.log(JSON.stringify({imageVersion:context.imageVersion,materialSha256:profile.materialSha256,files:files.length,bytes:files.reduce((n,f)=>n+f.bytes,0),views:material.views}));
   return profile;
  }finally{await browser?.close();}
 }
+export const captureDiagnosticProfile=(root,output)=>captureProfile(root,output,'diagnostic-only');
+export const captureRuntimeMaterial=(root,output)=>captureProfile(root,output,'runtime-measurement');
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- try{await captureDiagnosticProfile(process.cwd(),resolve(process.env.CI_BROWSER_MATERIAL_DIR));}
+ try{
+  const mode=process.argv[2];assert.ok(mode===undefined||mode==='measure','Expected diagnostic capture or measure.');
+  await (mode==='measure'?captureRuntimeMaterial:captureDiagnosticProfile)(process.cwd(),resolve(process.env.CI_BROWSER_MATERIAL_DIR));
+ }
  catch(error){console.error(error.message);process.exitCode=1;}
 }
