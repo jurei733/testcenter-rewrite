@@ -16,18 +16,28 @@ jobs:
         working-directory: rewrite-app
     env:
       CI: 'true'
+      UI_SMOKE_ARTIFACT_DIR: ${{ github.workspace }}/rewrite-app/probe-verona-diagnostics
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - uses: ./.github/actions/rewrite-runtime
       - run: npm run build
+      - name: Prepare native packages through the verified producer
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/native-verona-browser-system
+        shell: bash
+        run: |
+          mkdir -p "$UI_SMOKE_ARTIFACT_DIR"
+          set -o pipefail
+          timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack 2>&1 | tee "$UI_SMOKE_ARTIFACT_DIR/package-setup.log"
       - name: Install locked native Chromium for isolated reproduction
-        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install --with-deps chromium
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium 2>&1 | tee "$UI_SMOKE_ARTIFACT_DIR/browser-setup.log"
       - name: Reproduce full unchanged Verona journey with native diagnostics
         shell: bash
-        env:
-          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-verona-input
         run: |
           mkdir -p "$UI_SMOKE_ARTIFACT_DIR"
           set -o pipefail
@@ -36,6 +46,6 @@ jobs:
         if: always()
         with:
           name: native-verona-input-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/native-verona-input/
+          path: ${{ github.workspace }}/rewrite-app/probe-verona-diagnostics/
           if-no-files-found: error
           retention-days: 1
