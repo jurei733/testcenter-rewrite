@@ -18,26 +18,20 @@ runs:
     - shell: bash
       working-directory: rewrite-app
       run: npm ci --no-audit --no-fund
-    - name: Prefer existing official HTTPS Ubuntu archive
+    - name: Restore authenticated same-run browser system packages
+      if: inputs.playwright == 'true'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      with:
+        digest-mismatch: error
+        name: browser-system-${{ github.sha }}
+        path: ${{ runner.temp }}/browser-system
+    - name: Verify and install browser system packages offline
       if: inputs.playwright == 'true'
       shell: bash
-      run: |
-        node rewrite-app/scripts/ci-apt-mirrors.mjs > "${RUNNER_TEMP}/rewrite-apt-mirrors.txt"
-        sudo install -m 644 "${RUNNER_TEMP}/rewrite-apt-mirrors.txt" /etc/apt/apt-mirrors.txt
-        cmp --silent "${RUNNER_TEMP}/rewrite-apt-mirrors.txt" /etc/apt/apt-mirrors.txt
-    - name: Bound browser dependency mirror waits
-      if: inputs.playwright == 'true'
-      shell: bash
-      run: |
-        apt-config dump | node -e 'const text=require("node:fs").readFileSync(0,"utf8");const limits={};for(const protocol of ["http","https"]){const match=text.match(new RegExp("^Acquire::"+protocol+"::Dl-Limit \"([0-9]{1,12})\";[ \\t]*$","mi"));limits[protocol]=match?Number(match[1]):null;}console.log(JSON.stringify({ciAptPreviousDownloadLimitKbps:limits}));'
-        printf '%s\n' \
-          'Acquire::http::Timeout "15";' \
-          'Acquire::https::Timeout "15";' \
-          'Acquire::Retries "1";' \
-          'Acquire::http::Dl-Limit "0";' \
-          'Acquire::https::Dl-Limit "0";' \
-          | sudo tee /etc/apt/apt.conf.d/zz-testcenter-ci-network >/dev/null
-        apt-config dump | node -e 'const config=require("node:fs").readFileSync(0,"utf8").split(/\r?\n/).map(line=>line.toLowerCase()); for(const line of ["Acquire::http::Timeout \"15\";","Acquire::https::Timeout \"15\";","Acquire::Retries \"1\";","Acquire::http::Dl-Limit \"0\";","Acquire::https::Dl-Limit \"0\";"]) if(!config.includes(line.toLowerCase())) throw Error("CI APT network bounds are not effective");'
+      working-directory: rewrite-app
+      env:
+        CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+      run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore
     - if: inputs.playwright == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
@@ -46,7 +40,7 @@ runs:
     - if: inputs.playwright == 'true'
       shell: bash
       working-directory: rewrite-app
-      run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install --with-deps chromium
+      run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
     - if: inputs.prebuilt == 'true'
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
