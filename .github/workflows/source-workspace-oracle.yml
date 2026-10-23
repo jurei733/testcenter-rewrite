@@ -1,7 +1,7 @@
-name: Pinned Original backend workspace Oracle
+name: Pinned Original results and selected-Test Oracle
 on:
   push:
-    branches: [codex/source-workspace-oracle-20261023]
+    branches: [codex/source-results-oracle-20261023]
 permissions:
   contents: read
 concurrency:
@@ -43,7 +43,7 @@ jobs:
           docker compose --file .github/probes/source-workspace-oracle.compose.yml up --detach backend
           address=$(docker compose --file .github/probes/source-workspace-oracle.compose.yml port backend 8080)
           echo "SOURCE_ORACLE_URL=http://$address" >> "$GITHUB_ENV"
-      - name: Qualify real Source workspace roles, selection and deletion through HTTP
+      - name: Qualify Source roles, result statistics and selected-Test lifecycle through HTTP
         run: node .github/probes/source-workspace-oracle.mjs
       - name: Verify Source stayed unchanged
         if: always()

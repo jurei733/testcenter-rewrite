@@ -78,6 +78,75 @@ try{
  assert.equal(deleted.deleted.length,3);
  assert.equal((await request('GET',root+'/report/sys-check',{token:ro})).value.length,502);
  check('RW deletes every report of the selected Check and retains unrelated reports');
+
+ // Exercise the native result/test lifecycle through unchanged production
+ // routes. No direct SQL, fabricated token or test-mode shortcut seeds data.
+ const xml=(type,repo,version,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${repo}/${version}">${body}</${type}>`;
+ const files=[
+  ['unit-one.xml',xml('Unit','unit-xml','17.6','<Metadata><Id>ORACLE.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="owned-oracle-player">Owned definition</Definition>')],
+  ['unit-two.xml',xml('Unit','unit-xml','17.6','<Metadata><Id>ORACLE.UNIT2</Id><Label>Owned second unit</Label></Metadata><Definition player="owned-oracle-player">Owned second definition</Definition>')],
+  ['booklet-one.xml',xml('Booklet','testcenter-booklet-xml','18.0','<Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet A</Label></Metadata><Units><Unit id="ORACLE.UNIT"/></Units>')],
+  ['booklet-two.xml',xml('Booklet','testcenter-booklet-xml','18.0','<Metadata><Id>ORACLE.BOOK.B</Id><Label>Owned booklet B</Label></Metadata><Units><Unit id="ORACLE.UNIT"/><Unit id="ORACLE.UNIT2"/></Units>')],
+  ['people.xml',xml('Testtakers','testcenter-testtaker-xml','18.0','<Metadata/><Group id="ORACLE.GROUP" label="Owned source group"><Login name="owned-source-participant" pw="owned-source-participant-secret" mode="run-hot-return"><Booklet>ORACLE.BOOK.A</Booklet><Booklet>ORACLE.BOOK.B</Booklet></Login></Group>')]
+ ];
+ for(const [name,document]of files){
+  const form=new FormData();form.append('fileforvo[]',new Blob([document],{type:'application/xml'}),name);
+  await request('POST',root+'/file',{token:users.RW.token,body:form,status:201});
+ }
+ check('native result fixture uses actual XSD-validated roster and two Booklets');
+ const groups=async()=> (await request('GET',root+'/results',{token:ro})).value;
+ const sessions=async()=>Object.values((await request('GET',root+'/responses/detailed',{token:ro})).value).flat();
+ const groupProjection=value=>value.map(row=>({groupName:row.groupName,bookletsStarted:row.bookletsStarted,
+  min:row.numUnitsMin,max:row.numUnitsMax,total:row.numUnitsTotal,average:row.numUnitsAvg}));
+ const login=(await request('PUT','/session/login',{body:{name:'owned-source-participant',password:'owned-source-participant-secret'}})).value;
+ assert.ok(typeof login.token==='string'&&login.token.length>10);
+ const person=(await request('PUT','/session/person',{token:login.token,body:{code:''}})).value;
+ assert.ok(typeof person.token==='string'&&person.token.length>10);
+ const personToken=person.token;
+ const createTest=async name=>Number((await request('PUT','/test',{token:personToken,body:{bookletName:name},status:201})).value);
+ const first=await createTest('ORACLE.BOOK.A');assert.ok(first>0);
+ assert.deepEqual(await groups(),[]);assert.deepEqual(await sessions(),[]);
+ check('creating a Test without opening its Booklet creates no result row or stateful Test-Session');
+ const opened=(await request('GET','/test/'+first,{token:personToken})).value;assert.equal(opened.firstStart,true);
+ assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:0,max:0,total:0,average:0}]);
+ assert.deepEqual(await sessions(),[]);
+ check('opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing');
+ await request('PUT',`/test/${first}/unit/ORACLE.UNIT/log`,{token:personToken,status:201,
+  body:[{key:'OWNED',content:'log-only',timeStamp:Date.now()}]});
+ assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:1,max:1,total:1,average:1}]);
+ assert.deepEqual(await sessions(),[]);
+ check('a log-only persisted Unit counts in result statistics without creating a stateful Test-Session');
+ await request('PATCH',`/test/${first}/state`,{token:personToken,body:[{key:'CURRENT_UNIT_ID',content:'ORACLE.UNIT',timeStamp:Date.now()}]});
+ let detailed=await sessions();assert.equal(detailed.length,1);assert.equal(detailed[0].bookletName,'ORACLE.BOOK.A');
+ const second=await createTest('ORACLE.BOOK.B');assert.ok(second>0&&second!==first);
+ await request('PATCH',`/test/${second}/state`,{token:personToken,body:[{key:'CURRENT_UNIT_ID',content:'ORACLE.UNIT2',timeStamp:Date.now()}]});
+ detailed=await sessions();assert.deepEqual(detailed.map(row=>row.bookletName).sort(),['ORACLE.BOOK.A','ORACLE.BOOK.B']);
+ assert.equal((await groups())[0].bookletsStarted,1);
+ check('stateful Test-Session listing and opened-Booklet result listing have different inclusion rules');
+ await request('GET','/test/'+second,{token:personToken});
+ await request('PUT',`/test/${second}/unit/ORACLE.UNIT/response`,{token:personToken,status:201,
+  body:{timeStamp:Date.now(),responseType:'owned',originalUnitId:'ORACLE.UNIT',dataParts:{owned:'Exact retained answer Ω'}}});
+ await request('PUT',`/test/${second}/unit/ORACLE.UNIT2/log`,{token:personToken,status:201,
+  body:[{key:'OWNED',content:'second log-only unit',timeStamp:Date.now()}]});
+ assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:2,min:1,max:2,total:3,average:1.5}]);
+ check('group statistics aggregate saved Unit rows across Booklets including log-only Units',{openedBooklets:2,savedUnits:3,minimum:1,maximum:2,average:1.5});
+ const selectedSession=(await sessions()).find(row=>row.bookletName==='ORACLE.BOOK.A');assert.ok(selectedSession);
+ const selection={loginName:selectedSession.loginName,code:selectedSession.code??'',nameSuffix:selectedSession.nameSuffix??'',bookletName:selectedSession.bookletName};
+ const beforeDetailed=await sessions(),beforeGroups=await groups();
+ const beforeResponse=(await request('GET',`/test/${second}/unit/ORACLE.UNIT`,{token:personToken})).value;
+ await request('DELETE',root+'/responses/detailed',{token:ro,body:{personSessions:[selection]},status:403});
+ assert.deepEqual(await sessions(),beforeDetailed);assert.deepEqual(await groups(),beforeGroups);
+ check('RO selected-Test deletion returns 403 without changing results or Test-Session listing');
+ await request('DELETE',root+'/responses/detailed',{token:users.RW.token,body:{personSessions:[selection]}});
+ detailed=await sessions();assert.deepEqual(detailed.map(row=>row.bookletName),['ORACLE.BOOK.B']);
+ assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:2,max:2,total:2,average:2}]);
+ assert.deepEqual((await request('GET',`/test/${second}/unit/ORACLE.UNIT`,{token:personToken})).value,beforeResponse);
+ await request('GET','/test/'+first,{token:personToken,status:404});
+ const recreated=await createTest('ORACLE.BOOK.A');assert.ok(recreated>0&&recreated!==first&&recreated!==second);
+ assert.deepEqual((await sessions()).map(row=>row.bookletName),['ORACLE.BOOK.B']);
+ assert.deepEqual((await groups()).map(row=>row.bookletsStarted),[1]);
+ check('selected-Test deletion retains the same person token, unrelated Booklet answer and assignment; relaunch creates a new empty Test');
+
  await request('PATCH','/user/'+users.RO.id+'/workspaces',{token,body:{ws:[{id:ownedId,role:''}]}});
  await request('GET',overview,{token:ro,status:404});
  check('revocation is enforced against the existing signed-in token');
