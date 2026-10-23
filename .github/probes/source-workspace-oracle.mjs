@@ -117,11 +117,21 @@ try{
  assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:0,max:0,total:0,average:0}]);
  assert.deepEqual(await sessions(),[]);
  check('opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing');
+ const emptyUnit=(await request('GET',`/test/${first}/unit/ORACLE.UNIT`,{token:personToken})).value;
+ assert.deepEqual(Object.keys(emptyUnit.dataParts),[]);assert.equal((await groups())[0].numUnitsTotal,0);
+ await request('PUT',`/test/${first}/unit/ORACLE.UNIT/log`,{token:personToken,status:500,
+  body:[{key:'OWNED',content:'before unit initialization',timeStamp:Date.now()}]});
+ assert.equal((await groups())[0].numUnitsTotal,0);
+ check('a definition read does not create a saved Unit; pre-initialization logs are rejected without a Unit row');
+ const initializeUnit=async(testId,name)=>request('PATCH',`/test/${testId}/unit/${name}/state`,{token:personToken,
+  body:{newState:[{key:'PRESENTATION_PROGRESS',content:'some',timeStamp:Date.now()}],originalUnitId:name}});
+ await initializeUnit(first,'ORACLE.UNIT');
  await request('PUT',`/test/${first}/unit/ORACLE.UNIT/log`,{token:personToken,status:201,
   body:[{key:'OWNED',content:'log-only',timeStamp:Date.now()}]});
  assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:1,max:1,total:1,average:1}]);
  assert.deepEqual(await sessions(),[]);
- check('a log-only persisted Unit counts in result statistics without creating a stateful Test-Session');
+ assert.deepEqual(Object.keys((await request('GET',`/test/${first}/unit/ORACLE.UNIT`,{token:personToken})).value.dataParts),[]);
+ check('a persisted state-and-log Unit counts without answers or a stateful Test-Session');
  await request('PATCH',`/test/${first}/state`,{token:personToken,body:[{key:'CURRENT_UNIT_ID',content:'ORACLE.UNIT',timeStamp:Date.now()}]});
  let detailed=await sessions();assert.equal(detailed.length,1);assert.equal(detailed[0].bookletName,'ORACLE.BOOK.A');
  const second=await createTest('ORACLE.BOOK.B');assert.ok(second>0&&second!==first);
@@ -130,8 +140,10 @@ try{
  assert.equal((await groups())[0].bookletsStarted,1);
  check('stateful Test-Session listing and opened-Booklet result listing have different inclusion rules');
  await request('GET','/test/'+second,{token:personToken});
+ await initializeUnit(second,'ORACLE.UNIT');
  await request('PUT',`/test/${second}/unit/ORACLE.UNIT/response`,{token:personToken,status:201,
   body:{timeStamp:Date.now(),responseType:'owned',originalUnitId:'ORACLE.UNIT',dataParts:{owned:'Exact retained answer Ω'}}});
+ await initializeUnit(second,'ORACLE.UNIT2');
  await request('PUT',`/test/${second}/unit/ORACLE.UNIT2/log`,{token:personToken,status:201,
   body:[{key:'OWNED',content:'second log-only unit',timeStamp:Date.now()}]});
  assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:2,min:1,max:2,total:3,average:1.5}]);
