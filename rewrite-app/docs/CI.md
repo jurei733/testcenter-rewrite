@@ -1,5 +1,18 @@
 # CI iteration and complete acceptance
 
+### Install-free full-scope security audit and targeted patches (2026-10-23)
+
+The required dependency job now audits the committed lock directly, with explicit
+dev/optional inclusion and the unchanged high threshold, avoiding npm cache
+restoration and package installation. Owned temporary-workspace controls with no
+`node_modules` still reject the old vulnerable lock, including under
+`NODE_ENV=production`. Targeted Angular CLI 21.2.28 / Zod 4.6.6 and compatible
+ip-address 10.7.4 updates clear all three current findings after a clean install.
+See [audit scope, exact evidence and timing limits](DEPENDENCY-AUDIT.md).
+The actual predecessor audit failed correctly; this local fix does not make that
+run green or establish complete hosted acceptance.
+
+
 ### Focused group-snapshot feedback (2026-10-23)
 
 `npm run test:original-results` now also covers group snapshots and the actual
