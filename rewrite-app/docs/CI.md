@@ -1,5 +1,49 @@
 # CI iteration and complete acceptance
 
+## PostgreSQL UI failure evidence without extra success captures (2026-10-24)
+
+[Run 40051919357](https://github.com/jurei733/testcenter-rewrite/actions/runs/40051919357)
+finishes **87 successful jobs**, one failed PostgreSQL UI leaf and failed final
+acceptance. Its actual merge `c3a237e03ec78728e8376ce6c74b240b71f483dd`
+has the exact published tree `8f6b696cef09b8663888b0f5f785d45967ec6ec6`.
+Actual logs qualify all **22 Rewrite timer and nine Original Worker cases** in
+[120747363324](https://github.com/jurei733/testcenter-rewrite/actions/runs/40051919357/job/120747363324)
+and all **44 Exit/dialog cases** in
+[120747363000](https://github.com/jurei733/testcenter-rewrite/actions/runs/40051919357/job/120747363000).
+The independent PostgreSQL UI leaf
+[120747362686](https://github.com/jurei733/testcenter-rewrite/actions/runs/40051919357/job/120747362686)
+times out navigating from `/app/runtime` to Workspace after the booklet-detail
+Review Response handoff. Its screenshot is written to an unretained temporary
+directory, so this run cannot prove whether the navigation received trusted
+input or why it stayed on Runtime. The remaining useful jobs finish normally;
+this failure is not hidden by restarting the whole job.
+
+The full PostgreSQL UI now retains its exact failing process log plus a
+failure-only screenshot and bounded navigation JSON (trusted shell-nav events,
+focus/visibility, link bounds and active element). It records no credentials,
+request bodies or database dumps. The separate failure directory does not turn
+on the large journey's success screenshots. Explicit Bash keeps `pipefail`
+through `tee`; the unchanged UI command, deadlines and assertions remain
+mandatory. Policy checks require the failure/cancellation upload, seven-day
+retention and narrow paths. This improves diagnosis; it does not claim the
+historical navigation failure's root cause is fixed.
+
+The accompanying standalone-zero XML parser fix is exercised in all existing
+required native identity/HTTP/focused suites and normal/protected login browser
+gates. [Source62 and the remaining native suffix gaps](ORIGINAL-RESULT-GROUPS.md)
+are retained with exact public bytes. Local implementation qualification passes
+4,041 unit/frontend and 2,173 complete PostgreSQL checks, plus focused
+PostgreSQL 243, CI policy 267 passes/one explicit GNU-timeout-only macOS skip,
+core/web typechecking and the 468.39 kB production entry under 470 kB.
+All thirteen Source62 artifact members are revalidated in the native identity
+suite; its receipt-bound follow-up passes 41 checks across all four stores.
+The full local headed PostgreSQL UI also passes through the failed hosted
+navigation and every later review/monitor/deletion assertion to successful
+owned teardown. This does not reproduce or explain the historical Linux
+navigation failure. All test schemas and other database sessions are absent
+before dropping the owned database and stopping its initially stopped cluster.
+Exact hosted acceptance remains separate from these local results.
+
 ## Strict held-route transport and dialog fallback (2026-10-24)
 
 [Run 40049080532](https://github.com/jurei733/testcenter-rewrite/actions/runs/40049080532)

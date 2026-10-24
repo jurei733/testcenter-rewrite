@@ -316,6 +316,28 @@ try {
   }
   await context.close();
   process.stdout.write("Original password login: real authorized session, no persisted password.\n");
+  // Source treats the complete codes="0" attribute as PHP-falsy. It must
+  // continue through password/PoW into the Player without a second-code page.
+  await api("/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster", {
+    rosterText: `<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="OWNED.ZERO" label="Owned zero"><Login name="owned-zero-alone" pw="${password}" mode="run-hot-return"><Booklet codes="0">booklet:demo</Booklet></Login></Group></Testtakers>`
+  });
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } }), page = await context.newPage(), errors = [];
+    page.on("pageerror", error => errors.push(String(error))); observeProofOfWork(page);
+    await page.goto(`${baseUrl}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=demo-workspace`, { waitUntil: "networkidle" });
+    await page.getByLabel("Anmeldename", { exact: true }).fill("owned-zero-alone");
+    await page.getByRole("button", { name: "Weiter", exact: true }).click();
+    await page.getByLabel("Kennwort", { exact: true }).fill(password);
+    const signedIn = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/participant/auth/sign-in" && response.request().method() === "POST");
+    await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+    const response = await signedIn; assert.equal(response.status(), 200);
+    const identity = await response.json(); assert.equal(identity.participantSession.participantCode ?? "", "");
+    assert.equal(identity.participantSession.originalNameSuffix, "");
+    await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+    assert.deepEqual(errors, []);
+    assert.equal(await page.evaluate(secret => Object.keys(localStorage).some(key => localStorage.getItem(key)?.includes(secret)), password), false);
+    await context.close(); process.stdout.write("original_login=zero-only-native-XML-no-code:passed\n");
+  }
   if (!protectedParticipant) {
     // Second-code-only protection must not disable the preceding name login.
     // This roster and all resulting Runs belong exclusively to this test API.
