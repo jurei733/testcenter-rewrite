@@ -1,7 +1,8 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, mkdtemp, readFile, readdir } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -10,8 +11,21 @@ import { chromium } from "playwright";
 
 // These fixtures own their API/database/address; no interactive test is reset.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
+const noticeReference = await loadOriginalVisualReference("original-login-notices");
+const readNotice = element => {
+  const box = el => { const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, color: style.color,
+      font: style.font, margin: style.margin, display: style.display }; };
+  const host = box(element), icon = box(element.querySelector(".mat-icon"));
+  icon.x -= host.x; icon.y -= host.y;
+  host.x = host.y = 0;
+  return { text: element.textContent.trim(), host, icon };
+};
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(), "testcenter-original-admin-login-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR
+  ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, "original-admin-login")
+  : await mkdtemp(join(tmpdir(), "testcenter-original-admin-login-"));
+await mkdir(artifacts, {recursive:true});
 process.stdout.write(`owned_artifacts=${artifacts}\n`);
 const proof = ["1", "true"].includes(String(process.env.UI_SMOKE_ADMIN_PROOF_OF_WORK));
 const serverModule = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
@@ -61,6 +75,7 @@ try {
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
     ...(process.env.UI_SMOKE_BROWSER_CHANNEL ? { channel: process.env.UI_SMOKE_BROWSER_CHANNEL } : {}),
     args: ["--host-resolver-rules=MAP testcenter-proof.insecure 127.0.0.1"] });
+  assertOriginalVisualBrowser(browser, noticeReference);
   let browserChallenges = 0;
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
@@ -68,6 +83,7 @@ try {
       for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844]]) {
         const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
         const page = await context.newPage(), credentialRequests = [];
+        await page.bringToFront();
         page.on("request", request => {
           if (request.method() === "POST" && ["/api/v1/admin/auth/sign-in", "/api/v1/system/proof-of-work/challenges"].includes(new URL(request.url()).pathname)) credentialRequests.push(request);
         });
@@ -80,8 +96,7 @@ try {
         if (proof) {
           await notice.waitFor(); assert.equal(await notice.innerText(), "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.");
           if (mode === "original") {
-            const icon = await notice.locator(".mat-icon").boundingBox();
-            assert.equal(icon.width, 24); assert.equal(icon.height, 24);
+            assert.deepEqual(await notice.evaluate(readNotice), noticeReference.measurements[`${theme}-${screen}`].httpsAdmin);
           }
           assert.equal(await submit.isDisabled(), true);
           await page.locator("#adminPassword").press("Enter");
@@ -93,8 +108,26 @@ try {
           const authenticated = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/admin/auth/sign-in" && response.ok());
           await submit.click(); assert.equal((await authenticated).status(), 200);
           await page.waitForURL(url => url.pathname === "/app/workspace"); assert.equal(credentialRequests.length, 1);
+          await page.locator("#workspaceDirectorySortCard").waitFor();
         }
-        await page.screenshot({ path: join(artifacts, `${theme}-${screen}-${mode}-insecure-${proof ? "blocked" : "inactive"}.png`), fullPage: true });
+        await page.bringToFront();
+        await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+        const captureName = `${theme}-${screen}-${mode}-insecure-${proof ? "blocked" : "inactive"}`;
+        try {
+          await page.screenshot({ path: join(artifacts, `${captureName}.png`), fullPage: false });
+        } catch (error) {
+          const packet = await page.evaluate(() => ({ url:location.pathname, ready:document.readyState,
+            visibility:document.visibilityState, focus:document.hasFocus(),
+            viewport:{width:innerWidth,height:innerHeight,visual:visualViewport?.toJSON?.() ??
+              {width:visualViewport?.width,height:visualViewport?.height,scale:visualViewport?.scale,pageTop:visualViewport?.pageTop}},
+            root:document.querySelector("app-root")?.getBoundingClientRect().toJSON(),
+            workspace:document.querySelector("app-workspace-view")?.getBoundingClientRect().toJSON(),
+            animations:document.getAnimations().map(a=>({pending:a.pending,state:a.playState,timing:a.effect?.getComputedTiming()}))
+          }));
+          await writeFile(join(artifacts, `${captureName}-capture-failure.json`), JSON.stringify({error:String(error),...packet},null,2));
+          console.error(`admin_capture_failure=${JSON.stringify(packet)}`);
+          throw error;
+        }
         await context.close();
         process.stdout.write(`insecure_admin_entry=${theme}/${screen}/${mode}/${proof ? "blocked-no-request" : "inactive-authorized"}:passed\n`);
       }
@@ -102,6 +135,7 @@ try {
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
       const context = await browser.newContext({ viewport: { width, height } });
       const page = await context.newPage(); const errors = [], signIns = [];
+      await page.bringToFront();
       page.on("pageerror", error => errors.push(String(error)));
       page.on("console", message => { if (message.type() === "error" && /TypeError|ReferenceError|SyntaxError|NG\d{4}/u.test(message.text())) errors.push(message.text()); });
       page.on("response", response => {
@@ -115,16 +149,25 @@ try {
       const geometry = await root.evaluate(element => {
         const b = element.getBoundingClientRect(), card = element.querySelector("mat-card");
         const footer = document.querySelector("#originalApplicationFooter").getBoundingClientRect();
-        return { width: b.width, height: b.height, footer: [footer.y, footer.height],
+        const scroller = element.closest(".home-stage"), border = getComputedStyle(scroller);
+        const horizontalScrollbarHeight = scroller.offsetHeight - scroller.clientHeight -
+          parseFloat(border.borderTopWidth) - parseFloat(border.borderBottomWidth);
+        const versionText = document.createRange();
+        versionText.selectNodeContents(document.querySelector("#originalApplicationFooter .version-label"));
+        return { width: b.width, height: b.height, horizontalScrollbarHeight, footer: [footer.y, footer.height],
+          versionBottom: versionText.getBoundingClientRect().bottom,
+          documentHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
           header: document.querySelector("#participantApplicationHeader").getBoundingClientRect().height,
           cardWidth: card.getBoundingClientRect().width, cardColor: getComputedStyle(card).backgroundColor,
           heading: element.querySelector("mat-card-title").textContent.trim(),
           extraHero: Boolean(document.querySelector(".hero")), extraNavigation: Boolean(document.querySelector(".view-nav")),
           passwordSuffix: Boolean(element.querySelector(".mat-mdc-form-field-icon-suffix")) };
       });
-      assert.equal(geometry.height, height - (width < 600 ? 56 : 64) - 56 - 14);
+      assert.equal(geometry.height, height - (width < 600 ? 56 : 64) - 56 - 14 - geometry.horizontalScrollbarHeight);
       assert.ok(Math.abs(geometry.width - width * .98) <= 1 / 64);
       assert.deepEqual(geometry.footer, [height - 56, 56]);
+      assert.ok(geometry.versionBottom <= geometry.documentHeight + 1,
+        "The Original footer's wrapped text overflow must survive outside the inner scroll container");
       assert.equal(geometry.header, width < 600 ? 56 : 64);
       assert.equal(geometry.cardWidth, 400); assert.equal(geometry.cardColor, "rgb(255, 255, 255)");
       assert.equal(geometry.heading, "Admin-Bereich");
@@ -140,6 +183,7 @@ try {
       assert.equal(signIns.length, 1); assert.equal(signIns[0].status(), 401);
       assert.equal(await name.inputValue(), ""); assert.equal(await pw.inputValue(), "");
       assert.equal(await submit.isDisabled(), true);
+      await page.bringToFront();
       await page.screenshot({ path: join(artifacts, `${theme}-${screen}-wrong.png`) });
       await name.fill("demo-admin"); await pw.fill(password);
       const pending = (() => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; })();

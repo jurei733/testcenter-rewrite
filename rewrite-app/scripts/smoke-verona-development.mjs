@@ -216,7 +216,11 @@ try {
     const runId = initial.testRun.testRunId;
     const frame = page.frameLocator("#participantVeronaPlayerFrame");
     await frame.locator("input:not([type])").first().fill("Abi-42");
-    await frame.getByText("Sekundar I", { exact: true }).click();
+    const secondaryChoice = frame.getByRole("radio", { name: "Sekundar I", exact: true });
+    // Historical Material paints the label while visually hiding the native
+    // input outside the viewport. Exercise its supported keyboard selection.
+    await secondaryChoice.press("Space");
+    assert.equal(await secondaryChoice.isChecked(), true);
     const saved = await poll(async () => {
       const current = (await state()).currentRunState;
       const response = current.testRun.unitResponses[unitKeys[0]];
@@ -245,7 +249,15 @@ try {
     await ready();
     const restored = (await state()).currentRunState;
     assert.equal(restored.testRun.testRunId, runId);
-    assert.equal(restored.testRun.unitResponses[unitKeys[0]], exactResponse);
+    const originalPacket = JSON.parse(exactResponse), restoredPacket = JSON.parse(restored.testRun.unitResponses[unitKeys[0]]);
+    const { fieldTimestamps: originalClocks, ...originalState } = originalPacket;
+    const { fieldTimestamps: restoredClocks, ...restoredState } = restoredPacket;
+    assert.deepEqual(restoredState, originalState, "Player data and their types remain exact after reload and navigation");
+    for (const [group, fields] of Object.entries(originalClocks ?? {})) {
+      for (const [field, clock] of Object.entries(fields)) {
+        assert.ok(restoredClocks?.[group]?.[field] >= clock, `Restored ${group}.${field} capture clock cannot regress`);
+      }
+    }
     assert.equal(await page.locator("#bugReportDialog").count(), 0);
     clean();
     await page.close();

@@ -15,6 +15,7 @@ import { RecordCollectionComponent } from "./record-collection.component";
 import { SummaryCardsComponent } from "./summary-cards.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalAdminLoginComponent } from "./original-admin-login.component";
+import { OriginalSystemAdministrationComponent } from "./original-system-administration.component";
 
 @Component({
   selector: "app-ops-view",
@@ -26,120 +27,11 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
     JsonPanelComponent,
     SummaryCardsComponent,
     RecordCollectionComponent,
-    OriginalAdminLoginComponent
+    OriginalAdminLoginComponent,
+    OriginalSystemAdministrationComponent
   ],
   template: `
-    @if (interfaceMode.mode() === 'original' && !view.canUseAdminSession) {
-      @defer (when true) {
-        <app-original-admin-login [authenticate]="authenticateOriginal" />
-      } @error {
-        <p role="alert">Die Original-Anmeldung konnte nicht geladen werden.</p>
-        <button type="button" (click)="interfaceMode.select('rewrite')">Rewrite-Anmeldung öffnen</button>
-      }
-    } @else {
-    <div class="stack">
-      <article class="card" *ngIf="view.canUseAdminSession">
-        <h2>Diagnostics</h2>
-        <p>Inspect health, readiness, metrics, and effective runtime configuration without leaving the app.</p>
-        <div class="actions">
-          <button class="primary" type="button" (click)="view.refreshDiagnostics()">Refresh Diagnostics</button>
-          <button class="ghost" type="button" (click)="view.refreshMetrics()">Refresh Metrics</button>
-        </div>
-      </article>
-
-      <app-record-collection
-        *ngIf="view.localDemoAccessItems.length"
-        title="Local Demo Access"
-        subtitle="When local demo bootstrap is enabled, use these ready-made credentials and direct participant entry link."
-        [items]="view.localDemoAccessItems"
-        (itemAction)="view.runLocalDemoAccessAction($event)"
-        emptyState="Refresh diagnostics to detect whether local demo bootstrap is enabled."
-      ></app-record-collection>
-
-      <article id="operatorAccessCard" class="card operator-access-card" [class.is-signed-out]="!view.canUseAdminSession">
-        <span class="eyebrow">Protected operator access</span>
-        <h2>{{ view.canUseAdminSession ? "Operator Session" : "Sign In To The Operator Console" }}</h2>
-        <p>{{ view.canUseAdminSession
-          ? "The active account controls which administration and monitoring surfaces are available."
-          : "Use an administrator, study-monitor, or group-monitor account. You will return to the requested protected view after sign-in." }}</p>
-
-        <ng-container *ngIf="!view.canUseAdminSession; else activeOperatorSession">
-          <form class="operator-sign-in-form" (ngSubmit)="signInAdmin()">
-            <input id="adminSessionToken" name="adminSessionToken" type="hidden" [(ngModel)]="view.ops.adminSessionToken" />
-            <label>
-              Username
-              <input id="adminUsername" name="adminUsername" autocomplete="username" [(ngModel)]="view.ops.adminUsername" (change)="view.persistState()" />
-            </label>
-            <label>
-              Password
-              <input id="adminPassword" name="adminPassword" type="password" autocomplete="current-password" [(ngModel)]="view.ops.adminPassword" />
-            </label>
-            <p *ngIf="view.adminSignInProtectionUnavailable" data-cy="login-insecure-context" role="alert">{{ view.insecureContextMessage }}</p>
-            <button id="adminSignInButton" class="primary" type="submit" [disabled]="!view.canUseAdminCredentials">{{ view.proofOfWorkBusy ? "Computing Security Challenge…" : "Sign In" }}</button>
-          </form>
-
-          <details id="firstDeploymentSetup" class="operator-bootstrap-details" *ngIf="view.canBootstrapAdmin">
-            <summary>First deployment setup</summary>
-            <p>Create the first platform administrator only when this instance has not been initialized yet.</p>
-            <p id="adminBootstrapPasswordPolicy">New administrator passwords require {{ view.adminPasswordPolicyDescription }}.</p>
-            <label>
-              Display Name
-              <input id="adminDisplayName" name="adminDisplayName" [(ngModel)]="view.ops.adminDisplayName" (change)="view.persistState()" />
-            </label>
-            <div class="actions">
-              <button id="adminBootstrapOrSignInButton" class="secondary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
-              <button id="adminBootstrapButton" class="ghost" type="button" [disabled]="!view.canBootstrapAdminCredentials" (click)="view.bootstrapAdmin()">Create Without Signing In</button>
-            </div>
-          </details>
-        </ng-container>
-
-        <ng-template #activeOperatorSession>
-          <div class="form-grid operator-session-fields">
-            <label>
-              Username
-              <input id="adminUsername" name="adminUsername" [value]="view.ops.adminUsername" readonly />
-            </label>
-            <details class="technical-session-details">
-              <summary>Technical session details</summary>
-              <label>
-                Bearer Token
-                <input id="adminSessionToken" name="adminSessionToken" type="password" autocomplete="off" [(ngModel)]="view.ops.adminSessionToken" (change)="view.persistState()" readonly />
-              </label>
-            </details>
-          </div>
-          <div class="actions">
-            <button id="adminCurrentSessionButton" class="secondary" type="button" (click)="view.refreshAdminSession()">Refresh Session</button>
-            <button id="adminSessionsButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" (click)="view.refreshAdminSessions()">Admin Sessions</button>
-            <button id="adminUsersButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" (click)="view.refreshAdminUsers()">Admin Users</button>
-            <button id="adminAuditEventsButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
-            <button id="adminSignOutButton" class="ghost" type="button" (click)="view.signOutAdmin()">Sign Out</button>
-          </div>
-        </ng-template>
-        <p
-          *ngIf="view.ops.adminAccessWindowNotice"
-          id="adminAccessWindowNotice"
-          class="operator-access-window-notice"
-          role="alert"
-          aria-live="assertive"
-        >{{ view.ops.adminAccessWindowNotice }}</p>
-      </article>
-
-      <app-record-collection
-        *ngIf="view.canUseAdminSession"
-        title="Operator Session"
-        [subtitle]="'Active access: ' + view.operatorAccessLabel"
-        [items]="view.adminSessionItems"
-        emptyState="Bootstrap or sign in to inspect the admin session."
-      ></app-record-collection>
-
-      <ng-container *ngIf="view.canUseAdminManagement">
-
-      <app-administration-nav
-        *ngIf="view.canManageApplicationSettings"
-        [activeSection]="activeAdminSection"
-        (sectionSelected)="selectAdminSection($event)"
-      ></app-administration-nav>
-
+    <ng-template #applicationSettings>
       <article id="applicationSettingsCard" class="card" *ngIf="view.canManageApplicationSettings && activeAdminSection === 'settings'">
         <div class="section-heading">
           <div>
@@ -299,7 +191,7 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
           </section>
           <details id="applicationCustomTextsEditor" class="span-all application-custom-texts-editor">
             <summary>Custom text overrides ({{ view.applicationCustomTextKeys.length }})</summary>
-            <p>Original precedence is global, then workspace Testtakers login, then active Booklet. Empty global values inherit the built-in default.</p>
+            <p>Original precedence is global, then workspace Testtakers login, then active Booklet. Text values, spaces and line breaks are kept. Use Inherit to remove a global override.</p>
             <div class="application-custom-text-add">
               <label>
                 Additional key
@@ -325,7 +217,7 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
                 </label>
                 <div class="actions compact-actions">
                   <button class="ghost" type="button" *ngIf="view.applicationCustomTextDefault(key)" (click)="view.setApplicationCustomTextToDefault(key)">Use default</button>
-                  <button class="ghost" type="button" [disabled]="!view.applicationCustomTextDrafts[key]" (click)="view.removeApplicationCustomText(key)">Inherit</button>
+                  <button class="ghost" type="button" [disabled]="!view.hasApplicationCustomTextOverride(key)" (click)="view.removeApplicationCustomText(key)">Inherit</button>
                 </div>
               </div>
             </div>
@@ -367,6 +259,129 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
           <button id="refreshApplicationSettingsButton" class="ghost" type="button" (click)="view.refreshApplicationSettings()">Refresh Settings</button>
         </div>
       </article>
+
+    </ng-template>
+    @if (interfaceMode.mode() === 'original' && !view.canUseAdminSession) {
+      @defer (when true) {
+        <app-original-admin-login [authenticate]="authenticateOriginal" />
+      } @error {
+        <p role="alert">Die Original-Anmeldung konnte nicht geladen werden.</p>
+        <button type="button" (click)="interfaceMode.select('rewrite')">Rewrite-Anmeldung öffnen</button>
+      }
+    } @else if (interfaceMode.mode() === 'original' && view.canManageApplicationSettings) {
+      @defer (when true) {
+        <app-original-system-administration [sessionToken]="view.ops.adminSessionToken"
+          [section]="activeAdminSection"
+          (sectionSelected)="selectAdminSection($event)" />
+      } @error {
+        <p role="alert">Die Systemverwaltung konnte nicht geladen werden.</p>
+        <button type="button" (click)="interfaceMode.select('rewrite')">Rewrite-Verwaltung öffnen</button>
+      }
+    } @else {
+    <div class="stack">
+      <article class="card" *ngIf="view.canUseAdminSession">
+        <h2>Diagnostics</h2>
+        <p>Inspect health, readiness, metrics, and effective runtime configuration without leaving the app.</p>
+        <div class="actions">
+          <button class="primary" type="button" (click)="view.refreshDiagnostics()">Refresh Diagnostics</button>
+          <button class="ghost" type="button" (click)="view.refreshMetrics()">Refresh Metrics</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        *ngIf="view.localDemoAccessItems.length"
+        title="Local Demo Access"
+        subtitle="When local demo bootstrap is enabled, use these ready-made credentials and direct participant entry link."
+        [items]="view.localDemoAccessItems"
+        (itemAction)="view.runLocalDemoAccessAction($event)"
+        emptyState="Refresh diagnostics to detect whether local demo bootstrap is enabled."
+      ></app-record-collection>
+
+      <article id="operatorAccessCard" class="card operator-access-card" [class.is-signed-out]="!view.canUseAdminSession">
+        <span class="eyebrow">Protected operator access</span>
+        <h2>{{ view.canUseAdminSession ? "Operator Session" : "Sign In To The Operator Console" }}</h2>
+        <p>{{ view.canUseAdminSession
+          ? "The active account controls which administration and monitoring surfaces are available."
+          : "Use an administrator, study-monitor, or group-monitor account. You will return to the requested protected view after sign-in." }}</p>
+
+        <ng-container *ngIf="!view.canUseAdminSession; else activeOperatorSession">
+          <form class="operator-sign-in-form" (ngSubmit)="signInAdmin()">
+            <input id="adminSessionToken" name="adminSessionToken" type="hidden" [(ngModel)]="view.ops.adminSessionToken" />
+            <label>
+              Username
+              <input id="adminUsername" name="adminUsername" autocomplete="username" [(ngModel)]="view.ops.adminUsername" (change)="view.persistState()" />
+            </label>
+            <label>
+              Password
+              <input id="adminPassword" name="adminPassword" type="password" autocomplete="current-password" [(ngModel)]="view.ops.adminPassword" />
+            </label>
+            <p *ngIf="view.adminSignInProtectionUnavailable" data-cy="login-insecure-context" role="alert">{{ view.insecureContextMessage }}</p>
+            <button id="adminSignInButton" class="primary" type="submit" [disabled]="!view.canUseAdminCredentials">{{ view.proofOfWorkBusy ? "Computing Security Challenge…" : "Sign In" }}</button>
+          </form>
+
+          <details id="firstDeploymentSetup" class="operator-bootstrap-details" *ngIf="view.canBootstrapAdmin">
+            <summary>First deployment setup</summary>
+            <p>Create the first platform administrator only when this instance has not been initialized yet.</p>
+            <p id="adminBootstrapPasswordPolicy">New administrator passwords require {{ view.adminPasswordPolicyDescription }}.</p>
+            <label>
+              Display Name
+              <input id="adminDisplayName" name="adminDisplayName" [(ngModel)]="view.ops.adminDisplayName" (change)="view.persistState()" />
+            </label>
+            <div class="actions">
+              <button id="adminBootstrapOrSignInButton" class="secondary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
+              <button id="adminBootstrapButton" class="ghost" type="button" [disabled]="!view.canBootstrapAdminCredentials" (click)="view.bootstrapAdmin()">Create Without Signing In</button>
+            </div>
+          </details>
+        </ng-container>
+
+        <ng-template #activeOperatorSession>
+          <div class="form-grid operator-session-fields">
+            <label>
+              Username
+              <input id="adminUsername" name="adminUsername" [value]="view.ops.adminUsername" readonly />
+            </label>
+            <details class="technical-session-details">
+              <summary>Technical session details</summary>
+              <label>
+                Bearer Token
+                <input id="adminSessionToken" name="adminSessionToken" type="password" autocomplete="off" [(ngModel)]="view.ops.adminSessionToken" (change)="view.persistState()" readonly />
+              </label>
+            </details>
+          </div>
+          <div class="actions">
+            <button id="adminCurrentSessionButton" class="secondary" type="button" (click)="view.refreshAdminSession()">Refresh Session</button>
+            <button id="adminSessionsButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" (click)="view.refreshAdminSessions()">Admin Sessions</button>
+            <button id="adminUsersButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" (click)="view.refreshAdminUsers()">Admin Users</button>
+            <button id="adminAuditEventsButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
+            <button id="adminSignOutButton" class="ghost" type="button" (click)="view.signOutAdmin()">Sign Out</button>
+          </div>
+        </ng-template>
+        <p
+          *ngIf="view.ops.adminAccessWindowNotice"
+          id="adminAccessWindowNotice"
+          class="operator-access-window-notice"
+          role="alert"
+          aria-live="assertive"
+        >{{ view.ops.adminAccessWindowNotice }}</p>
+      </article>
+
+      <app-record-collection
+        *ngIf="view.canUseAdminSession"
+        title="Operator Session"
+        [subtitle]="'Active access: ' + view.operatorAccessLabel"
+        [items]="view.adminSessionItems"
+        emptyState="Bootstrap or sign in to inspect the admin session."
+      ></app-record-collection>
+
+      <ng-container *ngIf="view.canUseAdminManagement">
+
+      <app-administration-nav
+        *ngIf="view.canManageApplicationSettings"
+        [activeSection]="activeAdminSection"
+        (sectionSelected)="selectAdminSection($event)"
+      ></app-administration-nav>
+
+      <ng-container [ngTemplateOutlet]="applicationSettings" />
 
       <ng-container *ngIf="activeAdminSection === 'users'">
       <ng-container *ngIf="view.canUseAdminSession">
@@ -688,7 +703,7 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
           </label>
         </div>
         <p id="adminCustomTextsValidationError" *ngIf="view.normalizedAdminCustomTextsUpdate === null" role="alert">Use a JSON object with at most 250 valid keys and string values within the supported size limits.</p>
-        <p>{{ view.adminCustomTextsUpdateCount }} non-empty login-specific custom text(s) will replace the complete current map. Values are trimmed; empty values remove their key.</p>
+        <p>{{ view.adminCustomTextsUpdateCount }} login-specific custom text(s) will replace the complete current map. Values are kept exactly. Remove a key to inherit global text.</p>
         <div class="actions">
           <button id="adminUpdateCustomTextsButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserCustomTexts" (click)="view.confirmUpdateAdminUserCustomTexts()">Update Custom Texts</button>
         </div>
@@ -1249,7 +1264,7 @@ export class OpsViewComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(params => {
         this.activeAdminSection =
-          params.get("adminSection") === "settings" ? "settings" : "users";
+          params.get("adminSection") === "settings" ? "settings" : params.get("adminSection") === "workspaces" ? "workspaces" : "users";
       });
     if (this.route.snapshot.queryParamMap.get("demoAdmin") === "sign-in") {
       void this.signInLocalDemoAdmin();

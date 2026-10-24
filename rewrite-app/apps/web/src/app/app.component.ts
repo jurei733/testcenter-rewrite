@@ -1,4 +1,4 @@
-import { NgIf, NgTemplateOutlet } from "@angular/common";
+import { NgTemplateOutlet } from "@angular/common";
 import {
   ChangeDetectorRef,
   Component,
@@ -16,6 +16,7 @@ import {
 } from "@angular/router";
 
 import { ActivityFeedComponent } from "./activity-feed.component";
+import { AdminPasswordDialogsComponent } from "./admin-password-dialogs.component";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
 import { BugReportDialogComponent } from "./bug-report-dialog.component";
@@ -26,6 +27,7 @@ import { LiveContextComponent } from "./live-context.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalFooterComponent } from "./original-footer.component";
 import { OriginalParticipantAccountComponent } from "./original-participant-account.component";
+import { OriginalApplicationLogoComponent } from "./original-application-logo.component";
 import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
@@ -44,8 +46,8 @@ const routeViews: AppView[] = [
   selector: "app-root",
   standalone: true,
   imports: [
-    NgIf,
     NgTemplateOutlet,
+    AdminPasswordDialogsComponent,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
@@ -55,7 +57,8 @@ const routeViews: AppView[] = [
     ConfirmationDialogComponent,
     LiveContextComponent,
     OriginalFooterComponent,
-    OriginalParticipantAccountComponent
+    OriginalParticipantAccountComponent,
+    OriginalApplicationLogoComponent
   ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css"
@@ -132,6 +135,16 @@ export class AppComponent implements OnInit, OnDestroy {
   get isOriginalAdminLogin(): boolean {
     return this.interfaceMode.mode() === "original" && this.isSignedOutOpsView;
   }
+
+  get isOriginalAdministration(): boolean {
+    return this.interfaceMode.mode() === "original" && this.activeRouteView === "ops" && this.app.isPlatformAdmin;
+  }
+
+  get isOriginalWorkspaceFiles(): boolean {
+    return this.interfaceMode.mode()==='original' && this.activeRouteView==='content' && this.app.hasAdminSession;
+  }
+
+  get isOriginalNativeOperator(): boolean { return this.isOriginalAdministration || this.isOriginalWorkspaceFiles; }
 
   get activeRouteView(): AppView {
     this.routeVersion();
@@ -284,7 +297,9 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
     const initialView = this.getInitialViewFromLocation();
-    const isApplicationRoot = this.router.url === "/" || this.router.url === "";
+    // Router.url can still be '/' during an auxiliary route's initial guard.
+    // Only the actual entry path should trigger the default home navigation.
+    const isApplicationRoot = /^\/(?:app\/?)?$/.test(window.location.pathname);
     this.app.init(initialView ?? (isApplicationRoot ? "home" : null));
     if (!initialView && isApplicationRoot) {
       await this.router.navigateByUrl("/home", {

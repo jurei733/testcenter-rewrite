@@ -1,3 +1,4 @@
+import { originalSystemCheckCustomTextDefaults, originalSystemCheckCustomTextKeys } from "@testcenter-rewrite-app/contracts/system-check-custom-texts";
 import { Injectable, inject } from "@angular/core";
 
 import type {
@@ -364,20 +365,26 @@ export class OpsViewFacade {
     return [...new Set([
       ...originalParticipantCustomTextKeys,
       ...originalMonitorCustomTextKeys,
+      ...originalSystemCheckCustomTextKeys,
       ...Object.keys(this.applicationCustomTextDrafts)
     ])].sort((left, right) => left.localeCompare(right));
   }
 
   applicationCustomTextDefault(key: string): string {
-    return (
-      originalParticipantCustomTextDefaults[
-        key as keyof typeof originalParticipantCustomTextDefaults
-      ] ??
-      originalMonitorCustomTextDefaults[
-        key as keyof typeof originalMonitorCustomTextDefaults
-      ] ??
-      ""
-    );
+    if (Object.hasOwn(originalParticipantCustomTextDefaults, key)) {
+      return originalParticipantCustomTextDefaults[key as keyof typeof originalParticipantCustomTextDefaults];
+    }
+    if (Object.hasOwn(originalMonitorCustomTextDefaults, key)) {
+      return originalMonitorCustomTextDefaults[key as keyof typeof originalMonitorCustomTextDefaults];
+    }
+    if (Object.hasOwn(originalSystemCheckCustomTextDefaults, key)) {
+      return originalSystemCheckCustomTextDefaults[key as keyof typeof originalSystemCheckCustomTextDefaults];
+    }
+    return "";
+  }
+
+  hasApplicationCustomTextOverride(key: string): boolean {
+    return Object.hasOwn(this.applicationCustomTextDrafts, key);
   }
 
   get applicationCustomTextsValid(): boolean {
@@ -405,8 +412,7 @@ export class OpsViewFacade {
     const key = this.applicationCustomTextNewKey.trim();
     return (
       /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) &&
-      key.length <= 120 &&
-      Boolean(this.applicationCustomTextNewValue.trim())
+      key.length <= 120
     );
   }
 
@@ -591,7 +597,7 @@ export class OpsViewFacade {
     draft: string
   ): Record<string, string> | null {
     const parsed = parseJsonDocument<Record<string, unknown>>(draft);
-    if (!parsed || Array.isArray(parsed)) {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return null;
     }
     const entries = Object.entries(parsed);
@@ -599,7 +605,7 @@ export class OpsViewFacade {
       return null;
     }
     const encoder = new TextEncoder();
-    const normalized: Record<string, string> = {};
+    const normalized: Array<[string, string]> = [];
     let totalBytes = 0;
     for (const [rawKey, rawValue] of entries) {
       const key = rawKey.trim();
@@ -610,18 +616,15 @@ export class OpsViewFacade {
       ) {
         return null;
       }
-      const text = rawValue.trim();
-      if (!text) {
-        continue;
-      }
+      const text = rawValue;
       const valueBytes = encoder.encode(text).byteLength;
       totalBytes += encoder.encode(key).byteLength + valueBytes;
       if (valueBytes > 10_000 || totalBytes > 250_000) {
         return null;
       }
-      normalized[key] = text;
+      normalized.push([key, text]);
     }
-    return normalized;
+    return Object.fromEntries(normalized);
   }
 
   get isAssigningMonitorRole(): boolean {
@@ -1010,7 +1013,7 @@ export class OpsViewFacade {
     this.applicationCustomTextDrafts = {
       ...this.applicationCustomTextDrafts,
       [this.applicationCustomTextNewKey.trim()]:
-        this.applicationCustomTextNewValue.trim()
+        this.applicationCustomTextNewValue
     };
     this.applicationCustomTextNewKey = "";
     this.applicationCustomTextNewValue = "";
@@ -4180,9 +4183,8 @@ export class OpsViewFacade {
     return Object.fromEntries(
       Object.entries(this.applicationCustomTextDrafts).flatMap(([key, value]) => {
         const normalizedKey = key.trim();
-        const normalizedValue = value.trim();
-        return normalizedKey && normalizedValue
-          ? [[normalizedKey, normalizedValue] as const]
+        return normalizedKey
+          ? [[normalizedKey, value] as const]
           : [];
       })
     );

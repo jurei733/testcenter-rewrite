@@ -1,5 +1,6 @@
 import QrScanner from "qr-scanner";
 import { AttachmentQrDecoder } from "./attachment-qr-decoder";
+import { attachmentCameraMirrored, attachmentPageGeometry } from "./attachment-page-geometry";
 
 type CameraDependencies = {
   getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
@@ -93,8 +94,7 @@ export class AttachmentCameraScanner {
     this.video.srcObject = stream;
     this.video.muted = true;
     this.video.playsInline = true;
-    const track = stream.getVideoTracks()[0];
-    const mirrored = track?.getSettings().facingMode === "user" || /front|user|face/i.test(track?.label ?? "");
+    const mirrored = attachmentCameraMirrored(stream);
     this.video.style.transform = mirrored ? "scaleX(-1)" : "";
     try {
       await this.video.play();
@@ -182,7 +182,10 @@ export class AttachmentCameraScanner {
     const decoder = this.decoder;
     try {
       if (decoder && this.video.readyState >= 2 && this.video.videoWidth && this.video.videoHeight) {
-        const result = await decoder.decode(this.video);
+        const geometry = attachmentPageGeometry(this.video.videoWidth, this.video.videoHeight,
+          attachmentCameraMirrored(this.stream));
+        if (!geometry) return;
+        const result = await decoder.decode(this.video, geometry.scanRegion);
         if (!this.active || generation !== this.generation) return;
         await this.onDecode(result);
       }

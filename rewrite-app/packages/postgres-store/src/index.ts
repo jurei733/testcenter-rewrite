@@ -1,10 +1,30 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { defaultParticipantExecutionMode } from "@testcenter-rewrite-app/domain";
 
 import {
+  originalParticipantGroupKeysEqual,
+  prepareOriginalParticipantGroup,
+  prepareOriginalLoginBinding,
+  prepareOriginalParticipantSession,
+  resolveOriginalPerson,
+  assertOriginalPersonUnique,
+  projectOriginalPersonRuns,
+  projectOriginalLoginMode,
+  withOriginalTestRunMode,
+  createContentReleaseActivationRevision,
+  prepareContentReleaseActivation,
+  prepareWorkspaceFilePublication,
+  prepareApplicationAssetDeletion,
+  validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
-  selectParticipantAssignmentRun,
+  prepareParticipantAssignmentRunCreation,
+  prepareParticipantControllerActivation,
+  prepareParticipantRunMutation,
+  appendParticipantRunCommand,
+  acknowledgeParticipantRunCommand,
+  prepareParticipantRunCommandApplication,
   type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
@@ -25,7 +45,11 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  OriginalParticipantGroup,
+  OriginalLoginBinding,
   ParticipantTestLog,
+  ParticipantRunCommand,
+  ParticipantProgressDelivery,
   SourcePackage,
   SourcePackageContentStructure,
   Tenant,
@@ -42,6 +66,18 @@ type PostgresMigration = {
   name: string;
   sql: string;
 };
+
+const mapOriginalParticipantGroup = (row: Record<string, unknown>): OriginalParticipantGroup => ({
+  tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id),
+  groupKey: String(row.group_key), groupLabel: String(row.group_label),
+  createdAt: String(row.created_at), lastModifiedAt: String(row.last_modified_at)
+});
+
+const mapOriginalLoginBinding = (row: Record<string, unknown>): OriginalLoginBinding => ({
+  tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),loginKey:String(row.login_key),
+  groupKey:String(row.group_key),groupSnapshotKey:String(row.group_snapshot_key),
+  createdAt:String(row.created_at),lastAuthenticatedAt:String(row.last_authenticated_at)
+});
 
 const mapTenant = (row: Row | undefined): Tenant | null =>
   row
@@ -368,6 +404,8 @@ const mapParticipantSession = (row: Row | undefined): ParticipantSession | null 
         contentReleaseId: String(row.content_release_id),
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
+        ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
+        ...(row.original_name_suffix === null || row.original_name_suffix === undefined ? {} : {originalNameSuffix:String(row.original_name_suffix)}),
         participantCode:
           row.participant_code === null || row.participant_code === undefined
             ? null
@@ -482,6 +520,7 @@ const mapParticipantRosterEntry = (
               ? undefined
               : (String(row.execution_mode) as ParticipantRosterEntry["executionMode"]),
           groupKey: String(row.group_key),
+          ...(row.original_login_identity ? {originalLoginIdentity:true as const} : {}),
           ...(row.group_label === null || row.group_label === undefined
             ? {}
             : { groupLabel: String(row.group_label) }),
@@ -524,9 +563,16 @@ const mapParticipantRosterEntry = (
       })()
     : null;
 
+// Cast optional JSON metadata to text so JSON null remains distinct from SQL NULL.
+const testRunProjection = `test_runs.*, controller_entry_json::text AS controller_entry_json, controller_dispatches_json::text AS controller_dispatches_json, original_result_state_json::text AS original_result_state_json`;
+
 const mapTestRun = (row: Row | undefined): TestRun | null =>
   row
     ? {
+        ...(row.controller_entry_json == null ? {} : { controllerEntry: typeof row.controller_entry_json === "string" ? JSON.parse(row.controller_entry_json) : row.controller_entry_json as TestRun["controllerEntry"] }),
+        ...(row.original_result_state_json == null ? {} : { originalResultState: (typeof row.original_result_state_json === "string" ? JSON.parse(row.original_result_state_json) : row.original_result_state_json) as TestRun["originalResultState"] }),
+        ...(row.state_revision == null ? {} : { stateRevision: Number(row.state_revision) }),
+        ...(row.controller_dispatches_json == null ? {} : { controllerDispatches: (typeof row.controller_dispatches_json === "string" ? JSON.parse(row.controller_dispatches_json) : row.controller_dispatches_json) as TestRun["controllerDispatches"] }),
         testRunId: String(row.test_run_id),
         participantSessionId: String(row.participant_session_id),
         tenantId: String(row.tenant_id),
@@ -556,6 +602,14 @@ const mapTestRun = (row: Row | undefined): TestRun | null =>
         unitResponses: JSON.parse(
           String(row.unit_responses_json ?? "{}")
         ) as Record<string, string>,
+        ...(() => {
+          const fields = JSON.parse(String(row.response_field_timestamps_json ?? "{}")) as NonNullable<TestRun["unitResponseFieldTimestamps"]>;
+          return Object.keys(fields).length ? { unitResponseFieldTimestamps: fields } : {};
+        })(),
+        ...(() => {
+          const fields = JSON.parse(String(row.shared_parameter_timestamps_json ?? "{}")) as NonNullable<TestRun["sharedParameterTimestamps"]>;
+          return Object.keys(fields).length ? { sharedParameterTimestamps: fields } : {};
+        })(),
         sharedParameters: (() => {
           try {
             const value = row.shared_parameters_json;
@@ -1459,6 +1513,118 @@ const migrations: PostgresMigration[] = [
       CREATE INDEX idx_participant_connection_presence_expiry
         ON participant_connection_presence(next_expiry) WHERE next_expiry IS NOT NULL;
     `
+  },
+  {
+    version: 53,
+    name: "add_participant_run_commands",
+    sql: `
+      CREATE TABLE participant_run_commands (
+        test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        command_id TEXT NOT NULL,
+        sequence BIGINT NOT NULL CHECK (sequence > 0 AND sequence <= 9007199254740991),
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        command_json JSONB NOT NULL,
+        acknowledged_at TEXT,
+        PRIMARY KEY (test_run_id, command_id),
+        UNIQUE (test_run_id, sequence)
+      );
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
+    `
+  },
+  {
+    version: 54,
+    name: "index_participant_command_application_order",
+    sql: `
+      CREATE UNIQUE INDEX idx_participant_run_commands_execution
+        ON participant_run_commands(test_run_id, ((command_json->>'executionSequence')::bigint))
+        WHERE command_json->>'executionSequence' IS NOT NULL;
+    `
+  },
+  {
+    version: 55,
+    name: "index_pending_participant_command_effects",
+    sql: `
+      DROP INDEX idx_participant_run_commands_pending;
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL OR (command_json->>'effectsDeferred' = 'true' AND command_json->>'executedAt' IS NULL);
+    `
+  },
+  {
+    version: 56,
+    name: "index_unacknowledged_participant_commands",
+    sql: `
+      DROP INDEX idx_participant_run_commands_pending;
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
+    `
+  },
+  {
+    version: 57,
+    name: "participant_progress_delivery_and_field_ordering",
+    sql: `
+      ALTER TABLE test_runs ADD COLUMN response_field_timestamps_json TEXT NOT NULL DEFAULT '{}';
+      ALTER TABLE test_runs ADD COLUMN shared_parameter_timestamps_json TEXT NOT NULL DEFAULT '{}';
+      CREATE TABLE participant_progress_deliveries (
+        test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        delivery_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        content_release_id TEXT NOT NULL,
+        delivery_json JSONB NOT NULL,
+        PRIMARY KEY (test_run_id, delivery_id)
+      );
+      CREATE INDEX idx_participant_progress_deliveries_workspace
+        ON participant_progress_deliveries(tenant_id, workspace_id);
+    `
+  },
+  {
+    version: 58,
+    name: "participant_run_controller_entry",
+    sql: `ALTER TABLE test_runs ADD COLUMN controller_entry_json JSONB;`
+  },
+  {
+    version: 59,
+    name: "participant_run_state_revision",
+    sql: `ALTER TABLE test_runs ADD COLUMN state_revision BIGINT; ALTER TABLE test_runs ADD COLUMN controller_dispatches_json JSONB;`
+  },
+  {
+    version: 60,
+    name: "original_test_result_state",
+    sql: `ALTER TABLE test_runs ADD COLUMN original_result_state_json JSONB;`
+  },
+  {
+    version: 61,
+    name: "original_participant_groups",
+    sql: `CREATE TABLE IF NOT EXISTS original_participant_groups (
+      tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, group_key TEXT NOT NULL,
+      group_label TEXT NOT NULL, created_at TEXT NOT NULL, last_modified_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, workspace_id, group_key)
+    );`
+  },
+  {
+    version: 62,
+    name: "original_login_bindings",
+    sql: `CREATE TABLE IF NOT EXISTS original_login_bindings (
+      tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, login_key TEXT NOT NULL,
+      group_key TEXT NOT NULL, group_snapshot_key TEXT NOT NULL,
+      created_at TEXT NOT NULL, last_authenticated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, workspace_id, login_key),
+      FOREIGN KEY (tenant_id, workspace_id, group_snapshot_key)
+        REFERENCES original_participant_groups(tenant_id, workspace_id, group_key) ON DELETE CASCADE
+    );
+    ALTER TABLE participant_sessions ADD COLUMN original_login_key TEXT;
+    ALTER TABLE participant_roster_entries ADD COLUMN original_login_identity BOOLEAN;
+    CREATE INDEX IF NOT EXISTS participant_sessions_original_login
+      ON participant_sessions(tenant_id, workspace_id, original_login_key);`
+  },
+  {
+    version: 63,
+    name: "original_person_name_suffix",
+    sql: `ALTER TABLE participant_sessions ADD COLUMN original_name_suffix TEXT;`
   }
 ];
 
@@ -1562,8 +1728,8 @@ export const checkPostgresFirstSliceReadiness = async (
 const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun, updateExisting = true): Promise<boolean> => {
   const result = await connection.query(
     `INSERT INTO test_runs (
-      test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+      test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
     ${updateExisting ? `ON CONFLICT(test_run_id) DO UPDATE SET
       participant_session_id = EXCLUDED.participant_session_id,
       tenant_id = EXCLUDED.tenant_id,
@@ -1588,7 +1754,13 @@ const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun,
       created_at = EXCLUDED.created_at,
       updated_at = EXCLUDED.updated_at,
       completed_at = EXCLUDED.completed_at,
-      pause_source = EXCLUDED.pause_source` : "ON CONFLICT(test_run_id) DO NOTHING"}`,
+      pause_source = EXCLUDED.pause_source,
+        response_field_timestamps_json = EXCLUDED.response_field_timestamps_json,
+        shared_parameter_timestamps_json = EXCLUDED.shared_parameter_timestamps_json,
+        controller_entry_json = EXCLUDED.controller_entry_json,
+        state_revision = EXCLUDED.state_revision,
+        controller_dispatches_json = EXCLUDED.controller_dispatches_json,
+        original_result_state_json = EXCLUDED.original_result_state_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`,
     [
       testRun.testRunId,
       testRun.participantSessionId,
@@ -1614,13 +1786,29 @@ const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun,
       testRun.createdAt,
       testRun.updatedAt,
       testRun.completedAt,
-      testRun.status === "paused" ? testRun.pauseSource ?? null : null
+      testRun.status === "paused" ? testRun.pauseSource ?? null : null,
+      JSON.stringify(testRun.unitResponseFieldTimestamps ?? {}),
+      JSON.stringify(testRun.sharedParameterTimestamps ?? {}),
+      testRun.controllerEntry === undefined ? null : JSON.stringify(testRun.controllerEntry),
+      testRun.stateRevision ?? null,
+      testRun.controllerDispatches === undefined ? null : JSON.stringify(testRun.controllerDispatches),
+      testRun.originalResultState === undefined ? null : JSON.stringify(testRun.originalResultState)
     ]
   );
   return result.rowCount === 1;
 };
 
 const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
+  const readActivationState=async(client:Pool|PoolClient,tenantId:string,workspaceId:string,lock=false)=>{
+    const scope=[tenantId,workspaceId],suffix=lock?" ORDER BY participant_session_id FOR UPDATE":"";
+    // Parent first, matching Run creation/mutation; lock rows before reading
+    // the state used to reject stale open-run checks.
+    const participantSessions=(await client.query("SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2"+suffix,scope)).rows.map(row=>mapParticipantSession(row as Row)).filter((value):value is ParticipantSession=>value!==null);
+    const testRuns=(await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE tenant_id=$1 AND workspace_id=$2`+(lock?" ORDER BY test_run_id FOR UPDATE":""),scope)).rows.map(row=>mapTestRun(row as Row)).filter((value):value is TestRun=>value!==null);
+    const contentReleases=(await client.query("SELECT * FROM content_releases WHERE tenant_id=$1 AND workspace_id=$2",scope)).rows.map(row=>mapContentRelease(row as Row)).filter((value):value is ContentRelease=>value!==null);
+    return {contentReleases,participantSessions,testRuns};
+  };
+
   const one = async <T>(
     sql: string,
     values: unknown[],
@@ -1670,22 +1858,18 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     }
   };
 
-  return {
-    async getApplicationSettings() {
-      return one(
-        `SELECT app_title, main_logo, theme_name, intro_html,
-                legal_notice_html, privacy_notice, accessibility_notice,
-                custom_texts_json, asset_assignments_json,
-                global_warning_text, global_warning_expires_at,
-                updated_at, updated_by_admin_user_id
-         FROM application_settings
-         WHERE settings_key = 'global'`,
-        [],
-        mapApplicationSettings
-      );
-    },
-    async saveApplicationSettings(settings) {
-      await pool.query(
+  const withAssetWrite=async<Result>(mutation:(client:PoolClient)=>Promise<Result>):Promise<Result>=>{
+    const client=await pool.connect();
+    try{await client.query("BEGIN");
+      // Shared by catalog and assignment writers across every process.
+      await client.query("SELECT pg_advisory_xact_lock(1413693779, hashtext(current_schema()))");
+      const result=await mutation(client);await client.query("COMMIT");return result;
+    }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+  };
+  const assetNames=async(client:PoolClient)=> (await client.query<{original_name:string}>("SELECT original_name FROM application_assets")).rows.map(row=>({originalName:row.original_name}));
+
+  const writeSettings=async(client:PoolClient,settings:ApplicationSettings):Promise<void>=>{
+      await client.query(
         `INSERT INTO application_settings (
           settings_key, app_title, main_logo, theme_name, intro_html,
           legal_notice_html, privacy_notice, accessibility_notice,
@@ -1723,6 +1907,132 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           settings.updatedByAdminUserId
         ]
       );
+
+  };
+
+  const reserveSourcePackageWithActivity = async (input: Parameters<FirstSliceRepository['reserveSourcePackageAssembly']>[0],
+    requiredEventType: 'source_package_assembled' | 'source_package_created'): Promise<boolean> => {
+    const { assembledSourcePackage, assemblyActivityEvent } = input;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const workspace = await client.query(
+        `SELECT workspace_id
+         FROM workspaces
+         WHERE tenant_id = $1 AND workspace_id = $2
+         FOR UPDATE`,
+        [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
+      );
+      const sourcePackages = (
+        await client.query(
+          `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type,
+                  content_structure_json, source_document_text, status, uploaded_at
+           FROM source_packages
+           WHERE tenant_id = $1 AND workspace_id = $2`,
+          [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
+        )
+      ).rows
+        .map(row => mapSourcePackage(row as Row))
+        .filter(Boolean) as SourcePackage[];
+      const activityEvents = (
+        await client.query(
+          `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+                  subject_type, subject_id, occurred_at, summary, details_json
+           FROM workspace_activity_events
+           WHERE tenant_id = $1 AND workspace_id = $2`,
+          [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
+        )
+      ).rows
+        .map(row => mapWorkspaceActivityEvent(row as Row))
+        .filter(Boolean) as WorkspaceActivityEvent[];
+      if (
+        workspace.rowCount !== 1 ||
+        assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
+        assemblyActivityEvent.workspaceId !==
+          assembledSourcePackage.workspaceId ||
+        assemblyActivityEvent.eventType !== requiredEventType ||
+        assemblyActivityEvent.subjectId !==
+          assembledSourcePackage.sourcePackageId ||
+        createWorkspaceSourcePackageReferenceRevision({
+          sourcePackages,
+          activityEvents
+        }) !== input.expectedWorkspaceSourcePackageReferenceRevision
+      ) {
+        await client.query("ROLLBACK");
+        return false;
+      }
+      await client.query(
+        `INSERT INTO source_packages (
+          source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          assembledSourcePackage.sourcePackageId,
+          assembledSourcePackage.tenantId,
+          assembledSourcePackage.workspaceId,
+          assembledSourcePackage.fileName,
+          assembledSourcePackage.mediaType,
+          assembledSourcePackage.contentStructure
+            ? JSON.stringify(assembledSourcePackage.contentStructure)
+            : null,
+          assembledSourcePackage.sourceDocument,
+          assembledSourcePackage.status,
+          assembledSourcePackage.uploadedAt
+        ]
+      );
+      await client.query(
+        `INSERT INTO workspace_activity_events (
+          activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          assemblyActivityEvent.activityEventId,
+          assemblyActivityEvent.tenantId,
+          assemblyActivityEvent.workspaceId,
+          assemblyActivityEvent.eventType,
+          assemblyActivityEvent.actorId,
+          assemblyActivityEvent.subjectType,
+          assemblyActivityEvent.subjectId,
+          assemblyActivityEvent.occurredAt,
+          assemblyActivityEvent.summary,
+          JSON.stringify(assemblyActivityEvent.details)
+        ]
+      );
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+
+  return {
+    async getApplicationSettings() {
+      return one(
+        `SELECT app_title, main_logo, theme_name, intro_html,
+                legal_notice_html, privacy_notice, accessibility_notice,
+                custom_texts_json, asset_assignments_json,
+                global_warning_text, global_warning_expires_at,
+                updated_at, updated_by_admin_user_id
+         FROM application_settings
+         WHERE settings_key = 'global'`,
+        [],
+        mapApplicationSettings
+      );
+    },
+    async saveApplicationSettings(settings) {
+      return withAssetWrite(async client=>{validateApplicationAssetReferences(settings.assetAssignments,await assetNames(client));await writeSettings(client,settings);});
+    },
+    async mutateApplicationSettings(transform) {
+      return withAssetWrite(async client=>{
+        const previous=mapApplicationSettings((await client.query("SELECT * FROM application_settings WHERE settings_key='global'")).rows[0]);
+        const effect=transform(structuredClone(previous));
+        validateApplicationAssetReferences(effect.settings.assetAssignments,await assetNames(client));
+        await writeSettings(client,effect.settings);
+        const audit=effect.auditEvent;
+        await client.query("INSERT INTO admin_audit_events(admin_audit_event_id,event_type,actor_admin_user_id,subject_admin_user_id,occurred_at,summary,details_json) VALUES($1,$2,$3,$4,$5,$6,$7)",[audit.adminAuditEventId,audit.eventType,audit.actorAdminUserId,audit.subjectAdminUserId,audit.occurredAt,audit.summary,JSON.stringify(audit.details)]);
+        return structuredClone(effect.settings);
+      });
     },
     async listApplicationAssets() {
       return many(
@@ -1754,8 +2064,12 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapApplicationAsset
       );
     },
-    async saveApplicationAsset(applicationAsset) {
-      await pool.query(
+    async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
+      return withAssetWrite(async client=>{
+        const existing=replaceByOriginalName?mapApplicationAsset((await client.query("SELECT * FROM application_assets WHERE original_name=$1",[applicationAsset.originalName])).rows[0]):null;
+        if(existing)applicationAsset={...applicationAsset,applicationAssetId:existing.applicationAssetId,createdAt:existing.createdAt};
+
+      await client.query(
         `INSERT INTO application_assets (
           application_asset_id, original_name, media_type, data_base64,
           byte_length, created_at, updated_at
@@ -1776,13 +2090,35 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           applicationAsset.updatedAt
         ]
       );
+        return { applicationAsset, replaced: Boolean(existing) };
+      });
+    },
+    async mutateApplicationAssetDeletion(input) {
+      return withAssetWrite(async client=>{
+        const asset=mapApplicationAsset((await client.query("SELECT * FROM application_assets WHERE application_asset_id=$1",[input.applicationAssetId])).rows[0]);
+        const settings=mapApplicationSettings((await client.query("SELECT * FROM application_settings WHERE settings_key='global'")).rows[0]);
+        const roster=(await client.query("SELECT * FROM participant_roster_entries")).rows.map(row=>mapParticipantRosterEntry(row)!).map(row=>({...row,assetAssignments:row.assetAssignments??{}}));
+        const operational=(await client.query("SELECT tenant_id,workspace_id,candidates_json FROM operational_login_migration_candidates")).rows.map(row=>({tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),candidates:row.candidates_json as OperationalLoginMigrationCandidate[]}));
+        const scopes=(await client.query("SELECT w.tenant_id,w.workspace_id,w.workspace_key,t.tenant_key FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id")).rows.map(row=>({tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),tenantKey:String(row.tenant_key),workspaceKey:String(row.workspace_key)}));
+        const effect=prepareApplicationAssetDeletion(input,{asset,settings,roster,operational,scopes});if(!effect)return null;
+        if(effect.settings)await client.query("UPDATE application_settings SET asset_assignments_json=$1,updated_at=$2,updated_by_admin_user_id=$3 WHERE settings_key='global'",[JSON.stringify(effect.settings.assetAssignments),effect.settings.updatedAt,effect.settings.updatedByAdminUserId]);
+        for(const row of effect.roster)await client.query("UPDATE participant_roster_entries SET asset_assignments_json=$1 WHERE participant_roster_entry_id=$2",[JSON.stringify(row.assetAssignments),row.participantRosterEntryId]);
+        for(const group of effect.operational)await client.query("UPDATE operational_login_migration_candidates SET candidates_json=$1 WHERE tenant_id=$2 AND workspace_id=$3",[JSON.stringify(group.candidates),group.tenantId,group.workspaceId]);
+        await client.query("DELETE FROM application_assets WHERE application_asset_id=$1",[effect.asset.applicationAssetId]);
+        const audit=effect.auditEvent;
+        await client.query("INSERT INTO admin_audit_events(admin_audit_event_id,event_type,actor_admin_user_id,subject_admin_user_id,occurred_at,summary,details_json) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(admin_audit_event_id) DO UPDATE SET details_json=excluded.details_json",[audit.adminAuditEventId,audit.eventType,audit.actorAdminUserId,audit.subjectAdminUserId,audit.occurredAt,audit.summary,JSON.stringify(audit.details)]);
+        return effect.asset;
+      });
     },
     async deleteApplicationAsset(applicationAssetId) {
-      const result = await pool.query(
+      return withAssetWrite(async client=>{
+
+      const result = await client.query(
         "DELETE FROM application_assets WHERE application_asset_id = $1",
         [applicationAssetId]
       );
       return (result.rowCount ?? 0) > 0;
+      });
     },
     async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
       return many(
@@ -2217,6 +2553,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           "participant_roster_entries"
         );
         await deleteScoped("operational_login_migration_candidates");
+        await deleteScoped("original_login_bindings");
+        await deleteScoped("original_participant_groups");
         const deletedLoginAttemptCount = await deleteScoped(
           "participant_login_attempts"
         );
@@ -2269,12 +2607,14 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         client.release();
       }
     },
-    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId, eventTypes) {
+      if (eventTypes?.length === 0) return [];
       return many(
         `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
          FROM workspace_activity_events
-         WHERE tenant_id = $1 AND workspace_id = $2`,
-        [tenantId, workspaceId],
+         WHERE tenant_id = $1 AND workspace_id = $2
+           AND ($3::text[] IS NULL OR event_type = ANY($3::text[]))`,
+        [tenantId, workspaceId, eventTypes ?? null],
         mapWorkspaceActivityEvent
       );
     },
@@ -2374,100 +2714,39 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           )
       );
     },
-    async reserveSourcePackageAssembly(input) {
-      const { assembledSourcePackage, assemblyActivityEvent } = input;
-      const client = await pool.connect();
+    reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    async publishWorkspaceFiles(input) {
+      input=structuredClone(input);
+      const source=input.sourcePackage,job=input.importJob,release=input.contentRelease;
+      const client=await pool.connect();
       try {
         await client.query("BEGIN");
-        const workspace = await client.query(
-          `SELECT workspace_id
-           FROM workspaces
-           WHERE tenant_id = $1 AND workspace_id = $2
-           FOR UPDATE`,
-          [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
-        );
-        const sourcePackages = (
-          await client.query(
-            `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type,
-                    content_structure_json, source_document_text, status, uploaded_at
-             FROM source_packages
-             WHERE tenant_id = $1 AND workspace_id = $2`,
-            [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
-          )
-        ).rows
-          .map(row => mapSourcePackage(row as Row))
-          .filter(Boolean) as SourcePackage[];
-        const activityEvents = (
-          await client.query(
-            `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
-                    subject_type, subject_id, occurred_at, summary, details_json
-             FROM workspace_activity_events
-             WHERE tenant_id = $1 AND workspace_id = $2`,
-            [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
-          )
-        ).rows
-          .map(row => mapWorkspaceActivityEvent(row as Row))
-          .filter(Boolean) as WorkspaceActivityEvent[];
-        if (
-          workspace.rowCount !== 1 ||
-          assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
-          assemblyActivityEvent.workspaceId !==
-            assembledSourcePackage.workspaceId ||
-          assemblyActivityEvent.eventType !== "source_package_assembled" ||
-          assemblyActivityEvent.subjectId !==
-            assembledSourcePackage.sourcePackageId ||
-          createWorkspaceSourcePackageReferenceRevision({
-            sourcePackages,
-            activityEvents
-          }) !== input.expectedWorkspaceSourcePackageReferenceRevision
-        ) {
-          await client.query("ROLLBACK");
-          return false;
-        }
-        await client.query(
-          `INSERT INTO source_packages (
-            source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [
-            assembledSourcePackage.sourcePackageId,
-            assembledSourcePackage.tenantId,
-            assembledSourcePackage.workspaceId,
-            assembledSourcePackage.fileName,
-            assembledSourcePackage.mediaType,
-            assembledSourcePackage.contentStructure
-              ? JSON.stringify(assembledSourcePackage.contentStructure)
-              : null,
-            assembledSourcePackage.sourceDocument,
-            assembledSourcePackage.status,
-            assembledSourcePackage.uploadedAt
-          ]
-        );
-        await client.query(
-          `INSERT INTO workspace_activity_events (
-            activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            assemblyActivityEvent.activityEventId,
-            assemblyActivityEvent.tenantId,
-            assemblyActivityEvent.workspaceId,
-            assemblyActivityEvent.eventType,
-            assemblyActivityEvent.actorId,
-            assemblyActivityEvent.subjectType,
-            assemblyActivityEvent.subjectId,
-            assemblyActivityEvent.occurredAt,
-            assemblyActivityEvent.summary,
-            JSON.stringify(assemblyActivityEvent.details)
-          ]
-        );
+        const scope=[source.tenantId,source.workspaceId];
+        const workspace=(await client.query(`SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE`,scope)).rows[0];
+        const sourcePackages=((await client.query(`SELECT * FROM source_packages WHERE tenant_id=$1 AND workspace_id=$2`,scope)).rows).map(row=>mapSourcePackage(row as Row)).filter(Boolean) as SourcePackage[];
+        const activityEvents=((await client.query(`SELECT * FROM workspace_activity_events WHERE tenant_id=$1 AND workspace_id=$2`,scope)).rows).map(row=>mapWorkspaceActivityEvent(row as Row)).filter(Boolean) as WorkspaceActivityEvent[];
+        const contentReleases=((await client.query(`SELECT * FROM content_releases WHERE tenant_id=$1 AND workspace_id=$2`,scope)).rows).map(row=>mapContentRelease(row as Row)).filter(Boolean) as ContentRelease[];
+        const occupiedSource=(await client.query(`SELECT source_package_id FROM source_packages WHERE source_package_id=$1`,[source.sourcePackageId])).rows[0];
+        const occupiedJob=(await client.query(`SELECT import_job_id FROM import_jobs WHERE import_job_id=$1`,[job.importJobId])).rows[0];
+        const occupiedRelease=release ? (await client.query(`SELECT content_release_id FROM content_releases WHERE content_release_id=$1`,[release.contentReleaseId])).rows[0] : null;
+        let occupiedEvent=false;
+        for(const event of input.activityEvents)if((await client.query(`SELECT activity_event_id FROM workspace_activity_events WHERE activity_event_id=$1`,[event.activityEventId])).rows[0])occupiedEvent=true;
+        const superseded=prepareWorkspaceFilePublication(input,{workspaceExists:!!workspace,
+          identitiesAvailable:!occupiedSource && !occupiedJob && !occupiedRelease && !occupiedEvent,
+          sourcePackages,activityEvents,contentReleases});
+        if(!superseded){await client.query("ROLLBACK");return false;}
+        await client.query(`INSERT INTO source_packages (source_package_id,tenant_id,workspace_id,file_name,media_type,content_structure_json,source_document_text,status,uploaded_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[source.sourcePackageId,source.tenantId,source.workspaceId,source.fileName,source.mediaType,source.contentStructure?JSON.stringify(source.contentStructure):null,source.sourceDocument,source.status,source.uploadedAt]);
+        await client.query(`INSERT INTO import_jobs (import_job_id,tenant_id,workspace_id,source_package_id,status,created_at,finished_at,diagnostics_json) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,[job.importJobId,job.tenantId,job.workspaceId,job.sourcePackageId,job.status,job.createdAt,job.finishedAt,JSON.stringify(job.diagnostics)]);
+        for(const previous of superseded){await client.query(`UPDATE content_releases SET status='superseded' WHERE content_release_id=$1`,[previous.contentReleaseId]);}
+        if(release){await client.query(`INSERT INTO content_releases (content_release_id,tenant_id,workspace_id,import_job_id,release_label,runtime_snapshot_json,status,created_at,activated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[release.contentReleaseId,release.tenantId,release.workspaceId,release.importJobId,release.releaseLabel,JSON.stringify(release.runtimeSnapshot),release.status,release.createdAt,release.activatedAt]);}
+        for(const event of input.activityEvents){await client.query(`INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[event.activityEventId,event.tenantId,event.workspaceId,event.eventType,event.actorId,event.subjectType,event.subjectId,event.occurredAt,event.summary,JSON.stringify(event.details)]);}
         await client.query("COMMIT");
         return true;
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      } finally {
-        client.release();
-      }
+      }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
     },
+    reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
+      assemblyActivityEvent:input.createdActivityEvent,
+      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),
     async reserveSourcePackageReplacement(input) {
       const { replacementSourcePackage, replacementActivityEvent } = input;
       const client = await pool.connect();
@@ -2764,6 +3043,24 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapContentRelease
       );
     },
+    async getContentReleaseActivationRevision(tenantId,workspaceId) {
+      return createContentReleaseActivationRevision(await readActivationState(pool,tenantId,workspaceId));
+    },
+    async commitContentReleaseActivation(input) {
+      const client=await pool.connect();
+      try{
+        await client.query("BEGIN");
+        const workspace=(await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE",[input.tenantId,input.workspaceId])).rows[0];
+        const occupied=(await client.query("SELECT activity_event_id FROM workspace_activity_events WHERE activity_event_id=$1",[input.activityEvent.activityEventId])).rows[0];
+        const prepared=prepareContentReleaseActivation(input,{...await readActivationState(client,input.tenantId,input.workspaceId,true),workspaceExists:!!workspace,eventIdAvailable:!occupied});
+        if(!prepared){await client.query("ROLLBACK");return false;}
+        for(const release of prepared.contentReleases)await client.query("UPDATE content_releases SET status=$1,activated_at=$2 WHERE content_release_id=$3",[release.status,release.activatedAt,release.contentReleaseId]);
+        const event=prepared.activityEvent;
+        await client.query("INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[event.activityEventId,event.tenantId,event.workspaceId,event.eventType,event.actorId,event.subjectType,event.subjectId,event.occurredAt,event.summary,JSON.stringify(event.details)]);
+        await client.query("COMMIT");return true;
+      }catch(error){await client.query("ROLLBACK");throw error;}
+      finally{client.release();}
+    },
     async saveContentRelease(contentRelease) {
       await pool.query(
         `INSERT INTO content_releases (
@@ -2793,7 +3090,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getParticipantSessionById(participantSessionId) {
       return one(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
          FROM participant_sessions
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -2827,18 +3124,93 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
          FROM participant_sessions
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
         mapParticipantSession
       );
     },
+    async getOrCreateOriginalParticipantGroup(input) {
+      const candidate = prepareOriginalParticipantGroup(input);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Serialize absent-row creation, including collator-equivalent spellings,
+        // with other workspace mutations and deletion.
+        const workspace = await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id = $1 AND workspace_id = $2 FOR UPDATE", [candidate.tenantId, candidate.workspaceId]);
+        if (!workspace.rowCount) { await client.query("ROLLBACK"); return null; }
+        const groups = (await client.query("SELECT * FROM original_participant_groups WHERE tenant_id = $1 AND workspace_id = $2", [candidate.tenantId, candidate.workspaceId])).rows.map(mapOriginalParticipantGroup);
+        const existing = groups.find(group => originalParticipantGroupKeysEqual(group.groupKey, candidate.groupKey));
+        if (!existing) await client.query("INSERT INTO original_participant_groups (tenant_id, workspace_id, group_key, group_label, created_at, last_modified_at) VALUES ($1, $2, $3, $4, $5, $6)",
+          [candidate.tenantId, candidate.workspaceId, candidate.groupKey, candidate.groupLabel, candidate.createdAt, candidate.lastModifiedAt]);
+        await client.query("COMMIT");
+        return existing ?? candidate;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    },
+    async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
+      return (await pool.query("SELECT * FROM original_participant_groups WHERE tenant_id = $1 AND workspace_id = $2 ORDER BY group_key", [tenantId, workspaceId])).rows.map(mapOriginalParticipantGroup);
+    },
+    async bindOriginalLoginGroup(input) {
+      const validated = prepareOriginalLoginBinding(input), client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const parent = await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE",[input.tenantId,input.workspaceId]);
+        const group = await client.query("SELECT group_key FROM original_participant_groups WHERE tenant_id=$1 AND workspace_id=$2 AND group_key=$3",[input.tenantId,input.workspaceId,input.groupSnapshotKey]);
+        if (!parent.rowCount || !group.rowCount) { await client.query("ROLLBACK"); return null; }
+        const previous = (await client.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[input.tenantId,input.workspaceId,validated.loginKey])).rows[0];
+        const binding = prepareOriginalLoginBinding(input,previous?mapOriginalLoginBinding(previous):undefined);
+        await client.query(`INSERT INTO original_login_bindings (tenant_id,workspace_id,login_key,group_key,group_snapshot_key,created_at,last_authenticated_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (tenant_id,workspace_id,login_key) DO UPDATE SET
+          group_key=EXCLUDED.group_key,group_snapshot_key=EXCLUDED.group_snapshot_key,last_authenticated_at=EXCLUDED.last_authenticated_at`,
+          [binding.tenantId,binding.workspaceId,binding.loginKey,binding.groupKey,binding.groupSnapshotKey,binding.createdAt,binding.lastAuthenticatedAt]);
+        await client.query("UPDATE participant_sessions SET group_key=$1 WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4",[binding.groupKey,binding.tenantId,binding.workspaceId,binding.loginKey]);
+        await client.query("COMMIT"); return binding;
+      } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    },
+    async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
+      return (await pool.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY login_key",[tenantId,workspaceId])).rows.map(mapOriginalLoginBinding);
+    },
+    async resolveOriginalParticipantSession(candidate,validate) {
+      const client=await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Fence deletion/other native writers, without blocking the KEY SHARE
+        // workspace reference held by an in-flight Run's activity insert.
+        const workspace=await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE",[candidate.tenantId,candidate.workspaceId]);
+        if(!workspace.rowCount){await client.query("ROLLBACK");return null;}
+        const binding=(await client.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null])).rows[0];
+        const people=(await client.query("SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3 ORDER BY participant_session_id FOR UPDATE",[candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null])).rows.map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+        const result=resolveOriginalPerson(candidate,binding?mapOriginalLoginBinding(binding):null,people,validate),person=result.participantSession;
+        const runs=(await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE`,[person.tenantId,person.workspaceId,person.originalLoginKey])).rows.map(mapTestRun).filter((run):run is TestRun=>run!==null);
+        projectOriginalPersonRuns(person,runs,people);
+        if(result.created)await client.query("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null]);
+        await client.query("UPDATE participant_sessions SET group_key=$1,execution_mode=$2 WHERE tenant_id=$3 AND workspace_id=$4 AND original_login_key=$5 AND (group_key IS DISTINCT FROM $1 OR execution_mode IS DISTINCT FROM $2)",[person.groupKey,person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey]);
+        await client.query("UPDATE test_runs SET execution_mode=$1 WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4) AND execution_mode IS DISTINCT FROM $1",[person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey]);
+        await client.query("COMMIT");return result;
+      }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+    },
     async saveParticipantSession(participantSession) {
-      await pool.query(
+      let previous = mapParticipantSession((await pool.query("SELECT * FROM participant_sessions WHERE participant_session_id=$1",[participantSession.participantSessionId])).rows[0]);
+      if (previous?.originalLoginKey === undefined && participantSession.originalLoginKey === undefined) participantSession=prepareOriginalParticipantSession(participantSession,previous,null);
+      const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
+      const native = originalLoginKey !== undefined, client = native ? await pool.connect() : null;
+      try {
+        if (native) {
+          await client!.query("BEGIN");
+          const parent = await client!.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE",[participantSession.tenantId,participantSession.workspaceId]);
+          previous=mapParticipantSession((await client!.query("SELECT * FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE",[participantSession.participantSessionId])).rows[0]);
+          const binding = (await client!.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[participantSession.tenantId,participantSession.workspaceId,originalLoginKey])).rows[0];
+          participantSession = prepareOriginalParticipantSession(participantSession,previous,binding?mapOriginalLoginBinding(binding):undefined);
+          if (!parent.rowCount) throw new TypeError('Native person requires its current scoped login binding.');
+          const people=(await client!.query("SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3",[participantSession.tenantId,participantSession.workspaceId,originalLoginKey])).rows.map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+          assertOriginalPersonUnique(participantSession,people);
+        }
+        await (client ?? pool).query(
         `INSERT INTO participant_sessions (
-          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT(participant_session_id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
@@ -2849,7 +3221,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           execution_mode = EXCLUDED.execution_mode,
           status = EXCLUDED.status,
           valid_until = EXCLUDED.valid_until,
-          created_at = EXCLUDED.created_at`,
+          created_at = EXCLUDED.created_at,
+          original_login_key = EXCLUDED.original_login_key,
+          original_name_suffix = EXCLUDED.original_name_suffix`,
         [
           participantSession.participantSessionId,
           participantSession.tenantId,
@@ -2861,13 +3235,18 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantSession.executionMode ?? null,
           participantSession.status,
           participantSession.validUntil ?? null,
-          participantSession.createdAt
+          participantSession.createdAt,
+          participantSession.originalLoginKey ?? null,
+          participantSession.originalNameSuffix ?? null
         ]
       );
+        if (native) await client!.query("COMMIT");
+      } catch (error) { if (native) await client!.query("ROLLBACK"); throw error; }
+      finally { client?.release(); }
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
          FROM participant_roster_entries
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -2894,7 +3273,10 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       workspaceId,
       candidates
     ) {
-      await pool.query(
+      return withAssetWrite(async client=>{
+        const assets=await assetNames(client);
+        for(const candidate of candidates)validateApplicationAssetReferences(candidate.assetAssignments,assets);
+      await client.query(
         `INSERT INTO operational_login_migration_candidates (
           tenant_id, workspace_id, candidates_json, updated_at
         ) VALUES ($1, $2, $3::jsonb, $4)
@@ -2903,6 +3285,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           updated_at = EXCLUDED.updated_at`,
         [tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString()]
       );
+      });
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
       const result = await pool.query<{ password_hash: string | null }>(
@@ -2914,10 +3297,16 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       return result.rows[0]?.password_hash ?? null;
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
-      await pool.query(
+      return withAssetWrite(async client=>{
+        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,await assetNames(client));
+        if(participantRosterEntry.originalLoginIdentity){
+          const workspace=await client.query('SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE',[participantRosterEntry.tenantId,participantRosterEntry.workspaceId]);
+          if(!workspace.rowCount)throw new Error('Native roster workspace no longer exists.');
+        }
+      await client.query(
         `INSERT INTO participant_roster_entries (
-          participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+          participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
         ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
           participant_roster_entry_id = EXCLUDED.participant_roster_entry_id,
           execution_mode = EXCLUDED.execution_mode,
@@ -2935,7 +3324,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           custom_texts_json = EXCLUDED.custom_texts_json,
           view_settings_json = EXCLUDED.view_settings_json,
           asset_assignments_json = EXCLUDED.asset_assignments_json,
-          imported_at = EXCLUDED.imported_at`,
+          imported_at = EXCLUDED.imported_at,
+          original_login_identity = EXCLUDED.original_login_identity`,
         [
           participantRosterEntry.participantRosterEntryId,
           participantRosterEntry.tenantId,
@@ -2943,7 +3333,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantRosterEntry.loginKey,
           participantRosterEntry.executionMode ?? null,
           participantRosterEntry.groupKey,
-          participantRosterEntry.groupLabel?.trim() || null,
+          participantRosterEntry.groupLabel ?? null,
           participantRosterEntry.bookletKey,
           participantRosterEntry.bookletKeys?.length
             ? JSON.stringify(participantRosterEntry.bookletKeys)
@@ -2962,9 +3352,20 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           JSON.stringify(participantRosterEntry.customTexts ?? {}),
           JSON.stringify(participantRosterEntry.viewSettings ?? {}),
           JSON.stringify(participantRosterEntry.assetAssignments ?? {}),
-          participantRosterEntry.importedAt
+          participantRosterEntry.importedAt,
+          participantRosterEntry.originalLoginIdentity ?? null
         ]
       );
+      if(participantRosterEntry.originalLoginIdentity){
+        const entry=participantRosterEntry;
+        const people=(await client.query('SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3 ORDER BY participant_session_id FOR UPDATE',[entry.tenantId,entry.workspaceId,entry.loginKey])).rows.map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+        // Authorization metadata does not require decoding private responses or Test state.
+        const runs=(await client.query('SELECT test_run_id,participant_session_id,tenant_id,workspace_id,execution_mode FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE',[entry.tenantId,entry.workspaceId,entry.loginKey])).rows.map(row=>({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),executionMode:row.execution_mode==null?undefined:row.execution_mode as TestRun['executionMode']}));
+        const modes=projectOriginalLoginMode(entry,people,runs),mode=entry.executionMode??defaultParticipantExecutionMode;
+        if(modes.participantSessions.some((person,index)=>person!==people[index]))await client.query('UPDATE participant_sessions SET execution_mode=$1 WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4 AND execution_mode IS DISTINCT FROM $1',[mode,entry.tenantId,entry.workspaceId,entry.loginKey]);
+        if(modes.testRuns.some((run,index)=>run!==runs[index]))await client.query('UPDATE test_runs SET execution_mode=$1 WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4) AND execution_mode IS DISTINCT FROM $1',[mode,entry.tenantId,entry.workspaceId,entry.loginKey]);
+      }
+      });
     },
     async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
       return one(
@@ -3011,7 +3412,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getTestRunById(testRunId) {
       return one(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT ${testRunProjection}
          FROM test_runs
          WHERE test_run_id = $1`,
         [testRunId],
@@ -3020,7 +3421,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listTestRunsByParticipantSessionId(participantSessionId) {
       return many(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT ${testRunProjection}
          FROM test_runs
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -3029,7 +3430,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       return one(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT ${testRunProjection}
          FROM test_runs
          WHERE participant_session_id = $1 AND status != 'completed'
          ORDER BY updated_at ASC
@@ -3040,14 +3441,14 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT ${testRunProjection}
          FROM test_runs
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
         mapTestRun
       );
     },
-    async getOrCreateTestRunForAssignment(candidate) {
+    async getOrCreateTestRunForAssignment(candidate, initialize) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -3058,19 +3459,31 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           [candidate.participantSessionId]
         )).rows[0]);
         const runs = (await client.query(
-          "SELECT * FROM test_runs WHERE participant_session_id = $1 OR test_run_id = $2",
+          `SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id = $1 OR test_run_id = $2`,
           [candidate.participantSessionId, candidate.testRunId]
         )).rows.map(mapTestRun).filter((run): run is TestRun => run !== null);
-        const existing = selectParticipantAssignmentRun(candidate, session, runs);
-        if (existing) {
+        const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize);
+        if (!prepared.created) {
           await client.query("COMMIT");
-          return { testRun: existing, created: false };
+          return { testRun: prepared.testRun, created: false };
         }
-        if (!await persistTestRun(client, candidate, false)) {
+        if (!await persistTestRun(client, prepared.testRun, false)) {
           throw new Error("Run ID already exists outside the participant assignment reservation.");
         }
+        const effect = prepared.effect!;
+        for (const log of effect.testLogs) await client.query(`INSERT INTO participant_test_logs
+          (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [log.participantTestLogId, log.tenantId,
+            log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+            log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+        for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
+          (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`, [event.activityEventId, event.tenantId, event.workspaceId,
+            event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details)]);
+        if (effect.participantSession) await client.query("UPDATE participant_sessions SET status = $1 WHERE participant_session_id = $2",
+          [effect.participantSession.status, candidate.participantSessionId]);
         const stored = mapTestRun((await client.query(
-          "SELECT * FROM test_runs WHERE test_run_id = $1", [candidate.testRunId]
+          `SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1`, [candidate.testRunId]
         )).rows[0]);
         if (!stored) throw new Error("Participant assignment reservation was not persisted.");
         await client.query("COMMIT");
@@ -3083,7 +3496,169 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       }
     },
     async saveTestRun(testRun) {
-      await persistTestRun(pool, testRun);
+      const client=await pool.connect();
+      try{
+        await client.query('BEGIN');
+        const parent=mapParticipantSession((await client.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE',[testRun.participantSessionId])).rows[0]);
+        await persistTestRun(client,withOriginalTestRunMode(testRun,parent));await client.query('COMMIT');
+      }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    },
+    async activateParticipantController(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const session = mapParticipantSession((await client.query(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = $1 FOR UPDATE", [input.participantSessionId])).rows[0]);
+        const run = mapTestRun((await client.query(
+          `SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1 FOR UPDATE`, [input.testRunId])).rows[0]);
+        const result = prepareParticipantControllerActivation(input, session, run);
+        if (result?.activated) await client.query("UPDATE participant_sessions SET status = 'launched' WHERE participant_session_id = $1", [input.participantSessionId]);
+        if (result?.entryChanged) await persistTestRun(client, result.testRun);
+        await client.query("COMMIT");
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally { client.release(); }
+    },
+    async appendParticipantRunCommand(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const runResult = await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1 FOR UPDATE`, [input.testRunId]);
+        const existing = await client.query("SELECT command_json FROM participant_run_commands WHERE test_run_id = $1 AND command_id = $2", [input.testRunId, input.commandId]);
+        const last = await client.query("SELECT sequence FROM participant_run_commands WHERE test_run_id = $1 ORDER BY sequence DESC LIMIT 1", [input.testRunId]);
+        const command = appendParticipantRunCommand(input, mapTestRun(runResult.rows[0]), {
+          existing: existing.rows[0]?.command_json ?? null,
+          lastSequence: Number(last.rows[0]?.sequence ?? 0)
+        });
+        if (command) await client.query(`INSERT INTO participant_run_commands
+          (test_run_id, command_id, sequence, tenant_id, workspace_id, participant_session_id, command_json, acknowledged_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8) ON CONFLICT(test_run_id, command_id) DO NOTHING`,
+          [command.testRunId, command.commandId, command.sequence, command.tenantId, command.workspaceId,
+            command.participantSessionId, JSON.stringify(command), command.acknowledgedAt]);
+        await client.query("COMMIT");return command;
+      } catch (error) { await client.query("ROLLBACK");throw error; }
+      finally { client.release(); }
+    },
+    async listPendingParticipantRunCommands(scope) {
+      const result = await pool.query(`SELECT command.command_json FROM participant_run_commands AS command
+        JOIN test_runs AS run ON run.test_run_id = command.test_run_id
+        WHERE command.test_run_id = $1 AND command.tenant_id = $2 AND command.workspace_id = $3
+          AND command.participant_session_id = $4 AND command.acknowledged_at IS NULL
+          AND run.tenant_id = $2 AND run.workspace_id = $3 AND run.participant_session_id = $4
+        ORDER BY command.sequence`, [scope.testRunId, scope.tenantId, scope.workspaceId, scope.participantSessionId]);
+      return result.rows.map(row => row.command_json as ParticipantRunCommand);
+    },
+    async acknowledgeParticipantRunCommand(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const runResult = await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1 FOR UPDATE`, [input.testRunId]);
+        const row = await client.query("SELECT command_json FROM participant_run_commands WHERE test_run_id = $1 AND command_id = $2", [input.testRunId, input.commandId]);
+        const command = acknowledgeParticipantRunCommand(input, mapTestRun(runResult.rows[0]), row.rows[0]?.command_json ?? null);
+        if (command) await client.query(`UPDATE participant_run_commands SET command_json = $1::jsonb, acknowledged_at = $2
+          WHERE test_run_id = $3 AND command_id = $4`, [JSON.stringify(command), command.acknowledgedAt, input.testRunId, input.commandId]);
+        await client.query("COMMIT");return command;
+      } catch (error) { await client.query("ROLLBACK");throw error; }
+      finally { client.release(); }
+    },
+    async mutateParticipantRun(input, transform) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Parent first, matching assignment reservation and parent deletion.
+        const participantSession = mapParticipantSession((await client.query(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = $1 FOR UPDATE", [input.participantSessionId])).rows[0]);
+        const testRun = mapTestRun((await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1 FOR UPDATE`, [input.testRunId])).rows[0]);
+        const testRuns = (await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id = $1`, [input.participantSessionId]))
+          .rows.map(mapTestRun).filter((run): run is TestRun => run !== null);
+        const deliveryRow = input.deliveryId ? await client.query("SELECT delivery_json FROM participant_progress_deliveries WHERE test_run_id = $1 AND delivery_id = $2", [input.testRunId, input.deliveryId]) : null;
+        const progressDelivery = (deliveryRow?.rows[0]?.delivery_json ?? null) as ParticipantProgressDelivery | null;
+        const prepared = prepareParticipantRunMutation(input,
+          testRun && participantSession ? { testRun, participantSession, testRuns, progressDelivery } : null, transform);
+        if (prepared?.effect) {
+          const effect = prepared.effect;
+          if (effect.progressDelivery) {
+            const receipt = effect.progressDelivery;
+            await client.query(`INSERT INTO participant_progress_deliveries
+              (test_run_id, delivery_id, tenant_id, workspace_id, participant_session_id, content_release_id, delivery_json)
+              VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) ON CONFLICT(test_run_id, delivery_id) DO NOTHING`,
+              [receipt.testRunId, receipt.deliveryId, receipt.tenantId, receipt.workspaceId, receipt.participantSessionId,
+                receipt.contentReleaseId, JSON.stringify(receipt)]);
+          }
+          if (effect.commandInput) {
+            const existing = await client.query("SELECT command_json FROM participant_run_commands WHERE test_run_id = $1 AND command_id = $2", [input.testRunId, effect.commandInput.commandId]);
+            const last = await client.query("SELECT sequence FROM participant_run_commands WHERE test_run_id = $1 ORDER BY sequence DESC LIMIT 1", [input.testRunId]);
+            const command = appendParticipantRunCommand(effect.commandInput, effect.testRun, {
+              existing: existing.rows[0]?.command_json ?? null,
+              lastSequence: Number(last.rows[0]?.sequence ?? 0)
+          });
+        if (!command) throw new Error("The Run no longer accepts the projected command.");
+        if (command) await client.query(`INSERT INTO participant_run_commands
+          (test_run_id, command_id, sequence, tenant_id, workspace_id, participant_session_id, command_json, acknowledged_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8) ON CONFLICT(test_run_id, command_id) DO NOTHING`,
+          [command.testRunId, command.commandId, command.sequence, command.tenantId, command.workspaceId,
+            command.participantSessionId, JSON.stringify(command), command.acknowledgedAt]);
+        }
+          await persistTestRun(client, effect.testRun);
+          for (const log of effect.testLogs) await client.query(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id, participant_session_id = EXCLUDED.participant_session_id, test_run_id = EXCLUDED.test_run_id, unit_key = EXCLUDED.unit_key, original_unit_id = EXCLUDED.original_unit_id, log_key = EXCLUDED.log_key, log_content = EXCLUDED.log_content, timestamp = EXCLUDED.timestamp, recorded_at = EXCLUDED.recorded_at, original_timestamp = EXCLUDED.original_timestamp`, [log.participantTestLogId, log.tenantId,
+              log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+              log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+          for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
+            (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb) ON CONFLICT(activity_event_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id, event_type = EXCLUDED.event_type, actor_id = EXCLUDED.actor_id, subject_type = EXCLUDED.subject_type, subject_id = EXCLUDED.subject_id, occurred_at = EXCLUDED.occurred_at, summary = EXCLUDED.summary, details_json = EXCLUDED.details_json`, [event.activityEventId, event.tenantId, event.workspaceId,
+              event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details)]);
+          if (effect.participantSession) await client.query("UPDATE participant_sessions SET status = $1 WHERE participant_session_id = $2",
+            [effect.participantSession.status, input.participantSessionId]);
+        }
+        await client.query("COMMIT");
+        return prepared?.result ?? null;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    },
+    async applyParticipantRunCommand(input, transform) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Parent first, matching assignment reservation and parent deletion.
+        const participantSession = mapParticipantSession((await client.query(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = $1 FOR UPDATE", [input.participantSessionId])).rows[0]);
+        const testRun = mapTestRun((await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1 FOR UPDATE`, [input.testRunId])).rows[0]);
+        const command = (await client.query("SELECT command_json FROM participant_run_commands WHERE test_run_id = $1 AND command_id = $2",
+          [input.testRunId, input.commandId])).rows[0]?.command_json as ParticipantRunCommand | undefined;
+        const terminal = command?.commandType === "complete" || command?.commandType === "complete_and_lock";
+        const testRuns = terminal ? (await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id = $1`, [input.participantSessionId]))
+          .rows.map(mapTestRun).filter((run): run is TestRun => run !== null) : testRun ? [testRun] : [];
+        const last = await client.query(`SELECT (command_json->>'executionSequence')::bigint AS sequence
+          FROM participant_run_commands WHERE test_run_id = $1 AND command_json->>'executionSequence' IS NOT NULL
+          ORDER BY (command_json->>'executionSequence')::bigint DESC LIMIT 1`, [input.testRunId]);
+        const prepared = prepareParticipantRunCommandApplication(input,
+          command && testRun && participantSession ? { command, testRun, participantSession, testRuns } : null,
+          Number(last.rows[0]?.sequence ?? 0), transform);
+        if (prepared?.effect) {
+          const effect = prepared.effect;
+          await persistTestRun(client, effect.testRun);
+          for (const log of effect.testLogs) await client.query(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [log.participantTestLogId, log.tenantId,
+              log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+              log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+          for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
+            (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`, [event.activityEventId, event.tenantId, event.workspaceId,
+              event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details)]);
+          if (effect.participantSession) await client.query("UPDATE participant_sessions SET status = $1 WHERE participant_session_id = $2",
+            [effect.participantSession.status, input.participantSessionId]);
+          await client.query("UPDATE participant_run_commands SET command_json = $1::jsonb WHERE test_run_id = $2 AND command_id = $3",
+            [JSON.stringify(prepared.result.command), input.testRunId, input.commandId]);
+        }
+        await client.query("COMMIT");
+        return prepared?.result ?? null;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
     },
     async deleteTestRunsByIds(testRunIds) {
       if (testRunIds.length === 0) {
@@ -3149,7 +3724,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
               log_content = EXCLUDED.log_content,
               timestamp = EXCLUDED.timestamp,
               recorded_at = EXCLUDED.recorded_at,
-              original_timestamp = EXCLUDED.original_timestamp`,
+              original_timestamp = EXCLUDED.original_timestamp
+            WHERE substr(participant_test_logs.participant_test_log_id, 1, 9) <> 'delivery:'`,
             [
               testLog.participantTestLogId,
               testLog.tenantId,
@@ -3181,7 +3757,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         // Lock the existing parent, including the first transition with no presence row.
         // Independent processes therefore cannot both register or log one revision.
         const run = mapTestRun((await client.query(
-          "SELECT * FROM test_runs WHERE test_run_id = $1 FOR UPDATE", [input.testRunId])).rows[0]);
+          `SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1 FOR UPDATE`, [input.testRunId])).rows[0]);
         const session = mapParticipantSession((await client.query(
           "SELECT * FROM participant_sessions WHERE participant_session_id = $1", [input.participantSessionId])).rows[0]);
         const row = (await client.query(

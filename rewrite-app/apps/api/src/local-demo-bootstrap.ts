@@ -124,7 +124,7 @@ const localDemoPlayerHtml = String.raw`<!doctype html>
       <p id="demoPlayerInstruction">The unit definition is being prepared.</p>
       <label for="demoPlayerAnswer">
         <span id="demoPlayerQuestion">Your answer</span>
-        <textarea id="demoPlayerAnswer" autocomplete="off"></textarea>
+        <textarea id="demoPlayerAnswer" autocomplete="off" disabled></textarea>
       </label>
       <footer>
         <span>Responses are saved by the Testcenter host.</span>
@@ -181,6 +181,7 @@ const localDemoPlayerHtml = String.raw`<!doctype html>
           question.textContent = String(definition.question || "Your answer");
           answer.placeholder = String(definition.placeholder || "Type your answer here…");
           answer.value = String(event.data.unitState?.dataParts?.answer || "");
+          answer.disabled = !sessionId;
           updateStatus();
         });
 

@@ -1,0 +1,108 @@
+{
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "scope": "Source frontend on owned API/player fixtures; no Source backend control-state equivalence proof",
+  "cases": {
+    "pending-pause": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "dialogRetained": true,
+      "commandPollCount": 1,
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR"
+      ],
+      "acknowledgedCommandIds": [],
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": true,
+      "reloadedCurrentUnit": false
+    },
+    "pending-terminate": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "dialogRetained": true,
+      "commandPollCount": 1,
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR"
+      ],
+      "acknowledgedCommandIds": [],
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": true,
+      "reloadedCurrentUnit": false
+    },
+    "queued-pause": {
+      "iframePreserved": false,
+      "cardCount": 1,
+      "dialogRetained": true,
+      "commandPollCount": 2,
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR",
+        "PAUSED"
+      ],
+      "acknowledgedCommandIds": [
+        1,
+        2
+      ],
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": false,
+      "reloadedCurrentUnit": false
+    },
+    "queued-terminate": {
+      "iframePreserved": false,
+      "cardCount": 1,
+      "dialogRetained": true,
+      "commandPollCount": 1,
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR",
+        "TERMINATED"
+      ],
+      "acknowledgedCommandIds": [
+        1,
+        2
+      ],
+      "returnedToStarter": true,
+      "samePlayerFrameAsBeforeError": false,
+      "reloadedCurrentUnit": false
+    },
+    "pending-resume": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "dialogRetained": true,
+      "commandPollCount": 1,
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR"
+      ],
+      "acknowledgedCommandIds": [],
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": true,
+      "reloadedCurrentUnit": false
+    },
+    "queued-resume": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "dialogRetained": true,
+      "commandPollCount": 2,
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR",
+        "RUNNING"
+      ],
+      "acknowledgedCommandIds": [
+        1,
+        2
+      ],
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": false,
+      "reloadedCurrentUnit": true
+    }
+  }
+}

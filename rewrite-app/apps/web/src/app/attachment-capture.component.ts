@@ -17,8 +17,12 @@ import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
 import { AttachmentManagerService } from "./attachment-manager.service";
 import { AttachmentCameraScanner } from "./attachment-camera-scanner";
 import { AttachmentQrDecoder } from "./attachment-qr-decoder";
+import { attachmentCameraMirrored, attachmentPageGeometry } from "./attachment-page-geometry";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { InterfaceModeService } from "./interface-mode.service";
+import { ApplicationSettingsService } from "./application-settings.service";
+import { resolveAttachmentText, type AttachmentCustomTextKey } from "./attachment-custom-texts";
 
 type AttachmentScope = {
   sessionToken: string;
@@ -37,14 +41,15 @@ type AttachmentScope = {
     .section-heading h2 { margin: .4rem 0 0; }
     .status-pill { display: inline-block; padding: .4rem .7rem; vertical-align: middle; }
     .capture-intro { max-width: 70ch; color: var(--muted); }
-    .capture-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(18rem, .75fr); gap: 1rem; }
-    .camera-shell { position: relative; min-height: 24rem; display: grid; place-items: center; overflow: hidden; border-radius: var(--radius-lg); background: #101519; color: #fff; }
-    .camera-shell video { display: block; width: 100%; max-height: 70vh; object-fit: contain; transition: opacity .15s ease; }
+    .capture-grid { display: grid; grid-template-columns: minmax(18rem, .75fr) minmax(0, 1.25fr); gap: 1rem; }
+    .camera-shell.has-preview { display: none; }
+    .camera-shell { position: relative; width: min(100%, calc(70vh * 210 / 297)); aspect-ratio: 210 / 297; overflow: hidden; border-radius: var(--radius-lg); background: #101519; color: #fff; }
+    .camera-shell video { position: absolute; top: 0; left: 0; display: block; max-width: none; transition: opacity .15s ease; }
     .camera-shell:not(.is-active) video { opacity: 0; }
     .camera-placeholder { position: absolute; inset: 0; display: grid; place-items: center; padding: 2rem; text-align: center; }
     .camera-shell.is-active .camera-placeholder { display: none; }
-    .scan-frame { position: absolute; inset: 12% 16%; border: 3px solid rgba(255, 255, 255, .9); border-radius: 1rem; box-shadow: 0 0 0 999px rgba(0, 0, 0, .22); pointer-events: none; }
-    .capture-controls { display: grid; gap: .9rem; align-content: start; }
+    .scan-frame { position: absolute; left: calc(18 / 210 * 100%); top: calc(18 / 297 * 100%); width: calc(44 / 210 * 100%); height: calc(44 / 297 * 100%); border: 3px solid rgba(255, 255, 255, .9); box-sizing: border-box; border-radius: 3px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .22); pointer-events: none; }
+    .capture-controls { display: grid; gap: .9rem; align-content: start; order: -1; }
     .capture-panel { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: rgba(255, 255, 255, .62); }
     .capture-panel h2, .capture-panel h3 { margin-top: 0; }
     .capture-code { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; }
@@ -56,22 +61,20 @@ type AttachmentScope = {
     input[type="file"] { width: 100%; }
     @media (max-width: 820px) {
       .capture-grid { grid-template-columns: 1fr; }
-      .camera-shell { min-height: 18rem; }
+      .capture-controls { order: 0; }
     }
   `],
   template: `
     <article id="attachmentCaptureCard" class="card capture-card">
       <div class="section-heading">
         <div>
-          <span class="eyebrow">Original Attachment Manager flow</span>
-          <h2>Scan, capture, confirm</h2>
+          <span class="eyebrow">Attachments</span>
+          <h2>{{ customText('am_capture_image', 'Capture a printed page') }}</h2>
         </div>
-        <span class="status-pill">Server-scoped</span>
+        <span class="status-pill">Review before uploading</span>
       </div>
       <p class="capture-intro">
-        Point the camera at the QR code on a printed attachment page. The code
-        selects the participant slot; the image is uploaded only after you
-        confirm the scoped participant, booklet, unit, and variable.
+        {{ customText('am_capture_image_instructions', 'Align the printed page with the camera preview and its QR code with the highlighted box. Check the image, participant, booklet, unit and variable before uploading.') }}
       </p>
       <p class="scope-line">
         <span><strong>Tenant:</strong> {{ tenantKey || 'not selected' }}</span>
@@ -90,21 +93,25 @@ type AttachmentScope = {
       <ng-container *ngIf="hasSessionScope">
         <div class="capture-grid">
           <section>
-            <div class="camera-shell" [class.is-active]="cameraActive">
-              <video #cameraVideo id="attachmentCaptureVideo" playsinline muted></video>
+            <div class="camera-shell" [class.is-active]="cameraActive" [class.has-preview]="capturePreviewUrl != null">
+              <video #cameraVideo id="attachmentCaptureVideo" playsinline muted
+                [style.width.%]="cameraGeometry?.videoWidthPercent || 100"
+                [style.height.%]="cameraGeometry?.videoHeightPercent || 100"
+                (loadedmetadata)="onCameraMetadataLoaded()"></video>
               <div class="camera-placeholder">
                 <p>{{ cameraMessage || 'Start the rear camera or use the QR-image and manual-code fallbacks.' }}</p>
               </div>
-              <div class="scan-frame" *ngIf="cameraActive" aria-hidden="true"></div>
+              <div class="scan-frame" *ngIf="cameraActive" [style.left.%]="cameraGeometry?.scanLeftPercent" aria-hidden="true"></div>
             </div>
+            <img id="attachmentCapturePreview" class="capture-preview" *ngIf="capturePreviewUrl" [src]="capturePreviewUrl" alt="Captured attachment page ready to review" />
             <canvas #captureCanvas hidden></canvas>
-            <div class="actions">
+            <div class="actions" *ngIf="!capturePreviewUrl">
               <button id="startAttachmentCameraButton" class="primary" type="button" [disabled]="busy || cameraActive || cameraStarting" (click)="startCamera()">Start camera</button>
               <button id="stopAttachmentCameraButton" class="ghost" type="button" [disabled]="!cameraActive" (click)="stopCamera()">Stop camera</button>
-              <button id="toggleAttachmentFlashButton" class="ghost" type="button" [disabled]="!cameraActive || !hasFlash" (click)="toggleFlash()">{{ flashOn ? 'Turn flash off' : 'Turn flash on' }}</button>
+              <button id="toggleAttachmentFlashButton" class="ghost" type="button" [disabled]="!cameraActive || !hasFlash" [attr.aria-pressed]="flashOn" (click)="toggleFlash()">{{ customText('gm_flash_checkbox', flashOn ? 'Turn flash off' : 'Turn flash on') }}</button>
             </div>
-            <label *ngIf="cameras.length > 1">
-              Camera
+            <label *ngIf="!capturePreviewUrl && cameras.length > 1">
+              {{ customText('am_available_cameras', 'Camera') }}
               <select id="attachmentCameraSelect" [(ngModel)]="selectedCameraId" (change)="selectCamera()">
                 <option *ngIf="!selectedCameraIsListed" [value]="selectedCameraId">{{ selectedCameraId ? 'Selected camera' : 'Default camera (rear preferred)' }}</option>
                 <option *ngFor="let camera of cameras" [value]="camera.id">{{ camera.label || camera.id }}</option>
@@ -114,8 +121,8 @@ type AttachmentScope = {
           </section>
 
           <section class="capture-controls">
-            <div class="capture-panel">
-              <h3>1. Resolve QR code</h3>
+            <div class="capture-panel" *ngIf="!capturePreviewUrl">
+              <h3>Select a page</h3>
               <label>
                 Scan a saved QR image
                 <input id="attachmentQrImageInput" type="file" accept="image/png,image/jpeg,image/webp" [disabled]="busy" (change)="scanQrImage($event)" />
@@ -130,7 +137,7 @@ type AttachmentScope = {
             </div>
 
             <div id="attachmentCaptureTarget" class="capture-panel" *ngIf="attachment as target">
-              <h3>2. Confirm target</h3>
+              <h3>Page belongs to</h3>
               <p><strong>{{ target.personLabel }}</strong></p>
               <p>{{ target.groupKey }} / {{ target.loginKey }}</p>
               <p>{{ target.testLabel }}</p>
@@ -139,33 +146,33 @@ type AttachmentScope = {
               <span class="status-pill">{{ target.dataType }}</span>
             </div>
 
-            <div class="capture-panel" *ngIf="attachment && canCaptureTarget">
-              <h3>3. Capture page</h3>
+            <div class="capture-panel" *ngIf="attachment && canCaptureTarget && !capturePreviewUrl">
+              <h3>Capture page</h3>
               <div class="actions">
-                <button id="captureAttachmentFrameButton" class="secondary" type="button" [disabled]="busy || !cameraActive" (click)="captureCurrentFrame()">Capture camera frame</button>
+                <button id="captureAttachmentFrameButton" class="secondary" type="button" [disabled]="busy || !cameraActive" (click)="capturePage()">Capture camera frame</button>
               </div>
               <label>
                 Or take/select a photo
                 <input id="attachmentCaptureFileInput" type="file" accept="image/png,image/jpeg" capture="environment" [disabled]="busy" (change)="selectCaptureFile($event)" />
               </label>
-              <img id="attachmentCapturePreview" class="capture-preview" *ngIf="capturePreviewUrl" [src]="capturePreviewUrl" alt="Attachment page ready to upload" />
             </div>
 
             <div class="capture-panel" *ngIf="attachment && canCaptureTarget && captureBlob">
-              <h3>4. Upload confirmed image</h3>
+              <h3>Confirm upload</h3>
               <div class="actions">
                 <button id="uploadCapturedAttachmentButton" class="primary" type="button" [disabled]="busy || !canWrite" (click)="uploadCapture()">{{ busy ? 'Uploading…' : 'Upload attachment' }}</button>
-                <button class="ghost" type="button" [disabled]="busy" (click)="clearCapture()">Retake</button>
+                <button id="retakeAttachmentCaptureButton" class="ghost" type="button" [disabled]="busy" (click)="resetTarget()">New capture</button>
               </div>
               <p *ngIf="!canWrite">This operator session does not have write access. The server will not accept an upload.</p>
             </div>
           </section>
         </div>
 
+        <p id="attachmentCaptureUploadStatus" class="capture-status" *ngIf="uploadNotice" role="status" aria-live="polite">{{ uploadNotice }}</p>
         <p id="attachmentCaptureStatus" class="capture-status" [class.is-error]="statusIsError" role="status" aria-live="polite">{{ status }}</p>
         <div class="actions">
-          <button id="resetAttachmentCaptureButton" class="ghost" type="button" [disabled]="busy" (click)="resetTarget()">Scan another page</button>
-          <a class="button-link secondary" routerLink="/runtime">Back to Attachment Manager</a>
+          <button id="resetAttachmentCaptureButton" class="ghost" type="button" *ngIf="!capturePreviewUrl || !attachment || !canCaptureTarget" [disabled]="busy" (click)="resetTarget()">Scan another page</button>
+          <a id="backToAttachmentManager" class="button-link secondary" routerLink="/runtime">{{ customText('am_goto_attachment_overview', 'Back to Attachment Manager') }}</a>
         </div>
       </ng-container>
     </article>
@@ -181,6 +188,8 @@ export class AttachmentCaptureComponent
   private readonly captureCanvas!: ElementRef<HTMLCanvasElement>;
 
   private readonly manager = inject(AttachmentManagerService);
+  private readonly interfaceMode = inject(InterfaceModeService);
+  private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly route = inject(ActivatedRoute);
@@ -191,6 +200,17 @@ export class AttachmentCaptureComponent
   private scanInProgress = false;
   private cameraSelectionVersion = 0;
   private cameraDetailsVersion = 0;
+  // Native encoding, QR decoding and HTTP can finish after a reset or switch.
+  // Each result belongs to the scope, target and photo that started it.
+  private captureVersion = 0;
+  private targetVersion = 0;
+  private operationVersion = 0;
+  private uploadNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  customText(key: AttachmentCustomTextKey, rewriteFallback: string): string {
+    return resolveAttachmentText(this.applicationSettings.settings().customTexts,
+      this.operatorAccess.customTexts, key, this.interfaceMode.mode() === "original" ? undefined : rewriteFallback);
+  }
 
   attachmentCode = "";
   attachment: WorkspaceAttachment | null = null;
@@ -207,6 +227,17 @@ export class AttachmentCaptureComponent
   busy = false;
   status = "Scan a QR code or enter an attachment code to begin.";
   statusIsError = false;
+  uploadNotice: string | null = null;
+
+  get cameraGeometry(): ReturnType<typeof attachmentPageGeometry> {
+    const video = this.cameraVideo?.nativeElement;
+    return video ? attachmentPageGeometry(video.videoWidth, video.videoHeight,
+      attachmentCameraMirrored(video.srcObject as MediaStream | null)) : null;
+  }
+
+  onCameraMetadataLoaded(): void {
+    this.refreshView();
+  }
 
   get selectedCameraIsListed(): boolean {
     return this.cameras.some(camera => camera.id === this.selectedCameraId);
@@ -253,6 +284,7 @@ export class AttachmentCaptureComponent
   }
 
   ngOnDestroy(): void {
+    if (this.uploadNoticeTimeout != null) clearTimeout(this.uploadNoticeTimeout);
     this.destroyScanner();
     this.imageDecoder?.dispose();
     this.imageDecoder = null;
@@ -364,15 +396,22 @@ export class AttachmentCaptureComponent
     const file = input.files?.[0];
     input.value = "";
     if (!file || this.busy) return;
+    const scope = this.scope();
+    const operation = ++this.operationVersion;
+    const current = () => this.isCurrentScope(scope) && operation === this.operationVersion;
+    this.targetVersion++;
+    this.attachment = null;
+    this.clearCapture();
     this.busy = true;
     this.statusIsError = false;
     const decoder = this.imageDecoder = new AttachmentQrDecoder();
     try {
       const result = await decoder.decode(file);
-      if (this.destroyRef.destroyed) return;
+      if (!current()) return;
       this.attachmentCode = result.data.trim();
       await this.resolveCodeInternal();
     } catch (error) {
+      if (!current()) return;
       this.status =
         error === QrScanner.NO_QR_CODE_FOUND
           ? "No QR code was found in that image."
@@ -381,41 +420,48 @@ export class AttachmentCaptureComponent
     } finally {
       decoder.dispose();
       if (this.imageDecoder === decoder) this.imageDecoder = null;
-      this.busy = false;
+      if (operation === this.operationVersion) this.busy = false;
       this.refreshView();
     }
   }
 
-  async resolveCode(): Promise<void> {
+  async resolveCode(preserveCapture = false): Promise<void> {
     if (this.busy) return;
+    const operation = ++this.operationVersion;
     this.busy = true;
     this.statusIsError = false;
     try {
-      await this.resolveCodeInternal();
+      await this.resolveCodeInternal(preserveCapture);
     } finally {
-      this.busy = false;
+      if (operation === this.operationVersion) this.busy = false;
       this.refreshView();
     }
   }
 
-  async captureCurrentFrame(): Promise<void> {
+  async capturePage(): Promise<void> {
+    const captured = await this.captureCurrentFrame();
+    if (!captured || this.captureBlob !== captured) return;
+    this.stopCamera();
+    this.status = "Page captured. Review the image and target before uploading.";
+  }
+
+  async captureCurrentFrame(): Promise<Blob | null> {
     const video = this.cameraVideo.nativeElement;
     if (!this.cameraActive || !video.videoWidth || !video.videoHeight) {
       this.status = "The camera does not have a frame ready yet.";
       this.statusIsError = true;
-      return;
+      return null;
     }
+    const scope = this.scope();
+    const capture = ++this.captureVersion;
+    const target = this.targetVersion;
+    const attachment = this.attachment;
+    const code = this.attachmentCode;
     const canvas = this.captureCanvas.nativeElement;
     const stream = video.srcObject;
-    const pageRatio = 210 / 297;
-    let sourceWidth = video.videoWidth;
-    let sourceHeight = sourceWidth / pageRatio;
-    if (sourceHeight > video.videoHeight) {
-      sourceHeight = video.videoHeight;
-      sourceWidth = sourceHeight * pageRatio;
-    }
-    const sourceX = Math.max(0, (video.videoWidth - sourceWidth) / 2);
-    const sourceY = Math.max(0, (video.videoHeight - sourceHeight) / 2);
+    const geometry = this.cameraGeometry;
+    if (!geometry) return null;
+    const { x: sourceX, y: sourceY, width: sourceWidth, height: sourceHeight } = geometry.page;
     const outputScale = Math.min(1, 1_600 / sourceHeight);
     canvas.width = Math.max(1, Math.round(sourceWidth * outputScale));
     canvas.height = Math.max(1, Math.round(sourceHeight * outputScale));
@@ -423,7 +469,7 @@ export class AttachmentCaptureComponent
     if (!context) {
       this.status = "The browser could not prepare the captured image.";
       this.statusIsError = true;
-      return;
+      return null;
     }
     context.drawImage(
       video,
@@ -439,17 +485,20 @@ export class AttachmentCaptureComponent
     const blob = await new Promise<Blob | null>(resolve =>
       canvas.toBlob(resolve, "image/png")
     );
-    if (this.destroyRef.destroyed || !this.cameraActive || video.srcObject !== stream) return;
+    if (!this.isCurrentScope(scope) || capture !== this.captureVersion ||
+        target !== this.targetVersion || this.attachment !== attachment || this.attachmentCode !== code ||
+        !this.cameraActive || video.srcObject !== stream) return null;
     if (!blob) {
       this.status = "The browser could not encode the captured image.";
       this.statusIsError = true;
       this.refreshView();
-      return;
+      return null;
     }
     this.setCapture(blob, `attachment-capture-${Date.now()}.png`);
     this.status = "Camera frame captured. Confirm the target and upload when ready.";
     this.statusIsError = false;
     this.refreshView();
+    return blob;
   }
 
   selectCaptureFile(event: Event): void {
@@ -466,6 +515,7 @@ export class AttachmentCaptureComponent
       return;
     }
     this.setCapture(file, file.name || `attachment-capture-${Date.now()}.png`);
+    this.stopCamera();
     this.status = "Image ready. Confirm the target details before uploading.";
     this.statusIsError = false;
   }
@@ -474,31 +524,43 @@ export class AttachmentCaptureComponent
     const attachment = this.attachment;
     const captureBlob = this.captureBlob;
     if (!attachment || !captureBlob || !this.canWrite || this.busy) return;
+    const scope = this.scope();
+    const fileName = this.captureFileName;
+    const capture = this.captureVersion;
+    const target = this.targetVersion;
+    const operation = ++this.operationVersion;
+    const current = () => this.isCurrentScope(scope) && operation === this.operationVersion &&
+      target === this.targetVersion && capture === this.captureVersion &&
+      this.attachment === attachment && this.captureBlob === captureBlob;
     this.busy = true;
     this.statusIsError = false;
     try {
+      const dataBase64 = this.arrayBufferToBase64(await captureBlob.arrayBuffer());
+      if (!current() || !this.canWrite) return;
       const updated = await this.manager.upload(
-        this.scope(),
+        scope,
         attachment.attachmentId,
         {
-          fileName: this.captureFileName,
+          fileName,
           mediaType: captureBlob.type,
-          dataBase64: this.arrayBufferToBase64(await captureBlob.arrayBuffer())
+          dataBase64
         }
       );
-      this.attachment = updated;
-      this.clearCapture();
-      this.status = `Attachment uploaded for ${updated.personLabel}. Scan another page when ready.`;
+      if (!current()) return;
+      this.resetTarget();
+      this.showUploadNotice(`Attachment uploaded for ${updated.personLabel}. Ready for the next page.`);
     } catch (error) {
+      if (!current()) return;
       this.status = this.manager.describeError(error);
       this.statusIsError = true;
     } finally {
-      this.busy = false;
+      if (operation === this.operationVersion) this.busy = false;
       this.refreshView();
     }
   }
 
   clearCapture(): void {
+    this.captureVersion++;
     if (this.capturePreviewUrl) {
       URL.revokeObjectURL(this.capturePreviewUrl);
     }
@@ -507,7 +569,20 @@ export class AttachmentCaptureComponent
     this.captureFileName = "";
   }
 
+  private showUploadNotice(message: string): void {
+    if (this.uploadNoticeTimeout != null) clearTimeout(this.uploadNoticeTimeout);
+    this.uploadNotice = message;
+    this.uploadNoticeTimeout = setTimeout(() => {
+      this.uploadNoticeTimeout = null;
+      this.uploadNotice = null;
+      this.refreshView();
+    }, 3_000);
+  }
+
   resetTarget(): void {
+    this.targetVersion++;
+    this.operationVersion++;
+    this.busy = false;
     this.attachment = null;
     this.attachmentCode = "";
     this.clearCapture();
@@ -520,11 +595,14 @@ export class AttachmentCaptureComponent
     if (this.scanInProgress || this.busy || !code.trim()) return;
     this.scanInProgress = true;
     try {
-      await this.captureCurrentFrame();
-      if (this.destroyRef.destroyed || !this.cameraActive) return;
+      const scope = this.scope();
+      const target = this.targetVersion;
+      const captured = await this.captureCurrentFrame();
+      if (!captured || this.captureBlob !== captured || !this.isCurrentScope(scope) ||
+          target !== this.targetVersion || !this.cameraActive) return;
       this.stopCamera();
       this.attachmentCode = code.trim();
-      await this.resolveCode();
+      await this.resolveCode(true);
     } finally {
       this.scanInProgress = false;
       this.refreshView();
@@ -556,15 +634,25 @@ export class AttachmentCaptureComponent
     this.refreshView();
   }
 
-  private async resolveCodeInternal(): Promise<void> {
+  private async resolveCodeInternal(preserveCapture = false): Promise<void> {
     const attachmentId = this.attachmentCode.trim();
     if (!attachmentId) {
       this.status = "Enter or scan an attachment code first.";
       this.statusIsError = true;
       return;
     }
+    const scope = this.scope();
+    const target = ++this.targetVersion;
+    const current = () => this.isCurrentScope(scope) && target === this.targetVersion &&
+      this.attachmentCode.trim() === attachmentId;
+    this.attachment = null;
+    // Only live QR capture brings a new frame associated with the scanned code.
+    // Manual/image lookups cannot reassign the previous target's photograph.
+    if (!preserveCapture) this.clearCapture();
     try {
-      this.attachment = await this.manager.get(this.scope(), attachmentId);
+      const attachment = await this.manager.get(scope, attachmentId);
+      if (!current()) return;
+      this.attachment = attachment;
       this.attachmentCode = this.attachment.attachmentId;
       if (!this.canCaptureTarget) {
         this.clearCapture();
@@ -575,6 +663,7 @@ export class AttachmentCaptureComponent
         this.statusIsError = false;
       }
     } catch (error) {
+      if (!current()) return;
       this.attachment = null;
       this.status = this.manager.describeError(error);
       this.statusIsError = true;
@@ -594,6 +683,12 @@ export class AttachmentCaptureComponent
       tenantKey: this.tenantKey,
       workspaceKey: this.workspaceKey
     };
+  }
+
+  private isCurrentScope(scope: AttachmentScope): boolean {
+    const current = this.scope();
+    return !this.destroyRef.destroyed && current.sessionToken === scope.sessionToken &&
+      current.tenantKey === scope.tenantKey && current.workspaceKey === scope.workspaceKey;
   }
 
   private destroyScanner(): void {

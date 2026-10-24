@@ -5,7 +5,7 @@ import {
   type ParticipantSession, type TestRun
 } from "@testcenter-rewrite-app/domain";
 import {
-  transitionParticipantPresence, PARTICIPANT_PRESENCE_LEASE_MS,
+  transitionParticipantPresence, canStreamParticipantRun, PARTICIPANT_PRESENCE_LEASE_MS,
   PARTICIPANT_PRESENCE_MAX_CONNECTIONS, type ParticipantPresence
 } from "./participant-presence.js";
 
@@ -92,6 +92,35 @@ test("completed, closed and expired sessions clear leases but preserve history c
     assert.equal(result.presence?.sequence, live.presence?.sequence);
     assert.equal(result.presence?.nextExpiry, null);
   }
+});
+
+test("selected entry controls streaming independently of sibling parent transitions", () => {
+  const active = { ...run, status: "paused" as const, controllerEntry: { active: true, revision: 3 } };
+  const inactiveParent = { ...session, status: "signed_in" as const };
+  assert.equal(canStreamParticipantRun(active, inactiveParent), true);
+  assert.equal(canStreamParticipantRun(run, inactiveParent), false, "Legacy streaming still requires a launched parent.");
+  assert.equal(canStreamParticipantRun(run, session), true);
+  const message = { testRunId: run.testRunId, participantSessionId: session.participantSessionId,
+    action: "open" as const, connectionId: id(1), timestamp };
+  const opened = transitionParticipantPresence(message, null, active, inactiveParent);
+  assert.equal(opened.accepted, true);
+  const live = transitionParticipantPresence({ ...message, action: "acknowledge" }, opened.presence, active, inactiveParent);
+  assert.equal(live.presence?.mode, "WEBSOCKET");
+  for (const controllerEntry of [{ active: false, revision: 4 }, { active: true, revision: 0 },
+    { active: true, revision: Number.MAX_SAFE_INTEGER + 1 }, null]) {
+    const closed = { ...active, controllerEntry } as TestRun;
+    assert.equal(canStreamParticipantRun(closed, session), false);
+    for (const action of ["open", "acknowledge", "poll"] as const) {
+      const rejected = transitionParticipantPresence({ ...message, action }, live.presence, closed, session);
+      assert.equal(rejected.accepted, false);
+      assert.deepEqual(rejected.presence?.connections, {});
+      assert.equal(rejected.testLog, null);
+    }
+  }
+  assert.equal(canStreamParticipantRun({ ...active, status: "created" }, session), false);
+  assert.equal(canStreamParticipantRun({ ...active, status: "completed" }, session), false);
+  assert.equal(canStreamParticipantRun(active, { ...session, status: "closed" }), false);
+  assert.deepEqual(active.unitResponses, run.unitResponses);
 });
 
 test("foreign identities cannot clear the owner's persisted presence", () => {

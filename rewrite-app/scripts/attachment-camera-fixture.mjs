@@ -2,21 +2,21 @@ import QRCode from "qrcode";
 
 // Real monochrome video data for Chromium's camera fixture. No DOM event,
 // decoder result, authenticated lookup or captured image is synthesized.
-export const createAttachmentQrCameraVideo = code => {
-  const width = 640, height = 480;
+export const createAttachmentQrCameraVideo = (code, { position = "printed" } = {}) => {
+  const width = 1280, height = 720;
   const { modules } = QRCode.create(code, { errorCorrectionLevel: "M" });
-  const margin = 4, scale = 3;
-  const square = (modules.size + margin * 2) * scale;
-  if (square > height) throw new Error("Owned QR camera fixture is too large.");
-  const left = Math.floor((width - square) / 2), top = Math.floor((height - square) / 2);
+  const margin = 4, square = Math.round(40 * height / 297);
+  const offset = Math.round(20 * height / 297);
+  const printed = position === "printed" || position === "printed-front";
+  const left = position === "printed-front" ? Math.round(width - height * 210 / 297) + offset : printed ? offset : Math.round((width - square) / 2);
+  const top = printed ? offset : Math.round((height - square) / 2);
   const luminance = Buffer.alloc(width * height, 235);
-  for (let row = 0; row < modules.size; row++) {
-    for (let column = 0; column < modules.size; column++) {
-      if (!modules.data[row * modules.size + column]) continue;
-      for (let y = 0; y < scale; y++) {
-        const start = (top + (row + margin) * scale + y) * width + left + (column + margin) * scale;
-        luminance.fill(16, start, start + scale);
-      }
+  for (let y = 0; y < square; y++) {
+    for (let x = 0; x < square; x++) {
+      const row = Math.floor(y / square * (modules.size + margin * 2)) - margin;
+      const column = Math.floor(x / square * (modules.size + margin * 2)) - margin;
+      if (row >= 0 && row < modules.size && column >= 0 && column < modules.size && modules.data[row * modules.size + column])
+        luminance[(top + y) * width + left + x] = 16;
     }
   }
   return Buffer.concat([

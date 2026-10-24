@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -9,7 +9,9 @@ import { chromium } from "playwright";
 
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(), "testcenter-participant-variant-"));
+const scratch = await mkdtemp(join(tmpdir(), "testcenter-participant-variant-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR) : scratch;
+await mkdir(artifacts, { recursive: true });
 process.stdout.write(`owned_artifacts=${artifacts}\n`);
 const apiModule = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
 const server = spawn(process.execPath, ["--input-type=module", "-e", `
@@ -18,7 +20,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
   server.listen(0, "127.0.0.1", () => process.send({ port: server.address().port }));
   process.once("SIGTERM", () => server.close(() => process.exit(0)));
 `], { cwd: frontendRoot, env: { ...process.env, PORT: "4310", FIRST_SLICE_STORE: "sqlite",
-  FIRST_SLICE_SQLITE_FILE: join(artifacts, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+  FIRST_SLICE_SQLITE_FILE: join(scratch, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
   FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", FIRST_SLICE_PROOF_OF_WORK_SCOPES: "",
   FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", REQUIRE_LOGIN_PASSWORD: "false" },
   stdio: ["ignore", "ignore", "inherit", "ipc"] });
@@ -78,7 +80,7 @@ try {
     activePage = page;
     const errors = [];
     page.on("pageerror", error => errors.push(String(error)));
-    await page.goto(`${baseUrl}/app/participant?ui=${ui}&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
+    await page.goto(`${baseUrl}/app/participant?ui=${ui}&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "domcontentloaded" });
     if (ui === "original") {
       await page.getByLabel("Anmeldename", { exact: true }).fill("variant-browser");
     } else {
@@ -107,10 +109,11 @@ try {
     const initial = (await first.json()).testRun;
     assert.equal(initial.bookletAssignmentKey, assignment);
     const textarea = page.locator("#participantRouteUnitResponse");
+    const returnToStarter = page.locator(ui === "original" ? "#participantApplicationLogoButton" : "#participantRouteReturnToStarterButton");
     await textarea.waitFor();
     const exactAnswer = `Exact browser answer: ä/β · ${ui}`;
     await textarea.fill(exactAnswer);
-    await page.locator("#participantRouteReturnToStarterButton").click();
+    await returnToStarter.click();
     await page.locator("#participantConfirmationContinueButton").waitFor();
     const returned = page.waitForResponse(response => new URL(response.url()).pathname === `/api/v1/participant/test-runs/${initial.testRunId}/return-to-starter`);
     await page.locator("#participantConfirmationContinueButton").click();
@@ -138,7 +141,7 @@ try {
     assert.equal(reentryLink.searchParams.get("bookletKey"), assignment);
     reentryLink.searchParams.set("ui", ui);
     const leave = async id => {
-      await page.locator("#participantRouteReturnToStarterButton").click();
+      await returnToStarter.click();
       await page.locator("#participantConfirmationContinueButton").waitFor();
       const response = page.waitForResponse(value => new URL(value.url()).pathname === `/api/v1/participant/test-runs/${id}/return-to-starter`);
       await page.locator("#participantConfirmationContinueButton").click();
@@ -172,7 +175,7 @@ try {
     await textarea.fill(secondAnswer);
     assert.deepEqual((await leave(otherRunId)).unitResponses, { "variant-unit": secondAnswer });
     assert.deepEqual((await enter(secondAssignment)).unitResponses, { "variant-unit": secondAnswer });
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, secondAnswer);
     assert.equal(new URL(page.url()).searchParams.get("testRunId"), otherRunId);
@@ -216,17 +219,18 @@ try {
     assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
     await page.screenshot({ path: join(artifacts, `${ui}-protected-navigation.png`) });
     await textarea.fill(exactAnswer);
-    await Promise.all([
-      page.waitForEvent("load"),
-      // This raw-text extension uses the shared fallback Player in both modes;
-      // Original Verona toolbar rendering has its own full browser acceptance.
-      page.locator("#participantRouteReloadButton").click()
-    ]);
+    if (ui === "original") {
+      // The Original surface hides the Rewrite fallback toolbar. Verify the
+      // real browser reload here; its Verona toolbar has separate acceptance.
+      await page.reload({ waitUntil: "domcontentloaded" });
+    } else {
+      await Promise.all([page.waitForEvent("load"), page.locator("#participantRouteReloadButton").click()]);
+    }
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
     assert.equal(page.url(), protectedUrl);
     assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
-    process.stdout.write(`participant_navigation=${ui}: prevented Back/Forward preserve exact Run URL and unsaved draft; shared fallback reload preserves saved answer and interface\n`);
+    process.stdout.write(`participant_navigation=${ui}: prevented Back/Forward preserve exact Run URL and unsaved draft; ${ui === "original" ? "browser" : "shared fallback"} reload preserves saved answer and interface\n`);
     const sessionPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}`;
     const participantHeaders = { authorization: `Bearer ${identity.sessionToken}` };
     const saveOther = async answer => {
@@ -242,9 +246,11 @@ try {
     assert.equal(legacy.status, 200);
     assert.equal((await legacy.json()).currentRunState.testRun.testRunId, otherRunId,
       "The selection fixture must really have a different latest run.");
+    // This page owns a persistent event stream. Document and scoped Run
+    // assertions below establish readiness; global network idleness cannot.
     const eventPath = `${sessionPath}/events`;
     const [, channel, acknowledgement] = await Promise.all([
-      page.goto(reentryLink.href, { waitUntil: "networkidle" }),
+      page.goto(reentryLink.href, { waitUntil: "domcontentloaded" }),
       page.waitForResponse(response => new URL(response.url()).pathname === eventPath &&
         new URL(response.url()).searchParams.get("testRunId") === initial.testRunId),
       page.waitForResponse(response => new URL(response.url()).pathname === `${eventPath}/acknowledgements` &&
@@ -254,25 +260,58 @@ try {
     assert.equal(acknowledgement.status(), 200);
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
     assert.equal(await textarea.inputValue(), exactAnswer);
     assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
     const monitorPath = `${workspace}/monitor/open-runs/${initial.testRunId}/commands`;
-    await api(monitorPath, { commandType: "pause", actorId: "owned-selection-smoke" });
+    const commandCompletions = new Map();
+    const captureCommandCompletion = response => {
+      const request = response.request();
+      if (request.method() !== "POST" || new URL(request.url()).pathname !== `${sessionPath}/command-completions`) return;
+      const packet = request.postDataJSON();
+      if (packet.command?.kind !== "remote") return;
+      void response.json().then(payload => commandCompletions.set(packet.command.commandId,
+        { status: response.status(), payload })).catch(error => commandCompletions.set(packet.command.commandId, { error }));
+    };
+    page.on("response", captureCommandCompletion);
+    const waitCommandCompletion = async command => {
+      const deadline = Date.now() + 30_000;
+      while (!commandCompletions.has(command.commandId)) {
+        assert.ok(Date.now() < deadline, `The selected ${command.commandType} must finish its actual command completion.`);
+        await delay(20);
+      }
+      const receipt = commandCompletions.get(command.commandId);
+      if (receipt.error) throw receipt.error;
+      assert.equal(receipt.status, 200);
+      assert.equal(receipt.payload.completion.testRunId, initial.testRunId);
+      assert.deepEqual(receipt.payload.completion.command, { kind: "remote", commandId: command.commandId });
+      assert.equal(typeof receipt.payload.completion.applied, "boolean");
+    };
+    const pauseCommand = (await api(monitorPath, { commandType: "pause", actorId: "owned-selection-smoke" })).command;
     await saveOther("Owned background beginner update after advanced pause");
-    await page.locator("#participantRouteStatus", { hasText: "paused" }).waitFor();
+    await page.waitForFunction(() => document.querySelector("#participantRouteStatus")?.textContent?.trim() === "paused");
+    await page.locator("#participantRoutePausedState").waitFor();
     assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
     assert.equal(await textarea.count(), 0, "A selected monitor pause must remove answer editing.");
-    await api(monitorPath, { commandType: "resume", actorId: "owned-selection-smoke" });
+    await waitCommandCompletion(pauseCommand);
+    const resumeCommand = (await api(monitorPath, { commandType: "resume", actorId: "owned-selection-smoke" })).command;
     await saveOther("Owned background beginner update after advanced resume");
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
     assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
+    await waitCommandCompletion(resumeCommand);
+    // The legacy endpoint selects by updatedAt. Command application/completion
+    // can advance the selected Run after its answer control already appears.
+    // Keep the competing writes above, then deliberately make the other Run
+    // latest after the actual accepted command has finished, before asserting
+    // that its legacy projection cannot replace the selected browser Run.
+    await saveOther("Owned background beginner update after confirmed advanced resume");
     const latestOther = await fetch(`${baseUrl}${sessionPath}/current-state`, { headers: participantHeaders });
     assert.equal(latestOther.status, 200);
     assert.equal((await latestOther.json()).currentRunState.testRun.testRunId, otherRunId);
+    page.off("response", captureCommandCompletion);
     const completedOther = await fetch(`${baseUrl}/api/v1/participant/test-runs/${otherRunId}/complete`, {
       method: "POST", headers: { ...participantHeaders, "content-type": "application/json" }, body: "{}"
     });
@@ -283,7 +322,7 @@ try {
     });
     assert.equal(completedEntry.status, 409);
     assert.equal((await completedEntry.json()).error, "booklet_already_completed");
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
     assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId,
@@ -325,7 +364,7 @@ try {
       activePage = entryPage;
       const entryErrors = [];
       entryPage.on("pageerror", error => entryErrors.push(String(error)));
-      await entryPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({ ui, tenantKey: "demo-tenant", workspaceKey: entryWorkspaceKey })}`, { waitUntil: "networkidle" });
+      await entryPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({ ui, tenantKey: "demo-tenant", workspaceKey: entryWorkspaceKey })}`, { waitUntil: "domcontentloaded" });
       if (ui === "original") await entryPage.getByLabel("Anmeldename", { exact: true }).fill(mode);
       else await entryPage.locator("#participantLoginKey").fill(mode);
       const identityResponse = entryPage.waitForResponse(value =>
@@ -357,7 +396,11 @@ try {
       assert.deepEqual(beforeEntry.testRun.unitResponses, {});
       const entryRunId = beforeEntry.testRun.testRunId;
       assert.equal(new URL(entryPage.url()).searchParams.get("testRunId"), entryRunId);
-      await entryPage.reload({ waitUntil: "networkidle" });
+      const resetEntry = entryPage.waitForResponse(response =>
+        new URL(response.url()).pathname === `${entrySessionPath}/resume` && response.request().method() === "POST");
+      await entryPage.reload({ waitUntil: "domcontentloaded" });
+      assert.equal((await resetEntry).status(), 200);
+      await entryPage.locator("#participantRouteTestletUnlockCode").waitFor();
       const afterEntry = await readEntry();
       assert.equal(afterEntry.testRun.testRunId, entryRunId);
       assert.equal(afterEntry.testRun.currentUnitKey, null, "Non-saving hard reload must restore the code gate.");

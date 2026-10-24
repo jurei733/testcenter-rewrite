@@ -1,5 +1,4791 @@
 # Testcenter parity checklist
 
+### Native first person code and suffix foundation (2026-10-24)
+
+Validated native XML sign-in now preserves the first requested raw code (`abc`
+for assignment `AbC`) and its durable Original person suffix. Case-equivalent
+reentry retains the person/Test and first spelling; restart modes create the
+Source-shaped eight-character suffix. Scoped store saves preserve that identity
+through group moves, upgrades and durable failures without inventing unknown
+history. The required unit/PG/focused suites exercise the Rewrite behavior
+against the unchanged production Source53 receipt. See [exact scope and remaining
+auth/listing work](ORIGINAL-RESULT-GROUPS.md). Native two-step Login-token auth,
+atomic person lookup and changed-release/mode/status semantics remain partial.
+The formal ledger remains **27 done / 22 partial**, all eight broad visual rows
+open; this data prerequisite does not close a broad parity row.
+
+### Group snapshot foundation (2026-10-23)
+
+First validated participant credentials now capture a server-owned group label
+and clock before the separate person-code step, across all four stores. Later
+roster imports and repeated sign-ins preserve that snapshot; invalid credentials
+cannot create it. Atomic creation, Unicode comparison, durable failure and scoped
+cleanup controls are covered by the focused result suite and mandatory unit/PG
+gates. See [lifecycle, migrations and remaining scope](ORIGINAL-RESULT-GROUPS.md).
+Native result tables, selected-Test and whole-group deletion semantics,
+monitor-login creation and broad visual proof remain partial. The formal ledger
+stays **27 done / 22 partial**, with all eight broad visual rows open.
+
+
+### Test-row clock and saved Test state stay distinct (2026-10-23)
+
+Actual unmodified production Source Oracle 40018466023 passes 29 HTTP groups,
+including monitor lock/relock/unlock on an empty Test. These operations move the
+Test-row result time without adding nonempty Test state or Unit rows; Unit-only
+state/log writes do not move it. The additional pinned public receipt and reports
+are in `test-fixtures/original-testcenter/source-workspace-results/lock-clock`.
+The Rewrite's optional metadata now records the general Test-row clock separately
+from saved-state evidence, across all four stores and atomic command/mutation
+paths. Source result-group time uses Unix seconds; response-part client timestamps
+use milliseconds. Native Results/Tests projections, selected-Test deletion, four
+native downloads and all eight broad visual comparisons remain incomplete. The
+formal ledger remains **27 done / 22 partial**.
+
+
+### Original Test clocks: persisted foundation, native pages still partial (2026-10-23)
+
+Optional server-owned evidence now separates opening a Test, saving Test-wide state
+and saving a Unit. Opening/reopening records a server time without rewriting answer
+clocks; response-only writes and raw logs do not move the Test-state time. A real
+same-unit state write does, even when its value stays unchanged. Non-saving review
+mode records opening without saved state. Client-supplied evidence is ignored;
+stale controller effects, denied scope and late SQL audit failures cannot leave
+partial clock updates. All four stores preserve the evidence, and both SQL schema
+upgrades retain exact legacy answers without fabricating past times. Focused tests
+and protected HTTP controls qualify this foundation. It is not yet a complete
+Original group/result projection, selected-Test deletion, native Results/Tests UI
+or paired-page visual proof. The formal ledger stays **27 done / 22 partial**,
+with all eight broad visual rows open.
+
+
+### Saved unanswered Units in the Original result archive (2026-10-23)
+
+Unchanged production Source [run 40004889342](https://github.com/jurei733/testcenter-rewrite/actions/runs/40004889342)
+passes 27 HTTP groups, including review-created saved Units that remain after
+comment deletion. Its verified public response/log/legacy-review/enhanced-review
+CSV/JSON fixtures are retained under `test-fixtures/original-testcenter/source-workspace-results/`.
+The Rewrite archive correction emits empty response arrays for captured state
+without data parts and includes comment-only Units with null laststate. Exact
+scoped server review history preserves their identity after comment deletion and
+durable reopen. Intentional empty legacy answers remain explicit response entries.
+Arbitrary Unit logs, Booklet comments and foreign/mismatched journal identities
+cannot initialize a report row. Reports leave stored Run/answer bytes unchanged.
+
+This improves existing ZIP exports. Native opened-Test group statistics, exact
+Unit state/time projection, four individual CSV actions, selected-Test deletion,
+all four workspace tabs and paired Source/Rewrite visuals remain open. Formal
+status is now **27 done / 22 partial; all eight broad visual rows open**.
+The Source27 audit reopens Result group administration and Original result report
+archive: their existing functionality does not yet prove complete Source semantics.
+
+### Native Systemcheck report administration (2026-10-23)
+
+The implemented workspace pages now provide real Files/Reports navigation.
+The report page adapts pinned Source's five columns, selection controls, download
+filename, deletion prompt and Material table. Its statistics read has no report
+list pagination. Download uses every captured selected Check ID; the real browser
+journey verifies all **504** selected reports from **505** actual saved reports.
+The literal Source OS/browser name-plus-space-plus-version distributions are
+additive `operatingSystemVersions` / `browserVersions` fields. Existing canonical
+name-only fields retain their behavior. Matching uses Source's exact environment
+labels; missing fields preserve the literal space instead of inventing `unknown`.
+This matches the previously executed production Apache Source Oracle's versions.
+
+Selection, downloads and single-use deletion confirmations own the exact login
+and workspace. Logout, scope replacement and component destruction reject late
+data/downloads. The protected API authorizes every deletion batch; a refusal
+stops subsequent batches.
+More than 100 selected Checks use bounded requests with captured IDs; a failed
+batch stops subsequent writes, retains confirmed counts, and reloads real server
+statistics. Matching the actual Source template, read-only users can open the
+same selected-Check confirmation. Its protected DELETE returns 403, preserving
+all report rows, selected IDs and workspace audit records. A rejected first
+request does not refetch/clear the unchanged table; users can still export it.
+Tab changes discard selection. Report code
+is deferred and has an explicit missing-bundle error/reload state.
+
+Local qualification: **3,855 unit/frontend cases** (121 / 324 / 1,361 / 2,049),
+**173 complete API integrations each for Memory/File/SQLite**, and **1,950
+complete PostgreSQL cases**, all without failures/skips/cancellations. The
+focused suite has **25** cases, including exact version labels and missing-field
+separators in all stores and authenticated HTTP. Sixteen controller cases
+exercise ownership, authoritative RO/revoked-grant denial, failure/retry, exact
+CSV bytes, 205-Check deletion, partial failure and concurrent zero-count writes.
+The final frontend/selection group and complete report/Verona/native-navigation
+journeys qualify this frontend-only correction; unchanged core/API/PostgreSQL
+results are retained, rather than implying they were rerun for a template change. Typecheck and production pass; entry remains **468.39 kB**
+under the unchanged 470 kB limit. Owned PostgreSQL schema/cluster are retired.
+Full old native file and new report browser journeys pass independently.
+
+This still leaves native results/answers, individual Test-Session deletion and
+complete four-tab navigation open. Current canonical platform/tenant admin
+inheritance is retained; Source's explicit workspace-grant projection remains
+a separate gap. Six native report captures are diagnostic only: no paired
+Source/Rewrite pixel proof is claimed. Formal status stays **29 done / 20
+partial; all eight broad visual rows open**. A fresh complete published-head
+CI remains necessary; preceding run 39990402820 exposes an unresolved native
+Verona click-witness failure, separately recorded in `CI.md`.
+
+### Complete selected Systemcheck report exports (2026-10-23)
+
+The next native workspace pages need Source's multi-Check report download.
+The preceding implementation exports only the list's default 100 reports and
+ignores additional selected Check IDs. A stored 505-report regression reproduces
+both errors before the correction. CSV and JSON exports now read every selected
+record without injecting a list page; an explicit limit still applies after
+selection. Ordinary lists retain their default 100 and explicit 1–500 bounds.
+
+Repeated HTTP `checkId` parameters form a deduplicated, case-insensitive union
+across CSV, JSON, negotiated exports, lists and statistics. At the application
+port, an omitted `checkIds` means all permitted workspace reports, while an
+explicit empty array means none. Malformed selectors fail; all-blank repeated
+HTTP selections return 400 instead of broadening to all reports. The historical
+single blank query remains an omitted filter. Unselected reports cannot add
+private columns to a selected CSV.
+
+Qualification passes **3,836 unit/frontend cases** (121 / 324 / 1,361 / 2,030),
+**173 complete API integrations each in Memory, File and SQLite**, and the full
+**1,949-case PostgreSQL group**, without failures/skips/cancellations. New
+all-store cases include 505 stored reports, 504 selected reports, duplicate and
+empty selections, post-filter limits, exact stored-data preservation and durable
+reopen. Protected HTTP additionally covers negotiated formats, RO export,
+unauthenticated rejection, foreign-workspace denial and rejected RO deletion.
+Owned PostgreSQL schemas/cluster are retired. Build/typecheck pass; production
+entry remains **468.39 kB** under the unchanged 470 kB budget. Focused iteration
+uses `npm run test:system-check-reports`, with a fresh core build.
+
+This export correction supplies the prerequisite for the native Reports page
+described above. Results/answers, full four-tab navigation and selected
+Test-Session deletion remain open. The separate actual Source HTTP Oracle and animation
+qualification are detailed at the top of `CI.md` and `ORIGINAL-UI-PARITY.md`.
+Formal status remains **29 done / 20 partial; all eight broad visual rows open**.
+
+### Additional Booklet monitor details before start (2026-10-23)
+
+The monitor summary already counts every assigned Booklet, but its detail lookup
+used only the roster's primary Booklet. A later native Booklet therefore appears
+in the summary and starter while its detail endpoint returns 404 until launch.
+The detail now uses the same complete, deduplicated assignment keys as the summary.
+Its roster-only Unit calculation is explicitly scoped to the selected Booklet;
+a Unit shared with another assigned Booklet is not counted twice on that page.
+
+The regression first reproduces the actual missing `LIVE.B` detail in the
+Original-19 native runtime journey. It verifies summary/detail agreement before
+launch, one roster expectation for a shared Unit, unchanged stored Runs, and the
+transition to one existing Run after launch in every store. A protected HTTP
+case covers canonical two-Booklet assignments, repeated preset variants,
+primary-only assignments, excluded Review logins, unassigned-Booklet 404 and
+unauthenticated 401. Unit counts include only the selected Booklet. Its owned
+storage/schema avoids inheriting a demo administrator password changed by an
+earlier API test. This is an application detail-consistency correction, not a
+new native workspace page or complete Original backend authorization proof.
+
+Fresh qualification passes **3,814 unit/frontend cases**, **173 complete API
+integrations each in Memory, File and SQLite**, and the complete **1,941-case
+PostgreSQL group**, all without failures, skips or cancellations. The native
+Original-19 runtime journey passes all 27 Memory/File/SQLite cases; PostgreSQL
+runs it within its complete group. Typecheck, production build and Actionlint
+pass. CI policy passes 227 cases with one explicitly Linux-only GNU timeout
+case skipped on macOS. Initial production entry remains 468.39 kB. The owned
+PostgreSQL schema/cluster are retired. These results are local. Published CI
+migration `44233b4b` subsequently passes all 89 Linux jobs in run `39977337416`;
+this additional detail correction still requires its own publication qualification.
+
+The separate participant matrix and global Unit detail still require their own
+complete multi-assignment semantics. Full four-tab workspace, reports, ZIP,
+revalidation/deletion and Source/Rewrite file pixels remain open. Formal status
+remains **29 done / 20 partial; all eight broad visual rows open**.
+
+### Canonical and native Syscheck boundary (2026-10-23)
+
+The complete Linux run for `347b0746` exposes one common regression in Memory,
+File, SQLite, PostgreSQL and the compatibility gate: current physical XML was
+also treated as native when uploaded through the canonical package endpoint.
+That changed a canonical Syscheck's returned source-package ID from its imported
+artifact to its raw input. Native resolution now requires the actual native
+upload/replacement audit marker. Canonical imports retain their imported ID and
+pinned definition even alongside native Syschecks and later native Unit edits.
+The existing official-corpus assertions stay unchanged; a new all-store mixed
+workspace case catches the distinction earlier in the unit gate.
+
+Fresh local qualification passes **3,814 unit/frontend cases** (121 / 324 /
+1,361 / 2,008), **172 complete API integrations each in Memory, File and SQLite**,
+and the complete **1,940-case PostgreSQL integration group**, with no failures,
+skips or cancellations. The owned PostgreSQL schema/cluster are retired. A fresh
+production build remains 468.39 kB. The actual Systemcheck browser prefix through
+`system-check-report` and the complete native-file browser matrix pass and stop
+their owned processes. Complete new-publication Linux qualification remains
+required; no broad parity row closes.
+
+### Current native runtime and CI stability checkpoint (2026-10-23)
+
+Native Source files now resolve at runtime through one fixed workspace origin;
+later edits retain participant/test identities, answers and clocks, while
+canonical sessions stay pinned. Initial publication and its audit are atomic
+in all four stores. Current Syschecks, private save-key replacement and protected
+Resource reads are covered with real Original-19 XSD validation. The detailed
+scope and remaining gaps are in `ORIGINAL-UI-PARITY.md`.
+
+Local qualification passes **3,811 unit/frontend cases** (121 / 324 / 1,358 /
+2,008), **19 owned PostgreSQL cases**, the complete production Player-exit and
+native-file browser suites, typecheck, production build, Actionlint and diff
+checks. CI policy passes 189 portable cases with two explicitly Linux-only
+checks skipped on macOS. The owned PostgreSQL cluster and both browser/API
+fixtures are stopped after qualification. Initial entry remains 468.39 kB.
+
+Published parent `20f1fa38` finishes
+[run 39961652300](https://github.com/jurei733/testcenter-rewrite/actions/runs/39961652300)
+with **84 successful and 3 failed jobs**. Production-secret Compose stalls on
+its first external readiness connection while internal readiness remains healthy;
+Player exit passes all 36 matrix cases but loses a confirmation click in the
+additional resumed-context case. Acceptance correctly fails these prerequisites.
+The downloaded browser diagnostic records no trusted confirmation click and a
+still-open dialog. That case now awaits Material's existing opening barrier;
+the whole local production Player-exit suite passes, including the resumed gap.
+Readiness polling bounds each connection/body attempt inside the unchanged
+absolute deadline. Real stalled-connection recovery and fatal overall deadline
+tests pass; local Docker is unavailable, so the Compose change still requires
+its Linux run. No overall pipeline speedup is claimed from these fixes.
+
+The complete goal remains active: **29 done / 20 partial**, with all eight broad
+visual rows open. These bounded qualifications do not establish full Original
+backend authorization or whole-product parity.
+
+### Current settings and directory checkpoint (2026-10-21)
+
+Published `8935ff5e` passes the complete Linux administration settings reference
+in [run 39562001420](https://github.com/jurei733/testcenter-rewrite/actions/runs/39562001420),
+job `119096077885`: **24 exact Source/Rewrite viewports and 24 exact independent
+Source repeats** across all three themes, both widths and both tabs/scroll states.
+All six headed capture controls pass. The downloaded evidence ZIP has SHA256
+`3fd0715c08e9a42c88bc5ba93b191d6bc5845a49d2ed429bf98e182cacbc6c9f`;
+all 72 per-image records verify the actual cleared native frame, exact root-style
+restoration and three equal visible frames against their retained PNG hashes.
+Capture now clears retained browser paint before restoring the unmodified view.
+The final full-viewport RGBA comparison remains zero tolerance; no mask or
+reference-guided image selection is used. The earlier heading/background guesses
+and steady-only captures below are historical, superseded observations.
+
+Original settings now use a dedicated protected partial-update contract, with
+per-key custom-text merge against current state inside each store's write boundary.
+Settings, asset validation and the matching audit commit atomically in Memory,
+File, SQLite and PostgreSQL. The old endpoint retains its existing full-map and
+omitted-warning semantics. Native saves no longer pre-read and replace a stale
+whole settings map. Late audit/manifest rollback, combined-map limits and two
+actually queued independent PostgreSQL writers are covered. The pinned Original
+meta SQL executes in its own PostgreSQL oracle. The old concurrent-map warning
+below describes the earlier implementation and is superseded by this contract.
+
+The next directory change follows Source's `SuperAdminDAO` global name-ordered
+queries: flatten workspaces across their actual tenant scopes, then order names;
+inserted administrators/workspaces and renamed workspaces keep that initial order.
+Regression cases verify the real tenant/UUID and role target after reordering,
+including a saved cross-tenant permission and subsequent rename/create. Local
+validation passes 23 controller cases, 1,955 frontend cases, typecheck, production
+build and the full protected administration/settings browser flow. Whole-directory
+pixel comparisons, locale-specific ordering, every dialog/edited/notice state,
+non-platform administration and complete Original backend authorization remain
+unproven. This does not close a broad visual row or certify the new directory
+change's remote build. The published `8935ff5e` baseline finishes all 85 jobs
+successfully, including complete acceptance; the next directory head still
+requires its own full CI.
+
+Formal status remains **29 done / 20 partial**, with all eight broad visual rows
+open. The bounded settings renderer gate is now proven on Linux; that result
+must not be used as complete System administration or whole-product acceptance.
+
+
+### Linux settings reference qualification (2026-10-21)
+
+Published `6f7b0239` finishes [run 39503613658](https://github.com/jurei733/testcenter-rewrite/actions/runs/39503613658)
+with 79 successful jobs, including the corrected exact Player-exit checks,
+PostgreSQL, deployment and the other Source families. Administration reference
+and final acceptance fail. All 24 administration views complete; Linux finds
+one to four differing pixels at heading ink edges in several captures, while
+the local comparison is exact. The failure remains fatal. Follow-up `b5430c6d`
+also fails that family in run `39542338492`, despite matching heading box models.
+Its actual Linux text/layout rectangles are equal. The next change aligns the
+remaining inherited color scheme and literal heading whitespace with Source;
+all 24 local pairs and all 15 captured heading text/style records match. However,
+`6d87316a` also fails administration in run `39543317146`. Its separate parent-box
+diagnostic exactly matches desktop navigation; a Theming edge pixel remains.
+The follow-up restores only the proven Source text-container box models and
+moves diagnostics after the General series, before the fresh Images document.
+Resolution still requires a new Linux run. No parity row is closed:
+**29 done / 20 partial**, with all eight broad visual rows open.
+
+The subsequent local capture control shows eight Source pixels changing between
+its first image and the next five, without input or changed layout. A reference-
+independent barrier now requires three identical complete images and unchanged
+geometry before recording either build; the final RGBA comparison remains
+exact. Both builds share the same native page per theme/width, with origin-
+scoped fixture authentication and a real protected Rewrite sign-in. All 24
+local pairs and all 48 stability records pass, as do three real-browser negative
+controls, 122 policy checks, Actionlint and the protected administration/settings
+flow. Source window overflow ownership and Material text boxes are aligned.
+These are bounded local observations; current Linux qualification remains open.
+The full parent response also exposes a separate missing-version Source reload
+race (78 successful/three failed jobs overall). That reference now waits for a
+new document, exact unit route and recreated frame. All twelve local version
+cases pass with those witnesses; its original content/URL assertions remain.
+
+### Paired settings pages and acknowledged exit baseline (2026-10-20)
+
+The new required administration reference family compares 24 complete visible
+settings viewports against the actual unchanged Source: both tabs, initial and
+natively scrolled bottom states, all three themes and 1280/390 by 844 px. The
+complete local wrapper passes with zero differing RGBA pixels and matching
+hashes. Its evidence corrects early tab activation, pagination/theme-preview
+box sizing, inherited button fonts and the unassigned-image placeholder. Actual
+protected browser actions also clear, save and reassign the undefined slot
+before checking the compatibility guard and native cascade. Every prior Source
+task remains required; the reference set grows from 18 tasks/three families to
+19/four, without changing the historical Linux profile.
+
+Published parent `2878bcfc` completes [run 39496695102](https://github.com/jurei733/testcenter-rewrite/actions/runs/39496695102)
+with 78 successful jobs; the Player-exit clock comparison and final acceptance
+fail. Dependency audit, Source, PostgreSQL and deployment gates pass. The exit
+test now observes its exact successful answer-save HTTP ACK and the client's
+completed drainer before taking the immutable answer/clock baseline. A held-ACK
+case proves that SQLite can already contain the answer while the client still
+shows saving; no answer/clock assertions are removed. All 36 Original cases,
+six Rewrite variants and missing-renderer recovery pass locally. Fresh Linux
+confirmation remains required; this does not prove that the observed ordering
+hole is the only possible cause of the prior intermittent failure.
+
+Local validation also passes 1,949 frontend checks, 121 CI/reference checks,
+development/production builds, Actionlint and the real protected administration/
+settings gate. Initial JavaScript is 467.97 kB below the unchanged 470 kB cap.
+The Source visual fixture uses read-only controlled API data; full Original
+backend authorization, edited/dialog/directory states and complete-page/cross-
+cutting acceptance remain open. Formal status stays **29 done / 20 partial**,
+with all eight broad visual rows open. Complete publication CI is pending.
+
+### Atomic Original assigned-image removal (2026-10-20)
+
+The Original settings adapter now explicitly requests assigned-image removal.
+The deletion, global/participant/operational bindings and audit entry commit
+together in every store. A later upload of the same filename receives a new
+identity without restoring old bindings; replacing a still-existing filename
+retains its identity. Missing/false cascade policy preserves the old in-use
+rejection. Actual pinned Source PHP and PostgreSQL DDL are verified before the
+Source build, and its foreign-key cascade executes in the PostgreSQL tests.
+Store/HTTP tests include authorization, orphan operational scopes, stale writes,
+cross-connection PostgreSQL serialization, late audit failure and failed File
+manifest commits. Original settings/controller and production-browser checks
+cover the native removal action and versioned gallery refresh.
+
+Local validation passes all 3,624 unit/frontend checks, 117 CI/reference policy
+checks and 1,843 PostgreSQL integration checks in a fresh owned database. The
+focused command passes 39 checks with PostgreSQL in approximately 4.2 seconds;
+the production administration/settings browser gate also passes. Development
+and production builds pass; initial output is 467.97 kB under the unchanged
+470 kB cap. Published parent `36113122` completes all 80 jobs in
+[run 39490598043](https://github.com/jurei733/testcenter-rewrite/actions/runs/39490598043).
+That run qualifies the parent; this slice still needs its own remote run.
+
+This closes the assigned-image deletion difference identified below. It does
+not close concurrent whole-settings replacement, wider public/participant image
+cache freshness, full Original backend authorization or complete-page visual
+acceptance. The administrator row stays partial: **29 done / 20 partial**, with
+all eight complete-page visual rows open. Fresh complete publication CI is
+required for this change.
+
+### Source settings audit reopens administrator parity (2026-10-20)
+
+Direct inspection of pinned Source settings/assets revealed an
+assigned-image deletion difference (addressed above) and unqualified cross-client replacement
+semantics. The administrator row is reopened as partial: the authoritative
+49-area matrix now has **29 done / 20 partial**. All eight complete-page visual
+acceptance rows remain open. New German settings controls, 102 Source text
+entries and real protected save/upload/assignment flows are implemented and
+locally qualified, but do not establish the missing full equivalence. See
+`ORIGINAL-UI-PARITY.md` for the exact scope and remaining image differences.
+
+
+### Attachment text inheritance and literal PDF fields (2026-10-20)
+
+Current Source remains `eedae41840cbe90e5547c0211da818bdf620f5aa` on a fresh
+fetch. Published parent `d39d8d46` now has a completed successful full workflow
+[`39187723764`](https://github.com/jurei733/testcenter-rewrite/actions/runs/39187723764),
+including its previously failing timer and shared-flow jobs. That qualifies the
+parent, not the follow-up described here.
+
+The attachment manager and camera now read global < authenticated operator
+`am_*` text, with the Original template-pipe fallback after an empty override.
+Padded/multiline values survive. These runtime keys do not add invented entries
+to the 102-default editor. The selected QR-page template uses the separate
+direct-value rule; HTTP omits an empty template like Source's backend client,
+but transmits a nonempty whitespace-only or padded value exactly. A temporary
+editor override is discarded when the manager's authenticated scope changes.
+Source fallbacks, HTML and PHP are byte/hash-pinned in
+`current-attachment-text-reference.json`, with the existing MIT notice retained.
+
+Original PDF `%CODE%` now substitutes the started participant's second-code
+suffix (empty for an uncoded login), rather than the unrelated QR attachment ID.
+The authorized attachment projection carries that suffix and its authored group
+label without new storage. Replacement values containing JavaScript `$&`,
+backtick/apostrophe or `$$` tokens are inserted literally as PHP `str_replace`
+does. Original batch document titles list distinct authored group labels in
+first-seen order. The Rewrite-specific CODE and batch-title behavior is retained.
+All three PDF mismatches reproduce independently against parent `d39d8d46`.
+
+Production/core builds pass; initial output stays 469.88 kB below the unchanged
+470 kB cap. All 1,876 frontend checks and 231 focused attachment/PDF/lifecycle
+checks pass. The protected attachment HTTP case, including a real coded roster,
+single PDF, typed attachments and group isolation, passes separately on Memory,
+File and SQLite. `smoke:ui:attachment-custom-text:built` passes 16 actual
+production Chromium/SQLite cases: both interfaces at 1280/390 px with defaults,
+global values, empty login overrides and padded multiline login values. Every
+case signs in, verifies the scoped inventory, downloads the actual PDF and
+checks its exact query, rejects a foreign group's export and opens the camera's
+authored labels. The gate is included in Quick CI; source-execution regressions
+run with the frontend suite. Desktop/mobile screenshots were inspected.
+
+This is a functional text/export correction. Full Original attachment-page
+layout, extended PDF glyph/markup identity, physical cameras, complete current
+CI and production acceptance remain separate. The formal matrix remains 30
+complete / 19 partial and all eight full-page visual acceptance rows remain open.
+
+For the autonomous continuation requested on 2026-10-20, the planning range is
+roughly 4–8 engineer-weeks to complete functional, whole-page visual and
+operational acceptance, with roughly 1–2 weeks attributable to functional
+qualification alone. This is a judgment range from the explicit remaining
+matrix, not elapsed autonomous runtime, a commitment or the historical 94%
+functional estimate. Full-page operator/workspace/monitor rendering and wider
+production package, Player and storage/device qualification dominate uncertainty.
+
+### Monitor fixture expectation and owned route diagnostics (2026-10-19)
+
+Published `b9345905` completes workflow `39185026985` with 26 successful and
+12 failed jobs. Eleven shared browser jobs reach the same obsolete imported
+profile expectation: the `gm_col_personLabel` override was also expected in a
+generated filter label. Both expectation sites now use the separate
+`personLabel` fallback; the column override is still checked independently.
+Two strict Original-19 Chromium/SQLite cases import the actual profile, sign in
+with its monitor account, verify column/target independence with and without
+an explicit runtime target key, and toggle/reset the real profile filter.
+
+The separate participant-console job stops in the eighth controller-timer
+case with an unhandled `route.fetch: read ECONNRESET`. Its cause remains
+unproven. The unchanged four-case local Zero-Tick matrix passes, as does the
+four-case observed matrix and the complete 22-case observed timer matrix.
+Timer balances, saved answers, clocks, sibling/parent equality, application
+counts, legacy FIFO and idempotency assertions remain unchanged.
+
+Owned route callbacks now record failures for the scenario, preserve native
+causes and record the phases where work starts and failures are observed.
+Rejected routes are explicitly completed, and their callback promises are
+settled after failed-scenario disposal. Successful scenarios still wait for
+their handlers before closing. An injected browser assertion remains the first
+reported failure while a later cleanup transport/closed-target error is retained
+separately. The before witness also retained that assertion, so this does not
+establish masking as the cause of the actual CI reset. No transport retries are
+added and genuine route/protocol failures still fail the gate.
+
+Six tests cover these failure/cleanup contracts, including a real truncated
+HTTP body and header-free bounded artifact serialization with unchanged native
+causes. All 1,781 frontend checks pass. The timer gate now writes its own API
+log and structured failure JSON under a configurable diagnostics root; failed
+participant-console CI retains only those two file types for seven days,
+excluding its SQLite data. The workflow YAML parses, and the configured nested
+artifact-root failure witness produces both files. Full exact-head CI remains
+required; this is stronger diagnosis, not proof the observed reset is fixed.
+
+### Complete published CI baseline (2026-10-19)
+
+Published `aafa0fbe` passes all 38 jobs in workflow `39182233472`, including
+PostgreSQL, the full shared browser flow, participant-console Debug/native
+routes/tabs, administration and synchronization gates. The later direct
+participant and monitor text corrections below pass their local/source/browser
+checks and still require their own complete remote run. This green baseline
+does not establish production or physical-device acceptance; formal parity
+remains 30 complete / 19 partial areas.
+
+### Monitor filter pipes and direct values (2026-10-19)
+
+Generated filter labels now read the exact Original `gm_filter_target_*` and
+`gm_filter_type_*` keys directly, falling back to their target/type identifiers
+only when empty. Negation keeps an authored empty value. The target dropdown
+has a different Original rule: first the column template pipe with an empty
+fallback, then the filter-target pipe with the target identifier. Type options
+also use their identifier as template fallback. The negation checkbox retains
+the Original `Nicht` fallback, while generated labels omit empty negation.
+Runtime key patterns support those non-catalog reads without adding invented
+defaults to the unchanged 54-key monitor catalog or 102-default editor.
+
+Go-to restoration titles/content and both unlock-warning paths now retain raw
+direct values. The actual Original filter method, command-response method,
+service and pipe are pinned/executed with their full source hashes. The 431
+additional checks cover 312 generated labels, 96 dropdown options, seven toggle
+cases, 14 direct confirmations/notices and both complete target/type inventories.
+On the previous implementation, 201 of the complete 611 reference cases fail;
+all 611 now pass. Authored user filter-name prefixes and advanced sub-value
+display metadata are outside this comparison's claim.
+
+Eight real authenticated strict Original-19 Chromium/SQLite cases create and
+activate filters at 1280/390 px. They verify defaults, empty login values over
+global text, padded multiline text, and a configured non-catalog column key.
+All 24 exact option/generated-label assertions and negation checks pass with
+no page errors. Test accounts complete the actual required password change
+through the API before a new real browser sign-in. All 1,773 frontend and 156
+compiled contract checks pass; core and production web builds pass with the
+unchanged 469.88 kB initial bundle and 470 kB error cap. Full remote qualification
+of this follow-up remains pending.
+
+### Direct participant controller text consumers (2026-10-19)
+
+Participant error surfaces, timer warnings, navigation-denial text, Unit/Testlet
+leave confirmations and fullscreen copy now use the same direct-value semantics
+as the Original controller service/component. An explicitly empty scoped value
+stays empty instead of reviving template fallback copy. The lazy Starter-exit
+policy receives that same direct resolver. Timer warnings replace only the
+first `%s`, exactly like the actual Original `String.replace` call. Ordinary
+template-pipe consumers retain their own fallback behavior.
+
+Both full controller source files are pinned with hashes to Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`. Executing the actual Original
+navigation, error, timer, leave and fullscreen methods against the actual
+Rewrite consumers adds 63 comparisons. Nine of the 180 text-reference cases
+fail on the previous implementation and all pass after the correction. Seven
+additional Starter-exit checks cover empty/padded Unit, Testlet and timer
+dialogs plus an empty completeness dialog. All 1,342 frontend checks pass.
+
+Six authenticated, strict Original-19 Chromium/SQLite scenarios verify the
+visible fullscreen prompt and timed-leave dialog in both interfaces for
+defaults, empty local overrides over global text, and padded multiline text.
+The exact text assertions pass; opening and cancelling issue no completion or
+Starter-return mutation. Error and timer-warning text have source-execution
+coverage here, not an additional real-browser claim. The production initial
+bundle remains 469.88 kB under the unchanged 470 kB cap.
+
+The previous shared flow passes Original ASPECT, the sample package and the
+current Booklet Config, then fails at a native radio check in the protected
+Controller case. That one call now uses the same explicit frame scroll/render
+barrier already used by the neighboring Controller completion helper, while
+retaining native `check()` and the subsequent buffered-answer assertions. The
+fresh complete shared SQLite flow passes at `292169f7`, including the entire
+Controller sequence, current Unit labels, monitor operations and attachments.
+The later monitor text changes above have their own focused browser gates;
+their full remote qualification and the attachment text inheritance remain open.
+
+### Player readiness and complete fixture HTTP bodies (2026-10-19)
+
+Published `b6bf7e94` finishes with 23 successful and 15 failed CI jobs. The
+complete Debug suite and all seven native-route cases pass. Fourteen shared
+browser jobs stop at the obsolete `Complete Test` expectation corrected below.
+The remaining participant-console job reaches the native-tabs scenario and
+reads an empty Player input immediately after the iframe mounts, before the
+real Ready/Start replay restores its saved answer.
+
+A headful production Angular/SQLite witness delays only the DemoPlayer's
+actual Ready notification by two seconds. The old fixture reproduces that
+exact empty-versus-`First trusted Ω` failure; waiting for enabled input and the
+exact restored value passes all ten tab/crash scenarios. Backend answer,
+pending-command, clock and tab-owner assertions remain intact. Runtime code
+does not change.
+
+The shared fixture also discarded the response bodies of 118 status-only JSON
+setup calls, including large source/release responses. Those calls now await
+complete body consumption while discarding chunks rather than buffering them.
+Callers that read the returned response keep their existing behavior. Real
+HTTP tests prove that successful headers cannot advance past a delayed body,
+and that a truncated body still rejects. Participant credential-capture errors
+also retain the original protocol cause while adding the owning method/path;
+a real malformed chunked response verifies that error propagation.
+
+All 1,272 frontend checks pass. The last longer shared flow passed completion,
+response advisories and the earlier Player families, then failed with
+`HPE_INVALID_CHUNK_SIZE` around Original ASPECT. Its cause remains unproven:
+32 subsequent transfers of the same roughly 51.9 MB current-state payload pass
+through native fetch, the participant actor, node:http and raw TCP chunk
+validation. Draining ignored bodies corrects a confirmed resource-management
+gap; it is not proof of the cause of that framing error. A fresh complete
+shared flow and next-head remote qualification remain pending.
+
+### Default completion and leave labels in the shared browser fixture (2026-10-19)
+
+The longer local shared flow reaches participant completion after passing the
+settings, systemcheck, account, role and session stages, then searches for the
+old `Complete Test` fallback. The actual button now correctly resolves the
+Original `login_testEndButtonLabel` default. The browser action and remaining
+unit/timed-block confirmation and response-completeness advisory expectations
+now use their exact Original keys, rather than old English fallbacks. A second
+full local run passes completion and reaches the response advisory; its old
+English expectation is likewise replaced with the actual Original default. No API or completion guard is relaxed.
+
+Three draft/completion hints also named the fixed `Complete Test` label even
+when a project customized that button. They now describe finishing the test
+without assuming its visible label; their saved-response/readiness conditions
+are unchanged. The production build remains 469.88 kB and all 1,268 frontend
+checks pass. The fresh full flow passes these changed labels and later fails
+at the separate ASPECT transport observation recorded above. Complete shared
+flow and next-head remote qualification are still pending.
+
+### Correlated Debug fixture acknowledgements (2026-10-19)
+
+The `c887012d` participant-console CI job reaches the paused Debug check but
+counts five logs against an expected four. An earlier native `debug off` had
+not committed when the fixture captured its baseline. The test also treated
+any successful test-log response as acknowledgement of the new, labelled
+`debug off`, so an earlier queue entry could satisfy the wrong waiter.
+
+A real headful Angular/SQLite reproduction delays only the earlier `debug off`
+request by five seconds. The unchanged fixture captures three prior logs and
+then observes five, reproducing the CI error. The corrected fixture awaits the
+exact earlier log, both remote commands' correlated application receipts
+(including persisted execution timestamp/sequence), and the exact labelled
+new log before checking its delta. The same delayed witness passes the whole
+Debug browser suite. The exact one-new-row/one-label checks and full equality
+of the paused Run, parent session and timers remain unchanged. This correction
+changes the browser fixture only, not runtime delivery or Original console
+promise semantics; the fulfilled-handler timestamp checks still pass.
+
+The next `b6bf7e94` CI run passes the entire Debug suite, including exact log
+delta and fulfilled-handler timestamp checks. Its participant-console job
+later fails in the separate native-tabs readiness check recorded above; the
+overall workflow remains failed.
+
+### Systemcheck text consumers, complete editor catalog and filter copy (2026-10-19)
+
+Systemcheck rendering now keeps the selected check's empty and authored values
+when resolving global < check scopes. An empty local override selects that
+specific template's fallback; it no longer revives the global override.
+Unconfigured values use all seven actual Original systemcheck defaults,
+including the shared participant page-navigation token. The global editor now
+offers every one of the actual catalog's 102 defaults (41 participant, 54
+monitor, seven systemcheck). The Original template also uses
+`gm_add_custom_filter` although its catalog omits that key. Both filter-editor
+entry points now honor its global/login overrides and Original fallback while
+the advertised monitor default catalog correctly stays at 54 keys.
+
+The pinned service/production pipe executes against the actual Rewrite
+systemcheck method in 56 cases: eight keys by seven authored-value/scope cases.
+Seven further comparisons cover the runtime-only monitor filter key. Complete
+catalog/default checks and six editor checks accompany these gates. The
+Original systemcheck templates are pinned as full bytes/hashes. Their literal
+fallbacks match, with one deliberate copy correction: the source joins
+`das` + `Sie` without a space in the password explanation; the Rewrite retains
+the correctly spaced wording from the Original default catalog.
+
+All 156 compiled contracts and 1,268 frontend checks pass. Strict Original-19,
+authenticated Chromium/SQLite covers five systemcheck value/scope scenarios in
+both interfaces (desktop/mobile) plus three actual monitor logins: 13 browser
+cases and 26 exact rendered-text assertions, without page errors. The complete
+shared browser flow passes through systemcheck report handling. The new
+systemcheck contract has an independent module entry point, so the catalog
+stays with its lazy consumers: the production initial bundle is 469.88 kB,
+within the unchanged 470 kB cap. Full shared browser verification is running.
+
+Published `c887012d` completes with 22 successful and 16 failed CI jobs.
+PostgreSQL passes all 1,814 tests, including all four raw content-import/reopen
+cases and protected global/account text mutation/reopen. Fifteen browser jobs
+stop at one obsolete offline subtitle expectation (`Start or Resume Test`
+instead of Original `Testauswahl`). That expectation now uses the actual
+Original default; the branding gate also uses the actual Starter key's default
+rather than a different Login key's override. Local shared flow passes both.
+The remaining CI failure is the separately reproduced Debug fixture race
+recorded below. This is a failed workflow, not full remote qualification.
+Formal parity remains 30 complete / 19 partial; production acceptance remains
+open.
+
+### Content text preservation and strict package manifests (2026-10-19)
+
+The same raw-value guarantee now reaches Booklet and SysCheck imports. Their
+XML readers use untrimmed character data; structured JSON and Booklet manifest
+normalizers retain empty, whitespace-only and padded strings. Other metadata,
+identifiers and ordinary XML text fields retain their existing normalization.
+The actual pinned Original Booklet parser and both DOM traversal methods run
+in Chromium 147; the actual Original SysCheck extraction method runs on PHP
+8.3.35 / libxml 2.9.14. Both return the fixture's exact empty, padded, whitespace,
+CDATA/entity-literal and zero values. The SysCheck witness sets `isValid` true
+to isolate extraction; HTTP fixtures separately require native Original-19 XSD
+acceptance. Full source bytes and hashes accompany both witnesses.
+
+Four HTTP gates cover structured JSON, manifest JSON Booklet text, loose
+Booklet XML with its actual Unit/Player dependency assembly, and SysCheck XML.
+All four pass on Memory/File/SQLite; every File/SQLite result is read again
+after reopening the server. Booklet dependency assembly also exposed a strict
+intake defect: its selected IMS manifest was treated as Testcenter content and
+rejected for having a `manifest` root. The selected, well-formed `manifest`
+now uses the existing resource-graph checks. XML parsing, DOCTYPE, encoding,
+archive integrity and each content member's native XSD checks still apply.
+All 305 compiled backend checks and 172 Memory HTTP tests pass.
+Four invalid packaged manifests and one standalone manifest remain rejected,
+including a Booklet with a misleading manifest comment and no schema reference.
+
+The preceding published `089cffc1` completes all 38 CI jobs successfully,
+including PostgreSQL and full participant/operator browser gates. Its duplicate
+push run is completed/cancelled. These later content changes have local
+qualification and still require fresh full remote CI. Complete parity remains
+30 complete / 19 partial; remaining direct-read callsites, editor default keys,
+real production-package/staging acceptance and physical-camera checks remain
+open.
+
+### Exact custom-text values through settings, accounts and rendering (2026-10-19)
+
+Global and operator-account normalizers previously trimmed text and discarded
+empty values after correct roster extraction. This could revive a global
+monitor headline that an empty login override intentionally suppressed. Both
+protected APIs and their Angular editors now retain authored strings exactly;
+removing a key explicitly inherits the broader scope. Existing entry/key/UTF-8
+byte limits still apply to all authored whitespace. The editor also rejects
+primitive JSON instead of interpreting it as an empty replacement map, and
+uses own-key checks for empty overrides and catalog defaults.
+
+The pinned Original CustomtextService, production pipe and AppConfig methods
+execute with actual RxJS in the regression gate. They distinguish direct reads
+(empty remains empty) from template fallback (an empty value uses the supplied
+template). Twenty-eight comparisons cover both participant and monitor scopes.
+Eighteen further comparisons execute the actual Original TimerData getter and
+notice expression: the start notice appends rounded minutes (`1 min` for 62
+seconds) directly to the authored prefix. No prefix trimming or extra space is
+introduced. Existing browser expectations now use that format and the actual
+Original default messages.
+
+JSON roster maps, value objects and entry arrays also retain empty and padded
+text; identifier normalization is unchanged. All 156 compiled contract tests,
+1,196 frontend checks and 168 Memory HTTP tests pass. Protected settings,
+account creation/update, fresh sign-in, oversized-value rejection and durable
+reopen pass on File and SQLite. Real authenticated Chromium/SQLite proves
+that an empty imported login headline overrides a global headline, a padded
+pause label survives, and a JSON roster reaches participant sign-in unchanged.
+Starting its real 62-second timed block renders the exact padded prefix plus
+`1 min`, without page errors. Initial bundle size is 469.79 kB under the
+unchanged 470 kB error cap.
+
+This closes these normalization/rendering paths. Booklet/SysCheck import values,
+remaining direct-read callsites and runtime-only monitor keys still require
+separate source-backed checks; the formatting oracle does not qualify complete
+timer reentry or production operation. Formal status remains 30 complete /
+19 partial. Full remote qualification of this change is pending.
+
+### Explicit GET for the shared Booklet corpus adapter (2026-10-19)
+
+Published `cb530787` CI completes with 24 successful and 14 failed jobs. All
+14 failures are the same test-helper integration error: release detail was read
+without an explicit method, so the main smoke's default-POST adapter sent POST
+to a GET-only route and received 404. Earlier standalone acceptance used an
+implicit GET default and could not detect this mismatch. Production routing
+and authorization remain correct.
+
+The helper now explicitly requests GET. A default-POST adapter regression fails
+before this change and passes afterward. The strict, authenticated, complete
+20-case Angular/SQLite fixture is also rerun through that same default-POST
+contract and passes all cases. Main CI coverage remains mandatory; the adapter
+fix does not weaken the API or bypass the failing corpus stage. The prior
+native-route correction passes its complete participant-console CI job.
+
+Published `089cffc1` subsequently completes all 38 workflow jobs successfully.
+The preceding `cb530787` remains recorded as failed. Later local runtime
+changes require qualification on their own published head.
+
+### Original roster XML text and structural content (2026-10-19)
+
+A self-closing `CustomText` previously consumed its next sibling and lost that
+sibling's key. XML comments and CDATA could also be interpreted as real Login
+markup; a commented-out participant was imported as an active roster entry.
+Custom-text extraction now walks XML tokens, preserves empty/authored text,
+normalizes literal XML line endings and decodes named/numeric references once.
+The structural roster view removes comments/processing instructions and escapes
+CDATA as literal text, while custom texts retain their original character data.
+Participant and operational-login parsing use the same prepared structure.
+
+The actual pinned Original `XMLFileTesttakers::getCustomTexts` body executes on
+PHP 8.3.35 / libxml 2.9.14 with native SimpleXML. Its 14 fixtures yield 28 paired
+participant/operator checks. They cover empty/self-closing fields, following
+siblings, CDATA/markup, comments, instructions, references, whitespace, zero,
+prototype-like keys, hidden Login examples and actual CDATA Booklet IDs. All
+153 compiled contract tests pass. Three new structural checks fail before the
+preparation fix and pass afterward; the earlier regex fails 16 of the first
+18 native text comparisons.
+
+Strict Original-19/native-XSD HTTP gates pass on Memory/File/SQLite: 13 valid
+rosters per store retain exact text through import, operational candidates,
+participant sign-in and resumed runtime reads. File/SQLite reopen retains all
+13 maps. An empty CustomTexts section still fails its unchanged XSD requirement
+for at least one child. HTTP fixtures add the required schema reference,
+Metadata and Group label; the extraction oracle alone does not prove XSD validity.
+All 167 Memory HTTP tests and 1,145 current frontend checks pass. Initial bundle
+size stays 469.75 kB under the unchanged 470 kB error cap.
+
+This qualifies roster parsing and participant delivery, not all later operator
+account normalizers or full custom-text/production acceptance. Formal status
+remains 30 complete / 19 partial. New-head full remote qualification is pending.
+
+### Current fixed monitor Booklet diagnostics (2026-10-19)
+
+Current Original `eedae418` / change `cc3fd9bc6` removes the four
+`gm_booklet_error_*` custom-text keys and renders fixed diagnostics for
+missing IDs/files, malformed XML and general Booklet access failures. The
+Rewrite still advertised 58 monitor keys and let stored legacy overrides
+replace those messages. Its catalog now exactly matches all 54 current
+`gm_*` keys and defaults; the four error states use the current fixed copy.
+Existing stored unknown overrides remain data but cannot alter these labels.
+
+The complete actual Original catalog JSON and monitor template are pinned with
+source hashes. Six source-reference checks pass, including every catalog key/
+default and all four template messages. Four compiled catalog tests and all
+1,144 frontend checks pass. A production Angular/SQLite browser witness with
+real operator login and persisted legacy overrides fails against the preceding
+built UI and passes all four corrected labels; only the four malformed monitor
+rows are controlled response fixtures derived from a real scoped Run. Broken
+rows remain unavailable for batch commands. This does not claim native
+corrupt-package acceptance or a complete live Original UI comparison.
+
+The production Initial total is 469.75 kB under the unchanged 470 kB error cap.
+This section records local qualification at `1f15b6cb`; subsequent publication
+and workflow results are tracked in the newer entries above.
+Full parity remains 30 complete / 19 partial; production acceptance stays open.
+
+### Bounded browser-fixture credential capture (2026-10-19)
+
+The authenticated browser fixture's HTTP actor awaited all pending browser
+JSON captures repeatedly until none remained. A regression witness shows that
+an unrelated response arriving after an API call started can extend that call's
+credential barrier. A continuous stream can therefore starve fixture API work.
+The new test fails on the preceding helper and passes with a snapshot of the
+captures already in flight when the call starts.
+
+A body that does not finish now fails the fixture after 30 seconds with only
+its pathname in the diagnostic. It does not issue a fallback request, expose
+query credentials or change production authentication. Late completion still
+learns the real issued credential for subsequent calls. All five focused tests
+and all 1,138 frontend checks pass with zero failures/skips/cancellations.
+The preceding `ui-ops` job ultimately passes; the credential-starvation witness
+is an independent fixture defect, not a confirmed cause of a remote failure.
+The complete `3eb48b8a` workflow finishes with 37 successful jobs and one failed
+native-route fixture. No job was canceled: a cancellation request made during
+the final status transition was rejected because the workflow had completed.
+Complete new-head CI remains necessary.
+
+### Native route smoke save ownership (2026-10-19)
+
+PR CI `39170753534` at `3eb48b8a` fails in the native-route browser fixture:
+the second Unit answer is absent after Goto and route reentry. The former
+fixture waits for any `save-progress` reply, even though startup/focus logs use
+the same endpoint. A real-browser witness satisfies that gate with a log-only
+packet before any answer input. This proves the fixture cannot establish the
+claimed closed-answer precondition; it does not alone identify every cause of
+the remote missing answer.
+
+The held reply now belongs to `first-2` and the exact trusted answer. A preceding
+real focus explicitly exercises an unrelated save and proves it does not open
+the gate. All seven local production-bundle/SQLite browser checks pass, retaining
+exact answer/clock preservation, Goto-before-reply, canceled route continuations,
+terminal preparation and replacement-Run isolation. Runtime behavior and final
+answer assertions are unchanged. Complete remote confirmation is pending.
+
+### Current Original 56-account Booklet Config corpus (2026-10-19)
+
+An explicit live-source audit finds 56 Booklet Config cases in Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`; the previous current package pins
+51. Cases 40/41 now use modern toolbar-label keys, and 52–56 add authored short
+labels and missing-short-label fallbacks for toolbar, navigation and header.
+The refreshed package retains all older fixtures, adds exact current overrides
+and five Units with current 17.6 schema references, and pins the complete 56-account roster.
+All 63 source files (56 Booklets, five Units, Player and roster) independently
+match that Original Git revision byte-for-byte. Forty-five unchanged Booklets
+retain their existing source fixtures; eleven use explicit current overrides.
+
+125 contract checks pass. The production HTTP corpus gate explicitly requires
+the Original-19 profile and native XSD validation and passes on Memory, File
+and SQLite: all 56 Booklets stage without diagnostics, all 56 real roster
+accounts are classified, and 24 real participant sign-ins/resumes cover the
+existing entry points plus all five new cases. Runtime projections preserve
+the two Unit aliases, optional short labels and independent toolbar/navigation/
+header policies. The strict package uses Original workspace files without an
+invented IMS migration manifest; that additional manifest requires the separate
+compatibility profile and initially fails strict root validation as expected.
+
+All 20 production Angular/SQLite browser cases also pass: five exact new
+Booklets × both interfaces × 1280/390 px viewports. They use the real password
+roster and unchanged Player/buffer defaults, check full/short/fallback labels
+independently in header, toolbar and navigation, preserve full iframe metadata,
+enter a native radio answer, move through the repeated Unit alias, and restore
+the same Run, response data/types/clocks and checked control after reload.
+No operator token enters the participant requests and no page errors occur.
+The complete browser gate now executes these cases alongside the earlier 32
+synthetic native-label cases. Other current-source schema/config drift, complete
+package acceptance and full production readiness remain open; formal parity
+stays 30 complete / 19 partial. The preceding `3eb48b8a` CI completes with 37/38 jobs successful; its failed
+native-route fixture is corrected separately. Full new-head CI remains open.
+
+### Auxiliary deep links and full Angular camera visibility (2026-10-19)
+
+Initial navigation can still expose `Router.url` as `/` while a camera or public
+information route is being resolved. Previously the shell treated this as the
+application entry and forced `/home`, discarding the requested route. Startup
+now identifies only actual `/`, `/app` and `/app/` entry paths as defaults.
+Eight actual-method cases fail against the previous source; all 19 pass after
+correction, including camera/legal/privacy/accessibility deep links, both
+transient Router URL values, normal entry defaults and legacy hash login.
+All 1,136 frontend checks pass and production initial size remains 469.99 kB
+under the unchanged 470 kB error cap.
+
+The same direct camera entry now reaches its protected operator guard with
+its return URL intact. After real demo authentication, an independent raw
+Chrome process opens the complete built Angular camera application and starts
+its synthetic camera through native UI. Actual native minimization produces
+`document.hidden=true`, inactive camera, cleared video and ended old tracks.
+Native restoration produces a visible, active camera and a distinct new stream
+while the old tracks remain ended. The probe reads DOM/stream/native-window
+state through public CDP without SDK focus emulation or visibility overrides;
+it does not inject a capture host, Angular state or a decoded QR. Browser and
+owned API exit cleanly. This qualifies complete Angular window pause/resume
+with synthetic media; physical rear/front hardware acceptance remains open.
+
+The preceding printed-camera head `820bf4e2` now completes its full PR workflow
+with 38/38 successful jobs, including 2,639 unit/frontend checks and complete
+SQLite/PostgreSQL browser gates. The newly combined head requires its own full
+CI qualification. Formal parity remains 30 complete / 19 partial.
+
+### Native component camera visibility qualification (2026-10-19)
+
+A fresh raw Chrome process now runs the actual capture-component methods,
+camera scanner and shipped QR worker with an owned synthetic video device.
+It attaches directly through public CDP, without the Playwright SDK's focus
+emulation or any replacement of `document.hidden`. Native UI minimization
+produces an observed minimized window and hidden document: the camera becomes
+inactive, video `srcObject` clears and every old track ends. Subsequent native
+window restoration produces a visible document, active camera and distinct
+new stream while the old tracks remain ended. Both native window states and
+visibility events are retained, and the owned browser process exits cleanly.
+
+This closes the independent native component-method visibility witness that
+previous probes could not establish. The subsequent full Angular witness above additionally qualifies the built
+application; physical-camera acceptance remains open. Earlier SDK timeout/startup failure logs
+remain as separate failed attempts, rather than being reclassified as passes.
+
+### Declared UTF-7 XML without transport-codec expansion (2026-10-19)
+
+The previous runtime rejects a valid UTF-7 Booklet with
+`source_document_xml_encoding_unsupported`. An isolated official PHP 8.3
+Debian Bookworm runtime, matching the Original Dockerfile's PHP/distribution
+family, reads its exact `Ä + 日本` label through SimpleXML and validates the
+Booklet against the current Original-19 profile's 18.0 XSD. This is a native
+runtime/schema witness, not execution of the complete Original application.
+The cached Alpine PHP runtime does not support this encoding, so host-native
+XML acceptance alone is not used as the deployment compatibility oracle.
+
+A separate strict decoder now accepts `UTF-7`, `UTF7`, `UTF_7` and
+`unicode-1-1-utf-7` in a readable leading XML declaration. It validates direct
+bytes, complete UTF-16BE units, zero padding and surrogate pairs before import.
+Implicit shift termination and shifted ASCII remain valid, and authored U+FFFD
+is retained. Corrupt bytes, incomplete shifts and undefined Unicode fail
+without publishing. Bare `+`/`+!` remain rejected under the
+[RFC 2152](https://www.rfc-editor.org/rfc/rfc2152.html) grammar even though the
+Debian library silently discards their shift marker. This deliberate boundary
+avoids reproducing silent source-data loss. UTF-7 is absent from the generic
+single-byte fallback: a MIME-only charset or an embedded XML declaration in
+JSON cannot activate this decoder. BOM/declaration mismatch and decoded
+DOCTYPE rejection remain enforced.
+
+All 1,617 backend checks pass (114 lifecycle/API, 274 compiled core, 1,229
+application/API groups); the existing exact camera frontend revision separately
+passes 1,117 frontend tests. The focused four-store set passes 205 codec/import
+checks including PostgreSQL 16, native strict XSD validation and durable reopen.
+Six real HTTP corpus/ZIP cases pass across Memory, File and SQLite. They retain
+the four UTF-7 alias labels and isolate a corrupt Unit and its dependent graph
+from a valid UTF-7 sibling package. Whole-head CI remains a separate gate.
+Text-encoding parity remains partial because other registered encodings and
+production package variants still lack representative acceptance evidence.
+
+### Capture confirmation and continuous-page lifecycle (2026-10-18)
+
+The current Original stops the camera before confirmation, presents the
+captured page beside its target/actions, and resets the target and starts the
+next scan after successful upload. The Rewrite now follows that lifecycle.
+Manual camera capture and selecting a device photo stop live decoding; stale
+manual encoding cannot stop a replacement camera. Confirmation replaces the
+camera/QR selector with the captured page. Desktop controls sit beside the
+preview and mobile controls follow it, without the former duplicate inactive
+camera panel. New capture clears the photo and target and restarts scanning.
+
+Successful upload resets its completed target and starts the next scan, while
+a separate three-second notice retains the upload result through camera status
+changes. Failed uploads retain their exact photo/target for retry. Destruction
+cancels notice timing; existing scope, target and capture-version guards still
+reject obsolete callbacks. Five actual-method regressions extend the focused
+camera/lifecycle set to 112 passing checks. All 1,117 frontend tests pass, and
+the production build stays 469.99 kB under the unchanged 470 kB error cap.
+Built image/manual, rear and front sequences pass 62/60/60 steps, including
+native new-capture reset, automatic next-scan state, 1280/390 px layout and
+closure of every observed worker.
+
+The subsequent raw-Chrome native component visibility witness above now
+qualifies actual minimize/hide/stop and restore/resume transitions; the later
+full Angular witness above also passes. Physical-camera acceptance stays open. Earlier focus-emulated
+and startup-failed probes remain failed evidence. The `820bf4e2` PR CI now finishes 38/38 successfully, including its full
+image/rear/front attachment job. Its redundant push
+workflow was cancelled with the full PR gate retained. Formal parity is 30/19.
+
+### Printed A4 camera framing and QR isolation (2026-10-18)
+
+The camera now uses one geometry for its A4 preview, encoded page and QR search.
+Against `7178a463`, the native regression recognises the real printed QR but
+cannot decode it from the subsequently saved centre crop. The corrected photo
+retains the same selected code, so scan success alone cannot satisfy this gate.
+The current Original's 210/297 mm page and 20/20/40 mm QR placement retain its
+0.9/1.1 search allowance. Rear capture uses the left page; a mirrored front
+preview uses the right source page, with its QR guide mirrored on screen.
+Portrait input is bounded to the available frame. Encoded pixels retain their
+readable orientation and positive dimensions rather than reproducing the
+Original draw method's negative-destination behavior. A standalone Chromium
+execution of that Original method with an owned pattern produces a reversed
+rear image and transparent front image; this is a method-level witness, not
+execution of the complete Original camera application.
+
+Live decoding no longer falls back to an unrelated QR outside the printed
+region. Saved QR images retain full-image decoding. The owned fake-camera
+fixture places its real QR on the printed page instead of at the frame centre;
+the front fixture also identifies its actual simulated facing through the
+device label. A native Chromium gate executes the real scanner, shipped worker
+and capture methods: both facing cases produce a nonempty 509x720 image whose
+QR decodes to the selected code, and a valid outside QR causes no lookup/photo
+while the camera remains active. Frame/guide proportions pass at 1280 and 390 px.
+
+All 107 focused camera/lifecycle and 1,117 frontend checks pass; the production
+build remains 469.99 kB under the unchanged 470 kB error cap. The real Angular
+rear and front camera flows pass 60 steps each, including scoped lookup, capture,
+confirmed upload, manager preview/deletion and worker closure. The image/manual flow passes 61 steps, including invalid/inverted QR recovery
+and late native-encoding isolation. New-head full CI is qualified separately. CI now includes the full
+front-camera flow as well as image and rear flows. Physical device visibility
+and complete Original capture layout remain open; formal parity stays 30/19.
+
+The preceding HTTP checkpoint `7178a463` finishes both workflows with 38/38
+successful jobs, including 2,629 unit/frontend and 1,732 PostgreSQL-16 tests,
+complete SQLite/PostgreSQL browser jobs and monitor-review. Its separate local
+browser attempt fails at step 309 with SQLite code 14 during measured disk
+pressure; the exact underlying cause is not established by that error alone.
+The owned database passes a later read-only `quick_check`. Retain that failed
+log independently from the complete remote qualification.
+
+### Received but unread HTTP bodies (2026-10-18)
+
+Both `d333c94b` workflows finish 37/38 green. The PR run passes the complete
+SQLite browser suite and monitor-review; its PostgreSQL browser reaches the
+unchanged server-health gate with two incoming-stream resets. Both have
+`bodyComplete: true`. HTTP-parser completion does not imply application-reader
+completion: asynchronous authentication may leave all received bytes buffered
+when the client disconnects. A real socket regression reproduces that state
+and fails against the preceding reader with `Error: aborted`.
+
+The incoming-body boundary now checks `readableEnded` rather than `complete`,
+still requiring the request's abort flag and an `ECONNRESET` thrown by that
+specific incoming iterator. Resets after consumption, resets without an abort,
+other stream errors and downstream failures retain their error path. A second
+real production-API regression holds the native body iterator until the whole
+body arrives, disconnects the client, and proves cancellation without parsing,
+application validation, internal errors or leaked request metrics. The earlier
+incomplete-upload and malformed-JSON checks remain.
+
+All 26 focused checks and all 2,629 unit/frontend tests pass without failures,
+skips or cancellations. Current-head remote and full PostgreSQL browser
+qualification remain open. The separate `d333c94b` push monitor-review job times
+out waiting for the transient timer-ended notice; the same exact revision's PR
+monitor-review and full SQLite jobs pass. Preserve that failed log and inspect
+fresh qualification before attributing a new timer defect or weakening the gate.
+Formal parity remains 30 complete/19 partial; production acceptance is open.
+
+### Client-aborted uploads and HTTP accounting (2026-10-18)
+
+The `09497d51` PostgreSQL browser run reaches the final health assertion but
+fails on a client-aborted `test-logs` upload logged as an internal failure.
+A real partial JSON upload reproduces that same `ECONNRESET` failure before
+the correction. Its closed response also leaves `activeRequests` incremented.
+
+The incoming-body iterator now marks only a proven reset of an aborted,
+incomplete upload as transport cancellation. The API does not process partial
+JSON or attempt a response on that closed connection. Resets without that
+body-stream proof and downstream/storage errors retain their original error
+path. HTTP finish/close accounting settles exactly once, distinguishes
+completed from aborted responses and exposes `abortedRequests` in JSON and
+Prometheus metrics. Capability-bearing resource paths remain redacted in the
+new informational abort event. Handler lifetime and storage shutdown drainage
+remain independent of the closed socket; the server failure gate is unchanged.
+
+All 23 focused checks pass, including the real socket abort, five classifier
+cases, normal malformed JSON, shutdown/SSE drainage and actual SQLite internal
+failures. Fresh complete unit/frontend qualification passes all 2,626 tests;
+all 166 Memory HTTP checks, 43 loading/overlap groups and the 469.99 kB production
+build pass. An earlier local contention-test timeout coincides with a verified
+901-second host sleep; the complete rerun passes without cancelled/skipped tests.
+
+Exact XML revision `06db6347` passes 2,620 unit/frontend, 1,732 PostgreSQL-16
+tests and the complete PostgreSQL browser job. Its push is 37/38 green: the
+remaining console smoke emits `Route is already handled` while fulfilling an
+old held view. The probe now recognizes only a successful held read with an
+explicit browser `net::ERR_ABORTED` after its accepted Resume, still requires
+an actually delivered current view and every existing state/clock/log assertion,
+and keeps unexpected route failures fatal with primary diagnostics.
+Current-head full CI and complete browser qualification remain separate; formal
+parity is still 30 complete/19 partial and production acceptance remains open.
+
+### Authored XML replacement characters and undefined legacy bytes (2026-10-17)
+
+Current Original `eedae41840cbe90e5547c0211da818bdf620f5aa` validates uploaded
+XML with `simplexml_load_string`. Native libxml accepts a correctly encoded
+U+FFFD (`�`) and rejects undefined IBM857 bytes. The Rewrite previously rejected
+both through xmldom's replacement-character warning, including valid UTF-8/16
+metadata. Invalid bytes were already blocked; this correction does not describe
+a previously accepted corrupted import.
+
+Raw byte validation now recognizes undefined bytes in the allowed legacy
+single-byte pages and returns `source_document_xml_encoding_invalid_bytes`.
+The primary XML validator and dependency/Unit projections ignore only xmldom's
+exact nonfatal replacement-character heuristic. Actual parser errors, other
+warnings, fatal UTF decoding, DOCTYPE and XSD guards remain enforced. Authored
+characters survive Booklet metadata, Unit definitions and strict Original-19
+SysCheck question/label projection.
+
+All 72 compiled Memory/File/SQLite checks pass, including all eighteen undefined
+bytes in IBM857/864/869, UTF-8/UTF-16LE/UTF-16BE, native XSD import and durable
+reopen. The optional PostgreSQL suite passes all 96 four-store checks against an
+owned PostgreSQL 14.24 server, which is stopped afterwards. These checks are
+included in unit and PostgreSQL CI. The actual HTTP corpus adds 21 encoded cases
+and preserves an authored character in the valid sibling of a damaged ZIP graph.
+All 2,620 unit/frontend tests pass (1,109 frontend). Complete Memory, File and
+SQLite HTTP suites pass 166 checks each (498 total), including the new encoded
+cases and mixed ZIP graph. File/SQLite qualification was rerun sequentially
+after the parallel attempt exhausted the host disk; its failed logs are retained.
+The fresh production dependency audit has zero vulnerabilities. New-head remote
+qualification remains separate.
+
+The preceding `09497d51` browser checkpoint passes the full 548-step SQLite
+suite, including all Player/recovery/label/monitor/attachment/result-deletion
+flows. That run predates this XML correction; it is not new-backend browser or
+PostgreSQL-16 proof. Formal parity remains 30 complete/19 partial and production
+acceptance stays open.
+
+The `09497d51` push finishes with 37/38 passing jobs. Its PostgreSQL browser run
+reaches the final server-health assertion and fails on a client-aborted
+`test-logs` upload (`ECONNRESET`), recorded as an internal API error. Investigate
+request-abort classification and metrics without weakening the server failure
+gate or treating downstream/storage failures as cancellation.
+
+### Monitor next-block selection after asynchronous Goto (2026-10-17)
+
+The full production-browser run passes the six STARS recovery phases, official
+Player families, complete Original Test-Controller package, all 32 Unit-label
+cases and bulk Pause/Resume, then exposes a real next-block selection gap. A
+Goto receipt reports the dispatch-time Unit, so advancing from that field can
+clear the target after jumping to the first block. Current Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`,
+`group-monitor.component.ts::selectNextBlock`, advances from the selected block.
+
+Single Goto now retains its requested target through the asynchronous receipt.
+Batch Goto resolves the first accepted Run's own target from the submitted
+variant groups, including partial failure. Neither path treats the receipt's
+old current Unit as the destination. Manual selection, last-block clearing and
+fully failed batches retain their respective behavior. Six tests execute the
+actual facade methods; three fail against the prior production facade and all
+six pass after the correction. The full frontend suite passes 1,109 tests and
+the production build stays 469.99 kB under the unchanged 470 kB cap.
+
+The backend is unchanged from the 1,439 unit and 1,636 PostgreSQL-16 checks
+qualified at `51c6d7b9`; the combined unit/frontend count is 2,548. Full browser
+and current-head CI qualification remain open. The formal count remains 30
+complete/19 partial, with no release or production acceptance claimed.
+
+The same published `34d00de4` subsequently passes all 2,548 unit/frontend and
+1,636 PostgreSQL-16 CI checks without failures/skips/cancellations. The complete
+local browser run passes the former auto-next failure and reaches the later
+result-preservation Pause, where another old fixture treats the dispatch
+snapshot as the applied state. It now requires the exact command's execution
+activity and the resulting paused Run/timer before retaining the snapshot for
+deletion checks. A downloaded CI outbox failure contains only a newly enqueued
+real FOCUS log after answer recovery; the gate now waits for the entire outbox
+to drain instead of assuming an unrelated later log is already absent. Exact
+restored answers and log de-duplication remain mandatory. All 33 focused monitor,
+participant-credential and command HTTP cases pass; complete browser/CI reruns
+remain distinct qualification.
+
+### Player startup input and asynchronous monitor receipts (2026-10-17)
+
+Published `26bc0965` finishes CI with 24 passing and 14 failing jobs. Downloaded
+logs identify thirteen failures at the same monitor-issued history expectation
+and one at rapid native Pause after a resumed Player. Monitor-issued receipts
+retain their dispatch-time status with `effectsDeferred: true`; the browser
+applies the command separately. The full browser fixture now checks that exact
+intent snapshot, keeps its real browser-v1 receiver alive through the command
+chain, and still requires the resulting durable status and Participant UI.
+Bulk Pause/Resume likewise distinguish the accepted snapshot from application.
+The isolated command target explicitly receives, ACKs and applies the command
+through authenticated participant HTTP routes. Neither dispatch nor ACK may
+change its status, Unit or lock. Termination retains the paused, locked Run and
+answers with an inactive controller entry and no completion timestamp; runtime
+and monitoring must show that exact state, separately from immutable history.
+A focused real SQLite/HTTP run executes the actual smoke helper and passes both
+Goto and Terminate plus answer/clock retention and scoped history assertions.
+
+The Player host now blocks interaction while loading and covers the mounted
+iframe with its progress surface, matching the current Original controller's
+loading overlay while preserving iframe layout and startup. The local Demo
+input remains disabled until Start supplies a nonempty session, after restored
+data is installed. A deterministic production-browser gate holds Ready, enables
+the owned fixture's control to model an early third-party input, and proves that
+native click/typing cannot enter an answer. After Ready/Start, the control becomes
+usable. Rapid Pause still follows new trusted input without waiting for its save;
+the fixture first waits only for the previously saved answer to be restored.
+
+Fresh validation passes all 2,542 unit/frontend tests (1,103 frontend), all 16
+Debug browser groups and the production build at 469.99 kB under the unchanged
+470 kB cap. Full browser/overlap and current-head remote qualification remain
+separate. Formal parity remains 30 complete/19 partial; production acceptance
+is open.
+
+The held-runtime terminal probe now requires the exact terminal application
+before testing its committed state: a preceding Resume may already have an
+unrelated held read. Completion-route failures are collected and rethrown by
+the probe, and the primary error is printed before teardown; they cannot silently
+pass or replace the original failure with an unhandled cleanup rejection.
+
+### Participant input capture, locked Starter and direct-entry rendering (2026-10-17)
+
+The first published CI runs for `d07446f4` exposed five shared browser failure
+sites. Native Pause/Goto now retain the existing 200 ms Player-input capture
+interval before retiring the frame, then drain their own closed buffers without
+waiting for HTTP acknowledgement. Route/Run replacement during that interval
+cancels the old handler. This preserves the real Player's just-typed answer
+without changing the independent command continuation documented below.
+
+A monitor's accepted termination intent is applied by the participant and returns
+to the Starter with an inactive controller entry and the requested lock. The
+paused Run, answers and unset completion timestamp remain intact. The Starter
+disables a locked/completed selected assignment, still permits another available
+assignment, and no longer renders an orphan response editor in Rewrite mode.
+The controller surface still renders a code gate or loading/error state before
+there is a current Unit: only Login and Starter hide it. The full browser gate
+caught and corrected an over-broad Unit-focused visibility condition.
+
+Direct participant-link parameters also change shared workspace/header state.
+Their initialization now runs after the current Angular tree check, explicitly
+requests a zoneless render and cancels if the route was destroyed. The real
+Angular development gate passes in both interfaces with trusted text/radio input,
+reload and Unit changes, and catches the former `NG0100` logo-link failure.
+
+The corrected browser fixtures retain their behavioral checks: local/background
+outbox recovery captures distinct response data with production per-field clocks;
+active-Player recapture may advance unrelated clocks but must preserve every
+response value/type and nondecreasing field clocks. The development reload gate
+requires exact response values/types and nondecreasing field clocks. The busy
+deletion gate waits for the rendered read-only/disabled controls before asserting
+input, duplicate-submit, Escape and backdrop guards. Monitor completion waits for
+the actual participant application before asserting its locked Starter state.
+Overlap probes distinguish the immediately projected pending Debug phase from
+the exact remote command's durable application and acknowledgement, and require
+those receipts before releasing held views or retiring request routes.
+Starter gates require the visible entry status, cleared persisted Run identity
+and removed Player instead of reading the former empty editor's status fields.
+Branded/fallback entry navigation waits for DOM readiness followed by the existing
+exact logo/text/loaded-image checks rather than global network silence.
+
+Fresh local validation passes 2,542 unit/frontend tests (1,103 frontend), the
+48-case actual-Original/service terminal differential, the production build and
+both development-Player lifecycle scenarios. The production initial bundle stays
+469.99 kB under the unchanged 470 kB hard cap. Production Chromium/SQLite passes
+all 43 loading/overlap groups, 15 Debug groups, five deletion-dialog groups and
+the reconnect/idle/error/recovery/pause/resume/locked-Starter monitor flow. The
+complete browser suite and current remote CI remain pending at this checkpoint. Earlier
+PostgreSQL/container results below describe their recorded revisions; they are
+not new qualification of these report/UI changes. Formal parity remains 30
+complete and 19 partial areas, with full production acceptance still open.
+
+GitHub subsequently passes all 1,636 PostgreSQL-16 tests for published runtime
+checkpoint `2d9c6c0d`, without failures, skips or cancellations. This includes the
+new report-selection cases. Unit/compatibility, live monitoring, quick browser,
+deployability and image checks also pass for that checkpoint. Eight downloaded
+browser failures share the later 28-Unit STARS fixture's copied clocks: outer
+JSON whitespace cannot create a new field update. Its six recovery phases now
+capture distinct owned response data with current Run/Unit clocks, retain exact
+inactive packets, and require unchanged values/types plus
+nondecreasing clocks for every restored field in the active Player. Full browser/remote qualification
+of that fixture correction remains open.
+
+The shared response matcher now applies the same active-Player rule to the
+outbox/reload and Unit-label gates: only valid, nondecreasing per-field capture
+clocks may differ. It compares every other envelope field, raw dataPart string,
+value type, page and metadata exactly; inactive packets stay byte-exact. New
+unit cases reject dropped, older, nonnumeric, negative and fractional clocks,
+and changed/missing/typed response data. All 32 focused real-Player label cases
+pass in both interfaces at desktop/mobile widths, retaining native checked-state,
+exact Run identity and complete label/metadata assertions. The entire browser
+suite remains a separate qualification; a focused pass is not full acceptance.
+
+### Unfiltered Original result archives (2026-10-17)
+
+Original `eedae41840cbe90e5547c0211da818bdf620f5aa` changes omitted report
+`dataIds` to an unfiltered read while keeping an explicit empty internal selection
+empty. The Rewrite archive now follows that distinction: omitted `groupKey`
+exports all groups in the authorized workspace; explicit service `groupKeys: []`,
+blank-only lists and unknown groups cannot widen into all groups. Explicit
+selections retain their 100-group limit; the all-groups default is not truncated
+to that limit. The existing 50,000-row-per-report guard remains unchanged.
+
+Fifteen fresh Memory/File/SQLite tests prove that every CSV and JSON member equals
+the union of the per-group reports, preserves both groups and exact response/log/
+review content, excludes a separate workspace, and survives durable reopen.
+They also cover empty workspaces, normalized duplicate filters and 103 groups.
+Five additional report cases pass against an owned PostgreSQL 14.24 instance,
+including durable reopen; the combined four-store suite passes all 20 cases.
+The owned server was stopped after the test. PostgreSQL 16 remains the CI target.
+The protected local-demo HTTP scenario passes on each of Memory, File and SQLite,
+comparing all six unfiltered report members to their explicitly selected copies.
+The new focused suite is part of the unit and PostgreSQL CI commands. PostgreSQL
+16 qualification for this report change remains for the current CI run; prior
+PostgreSQL results describe the preceding checkpoint. No schema migration is added.
+
+The unchanged selected-group Angular workflow remains available. Formal parity
+remains 30 complete and 19 partial areas; this closes the newly observed report
+default gap without claiming full functional/visual/package or production proof.
+
+### Independent terminal continuation and closed save buffers (2026-10-15)
+
+The held-termination counterexample below is corrected in the application and
+production browser. An accepted browser-v1 termination retains its own lock and
+Starter continuation after a later Pause/Resume has already finished. Its state
+effect uses the current locked Run and parent, changes only the requested lock,
+controller-entry departure and parent status, and preserves later answers, Unit,
+timers and dispatch highwater. Receipt replay cannot close a subsequent entry.
+The general stale-projection fence remains intact. Legacy command behavior is
+unchanged; this is not complete mixed-version qualification.
+
+The participant facade tracks concrete save-request acknowledgements separately
+from visible/outbox entries and assigns each closed buffer to its first handler.
+Original Pause/Goto close buffers without waiting for their saved events; Resume
+navigates directly. Terminate waits for its own captured buffers, including Player
+updates captured during the existing foreground grace interval. Later handlers
+cannot steal its wait, and an earlier Pause's already-closed answer does not
+become Terminate's new wait. Response-only packets may still save after locking
+without navigating, resuming, unlocking or replacing the controller projection.
+
+Fresh local evidence: all 2,518 unit/frontend tests pass without skips or
+cancellations, the 48-case actual-Original/service differential passes on Memory,
+File and SQLite, and all 43 production Chromium/SQLite loading/overlap groups
+pass. The production build remains 469.99 kB under the unchanged 470 kB hard cap.
+The root CI unit job now also executes the differential as
+`test:parity:terminal-overlap:built`. All 1,616 PostgreSQL tests, 498 full HTTP
+tests on Memory/File/SQLite, and 61 compatibility tests also pass without skips
+or cancellations. PostgreSQL schema-59 doctor, runtime preflight and startup
+pass against an owned PostgreSQL 16 instance. The current production dependency
+audit reports zero vulnerabilities. These are local checks; current container,
+remote CI and release acceptance are not claimed here.
+
+The broader Chromium gates pass all 22 controller-timer cases, 15 Debug groups,
+nine actual Original Worker cases, five old-context-API compatibility groups and
+both native/remote completion lost-reply/reload cases. The latter now has its own
+npm command in the root CI console job. The initial timer-smoke failure pinned
+an obsolete native-Pause answer-wait assumption; the revised gate instead proves
+Pause completes before that answer reply, retains the exact timer/data assertions,
+and keeps Terminate's saved-event wait plus legacy FIFO assertions. Six native
+route groups and ten crash/copied-tab groups also pass, bringing this focused
+browser qualification to 112 groups. The route gate proves independent Goto
+completion and cancellation of Terminate during its own saved-buffer wait. The
+real browser-process crash gate retains both prepared and unprepared terminal
+intents plus a prepared Resume, restores the actual crashed tab through Chromium,
+and proves that a new owner cannot replay or remove the former journal. The older
+unprepared-Goto assumption is replaced by the actual terminal saved-event barrier;
+prepared terminal crash coverage remains intact. The protected presentation's
+SHA-256 remains `7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+
+Upstream is now `eedae41840cbe90e5547c0211da818bdf620f5aa` (2026-10-14).
+All five complete Original completion-reference source files retain their pinned
+SHA-256 hashes. Its intervening unfiltered-workspace-report change is covered by
+the separate report checkpoint above. Formal parity remains
+30 complete and 19 partial areas. Full functional/visual/package acceptance and
+production-environment proof remain open.
+
+### Held termination survives later Pause/Resume: historical counterexample (2026-10-14)
+
+The pinned Original completion fixture now also extracts the actual `pause`,
+`resume`, `setUnitNavigationRequest` and `UnitNavigationTarget` declarations. Its
+five complete source-file hashes still match reference
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. Eight new cases cover initially RUNNING
+and PAUSED controllers, each later Pause/Resume and termination with/without lock.
+All nineteen Original completion cases pass. In the new cases, the later command
+finishes while the first termination still waits for its own saved-buffer barrier.
+After that barrier, the first handler still locks when requested, navigates to
+`/r/starter` and logs completion after navigation. It preserves the later PAUSED
+or RUNNING controller state. Original `TestDAO::changeTestLockStatus` updates the
+lock flag independently of controller state and answers.
+
+`scripts/audit-participant-terminal-overlap.mjs` reproduces the corresponding
+state-effect request order against the freshly built Rewrite application on
+Memory, File and SQLite, for native and deferred remote termination. All 48 cases
+fail parity: the old effect leaves the controller entry active, and all 24 lock
+cases also omit the requested lock. All cases preserve the later status, answers,
+current Unit and dispatch highwater, and exact effect replay is idempotent. The
+expected inactive entry is derived from the observed Original Starter destination;
+it is not claimed as an Original metadata field. This witness controls Original
+backend/router I/O and invokes Rewrite application services directly; it does not
+prove full Angular navigation, HTTP, PostgreSQL or Original remote delivery.
+
+The negative report is
+`outputs/testcenter-terminal-overlap-before-5512e1cd.json` in the owning task.
+The existing three-store single-command completion differential remains green;
+all 53 focused logger/Original-reference tests and typecheck pass without skips.
+This checkpoint changes qualification scripts and documentation only, retaining
+application `9528a6b6855b`. It does not qualify a runtime correction or a new image.
+The loading smoke's later-command assertion that the entry stays active is now a
+known expectation mismatch, not evidence of full Original behavior.
+
+The implementation must preserve the newer controller/data projection while
+fulfilling the earlier handler's independent terminal lock and navigation, then
+capture completion after that navigation. Disabling the general supersession
+fence would allow stale answer/timer/Unit projections and is not a correction.
+Receipt replay, selected-Run isolation and later entry changes need qualification
+alongside the actual Angular continuation. Formal parity remains 30 complete and
+19 partial; full production acceptance remains open.
+
+### Native Debug fulfilled-handler timestamp (2026-10-14)
+
+Application `9528a6b6855b` retains the immediate Debug pane/preference change and
+captures its completion log in the following fulfilled-handler microtask, matching
+the pinned Original `toggleDebugPane` and root `.then()` callback. Invocation scope
+and arguments are copied before that continuation; a same-turn selection change
+cannot relabel the log. Stopping the owned logger before continuation prevents a
+late orphan entry. Existing retry IDs, fresh credentials, lifecycle status logging
+and non-saving behavior remain covered.
+
+The actual Original reference now has eleven cases, including Debug on/off with
+synchronous preference effects and a later controlled completion timestamp. The
+prior production logger fails the added microtask assertion (one failure); the
+current logger passes. Forty-five focused logger/reference tests and all 1,055
+frontend tests pass without skips/cancellations. Together with the preceding 1,397
+non-frontend results, the qualified total is 2,452. Those non-frontend suites were
+not rerun: all 97 backend source hashes match the previous qualified checkpoint.
+The prior 1,580 PostgreSQL and 498 HTTP results retain that same boundary.
+
+Production Angular/SQLite passes all fifteen Debug groups both headed and with
+`CI=true`. The new gate changes the browser clock within one invocation: preference
+changes immediately, no completion entry exists synchronously, the entry appears
+in the next microtask with the later timestamp, and the exact scope/timestamp is
+persisted without changing the paused Run, parent or timer. The other fourteen
+Debug behavior, error and isolation groups remain intact.
+
+A clean 930-file archive builds image
+`sha256:04a075b339c5c48975e824a8d7516ab310a7ec5a80ddc8a1c054dbf329fd7997`.
+All three PostgreSQL profiles, SQLite runtime and 689 read-only node tests pass.
+All 169 tested/frozen/image frontend files match; the initial bundle remains
+469.99 kB under the existing hard cap, with build-only resource options absent at
+runtime. The 24 prior containers, immutable images, states and mounts, 86 volumes,
+423 image aliases and protected files are preserved; owned containers/volumes are
+removed. The broader preceding 172-group browser qualification belongs to its
+prior checkpoint and is not represented as rerun here.
+
+Normal native Debug completion timing is now locally qualified. Complete Original
+mixed-command/buffer/lock/navigation ordering, cross-document behavior, remaining
+functional/visual/package acceptance and production-environment proof remain open.
+Formal parity stays 30 complete/19 partial; Test logs export remains partial.
+No push, remote CI verification, release or production deployment occurred.
+
+### Separate browser command completion and durable replay (2026-10-14)
+
+Application checkpoint `38d8e7ef78ff` includes runtime `67a50b1b8157` and the
+subsequent browser identity/phase assertions. Opted-in native and remote commands
+now commit their state effect without prematurely publishing `command executed`.
+After the client handler continuation fulfills, an independent journal captures
+the completion timestamp and delivers the completion to its exact accepted Run
+and command. Terminal continuations wait for their own reconciliation/navigation;
+other command handlers remain independent. A rejected continuation does not
+create a completion. Old clients and API replies without the marker retain their
+legacy logging; that older timing is not promoted to fixed parity.
+
+The authenticated completion endpoint verifies the native immutable payload
+fingerprint or the already-executed remote receipt. Remote completion content is
+captured under the original state-effect transaction in existing command JSON.
+Completion log and delivery receipt commit together without changing Run data,
+parent state, answers, field clocks or state revision. Concurrent duplicates and
+lost replies retain the first completion timestamp; conflicting replay is refused.
+Memory, File, SQLite and PostgreSQL gates cover these boundaries and reopen the
+durable stores. Pending remote commands cannot be acknowledged/applied by the
+completion endpoint. Saving/non-saving modes keep their logging policies. No
+schema migration is added.
+
+The browser journal stores six immutable scope fields and the completed packet,
+not credentials or Run snapshots. It restores only observed participant sessions,
+reads fresh credentials, validates exact acknowledgements and preserves unrelated
+or uncertain storage. A stalled request times out; client-error retries use a
+bounded monotonic cooldown so a temporarily older API cannot strand the packet.
+Production Angular/SQLite, both headed and with `CI=true`, holds native and remote
+terminal reconciliation, proves no premature completion log, releases it, loses
+the already-committed completion reply, then reloads the Starter and repeats the
+exact packet once without replaying the state effect or changing the Run.
+
+All 2,447 unit/frontend tests, 1,580 PostgreSQL tests and 498 Memory/File/SQLite
+HTTP tests pass with no skips or cancellations. The final frontend segment has
+1,050 tests; the unchanged backend segments retain their fresh 1,397-test results.
+All 163 Rewrite browser groups plus nine actual Original Worker groups pass.
+The nine Original completion-reference cases retain their controlled backend,
+router and non-adaptive-Unit scope; they are not whole-Original-app acceptance.
+The independent held-completion witness now reports parity on Memory/File/SQLite
+against the preceding immutable counterexample.
+
+Browser qualification first exposed assertions tied to the former state-effect
+log identity or immediate network persistence. The revised loading, route and
+copied-tab checks retain exactly-one assertions and bind completion to its exact
+native packet and timestamp. The actual browser-process crash fixture holds the
+accepted effect reply until death: it now requires the committed PAUSED effect
+but forbids fabricated completion and old-intent replay. Its previous failure
+and the corrected ten-group run are retained. These are protocol qualification
+changes; the production runtime is unchanged after `67a50b1b8157`.
+
+A clean archive of all 930 tracked application files builds image
+`sha256:a7b1fd91210368cfbc7395b04ada2c5af23c48a9bcf0cb435e3b7c6611faf23b`.
+Standard, Demo and production PostgreSQL profiles, SQLite runtime and 689
+transaction/API/storage tests pass as node in a read-only container. All 169
+image, frozen and tested host frontend files match exactly; build-only resource
+options are absent from runtime. The initial bundle remains 469.99 kB under the
+unchanged 470 kB hard limit. Existing 24 containers, immutable images, states and
+mounts, 86 volumes, 413 image aliases and all protected files are preserved;
+owned container/volume resources are removed. Mount comparison normalizes only
+Docker's non-semantic list ordering.
+
+Deploy the accepting API before the new frontend. Complete mixed-version rollout,
+native Debug timing and Original overlapping buffer/lock/navigation completion
+remain open, alongside the other package, import, QR, visual, performance,
+power-loss and production-environment requirements. Test logs export remains
+partial: formal parity stays at 30 complete and 19 partial areas. Full functional
+parity and production readiness remain unproven. This checkpoint is local and
+unpushed; no release or production deployment occurred.
+
+### Executable Original command-completion barrier (2026-10-14)
+
+Reference checkpoint `d9e3f587` adds a source-derived controller-completion oracle.
+It executes the pinned October Original's actual three buffer pipelines, chunk
+and state aggregation, saved-event barrier, forced deactivation, termination,
+controller-state subscription and command-completion callback. Five complete
+Original files are SHA-256 verified against `ee2ab9ab64bd91209ef8534bbe6005838024e46d`.
+Backend writes and router completion are controlled; this is not acceptance of
+the complete Original frontend. Adaptive coding and timer internals retain their
+separate qualification boundaries.
+
+Nine fresh cases show that termination waits for every response, Unit-state and
+test-state save before locking, then waits for lock and navigation completion
+before writing `command executed` with its completion-time timestamp. Empty
+response/state buffers, non-saving frontend behavior, a `false` navigation result,
+paused termination, repeated already-terminated commands and exact chunk-string
+aggregation are included. The repeated command's immediate no-op completion can
+precede the first termination's eventual completion; an issuance FIFO would not
+match this behavior.
+
+An independent differential witness executes the actual Rewrite native transport
+and application service with real Memory, File and SQLite adapters. With its
+client application continuation held after the accepted effect, every adapter
+already contains `command executed`; its timestamp is the invocation timestamp
+and remains unchanged when that continuation completes. The Original has no
+completion log while its navigation is held and records the later timestamp on
+completion. `node scripts/audit-participant-command-completion.mjs <report.json>
+--assert-parity` exits 1 for these three cases. This is a confirmed remaining gap,
+not a passing production qualification. HTTP routing and the complete Angular
+view are outside the witness; browser acceptance of the corrected phases is
+still required.
+
+All 2,391 unit/frontend tests pass fresh with zero failures, skips or cancellations.
+At reference commit `d9e3f587`, the prior 918 qualified file hashes remain
+identical; only the package test command changes. These documentation updates
+follow that check, and all 306 application/package files remain unchanged. The prior
+image, browser, PostgreSQL and HTTP evidence remains attached to its original
+application checkpoint; none of those suites was rerun here. Protected artifacts
+remain byte-identical. The newly confirmed completion-timing gap reopens Test logs export: formal
+parity is now 30 complete and 19 partial areas.
+
+The next implementation must distinguish a committed state effect from handler
+completion, preserve exact completion timestamps and replay identities across
+lost replies/reloads, retain legacy-client behavior, and cover native and remote
+handlers including early returns and overlapping commands. Changing a timestamp
+before the actual completion barrier cannot close this gap. Full functional parity
+and production readiness remain unproven; this checkpoint is local and unpushed.
+
+### Coordinated File maintenance and process termination (2026-10-14)
+
+Application checkpoint `d3b599ec7eee` adds safe, explicit File version compaction
+and closes two observed process-lifetime gaps. The runtime implementation is
+`59fc9bb7b96e`; the subsequent validation changes give File-only isolated integration
+fixtures their own storage paths and wait for the exact trusted Player answer
+after its asynchronous handshake. They change no runtime behavior. The File adapter remains a same-host/PID-namespace, single-writer
+local-development option; PostgreSQL remains the multi-process deployment path.
+
+The new nested sidecar manifest version is 3. Existing inline, version-one and
+version-two data remain readable and migrate on a successful write or explicit
+migration. Older binaries cannot read version 3, so upgrade stops old accesses
+and takes an offline manifest/objects backup. Unique process/namespace access
+markers coordinate current readers, writers and maintenance. The API holds its
+writer registration through shutdown, while direct repository operations enroll
+during access. Maintenance and competing writers are refused while incompatible
+processes are alive. Unknown markers, foreign namespaces and symlinked metadata
+are retained/refused. Only uniquely named markers belonging to a verified dead
+process in the same namespace are removed; no expiry heuristic declares a live
+writer dead. These cooperative local guards are not distributed locks.
+
+`db:compact:file:built` previews candidate count/bytes by default; explicit
+`--apply` removes only unselected known versions and dead owned pending files.
+Selected objects are validated and the main manifest is rechecked before
+deletion. Store and namespace identifiers plus the owning PID distinguish
+pending files from live work and another store in the same directory. Unknown
+or malformed files and collection-directory symlinks are preserved. Active
+readers defer aggregate sidecar pruning until a later successful mutation.
+Process metadata and unpublished pending files are excluded from offline
+backups/moves; uncertain namespace metadata needs operator investigation.
+
+Three owned SIGKILL probes pause the actual writer before sidecar publication,
+before manifest replacement and just after it. Maintenance refuses the still
+live writer. After its confirmed death, reopen observes respectively the old,
+old and new committed value; compaction reclaims crash debris/old versions
+without changing selected data or manifest bytes. Fifty concurrent writer/
+maintenance enrollment trials never grant both actors. These checks leave the
+kernel/disk running and do not prove actual power-loss durability.
+
+A real API counterexample showed its public close callback completing before
+the asynchronous File writer registration was released. The callback now
+awaits one shared runtime shutdown. Another injected bootstrap I/O failure
+left writer ownership active in the same process; failed bootstrap now closes
+storage before rethrowing, allowing a clean retry. Both before-fix probes fail
+and their current counterparts pass. File storage itself releases registration
+after rejected initialization and rejects access after its idempotent shutdown.
+
+All 2,382 unit/frontend tests, 1,536 PostgreSQL tests and the 498 HTTP checks
+across Memory, File and SQLite pass without skips or cancellations. Unit,
+PostgreSQL and Memory HTTP validation belongs to runtime `59fc9bb7b96e`;
+File/SQLite HTTP uses the final File-only fixture correction. The first File
+matrix passed 160 and failed six: its nominally isolated servers inherited the
+active main File path and were correctly refused as second writers. Owned
+private File paths fix the fixture defect without switching adapters or weakening
+writer protection; all six targeted cases and the complete matrix pass.
+The first headless context run asserted an empty iframe input before restoration
+finished; its failure screenshot already shows the exact trusted answer. The
+probe now polls that same expected value within its existing bound, then retains
+the selected-run, sibling-answer and timestamp assertions. Failure evidence is
+retained; both current headed/headless context groups pass.
+Migration, doctor, metadata-required preflight, startup and shutdown also pass.
+
+A clean archive of all 919 tracked application files builds image
+`2aeff9ae818e`. Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 652 tests inside the read-only image as node pass. All 169 image/frozen/host
+frontend files match byte for byte, and all 206 frontend source files are
+unchanged. The bounded build options remain absent from the final runtime.
+One fresh headed File/Angular flow passes through participant-verona-loading.
+The current backend additionally passes 159 Rewrite browser groups and nine
+pinned Original Worker groups, 168 total, covering context, timer interruption,
+loading/commands, Debug, native routes, copied tabs and runtime errors. The
+Original harness controls router/iframe wiring; this does not establish full
+Original application or visual acceptance.
+
+All 24 preexisting containers with their image IDs/states/mounts, 86 volumes,
+393 prior image aliases and the three protected artifacts remain intact. Owned
+test resources are removed. This checkpoint is local: no push, remote CI,
+release, deployment or production acceptance is claimed. Actual power-loss,
+broader operating/performance qualification, complete Original concurrency/
+timer/Player and package/property/visual/camera acceptance remain open. The
+earlier intermittent SQLite CANTOPEN still has no proven original cause.
+
+### File mutation publication and real writer readiness (2026-10-14)
+
+Application checkpoint `c4a82157fc98` fixes the three reproduced File-store
+failures from the preceding SQLite checkpoint. A readable but non-writable
+manifest or package directory now fails readiness through a real exclusive
+write, flush and rename probe. Probes leave committed bytes unchanged and no
+probe files behind. The real API retains health while readiness returns 503;
+write errors expose a generic public response and safe EACCES diagnostics, then
+normal readiness and sign-in recover when permissions are restored.
+
+Generic mutations isolate collection maps and publish the live cache only after
+persistence succeeds. Failed mutations restore their pending dirty-entity sets,
+remain absent from live reads and cannot leak into a later independent commit.
+The File adapter additionally writes new package/release contents to immutable
+hash-named files. One atomic main-manifest replacement publishes all selected
+versions. Failure before that replacement preserves the previous manifest and
+selected sidecars and removes newly created candidate files when cleanup is
+possible. Reopen therefore retains the committed package/release, rather than
+observing an overwritten rejected version. A missing selected sidecar now
+rejects loading instead of silently initializing an empty repository; the new
+version-two sidecar manifest also detects content-hash mismatches.
+
+Legacy inline and version-one sidecar stores remain readable and migrate on an
+explicit migration or the first successful write. Owned failure fixtures prove
+that a rejected migration/replacement retains version-one manifest and sidecar
+bytes and can be retried after recovery. The enclosing state document and public
+migration result keep formatVersion 1; the nested sidecar manifest is version 2.
+Older binaries cannot read it, so the documented rollback restores the complete
+pre-upgrade manifest/objects backup while the single writer is stopped. Prior
+versions of live entities remain available to readers of an earlier manifest.
+Guarded deletion drops the references and prunes all versions; failed cleanup
+retries on the next mutation. Retention/compaction, broader failure injection
+and power-loss behavior still need operating qualification.
+
+All 2,359 unit/frontend tests and 166 fresh File HTTP integration tests pass
+without skips or cancellations. The focused 29 tests include existing File
+behavior, eleven new storage failure/migration/integrity cases and two real API
+cases. The previous immutable image `f386eaa7dc6b` passes one and fails ten of
+the eleven current storage cases, and fails both new API cases; the same scripts
+pass against the current code/image. Migration, doctor, metadata-required
+preflight, startup and shutdown CLI checks pass on an owned File fixture.
+
+A clean archive of all 913 tracked application files builds fresh image
+`99695362f806`. Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 629 tests inside the read-only image as node pass. All 169 production
+frontend files match the frozen tested frontend and host byte for byte; all 206
+frontend source files are unchanged. The bounded Node/Angular build options
+remain absent from runtime configuration. The earlier 1,536 PostgreSQL tests,
+332 Memory/SQLite HTTP tests and 168 browser/reference groups remain explicitly
+retained evidence for unchanged non-File runtime paths, not fresh current runs.
+
+A fresh headed File/Angular browser flow passes through the requested
+participant-verona-loading boundary. It covers administrator settings/accounts,
+workspace/content authoring, source intake and dependency assembly, import,
+activation, prompt read models, participant login/code/reentry, navigation,
+response autosave, completion and Player loading. This is one bounded flow,
+not the complete Original player/visual/operating acceptance matrix. The first
+attempt mistakenly enabled Demo bootstrap although the harness creates its own
+administrator: bootstrap returned 409 and sign-in 401. Its failure log/report
+and screenshot remain retained. The corrected attempt disables only that fixture
+option and passes without an application change.
+
+All 24 preexisting containers, their image IDs/states/mounts, all 86 volumes and
+383 prior image aliases at this checkpoint's start, and the three protected
+artifacts remain intact. Owned test resources are removed. The current work is
+local; nothing was pushed, released or deployed and remote CI is unverified.
+Complete Original functional parity and production readiness remain unproven,
+including broader legacy/native concurrency and timer scheduling, full
+real-package/property/visual and camera/QR acceptance, measured performance,
+retention/power-loss qualification and production acceptance. The earlier
+intermittent SQLite CANTOPEN still has no proven original cause.
+
+### Live SQLite readiness, safe storage shutdown and bounded builds (2026-10-14)
+
+Application checkpoint `ca72428d7d39` strengthens the operational boundary
+without changing the participant protocol or frontend. SQLite readiness now
+uses the persistent writer owned by the API instead of opening another
+connection. It checks the existing schema and performs real writes in a rolled
+back transaction. Missing files are not created by standalone readiness checks,
+and empty databases are not silently migrated. Healthy probes retain database
+bytes, schema and application data; a read-only writer, replaced database path
+or obstructed journal causes readiness failure. API health remains available
+while readiness returns 503. Safe driver codes are retained in operational logs;
+public write failures keep their generic response and do not expose credentials.
+Rejected startup migrations close their connection and shutdown closes the
+successful live writer exactly once.
+
+Closing a socket does not imply that its asynchronous database work finished.
+The API now includes participant and monitor SSE polls and participant lease
+closure in its request lifecycle. Shutdown drains that work before closing
+storage. A disconnect during initial stream registration closes the participant
+lease and starts no poller; the corresponding monitor path also starts no
+poller. Eight lifecycle tests execute the actual extracted stream/shutdown
+methods with controlled scheduling and services. The previous source passes
+three and fails the five newly added stream cases. Two separate real
+SQLite/HTTP stream tests pass; the controlled cases do not replace complete
+application shutdown/load qualification.
+
+The application code at `6d0f84e7e6c1` passes 2,346 unit/frontend tests, 1,536
+PostgreSQL tests and 498 HTTP tests across Memory, File and SQLite, without skips
+or cancellations. Startup and shutdown CLI checks also pass. The only subsequent
+application change is the Dockerfile: build processes use a 1,536 MiB Node heap
+limit and two Angular workers. Those options are absent from the final runtime
+environment. A clean archive of all 911 tracked application files builds image
+`f386eaa7dc6b`; Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 600 tests as node inside the read-only image pass. Its 169 production
+frontend files match the frozen tested frontend and the host byte for byte.
+Three actual SQLite API tests fail against the preceding `1e819f1c4ad6` image
+and pass in the new image, including shutdown lifetime and live-writer failure
+with generic public errors.
+
+The current backend additionally passes 159 fresh Rewrite browser groups:
+context selection headed/headless, timer interruption headed/headless, loading
+and commands headed/headless, Debug, native routes, copied tabs/crash recovery
+and runtime errors. Nine fresh groups execute the pinned Original's extracted
+timer/controller/guard/Unit-host methods and real Blob Worker. Router wiring and
+iframe presentation in that reference harness remain controlled. These 168
+groups do not establish full Original application, visual or package acceptance.
+The prior five actual older-API groups remain predecessor evidence; no fresh
+complete mixed-version rollout is claimed.
+
+The initial concurrent HTTP/PostgreSQL qualification exhausted host storage,
+producing SQLite FULL/CANTOPEN and Docker overlay failures. Those trials and a
+browser ENOSPC failure remain retained. A normal Docker Desktop restart restored
+the daemon; only verified owned failed resources were removed. Integration runs
+were repeated sequentially. A subsequent guarded container run also stopped at
+low storage and its residual owned container was removed. The final bounded
+build and all profiles pass under a storage guard. The earlier intermittent
+CANTOPEN in the causal-context checkpoint still has no proven original cause;
+these new live-writer checks and later disk exhaustion do not establish that
+cause. Build resource bounds do not guarantee host headroom under every workload.
+
+All 24 preexisting containers, their image IDs/states/mounts, 85 preexisting
+volumes, 369 prior image aliases and protected artifacts are verified intact.
+Observed unrelated inventory additions are recorded separately. Four closed
+owned historical SQLite fixtures were losslessly compressed, reclaiming
+197,197,670 bytes with verified round-trip hashes and a retained restore script;
+the protected legacy tryout database is unchanged. Only verified private owned
+BuildKit records were pruned; no broad image/volume prune or Docker reset occurred.
+
+Full functional parity and production readiness remain unproven. Further work
+includes exact Original Player/navigation/timer/concurrency and completion-lock
+behavior, complete real-package/property/visual and camera/QR acceptance,
+measured performance and broader storage/operating failure qualification.
+An owned permission fixture independently reproduces a remaining File-store
+readiness gap: a readable but non-writable directory passes readiness while an
+actual repository write fails with EACCES and leaves persisted bytes unchanged.
+The failed change nevertheless becomes visible in the live repository and an
+independent later successful write persists it. The fixture was removed; this
+SQLite checkpoint fixes neither File readiness nor that failed-write cache leak.
+A separate owned SourcePackage replacement also fails at the manifest write
+after overwriting its existing sidecar: an independently reopened repository
+then observes the rejected replacement despite unchanged manifest bytes.
+That on-disk partial commit requires a persistence correction as well.
+Remote CI, release, deployment and production acceptance are separate outstanding
+gates. This is a local checkpoint; nothing was pushed or deployed.
+
+### Causal timer interruption after a legacy retime (2026-10-13)
+
+Application checkpoint `0572ff28aa89` corrects an observed same-Unit race: a
+restored unclocked Goto had already changed the server timer, but its reply was
+held or lost. A subsequent Pause/Terminate still observed the earlier deadline.
+The old timer receipt was accepted without freezing the changed timer; the
+actual predecessor frontend reproduces an expired timer after acknowledgement,
+with no unrelated page errors.
+
+New timer preparations may carry the exact outstanding legacy Goto/Resume
+identity and the observation timestamp. The server records a causal witness
+only when that clockless command retimes a running timer on the same current
+Unit. The witness binds the participant/Run, tenant/workspace, immutable
+release/Booklet/assignment, delivery ID, canonical command payload hash, old
+start/deadline, and the exact resulting timer fingerprint. It is retained only
+while that fingerprint and scope still match. Reconciliation requires the
+known old packet and timer plus an observation after its server effect and
+before its new deadline, bounded by the current server time. Other Units,
+subsequent timer changes, different packet bodies, later dispatches and ambiguous
+observation times cannot use this path. Ordinary exact-identity preparations
+retain their existing behavior. The legacy main HTTP body remains unchanged;
+the optional witness uses the existing JSON timer storage without DDL or a
+schema-version change.
+
+The pinned Original's real Blob Worker additionally proves that same-block Goto
+interrupts the last STEP balance and reentry emits its first STEP immediately.
+Native Goto/Resume interruption now honors that STEP; a zero STEP before ENDED
+can restart the authored duration. Already-paused timers retain their previous
+interruption marker. Nine fresh Original Worker groups cover the earlier seven
+Pause/Terminate/zero/expiry cases plus positive-balance and zero-balance Goto
+reentry. This harness executes the actual extracted controller, timer service,
+Worker, guards and Unit-host methods; router wiring and iframe presentation are
+harness-owned, so this is not full Original router/application acceptance.
+
+All 2,330 unit/frontend tests, 1,536 fresh PostgreSQL tests and 498 fresh
+Memory/File/SQLite HTTP tests pass without skips or cancellations. The store
+matrix covers all six execution modes, Pause/Terminate, positive/zero reentry,
+restart before preparation and replay, exact duplicate retention, and negative
+causality/clock/scope cases. The actual previous image passes 57 and fails 81
+of the 138 current store tests, including failed parent groups. Seventy-two
+native-transport tests and three new contract tests pass. Typecheck and the
+production build pass at 469.99 kB under the unchanged 470 kB hard limit.
+
+Twenty-two production Rewrite timer groups pass headed and headless. Ten added
+groups cover already-applied legacy Goto with a held reply or a lost first reply,
+live current-state updates or deliberately withheld current-state replies, and
+zero-tick reentry before Pause/Terminate. Live event reception does not guarantee
+a fresh snapshot before invocation: the assertions derive the exact expected
+balance from the packet's observed timer identity, while deliberately stale
+cases must retain the old identity. The tests hold a genuinely committed Player
+answer independently, prove the early timer freeze beyond the former deadline,
+then release legacy/answer/main replies and prove one legacy state effect,
+retained balance and unchanged sibling, answers and response clocks. The wider
+29 command/loading groups pass headed and headless, plus 14 Debug, five route,
+ten copied-tab/crash, five context, 18 ERROR and five actual older-API groups.
+That is 159 fresh Rewrite and nine fresh Original Worker groups, 168 in total.
+
+A clean archive of all 908 tracked application files produces fresh image
+`1e819f1c4ad6`. Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 589 API/transaction tests inside the read-only image as node pass. All 169
+image, tested and host production files match; the prior host frontend is
+preserved. All 24 preexisting containers, immutable image IDs/states/mounts,
+85 volumes, 359 prior image aliases and protected files remain intact. Ten
+checkpoint aliases are added and owned containers, volumes and the clean source
+archive are removed. Three closed owned development builds were removed,
+reclaiming 73,809,189 bytes while retaining every frozen production frontend.
+
+The first backend matrix found an already-paused marker regression, now fixed.
+The first full browser matrix incorrectly assumed live SSE meant an already
+fresh view; the corrected assertions preserve the actual snapshot distinction.
+The first current-API context run also emitted SQLite `unable to open database
+file` errors during save-progress/events. Its retained database passes a read-only
+`quick_check`, and all five cases pass on a fresh owned database without any
+source change. The cause remains unresolved; the successful rerun is not a fix
+for that operational failure. Final acceptance uses the corrected matrix and
+retains this separate production-readiness finding. Backend-first rollout is required:
+historical already-applied packets without the server witness, different-Unit
+legacy effects, broader restored/mixed-version concurrency, clock skew, exact
+Worker scheduling/hidden-window behavior, buffer/completion-log and late
+terminal navigation/lock ordering remain open. Global/cross-document and
+post-unload ordering, full visual/property/real-package acceptance, measured
+performance, remote CI, release, deployment and production acceptance also
+remain unproven. This is a local checkpoint; nothing was pushed or deployed.
+
+### Timer preparation while legacy commands wait (2026-10-13)
+
+Application checkpoint `ed351fc1c0e6` closes the confirmed transport gap where a
+restored unclocked legacy packet blocked a new timer interruption as well as new
+main commands. An eligible Pause/Terminate timer receipt can now finish while
+the legacy packet waits. Its exact acknowledgement is persisted before the new
+command prepares answers. New answer preparation and main state application
+remain behind the legacy FIFO; the legacy HTTP packet gains no dispatch or wire
+metadata. Lost timer replies retry their original packet, restoration retains
+an acknowledged interruption, and controller replacement aborts the preflight
+without applying a late receipt. No wire or storage schema version changes.
+
+The receipt changes the selected timer plus the Run's transaction metadata
+(`stateRevision` and `updatedAt`). It does not change Run status, command dispatch
+highwater, Unit, parent session, controller entry, answers or response clocks,
+and does not project a returned Run snapshot. This distinction is deliberate:
+timer preparation is independent of the older command's state ordering, while
+its own store mutation still participates in normal revision tracking.
+
+All seventy native-transport tests pass, including seven new cases for Pause and
+Terminate behind a held legacy reply, exact lost-reply retry, restoration,
+legacy settlement during an in-flight timer receipt, controller replacement,
+and an unprepared legacy packet still draining its answers. The immutable
+predecessor transport passes 63 and fails exactly those seven cases. All 2,247
+unit/frontend tests pass fresh, including the unchanged 31 actual-Source command/
+timer oracle cases. Typecheck and the production build pass at 469.99 kB under
+the unchanged 470 kB hard limit, retaining existing warnings. A comment-only
+clarification was rebuilt separately; all 169 production files match the earlier
+frozen frontend used by the wider browser regression.
+
+Twelve production Rewrite timer groups pass headed and headless. The two new
+cases restore an owned, seeded, prepared legacy Goto journal through a real
+browser reload, hold that Goto before server application, and hold a genuinely
+committed Player answer independently. New Pause and Terminate freeze the
+matching timer beyond its former deadline while both main effects still wait.
+The Pause case loses its first timer reply and proves the exact retry is already
+acknowledged before legacy release. The legacy packet is applied exactly once;
+its body, sibling Run, answers and response clocks retain their required identity.
+The previous immutable frontend fails with zero timer receipts at the expected
+early-interruption assertion and no unrelated page errors. This uses the current
+API with an old wire journal; it is not an actual older-client executable or a
+complete mixed-version timing matrix.
+
+The wider twenty-nine command/loading groups pass headed and headless, together
+with fourteen Debug, five route, ten copied-tab/crash, five context, eighteen
+ERROR and five actual older-API groups. That is 139 fresh Rewrite browser groups.
+Seven previously verified actual-Source Worker groups remain retained evidence:
+their fixture, extractor, unit oracle and Worker harness hashes are unchanged.
+The resulting 146 positive groups distinguish fresh Rewrite runs from retained
+Source runs. The root CI's existing timer gate executes all twelve groups, and
+the normal frontend-state gate executes the seven new transport cases. Remote CI
+has not run for this local, unpushed checkpoint.
+
+Every backend, store, contract, configuration and integration-test source hash
+is unchanged from `acb3e516db34`. Its 1,432 PostgreSQL and 498 Memory/File/SQLite
+HTTP tests are therefore retained predecessor evidence, not fresh executions.
+A clean archive of all 906 tracked application files produces a fresh image
+`620db5dfc4f8`. Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 511 API/transaction tests inside the read-only image as node pass fresh.
+Image, tested and host frontend match in all 169 files. The former host frontend
+is preserved separately. All 24 preexisting containers, their immutable image
+IDs/states/mounts, 85 volumes, 349 prior image aliases and protected files remain
+intact; ten checkpoint aliases are added. Owned containers, volumes and the clean
+source archive are removed, with preservation rechecked after the older-API run.
+
+Storage preparation removed exactly 65 private unused BuildKit cache records
+from three verified older dependency/build lineages of this repository,
+reclaiming 1.692 GB. The current dependency cache, every image alias, container
+and volume remain intact. Selection was checked read-only by explicit cache IDs
+and ancestry before removal; the observed cache delta contains only those IDs.
+This is a targeted own-cache cleanup, not a global Docker prune or disk reset.
+
+Browser qualification corrected the migration setup to run only in the replacement
+top-level document: injecting it into sandboxed Player frames produced unrelated
+storage-access errors. Failure cleanup now releases deliberately blocked routes
+without waiting indefinitely for canceled handlers. An earlier failed negative
+control required stopping only its verified owned browser/API; the final negative
+control exits with its original timer assertion. Earlier qualification failures
+are excluded from final acceptance. Final timer logs use the corrected setup and
+complete without page errors.
+
+Complete Original parity and production readiness remain unproven. Further work
+includes already-applied/lost legacy replies, broader restored and mixed-version
+concurrency, exact Worker scheduling and hidden-window behavior, state-buffer/
+completion-log timing, late terminal lock/navigation completion, initial loading/
+controller replacement, global/cross-document and post-unload ordering, full
+visual/property/real-package acceptance and measured performance. Release,
+deployment and production acceptance remain outstanding separate gates.
+
+### Zero-tick timer reentry and current code gates (2026-10-13)
+
+Application checkpoint `acb3e516db34` distinguishes an interrupted zero STEP from
+actual expiry. The pinned Original Blob Worker emits zero before ENDED; a Pause
+at that boundary prevents the time lock. Its real Resume, UnitActivateGuard and
+Unit host restart the full authored duration. By contrast, an enforced ENDED
+keeps its time lock and redirects to the next accessible Unit. Non-enforcing
+preview modes can explicitly reenter the expired block and restart its duration.
+The Rewrite preserves these distinctions without changing a wire or schema
+version, and resumes only the selected accessible timer rather than every paused
+block in the Run. Positive balances remain bounded by the authored duration;
+receipt replay after a store reconnect cannot restore an old timer or snapshot.
+
+Native and remote Resume, ordinary Run and saving-session reentry, and the
+legacy monitor issuance path share the entry projection. An already leave-locked
+current Unit is skipped through the Original guard rules. This exposed a second
+confirmed gap: a first Unit behind a code lock is an accessible code-entry route,
+but its Player and timer must wait for code release. Current-state now exposes
+that current gate, the frontend suppresses the locked Player, and a valid code
+starts the current Unit in place. Invalid codes leave the Run unchanged. Existing
+upcoming-gate behavior remains covered; timer preparation and state-command
+ordering retain their separate receipts and highwater semantics.
+
+The Source fixture now pins seven original files, including the actual route
+guard, Unit host, code submission and lock aggregation. Thirty-one unit oracle
+cases execute the extracted Original command/timer paths. Seven real Chromium
+Blob-Worker groups cover Pause, ordinary and ERROR forced termination, zero-tick
+Pause with/without enforced time, and actual expiry with/without enforced time.
+The Source browser harness stubs iframe presentation; it does not prove the full
+Original router or Player application. Sixty new Memory/File/SQLite cases and
+eighty cases with PostgreSQL cover all six execution modes, native/remote
+application where supported, explicit entry, sibling/answer/clock retention,
+code release, and receipt replay after reopening the store. PostgreSQL replay
+actually shuts down and reconnects its storage pool.
+
+Ten production-built Rewrite timer groups pass both headed and headless:
+native/remote Pause and Terminate with a held committed Player answer and a held
+application, a lost timer reply, four native/remote zero-Pause/Resume combinations,
+and native/remote Resume into a current code gate. The preceding immutable image
+`04b894492418` passes nine and fails 51 of the sixty current store cases. The
+preceding frontend fails the code-entry iframe-absence assertion while the new
+frontend passes it. These controls are local regression evidence, not a complete
+older-API behavioral matrix. The broader twenty-nine command/loading groups pass
+headed and headless, with fourteen Debug, five route, ten copied-tab/crash, five
+context, eighteen ERROR and five actual older-API groups: 135 Rewrite browser
+groups plus seven actual-Source Worker groups, 142 positive groups in total.
+
+All 2,240 unit/frontend tests, 1,432 fresh PostgreSQL tests and 498 fresh
+Memory/File/SQLite HTTP tests pass without skips or cancellations. Typecheck and
+the production build pass at 469.99 kB under the unchanged 470 kB hard limit;
+existing warnings remain. A clean archive of 906 tracked application files passes
+Standard, Demo and production PostgreSQL profiles, SQLite runtime and 511
+API/transaction tests inside the fresh read-only image as node. Image
+`37c36b6f1a43` matches all 169 tested and host frontend files. All 24 preexisting
+containers, their immutable image IDs/states/mounts, 85 volumes, 339 prior image
+aliases and protected files remain intact; ten checkpoint aliases are added.
+Owned profile/test containers, volumes and the clean archive are removed. The
+previous host frontend remains preserved separately. Preservation is checked
+again after the actual older-API run.
+
+The initial broader integration expectation retained the leave-locked introductory
+Unit on Resume. Actual Original guard execution proves the forward redirect; the
+test now explicitly checks both the leave lock and the resumed code-entry Unit.
+The resulting current-code-gate failure was fixed in runtime code, rather than
+removing the unlock assertion. A subsequent validation-only checkpoint updates
+the Debug browser case to assert no Player before inherited-code release, release
+in place, and retained Unit locks/answers; runtime and image stay at `acb3e516db34`. Final browser evidence uses the newly frozen
+frontend and unique logs; earlier predecessor-frontend qualification runs are not
+counted as final acceptance. Existing root CI timer/Worker gates execute the
+expanded ten/seven groups; the new store cases run in unit and PostgreSQL gates.
+Remote CI has not run for this local, unpushed checkpoint.
+
+Complete timer parity and production readiness remain unproven. Remaining work
+includes exact Worker scheduling and hidden-window behavior, restored/legacy
+concurrency, state-buffer/completion-log timing, late terminal lock/navigation
+completion, initial loading/controller replacement, global/cross-document and
+mixed-version ordering, worker/post-unload behavior, full visual/property/real-
+package acceptance and measured performance. Release, deployment and production
+acceptance remain separate outstanding gates. An extracted-transport audit
+confirms that a held unclocked legacy packet currently delays a newly captured
+timer-only receipt. Removing that delay while retaining legacy state-effect FIFO
+is a concrete next task; this checkpoint does not claim to fix it.
+
+### Controller timer interruption before answer preparation (2026-10-13)
+
+Application checkpoint `e481e22720e1` captures an eligible native or accepted
+remote Pause/Terminate timer interruption before answer preparation. Its scoped,
+authenticated receipt freezes the exact observed timer and balance without
+changing Run status, Unit, answers, response clocks, parent session, controller
+entry or command highwater. The explicit interruption marker prevents current-
+state reads from restarting the timer while its original command still waits.
+A later application retains the prepared balance; an explicit Resume restarts
+it. Receipt replays never project an old Run snapshot into the current view.
+Timer identity, Unit and dispatch checks prevent stale preparations from
+interrupting a replacement timer or a newer completed command. No schema version
+change is needed because the existing atomic progress-delivery receipt is reused.
+
+Native journals retain the separate timer packet and acknowledgement across
+lost replies and restoration; prepared main packets and legacy packets preserve
+their prior wire identity. Remote retries retain their first interruption packet.
+Pause interrupts even from ERROR or TERMINATED. Forced terminal interruption
+preserves the Original ERROR, missing-Unit, locked-parent and exact TERMINATED
+early returns; the authenticated current-state projection now distinguishes
+aggregate parent locks from a Unit's own leave lock and non-enforced expiry.
+The local interrupted timer is hidden and stops generating new warnings or
+expiry refreshes while its main command is pending. Its displayed/captured
+seconds use the immediate Worker-tick boundary rather than rounding up.
+The server accepts the authenticated controller's bounded observation; it does
+not independently prove that a local Original guard ran.
+
+The real pinned Original Blob Worker passes Pause, ordinary forced Terminate and
+ERROR-bypass browser references, including worker termination and URL revocation.
+It emits an immediate first STEP; on normal expiry the zero STEP and ENDED each
+write a zero TESTLETS_TIMELEFT snapshot. Four production-built Rewrite cases pass
+both headless and headed: native/remote Pause and Terminate, a genuinely held
+committed Player answer, an independently held application, passage beyond the
+original deadline, exact sibling/answer-clock retention, and a lost timer reply.
+The preceding immutable frontend `32b73d7b490d` fails at the missing early timer
+receipt. Its backend control fails sixteen of 99 current tests, including the
+missing timer route export at API-module load; this is not an old-API behavioral
+matrix. The existing twenty-nine command/loading groups pass headed and headless,
+with fourteen Debug, five route, ten copied-tab/crash, five context, eighteen ERROR
+and five actual older-API groups. In total, 123 Rewrite browser groups and three
+actual-Source Worker groups pass. New timer and Worker gates are wired into the
+root CI workflow; remote CI has not run for this local commit.
+
+All 2,175 unit/frontend tests, 1,352 fresh PostgreSQL tests and 498 fresh
+Memory/File/SQLite HTTP tests pass without skips or cancellations. Typecheck and
+the production build pass at 469.99 kB under the unchanged 470 kB hard limit.
+The fresh image from 905 verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 451 API/transaction tests as
+node in a read-only container. All 169 image, tested and host frontend files match.
+Existing build warnings remain. Earlier qualification failures caught a missing
+owned-route registration, an incomplete test-host signal and a transport syntax
+error before the final checks; all were repaired. The older buffer browser gate
+now permits only the exact separately receipted timer mutation and continues to
+compare every other Run field unchanged.
+
+Docker stopped during a subsequent PostgreSQL preparation with an invalid storage
+attachment. A normal Desktop restart recovered the daemon; the failed test volume
+was absent. All 24 original containers, immutable image IDs, states and mount
+fields, 85 volumes, 329 image aliases and protected files were verified unchanged
+before resuming. Ten checkpoint image aliases are added. Owned profile/test
+containers, volumes and the clean source archive are removed, and preservation
+is rechecked after the actual older-API run.
+
+Backend-first rollout is required for the new timer endpoint. The five older-API
+groups prove their bounded existing sequential flows, not timed new-command or
+complete mixed-version concurrency. Full timer parity remains unproven: zero-tick
+interruption/resume, exact Worker scheduling and hidden-window behavior, restored
+and legacy concurrency, state-buffer/completion-log timing, and late terminal
+lock/navigation completion need further acceptance. Initial loading/controller
+replacement, global/cross-document ordering, worker/post-unload behavior, full
+visual/property/real-package acceptance, measured performance, remote CI,
+release, deployment and production acceptance also remain open. This checkpoint
+is local and unpushed.
+
+### Timer interruption Source audit and confirmed buffer gap (2026-10-13)
+
+A new pinned actual-Source fixture executes the complete timer start/finish/
+interrupt methods, root timer-event handler, native command handler, forced
+deactivation guard, and navigation helper from `ee2ab9ab64bd`. Seven reference
+cases prove that Pause interrupts immediately and ordinary forced Terminate
+interrupts before its awaited continuation and answer buffers. Their timers
+retain the last STEP balance beyond the former expiry deadline. INTERRUPTED
+clears the visible timer without setting its balance to zero or emitting a new
+TESTLETS_TIMELEFT snapshot. ERROR, missing-current-Unit, locked-immediate-parent
+and exact TERMINATED early returns skip that interruption. The actual ticker's
+interval fallback runs under a virtual RxJS scheduler; this is not a Worker
+execution or full browser lifecycle proof.
+
+A deterministic actual-Source/application-service comparison confirms the next
+runtime gap: a five-second timer paused at 2.5 seconds retains three seconds in
+the Original while buffers wait until ten seconds. The current Rewrite applies
+the delayed native command with zero seconds remaining, although its exact
+answer and response clocks survive and the receipt remains idempotent. The audit
+therefore does not claim a timer fix. Interruption must reach local countdown and
+canonical expiry/navigation before answer drain, retain timer identity and Source
+balance, and preserve early-return, overlapping-command, retry and legacy rules.
+
+The seven new reference cases run in the normal frontend-state gate; all 2,148
+unit/frontend tests pass fresh without skips or cancellations. Runtime code and
+frontend output remain unchanged from verified application `32b73d7b490d`; its
+build, 1,335 PostgreSQL, 498 HTTP, 115 browser and 438 inside-image results remain
+that checkpoint's evidence and were not rerun for this reference-only audit.
+Full timer/Worker timing, visual acceptance, CI, deployment and production proof
+remain open. No push occurred.
+
+### Exact terminal early returns and pending commands (2026-10-13)
+
+Application checkpoint `32b73d7b490d` captures the pinned Original's exact
+TERMINATED guard at invocation. A later Terminate while an earlier effective
+Terminate waits for answer buffers logs once and returns without another buffer
+wait, lock, navigation, controller-entry change or Run state effect. Its receipt
+does not advance the Run dispatch highwater or finish the earlier pending phase,
+so the first effective command still applies. Two calls in the same JavaScript
+turn both pass the guard; TERMINATED_PAUSED also passes it and becomes TERMINATED.
+The decision is not inferred from the state observed after deactivation.
+
+Native packets preserve that decision across lost replies, retries and journal
+restoration. Accepted remote terminal commands persist it with their executed
+command JSON; retries with a different decision fail closed. Store invariants
+allow only command-log/receipt effects for a no-op. Existing authorization,
+immutable scope, access windows, completed-Run rejection and execution-mode log
+filtering remain active. A retained older ERROR dialog is presentation after
+successful termination; a newer trusted ERROR still interrupts the pending phase.
+Pure-log no-ops can bypass a held legacy packet, while state effects preserve
+legacy FIFO and prepared packets keep their original bytes. The guard decision
+is reported by the authenticated controller; the server does not independently
+observe the local controller phase.
+
+All nineteen actual-Source oracle cases and 2,141 unit/frontend tests pass fresh
+without skips or cancellations. Fresh PostgreSQL validation passes 1,335 tests;
+the Memory/File/SQLite HTTP matrix passes 498. Typecheck and the production build
+pass at 469.99 kB under the unchanged 470 kB hard limit, retaining existing warnings.
+Twenty-nine command/loading groups pass headed and headless; fourteen Debug,
+five route, ten copied-tab/crash, five context, eighteen ERROR and five actual
+older-API groups also pass, for 115 positive groups. The preceding immutable
+frontend `87be5c23dda1` fails the no-op gate after fourteen groups. Its backend
+image fails 26 of 109 current contract/application tests as a negative control.
+The first headed trial held an incorrect remote ACK URL; the final fixture holds
+the exact acknowledgement route and passes the native lost-reply and remote
+held-ACK scenarios. Every final browser run shuts down its owned API.
+
+The fresh image from 900 verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 438 API/transaction tests as
+node in a read-only container. Its 169 frontend files match the tested frontend
+and aligned host output. No schema version changes. The existing backend-first
+rollout remains required; the five actual older-API groups prove their bounded
+sequential compatibility, not full no-op mixed-version concurrency. All 24 prior
+containers, immutable image IDs, states and mount fields, 85 volumes, 315 image
+aliases and protected files remain intact. Ten checkpoint image aliases are added;
+four other new aliases are retained separately. Owned containers, volumes and
+the clean source archive are removed.
+
+Full Original parity and production readiness remain unproven. Timer interruption,
+buffer/completion-log timing and terminal lock/navigation completion after later
+commands remain open. Initial loading/controller replacement, global/cross-document
+ordering, complete legacy mixed-version concurrency, worker/post-unload behavior,
+full visual/property/real-package acceptance, measured performance, remote CI,
+release, deployment and production acceptance are still required. This checkpoint
+is local and unpushed.
+
+### Terminal controller phases before answer buffers (2026-10-13)
+
+Application checkpoint `87be5c23dda1` enters TERMINATED or TERMINATED_PAUSED
+after the awaited forced-deactivation continuation and before answer-buffer
+preparation. Native Terminate starts in that microtask, not synchronously and
+not after answer preparation. A same-turn Pause can therefore precede the
+terminal continuation; a command arriving later during the buffer wait gets a
+newer dispatch position and controller phase. Remote terminal handlers enter
+their phase before the lazy execution import, and memoize their first scoped
+observation and dispatch across retries.
+
+The phase does not forge the committed Run, answer clocks, controller entry or
+navigation. It suspends new remote reception while already accepted handlers
+finish. A later Pause, Resume or trusted Player ERROR survives an old terminal
+receipt. Prepared native packets remain exact across retries/restoration;
+restored modern or legacy packets do not replay a local phase. Scope replacement
+before the native terminal continuation removes that intent before delivery.
+
+The fifteen-case actual-source oracle includes the real forced guard and held
+buffers. Four new browser groups prove early native/remote termination, later
+Pause/Resume during a genuinely held committed Player answer, exact response
+clocks and sibling isolation, and fresh reentry. The preceding immutable frontend
+`b3ddb94b9432` fails the early terminal-phase assertion after ten passing groups.
+The immutable pre-fix unit control fails nine of 186 cases; all 187 final focused
+cases and all 2,105 unit/frontend tests pass without skips or cancellations.
+
+Typecheck and production build pass at 469.99 kB under the unchanged 470 kB
+hard limit. Twenty-seven command/loading groups pass headed and headless;
+fourteen Debug, five route, ten copied-tab/crash, five context, five actual
+older-API and eighteen ERROR groups pass. The first headed fixture cleanup
+incorrectly waited for an iframe absent in Pause; the final fixture checks its
+presence and awaits action/response together. Existing bundle and CommonJS
+warnings remain.
+
+The fresh image from 900 verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 388 API/transaction tests
+as node in a read-only container. All 169 image, tested and restored host
+frontend files match. Backend contracts, stores and schemas are unchanged;
+previous PostgreSQL (1,313) and HTTP (498) results are reused only after all
+90 backend source hashes match. Those two suites were not rerun. The existing
+backend-first rollout boundary remains. All 24 existing containers, immutable
+image IDs, states and mount fields, 85 volumes, 305 image aliases and protected
+files are preserved; ten aliases are added. Owned containers and the clean
+source archive are removed.
+
+Full Original parity and production readiness remain unproven. Exact
+already-TERMINATED no-op behavior, timer interruption, buffer/completion-log
+timing and terminal lock/navigation completion after later commands remain open.
+Initial loading/controller replacement, global/cross-document order, complete
+legacy mixed-version concurrency, worker/post-unload behavior, full
+visual/property/real-package acceptance, measured performance, remote CI,
+release, deployment and production acceptance are also still required.
+This checkpoint is local and unpushed.
+
+### Forced terminal Source audit (2026-10-13)
+
+Reference checkpoint `bac6840d74b9` executes the pinned Original's real
+`canDeactivateUnit` together with the native root handler and `terminateTest`.
+For the native force=true path, deactivation completes immediately and the
+terminal phase is entered before `closeAllBuffers` waits. A Pause or Resume
+arriving during that buffer wait changes the controller state; buffer completion
+does not set the former terminal state again. Two new actual-source cases prove
+both orders with held buffers, locking and navigation.
+
+The preceding candidate `4a082496e30e` sampled native terminal state after answer
+preparation. Its reference work was incomplete at that point:
+the injected held deactivation Subject covered the generic method, not the real
+forced native path. Green candidate browser/container checks therefore did not
+prove Original parity. Its runtime change and the two unsupported browser
+expectations are withdrawn. Candidate source, frontend and diagnostic results
+are retained separately; the fixture receipt refinement `bd4f91bcf366` is also
+withdrawn with that scenario. No candidate production-readiness claim is made.
+
+The current runtime and browser harness again match accepted application
+`438d1cebf5fd` byte for byte. The reference oracle now has fifteen cases, including
+the two actual forced-guard cases; two additional native transport cases protect
+prepared retry/restoration and unprepared legacy observations. All 2,093
+unit/frontend tests pass fresh without skips or cancellations. The unchanged
+runtime reuses the accepted build, browser and image evidence after source-hash
+verification; those suites were not rerun for the current reference-only change.
+All 169 host frontend files are restored to the accepted image's exact bytes.
+
+All 24 existing containers, immutable IDs, states and mount fields, 85 volumes,
+305 image aliases and protected files remain intact. Owned candidate container
+and source-archive resources are removed; only its ten newly created image
+aliases are deleted. Complete local terminal phase timing, the already-TERMINATED
+guard, timer/navigation/buffer/log ordering and the other full-parity, CI, rollout,
+performance and production acceptance requirements remain open. No push occurred.
+
+### Immediate participant controller phases (2026-10-13)
+
+Application checkpoint `438d1cebf5fd` enters PAUSED for Pause and RUNNING for
+Resume/Goto within native invocation or successful remote ACK handling, before
+asynchronous preparation, lazy execution imports or application replies. The
+remote handler now starts in the ACK callback itself: an extra Promise
+microtask previously allowed a later native invocation to overtake it. Shared
+dispatch allocation observes the authenticated Run's existing highwater before
+lazy execution. Native requests retain their pre-invocation controller
+observation; remote terminal commands still sample state after preparation.
+
+The local phase is independent of committed Run and navigation state. A held
+application request leaves the server Run and trusted Player unchanged while
+the console reports the Source-equivalent phase. Older receipts cannot restore
+an earlier local phase. A later trusted Player ERROR interrupts the pending
+phase and remains active after that command's late reply; a fresh Resume exits
+ERROR immediately while retaining its existing dialog before the application.
+Fresh entry and route destruction clear the phase. Restored legacy native
+packets retain their prior delivery semantics and do not replay a new local
+phase merely because their journal was restored. Startup transition logs stay
+deduplicated; exact state-buffer and command-completion log timing remains open.
+
+The pinned Original oracle now executes actual Pause, Resume, errorOut, Goto,
+ACK-pipeline and handler-subscription bodies in seven cases. It proves normal
+and reversed ACK overlap, Goto's RUNNING phase before invalid-target rejection,
+and ERROR remaining after an earlier navigation promise resolves. The preceding
+immutable frontend image `8a6110a0b7bc` fails at the held-request PAUSED gate.
+A separate negative unit control reproduces remote/native start inversion.
+Two additional real-browser groups cover both native and remote Pause followed
+by trusted ERROR, the late receipt and a fresh native Resume. Answers, response
+clocks and the sibling Run remain exact.
+
+All 2,083 unit/frontend tests pass fresh without skips or cancellations.
+Typecheck and production build pass at 469.99 kB under the unchanged 470 kB
+hard limit. Twenty-three loading/command groups pass headful and with CI=true;
+fourteen Debug, five route, ten copied-tab/crash, five context, five actual
+older-API and eighteen ERROR groups also pass. The final isolated production
+frontend's 169 files match the fresh image byte for byte. Its build preserves
+all 169 frontend files used by the earlier running comparison. Existing bundle
+and CommonJS warnings remain.
+
+A fresh image from 900 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 388 transaction/API tests
+in the read-only container as node. The previous 1,313 PostgreSQL and 498 HTTP
+results are reused only after all 90 backend source hashes match; those suites
+were not rerun here. Backend contracts, stores and schemas are unchanged, so
+the previous backend-first rollout requirement still applies. All 24 existing
+containers, immutable image IDs, states and mount fields, 85 volumes, 295 image
+aliases and protected files remain intact; ten image aliases are added. Owned
+container and clean archive resources are removed.
+
+Full Original parity and production readiness remain unproven. Exact timer
+interruption, asynchronous navigation, native terminal-state sampling after
+preparation, state-buffer and command-completion log phases still need Source
+comparison. Initial LOADING/controller replacement,
+global/cross-document intent order, complete legacy mixed-version concurrency,
+post-unload Player effects, worker upgrades, full visual/property/real-package
+acceptance, measured performance, remote CI, release, deployment and production
+acceptance also remain open. This is a local checkpoint and is not pushed.
+
+### Ordered overlapping controller applications (2026-10-13)
+
+Application checkpoint `bc7b1ad5b6fc` lets independent native requests and
+successfully acknowledged remote commands apply concurrently. ACK pacing
+remains unchanged. Per-controller dispatch highwaters within each Run reject
+late older state effects; changed committed Run snapshots receive a separate
+revision under the store lock. Late views and receipts cannot replace a newer
+snapshot. Superseded commands retain execution receipts without replaying the
+old reload or Starter effect. Debug replies have their own presentation fence.
+This establishes overlap and final-state ordering within a controller, not a
+global intent order across independent controllers.
+
+Memory, File, SQLite and PostgreSQL persist the optional ordering metadata.
+SQLite schema 65 and PostgreSQL schema 59 migrate legacy rows without changing
+answers or clocks, with rollback and retry coverage. Forged projections cannot
+advance stored revisions or dispatch positions. PostgreSQL Run reads preserve
+the distinction between SQL NULL and explicit JSON null so corrupt entry or
+dispatch metadata fails atomically. Legacy prepared native packets retain their
+exact bytes and FIFO; new version-2 packets share the controller dispatch clock
+with remote applications. Backend-first rollout remains required. The older
+API gate proves selected context/native compatibility, not a full mixed-version
+concurrency rollout.
+
+The pinned Original oracle executes the actual ACK pipeline, component
+subscription and Pause/Resume methods for normal and reversed ACK completion.
+It proves independent handler starts and completion-order logs. Five additional
+browser groups hold real application requests or committed receipts and verify
+a later Resume applies, stale state is fenced, and trusted answers, clocks and
+siblings stay exact. The immutable preceding frontend image `8d7a246f3cf9`
+fails at the held-application assertion. The crash fixture now holds a real
+answer receipt to keep an intent unprepared and observes its owned Chromium
+storage marker on disk before crashing the browser process. Both crash cases
+retain old journals without replay and accept independent fresh commands.
+
+All 2,067 unit/frontend, 1,313 PostgreSQL and 498 Memory/File/SQLite HTTP tests
+pass fresh without skips or cancellations. Typecheck and production build
+pass at 469.99 kB under the unchanged 470 kB hard limit. Twenty-one loading
+and command groups pass headful and with CI=true, alongside fourteen Debug,
+five route, ten copied-tab/crash, five context, five actual older-API and all
+eighteen ERROR groups. Existing bundle and CommonJS warnings remain.
+
+A fresh image from 900 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 388 transaction/API tests
+in the read-only container as node. All 24 preexisting containers, their
+immutable image IDs, states and every mount field, 85 volumes, 285 existing
+image aliases and protected files are preserved; ten image aliases are added.
+Owned container, HTTP-integration, browser-profile and clean archive resources
+are removed.
+
+Full Original parity and production readiness remain unproven. In particular,
+the Original changes controller status synchronously when a handler starts,
+while this checkpoint still waits for application receipts; exact status,
+navigation completion and command-executed log phases remain open. Initial
+LOADING/controller replacement, global/cross-document intent order, complete
+legacy mixed-version concurrency, post-unload Player effects, worker upgrades,
+full visual/property/real-package acceptance, measured performance, remote CI,
+release, deployment and production acceptance also remain open. This is a
+local checkpoint and is not pushed.
+
+### Scoped controller entry and sibling-independent reception (2026-10-12)
+
+Application checkpoint `23af86e57514`, following persistence checkpoint
+`ef01973312a5`, stores optional controller entry evidence on each Run. Entry
+and termination flips advance its validated revision inside the same atomic
+mutation as the selected Run and parent effects. Response-only projections and
+replayed receipts preserve the current evidence. The revision orders activity
+flips only; it does not establish a global order for every command or answer.
+Memory, File, SQLite and PostgreSQL preserve answers and response clocks;
+SQL migration failures roll back and can be retried. Legacy rows omit the field.
+
+An already loaded terminated controller can reopen after a fresh authorized
+RUNNING or PAUSED view proves a newer active entry for that same Run. Starting
+a sibling cannot reopen it. Conversely, ending a sibling cannot close the
+selected active Run even when the shared parent becomes signed_in. Server
+stream registration, polling and atomic lease renewal follow the selected
+entry; closed, expired, completed, foreign and terminated entries remain denied.
+Legacy streaming still requires a launched parent. Initial LOADING context
+alone still cannot open reception. Terminal reconciliation validates the exact
+selected context and rejects missing, malformed or contradictory evidence.
+Older replayed termination receipts cannot terminate a newer active entry.
+
+The browser gate holds a terminal read in one actual page, resumes or pauses
+through another, closes that page, then verifies the first page alone applies
+a new remote command. It also launches and terminates a sibling through its
+own accepted commands in the paused case. Its answers and clocks stay exact;
+only that owned sibling fixture is restored before later independent groups.
+The immutable preceding frontend image `03269a457d80` fails at the new paused
+reception assertion. An earlier followup exposed a real server rejection after
+a sibling exit; the final API, store and browser tests verify its correction.
+
+All 2,020 unit/frontend, 1,290 PostgreSQL and 498 Memory/File/SQLite HTTP tests
+were executed fresh and pass without skips or cancellations. Typecheck and
+production build pass at 469.99 kB under the unchanged 470 kB hard limit.
+Sixteen loading/command groups pass headful and with CI=true; fourteen Debug,
+five route, ten copied-tab, five context and five actual older-API groups pass.
+All eighteen ERROR variants pass headful. Existing build warnings remain.
+
+A fresh image from 893 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 371 transaction/API tests
+in the read-only container as node. All 24 preexisting containers, immutable
+image IDs, states and every mount field, 85 volumes, 275 preexisting image
+aliases and protected files are preserved; ten image aliases were added.
+Owned runtime, database and archive resources are removed. Backend-first
+rollout is required for SQLite schema 64/PostgreSQL schema 58 and the entry
+semantics. Older-API tests cover context/native compatibility, not a complete
+mixed-version rollout of the new server behavior.
+
+Full Original parity and production readiness remain unproven. Source-equivalent
+initial loading and controller replacement, fully overlapping command application,
+global/cross-document ordering, post-unload Player effects, worker/mixed-version
+rollout, real-package and visual acceptance, measured performance, remote CI,
+release, deployment and production acceptance remain open. This checkpoint is
+local and not pushed.
+
+### Reception after external controller reentry (2026-10-12)
+
+Application checkpoint `1e839d66419d` restores command reception when a fresh,
+authorized full view confirms that another controller resumed the same Run:
+the selected Run is running and its parent session is launched. A launched
+parent with a still-paused selected Run leaves that controller terminated.
+An older running view captured before termination cannot reopen reception.
+Answers, response clocks and sibling Runs remain unchanged.
+
+The browser gate uses two actual pages sharing the selected Run. It holds the
+first page's terminal runtime read, resumes through the second page, closes
+that page and verifies a new remote Pause is applied by the first page alone.
+The immutable preceding frontend image `0399c6ad4fda` fails exactly at the new
+reception assertion; the negative unit control also reproduces the defect.
+Released Goto view handlers now finish within a bounded wait before routes are
+removed, followed by two animation frames before checking late-view fencing.
+An earlier trial stalled before the new case and is not a negative control.
+
+All 1,978 unit/frontend tests pass without skips or cancellations, including
+96 focused context, execution and ERROR tests. Typecheck and production build
+pass at 469.99 kB under the unchanged 470 kB hard limit. Fifteen loading/command
+groups pass headful and with CI=true; fourteen Debug, five route, ten copied-tab,
+five context and five actual older-API groups pass. All eighteen ERROR variants
+pass headful. Existing bundle and CommonJS warnings remain.
+
+A fresh image from 892 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 340 transaction/API tests
+in the read-only container as node. All 24 existing containers, their immutable
+image IDs, states and every mount field, 85 volumes, 255 preexisting image
+aliases and protected files are preserved. Owned runtime and archive resources
+are removed. Backend, contracts, schemas, manifests and workflow are unchanged
+from `56cc13512b02`: its 1,269 PostgreSQL and 498 HTTP tests are reused only after
+89 backend source hashes match; those suites were not rerun in this checkpoint.
+The prior backend-first rollout requirement still applies.
+
+Full Original parity and production readiness remain unproven. A paused Run
+with a launched parent cannot yet distinguish external same-Run Pause reentry
+from sibling activation. Per-Run controller state and ordering, source-equivalent
+initial loading and controller replacement, fully overlapping application,
+post-unload Player effects, mixed-version and worker rollout, real-package and
+visual acceptance, measured performance, remote CI, release, deployment and
+production acceptance remain open. This checkpoint is local and not pushed.
+
+### Terminal presentation and received-command lifecycle (2026-10-12)
+
+Application checkpoint `56cc13512b02` finishes verified native and remote
+terminal effects independently of the later Starter runtime read. New reception
+stops immediately while already accepted receipts survive. An accepted Pause,
+Resume or Goto of an already loaded controller can reopen reception before its
+next Unit view arrives. A lightweight initial LOADING context still cannot do so.
+Transient presentation failures retry independently; abort and scope replacement
+end recovery, and permanent access or scope failures remain closed.
+
+The backend now reactivates the parent session atomically with an accepted Pause,
+Resume or Goto, matching the native command path. Replaying an older application
+cannot reactivate it again. Exact answers, response clocks and sibling Runs remain
+unchanged. An identical ordinary Run refresh no longer fences a confirmed command;
+changed answers, selection or state still do. Terminal reconciliation leaves a
+newer local receipt in control of its own Unit refresh.
+
+All 1,975 unit/frontend tests, 1,269 PostgreSQL tests and 498 Memory/File/SQLite
+HTTP tests pass without skips or cancellations. Typecheck and production build
+pass at 469.99 kB under the unchanged 470 kB hard limit. Fourteen loading/command
+groups pass headful and with CI=true; fourteen Debug, five route, ten copied-tab,
+five context and five actual older-API groups pass. All eighteen ERROR variants
+pass headful. The previous production frontend `6b4ae9daa478` fails the held
+terminal-presentation assertion; its backend fails the three new parent
+reactivation cases. A separate negative unit control reproduces the identical-view
+Goto failure before the fix.
+
+A fresh image from 892 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and all 340 transaction/API tests
+in the read-only container as node. Existing 24 containers including image IDs,
+state and every mount field, 85 volumes, 245 preexisting image aliases and the
+protected files are preserved. Owned database, container and archive resources
+are removed. Contracts, schemas, manifests and workflow are unchanged; backend
+semantics changed. Backend-first rollout remains required. Older-API checks prove
+the existing context/native entry contracts, not the new remote parent behavior.
+
+Full Original parity and production readiness remain unproven. Open work includes
+initial loading and controller replacement activation, fully overlapping command
+application and global Run ordering, post-unload Player delivery and cross-document
+effects, complete mixed-version/worker rollout, real-package/visual acceptance and
+measured performance. Remote CI, release, deployment and production acceptance
+are outstanding. This checkpoint is local and has not been pushed.
+
+### Accepted commands while the next Unit view loads (2026-10-12)
+
+Application checkpoint `6b4ae9daa478` projects a verified remote application
+receipt before fetching its next full Unit view. An already accepted Pause,
+Resume or Goto therefore does not wait behind an older held view. The transport
+validates all six immutable Run scope fields and the actual returned status;
+local view generations fence superseded replies. A terminal runtime reply is
+re-read when a newer native entry arrived while it was pending, retaining that
+entry instead of closing it with the older receipt. Existing ERROR presentation
+and its scoped recovery behavior remain covered by the original regression gates.
+
+When the confirmed selection and loaded Unit metadata differ, the old Player is
+retired without remounting it. Its existing scoped listener can still process
+already queued reports; a new Player waits for the target metadata. Text drafts
+and Save remain disabled during that mismatch. Durable response-only delivery
+now finishes independently of its subsequent view refresh, so a held refresh
+cannot strand a later foreground answer drain or termination. The browser gate
+uses actual input in the authenticated former frame while the native Goto receipt
+is held, then verifies its final answer, termination and absence of any fabricated
+target-Unit answer. It does not claim post-unload message delivery.
+
+The pinned Original `ee2ab9ab64bd` dispatches acknowledged commands without
+awaiting the previous component handler. Its fresh LOADING state does not open
+reception, whereas an already open endpoint survives LOADING. This checkpoint
+addresses the accepted-receipt/view boundary; it does not infer permission to
+start a remote channel from a merely running canonical Run.
+
+All 1,952 unit/frontend tests, 1,266 PostgreSQL tests and 498 Memory/File/SQLite
+HTTP tests pass without skips or cancellations. Typecheck and production build
+pass at 469.99 kB under the unchanged 470 kB initial hard limit. Twelve loading
+and command groups pass both headful and with CI=true; fourteen Debug, five
+route, ten copied-tab/crash and five context groups also pass. Five compatibility
+groups pass against the actual older API image `9b099ecc69ee`. All eighteen ERROR
+variants pass headful, including the native theme/viewport cases and accepted
+Pause with a held older answer. The preceding production frontend `1fd4aa257c28`
+fails the new held-view Pause projection assertion.
+
+A fresh image from 892 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and all 337 transaction/API tests
+in the read-only container as node. Existing 24 containers, all mount fields,
+85 volumes, 235 preexisting image aliases and protected files are preserved;
+dependency installation layers are reused. The owned clean archive is removed
+after verification. API, schemas, manifests and workflow are unchanged here.
+The prior backend-first entry-capability rollout requirement still applies;
+older-API checks do not prove new startup-log semantics or full mixed-version rollout.
+
+This is a local checkpoint. Source-equivalent early reception, controller
+replacement activation, post-unload Player delivery, cross-document late effects
+and global Run ordering remain open. Terminal runtime reconciliation can still
+delay following received commands. Actual frontend upgrades, complete visual and
+real-package acceptance, measured performance, mixed-version rollout, remote CI,
+release, deployment and production proof remain separate work. Full Original
+parity and production readiness are not established.
+
+### Initial controller lifecycle buffering (2026-10-12)
+
+Application checkpoint `1fd4aa257c28` records LOADING and the initial ready,
+paused or failed state without requiring a loaded Unit, a response or the answer
+outbox. The pinned Original loader sets LOADING before awaiting test data and its
+root component subscribes controller changes to the independent test-state buffer.
+The new browser advertises `controllerLifecycle: browser-v1` on all three entry
+paths; the API suppresses only the synthetic entry RUNNING log for this client.
+Clients without this field retain their existing entry behavior. Timer, activation,
+audit, response and field-clock transactions are unchanged.
+
+The initial log journal binds all six authorized scope fields, retains exact event
+IDs and timestamps across retry/reload, uses fresh credentials without storing them,
+and leaves other scopes and unrelated storage untouched. Native receipts and the
+existing durable Player log path suppress duplicate status entries. After the first
+full view, those established paths own later transitions. Non-saving modes do not
+persist these logs. No INIT event is fabricated from the Original subscription,
+whose pre-test emissions are filtered by its test-state buffer.
+
+All 1,926 unit/frontend tests, 1,266 PostgreSQL tests and 498 Memory/File/SQLite
+HTTP tests pass without skips or cancellations. Typecheck and production build
+pass; the initial bundle remains 469.99 kB under the unchanged 470 kB hard limit.
+Eight loading groups pass both headful and with CI=true, including pre-Unit ERROR
+and lost-receipt replay across a real reload with one server entry per original ID.
+Fourteen Debug, five route, ten copied-tab/crash and five context-fallback groups
+also pass. The prior production frontend fails the new initial-loading assertion
+with actual RUNNING / expected LOADING. Five compatibility groups pass against
+the actual older API image `9b099ecc69ee`.
+
+A fresh image built from 892 verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and all 337 transaction/API tests
+in the read-only container as node. Existing 24 containers, 85 volumes, image
+aliases and protected files are preserved; both dependency installation layers
+are reused. The owned clean archive is verified and removed after validation.
+Deploy the accepting API before the frontend: old-API compatibility checks cover
+existing context/native contracts, not the new startup-log semantics.
+
+This remains a local checkpoint. Remote early-loading reception, replacement
+activation and late effects, complete visual/real-package/performance acceptance,
+mixed-version rollout, remote CI, release, deployment and production proof remain
+open. Full Original parity and production readiness are not established.
+
+### Native LOADING observations and transition logs (2026-10-12)
+
+Native terminal packets now distinguish an authorized controller still in LOADING
+from a server Run that is already running. Debug and command observation use the
+same loading projection, retaining the existing ERROR and PAUSED precedence.
+The prepared packet keeps its exact status, timestamp and delivery identity across
+reload and retry. The API accepts LOADING and logs a real transition to RUNNING
+for early Resume even when the canonical Run was already running; an already
+committed server pause still controls the paused termination variant. Execution
+modes retain their response/log filtering. Answers, field clocks, immutable scope,
+sibling Runs and the remote queue remain protected by the existing transaction.
+
+A new protected browser case holds both the initial full view and the resumed view,
+observes LOADING on the actual HTTP request, checks the single RUNNING transition
+and command log, then releases the real Player. It fails against the preceding
+production bundle with actual RUNNING / expected LOADING. The final loading gate
+passes all seven groups headful and with CI=true, including the full observed
+LOADING/PAUSED/RUNNING/ERROR command sequence. The fourteen Debug, five route,
+ten copied-tab/crash and five context-fallback groups also pass. All 1,897 local
+unit/frontend tests, 1,252 PostgreSQL tests and 498 Memory/File/SQLite HTTP tests
+pass without skips or cancellations. Typecheck and the production build pass;
+the initial bundle remains 469.99 kB under the unchanged 470 kB hard limit.
+Five further browser groups pass with the actual older API image `9b099ecc69ee`,
+covering its authenticated context fallback and existing native status values.
+
+Application checkpoint `bfc07884cd23` additionally passes Standard, Demo and
+production PostgreSQL container profiles, SQLite runtime and all 326 transaction/API
+tests in the read-only image as `node`. Its clean archive contains 892 hash-verified
+tracked files without host dependencies or the protected presentation. The image
+build reuses both dependency installation layers. Existing 24 containers and all
+85 volumes are retained; the final preservation report verifies their mount fields,
+existing image tags and protected file hashes separately. This is local evidence;
+remote CI, publication, release, deployment and production remain unverified.
+
+Remaining Original controller lifecycle acceptance includes initial buffering,
+remote early-loading reception, replacement activation and late effects.
+New LOADING packets require
+the updated API; deploy the accepting backend before the frontend. Existing
+RUNNING/PAUSED/ERROR packets and their receipt fingerprints remain supported.
+The older-API context fallback does not prove support for new LOADING packets.
+Full visual/property/real-package acceptance, actual frontend upgrades, measured
+performance, remote CI, release, deployment and production acceptance remain open.
+
+### Native commands after a browser-process crash (2026-10-12)
+
+The pinned Original `CommandService.commandFromTerminal` creates an ephemeral
+command and publishes it directly; it does not persist or restore terminal
+commands. The Rewrite therefore does not automatically replay an unproven
+pre-crash native intent. Reentry reads the authenticated, explicitly selected
+Run. A command already committed on the server remains effective, even if its
+receipt was lost. Fresh commands use the new document owner and delivery ID;
+unowned journal rows are preserved without authority to execute or delete them.
+This policy is separate from recovery of participant answers through the outbox.
+
+The existing required tab gate now also crashes two complete Chromium processes
+with `Browser.crash`, relaunches each persistent profile and restores its real
+tab through the [browser session API](https://developer.chrome.com/docs/extensions/reference/api/sessions).
+One case leaves a prepared terminate-with-lock and an unprepared Goto queued;
+the other commits Pause while holding its response. Both verify no `pagehide`,
+no old native replay on reentry/online reception, exact selected Run, unchanged
+answers and nonempty captured field clocks, expected command log counts, retained
+unowned journal bytes, an empty remote command queue and working fresh commands.
+The Player must actually receive its restored answer after its asynchronous start.
+
+The browser must persist its open-session preference as well as its DOM store
+before the crash. An owned extension with only the `sessions` permission invokes
+Chromium's real restore operation; it never injects application storage. Its
+profile, including credentials, is removed after each case. In the observed
+Chromium path the restored tab does **not** retain the old `sessionStorage`.
+Restoration paths that retain that namespace, and interrupted actual frontend
+upgrades, remain separate acceptance work; they are not inferred from this gate.
+
+Four new crash groups and the six existing copied-tab groups pass locally both
+headful and with `CI=true`; 55 focused native transport/Original-reference tests
+also pass. The existing non-optional CI command already invokes the extended gate;
+remote CI remains unverified. Application sources, manifests, lockfile, build
+configuration and Dockerfile are unchanged from `0e8538d10915`, so its 1,890 tests,
+typecheck, production build and image validation are reused predecessor evidence,
+not fresh broad executions. Only the regression gate and these acceptance notes
+change. No push, release, deployment, full parity or production claim is made.
+
+The preceding storage cleanup removed 70 precisely selected obsolete Testcenter
+cache entries (Docker reports 4.29 GB). Existing 24 containers with all mount
+fields, 85 volumes, image tags and protected file hashes remain intact. The current
+install cache is retained; fresh SQLite/PostgreSQL startup, migration, preflight,
+readiness and write/read checks pass. About 10.4 GB was free after that cleanup.
+Sustained cache growth remains an operational concern for later changed manifests.
+
+### Native command ownership in copied browser tabs (2026-10-12)
+
+A new document now receives a fresh native command owner. Only a real reload
+with an exact departing-document handoff restores the previous owner; an active
+tab's copied `sessionStorage` cannot establish ownership. One document retains
+its owner across Angular route recreation, without multiplying document listeners.
+`pagehide` records the handoff, and creation or `pageshow` consumes/revokes it.
+This addresses the browser's actual [opener storage copy behavior](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage),
+without relying on the continued presence of `opener` or fabricated tab IDs.
+
+The pre-fix production browser gate reproduced the shared owner. Six groups now
+pass with actual copied storage before app initialization: a fresh opener copy,
+removal of the opener plus its own exact reload, clone route destruction/reentry
+and close preserving the source journal, the source's idempotent reload, a copied
+document reloaded before bootstrap, and retained trusted answers/clocks on source
+retry. The real service worker runs for the ordinary cases. Only the deliberately
+interrupted uncached-bootstrap download bypasses it. Seven additional default-owner
+source tests cover handoff, navigation type, denied storage, cached-document
+reactivation and unproven legacy owners; no caller-supplied owner bypass is used
+for those identity cases.
+
+This is deliberately not a lossless crash/upgrade-recovery claim. Without the
+handoff, existing legacy/crash journal rows remain untouched and are not
+executed automatically. [`pagehide` is not guaranteed for every termination](https://developer.mozilla.org/en-US/docs/Web/API/Window/pagehide_event).
+Recovery policy and full deployment acceptance for those unproven intents remain
+open, along with broader remote/activation races, LOADING wire/log lifecycle,
+complete Original visual/property/real-package acceptance and measured performance.
+
+Application checkpoint `0e8538d10915` passes all 1,890 local tests, typecheck and
+the 469.99 kB production build under the unchanged 470 kB hard limit, with existing
+warnings. Its six tab, five actual route, fourteen Debug/native, six loading/error,
+five route-contract and five actual prior-API-image groups pass. The non-optional
+console CI job requires the tab gate; remote execution remains unverified.
+Backend sources are unchanged: 1,244 PostgreSQL, 498 HTTP, 61 compatibility and
+147 broad browser cases remain verified predecessor evidence, not fresh executions.
+
+The current image passes Standard, Demo and production PostgreSQL profiles,
+SQLite runtime and all 320 read-only transaction/API checks as `node`. All 891
+tracked archive files were hash-verified and the owned archive removed. Existing
+24 containers, every mount field, 85 volumes, the protected presentation and host
+TypeScript hashes are preserved. The proof contains 64 hash-verified files; about
+4.6 GB remains free. Sustained container cache/storage headroom needs attention
+before many further images. No push, remote CI, release, deployment, full parity
+or production confirmation is claimed.
+
+
+### Native command lifetime on an actual route exit (2026-10-12)
+
+Destroying the Angular participant route now removes its own pending native
+command journal as well as aborting requests, retry timers and online reception.
+This does not depend on another change-detection/scope observation after the
+parent's destroy hook. Foreign-owner entries and unrelated storage remain intact.
+A full document reload retains the exact prepared packet and owner, as verified
+in the actual production browser bundle rather than by calling the destroy hook
+in a reload fixture. A committed server transaction remains on its authorized
+old Run; canceling its client response cannot undo it or project its late result
+onto another Booklet.
+
+Two new transport regressions failed before the fix. The actual Angular
+Back/Forward gate also failed on the retained resume journal after its two reload
+checks had passed. All five groups now pass: exact reload, idempotent retry after
+a committed/lost receipt, cancellation across route reentry/online reception,
+destruction during trusted-answer drain before dispatch, and an already committed
+old-Run reply released after selection of a second saved Booklet. The document
+identity is checked across the actual route destruction; trusted answers/clocks,
+selected entry URL and the absence of remote command queues are asserted.
+
+Application checkpoint `98b182dddcd4` passes all 1,883 local tests, typecheck and
+the production build (469.99 kB under the unchanged 470 kB hard limit, with existing
+warnings). Fourteen Debug/native, six loading/error, five route-contract and five
+actual prior-API-image groups also pass. The console CI job now requires the new
+route gate; remote execution remains unverified. Backend sources are unchanged:
+1,244 PostgreSQL, 498 HTTP, 61 compatibility and 147 broad browser cases retain
+verified predecessor evidence, without fresh execution in this checkpoint.
+
+The current clean image passes Standard, Demo and production PostgreSQL profiles,
+SQLite runtime and all 320 transaction/API checks read-only as `node`. All 890
+tracked archive files were hash-verified and the owned archive removed. The
+24 pre-existing containers, every mount field, 85 volumes, protected presentation
+and host TypeScript hashes are preserved; about 6.4 GB remains free. The local
+proof contains 52 hash-verified files and references the predecessor's already
+durable broad evidence without duplicating its screenshots.
+
+Real cloned-tab owner identity, wider remote ACK/application/activation races,
+Original LOADING wire/log lifecycle, full visual/property/real-package acceptance,
+measured performance, remaining mixed-version rollout and production confirmation
+remain open. No push, remote CI, release, deployment or complete parity is claimed.
+
+
+### Participant reentry with an older API (2026-10-12)
+
+A new frontend now tolerates an older API without `controller-context`: only
+HTTP 404 with `route_not_found` continues through the existing authenticated
+current-state route. The captured participant Session and explicit Run remain in
+that request. Access rejection, a missing selected Run, malformed success or another
+server error cannot downgrade to a different Run or an unselected read. Six scope
+fields, Session ownership and actual response data are validated before either
+controller context or the full Unit view is accepted, including eager assets.
+Replacement-controller and late legacy responses remain fenced. A session-only
+legacy link derives its selection from the authorized server response; an explicit
+link never falls back to the latest Run. The old API establishes console authority
+only after its real full-state response, without fabricated loading metadata.
+
+All 1,881 unit/frontend tests, typecheck and the production build pass, with
+469.99 kB under the unchanged 470 kB hard limit and existing warnings retained.
+The browser compatibility gate passes five groups for the owned unsupported-route
+contract and five more against actual prior API image `9b099ecc69ee`, serving the
+current frontend through a read-only mount. Two saved Booklets prove selected
+reentry, trusted response/clock retention, session-only selection, missing explicit
+Run rejection and closed credential rejection. All six current loading/error and
+fourteen existing Debug/native groups also pass. The non-optional console CI job
+includes the contract gate; remote execution and the old-image variant in remote
+CI are not claimed.
+
+Backend application/API/store source hashes remain identical to checkpoint
+`7fdff889a3bd`; its 1,244 PostgreSQL, 498 HTTP and 61 compatibility checks remain
+applicable predecessor evidence, without rerunning those unchanged suites.
+Application checkpoint `94a7d5b42f1a` additionally passed all 147 existing
+termination, save/retry, Player-exit, completeness and paused-exit browser cases.
+Standard, Demo and production PostgreSQL profiles, SQLite runtime and all 320
+transaction/API checks in the read-only image as `node` passed without skips or
+cancellations. The clean Git archive's 889 tracked files were hash-verified and the
+archive removed. All 24 existing containers, every mount field, 85 volumes and the
+protected presentation/host TypeScript hashes remain intact. The proof preserves
+304 verified evidence files; about 8.01 GB of host space remains. This local
+checkpoint carries no push, remote CI, release, deployment or production claim.
+
+Full mixed-schema/worker/native-DTO/deployment rollout, Original controller
+lifecycle/log status, actual route/tab ownership, complete visual/property/real
+package acceptance, measured performance and production confirmation remain open.
+
+### Participant console before the first Unit view (2026-10-12)
+
+The pinned Original command service binds its terminal methods before the root
+controller awaits `loadTest`. The participant route now binds all five methods
+at mount time. They cannot dispatch, open Debug or log without a server-authorized
+selected Run. A participant-owned, private/no-store controller-context GET supplies
+the actual Session and Run before the complete Unit view. Explicit selection keeps
+all six scope identities; legacy selection uses the existing authorized selector.
+The read returns no Unit definitions and changes no answers, clocks, logs, audit,
+command queue or receipts. It includes the saved Run answers and is not a
+constant-size payload.
+
+Early Debug shows LOADING, PAUSED or ERROR using verified Run data. Native receipts
+update reactive state immediately, while full-view refresh runs separately from
+the ordered command transport. Older loading/paused/Goto replies cannot revert a
+newer receipt or resurrect a terminated Player. Trusted reports tagged with the
+former Unit still drain; an untouched or stale shell cannot become a new Unit
+answer. Exact entry URLs synchronize before initial loading, so a failed first
+load and a document reload retain the selected Run. Native Resume clears the early
+error and loads that Run; termination can retain the Source lock and return to
+Starter before any Player was loaded. The Original surface styles load before
+the first Player, hiding technical summaries during loading; no Unit metadata is
+fabricated for the presentation.
+
+All 1,874 unit/frontend tests, 1,244 PostgreSQL tests, 498 Memory/File/SQLite HTTP
+checks and 61 compatibility checks passed. Typecheck and production build passed,
+with 469.99 kB under the unchanged 470 kB hard limit and existing warnings retained.
+Six protected Chromium/SQLite loading groups cover held replies, early pause/resume,
+trusted old-Unit drain, failed first load, reload context and locked termination.
+The fourteen existing Debug/native groups and all 147 existing termination,
+save/retry, Player exit, completeness and paused-exit browser cases also pass. A non-optional CI matrix job
+now includes both browser gates; YAML and command resolution were checked, but
+remote execution is not verified.
+
+Application checkpoint `7fdff889a3bd` additionally passed Standard, Demo and
+production PostgreSQL container profiles, SQLite runtime and all 320 transaction/API
+checks in the read-only image as `node`, with no skips or cancellations. Its clean
+Git archive contained 888 hash-verified tracked files and no host dependencies or
+protected presentation. All 24 existing containers, every mount field, 85 volumes
+and the protected presentation/host TypeScript hashes were preserved. Owned test
+resources and the archive were removed; about 8.95 GB of host space remains.
+The local proof contains 307 hash-verified evidence files. This is a local application
+checkpoint; no remote CI, publication, release, deployment or production proof follows.
+
+The native wire observation still has only RUNNING/PAUSED/ERROR: early LOADING log
+parity is separate. The new context route currently has no old-backend fallback.
+Actual route-destruction journal cancellation, cloned-tab owner identity, early
+remote-command lifetime, replacement activation and late server effects remain
+open. Complete live Original visual/property/real-package acceptance, measured
+large-package performance, mixed-version rollout and external production acceptance
+remain required. No full parity, push, remote CI, release or deployment is claimed.
+
+### Native Resume entry guard (2026-10-12)
+
+Native Resume now enters the same accessibility projection as Goto. An
+inaccessible current Unit redirects to the next accessible authored Unit;
+intermediate Unit, inherited code/leave, adaptive show and expired-time locks
+are considered without clearing them. A locked final Unit retains the Original
+no-alternative fallback. The first local Unit of a code-locked block remains
+accessible only under the Source's own show/time/leave exceptions. Resume
+interrupts the former countdown and activates only the selected target; answers,
+response clocks, shared parameters, sibling/foreign Runs and immutable content
+remain intact. A missing current Unit no longer fabricates an authored-first
+selection. Pinned `resume`, navigation, accessibility and activation-guard methods
+execute directly in the reference gate, including the Source's null FIRST target.
+
+All 1,852 local unit/frontend tests, 1,239 PostgreSQL tests, typecheck and the
+production build passed. The bundle remains 469.99 kB under the unchanged
+470 kB hard limit; existing warning budgets/CommonJS notices remain. All fourteen
+protected Chromium/SQLite groups passed without JavaScript errors. The new
+browser group pauses the real Player, applies an owned Unit lock, resumes through
+the participant HTTP route and verifies redirect, retained locks, exact answers
+and clocks, no remote command queue and successful reentry. Cross-store checks
+also verify repeat/restart receipts and expired/hidden countdown selection.
+
+Application checkpoint `9b099ecc69ee` additionally passed Standard, Demo and
+production PostgreSQL container profiles, SQLite runtime and all 316
+transaction/API checks in the read-only image as `node`. Its clean Git archive
+contained 886 hash-verified tracked files without host dependencies or the
+protected presentation. All 24 existing containers, every mount field, 85
+volumes and the presentation/host TypeScript hashes were preserved. Owned test
+resources and the archive were removed; approximately 9.52 GB of host space
+remains. The prior 147 browser, 498 HTTP and 61 compatibility checks remain
+predecessor evidence; all frontend source hashes match that checkpoint. Those
+three suites were not repeated for this backend guard follow-up.
+
+The remaining frontier includes early-loading command lifetime/ERROR, late
+server effects versus replacement-controller activation, complete Original
+property/visual/real-package acceptance, measured performance, mixed-version
+rollout, remote CI, release, deployment and production confirmation. No full
+parity or production claim follows from this local guard fix.
+
+### Native participant console commands and log-only delivery (2026-10-12)
+
+The participant console now provides the remaining Source `pause`, `resume`,
+`terminate` and `goto` methods alongside Debug. Native calls use participant
+ownership and their exact selected Run/release/booklet, without operator
+credentials or a remote command queue/ACK. The existing parent/Run transaction
+commits effects, mode-filtered logs, audit and a stable delivery receipt together.
+An identical retry returns the current Run without repeating effects; changed
+arguments, controller observation or timestamp conflict. Faulted File/SQL writes
+leave no partial Run, parent, artifacts or receipt.
+
+Goto follows the actual root handler: exact aliases or a positive Unit sequence,
+immediate-parent code/leave unlocks, target Unit leave unlock, cross-timer
+cancellation and restoration of a recorded nonpositive parent balance from the
+third argument's final word in minutes. Positive target balances remain intact.
+Ancestor locks retain Source priority and inaccessible targets use the Source
+next-accessible-Unit fallback. Resume activates only the selected timer; pause
+interrupts it. Terminate returns to Starter, retains answers and uses exact
+lowercase `lock` matching. Native console actions are available in all six modes,
+including modes that do not receive remote commands. Invalid/malformed targets
+reject atomically instead of reproducing the Source's partial mutation and
+unchecked JavaScript errors.
+
+The deferred browser controller orders tab-owned intents, drains trusted pending
+Player reports before dispatch, and validates the complete receipt. Its journal
+retains immutable packet identity through a reload without storing credentials.
+Live scope/controller replacement cancels pending intents and fences late UI
+responses; global method cleanup restores prior descriptors individually.
+Resume/Goto clear the old error presentation and replace the Player. An untouched
+empty loading shell is not saved as a new answer by a console action.
+
+Actual browser testing also exposed existing controller/Player logs fabricating
+empty answer packets. Explicit log-only packets now omit answers and response
+clocks in foreground and worker delivery. They use outbox entry version 2 and a
+version-2 worker message; an old worker cannot treat them as answer packets.
+Legacy answer entries remain version 1 with their former identity. Real pending
+answers and their logs are merged without loss; log-only entries do not replace
+optimistic, ephemeral or saved diagnostic answers.
+
+Fresh local validation passed 1,839 unit/frontend tests, 1,231 PostgreSQL tests,
+typecheck and the production build (469.99 kB under the unchanged 470 kB limit),
+and all thirteen protected Chromium/SQLite Debug/native groups. Pinned Original
+root/restore methods and actual preparation/staging methods gate the arguments,
+timer balance rules and absence of fabricated answers. Application checkpoint
+`6253dd500773` also passed all 147 existing browser cases, 498 Memory/File/SQLite
+HTTP checks and 61 compatibility checks. Its hash-verified clean Git archive
+contained 886 tracked files; all three PostgreSQL container profiles, SQLite
+runtime and 310 transaction/API checks in the read-only image as `node` passed.
+All 24 existing containers, every mount field, 85 volumes, the protected
+presentation and host TypeScript package were preserved. Owned test resources
+and the archive were safely removed; about 10.36 GB of host space remains.
+
+The additional owned probe at checkpoint `6253dd500773` confirmed Native
+Resume retaining an inaccessible current Unit. The next-accessible-Unit guard
+gap is resolved by the newer Native Resume entry-guard checkpoint above.
+Full Source controller lifetime/late server effects, early-loading ERROR,
+complete property/visual/real-package acceptance, measured performance, mixed
+version rollout, remote CI, release, deployment and production confirmation
+remain open. No push or deployment is implied. Previous sections preserve
+historical checkpoint evidence.
+
+### Effective participant Debug Testlet locks (2026-10-12)
+
+Debug Testlet details now report all four Source lock fields and the effective
+`BY ... THROUGH ...` cause. Root/ancestor locks take priority over a child's
+own locks; within a node, order is show, time, code, afterLeave. Code/time badges
+activate only on the Testlet causing the effective lock. Diagnostics use the
+existing `requiresCode` metadata, so an empty redacted code still has an active
+gate. They also show the Source root `[0]`, inherited block label/timer ID and
+Unit `lockedAfterLeaving`. Local adaptive choices, cleared codes, leave locks
+and the displayed countdown update the projection without changing stored
+answers, timers, Run state, content, logs or audit. The Booklet clock remains
+reactive with Main closed; invalid/cyclic parent references fail within the
+diagnostic projection.
+
+Twenty-eight checks execute pinned Original controller/loader methods and
+compare all overlapping lock combinations, ancestor/root precedence, metadata,
+cleared locks, local countdown purity, all six scope fields and actual pane
+properties. Fresh validation passed all 1,773 unit/frontend tests, typecheck,
+the production build (469.96 kB under the unchanged 470 kB hard limit) and all
+nine Chromium/SQLite Debug groups. The expanded Booklet proves a hidden code's
+own and inherited lock origins. API/core and existing test sources retain their
+byte-identical hashes from the 1,199-test PostgreSQL proof at `02bce022a44a`;
+that PostgreSQL suite was not repeated for this frontend-only change.
+Checkpoint `fbb5f1ea4eed` also passed standard/demo/production PostgreSQL
+container profiles, SQLite runtime and 286 transaction/API checks inside its
+read-only image as `node`. All 879 tracked archive files were hash-verified;
+the image was built without host dependencies or untracked artifacts. All 24
+existing containers, every mount field, 85 volumes and the protected
+presentation remain unchanged. Owned test resources and the build archive
+were removed; about 11.6 GB of host space remains. Other native
+console commands, early-loading ERROR, complete Original visual/property and
+real-package/controller-transition acceptance, performance, remote CI and
+production rollout remain open. Previous sections preserve historical evidence.
+
+### Participant Debug and access-code visibility (2026-10-12)
+
+The selected-run Debug workflow is implemented under `236cec382fba`; its
+scope and remaining Source acceptance are described below. A follow-up fixes
+raw Testlet codes leaking through the diagnostic snapshot in modes whose
+participant navigation contract hides them. The server clears only the cloned
+snapshot's code string for hot-return, hot-restart and simulation, including
+the legacy missing-mode default. Demo, review and trial retain visible codes.
+Prompts, code-gate metadata, immutable releases, selected/other Runs, parent
+sessions, logs and audit remain unchanged by a diagnostic read. Both GET and
+local-capture POST enforce this boundary. Browser projection keeps the gate
+visible without exposing its hidden code. This intentionally preserves the
+rewrite's participant visibility policy even though the Original raw Debug
+properties show codes; escaping condition error text is another deliberate
+diagnostic boundary.
+
+The follow-up passed 1,745 unit/frontend tests, all 1,199 PostgreSQL integration
+tests, typecheck and the production build (469.96 kB, unchanged 470 kB hard
+limit). All nine protected Chromium/SQLite Debug scenario groups passed again,
+including actual HTTP and expanded Booklet checks for a hidden code. The
+predecessor also passed 147 existing browser cases, 498 HTTP tests, 61 Original
+compatibility checks, three PostgreSQL container profiles, SQLite container
+runtime and 283 transaction/API checks inside its read-only image as `node`.
+Application checkpoint `02bce022a44a` also passed fresh standard/demo/production
+PostgreSQL container profiles, SQLite runtime, and all 286 transaction/API
+checks inside its read-only image as `node`. The image was built from a clean
+Git archive with all 876 tracked files verified, without host dependencies or
+untracked artifacts. PostgreSQL schema 57 remains unchanged. All 24 existing
+containers, every mount field, 85 volumes and the protected presentation were
+preserved; owned test resources and the build archive were removed. About
+12.27 GB of host space remains after validation. Full Original visual/package
+acceptance, other native commands, remote
+CI, rollout, release, deployment and production confirmation remain open.
+Previous sections preserve historical checkpoint evidence.
+
+### Atomic fresh participant Run initialization (2026-10-11)
+
+Local application checkpoint `613e2323e17c` closes the fresh-launch boundary
+confirmed under `e6587f2e626c`. Actual launch and fresh resume now reserve the
+assignment, start its timer, activate the current parent, and persist initial
+controller/current-unit/booklet/timer logs and timer/resumed audit in one store
+write. A failed initial insert returns an error without leaving a reserved Run,
+activated parent or partial artifacts; the same authenticated retry creates one
+complete Run. Concurrent losers reuse that Run without initializing artifacts.
+Timers start after the reservation lock, against current eligibility and expiry;
+late closure, expiry, participant-code or execution-mode changes reject entry.
+
+Memory prepares and validates the complete effect before publication. File uses
+its detached publication boundary, so a failed file write leaves both the cache
+and restarted state unchanged. SQLite uses BEGIN IMMEDIATE; PostgreSQL locks the
+parent on the transaction client. Initial logs and audit use INSERT rather than
+identity-overwriting upserts. Existing locked, completed or paused Runs remain
+unchanged; demo/review modes retain no initial state logs. No schema change is
+required: SQLite 63 and PostgreSQL 57 remain current. Legacy low-level callers
+may still reserve a row without an initializer; actual launch/resume provide one.
+Historically partial initial artifacts are not reconstructed by this checkpoint.
+
+Required unit and PostgreSQL commands include the new creation and real HTTP
+resume suites. Fault injection covers Run, initial log, timer/resumed audit and
+parent writes, failed File publication, immutable scope and artifact collisions.
+Independent PostgreSQL creators wait on a genuinely uncommitted first initial
+log; observers see no Run/log or parent activation until the winner commits.
+SQLite/PostgreSQL HTTP faults verify complete rollback and same-authentication
+retry, while foreign sessions remain unchanged. An owned Memory service probe
+also confirms zero partial artifacts after a prepared-effect failure and complete,
+idempotent retry without using the old standalone initial-log write.
+
+Local validation passed 1,587 unit/state tests, 1,157 complete PostgreSQL tests,
+166 HTTP tests for each Memory/File/SQLite store (498 total), and 61 compatibility
+tests, without skips. Chromium passed all 147 reference/state cases: two received
+termination/error/reentry cases, eight native input/offline/retry/reload cases,
+36 player-exit states, 57 completeness/pixel references and 44 paused-exit states.
+The production web build remains 469.88 kB under the unchanged 470 kB hard gate;
+the 450 kB and four style warnings remain.
+
+Browser harness checkpoint `66e1389d1171` corrects a confirmed observation race:
+the old waiter could be registered after the route already held a real retry,
+while a new focus packet coexisted with the previous queued status display. It
+now waits for the actual failed focus-bearing request and registers the retry
+waiter before either connectivity transition. The exact failed delivery ID,
+response bytes, native events and same-Run reload remain asserted; timeouts and
+reference fixtures were not relaxed. All eight cases passed three consecutive
+runs (24 total), including four clock-skew cases per run. Failed-attempt logs,
+the route/client diagnosis and screenshots remain in the evidence. Initial File
+restart serialization and API error-shape fixture failures were corrected against
+the real persistence/API contracts; the first evidence probe method-name error
+is also retained.
+
+A clean Git archive of application checkpoint `613e2323e17c` passed PostgreSQL
+standard/demo/production-boundary checks, SQLite runtime and 254 transaction/API
+tests inside its read-only image as node. Image
+`testcenter-rewrite-app:completeness-613e2323e17c` has ID
+`sha256:3692045ea688103d3292aea33167af786c57eb98e8b7eeb0461c5b9796121025`.
+The browser harness correction was committed after that image build; it changes
+only the browser test script. All 24 existing containers, every mount field and
+all 85 volumes were preserved. The owned archive was removed after unlinking
+its node_modules symlink, preserving host TypeScript and the protected
+presentation hashes. Approximately 12.4 GiB remained after the container checks;
+the earlier 2.861 GB cleanup removed recomputable Docker build cache.
+
+Full parity and production readiness remain open. Pinned Original
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d` exposes the root `debug` command,
+case-insensitive `off` and the persistent `tc-debug` pane; these are absent from
+the rewrite command contract and root handler. Next implement that Source
+behavior and audit late ACK/effect lifetime across replacement controllers.
+Remaining Source acceptance, mixed-version rollout, remote CI, release and
+deployment proof remain open. File evidence covers one repository owner.
+Everything in this checkpoint is local; nothing was pushed or deployed.
+The preceding sections below preserve historical checkpoint evidence.
+
+### Scoped Player clocks and response-only deliveries (2026-10-11)
+
+Local application checkpoint `e6587f2e626c` resolves the two delivery gaps
+recorded under `8ae5c5253e10`. The participant facade supplies the selected Run's
+stored response clocks to the lazy Player host. Active captures use an immutable
+snapshot for their Unit; retired frames keep their own Run/Unit/session snapshot
+when another Run loads the same Unit key. Same-Run clock refreshes update the
+baseline without remounting. New capture timestamps exceed both embedded and
+stored clocks even when the device clock is behind a legacy server arrival clock.
+The opaque store barrier only seeds that calculation and is excluded from Player
+packet metadata, preserving exact response bytes and per-field ordering.
+
+Foreground and worker outbox deliveries now explicitly set `responseOnly: true`.
+The API forwards and validates that mode. It requires an explicit response Unit
+and rejects navigation or leave-confirmation changes. First delayed deliveries
+can merge answers and logs while retaining current Unit, status, pause source,
+locks and status-driven timer state, including monitor pauses and created Runs.
+Current authorization, access checks, timer reconciliation and completion/lock
+guards still apply. The fingerprint binds the new mode; an upgraded transport
+can acknowledge the exact previously accepted legacy payload without replaying
+it. Non-saving modes retain no answers, clocks or answer/log fingerprints.
+Callers that omit the flag retain the existing explicit progress-control API;
+this checkpoint does not establish a mixed-version rollout guarantee.
+
+Validation passed 1,549 unit/state tests, 1,104 complete PostgreSQL tests,
+166 HTTP tests for each Memory/File/SQLite store (498 total), and 61 compatibility
+tests, without skips. Chromium passed 147 reference/state cases: two received
+termination/error/reentry cases, eight native input/offline/retry/reload cases,
+36 player-exit states, 57 completeness/pixel references and 44 paused-exit states.
+Four native retry cases use a device clock one minute behind the server, in both
+surfaces and both viewport sizes, with exact saved answers and same-Run reload.
+The production build remains 469.88 kB under the unchanged 470 kB hard gate;
+the 450 kB and four style warnings remain. Schemas remain SQLite 63/PostgreSQL 57.
+The first native retry attempt exposed an opaque bootstrap barrier leaking into
+the packet; capture metadata was corrected without weakening exact byte checks.
+The first targeted timer fixture was replaced with a real monitor pause command.
+Failed-attempt logs and the browser screenshot remain in the evidence.
+
+A clean Git archive of the application checkpoint passed PostgreSQL standard,
+demo and production-boundary checks, SQLite runtime, and 216 transaction/API
+tests in the read-only image as node. Image `testcenter-rewrite-app:completeness-e6587f2e626c` has ID
+`sha256:1f696e2f096dd436020b8a005d01557efb0f62ee4a673732c92081a7be312f62`. All 24 existing containers, every mount field and all
+85 volumes were preserved. The owned build archive was removed after unlinking
+its node_modules symlink; host TypeScript and the protected presentation retain
+their hashes. Approximately 13.1 GiB remained available after the runs; the earlier
+2.861 GB cleanup removed recomputable Docker build cache.
+
+Full parity and production readiness remain open. An owned Memory probe through
+the actual launch service now confirms the next boundary gap: injecting the first
+initial-log failure rejects launch but leaves a reserved Run and an unactivated
+parent. Retrying reuses that Run without writing the missing initial logs. Fresh
+assignment reservation, parent activation, initial logs and timer/resumed audit
+must commit together. Remaining Source acceptance, root command lifetime/debug,
+mixed-version rollout, remote CI, release and deployment proof remain open.
+No new remote publication or deployment was performed.
+
+### Durable participant deliveries and response field ordering (2026-10-11)
+
+Local application checkpoint `8ae5c5253e10` stores an immutable receipt for each
+accepted progress delivery inside the same Run transaction as answers, controls,
+logs, audit and any parent transition. Receipts bind Run, participant parent,
+tenant, workspace and content release. Repeating an accepted request returns the
+current scoped state without replaying its answer or control changes; a changed
+request under the same ID returns `participant_delivery_conflict`. Current
+authorization, access-window checks and timer reconciliation still apply before
+acknowledging a retry, including retries after lock or completion. Non-saving
+modes do not persist answers, their capture clocks or answer/log fingerprints.
+
+Pinned Original `ee2ab9ab64bd91209ef8534bbe6005838024e46d` uses strictly newer
+State and data-part timestamps. The rewrite now merges each response part and
+each Unit/Player field independently, retains absent fields and preserves raw
+part values. Equal or older captures cannot overwrite newer fields or satisfy
+navigation/completion restrictions. Shared parameters also have per-key ordering
+across Units. The Player stamps only actually reported fields, keeps its capture
+clock monotonic across reload and clock rollback for captured envelopes, and carries that metadata in
+the durable retry packet. Unclocked legacy packets retain arrival-based fallback;
+opaque response capture times are forwarded by foreground and background saves.
+Malformed ordering metadata is rejected instead of bypassing ordering through an
+opaque fallback. Fully accepted packets retain their exact serialization when
+no previous field or field clock needs merging; opaque barriers remain in the
+store sidecar without unnecessarily rewriting the packet.
+
+SQLite schema 63 and PostgreSQL schema 57 add response/shared-parameter clocks
+and scoped delivery receipts. Upgrade tests preserve exact legacy answers and
+inject failed migrations. Restart, duplicate concurrency, a genuinely uncommitted
+PostgreSQL first receipt, failed File publication and SQL Run/log/audit failures
+verify the combined boundary. Run/workspace deletion removes its receipts.
+File evidence covers one repository owner; PostgreSQL also exercises separate
+connections waiting for the first uncommitted receipt.
+
+Validation passed 1,522 unit/state tests, 1,078 complete PostgreSQL tests, 166 HTTP
+tests for each Memory/File/SQLite store (498 total), and 61 compatibility tests,
+without skips. The production web build remains 469.88 kB under the unchanged
+470 kB hard gate; the 450 kB and four style warnings remain. New Player capture
+helpers use scoped lazy imports; the existing generic Verona parser is unchanged.
+Chromium passed two received-termination/error/reentry cases, four actual
+input/offline/retry/reload cases, 36 player-exit states, 57 completeness/pixel
+reference cases and 44 paused-exit states (143 browser cases).
+
+A clean archive of the application commit passed PostgreSQL standard/demo/
+production-boundary checks, SQLite runtime and 196 transaction/API tests inside
+the read-only image as user node. Image `testcenter-rewrite-app:completeness-8ae5c5253e10`
+has ID `sha256:4b813d7bf4c13a4a2e20eb92cb71377c0fd601c8de5584539a72ccf8646f9031`.
+Recomputable Docker build cache cleanup reclaimed 2.861 GB; a temporary PostgreSQL
+readiness and SELECT 1 probe verified usable space before the complete runs.
+All 24 existing containers, their full mount configurations and all 85 volumes
+were preserved. The owned build archive was removed after unlinking its host
+node_modules symlink; host TypeScript and the protected presentation remain intact.
+
+Failed attempts remain evidence: an old policy assertion expected absent Player
+fields to be deleted and was corrected against State::applyPatch; the first retry
+browser exposed unnecessary opaque-barrier metadata, fixed without changing its
+strict byte assertions. Initial bundle-budget failures were fixed through scoped
+lazy module imports while retaining the 470 kB gate and reference fixtures.
+
+Full parity and production readiness remain open. A second owned Memory probe
+shows that a Player clock behind the server can have genuinely fresh captured
+input ignored after a legacy empty answer received a server arrival timestamp.
+Bootstrap Player capture clocks from the scoped stored field clocks before the
+next delivery changes. This prevents mixing independent browser/server clocks
+at that transition. An owned Memory probe also confirms
+that a distinct older packet arriving for the first time keeps the newer answer
+but can still reset current Unit and status. Response-only retry delivery or
+explicit control ordering is the next priority. Original's response endpoint
+writes answers without controls; its whole-test State path also documents a race,
+so that path is not an ordering guarantee. Fresh Run reservation/activation and
+initial artifacts still need one boundary. Remaining Source acceptance, root
+command lifetime/debug, remote CI, release and deployment proof remain open.
+The current GitHub CI snapshot covers older commit `143dc3e73ae8`, not this local
+checkpoint. No new remote publication or deployment was performed.
+
+### Atomic runtime transitions and monitor intent persistence (2026-10-11)
+
+Local application checkpoint `225f0ff29ed7` extends the transaction used for
+progress and timers to adaptive choices, code gates, direct resume, existing-Run
+session reentry, starter preparation/return, completion and monitor commands.
+The remaining ten application runtime `saveTestRun` calls have been removed.
+Decisions use the current scoped Run and parent inside the store write boundary;
+Run changes, test logs, activity and completion/activation parent status commit
+together. Existing-Run reentry now activates its controller in that same write.
+
+Monitor command intent is part of the projection. Deferred Source commands queue
+the intent and issued-command audit together; native controls commit their Run
+effect, queued intent and audit together. Memory remains synchronous, File
+publishes detached maps only after persistence, SQLite uses BEGIN IMMEDIATE and
+PostgreSQL locks parent before Run on one client. Schema versions remain 62/56.
+File evidence covers one repository owner; SQL evidence also exercises independent
+writers. Mode behavior, monitor-pause protection, transient non-saving packets,
+starter confirmation ordering and the non-saving completion response are retained.
+
+The required mutation suite now has 114 tests across Memory/File/SQLite and 158
+when PostgreSQL is enabled. New cases interleave answers, locks, access expiry,
+current-unit/status changes and sibling completion after the initial read; fault
+injection verifies complete rollback after Run, log, command, audit and final
+parent writes. Local validation passed 1,431 unit/state tests, 982 full PostgreSQL
+tests and 166 HTTP tests per Memory/File/SQLite store (498 total), without skips.
+The production web build passes at 469.88 kB under the existing 470 kB hard gate;
+the 450 kB warning and four style warnings remain.
+
+A clean archive of the application commit passed PostgreSQL standard/demo/
+production-boundary and SQLite runtime checks, plus 125 tests inside the read-only
+image `testcenter-rewrite-app:completeness-225f0ff29ed7` as user node. Its image ID
+is `sha256:b8b059760d06158cb36beddd6dc2cdab6656a501859b0cddcb12b65851e80f09`.
+All 24 existing containers, 85 volumes and their mount configurations
+were preserved; the owned archive was removed after unlinking its node_modules
+symlink. The protected presentation still hashes to
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+
+Chromium passed two received-termination/error/reentry variants, four real
+input/offline/retry/reload variants, 36 player-exit reference states and all 57
+completeness/pixel-reference cases, plus all 44 paused-exit reference states
+(143 browser state cases total).
+An initial mobile retry request timeout and a six-border-pixel, one-color-level
+capture difference were retained as failed-attempt evidence; the isolated reruns
+passed without changing application code or Source reference fixtures.
+
+Full parity and production readiness remain open. An owned Memory probe confirms
+that replaying a previously accepted older delivery overwrites a newer same-unit
+answer. Pinned Source `ee2ab9ab64bd91209ef8534bbe6005838024e46d` rejects older
+response timestamps in TestDAO; durable scoped delivery receipts and response
+version ordering are the next priority. Fresh Run creation/reservation plus its
+initial artifacts still needs a combined boundary. Other Source acceptance,
+command lifetime/debug and remote release/deployment proof remain outstanding.
+The live GitHub CI snapshot is green for older commit `143dc3e73ae8`; it does not
+cover this local application checkpoint.
+
+### Atomic participant progress and timer persistence (2026-10-11)
+
+Local application checkpoint `7037c86870cc` adds `mutateParticipantRun` to all
+four stores. Progress merges answers and shared parameters, evaluates navigation,
+locks and monitor-pause state, and projects timers from the current scoped Run
+inside the storage write boundary. The resulting Run, test logs, activity and
+any timer-completion parent status commit together. The projection performs no
+asynchronous repository access. Memory projects synchronously, File publishes
+its detached maps after persistence, SQLite uses BEGIN IMMEDIATE, and PostgreSQL
+locks the parent before the Run on one client. Schema versions remain 62/56.
+
+Current-state reads now calculate missing booklet-state snapshots inside the
+same timer transaction. Shared timer persistence also reads the current Run
+rather than writing the caller's old snapshot. Existing immutable Run identity
+and parent fields are preserved; no-op projections do not write. Source behavior
+was checked against the pinned controller/DAO at
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. That DAO explicitly notes a whole-test
+laststate race; the reference establishes behavior, not an atomicity guarantee.
+
+New required tests reproduce two independent service queues saving different
+answers, a monitor pause applied after a progress request's initial read,
+concurrent lock/expiry changes, and a current-state query overlapping a save.
+They check timer completion against current sibling Runs, scope denials,
+immutable fields and detached results. File persistence failure leaves cached
+state unchanged; SQL failures after Run/log writes or during the completion
+parent update roll back every artifact. A separate SQLite worker and independent
+PostgreSQL connections prove that a blocked mutation reads the writer's committed
+answer and preserves it. The new suite runs in both required local/PG gates.
+
+All 1,345 unit/state cases (80 + 177 + 520 + 568), 863 complete real-PostgreSQL
+integration cases and 166 HTTP integration cases each for Memory, File and
+SQLite pass without failures or skips. Core and production web builds pass at
+469.88 kB under the unchanged 470 kB error budget; existing bundle/style warnings
+remain. Both received-termination/ERROR-dialog/re-entry browser cases pass, as do
+four native offline/save/retry/reload cases in the Original and rewrite shells
+at widths 1280/390, preserving exact answers, the selected Run and foreign-session
+isolation. These are rewrite-host checks, not a new live Original backend run.
+
+Five clean-image checks pass: PostgreSQL standard/demo/production boundaries,
+SQLite startup, and 39 command-API/Run-mutation cases inside the read-only image.
+Image `testcenter-rewrite-app:completeness-7037c86870cc` runs as node and has ID
+`sha256:4b058272e5456a2746faebd34854d10f9d81d97fec2a62431a18ad1de597abcf`.
+The tracked build archive is removed. All 24 pre-existing container IDs and
+85 volumes, host dependencies and the protected presentation are preserved.
+This checkpoint is local and unpushed.
+
+Full parity and production readiness remain unproven. Other whole-Run mutation
+paths still need the same atomic treatment, including resume, starter return,
+completion and direct monitor operations. Delivery replay/order and ACKs arriving
+after replacement-controller activation, the Source debug command, the full
+Original acceptance corpus, remote CI/release/deployment and live production
+proof remain open. The preceding checkpoints below are historical evidence.
+
+### Atomic participant controller activation (2026-10-11)
+
+Local application checkpoint `73b60bf81b8b` replaces the preceding checkpoint's
+separate session read/write during launch and re-entry with
+`activateParticipantController`. The repository reads the current parent and
+selected Run inside its write boundary, validates tenant/workspace/session/Run
+and content-release scope, checks closed/expired parent and locked/completed
+Run states, and changes only the parent's status. It preserves all current
+session fields and every Run field. A repeated eligible activation is read-only.
+Memory uses a synchronous decision, File publishes its detached session map only
+after persistence, SQLite uses BEGIN IMMEDIATE, and PostgreSQL locks the parent
+before the Run on the same client. Schema versions remain 62/56.
+
+New required tests cover scope denials, expiry and pause semantics, detached and
+idempotent results, File persistence failure/cache recovery, and SQL rollback.
+Independent SQLite workers hold writes while activation starts; separate
+PostgreSQL pools demonstrably wait on parent/Run row locks. A concurrent close
+or lock survives and activation rejects it without restoring a stale parent.
+These tests run in the local unit gate and full PostgreSQL gate.
+
+All 1,317 local unit/state tests (80 + 177 + 492 + 568) and the complete
+824-case PostgreSQL integration pass without skips. Core and production web
+builds pass at 469.88 kB under the unchanged 470 kB error budget. Both regular
+and replacement-dialog browser termination/re-entry cases pass again, including
+the same saved Run, restored SSE and unapplied acknowledged follow-up command.
+The earlier eight command-overlap browser cases belong to checkpoint
+`876192634bf8` below. Five new clean-image checks pass, including 11 real command
+API tests inside the read-only image. Image
+`testcenter-rewrite-app:completeness-73b60bf81b8b` has USER node and ID
+`sha256:0ba767ebcd2dde32aeb3569c85047344f3ed4bd291854c44bf0df3c441a223ab`.
+The tracked build archive is removed. All 24 original container IDs, 85 volumes,
+the host dependencies and protected presentation digest are preserved. About
+9.45 GiB are free; the initial warning and four style warnings remain.
+
+Full parity and production readiness remain open: protect stale progress and
+current-state writes across API servers; resolve cross-controller late ACK and
+integrated multi-command ordering; implement debug; complete the Original corpus
+and full-page/device acceptance. This operation protects controller activation,
+not the entire launch/resume/logging transaction. Remote CI, release, deployment
+and live production remain unverified. These checkpoints are local and unpushed.
+
+### Historical command delivery after controller termination (2026-10-11, 876192634bf8)
+
+Local application checkpoint `876192634bf8` corrects the preceding checkpoint's
+redelivery of acknowledged deferred commands. Pinned Source
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d` filters `executed = false` in
+`TestDAO::getCommands`; its ACK sets that flag before browser dispatch. Memory,
+File, SQLite and PostgreSQL now deliver only commands with a null ACK. The
+receiver rejects previously acknowledged records. An application failure can
+still retry its accepted receipt within the current controller, and application
+receipts remain durable and idempotent. A new controller does not consume old
+ACKed intents or invent an execution timestamp for a discarded effect.
+SQLite schema 62 and PostgreSQL schema 56 restore the corresponding partial
+index without rewriting answers or command history. Both fresh stores and
+failed/retried upgrades from the preceding index versions are covered.
+
+Real browser verification also found and fixed two re-entry defects. A terminated
+controller now records `view=starter` in its synchronized Router address,
+so the retained error dialog's reload remains on the starter. Re-entering an
+existing Run activates the current participant session, allowing its SSE stream
+to reopen; launch rereads the parent before changing its status. The replacement
+error dialog now has an opaque white background when its optional surface
+variable is absent, with actual computed styles and a screenshot inspected.
+
+Eight actual Chromium cases pass with regular and replacement error dialogs:
+received pause/resume/terminate after ERROR, and an unreceived terminate that
+stays inert until explicit reload. Received termination logs ERROR → TERMINATED,
+retains the dialog over the starter, preserves the exact saved response and last
+unit, and permits explicit re-entry into the same Run with a live connection.
+A second resume whose ACK was held behind termination remains acknowledged but
+unapplied after re-entry; it is absent from delivery and command-executed logs.
+These browser cases are part of the required runtime-error smoke runner.
+
+All 1,298 local unit/state tests (80 + 177 + 473 + 568), the complete 797-case
+PostgreSQL integration and core/production web builds pass without skips.
+The initial web bundle is 469.88 kB below the unchanged 470 kB error budget.
+Five clean-image checks pass: PostgreSQL standard/demo/production boundaries,
+SQLite startup, and 11 command API tests within the read-only image, including
+the restored SSE connection. Image
+`testcenter-rewrite-app:completeness-876192634bf8` has USER node, schema 62/56
+and ID `sha256:6aa149bb68377a37c40501cc07b7268783eeb0e57faa90ce10372ac3eefa190c`.
+The tracked build archive is removed safely; the protected presentation, all
+24 original container IDs and 85 volume names are intact. About 10.07 GiB are
+free. The 450 kB warning and four style warnings remain.
+
+Full parity and production readiness remain open. Next verify ACK arrivals after
+a replacement controller is already open and multiple simultaneous command
+completions in real Source/Native browsers; protect session activation and
+progress/current-state writes across API servers; implement debug; complete the
+Original acceptance corpus and full-page/device checks. Remote CI, release,
+deployment and live production are unverified. This checkpoint is local and has
+not been pushed. The preceding sections document their historical revisions.
+
+### Historical deferred participant command dispatch (2026-10-11, db4ecc666bc8)
+
+Local application checkpoint `db4ecc666bc8` connects the atomic storage
+foundation to the authenticated participant application API and real browser.
+Issuing or acknowledging pause, resume, goto, complete or complete_and_lock
+stores an intent/receipt without applying its Run, timer or controller effect.
+Successful dispatch uses the stored command and latest Run under the repository
+lock. The API ignores forged command type, target and execution timestamps.
+The deep contract route is
+`POST /api/v1/participant/sessions/:participantSessionId/commands/:commandId/application`.
+Legacy intents retain their already-applied effects; their application is a
+receipt-only operation. Direct Native lock/navigation/time extensions retain
+existing behavior. The Source debug command is still missing.
+
+New deferred commands remain pending after ACK until their execution receipt is
+stored. SQLite schema 61 and PostgreSQL schema 55 update that pending index.
+The receiver preserves ACK completion order through asynchronous application,
+retries transient failures before its successor, and aborts view projection on
+route cleanup. Application replies must match the exact accepted receipt and
+Run/session scope. A duplicate receipt can restore an interrupted local view
+without replaying its durable effect.
+
+Source termination is resumable: complete returns to the starter, preserves the
+last unit and saved answers, interrupts timers, and leaves the session signed_in;
+complete_and_lock additionally locks the Run. The explicit participant complete
+operation remains final. SSE refuses a session at the starter. Starter cleanup
+also clears the serialized state fallback so rendering cannot resurrect the old
+Run. Legacy optional assignment identities survive command normalization under
+the immutable parent guard. A terminated resumable Run still blocks release
+activation until explicitly completed.
+
+Current checks pass core compilation and the production web build (469.88 kB,
+unchanged 470 kB error limit), 1293 unit/state tests (80+177+469+567) and 791 full
+PostgreSQL integration tests, with no failures or skips. Eight actual Chromium
+cases pass with normal and fallback dialogs: received pause/resume after ERROR,
+and unreceived pause/terminate after ERROR followed by explicit reload. The
+received cases verify Source ERROR-to-PAUSED/RUNNING controller log order;
+unreceived intents stay inert. Terminal reload/re-entry resumes the same saved
+Run. All eight owned API processes stop and every stored browser receipt has a
+server execution timestamp and execution sequence 1. The receiver/API order
+checks do not substitute for a multi-command browser comparison.
+
+Five clean-image checks pass: PostgreSQL standard/demo/production-secret
+boundaries, SQLite startup, and 11 real command API tests inside the read-only
+image. Image `testcenter-rewrite-app:completeness-db4ecc666bc8` uses USER node,
+SQLite schema 61 and PostgreSQL schema 55; its ID is
+`sha256:83f2023bb2a8db2d1525b5301c1a5503d94b9f5a33a5de184eb29c67875cc4b9`.
+The tracked build archive is removed without following the host dependency
+symlink. All 24 pre-existing container IDs, 85 volumes and the protected
+presentation digest remain unchanged. The recovered host has about 10 GiB free.
+The 450 kB initial warning and four style warnings remain unresolved.
+
+Full parity and production acceptance remain open. Next, retire ACKed but
+unexecuted intents when the Source root terminates, including late ACK/re-entry
+races; prove queued terminate with its retained ERROR dialog and real browser
+multi-ACK order; protect stale progress/current-state writes across API servers;
+implement debug; finish the Original acceptance corpus, full-page/device and
+fallback visual checks. Remote CI, release, deployment and production proof are
+unverified. This checkpoint is local and has not been pushed.
+
+
+### Historical atomic application foundation (2026-10-11, 6ef2057f7fb5)
+
+Application checkpoint `6ef2057f7fb5` commits the storage infrastructure below.
+The repository now commits an acknowledged command's Run effect, execution
+receipt, participant logs, workspace activity and optional session status in
+one operation. Memory uses a synchronous detached transform, File publishes
+its cache only after persistence, SQLite uses BEGIN IMMEDIATE and PostgreSQL
+locks the parent session before the Run. SQLite schema 60 and PostgreSQL schema
+54 add a unique execution-order index. Older ACK records remain valid.
+
+The first application receives a server execution timestamp and a per-Run
+execution sequence. Retries do not execute the transform again or replace newer
+saved answers. The transform reads the latest stored Run under the same lock;
+immutable parent fields and foreign or duplicate log identities are rejected.
+Failures in any associated SQL write roll back the entire operation. File
+persistence failure leaves both cached and durable state unchanged for retry.
+
+Fresh checks pass typecheck, the production web build (469.85 kB, unchanged
+470 kB error budget), all 1269 unit/state checks and 787 full PostgreSQL
+integration checks. The 56 targeted local command checks include real SQLite
+writer processes, restart/retry, injected write failures and failed/retried
+legacy migrations. PostgreSQL additionally covers independent pools and the
+same transactional failures. Owned PostgreSQL resources are removed; exact
+inventory retains 24 pre-existing containers and 85 volumes.
+
+All four clean-image checks pass for this application commit: PostgreSQL
+standard/demo/production-secret boundaries on schema 54 and SQLite on schema 60.
+Image `testcenter-rewrite-app:completeness-6ef2057f7fb5` has USER node and ID
+`sha256:4be48633796c9968efc0fda8ed21f91680b4fc97619d37d773fb2d762ef82675`.
+The tracked build archive is removed after the checks, with the protected
+presentation excluded and all pre-existing container and volume IDs preserved.
+
+Four fresh browser checks at the same application commit also pass received
+pause/resume with native and fallback dialogs, actual iframe lifecycle and saved
+answers retained; all four owned API processes shut down. These verify the
+existing transport and do not prove deferred command application or Source
+PAUSED/ERROR log-order parity.
+
+Pinned Source backend revision `ee2ab9ab64bd91209ef8534bbe6005838024e46d`
+confirms the separation: MonitorController.putCommand stores and broadcasts;
+TestDAO.setCommandExecuted only updates the receipt flag. Neither operation
+applies a controller effect. Native must apply it following successful browser
+dispatch, rather than treating the transport ACK as the effect itself.
+
+This is repository infrastructure. Monitor issuance and the participant browser
+still use the previous immediate canonical effect, so the confirmed PAUSED/ERROR
+log-order mismatch remains open. Storage order tests use pinned Source fixtures
+and do not prove integrated browser effect order. The next step is to connect
+application through the participant API and move command effects to successful
+browser dispatch, including terminal save drain. Cross-server stale progress
+writes, complete Original acceptance, devices, remote CI, release and deployment
+remain unproven. This checkpoint is local and has not been pushed.
+
+### Scoped command transport and same-status resume (2026-10-11)
+
+Application checkpoint `357eba0ffd84` connects nonterminal monitor commands
+with independent IDs to authenticated selected-Run command listing and ACK
+routes. SSE carries pending records; polling uses the same scoped collection.
+The server derives tenant/workspace ownership and the first receipt timestamp.
+An ACK changes receipt metadata without changing the Run or its saved answers.
+
+The browser validates records and receipts before dispatch, suppresses duplicate
+ACKs, spaces ACK starts by one second and dispatches in successful ACK completion
+order. ERROR cuts new delivery while preserving accepted requests and scheduled
+ACKs; route/session cleanup cancels both. Pending receipts also suppress opaque
+SSE state refreshes, including the interval after the server persists an ACK
+but before its held browser response arrives. The receiver loads lazily through
+a contract subpath; the production initial bundle is 469.85 kB under the unchanged
+470 kB error budget. Existing warning budgets remain exceeded.
+
+Fresh checks pass typecheck, the production web build, 1237 unit/state checks
+and 741 full PostgreSQL integration checks, including the new real command API
+proof in a private schema. All 21 runtime browser cases across 16 variants pass,
+including native/fallback same-status resume, accepted pause and old save replies.
+Resume replaces the actual errored iframe, restores the saved answer, retains
+the dialog and matches the pinned Source post-ERROR logs `ERROR, RUNNING`.
+Read-only storage inspection confirms the exact persisted command receipts.
+These are owned API/player fixtures, not a complete Original backend or device
+acceptance proof.
+
+All four fresh-image checks pass: PostgreSQL standard, demo and production-secret
+boundaries plus SQLite. The image `testcenter-rewrite-app:completeness-357eba0ffd84`
+has USER node and ID `sha256:6598630b62a1fe6a41507bf19c1041b016649ecf9f1449ba8a69b6773c6062f8`. Its build uses an archived tracked checkout;
+the protected presentation is excluded. Owned test resources are removed and
+exact inventory retains 24 existing containers and 85 volumes. About 8 GiB are
+free after builds; the preceding targeted cleanup reclaimed about 5 GiB.
+
+Confirmed remaining gaps: monitor issuance still changes canonical state before
+browser execution, and its Run mutation and command insertion are separate writes.
+In the held-pause test, Native persists `PAUSED` before `ERROR`; Source instead
+records `ERROR, PAUSED` at browser execution. Pause DOM/receipt checks pass while
+this log-order mismatch remains open. Integrated multi-command effects in ACK
+completion order, terminal command delivery and termination/save-drain equivalence
+still require work. All eight complete Original UI acceptance rows, real devices,
+current-checkpoint remote CI, release, deployment and production proof remain
+open. This is a local checkpoint; nothing was pushed.
+
+### Durable command identities and receipts (2026-10-11)
+
+Application checkpoint `5f88508c12e8` persists commands with independent IDs,
+per-Run sequences and an idempotent first acknowledgement in Memory, File,
+SQLite (schema 59) and PostgreSQL (schema 53). All four scope identifiers
+must match the parent Run. SQL reads also check the parent in the same query;
+writes serialize under a SQLite transaction or PostgreSQL Run lock. File
+receipts update the cache only after durable persistence succeeds. Run and
+workspace deletion remove their command history. Issuance and receipt alone
+leave status, saved answers, timers and the current Unit unchanged.
+
+Two additional pinned Source probes record pause/resume after ERROR with
+normal and reversed HTTP acknowledgement completion. The effect order follows
+successful acknowledgement completion, including RUNNING then PAUSED when
+responses finish in reverse order. This is frontend evidence on owned
+API/player fixtures, not a guarantee of execution in issuance order.
+`scripts/record-original-runtime-command-order.mjs` guards the actual controller
+states, command logs, DOM identity and response completion order in both cases.
+
+Fresh validation passes typecheck, the production web build, 1216 unit checks,
+733 full PostgreSQL integration checks and 32 additional command/migration
+checks. These include two actual SQLite writer processes, independent
+PostgreSQL pools, file write failure/recovery, selected-Run isolation,
+parent deletion, restart durability and failed migrations with exact saved
+answers retained after retry. The previously latest-schema-58 SQLite test
+was updated for the new migration. An initial 512-MiB private tmpfs was too
+small for the full corpus; the private-volume rerun passes and removes all
+owned resources.
+
+The new image `testcenter-rewrite-app:completeness-5f88508c12e8` has USER node
+and ID `sha256:215ebc9da10cf2997f9f5b707ffa0078a65646463126746027903b64dca2fdfb`.
+All four fresh container checks pass: PostgreSQL standard, demo and production
+secret boundaries plus SQLite. Exact inventory preserves the 24 existing
+containers, 85 volumes and protected presentation. Disk recovery initially
+reclaimed about 5 GiB; 9.2 GiB is free after the current builds and cleanup.
+
+This is storage infrastructure. Monitor issuance still mutates canonical
+state directly; no producer, authenticated command endpoint or browser
+consumer is connected to the new collection. The same-status resume regression
+and termination/save-drain equivalence remain open. All eight complete Original
+UI acceptance rows, remote CI for this checkpoint, real devices, release,
+deployment and production proof remain open. Nothing was pushed.
+
+### Command reception and dependency caching (2026-10-11)
+
+Packaging checkpoint `26f74a5bd6be` installs workspace dependencies from the
+root lockfile and all nine workspace manifests before copying application
+sources or applying build metadata. Runtime copies retain node ownership.
+A second image build in an owned archived checkout changes an API source file
+and the build timestamp: both development and production npm-install layers
+are CACHED, while the application rebuild and runtime preflight succeed.
+
+Six fresh read-only Source browser probes at
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d` cover pending and queued
+pause, terminate and resume. The recorder checks actual DOM identity:
+pending replies after ERROR retain the original iframe and receive no ACK;
+queued resume retains the dialog, replaces the iframe, records RUNNING and
+reopens polling. Queued pause/terminate retain their existing observations.
+These are unmodified Source frontend probes on owned API/player fixtures,
+not a Source backend control-state equivalence claim.
+
+An opt-in Rewrite regression (`UI_SMOKE_RUNTIME_RECEIVED_RESUME=true`)
+issues a real same-status/same-Unit monitor resume, captures its resulting
+current-state refresh before ERROR and delivers that response afterwards.
+It currently fails the specific Source-derived DOM assertion: the errored
+iframe remains connected. The failure is verified with the actual API shut
+down and no page errors. This refresh is not a durable command receipt.
+The regression is recorded, not fixed or enabled as a passing CI scenario;
+command identity, receipt handling and already-accepted command execution
+remain necessary. Clearing ERROR on an arbitrary snapshot cannot establish
+that command causality.
+
+Fresh checks pass 41 existing error-reception/save-drain tests and three
+browser cases (normal runtime error, accepted pause, accepted pause with the
+lazy-dialog fallback). Fresh-image Docker passes standard/demo/production-
+secret PostgreSQL (schema 52) and SQLite (schema 58). The image
+`testcenter-rewrite-app:completeness-26f74a5bd6be` has USER node and ID
+`sha256:a387648696fad847f7e2265ca881280958607ec2342ec25214dbdc00ee46e65f`.
+All owned runtime resources are removed; exact inventory retains 24 existing
+containers, 85 volumes and the protected presentation hash.
+
+Application/frontend sources are unchanged from `ef83639c4597`. Its 1192
+unit checks, typecheck, production build, 56 runtime contracts and complete
+Verona recovery checks below remain retained evidence, not new full-suite
+runs. The new Docker builds compile the current production application.
+Ordered command delivery, Source termination equivalence, all eight complete
+Original UI acceptance rows, current-checkpoint remote CI, real devices,
+release and deployment remain open. Nothing was pushed.
+
+
+
+### Late save receipts and accepted control state (2026-10-11)
+
+Application checkpoint `ef83639c4597` acknowledges successful durable Player saves
+without projecting their Run snapshot into an errored controller, another
+selected Run, or a state that has advanced through an applied refresh since
+the request started. Receipt processing still removes the exact delivered
+outbox entry and drains following packets. Unchanged active Runs retain their
+ordinary save-state synchronization. Backend authorization, completion and
+monitor write guards are unchanged.
+
+A real-browser negative probe on the prior build reproduces a late paused
+save receipt removing the ERROR Frame. A second probe uses only copied static
+assets from the verified owned 92e0d0eaa776 image: an old running receipt
+temporarily recreates the Player after an already accepted pause. The reference
+container was never started and was removed immediately after extraction.
+The corrected native and failed-lazy-load dialogs preserve the ERROR Frame or
+the accepted paused state, retain exactly one runtime error/controller ERROR,
+acknowledge the outbox, and preserve the exact incomplete response on reload.
+A DOM observer rejects transient Player resurrection hidden by a later pause.
+Read-only SQLite inspection confirms exact runtime-error text and one controller
+ERROR for each of the four owned native/fallback cases.
+Four new actual-method tests also cover ERROR, a newer state, Run switching
+and normal successful receipt handling.
+
+All 1192 unit/state checks pass (533 frontend). Typecheck and the subsequent
+production build pass; initial size remains 469.41 kB under the unchanged
+470 kB error budget, with existing warning budgets unchanged.
+Fresh production browser checks pass the existing 17 runtime cases, the two
+new accepted-pause/old-receipt cases with native/fallback dialogs, all 56
+runtime contracts and the complete Verona/official-player recovery flow.
+The late-save pair was additionally repeated with exact persisted error text
+and controller log checks. The other browser groups from 92e0d0eaa776 remain
+retained evidence; this checkpoint does not claim eight fresh browser groups.
+API/store code is unchanged from bceb17b4db38; 166 memory/file/SQLite and 702
+PostgreSQL integration checks remain retained evidence, not new API runs.
+
+Fresh-image Docker passes standard/demo/production-secret PostgreSQL (schema
+52) and standalone SQLite (schema 58). Image `testcenter-rewrite-app:completeness-ef83639c4597`
+has USER node and revision ef83639c4597; ID `sha256:9a8b1aadc32f7bdda1f3b0718afb84008b3102555710c6392709d3348180a24f`.
+All owned runtime resources are removed. Exact inventory preserves 24 existing
+containers, 85 volumes and the protected presentation hash. Approximately 5.2 GiB are free.
+
+Ordered/same-status command delivery, Source termination equivalence and all
+eight complete Original UI acceptance rows remain open. Nothing was pushed;
+current-checkpoint remote CI, real devices, release, deployment and overall
+production readiness remain unverified.
+
+### ERROR and accepted monitor pause overlap (2026-10-10)
+
+Application checkpoint `92e0d0eaa776` cuts new participant channel delivery and
+ordinary status refreshes on a validated ERROR from the selected running Unit.
+Already accepted channel refreshes may finish. A pre-error accepted pause moves
+the controller to PAUSED, removes the Player and reopens the channel, while
+keeping the error dialog until reload. Ordinary late status responses and API failures
+cannot replace or clear the errored Run; route/session cleanup still invalidates
+in-flight responses and discards queued refreshes.
+
+Pinned Source frontend ee2ab9ab64bd91209ef8534bbe6005838024e46d passes four
+owned Primar/desktop fixtures: pending pause/terminate are ignored after ERROR,
+queued pause executes and reopens command reception, and queued terminate
+returns to Starter. A maintained recorder validates the four complete probes.
+These are Source frontend/stub observations, not Source backend state proof.
+Pinned backend MonitorController.putCommand stores and broadcasts a command;
+TestDAO.getCommands reads unexecuted commands in timestamp order, and
+patchCommandExecuted marks the selected test/command as acknowledged.
+The current Rewrite monitor API applies canonical Run changes immediately.
+Native canonical completion is not claimed equivalent to Source terminate.
+
+The old production build reproduces the late-monitor-pause regression.
+The corrected production replay passes 15 runtime cases, including native and
+failed-lazy-load dialogs for late and already received pause. It verifies
+retained dialog, reopened channel, exact incomplete answer/progress and reload.
+All 1188 unit/state tests pass (529 frontend), including 11 new ERROR reception
+cases. Typecheck and the subsequent production build pass with unchanged
+469.41 kB initial size and 470 kB error budget; existing warnings remain.
+Fresh browser replay also passes 56 runtime contract cases, 22 Player-version
+cases, 44 pause, 43 exit, 32 header cases, Systemcheck and the complete
+Verona/official-player recovery sequence.
+
+API/store code is unchanged from bceb17b4db38. Its 166 memory/file/SQLite
+and 702 PostgreSQL checks are retained evidence, not fresh API reruns.
+Fresh-image Docker passes standard/demo/production-secret PostgreSQL (schema
+52) and standalone SQLite (schema 58). Image `testcenter-rewrite-app:completeness-92e0d0eaa776`
+has USER node, revision 92e0d0eaa776 and ID `sha256:334a95f30170f76fea2d8b7b6e800c8f99f4e8a9e7ba29bebf98a90778640a9d`.
+Owned runtime resources are removed; exact inventory preserves 24 containers,
+85 volumes and the protected presentation hash. Approximately 6 GiB are free.
+
+Same-status/ordered command delivery, control-state reconciliation from late
+save responses, Source termination equivalence and all eight full Original UI
+acceptance rows remain open. Nothing was pushed.
+Published main 143dc3e73ae8 has successful GitHub Actions run 38000558022;
+that run does not validate this unpublished application checkpoint.
+Remote CI, real devices, release, deployment and overall production readiness
+remain unverified.
+
+### Exact runtime error text and custom help (2026-10-10)
+
+Application checkpoint `0e5c90b47fb5` preserves runtime message whitespace in
+descriptions and logs, and keeps the Original log key for a missing code.
+The guarded fallback now preserves empty descriptions, renders allowed rich
+HTML through Angular sanitization, and displays multiline help with pre-wrap.
+Existing diagnostic bounds and secret redaction remain in force.
+
+The unchanged pinned Source frontend passes 28 cases: six known codes, an
+unknown code, defensive missing code, empty/rich whitespace messages, and
+application/login/booklet help across three themes and desktop/mobile.
+Missing code is defensive behavior, not a valid optional protocol field.
+A maintained recorder rejects incomplete Source probes. Source fixtures use
+owned API/player stubs; they do not prove Source backend authorization or
+persistence. Both probes neutralize the pointer before measuring dialogs.
+An initial hover-shadow mismatch is retained as test-harness evidence.
+
+All 56 Rewrite contract cases pass with native and failed-lazy-load dialogs:
+exact description HTML/text, exact stored messages and keys, first-dialog
+retention, one controller ERROR, focus trapping, and exact answer/progress/Run
+recovery. Collapsed native dialog inset pixel comparison covers 28 cases
+(maximum RMS 0.01357 on 0-255 RGB); outer shadows, underlying
+page, expanded metadata and fallback geometry are outside that pixel scope.
+The gate is included in ci:browser:quick. Negative unit/browser probes reproduce
+the whitespace loss before the fix.
+
+All 1177 unit/state checks pass (518 frontend). Typecheck and the subsequent
+production rebuild pass; initial size stays 469.41 kB below the unchanged
+470 kB error limit. Existing 450 kB/style warnings remain. Final production
+browser replay passes runtime 11, versions 22, pause 44, exits 43, headers 32,
+Systemcheck and the complete Verona/official-player recovery flow.
+API/store code is unchanged from bceb17b4db38; its 166 memory/file/SQLite
+and 702 PostgreSQL checks are retained evidence, not repeated API runs.
+
+Fresh-image Compose passes standard/demo/production-secret PostgreSQL (schema
+52), and standalone SQLite passes schema 58. Image `testcenter-rewrite-app:completeness-0e5c90b47fb5`
+has USER node, revision 0e5c90b47fb5 and ID `sha256:3dac41aeffa4c89d4fa3c8a322e9b96a978922385b7149ee0eff6b021573ec1b`.
+Owned resources are removed; exact inventory preserves 24 containers,
+85 volumes and the protected presentation hash. Approximately 6.8 GiB are free.
+
+Overlapping monitor commands and all eight full Original UI acceptance rows
+remain open. Nothing was pushed; remote CI, real devices, release, deployment
+and overall production readiness remain unverified.
+
+### Durable replacement logs and recovered retry (2026-10-10)
+
+Application checkpoint `bceb17b4db38` resolves the previous multi-unit answer
+outbox recovery failure. Restoration now protects only the actual packet in
+transit; a retry during the final status refresh can restore new work. A focus
+log takes the durable answer rather than an older runtime draft.
+
+Replacement answer packets retain unacknowledged logs with stable entry IDs.
+The optional, validated `clientEntryId` remains scoped to the authenticated Run;
+legacy callers retain the existing delivery/index IDs, and upgrading an old
+outbox reproduces those IDs exactly even after batch reorder. No store migration
+is required. Two new headful cases hold an old log-bearing request while a newer
+answer replaces it, then let the old request either succeed or return 503.
+Both preserve the latest exact answer and store each error log exactly once.
+Negative state probes also reproduce the lost retry and stale focus-answer bugs
+before their fixes.
+
+All 1168 unit/state checks pass, including 509 frontend-state checks. All 166
+API checks pass separately on memory, file and SQLite, and all 702 PostgreSQL
+integration checks pass. The new configured-store API case verifies legacy ID
+upgrade, reordered batches, distinct identical events, rejected IDs without
+answer mutation, and participant/Run authorization. The worker regression keeps
+the same log ID through an in-flight replacement and retry.
+
+The final production browser replay passes all 11 runtime-error cases, 22 version
+error cases, 44 pause cases, 43 exit cases (37 Original, 6 Rewrite), 32 header
+cases, the broad Systemcheck flow and the complete Verona/official-player flow.
+The latter includes three-Unit recovery plus STARS 28-Unit, parallel Run,
+mid-drain reload, process crash, background sync and capacity checks. The initial
+production bundle remains 469.41 kB under the unchanged 470 kB error limit;
+450 kB and component-style warnings remain. Typecheck passes; its development
+output was replaced by a fresh production build before the final browser replay.
+
+Current-image PostgreSQL Compose passes standard, demo and production-secret
+modes (schema 52), and standalone SQLite Docker passes (schema 58). Image
+`testcenter-rewrite-app:completeness-bceb17b4db38`, ID `sha256:f09ebe09d48b1fb657f629863c0a7efc9c64971a3809d4644f97320c68de32dd`, has USER node, revision
+bceb17b4db38 and timestamp 2026-10-10T18:57:05.043Z.
+All owned container resources are removed. Exact comparison preserves all 24
+preexisting container IDs, 85 volume names and the protected presentation SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`. Approximately 7.5 GiB are free.
+
+The first file-store replay hit an HTTP timeout during a verified 902-second
+macOS Maintenance Sleep (20:57:34 to 21:12:36 local time). Its complete replay
+with process-scoped sleep prevention passes 166/166; the failed trace is retained.
+Pinned Original master is freshly verified at
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. Source frontend fixtures do not prove
+Source backend authorization/persistence. Custom help, further notification and
+command overlap cases, and all eight full Original UI acceptance rows remain
+open. Nothing was pushed; remote CI, real devices, release, deployment and
+overall production readiness remain unverified.
+
+### Version-specific errors and acknowledged log delivery (2026-10-10)
+
+Application checkpoint `392692085f19` shows the pinned Original's titles and
+expanded descriptions for missing and unsupported Verona Player versions,
+including the actual failed-lazy-module fallback. Supported startup and the
+existing legacy module-version correction are retained. The production initial
+bundle remains 469.41 kB under the unchanged 470 kB error limit; the existing
+450 kB and component-style warnings remain.
+
+Twelve new unmodified Source frontend cases cover both version errors across
+Primar, Sekundar and Erwachsene on desktop/mobile. The owned Rewrite cases begin
+with a previously saved exact response/progress packet and retain it through
+rejected startup and reload, without leave locks or timer cancellation. The new
+mandatory quick-browser wrapper passes all 22 headful cases: 12 native states,
+2 failed lazy-module downloads, 2 delayed saves, 2 failed saves with recovery,
+2 delayed error-log deliveries after the answer was already saved, and 2 failed
+such log deliveries with recovery. All 1158 unit/state checks pass, including
+499 frontend-state checks. The existing nine runtime-error cases and all 44
+pause cases also pass against this checkpoint. All 43 exit cases (37 Original,
+6 Rewrite), 32 header cases and the broad Systemcheck flow pass. The broad
+Verona regression fails in its later multi-unit answer outbox recovery check; that failure
+is retained and remains unresolved at this checkpoint.
+
+Two negative browser probes confirmed actual storage defects. Refresh could
+acknowledge a log-bearing packet merely because its answer text already matched
+the server; error logs emitted after a delivered answer could instead use a
+detached HTTP write which reload did not await. Controller/focus logs now use
+the durable answer outbox. Restoration skips an active drain and requires a
+matching saved status plus an answer-only packet before inferring delivery;
+a foreground answer write likewise cannot acknowledge queued logs or a different
+status. Eight added save-drain tests and the delayed/failed browser cases prove
+these narrow corrections.
+
+All twelve closed-dialog interiors are pixel-identical after a 28-pixel inset.
+Zero whole dialog rectangles are identical; no full-viewport or expanded-report
+screenshot identity is claimed. A separate new unit probe confirms the next
+open gap: replacing a same-Unit packet during its failed in-flight delivery can
+lose the older packet's unacknowledged logs. That concurrent replacement is not
+covered by the completed version/error cases. Custom help, further error and
+command overlap cases, and all eight full Original UI acceptance rows remain open.
+
+Current-image PostgreSQL Compose passes in standard, demo and production-secret
+modes (schema 52), and standalone SQLite Docker passes (schema 58). Image
+`testcenter-rewrite-app:completeness-392692085f19`, ID
+`sha256:72421ecb598f4601da35681bd81d1b0b4db62ad0bd4536805f43d29549c7493b`,
+has USER node, revision 392692085f19 and declared timestamp
+2026-10-10T18:28:20.222Z. Owned containers/volumes are removed; exact comparison
+preserves all 24 preexisting container IDs and 85 volume names, plus the protected
+presentation SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 9.1 GiB are free after these runs.
+
+API/application/store code remains unchanged from checkpoint 9d9ec5754879 and
+its recorded 165 SQLite API/701 PostgreSQL integration checks; these full suites
+were not replayed for this frontend checkpoint. Remote Original master is freshly
+verified at `ee2ab9ab64bd91209ef8534bbe6005838024e46d`. The Source references use
+owned API fixtures and do not prove its backend authorization/persistence.
+Nothing was pushed; remote CI, real devices, release and deployment are unverified.
+
+### Runtime-error dialog and durable reload (2026-10-10)
+
+Application checkpoint `d026e3f7c63f` retains the running Original Player behind
+its native Material error dialog. It reproduces the help text, Fehlerdetails,
+focus, non-dismissible backdrop/Escape behavior and reload action. The fixed
+Source SVG and fixed en-US/local-zone date output are rendered directly, while
+the native dialog and expansion panel remain deferred. The first implementation
+failed the unchanged 470 kB initial budget; the final production build is
+469.41 kB. The 450 kB and component-style warnings remain; no limit was raised.
+
+Six unmodified Source frontend references and six owned SQLite browser cases
+cover Primar, Sekundar and Erwachsene on desktop/mobile, incomplete responses,
+and forbidden timed-block exits. A repeated error from the same callback leaves
+one dialog and one CONTROLLER=ERROR, while preserving both runtime-error logs.
+The reference and Rewrite share only an owned synthetic Player; the Source
+frontend stays unchanged. The new mandatory quick-browser gate also proves a
+failed lazy-module download, a delayed save, and failed saves followed by recovery.
+These nine headful cases pass. The 44 pause cases, 43 normal exits (37 Original,
+6 Rewrite), 32 header cases and the broad system-check browser flow also pass.
+The broad Verona flow passes after updating its stale merged-timer exit
+expectation: the timed confirmation suppresses the later leave-lock check, with
+current-unit/status guards present. Cancel and accepted return preserve the exact
+stored answer packet and leave unit/testlet locks empty. The new answer setup
+waits for vopStart's rendered unit definition before typing.
+Reload waits for the durable outbox, preserves
+exact response/progress packets and the selected authorized Run, and fences
+context changes while awaiting storage and Router navigation. All 1140 current
+unit/state checks pass, including 481 frontend-state checks.
+
+The six closed-dialog interiors are pixel-identical after a 28-pixel inset.
+Zero complete dialog rectangles or full viewports are claimed identical: the
+rounded corners expose different backgrounds (574 changed rectangle pixels on
+desktop, 362–364 on mobile; maximum channel difference 155). Expanded diagnostic
+content is functionally checked, without claiming complete screenshot identity.
+Custom help variants, other startup/error categories and overlapping commands
+remain open, as do all eight full Original UI acceptance rows.
+
+The new image passes PostgreSQL Compose in standard, demo and production-secret
+modes (schema 52), plus standalone SQLite Docker (schema 58). Image
+`testcenter-rewrite-app:completeness-d026e3f7c63f` has ID
+`sha256:fcd2cd7ed3fea049c3d9798e84ec78034a198dad0c4700baac01c3bdf1ea5da8`,
+USER node, revision d026e3f7c63f and declared timestamp
+2026-10-10T17:23:04.421Z. Owned containers/volumes are removed. Exact inventory
+comparison preserves all 24 preexisting container IDs and 85 volume names; the
+protected presentation remains SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 9.9 GiB remain free after the runs (8.7 GiB during them).
+
+The API/application/store implementation is unchanged from checkpoint
+9d9ec5754879 and its recorded 165 SQLite API/701 PostgreSQL integration checks;
+those full suites were not replayed for this frontend change. Source master is
+freshly verified at `ee2ab9ab64bd91209ef8534bbe6005838024e46d`. The Source references
+use owned API fixtures and do not prove Source backend authorization/persistence.
+Nothing was pushed. Remote CI, real-device acceptance, release and deployment
+are still unverified.
+
+### Native pause container and startup budget (2026-10-10)
+
+Application checkpoint `85e8e9e86fe8` uses the pinned Original's native
+Material sidenav container/content, closed end drawer and white content surface
+for the pause card. This clips the upper card shadow at the content boundary.
+The first drawer build exceeded the unchanged 470 kB startup limit by 694 bytes.
+Migrating the root template's conditional rendering to Angular control flow
+removes its static NgIf dependency and lowers the production initial bundle to
+469.02 kB. The existing 450 kB warning and component-style warnings remain;
+no budget was increased.
+
+Eight sequential headful browser suites pass against owned SQLite APIs: all 44
+pause cases, 32 header cases, participant login/second-code cases, admin login
+with and without its proof-of-work challenge, offline shell/central bug reporting,
+global warning and raw-response settings, and required/voluntary password changes.
+All 469 frontend state tests also pass. The API/application/store implementation
+is unchanged from the preceding 9d9ec5754879 checkpoint and its recorded
+1128 unit/state, 165 SQLite API and 701 PostgreSQL integration checks.
+
+The new application image passes PostgreSQL Compose in standard, demo and
+production-secret modes, plus standalone SQLite Docker. The image is
+`testcenter-rewrite-app:completeness-85e8e9e86fe8`, with ID
+`sha256:127a8503e58a17a4fd77db5b53751b81e80a47bc416cc1855f1e1c86b045299e`,
+USER node and revision 85e8e9e86fe8. Its declared build timestamp is
+2026-10-10T16:34:04.899Z. Owned test containers/volumes are removed. Exact comparison
+preserves all 24 preexisting container IDs and 85 volume names, and the protected
+presentation SHA-256 remains
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 11 GiB remain available after the runs.
+
+A new full-PNG comparison of the 44 pause cases measures at most 0.13965% changed
+pixels. The remaining differences are the header shadow and three card-edge
+pixels; the maximum channel difference is 5. Zero full viewports are pixel-identical.
+This improves the former upper-shadow overlap but does not close full-page UI
+acceptance, remote CI, real-device, release or deployment proof.
+
+The next confirmed gap is the Original runtime-error surface. Six unmodified
+Source frontend cases (three themes, desktop/mobile, Hot Return with incomplete
+presentation/response and a forbidden timed-block exit) pass in
+`scripts/reference-original-runtime-error.mjs`. The Source retains its iframe,
+focuses a native non-dismissible dialog, shows the default custom technical-help
+text and expandable Fehlerdetails, and offers Schließen und neu laden. Escape and
+backdrop clicks retain the dialog. Each case logs one Runtime Error: runtime-error
+and one CONTROLLER=ERROR, then reloads through the same participant route and
+sends a connection-lost beacon. Portable presentation expectations are saved in
+`scripts/fixtures/original-runtime-error.json`. These are frontend references on
+owned API/player fixtures, not Source backend authorization or persistence proof.
+The Rewrite's retained-player/native-error-dialog implementation and broader
+error, custom-text and overlapping-command acceptance remain open. The pinned
+Source revision remains `ee2ab9ab64bd91209ef8534bbe6005838024e46d`, freshly verified
+against remote master. All eight full Original UI acceptance rows remain open.
+
+### Paused starter exits (2026-10-10)
+
+Application checkpoint `9d9ec5754879` matches the pinned Original pause-status
+exit. A visible pause leaves for Starter without a termination question, another
+CONTROLLER write, changed response packets, timer cancellation or leave locks.
+The interrupted timer and monitor pause remain intact. A forced silent pause
+keeps only the ordinary end-test confirmation. Staying makes no mutation;
+approval records `TERMINATED_PAUSED` and, if configured, locks the whole test.
+Source's `patchLock` writes the separate `BOOKLETLOCKEDbyTESTEE` event and locked
+flag, preserving the controller state; the Rewrite now does that for paused exits.
+
+The lazy Original pause surface uses Source's native raised card, booklet title,
+login and mode labels, custom pause text and retained unit toolbar. The paused
+toolbar has Source's natural height and hides interrupted time. In all captured
+cases card/toolbar/title/paragraph geometry agrees within 0.6 px; fonts, colors,
+spacing, borders and shadows agree exactly. The shared participant controller
+continues to own the Run and the ordinary interface keeps its existing surface.
+
+Unmodified Source `ee2ab9ab64bd91209ef8534bbe6005838024e46d` passes 42 frontend
+cases: Hot Return across three themes and desktop/mobile, Hot Restart in Primar
+at desktop, three timer leave policies, and visible/silent pause. Two more
+Source cases prove the configured termination lock. The matching 44 authenticated
+Rewrite browser cases use its real SQLite API, owned operator pause commands and
+trusted synthetic Verona input. Anonymous/foreign sessions, stale units/status,
+exact saved packets, interrupted timers and absent leave locks are checked.
+The 36 advisory, 57 completeness/visible-button and 43 normal-exit regression
+cases also pass to owned API shutdown: 180 successful browser cases in total.
+An extra PNG audit finds 44 exact card-body crops but zero exact full viewports;
+small differences remain at the header/toolbar and upper-card shadow overlap.
+Full pixel parity is therefore still open despite matching measured geometry
+and computed styles.
+Source frontend fixtures do not prove Source backend authorization; the pinned
+PHP controller/DAO and TestLog sources independently establish the lock event.
+This does not close the full Player UI row or untested navigation/custom-text
+and hidden-header combinations.
+
+Optional `expectedStatus` fences stale HTTP confirmations. Run, current unit,
+view and status are also checked after lazy loading, autosave, draft saving,
+preparation, confirmation and the response. A refresh observing this action's
+exact server result before HTTP completes is accepted; a newer remote pause
+cannot be erased by the old response. The production methods are exercised in
+frontend state tests, alongside native browser flow checks.
+
+All 1,128 unit/state tests pass (469 frontend), all 165 SQLite API tests and all
+701 PostgreSQL integration tests pass. PostgreSQL uses a fresh owned container
+and volume, removed afterwards. The new 44-case browser gate is mandatory in
+`ci:browser:quick`; the initial bundle stays at 469.99 kB under the unchanged
+470-kB limit. Existing budget warnings remain visible.
+
+Fresh standard/demo/production-secret PostgreSQL Compose checks (schema 52) and
+standalone SQLite Docker (schema 58) pass for application `9d9ec5754879`. Image
+`testcenter-rewrite-app:completeness-9d9ec5754879` is
+`sha256:c7190455bac4b65f100c8d304fd89582be76c9fe1fe6d3be4987f081c75f728d`,
+uses `node`, and declares build time `2026-10-10T15:36:01.071Z`. All owned test
+resources are removed. Exact inventories retain all 24 existing containers and
+85 volumes, and the protected PPTX checksum is unchanged. Lossless compression
+of one additional closed owned test database saves 106,082,263 bytes, with a
+verified SHA-256 round trip. After the current image build, 11 GiB remain free.
+
+Keep the negative evidence: 24 pre-correction memory-store pause cases failed
+with forced-completeness denial. The first Source probe looked for literal
+"Testpause" although Source resolves its default custom text. The first own card
+used that fallback and had the wrong width. Reusing the same paused participant
+across viewports then blocked a fixture's next Player load; each browser case now
+uses its own workspace. The old API expectation of a termination during visible
+pause caused the first SQLite/PostgreSQL replay to fail. Its replacement checks
+unchanged complete test-log lists against the observed Source behavior; corrected
+full replays pass. Failure logs and closed database evidence remain available.
+
+All eight full Original UI rows, physical-device acceptance, current remote CI,
+release and deployment acceptance remain open. Next establish Source's actual
+Shell/error and overlapping-action behavior, then widen Player/Review acceptance.
+
+### Starter exit advisory order (2026-10-10)
+
+Application checkpoint `f74f3f8512a1` follows Source's order of completeness,
+timer and leave-lock checks. In Demo/Review/Trial, an allowed timer is cancelled;
+other non-enforced timers are interrupted before a later confirmation opens.
+Cancelling that confirmation keeps the Run and current unit active, without
+restarting its timer, changing saved packets or applying a leave lock. A repeated
+attempt repeats the completeness notice but not the timer notice. Non-confirmed
+lock notices appear immediately; confirmed lock notices appear only after consent.
+A forced timed confirmation short-circuits the later leave-lock check.
+
+The preparation endpoint authorizes the participant's selected Run and current
+unit. Its effects come from stored execution policy; it cannot bypass forced
+completeness/time rules or persist preview packets. Saving modes use stored
+responses for completeness. Old foreground actions are fenced by Run, unit and
+view at lazy loading, autosave, draft save, preparation, confirmation and response.
+The optional current-unit guard on the final return request also rejects stale
+HTTP confirmations while retaining compatibility for existing API callers.
+
+Unmodified Source `ee2ab9ab` passes 36 owned frontend cases: three preview modes,
+three timer leave policies, unit/testlet locks and both confirmation settings.
+Their captured copy and notice order match all 36 authenticated Rewrite browser
+cases with the real SQLite API and trusted synthetic Verona input. The browser
+also checks anonymous/foreign-session rejection, stale units, unchanged packets
+and no implicit locks after staying. A separate forced-time Source probe records
+zero remaining time and termination without an additional unit leave-lock write.
+These fixtures do not prove Source backend authorization or full Player UI parity.
+
+All 1,031 local unit/state tests pass, including 444 frontend tests. All 165
+SQLite API and 605 PostgreSQL integration tests pass; PostgreSQL used a fresh
+owned container and volume, both removed after verification. The production
+initial bundle remains 469.99 kB under the unchanged 470-kB limit. The new browser
+gate is mandatory in `ci:browser:quick`.
+
+Keep the negative evidence: the first preparation implementation let status
+reads automatically resume an interrupted timer. A persisted interruption bound
+to the loaded unit fixes that; status/save, repetition and explicit resume are
+tested across all four stores. Native lifecycle copy initially used a UI timer
+projection without its identity/duration fields; the compiler caught it and the
+implementation now retains the actual current-state timer.
+
+Fresh isolated PostgreSQL Compose checks (standard/demo/production-secret,
+schema 52) and standalone SQLite Docker (schema 58) pass for application commit
+`f74f3f8512a1`. Image `testcenter-rewrite-app:completeness-f74f3f8512a1` has ID
+`sha256:c0304bf4c57342bafb8c69c8db21e54f273f14be2b0f8b35fbe1613d06033274`,
+revision `f74f3f8512a1`, user `node` and declared timestamp
+`2026-10-10T14:31:03.202Z`. All owned resources have been removed. Exact inventory
+checks retain all 24 pre-existing containers and 85 volumes; the protected PPTX
+checksum is unchanged. After the new image build, host availability is 12 GiB.
+The 57-case completeness/visible-button and separate 43-case normal-exit
+regressions both pass through owned API shutdown. Together with the new 36-case
+advisory matrix, this checkpoint has 136 successful browser cases. The later
+test-only refinement loads the pinned fixture before spawning its API and checks
+Source's actual `UNITS_LOCKED_AFTER_LEAVE` / `TESTLETS_LOCKED_AFTER_LEAVE` keys;
+all 36 captured advisory traces plus the forced-time trace have neither key.
+All eight full Original UI rows, physical-device acceptance, current remote CI,
+release and deployment acceptance remain open. Next compare paused exits and
+Shell/error/busy races, then widen Player and Review acceptance.
+
+### Completeness before starter exit (2026-10-10)
+
+A forced logo exit now checks the current unit's completeness before timed-block
+or leave-lock decisions. Direct return-to-starter requests cannot skip that check
+with confirmation flags. The API resolves the nearest testlet/root policy and
+projects it with the current unit; the frontend uses the newest local Player
+report instead of an older API packet. A denial leaves saved responses, locks,
+timer expiry and the running Run unchanged. Non-saving modes evaluate transient
+reports without persisting them. Monitor navigation overrides keep the separate
+forbidden-timer restriction.
+
+Unmodified Source ee2ab9ab confirms the ordering in 54 presentation/response/both
+cases and 18 legacy Verona 2 cases, across three themes, desktop/mobile and three
+leave policies. Two additional fresh-Player probes distinguish an absent response
+status from explicit incomplete progress. Source requires exactly `complete` for
+presentation; `complete-and-valid` is accepted for responses. The controller,
+Verona interfaces, InfoDialog and close SVG match their pinned Git blobs. These
+frontend probes use owned API/Player fixtures; they do not prove Source backend
+authorization or whole-page parity.
+
+The Original UI presents the native information dialog with one close button.
+The shared UI also offers only a close action. A malformed positive result cannot
+approve a denied exit. Run/view fences cover lazy loading, autosave settling,
+draft saving and the eventual HTTP response, so an obsolete exit cannot clear a
+replacement view or stop its event stream. The lazy policy and direct contracts
+subpath keep the unchanged 470-kB initial limit; the production build is 469.99 kB.
+
+Local checks pass all 868 unit/state tests (including 419 frontend tests and 47
+exit-method tests), 165 SQLite API integration tests and 421 PostgreSQL integration
+tests against a fresh owned container. The mandatory 57-case browser gate uses
+trusted Verona input, direct authenticated/anonymous/foreign-session HTTP calls,
+exact stored packets, timer/lock precedence, native focus/close behavior and
+Source dialog copy/geometry. Its visible close-button comparison uses real
+locator screenshots from all 72 Source cases, including fractional positions;
+off-screen transparent whole-page crops are not accepted as icon evidence.
+The final 57-case visible-button replay and the separate 43-case normal-exit
+regression both pass through owned API shutdown. The original animation timeout
+remains recorded; its precise cause is not established by the successful retry.
+
+Keep the negative evidence: the old API returned HTTP 200 for a forced incomplete
+exit; the initial implementation invented an absent response status and failed
+an existing execution-mode case. Explicit MatIconRegistry wiring and a contracts
+barrel re-export exceeded the initial bundle budget. The inline SVG first sat
+four pixels too low on desktop; Source's inline baseline/automatic icon height
+fixes it. A generic close-button hash failed for a differently sized response
+dialog; reference hashes are now captured separately for every state. A normal
+exit replay timed out while waiting for animations; its retry brings the owned
+page forward and preserves animation diagnostics on any repeated failure.
+
+### Current container and storage checkpoint (2026-10-10)
+
+Application tree ca54c32603bd passes fresh isolated standard, demo and
+production-secret PostgreSQL Compose runs at schema 52, plus the same image's
+standalone SQLite Docker runtime at schema 58. The local image is
+`testcenter-rewrite-app:completeness-ca54c32603bd`, revision ca54c32603bd, user
+`node`, image ID `sha256:09e3106f02f5f59b57718f7390c67038606b7d8374400cdb63ab2762d7407b54`.
+Its declared build timestamp is 2026-10-10T13:44:39.382Z. All owned projects have
+removed their containers and volumes after verification. The earlier a0f479d6
+image also passed these four container executions.
+
+Docker recovered from a stopped engine after a bounded Desktop restart. Two
+completed owned SQLite artifacts were losslessly compressed and checksum-verified,
+saving 212,118,099 bytes. A further 1.269 GB of unused Docker build cache was removed after the current
+builds. Exact inventories retain all 24 pre-existing containers and 85 volumes;
+the protected PPTX checksum is unchanged. The final measured host availability is 13 GiB. Complete Original UI rows, physical-device acceptance, remote CI,
+release and deployment acceptance remain open. Continue with unforced timer/lock
+advisory ordering on exit and the remaining Shell/error/busy and wider Player/
+Review matrices; the visible-button and normal-exit replays are now closed.
+
+
+### Earlier f099540e container execution after storage recovery (2026-10-10)
+
+The application tree at f099540e was rebuilt in Docker after the native Player
+exit changes. Its local image `testcenter-rewrite-app:readiness-f099540e` has
+revision f099540e and runs as the `node` user. Fresh, isolated standard, demo and
+production-secret Compose projects all pass their PostgreSQL migration,
+runtime-preflight, readiness, build-metadata and applicable protected bootstrap
+checks at schema 52. The same current image passes the standalone SQLite Docker
+runtime gate at schema 58. These are actual container executions, not only
+Compose configuration validation.
+
+Separately, the current host API/core build passes all 233 integration tests
+against a fresh owned PostgreSQL 16 container, with zero failures, skips or
+cancellations (125.4 seconds). That runner uses its own labeled container and
+volume; it verifies ownership and absence of remaining references before cleanup.
+After all gates, the exact before/after inventories retain the original 24
+containers and 85 volumes. The protected PPTX checksum is unchanged. A further
+439.4 MB of unused Docker build cache was removed after the builds; measured host
+headroom is 8.6 GiB. Current runtime images remain available for subsequent gates.
+
+This closes the current local container build/start/storage checkpoint. It does
+not establish complete Original UI parity, remote CI or deployment acceptance.
+Historical pending check before the completeness implementation above:
+`checkAndSolveCompleteness` runs first for a logo exit, while the current
+`returnToStarterWithConfirmation` and application `returnToStarter` paths do not
+explicitly perform that check. Reproduce the restricted incomplete response with
+real API calls and an unmodified Source frontend before changing this behavior.
+
+### Original in-player logo exit and hidden header (2026-10-10)
+
+The optional Original Player now opens the native Material confirmation used by
+unmodified Source ee2ab9ab. A saved exit asks "Sicher, dass du den Test beenden
+möchtest?" without an extra saved-progress paragraph. A timed-block or leave-lock
+warning is folded into that one question. Source's restriction labels reverse
+the native result: "Hier bleiben" stays, "Trotzdem weiter" continues. Primar fills
+the first native false-result button; Sekundar/Erwachsene retain outlined order.
+A forced forbidden timer reports the Source toast and never opens a dialog.
+The shared Rewrite labels/renderer and server restrictions remain in use.
+
+Source's hidden header has a 48px positioned logo wrapper and an inline native
+link, whose measured hit rectangle differs from the image. Both visible and
+hidden header geometry now follow that actual DOM. Replacing an open dialog uses
+Material-generated IDs and keeps the original live focus trigger; destruction
+unsubscribes before closing. Weak focus references do not retain detached views.
+The parent rejects old overlay results, and the exit action fences its awaited
+confirmation against a changed Run or view lifecycle.
+
+The read-only Source helper covers 36 combinations: three themes, desktop/mobile,
+visible/hidden header, and plain/confirm/forbidden exit. Its API and synthetic
+Player fixtures establish frontend behavior, not Source backend authorization.
+The actual logo/image and 24 native dialog geometry/style/copy measurements are
+pinned in scripts/fixtures/original-player-exit.json. Caller revision metadata
+must still be verified against the unmodified Source build externally. Reproduce
+with ORIGINAL_PLAYER_REFERENCE_ROOT, ORIGINAL_PLAYER_REFERENCE_COMMIT and a fresh
+absolute UI_SMOKE_ARTIFACT_DIR, then reference:ui:original-player-exit:built.
+
+The new mandatory ci:browser:quick gate owns its real SQLite API and credentials.
+Its 36 Original cases check trusted Verona answers and exact stored packets,
+modified activation, native focus trap/Escape/backdrop/stay, one confirmed exit,
+cancelled timer state, and an actual forbidden-return 409. It also checks native
+dialog replacement, a deliberately missing lazy bundle's guarded fallback, and
+six shared Rewrite cases. Only the injected missing-bundle case models no Service
+Worker in its owned top frame; the normal matrix keeps production Worker behavior
+and the opaque Verona sandbox. Actual request failures stay fatal through child/stream
+shutdown. The 24 production-method tests exercise scoped timer/lock copy, reversed
+results, destroyed/replaced overlays, live focus ownership and changed Run/view
+fences; the complete frontend suite has 396 tests. Production build/typecheck
+retain the 470-kB initial limit (469.99 kB). The existing 24-state protected Review
+workflow and native header/read-only Starter gate also pass. The final 43-case
+exit gate succeeds through owned API shutdown. The settled broader participant
+entry/leave/resume/logout slice has 1,283 requests, zero actual API failures/5xx,
+and orderly shutdown at participant-entry-start-after-sign-in. This is a bounded
+local replay; it does not replace the complete browser/Compose matrix.
+
+Keep the negative observations. The initial Source forbidden check accidentally
+read the older timer snackbar instead of the current toast stack; the final
+helper waits for the exact denial text. The first own check exposed inherited
+logo fonts/inline hit geometry. Dialog replacement exposed a real detached-focus
+regression and one comparison captured the replacement's intermediate animation;
+the final gate waits for settled animation. The shared single-booklet login
+already starts its Player; the test must not click a disappearing Starter button.
+The first bundle-failure injection was satisfied by the Worker cache and did not
+block a request. Playwright's Worker-block shim then threw in the opaque iframe;
+the final injection models absent Worker support only in the owned top frame and
+requires an actually blocked bundle. The shared fallback passes an explicit
+request context and rejects obsolete results. The broad native cancellation flow
+now waits for Material dismissal before opening its next confirmation.
+A broad smoke initially reused demo bootstrap credentials with a different first-
+admin password; repeat on a fresh owned, non-demo database. Complete PNGs retain
+Player/notification/background differences, so no complete Original UI row,
+physical hardware, remote CI, new container image, deployment or production
+acceptance is closed here. The protected PPTX and user stores are preserved.
+This checkpoint is local and unpublished; continue remaining whole Player/Shell,
+error/busy and production acceptance.
+
+### Original native logo and authorized Starter links (2026-10-10)
+
+The optional Original header now uses the Source's native logo link, label,
+image alt text and settled Material tooltip. Primary/Enter activation on login
+clears the form and returns to blank entry; Ctrl/Meta activation clears both
+the originating and newly opened login tab, as independently observed on Source.
+On the authenticated Starter, Source cancels modified activation; the Rewrite
+preserves that behavior. Copy/open-link destinations retain only UI, workspace
+scope and session ID, never credentials or a selected Run. The normal in-player
+logo still uses the existing leave confirmation and server restrictions.
+
+A separately opened Starter uses the authorized runtime-state GET. It never
+loads player state, resumes/resets a Run, drains another tab's pending save
+outbox or emits player-load logs. The view clears its cached player presentation
+only after authorization and the lifecycle fence; existing non-saving re-entry
+semantics stay separate. Both fresh and running sessions are covered in
+run-hot-return, run-demo, run-review and run-simulation. Anonymous and foreign
+session links remain denied. Pending own authentication also prevents a logo
+reset from clearing its credentials. The default Rewrite button remains shared
+with the lazy Original failure fallback.
+
+All 48 complete initial/native-focus/Caps-Lock/rejection RGBA pairs and all
+12 complete settled-tooltip pairs match unmodified Source ee2ab9ab byte-for-byte
+across three themes and four widths. The Source helper separately passes twelve
+participant-login, twelve admin-login and twelve Starter header cases; API
+fixtures establish frontend behavior only. The own real SQLite header gate
+covers 24 participant/admin entry cases and eight authorized Starter cases,
+including native modified activation, no Run mutation, unchanged stored answers
+and pending save outbox, and anonymous/foreign-session rejection. It is part of
+ci:browser:quick and observes actual API failures through child/stream shutdown.
+The protected admin gate additionally passes its 24 real challenges, HTTPS,
+access-window and failed-asset/chunk cases. The 372-test frontend suite (including
+66 entry/protection cases), typecheck and unchanged 470-kB production limit pass;
+the initial bundle is 469.99 kB. The bounded normal entry/leave/resume/logout
+flow has 1,201 requests with zero actual API failures/5xx and orderly shutdown.
+
+Keep the negative observations: native href is #/r/login, tooltip surfaces do
+not have the assumed named role, and intermediate animation geometry differs
+from settled geometry. Loading an empty style host as a flex child initially
+moved the logo; the final hidden style host restores all full-page comparisons.
+An overlapping rebuild invalidated a previously loaded chunk in one broad
+browser run; the repeat used stable assets and passed. The first fresh-session
+snapshot incorrectly expected current-state GET success; a fresh session has
+no Run. The final Starter reads runtime-state directly, also avoiding player
+save/log side effects. No complete Original UI row, physical camera/keyboard,
+remote CI, new Docker image, deployment or production acceptance is claimed.
+Earlier complete Compose/full-browser evidence belongs to the preceding tree.
+The protected PPTX and user data are preserved. This checkpoint is local and
+unpublished; continue with remaining Shell/error/busy, hidden-header/timer and
+whole-flow Original acceptance.
+
+### Original participant login alerts and form reset (2026-10-10)
+
+The current unmodified Source `ee2ab9ab` renders rejected credentials and Caps
+Lock through `tc-alert`. The Rewrite had plain paragraphs, different error
+colors, missing icons and extra margins. Its submitted template form also left
+the new empty name field visibly invalid after rejection. The optional Original
+component now uses the Source error/warning SVGs, inherited text color, two-pixel
+alert margin and native icon shrinking; failed authentication resets the form's
+submitted/touched state as well as clearing credentials. The same authorized
+sign-in path, secret clearing, HTTPS blocking and existing Rewrite interface
+remain in use. Text stays safely interpolated.
+
+All 24 complete, unmasked Caps Lock/rejected-credential RGBA pairs match Source
+byte-for-byte across three themes and four widths. Their notice geometry also
+matches exactly; the original paragraph baseline differs in all 24 cases.
+The intermediate icon-only correction retained twelve red-field differences,
+which the actual form reset resolves. The HTTPS participant notice has twelve
+exact geometry comparisons and eleven exact full-page images; one Primar/1280
+pair differs in 25 text pixels (maximum channel delta 12). Retain that negative
+observation; it does not close the entire login/Shell row. Source admin HTTPS
+notices have separately measured references in all twelve theme/width cases.
+
+The protected/headful real SQLite participant gate passes both protection
+configurations, all 24 login geometry/error cases, 38 actual participant proof
+challenges, real password login, saved/explicit-name reload and protected second
+code. The admin gate passes all twelve normal-login cases, six Original HTTPS
+notice comparisons, 24 actual browser proof challenges, unavailable/expired
+accounts and failed-asset/chunk recovery. All 26 protection/admin method tests,
+typecheck and the 469.44-kB production build pass under the unchanged limit.
+The Source-only helper passes twelve normal focus/alert cases, twelve participant
+HTTPS cases and twelve admin HTTPS cases, rejecting unknown requests/page errors.
+Its fixture coordinates are local to each notice; the gates also require the
+Source's exact 24px gap below the participant field. Whole-page captures remain
+independent evidence rather than being cropped or position-normalized.
+
+Keep the initial negative gate logs. Their 24px fixed-icon assumption contradicted
+the newly measured Source shrinking; an empty required Material input has an
+unset `aria-invalid`, not literal `false`; native focus scrolling changes absolute
+page coordinates. The corrected expectations come from the unmodified Source
+and actual Material binding. Pristine/untouched state, no submitted form, absence
+of validation error, exact local geometry and no-request protection remain gated.
+Source still probes the name once on the own insecure fixture; the Rewrite keeps
+its stronger no-credential/no-challenge rule. These are Source frontend fixtures,
+not Source backend, physical keyboard/camera, remote CI or production proof.
+No complete Original UI row is closed, and the preceding whole-browser/Compose
+proofs were run on the earlier tree. Logo-link semantics and other error/busy
+states remain separate work. This change is local and unpublished.
+
+### Native Original participant login focus (2026-10-10)
+
+The actual current Source `ee2ab9ab` leaves initial name entry, password back
+and invalid-credential return unfocused. Only its first password insertion uses
+native `autofocus`; another password insertion in the same document does not
+force focus again. The Rewrite's render effect had instead repeatedly focused
+the name/password controls. Against unmodified Source, 24 of 36 baseline focus
+states differ. The Original component now uses the same native password
+attribute and has no imperative name-focus effect. Credential values, the
+retained name after Back, secret clearing and shared authorization are intact.
+
+All 72 native focus states match Source across three themes and four widths;
+the 24 independently observed keyboard sequences reach logo, welcome scroll
+container and name in that order. Six actual initial full-page desktop/mobile
+RGBA pairs now also match byte-for-byte, without artificially focusing either
+name field. The wider 12-pair capture has 11 exact images and one 113-pixel
+text-rendering difference at Primar/600px; its fresh single-case replay is exact.
+Both observations remain, and no deterministic whole-page row is closed.
+The logo remains a Source link versus a Rewrite button; wider interaction,
+error/busy rendering and all complete Original UI rows remain separate work.
+
+The production protected/headful login gate passes all twelve theme/width
+cases, 38 actual proof-of-work challenges, inaccessible-context no-request
+checks, saved/explicit-name reload, second code and real authorized password
+login with no persisted password. Seventeen actual protection-method tests
+pass. The bounded main protected/headful SQLite entry/logout/re-entry gate
+also passes with the same Run and intact answers, old-token rejection, 1,161
+completed API requests and zero actual failed requests/5xx through shutdown.
+Its owned port 60107 is closed. Typecheck and production build pass at 469.44 kB
+under the unchanged 470-kB limit. The preceding complete browser/Compose proofs
+belong to the earlier tree; this focus step has these fresh bounded checks.
+
+The portable read-only Source helper passes all twelve cases on the unchanged,
+byte-verified Source build and records its owned rejected-login fixtures,
+native focus, keyboard path, screenshots and unknown-request/page-error lists.
+It requires the caller to verify the supplied Source revision/build; its
+`callerVerifiedReferenceCommit` field does not perform that verification.
+Source frontend fixtures do not prove its backend authentication. The initial
+new gate's too-short synthetic proof secret and incorrect second-Tab assumption
+failed; the secret was corrected to meet the unchanged 32-character policy,
+and the current Source's native welcome scroll stop was measured directly.
+No gate, authentication or bundle policy was relaxed.
+
+### Host storage recovery and container gates (2026-10-10)
+
+The user explicitly requested space for the container runs. Docker's own host
+log confirms the daemon incident: writing VM `init.log` failed with
+`no space left on device`. The Mac initially had about 1.8 GiB available.
+Writable npm content cache, verified untracked/inactive Angular and Nx cache
+directories, unused Docker build cache and unreferenced dangling images were
+removed. Root-owned or unverifiable cache directories were retained. User
+working files, the protected PPTX, all 24 unrelated containers and the 85
+existing volumes were preserved. Only the four containers from the aborted
+owned Compose project were removed; its database volume remains.
+
+The failed Docker Desktop did not complete a normal CLI restart. After normal
+quit and termination requests, its remaining verified processes were stopped
+and the application restarted. The real Docker API responds again. Host
+availability reached about 12 GiB after cleanup and remains about 10–11 GiB
+after the fresh image build. All three fresh Compose gates pass with their own
+projects and ports: standard, demo and production-secret; PostgreSQL schema 52,
+metadata-required preflight, non-root `node` runtime and the production
+authentication/bootstrap checks are verified. Their generated test volumes
+are removed by the existing smoke teardown. The freshly built same production
+image also passes the standalone SQLite Docker runtime gate at schema 58.
+The real PostgreSQL integration runner also passes 233 tests with zero
+skips/cancellations, using a separately
+labelled ephemeral container with its database on tmpfs; that container has
+been stopped. This is local runtime evidence, not remote CI, deployment or
+production acceptance. The earlier masked SQLite incident's primary cause
+remains unknown; Docker's confirmed disk-full incident does not recover it.
+
+The fresh complete protected/headful SQLite browser replay now passes the
+stricter server gate through final teardown: 12,911 completed own API requests,
+zero actual failed requests/5xx, normal Attachment capture/upload/preview/delete,
+six observed QR-worker releases and exact 47/47 group-result log deletion.
+The API port 57894 is closed and no owned test process/container remains.
+The successful database, log and screenshots are retained alongside the earlier
+failed-run evidence. Complete local browser acceptance is restored; all eight
+complete Original UI comparisons, physical-camera/window proof, remote CI for
+these unpublished commits, deployment and production acceptance remain open.
+
+### Original login footer overflow (2026-10-10)
+
+The mobile full-page comparison against the byte-verified current Source
+`ee2ab9ab` exposed a three-pixel footer difference: Source captures 390x847,
+while Rewrite clipped at 390x844. Source clips the window at html/body but
+allows its footer text to extend outside the independently scrolling AppRoot.
+The participant and admin entry shells now follow that hierarchy. This does
+not make the Source's clipped mobile footer reachable by native window scroll.
+The scoped rules cease to apply when either login surface is absent; the
+participant starter has no Source footer and is unchanged.
+
+All twelve actual full-page RGBA comparisons now match byte-for-byte: participant
+and admin login, all three themes, desktop 1280x720 and mobile 390x844 viewports
+(847px full-page height on mobile), with equivalent pristine focused name fields.
+No masking, cropping or resizing is used. Initial participant autofocus still
+differs from Source; this bounded proof does not close the complete login row.
+The production browser gates measure the actual version text with a DOM Range
+and reject truncation outside the inner root. The admin baseline fails that
+assertion. Both corrected headful/protected SQLite gates pass all three themes
+and four widths, including actual login/navigation and their existing error,
+reload, entry-link and recovery cases. Production build passes at 469.44 kB
+under the unchanged 470-kB limit. Full parity, physical and deployment gates
+remain separate.
+
+### SQLite failure causes and strict browser server gate (2026-10-10)
+
+The full browser run exposed a masked storage failure: the unconditional
+`ROLLBACK` in a catch block replaced the primary error when SQLite had already
+aborted its transaction. A bounded real `SQLITE_FULL` and real `RAISE(ROLLBACK)`
+triggers reproduce this on the unchanged store. Four of five baseline cases
+fail; the regular `ABORT` case already passes. The actual original browser
+incident's primary cause remains unknown; low host capacity and Docker I/O
+errors do not establish it.
+
+All ten SQLite transaction failure paths now retain the primary error after an
+automatic rollback. An unexpected rollback failure reports both causes rather
+than silently discarding either. Seven real-store tests pass: ordinary and
+automatic rollback, bounded capacity, exact batch rollback/retry, challenge
+consumption, schema migration/retry, busy COMMIT and unexpected rollback failure.
+The protected real HTTP negative check returns a generic 500 without the private
+storage cause, logs that original cause, persists no rejected log and accepts
+an exact, idempotent retry after recovery.
+
+The main browser gate now observes its own API's structured output and rejects
+actual failed requests/5xx at normal completion, requested early exit and after
+shutdown. Both output streams remain visible; the final success message follows
+stream drain. Six helper cases cover expected 4xx, original-cause deduplication,
+500/502/503 and split UTF-8 output. Browser-injected recovery responses do not
+become exemptions for actual API failures. Replaying the earlier real server
+log fails this gate, as required. All 668 unit/frontend cases and all 165 SQLite
+API integration cases pass. The subsequent complete protected/headful SQLite
+browser run fails at the IB-family stage: a real test-log POST returns 500 with
+the now-visible primary `unable to open database file`, followed by an actual
+`ENOSPC` while writing its own log. Its owned API port 54778 is no longer open;
+no clean complete browser acceptance is claimed. This second incident does not
+recover the primary cause of the earlier masked failure. Three completed own
+synthetic databases are archived with byte-exact decompression SHA-256 checks,
+recovering about 261 MiB; the failed-run database, diagnostics and screenshots
+remain. No unrelated Docker resources or user data are removed. A fresh bounded
+protected/headful SQLite attachment flow passes the stricter early-exit and
+shutdown checks with no own API failed requests/5xx. It completes capture,
+upload, preview and deletion and releases six actual QR workers. This does not
+replace the complete browser, Compose, deployment or full-parity gates.
+
+### Neutral fresh participant entry and current Source comparison (2026-10-10)
+
+Fresh entry previously displayed the synthetic `student-ui` login and carried
+`group:student-ui` before any participant input. Both initial values are now
+empty. The production login gate requires blank, disabled fresh entry in both
+interfaces, checks twelve saved-name/explicit-link combinations across the
+three themes, and reloads each without sending an authentication request.
+Explicit links still override saved names. The existing password, protection,
+second-code and four-width Original geometry cases also pass. All 361 frontend
+state cases pass; typecheck and production build pass at 469.44 kB under the
+unchanged 470-kB limit.
+
+The full own protected SQLite UI run completes all browser assertions, including
+47/47 group deletion and six real attachment worker releases. Its log contains
+one test-log POST 500 with `cannot rollback - no transaction is active`.
+The original storage exception is masked by a secondary rollback failure;
+exit 0 alone does not close this runtime acceptance. The primary cause remains
+unconfirmed and is being investigated separately from the Docker failure.
+
+Current Original `ee2ab9ab64bd91209ef8534bbe6005838024e46d` is freshly built
+from an isolated complete frontend/common/definitions archive. All 398 tracked
+files, including symlink contents, match their Git blob hashes. Its generated
+untracked environment file uses the exact tracked production configuration.
+Own equal frontend fixtures and a protected Rewrite SQLite API capture both
+interfaces at 1280/390px with zero unknown requests or frontend errors. In the
+same pristine focused-name state, all three 1280x720 full-page screenshots have
+zero changed pixels. Initial focus differs, and mobile full-page image heights
+are 847px in Source versus 844px in Rewrite. These differences remain recorded;
+there is no image crop, mask or claim that the full Shell/login row is closed.
+An earlier prototype's label click touched only the already-focused Rewrite
+field and produced a different validation state. That invalid equal-state
+comparison and the subsequent incorrect Source ARIA expectation are retained
+separately from the corrected pristine-focus evidence.
+
+The same freshly built, unmodified Source again fails all twelve camera initial
+and native-reload/re-entry cases at `video.nativeElement`, with no video stream,
+metadata lookup or unknown request. The diagnostic exits 2; it is negative
+reference evidence, not a passing capture comparison.
+
+The new local Docker image builds and passes the standalone non-root SQLite
+runtime smoke with schema 58. Its metadata explicitly identifies the local
+`local-3e337dfa-neutral-entry` test tree. The separate production-overlay Compose
+gate fails in Docker's `overlay2` driver with actual `input/output error`; removal
+of its own API container also fails, and subsequent daemon requests report
+`Docker Desktop is unable to start`. Preserve `work/compose-production.log`;
+do not call this an application failure or a passing release gate. Other Docker
+images, containers and volumes are not pruned or reset. Only reproducible build
+caches inside this chat's verified Source archive are removed. Production,
+shared-environment deployment and all eight complete Original UI rows remain
+open.
+
+### Attachment capture ownership through async transitions (2026-10-10)
+
+Fresh GitHub main is `143dc3e73ae83f379de4b2fe38edef25c7286a4a`; its actual
+completed workflow `38000558022` passes 37/37 jobs. Development continues locally
+from that tree on `testcenter-production-readiness`. This baseline CI result does
+not verify the new local correction or establish deployment.
+
+The actual production component has three reproduced ownership problems:
+pending native PNG encoding restores an obsolete photo/status after reset;
+manual target lookup retains the previous target's photo; and late image/HTTP
+results can update a changed operator, tenant, workspace or target. Uploads can
+also start after scope changes while reading the old photo's bytes. Against the
+unmodified baseline, the initial 32 actual-method controls complete with 27
+failures and five passes. A protected headful SQLite browser gate independently
+fails after native reset when the real delayed canvas callback restores the old
+capture status. The retained callback contains the browser's actual PNG; no
+pixels, decoder result or application method is substituted.
+
+Encoding now belongs to a specific scope, target, stream and capture generation.
+Reset/retake/replacement expire earlier results. Manual and saved-QR target
+lookups discard the previous photo; successful automatic QR capture keeps its
+new frame. A failed encoding cannot stop the camera or start target lookup.
+Lookup/upload/QR results check their original context before changing state,
+and upload checks scope and write permission again after reading bytes. An old
+operation cannot clear a newer operation's busy state. A current failed upload
+keeps its own photo for retry.
+
+All 54 actual-method lifecycle cases and the 601 existing regular checks pass,
+as do 61 compatibility cases and 165 SQLite API cases. Typecheck and production
+build pass at 469.46 kB, below the unchanged 470-kB limit. The complete protected
+headful SQLite Attachment slice passes the native pending-encoding reset,
+saved-QR normal/inverted/error recovery, actual capture/upload/preview/deletion,
+1280/390px layout and six observed worker releases. Its separate generated live
+camera gate passes real worker decoding, A4 capture, protected upload and worker
+release. Fresh full-tree and server audits both report zero findings.
+
+This correction is local until separately published; no new remote CI, release,
+deployment or production acceptance is claimed. All eight complete Original UI
+rows, the remaining printed/camera reference work and physical-camera/window
+acceptance remain open. The protected migration presentation stays unchanged.
+
 ### Preserve the actual Quick failure evidence (2026-10-09)
 
 Published `6221bbdd` Push workflow `37986888156` completes 36/37 jobs and
@@ -2896,7 +7682,7 @@ the current queue, including capabilities that have since reached `done`.
 | 5 | P1 | Workspace file administration | Package-backed files are browsable/downloadable, classified by the five original content types, filterable in API/CSV/Angular, and support guarded aggregate deletion plus immutable replacement. Replacement package and lineage edge are reserved atomically against the exact workspace source-package revision in memory, file, SQLite, and PostgreSQL; concurrent requests cannot create two active successors, an already superseded package fails closed, and only the latest lineage tip can be replaced. Matching the Original workspace table, operators can sort the complete filtered read before its limit by file name, stored size, or upload time in either direction; the choice persists in Angular and the CSV export uses the same deterministic order. The list contract also separates total filtered matches from the returned limit and carries a complete workspace health summary: valid, pending, invalid, and warning-bearing files plus the same status counts for every Original type and the rewrite package type remain visible in Angular even when filters exclude them from the current window. The original unrestricted multi-file picker and upload queue are represented by a bounded 200-file best-effort flow: files are read and sent sequentially as byte-preserving Data URLs, `.voud`/`.vomd` and HTML media types are inferred deterministically, later files continue after an individual duplicate or validation error, and Angular reports live processed/selected progress, the exact current file, a distinct workspace-refresh phase, and every final accepted/rejected item while retaining successful files for reviewed assembly. The picker is disabled during the active batch. A production Chromium/SQLite gate holds the fourth request to prove the intermediate 3/4 state, after first proving that a successful upload can make the immediately following differently cased filename fail as a duplicate without rolling back that mutation or stopping the remaining real `.voud` definition and extension-unknown binary resource; the latter also retains byte-exact download and refreshed workspace projection. The original multi-file delete workflow is likewise represented by a bounded, role-protected Angular selection and API batch report: each exact-name-confirmed aggregate is rechecked independently, safe files and unused derivatives are deleted and audited, while still-used, missing, disallowed, and unexpected outcomes remain separated for retry. Matching the Original's recursive file-relation guard, a loose Unit/resource/Booklet dependency now remains undeletable while an active, non-superseded workspace source references it; readiness and the delete mutation expose the exact referencing source-package ID, and deletion succeeds after the referencing root is removed. Current unique graphs are derived before import, while the latest audited guided snapshot retains the exact chosen relationship through ambiguity and moves the blocker only after a replacement has actually been selected in a new import. The mixed-success delete path is gated in production Chromium/SQLite and the API contract, including dependency deletion, is gated across memory, file, and SQLite. Source detail derives a typed direct/transitive graph across assembly members and imported booklet/system-check/unit/resource relationships. A loose Booklet or SysCheck import resolves a unique transitive workspace chain through Unit, player, definition, variables, coding scheme, and player resources into an audited immutable dependency snapshot. Ambiguous legacy names return structured candidate IDs instead of guessing; Angular offers one action per candidate, the server rejects invalid, duplicate, root, and unused selections, and the chosen package is carried through any later ambiguity until the remaining transitive chain is complete. API and production Chromium/SQLite gates prove the selected immutable snapshot contains the root, the chosen candidate, and all unique downstream dependencies while excluding the rejected alternative. Result administration now has its own group inventory below. |
 | 6 | P1 | System check hardening | Current byte-exact 18.0 `SysCheck.xml` definitions import without creating an empty test release. The current byte-exact 18.0 `CY_SysCheck_2.xml` adds the original same-workspace two-check starter: Angular selects both checks independently, runs measured and configured-skipped network paths, reports an unanswered required field without trapping the participant, renders all six question types, executes the resolved Verona item, saves with the check key, and keeps report statistics/deletion isolated by check. Runtime compilation preserves both textual and numeric XML Schema boolean spellings for `skipnetwork` and question `required` after validation. The public cache-disabled server-time contract reproduces the Original clock check against the configured participant IANA timezone; Angular highlights deviations from 60 seconds and timezone mismatches and retains both values in the report, with an explicit warning fallback when time is unavailable. The same environment stage applies the Original 800 × 600 minimum screen-resolution warning and report IDs, and now captures the Original's UAParser-derived CPU, device, browser/version, operating-system/version, navigator, and available plugin fields in label order. Chromium forces a complete mobile identity and proves those values through capture, durable detail, and CSV export. The API path is gated across memory, file, and SQLite. Loose SysCheck, Unit, coding-scheme, and Verona files resolve into audited immutable snapshots; the referenced Unit definition/player are retained with each check and missing packaged Units fail with a stable diagnostic. Imported `sys-check-login` candidates become isolated workspace accounts that support concurrent device sessions and authorize report saving under the login name without exposing the report key. Configuring any such account activates the original instance-wide login mode, hides the anonymous flow, resolves the authenticated workspace scope, and closes the report-key API path. The byte-exact original `SysCheck-Report.json` is pinned and migrates through API and Angular while preserving its source date, filename, file timestamp, section order, scalar values, and original check label; legacy BOM/semicolon CSV plus JSON-with-`fileData` exports are reconciled against it. Operators can select up to 200 report files or an original report directory, receive per-file migration failures, safely resume without duplicating unchanged files, inspect OS/browser/rating distributions, and delete selected check report sets. Additional original configurations and player families remain. |
 | 7 | P2 | Attachments and QR capture | Every Original Unit BaseVariable with `type="attachment"` now survives ZIP import with its authored optional format and appears in the role-scoped inventory for every started run, matching the original discovery path. `capture-image` entries additionally provide the complete durable camera workflow: API and Angular support missing/captured status, PNG/JPEG upload, inline preview, deletion, and a copyable handoff code, while other formats stay visibly conserved without unsafe capture controls. The upload route accepts both the rewrite JSON contract and the original capture client's binary-safe `multipart/form-data` field. Operators can download one or all scoped A4 QR pages with the original seven label placeholders. The lazy mobile capture route now scans those codes by live camera or QR image, verifies the target through the existing operator/group scope, captures or selects a photo, previews it, and confirms the protected upload. |
-| 8 | P2 | Branding and custom-text presentation | The original instance title, expiring global warning, resettable logo, three audience themes, editable start-page HTML, and independent `Impressum`, `Datenschutz`, and `Barrierefreiheit` HTML, global < Testtakers/Login < active Booklet participant-text precedence, and global < authenticated monitor-login precedence for the complete 58-key `gm_*` contract are now usable. The eight original image slots have a platform-admin registry and global assignments, with Testtakers Group/Login assignments taking precedence for Participant presentation. Angular renders the resolved logo, login/code illustrations and companions, starter/completed cards, loading progress, and confirmation-dialog image; assigned global assets are deletion-protected. Angular also applies all 58 monitor keys, presents sanitized configured HTML on participant entry and three separately routed public information pages, and exposes all three links from every shell. The complete instance-branding surface is API-, store-, and production-browser-gated. |
+| 8 | P2 | Branding and custom-text presentation | The original instance title, expiring global warning, resettable logo, three audience themes, editable start-page HTML, and independent `Impressum`, `Datenschutz`, and `Barrierefreiheit` HTML, global < Testtakers/Login < active Booklet participant-text precedence, and global < authenticated monitor-login precedence for the complete 54-key `gm_*` contract are now usable. The eight original image slots have a platform-admin registry and global assignments, with Testtakers Group/Login assignments taking precedence for Participant presentation. Angular renders the resolved logo, login/code illustrations and companions, starter/completed cards, loading progress, and confirmation-dialog image; assigned global assets are deletion-protected. Angular also applies all 54 monitor keys, presents sanitized configured HTML on participant entry and three separately routed public information pages, and exposes all three links from every shell. The complete instance-branding surface is API-, store-, and production-browser-gated. |
 
 The latest source-to-corpus inventory confirms that every Booklet, Unit,
 Testtakers, SysCheck, Group-Monitor, Session-Management, Aspect, Verona 2–5,
@@ -3301,7 +8087,7 @@ Latest P0 legacy-encoding closure: declaration-driven XML decoding no longer
 stops at Node's browser-oriented WHATWG set. A production `iconv-lite`
 fallback now accepts the valid IANA `ISO-8859-16`/Latin-10 and DOS `CP850`
 aliases used by older source systems, while an explicit allowlist prevents
-iconv transport codecs such as base64, hex, CESU-8, or UTF-7 from becoming XML
+iconv transport codecs such as base64, hex or CESU-8 from becoming XML
 declaration encodings. The representative Booklets retain Romanian, German,
 Euro, and umlaut labels through the complete import/release projection in
 memory, file, and SQLite. Other IANA encodings outside the WHATWG and explicit
@@ -3793,7 +8579,7 @@ cross-feature navigation remain browser-gated.
 | Admin and participant login sink/rate limiting | login-sink E2E, `SessionController`, `CacheService` | done | P1 | admin sign-in now reproduces the original global username sink: five failed credentials block the next attempt for 30 minutes by default, correct credentials cannot bypass it, every blocked attempt is audited, and the counter is atomically durable across memory, file, SQLite, and Postgres. Password-protected participant accounts retain their separate tenant/workspace/login counter shared by sign-in and starter launch; unknown/passwordless participant logins do not increment it. Both paths expose configurable thresholds/windows and stable 429 details plus `Retry-After`; API gates run the admin path across memory, file, and SQLite, while restart tests cover file and SQLite persistence |
 | Supported-browser warning | `SystemController::getConfig`, `UserAgentService`, upstream `a7843f05` | done | P2 | the exact generated current 18.3.0 browser list from upstream `236217815` is pinned alongside browser-family parsing, semantic version comparison, acceptance of newer releases, and rejection of outdated/unknown browsers. Chrome/Edge 150–151, Firefox 140/153–154, iOS Safari 26.5–26.6, and Safari 26.5–26.6 form a tested compatibility contract. Matching the Original's higher-version rule, Firefox 140 remains the effective ESR floor while the current regular-release entries advance; Safari 26.4 is now rejected. Angular confines the accessible warning to the unauthenticated Participant login state, removes it from the global shell and signed-in Starter/Player, has no obsolete dismiss control, and resolves the current `login_unsupportedBrowser` default plus global placeholder overrides. A focused production Chromium gate proves the route boundary and exact outdated-Chrome copy |
 | Central error report | `ErrorComponent`, `BugReportService` | done | P1 | application and Angular-global errors open an accessible central report surface with error ID, timestamp, build, browser/device, parameter-free URL, stack, and a bounded previous-error buffer. Users can inspect, copy, or download `bug-report.txt`; optional direct GitHub issue delivery is server-configured, rate-limited, timeout-bounded, and exposes neither its token nor raw provider failures to the browser. Shared client/server redaction removes URL credentials/query/fragment, Bearer/JWT values, passwords, cookies, tokens, secrets, and API keys before delivery, while operational request logs retain only paths rather than potentially sensitive query strings. Contract and API integration tests gate sanitization, size bounds, secret/config isolation, query-free logging, and the safe disabled configuration; a production SQLite/Chromium gate triggers the global handler, inspects the redacted report, confirms disabled direct delivery, and downloads the exact filename |
-| Layered custom texts | `docs/pages/custom-texts.md` | partial | P2 | original file-level `CustomTexts` are parsed once, attached to every participant and operational login, persisted by every adapter, and returned on sign-in/resume. The exact current 41-key participant catalog from upstream `031b3313` is the versioned compatibility contract, including original defaults and sequential `%s` formatting. The removed `login_unsupportedBrowserBanner` is no longer accepted or rendered; current `login_unsupportedBrowser` carries its replacement default on Participant login. The current Original's four Starter action labels, two login-side texts, and two second-code error texts are applied in Angular. Matching upstream `fa2a1514`/`8bf6c9f8`, a protected block renders the global `booklet_codeToEnterPrompt` and authored `CodeToEnter` text separately and the removed `booklet_codeToEnterWarning` is neither advertised nor rendered. XML plus native JSON maps/value objects/key-text arrays support inherited defaults and participant overrides; Booklet XML/JSON now retains its own direct custom-text map. Angular applies matching text to booklet selection, second-code login, supported-browser warnings, fullscreen, code gates, task lists, Verona unit/block loading and failure guidance, the original page-navigation prompt, five-second timer start/expiry/cancellation notices, timer warnings, leave locks/prompts, navigation denials, pause, resume, and completion states. Leave/timer title and prompt keys now render together in labelled in-app dialogs instead of native browser prompts. The three current 2026-08-18 Original leave-prompt defaults omit their redundant final question because the dialog buttons already express that decision. The effective participant scope follows the original global < Testtakers/Login < active Booklet order; the Booklet layer starts only with the run, while system-check-specific text overrides global text on that surface. Production Chromium gates both separated code texts and current login/error/Starter labels on the real Participant path, plus both leave prompts on their real Verona page controls, check-specific text on SysCheck, and effective participant text on the active run. Matching upstream `a9166f32` and `623da15f`, the obsolete participant console warning and `booklet_console_warning` key are absent. The complete original 58-key `gm_*` catalog and defaults now form a second versioned contract. Imported Testtakers monitor text survives the password-redacted migration candidate, account creation, every store, and sign-in, then overrides global settings for the authenticated monitor. The focused Angular console actively applies all 58 keys to its headline, commands, core columns, summary/group context, profile view/filter presentation and pending/locked indicators, monitor-start and password-verified scheduled/expired labels, batch-selection counts, command tooltips and confirmed unlock feedback, target-timer state and confirmation, scroll/hide controls, and typed broken-booklet errors; sequential `%s`, `%date`, and `$date` substitution and original German defaults are contract-tested. Scheduled and expired operator accounts expose their concrete access boundary and login-scoped copy only after successful password verification, while unknown accounts and wrong passwords keep the generic credential response. Broken legacy runs remain visible and distinguish missing booklet IDs, missing release entries, malformed booklet snapshots, and unavailable releases without taking down healthy monitor rows; unsafe commands are withheld for those runs. The controller-error recovery action uses the current Original's fixed `Neu laden` label, and the non-catalog `booklet_reload` key is absent. Matching upstream `ccacee3a`, the obsolete misspelled locked-unit button key is absent and the code-input action uses the fixed `Weiter` label. Matching upstream `6ee8a53e`, the five ineffective granular loading keys are absent; the Verona host retains accessible queued, indeterminate, and exact 100%-loaded milestones with fixed UI copy, while only current `booklet_loading` remains customizable and the browser smoke gates the real phase order without inventing unavailable byte percentages. |
+| Layered custom texts | `docs/pages/custom-texts.md` | partial | P2 | original file-level `CustomTexts` are parsed once, attached to every participant and operational login, persisted by every adapter, and returned on sign-in/resume. The exact current 41-key participant catalog from upstream `031b3313` is the versioned compatibility contract, including original defaults and sequential `%s` formatting. The removed `login_unsupportedBrowserBanner` is no longer accepted or rendered; current `login_unsupportedBrowser` carries its replacement default on Participant login. The current Original's four Starter action labels, two login-side texts, and two second-code error texts are applied in Angular. Matching upstream `fa2a1514`/`8bf6c9f8`, a protected block renders the global `booklet_codeToEnterPrompt` and authored `CodeToEnter` text separately and the removed `booklet_codeToEnterWarning` is neither advertised nor rendered. XML plus native JSON maps/value objects/key-text arrays support inherited defaults and participant overrides; Booklet XML/JSON now retains its own direct custom-text map. Angular applies matching text to booklet selection, second-code login, supported-browser warnings, fullscreen, code gates, task lists, Verona unit/block loading and failure guidance, the original page-navigation prompt, five-second timer start/expiry/cancellation notices, timer warnings, leave locks/prompts, navigation denials, pause, resume, and completion states. Leave/timer title and prompt keys now render together in labelled in-app dialogs instead of native browser prompts. The three current 2026-08-18 Original leave-prompt defaults omit their redundant final question because the dialog buttons already express that decision. The effective participant scope follows the original global < Testtakers/Login < active Booklet order; the Booklet layer starts only with the run, while system-check-specific text overrides global text on that surface. Production Chromium gates both separated code texts and current login/error/Starter labels on the real Participant path, plus both leave prompts on their real Verona page controls, check-specific text on SysCheck, and effective participant text on the active run. Matching upstream `a9166f32` and `623da15f`, the obsolete participant console warning and `booklet_console_warning` key are absent. The complete original 54-key `gm_*` catalog and defaults now form a second versioned contract. Imported Testtakers monitor text survives the password-redacted migration candidate, account creation, every store, and sign-in, then overrides global settings for the authenticated monitor. The focused Angular console actively applies all 54 keys to its headline, commands, core columns, summary/group context, profile view/filter presentation and pending/locked indicators, monitor-start and password-verified scheduled/expired labels, batch-selection counts, command tooltips and confirmed unlock feedback, target-timer state and confirmation, scroll/hide controls; the four broken-booklet messages follow the current fixed Original template and ignore removed overrides; sequential `%s`, `%date`, and `$date` substitution and original German defaults are contract-tested. Scheduled and expired operator accounts expose their concrete access boundary and login-scoped copy only after successful password verification, while unknown accounts and wrong passwords keep the generic credential response. Broken legacy runs remain visible and distinguish missing booklet IDs, missing release entries, malformed booklet snapshots, and unavailable releases without taking down healthy monitor rows; unsafe commands are withheld for those runs. The controller-error recovery action uses the current Original's fixed `Neu laden` label, and the non-catalog `booklet_reload` key is absent. Matching upstream `ccacee3a`, the obsolete misspelled locked-unit button key is absent and the code-input action uses the fixed `Weiter` label. Matching upstream `6ee8a53e`, the five ineffective granular loading keys are absent; the Verona host retains accessible queued, indeterminate, and exact 100%-loaded milestones with fixed UI copy, while only current `booklet_loading` remains customizable and the browser smoke gates the real phase order without inventing unavailable byte percentages. |
 
 ### Participant player and booklet runtime
 
@@ -4094,8 +8880,9 @@ and lets a login replace individual slots. The effective filename map survives
 all persistent roster adapters. The protected global registry, public image
 delivery, global slot defaults, Participant override precedence, and all eight
 Angular presentation targets are now implemented. Registry replacement keeps
-stable identities, and deletion refuses assets still assigned globally or by
-persisted participant and operational roster entries across workspaces.
+stable identities. Default deletion refuses assets still assigned globally or by
+persisted participant and operational roster entries across workspaces; the
+Original adapter explicitly requests the atomic cascade described above.
 
 Latest legacy-encoding alias closure: XML declarations now accept every
 XML-`EncName`-compatible IANA alias registered for ISO-8859-10/Latin-6 and
@@ -4259,7 +9046,7 @@ the live Participant route.
 | Group/study overview | group monitor and study monitor modules | done | P1 | group/booklet/unit/participant/run read models, attention queue, expected/not-started roster counts. Authenticated `study_monitor` roles can read and control the full assigned workspace, while `group_monitor` roles can only list, stream, export, and control open runs in assigned groups and open their exact group detail; both are denied general workspace-admin routes, and SSE access is revalidated for scope changes. The Angular shell now derives these access modes from the live session, hides and route-guards workspace/content/admin-management surfaces, skips admin-only participant-detail reads even during `Select + Sync`, and presents a focused scoped command console; a protected browser gate proves route redirection, group isolation, selection, and command readiness with a real `group_monitor` account. The byte-exact original `CY_Logins_GM.xml` plus `CY_Bklt_GM-1.xml` path now proves monitor-candidate migration, profile preservation, assigned-group isolation against a live outside-group run, and an exact scoped command lifecycle across memory, file, and SQLite. Imported monitor profiles, localized view/filter descriptions and selection feedback, original booklet-species projection, profile-driven filter/column/density behavior, adaptivity-aware block choices, and original `autoselectNextBlock` jump preparation are available. Open runs now also project the latest bounded original test-wide state map, advance their server-owned activity timestamp for those updates, derive the complete original monitor super-state priority including the five-minute `idle` fallback, apply `testState`/`state` profile filters to their real values, and visibly surface idle/controller-error/recovery transitions in run, group, and summary views; SQLite/Chromium covers the SSE-driven priority changes without a five-minute wall-clock wait. Their cards additionally expose the current Unit's structured presentation/response progress plus resolved Player page position, label, id and count from the already persisted Verona state, including the same fields in open-run CSV; legacy raw responses remain unprojected instead of receiving fabricated completion. Angular shows these signals as compact always-visible badges and expanded Unit rows. Their Angular cards now reproduce the original neutral paused surface, striped pending/locked and error surfaces, and deterministic Booklet-species hues whenever multiple species are visible; the production Chromium gate covers live Unit progress/page projection, pause projection, and multi-species differentiation. The scoped Runtime view adds a profile-aware summary of visible runs, unique participants, running/paused/idle/locked states, and authorized groups plus actionable group aggregation with booklet, block, timer, and latest-activity context; the real SQLite browser gate proves outside-group exclusion, group-filter handoff, localized presentation, and live pause/resume updates. The study-wide Angular dashboard already renders status distribution, prioritized unit/group/booklet attention, review readiness, explicit not-started participant cards, and matrix/runtime handoffs with browser coverage. The 13 active upstream Group-Monitor command/participant scenarios plus the Study-Monitor start scenario are explicitly traced through protected API and production SQLite/Chromium gates: login/scope, control-all selection, pause, resume, per-run go-to, confirmed terminate/lock, unlock, participant-visible state transitions, study selection, and the study table all execute end to end. The richer attention, matrix, drill-down, review, scale, SSE, and audit surfaces exceed that functional baseline. |
 | Participant-by-unit drill-down | study monitor | done | P1 | matrix, filtered drill-downs, response/review handoff, CSV exports, and a 200-row source window kept separate from the operator-selected visible-card limit |
 | Near-real-time refresh | broadcaster/group monitor | done | P1 | an authenticated workspace-scoped Server-Sent Events channel publishes versioned initial snapshots, material open-run changes, and heartbeats; the Angular Runtime view exposes connecting/live/reconnecting/polling-fallback/offline state, coalesces push-triggered reads, reconnects automatically, and retains periodic polling only when the channel is unavailable. A separate session-scoped Participant channel now publishes stable current-run revisions and makes monitor pause/resume/go-to/lock/complete transitions visible in an already-open Player without manual refresh; it coalesces state reads, stops with the Participant route, and degrades to quiet three-second refreshes while reconnecting. The Player exposes the channel as an accessible connecting/live/reconnecting/offline status without blocking work, explains automatic recovery and the independent answer-outbox protection, and clears the degraded state after a successful reconnect. Matching the Original controller, semantic channel changes persist as test-wide `CONNECTION=POLLING` or `CONNECTION=WEBSOCKET` logs through that durable outbox and drive the monitor's real super-state without a synthetic operator update. Volatile computed timer countdown seconds and loaded assets are deliberately excluded from stream revisions so they do not create repository/read-model churn. API integration gates both snapshot/change contracts; production-built SQLite/Chromium deliberately fails the first Participant stream request, proves the visible reconnect plus monitor `CONNECTION_POLLING` state, releases the retry, proves automatic live recovery plus `CONNECTION_WEBSOCKET`, then verifies pause, resume, and locked completion while the operator page remains open |
-| Pause/resume/complete | monitor routes | done | P1 | The complete original command catalog is mapped semantically: `pause`, `resume`, and `goto` are direct; `terminate` maps to `complete`; and the Group Monitor's `terminate lock`/finish-everything path is an explicit atomic `complete_and_lock` command. It closes running timers and the participant session, records `completedAt`, persists the whole-test lock and both controller log states, and retains previous/next lock state in the command audit. Single- and bounded selected-run batch APIs support it. Matching the original `commandFinishEverything`, the original-labeled Angular finish control now confirms the destructive session-wide action, clears active request/profile/custom/quick filters, and submits a dedicated all-unlocked scope instead of depending on the selected run or the 100-row view. The server derives every target from the authenticated workspace/group scope without a client-supplied ID cap, leaves already locked runs untouched, and returns per-run failures; the official Group-Monitoring package proves that a scoped monitor finishes its assigned run while an outside-group run remains active. Production-built Chromium/SQLite additionally proves the exact request and filter-reset workflow. Original `debug` is deliberately excluded because source inspection shows it only toggles a non-production local debug pane. |
+| Pause/resume/complete | monitor routes | done | P1 | The complete original command catalog is mapped semantically: `pause`, `resume`, and `goto` are direct; `terminate` maps to `complete`; and the Group Monitor's `terminate lock`/finish-everything path is an explicit atomic `complete_and_lock` command. It closes running timers and the participant session, records `completedAt`, persists the whole-test lock and both controller log states, and retains previous/next lock state in the command audit. Single- and bounded selected-run batch APIs support it. Matching the original `commandFinishEverything`, the original-labeled Angular finish control now confirms the destructive session-wide action, clears active request/profile/custom/quick filters, and submits a dedicated all-unlocked scope instead of depending on the selected run or the 100-row view. The server derives every target from the authenticated workspace/group scope without a client-supplied ID cap, leaves already locked runs untouched, and returns per-run failures; the official Group-Monitoring package proves that a scoped monitor finishes its assigned run while an outside-group run remains active. Production-built Chromium/SQLite additionally proves the exact request and filter-reset workflow. Original `debug` is now supported as a selected-run command with immutable arguments and receipts. It only changes the local diagnostic pane; production accepts an explicit command while automatic preference restoration remains development-only. |
 | Go-to block, unlock, lock | monitor routes and E2E | done | P1 | audited go-to sets runs to running, targets an exact unit, bypasses completion navigation guards, clears target code/leave locks, and reopens closed timed blocks with an operator-confirmed replacement duration in the same command; the Angular console keeps this operator-entered target separate from the participant's current unit for single and batch commands, persists it across reloads with backward-compatible hydration, presents target timer state from the read model, and browser-verifies the resulting server transition. Matching the Original's `groupForGoto`, batch go-to and timer changes now treat the selected block key as the shared intent, resolve that block's first currently visible Unit separately for every selected run, group the existing bounded requests by the resulting Unit key, and leave incompatible runs unchanged with an explicit confirmation warning. A production Chromium interception gate proves two same-species runs with different first-Unit aliases receive distinct target payloads. Original whole-test lock/unlock is independent of progress status, blocks participant writes, is visible in starter/monitor/CSV projections, honors `lock_test_on_termination`, and supports continuation after monitor unlock; the separate navigation unlock/re-lock preserves status and controls the durable bypass for code, leave-lock, and completeness guards. The official Group-Monitoring package gates go-to from Startseite to Aufgabe2 plus whole-test lock/unlock against the participant runtime. Selected timed units accept replacement rest time without moving, and every command supports bounded multi-run dispatch with per-run results |
 | Profiles, filters, columns, view density | monitor profiles E2E | done | P2 | the byte-exact original `all` and `small` `Profiles/GroupMonitor` definitions persist with the migrated scoped monitor account and drive supported exclusion/inclusion filters, pending/locked visibility, booklet-state fields, columns, density, batch-visible selection, and `autoselectNextBlock`. The Angular profile summary renders the imported pending/locked flags with their original customizable labels, while the open-run collection turns the original `full`/`medium`/`small` setting into one-column, responsive medium, and compact responsive card layouts; `small` additionally suppresses the original detail fields, and a SQLite browser gate proves the imported density reaches the rendered collection. Matching the original monitor menus, operators can temporarily toggle every imported profile filter plus the base pending/locked filters, restore their complete imported baseline atomically, and clear stale batch selection whenever that visible set changes; the effective runtime profile also feeds overview counts, group aggregation, open-run cards, and select-all without mutating the reusable profile. The same controls temporarily toggle group, booklet, block, Unit, and currently available booklet-state columns, switch full/medium/small activity density, and reset the presentation to the active imported profile. The open-run list now also starts with the Original participant-ascending order and can sort ascending or descending by current batch selection, status, every currently displayed core column, activity timestamp, and displayed booklet-state values; selection-ascending matches the Original by placing checked runs first, and stable input order resolves equal values. Protected SQLite/Chromium coverage proves active imported filters, runtime reset, locked-run exclusion, imported display baselines, overrides, reset, selection order, and multi-row sorting. The Original-style case-insensitive quick filter then composes on top of server scope and the effective profile filters before sorting, clears stale batch selection when its visible set changes, and has an explicit one-click reset; Chromium proves no-match, case-insensitive match, and restoration. The original `Alle Tests gleichzeitig steuern` mode is now an explicit transient operator toggle: it is available only for one visible Booklet species, continuously derives the complete command-safe selection from the current authorized/filter-visible run set, includes later live updates automatically, and disables conflicting manual selection controls while active. A production SQLite/Chromium gate proves activation, exact selection, manual-control suppression, and clean return to an empty manual selection. When several species are visible, each eligible run now exposes an Original-equivalent species-cohort action that atomically replaces the batch with all authorized, filter-visible runs of that species; pending, locked, and broken-booklet runs are excluded from every automatic selection path. The same production gate proves a two-run cohort remains isolated from a second visible species. Matching the Original's clickable Testlet strip, every eligible rendered block is now a keyboard-accessible jump-target action: its first activation adds the origin run, the second selects the complete compatible visible species cohort, and the third clears that cohort while retaining the run-specific block target. As in the Original, selected compatible rows render their same-species target with an orange marker and expose the state through `aria-pressed`; clearing the selection removes every marker without losing the prepared target. Pointer hover and keyboard focus now also reproduce the Original's transient cross-row marker for the same block and Booklet species, clear on leave or blur, and never bleed into another species. The production multi-species gate proves the transient pointer/keyboard preview, species isolation, all three click stages, the cohort-wide target presentation, and the target selection before exercising grouped go-to. Per-login `ViewSettings/@monitorBookletVisibility` now follows the original `visible`/`collapsed`/`hidden` contract from XML import through the migration draft, durable role/session data, manual admin editing, and the monitor Testheft-list presentation. Open runs project ordered visible block targets from the effective adaptive route; the scoped console uses them as block choices, prepares the next block only after a successful jump when enabled, and clears the choice after the final block. Booklet Species follows the original top-level-testlet count, appears in cards/CSV/direct queries, and participates in imported profile filters. Request filters persist locally, and the scoped dashboard derives its status and group totals from the same profile-filtered read model. A structured Angular editor now authors, edits, and removes reusable monitor profiles and nested exclusion filters for either a new monitor account or an existing scoped role; original `state` filters use a real Super-State multi-select, persist as bounded arrays through the guarded admin API, and exclude every selected state in the live monitor. Its saved draft library survives reloads, same-scope assignment updates the durable profile set, and SQLite browser gates cover exact saved settings, multi-state filter persistence, plus the two-click automatic-next-block lifecycle. The seven active upstream profile scenarios are explicitly traced: two-profile selection, small/full density, profile-specific columns, imported filter application, and custom-filter creation all have production browser coverage. The sole additional upstream scenario is itself `it.skip` with a TODO and is not treated as a functional parity requirement; Rewrite additionally persists profile authoring, editing, deletion, multi-state exclusion, and automatic-next-block behavior. |
 | Command audit trail and bulk safety | monitor behavior | done | P1 | exact selected run ids are previewed in a labelled in-app confirmation before dispatch; operators can select all, clear, or reproduce the Original monitor's inversion of the currently visible, command-safe run set, while profile and quick-filter changes clear stale selection. Single timed go-to, bulk commands, and finish-all retain their original/customized warning copy without browser-native dialogs. The bounded bulk API deduplicates ids, returns per-run successes/failures, retains failed selections for retry, and preserves an actor/time/details activity event for every successful command |
@@ -4292,16 +9079,16 @@ workspace-centred gate.
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
 | Response inspection/export | workspace results | done | P1 | detailed filters, explicit session/test-run identity on response cards, run drill-down, CSV |
-| Result group administration | workspace results table | done | P1 | an authenticated API and Angular card view reproduce the original group rows with started-booklet count, minimum/maximum/average distinct answered units per run, and latest test activity; response/review/log counts extend the original view. Operators can use one group as the detailed inspection scope or select multiple/all visible groups for individual CSV exports, a combined Original-compatible archive, or workspace-key-confirmed aggregate deletion. Repeated `groupKey` filters preserve the existing single-group API while providing the original selection semantics; selected exports use a separate bounded 50,000-row window instead of the 500-row inspection limit, and both single and aggregate deletion remain audited. |
-| Original result report archive | `WorkspaceController::getReport`, `ResponseReportOutput.php`, `LogReportOutput.php`, `ReviewReportOutput.php` | done | P1 | the selected-group API and Angular action download one ZIP containing response, log, and enhanced-review reports in both compact JSON and UTF-8-BOM/semicolon CSV plus a versioned manifest. Response projection restores Verona `dataParts` entries and separates remaining unit state as `laststate`, preserves raw legacy responses as `all`, and resolves authored unit IDs from the run's immutable content release. Logs retain original fields and chronological order; reviews restore dynamic `category_*` values, priority, page/browser/reviewer metadata, entries, and release-resolved unit/booklet labels. Existing modern CSV endpoints remain stable. Missing selection, 100-group, and 50,000-row-per-report bounds fail explicitly; API/auth and real SQLite browser gates inspect the archive members and schemas before the selected results are deleted. |
+| Result group administration | workspace results table | partial | P1 | an authenticated API and Angular card view reproduce the original group rows with started-booklet count, minimum/maximum/average distinct answered units per run, and latest test activity; response/review/log counts extend the original view. Operators can use one group as the detailed inspection scope or select multiple/all visible groups for individual CSV exports, a combined Original-compatible archive, or workspace-key-confirmed aggregate deletion. Repeated `groupKey` filters preserve the existing single-group API while providing the original selection semantics; selected exports use a separate bounded 50,000-row window instead of the 500-row inspection limit, and both single and aggregate deletion remain audited. Source27 production HTTP proves distinct created/opened/stateful inclusion and saved Unit rows (including unanswered/review-only Units). The current canonical summary counts all Runs and answer keys and uses Run.updatedAt, so full Original group/count/time semantics and the native table remain incomplete. |
+| Original result report archive | `WorkspaceController::getReport`, `ResponseReportOutput.php`, `LogReportOutput.php`, `ReviewReportOutput.php` | partial | P1 | the selected-group API and Angular action download one ZIP containing response, log, and enhanced-review reports in both compact JSON and UTF-8-BOM/semicolon CSV plus a versioned manifest. Response projection restores Verona `dataParts` entries and separates remaining unit state as `laststate`, preserves raw legacy responses as `all`, and resolves authored unit IDs from the run's immutable content release. Logs retain original fields and chronological order; reviews restore dynamic `category_*` values, priority, page/browser/reviewer metadata, entries, and release-resolved unit/booklet labels. Existing modern CSV endpoints remain stable. Omitting the group filter exports every workspace group, matching Original `eedae4184`; an explicit empty service selection returns empty reports and never widens to all groups. Explicit selections retain the 100-group cap, while every report retains its 50,000-row bound; API/auth and real SQLite browser gates inspect the archive members and schemas before the selected results are deleted. Source27 verifies four individual selected report formats, state/review-only Unit inclusion and Unit retention after comment deletion. The current archive correction covers empty response arrays and scoped persisted review identities, but exact native Unit state keys, response clocks, configured review times, current-file label resolution and the four native download actions still need qualification. |
 | Review create/edit/delete/export | review routes and review E2E | done | P1 | participant-authored test/unit/task-page comments are `canReview`-gated and browser-tested; numeric page plus manual page label, original priorities `0–3`, simultaneous `tech`/`content`/`design` categories, server-captured browser identification, and authored unit IDs persist across memory/file/SQLite/Postgres storage, participant editing, operator cards, category filters, audit activity, and CSV. Alias-backed units retain their original `Unit/@id`, and both provenance values remain immutable when a review target is edited. Review-capable Starters expose the Original `Reviews downloaden` action, return its exact `Keine Kommentare verfügbar.` feedback for an empty participant-isolated export, and otherwise download the BOM/semicolon report as `testcenter-reviews.csv`. Participant deletion uses the same accessible in-player confirmation surface as irreversible leave actions instead of a browser-native dialog |
 | Group result deletion | results E2E | done | P1 | typed confirmation, counts, audit activity |
-| Test logs export | `ReportType::LOG`, `LogReportOutput.php`, `docs/pages/logging.md` | done | P1 | the current Original TestLog catalog is represented: `LOADCOMPLETE`, `CONNECTION`, test-wide TestState transitions, `command executed`, and `locked by monitor`; UnitLogs retain `PLAYER=LOADING/RUNNING`, page/progress state, runtime failures, and Player-defined entries. Protected monitor actions derive the event actor from the authenticated account rather than caller metadata, and original remote commands retain their space-joined `pause`, `resume`, `goto id …`, `terminate`, and `terminate lock` spelling. Logs persist through the durable response outbox/repository paths across every store, support scoped operator filters and Angular inspection, export the original BOM/semicolon column layout, and are deleted with their group results. API gates prove monitor command/lock contents and actor integrity; the production SQLite/Chromium gate observes both Player lifecycle states after the real handshake, de-duplicates a repeated active-frame controller error, observes successful controller recovery, and queries the later retired-frame runtime failure by Unit. The separate workspace activity CSV remains available as an extended audit export |
+| Test logs export | `ReportType::LOG`, `LogReportOutput.php`, `docs/pages/logging.md` | partial | P1 | the current Original TestLog catalog is represented: `LOADCOMPLETE`, `CONNECTION`, test-wide TestState transitions, `command executed`, and `locked by monitor`; UnitLogs retain `PLAYER=LOADING/RUNNING`, page/progress state, runtime failures, and Player-defined entries. Protected monitor actions derive the event actor from the authenticated account rather than caller metadata, and original remote commands retain their space-joined `pause`, `resume`, `goto id …`, `terminate`, and `terminate lock` spelling. Logs persist through the durable response outbox/repository paths across every store, support scoped operator filters and Angular inspection, export the original BOM/semicolon column layout, and are deleted with their group results. API gates prove monitor command/lock contents and actor integrity; the production SQLite/Chromium gate observes both Player lifecycle states after the real handshake, de-duplicates a repeated active-frame controller error, observes successful controller recovery, and queries the later retired-frame runtime failure by Unit. The separate workspace activity CSV remains available as an extended audit export The actual-buffer completion oracle and Memory/File/SQLite differential witness now qualify separate normal native/remote completion with its captured completion timestamp; real Angular/SQLite proves held reconciliation, lost reply and exact Starter-reload replay. Native Debug additionally matches the Original fulfilled-handler microtask in reference, logger and production browser gates. Full mixed-command/buffer/lock/navigation ordering and complete mixed-version acceptance remain open. |
 | System-check reports | sys-check module/routes | done | P1 | the pinned original definition plus a real Unit/coding/player dependency chain import into one typed immutable configuration; public direct links run environment/network/questionnaire/player stages with per-check custom texts, and the SQLite browser gate starts Verona API 6, records a real item response, and retains it in the saved report. The Original server-time welcome check is reproduced through a cache-disabled typed endpoint: browser clock skew and IANA timezone are compared with the configured participant timezone, warnings start at the Original 60-second threshold or any timezone mismatch, and both entries persist in the environment report. API coverage verifies configured timezone and timestamp bounds; Chromium forces both warnings and verifies their rendered report entries. The same gate forces an Android mobile user agent and browser plugin, verifies the Original CPU/device/browser-version/operating-system/navigator labels and IDs, then follows the values through durable report detail and CSV export. Save-key validation protects durable reports across every store, and scoped operators can list/filter/export them, inspect OS/browser/overall-rating distributions, drill into report values, and delete selected check report sets behind typed workspace confirmation with an audit event. The byte-exact starter `SysCheck-Report.json` now has a first-class admin migration route; Angular accepts up to 200 selected JSON files or a report directory in one best-effort batch, reports individual invalid/missing-check files, and makes reruns idempotent by filename plus a server-derived semantic digest. Migration accepts modern plus deprecated section names, binds each report to its imported check, and retains original filename, file modification time, source date, check label, and values in durable activity-backed storage. CSV export matches the original `Titel`/`SysCheck-Id`/`SysCheck`/`Responses`/`DatumTS`/`Datum`/`FileName` order, BOM/semicolon encoding, boolean conversion, dynamic section order, and no trailing row; JSON export emits the original report array with synthesized `fileData`. API compatibility and a multi-check SQLite browser gate cover migration resume and both downloads. Imported sys-check accounts support concurrent sessions, force the report title to the login name, resolve their assigned workspace, and activate the original instance-wide mode that replaces anonymous key saving in both UI and API. Matching all six active upstream scenarios, Angular resolves that mode before rendering the entry: no configured account exposes the general anonymous System Check action, while any configured account removes it and offers only an explicitly protected account sign-in. Anonymous submission now reproduces the Original save dialog with blank key/title inputs, three-character validation, password reveal, accessible cancellation/focus handling, and no-cancel success confirmation; protected accounts save directly, and both acknowledged successes return to Start after 500 ms. Production SQLite/Chromium gates both states, multiple-check selection, single-check auto-selection, required-question validation, both real saves, success redirects, and route isolation with the server-forced login title |
-| Platform/tenant/workspace admins | superadmin module, `user-management.cy.ts`, `workspace-management.cy.ts`, `settings.cy.ts` | done | P1 | scoped users, roles, passwords, status, sessions, audits, tenant/workspace directories, durable study/group monitor assignments with imported view profiles, password-safe operational-login-to-account creation in Angular, and persisted/enforced absolute plus first-login-relative access windows. Original workspace-admin `RW`/`RO` assignments normalize into durable `read_write`/`read_only` modes across file, SQLite, and Postgres storage: legacy assignments default safely to RW, RO may use every scoped read/export/SSE route, and mutations return a stable write-role error. Delegation now follows the target hierarchy: platform admins manage all accounts; tenant admins manage tenant/workspace/monitor/system-check roles only inside their tenant; RW workspace admins manage study/group monitor and system-check accounts only inside their workspace; RO workspace admins cannot delegate. User, role, password, status, session, CSV, and audit reads/mutations share that boundary, mixed higher-scope accounts cannot be captured by a lower admin, and failed role validation no longer leaves orphaned users. Angular limits role choices to the signed-in admin's delegation level. Matching the original workspace-centred Superadmin table, Angular now also projects every visible account against one selected workspace, distinguishes direct RO/RW from inherited tenant/platform write access, summarizes access counts, and applies direct RO/RW changes or confirmed revocation through the existing audited delegation boundary. A protected production SQLite/Chromium gate changes one workspace administrator from RO to RW and back through this matrix while verifying the durable role. Its status batch workflow keeps an exact bounded selection and preview, excludes the signed-in account, confirms the target state, dispatches best-effort per-account updates through the same server authorization boundary, and retains failed selections with concrete error codes. Disabling an account now formally revokes every active target session, leaves expired sessions unchanged, and records the exact revoked count and IDs in the user-update audit event; API coverage and the real SQLite batch-status browser gate prove token rejection plus revoked-directory visibility for two delegated accounts. The same selection can apply one exact role/scope to up to 50 accounts: identical assignments stay idempotent, each target is reauthorized, every created or updated assignment is audited by the existing server use case, successes leave the selection, and concrete failures remain for retry; a SQLite browser gate assigns the same scoped system-check role to two delegated accounts. The original superadmin password step-up now also protects every platform-admin role change: account creation, individual and batch assignment, and revocation require the acting administrator's password at the server boundary, with stable missing/invalid error codes. Matching current upstream `49c0843e`, an invalid confirmation is handled as a recoverable inline field error: the transient password and pending action remain available for immediate retry, editing clears the alert, and the generic technical-error surface stays closed. Success clears both password and error; neither request secrets nor confirmations enter persistent shell state or audit details. API coverage and a protected Chromium/SQLite gate prove rejection, inline retry, success, clearing, and audit redaction. Signed-in administrators can now also reproduce the original self-service password change from every operator shell: Angular requires current password, policy-valid double entry, and keeps all fields transient; the server re-verifies the current hash unless an administrator-set mandatory change is pending, then revokes every active session and retains the existing password-change audit without secrets. The same global navigation keeps sign-out available across admin and monitor shells, terminates the live bearer session at the server, clears its browser state, and returns protected views to operator access instead of leaving stale administration visible. Matching the original header account menu, a global account panel exposes the live username, display name, effective access mode, every role and scope, session expiry, and build identity without requiring diagnostics access. Direct protected links now resolve the live auth mode, retain an internal return URL, avoid protected probes while signed out, and resume after successful authentication; the signed-out Ops route exposes only credentials plus explicit first-deployment bootstrap rather than the administrative and diagnostic consoles. API and protected SQLite/Chromium gates prove rejection, success, sign-out, old-password invalidation, renewed sign-in, and protected-route return. Manual administrator password reset now also reproduces the original double-entry guard: Angular blocks missing or mismatched confirmation, keeps both values out of persistent shell state, clears both after success, and a protected Chromium/SQLite gate proves the old-password rejection plus the existing mandatory next-login change. The selection also supports a bounded password handoff without reusing secrets: Angular generates a distinct 24-character CSPRNG password for each account, submits every reset through the same delegation and audit boundary, removes successes while retaining concrete failures for retry, and keeps successful credentials only in memory until a CSV download clears them. A SQLite browser gate proves uniqueness, old-password rejection, new-password sign-in, exact CSV contents, and post-download cleanup. Session revocation has an independent bounded 50-target selection, exact-ID preview, current-session exclusion, confirmation, per-target reauthorization and audit trail, with successful targets removed and concrete failures retained for retry; API coverage verifies deduplication plus mixed success/self/missing results, and a SQLite browser gate revokes two live delegated sessions. Permanent user deletion now reuses the same 50-account exact selection and per-target delegation boundary, prevents self-delete, requires irreversible-action confirmation, removes every successful account with all sessions and role assignments in one store transaction, retains concrete failures for retry, and records a standalone audit snapshot with the deleted username, display/status/roles, and exact removal counts. API coverage proves authentication, self-protection, session invalidation, repeat-delete behavior, directory cleanup, and audit retention across the durable stores; a real SQLite browser gate deletes two delegated accounts and verifies their directory/session absence plus both retained audits. All Ops account, role, password, session, access-window, custom-text, and monitor-profile confirmations now share a labelled in-app alert dialog with safe initial focus, trapped keyboard navigation, Escape cancellation, focus restoration, and explicit action-specific confirmation. The protected production browser gates exercise the no-request cancel path and the representative single and batch confirmation sequence through account deletion. Original workspace lifecycle parity now covers creation, RW/RO assignment, rename, and platform-admin-only permanent deletion. Deletion requires the exact workspace key, atomically clears every workspace aggregate and scoped role, retains the global audit record, and is gated across memory/file/SQLite plus protected Chromium/SQLite. Matching the original three-tab system administration, platform admins now switch through one responsive, keyboard-visible `Admins` / `Workspaces` / `Settings` navigation shared by Ops and Workspace routes. Admin and Settings panels are mutually exclusive, the selected panel is URL-stable, and production Chromium gates the complete settings-to-workspace-to-admin round-trip. The workspace directory now also reproduces the Original table's `MAX(files.modification_ts)` signal from currently stored source-package upload times, keeps empty workspaces explicit, exports the value, and sorts interactively by name or latest file modification in either direction. The 18 upstream Superadmin E2E scenarios are now explicitly traced: all settings controls plus maintenance-warning set/clear; user action availability, creation, invalid/valid Superadmin step-up, RO/RW enforcement, password mismatch/success, and deletion; and workspace action availability, creation, user-centred RO/RW assignment, rename, and deletion. Rewrite API and production SQLite/Chromium gates cover every path, so the Original Superadmin surface is functionally closed; the additional tenant hierarchy, access windows, batch operations, session administration, CSVs, and audit evidence exceed that baseline. |
-| Branding/settings/custom texts | settings module, `e2e/src/e2e/Super-Admin/settings.cy.ts` | done | P2 | imported per-login participant, Booklet, monitor, and system-check texts are durable and applied. The original instance application title, expiring global warning, resettable 20 MiB logo, `Primar`/`Sekundar`/`Erwachsene` themes, bounded start-page HTML plus independently bounded `Impressum`, `Datenschutz`, and `Barrierefreiheit` HTML, and bounded global custom-text overrides are public, platform-admin editable, validated, audited, and durable across every adapter. The eight current Original presentation slots ship with the byte-exact upstream logo, login, code-input, companion, completion, loading, and confirmation images; registered global or per-login assignments override those built-ins, while the `Sekundar` code-input illustration follows the Original theme-specific fallback. Angular applies branding to participant and operator shells, switches real CSS variables immediately, removes the global banner at expiry, presents sanitized configured HTML on participant entry and three separate public information routes, and resolves participant text in the original global < Testtakers/Login < active Booklet order. System-check configuration remains more specific than global text; authenticated monitor login text likewise overrides global settings, with the complete 58-key `gm_*` defaults exposed in the editor and all 58 keys rendered across headline, commands, columns, summaries, profile view/filter text and status flags, scheduled/expired access boundaries, selection counts, tooltips and confirmed unlock feedback, target-timer state/confirmation, scroll/hide controls, and broken-booklet diagnostics. Legacy file/SQLite/Postgres migrations, API/store tests, and production SQLite browser gates cover custom branding, separate public documents, layered participant text, imported monitor-account text, placeholder formatting, access-window copy, sanitizer enforcement, and full reset. |
-| Attachments and QR capture | `AttachmentController`, `AttachmentFiles`, attachment-manager frontend | partial | P1 | Every Original BaseVariable attachment projects a typed slot per started run, including `image`, `audio`, `ggb-file`, custom, and omitted formats; only `capture-image` exposes the implemented missing/captured camera controls. Authenticated admins and scoped monitors can list the complete inventory, upload validated PNG/JPEG capture images, preview/download them inline, delete them, and use a stable copyable attachment code in Angular; files and audit events are durable across every adapter. Unsupported capture attempts and QR pages fail explicitly instead of silently treating another authored type as a photograph. The same upload endpoint accepts the original `multipart/form-data` `attachment` field and `type=image` request shape in addition to JSON/Base64. The manager downloads one selected or up to 500 role-scoped A4 capture QR pages as PDF, with the original seven configurable label placeholders and generation-time scope enforcement. The lazy mobile capture route implements live-camera/QR-image scans, camera/flash selection and manual fallback, server-scoped target lookup, A4 capture/device photo, preview and protected upload. Four production Chrome/Chromium sequences pass image and generated live-camera decoding through the unchanged owned worker, normal/inverted/error recovery, scoped lookup, actual A4 preview, upload, native manager preview/deletion and observed worker closure at 1280/390 pixels. Conditional visibility lifecycle tests pass; actual hidden-window pause/resume remains unproven in independent native browser probes. Current Original printed-page/QR-region and camera-facing framing, complete Original capture layout and fresh whole-flow acceptance remain open; manual fallback cannot close them. |
-| Durable storage | deployment stack | done | P0 | file, SQLite, Postgres, migrations, doctor/preflight |
+| Platform/tenant/workspace admins | superadmin module, `user-management.cy.ts`, `workspace-management.cy.ts`, `settings.cy.ts` | partial | P1 | Reopened on 2026-10-20: the actual Original deletes assigned assets with cascading assignments, while Rewrite still rejects in-use deletion; separate settings replacement writes also lack a concurrent merge/CAS contract. German settings controls and ordinary real-API workflows are implemented, but complete Source settings semantics remain open. scoped users, roles, passwords, status, sessions, audits, tenant/workspace directories, durable study/group monitor assignments with imported view profiles, password-safe operational-login-to-account creation in Angular, and persisted/enforced absolute plus first-login-relative access windows. Original workspace-admin `RW`/`RO` assignments normalize into durable `read_write`/`read_only` modes across file, SQLite, and Postgres storage: legacy assignments default safely to RW, RO may use every scoped read/export/SSE route, and mutations return a stable write-role error. Delegation now follows the target hierarchy: platform admins manage all accounts; tenant admins manage tenant/workspace/monitor/system-check roles only inside their tenant; RW workspace admins manage study/group monitor and system-check accounts only inside their workspace; RO workspace admins cannot delegate. User, role, password, status, session, CSV, and audit reads/mutations share that boundary, mixed higher-scope accounts cannot be captured by a lower admin, and failed role validation no longer leaves orphaned users. Angular limits role choices to the signed-in admin's delegation level. Matching the original workspace-centred Superadmin table, Angular now also projects every visible account against one selected workspace, distinguishes direct RO/RW from inherited tenant/platform write access, summarizes access counts, and applies direct RO/RW changes or confirmed revocation through the existing audited delegation boundary. A protected production SQLite/Chromium gate changes one workspace administrator from RO to RW and back through this matrix while verifying the durable role. Its status batch workflow keeps an exact bounded selection and preview, excludes the signed-in account, confirms the target state, dispatches best-effort per-account updates through the same server authorization boundary, and retains failed selections with concrete error codes. Disabling an account now formally revokes every active target session, leaves expired sessions unchanged, and records the exact revoked count and IDs in the user-update audit event; API coverage and the real SQLite batch-status browser gate prove token rejection plus revoked-directory visibility for two delegated accounts. The same selection can apply one exact role/scope to up to 50 accounts: identical assignments stay idempotent, each target is reauthorized, every created or updated assignment is audited by the existing server use case, successes leave the selection, and concrete failures remain for retry; a SQLite browser gate assigns the same scoped system-check role to two delegated accounts. The original superadmin password step-up now also protects every platform-admin role change: account creation, individual and batch assignment, and revocation require the acting administrator's password at the server boundary, with stable missing/invalid error codes. Matching current upstream `49c0843e`, an invalid confirmation is handled as a recoverable inline field error: the transient password and pending action remain available for immediate retry, editing clears the alert, and the generic technical-error surface stays closed. Success clears both password and error; neither request secrets nor confirmations enter persistent shell state or audit details. API coverage and a protected Chromium/SQLite gate prove rejection, inline retry, success, clearing, and audit redaction. Signed-in administrators can now also reproduce the original self-service password change from every operator shell: Angular requires current password, policy-valid double entry, and keeps all fields transient; the server re-verifies the current hash unless an administrator-set mandatory change is pending, then revokes every active session and retains the existing password-change audit without secrets. The same global navigation keeps sign-out available across admin and monitor shells, terminates the live bearer session at the server, clears its browser state, and returns protected views to operator access instead of leaving stale administration visible. Matching the original header account menu, a global account panel exposes the live username, display name, effective access mode, every role and scope, session expiry, and build identity without requiring diagnostics access. Direct protected links now resolve the live auth mode, retain an internal return URL, avoid protected probes while signed out, and resume after successful authentication; the signed-out Ops route exposes only credentials plus explicit first-deployment bootstrap rather than the administrative and diagnostic consoles. API and protected SQLite/Chromium gates prove rejection, success, sign-out, old-password invalidation, renewed sign-in, and protected-route return. Manual administrator password reset now also reproduces the original double-entry guard: Angular blocks missing or mismatched confirmation, keeps both values out of persistent shell state, clears both after success, and a protected Chromium/SQLite gate proves the old-password rejection plus the existing mandatory next-login change. The selection also supports a bounded password handoff without reusing secrets: Angular generates a distinct 24-character CSPRNG password for each account, submits every reset through the same delegation and audit boundary, removes successes while retaining concrete failures for retry, and keeps successful credentials only in memory until a CSV download clears them. A SQLite browser gate proves uniqueness, old-password rejection, new-password sign-in, exact CSV contents, and post-download cleanup. Session revocation has an independent bounded 50-target selection, exact-ID preview, current-session exclusion, confirmation, per-target reauthorization and audit trail, with successful targets removed and concrete failures retained for retry; API coverage verifies deduplication plus mixed success/self/missing results, and a SQLite browser gate revokes two live delegated sessions. Permanent user deletion now reuses the same 50-account exact selection and per-target delegation boundary, prevents self-delete, requires irreversible-action confirmation, removes every successful account with all sessions and role assignments in one store transaction, retains concrete failures for retry, and records a standalone audit snapshot with the deleted username, display/status/roles, and exact removal counts. API coverage proves authentication, self-protection, session invalidation, repeat-delete behavior, directory cleanup, and audit retention across the durable stores; a real SQLite browser gate deletes two delegated accounts and verifies their directory/session absence plus both retained audits. All Ops account, role, password, session, access-window, custom-text, and monitor-profile confirmations now share a labelled in-app alert dialog with safe initial focus, trapped keyboard navigation, Escape cancellation, focus restoration, and explicit action-specific confirmation. The protected production browser gates exercise the no-request cancel path and the representative single and batch confirmation sequence through account deletion. Original workspace lifecycle parity now covers creation, RW/RO assignment, rename, and platform-admin-only permanent deletion. Deletion requires the exact workspace key, atomically clears every workspace aggregate and scoped role, retains the global audit record, and is gated across memory/file/SQLite plus protected Chromium/SQLite. Matching the original three-tab system administration, platform admins now switch through one responsive, keyboard-visible `Admins` / `Workspaces` / `Settings` navigation shared by Ops and Workspace routes. Admin and Settings panels are mutually exclusive, the selected panel is URL-stable, and production Chromium gates the complete settings-to-workspace-to-admin round-trip. The workspace directory now also reproduces the Original table's `MAX(files.modification_ts)` signal from currently stored source-package upload times, keeps empty workspaces explicit, exports the value, and sorts interactively by name or latest file modification in either direction. The 18 upstream Superadmin E2E scenarios are now explicitly traced: all settings controls plus maintenance-warning set/clear; user action availability, creation, invalid/valid Superadmin step-up, RO/RW enforcement, password mismatch/success, and deletion; and workspace action availability, creation, user-centred RO/RW assignment, rename, and deletion. Rewrite API and production SQLite/Chromium gates cover every path, so the Original Superadmin surface is functionally closed; the additional tenant hierarchy, access windows, batch operations, session administration, CSVs, and audit evidence exceed that baseline. |
+| Branding/settings/custom texts | settings module, `e2e/src/e2e/Super-Admin/settings.cy.ts` | done | P2 | imported per-login participant, Booklet, monitor, and system-check texts are durable and applied. The original instance application title, expiring global warning, resettable 20 MiB logo, `Primar`/`Sekundar`/`Erwachsene` themes, bounded start-page HTML plus independently bounded `Impressum`, `Datenschutz`, and `Barrierefreiheit` HTML, and bounded global custom-text overrides are public, platform-admin editable, validated, audited, and durable across every adapter. The eight current Original presentation slots ship with the byte-exact upstream logo, login, code-input, companion, completion, loading, and confirmation images; registered global or per-login assignments override those built-ins, while the `Sekundar` code-input illustration follows the Original theme-specific fallback. Angular applies branding to participant and operator shells, switches real CSS variables immediately, removes the global banner at expiry, presents sanitized configured HTML on participant entry and three separate public information routes, and resolves participant text in the original global < Testtakers/Login < active Booklet order. System-check configuration remains more specific than global text; authenticated monitor login text likewise overrides global settings, with the complete 54-key `gm_*` defaults exposed in the editor and all 54 keys rendered across headline, commands, columns, summaries, profile view/filter text and status flags, scheduled/expired access boundaries, selection counts, tooltips and confirmed unlock feedback, target-timer state/confirmation, scroll/hide controls. The four broken-booklet diagnostics use fixed current Original copy and ignore removed overrides. Legacy file/SQLite/Postgres migrations, API/store tests, and production SQLite browser gates cover custom branding, separate public documents, layered participant text, imported monitor-account text, placeholder formatting, access-window copy, sanitizer enforcement, and full reset. |
+| Attachments and QR capture | `AttachmentController`, `AttachmentFiles`, attachment-manager frontend | partial | P1 | Every Original BaseVariable attachment projects a typed slot per started run, including `image`, `audio`, `ggb-file`, custom, and omitted formats; only `capture-image` exposes the implemented missing/captured camera controls. Authenticated admins and scoped monitors can list the complete inventory, upload validated PNG/JPEG capture images, preview/download them inline, delete them, and use a stable copyable attachment code in Angular; files and audit events are durable across every adapter. Unsupported capture attempts and QR pages fail explicitly instead of silently treating another authored type as a photograph. The same upload endpoint accepts the original `multipart/form-data` `attachment` field and `type=image` request shape in addition to JSON/Base64. The manager downloads one selected or up to 500 role-scoped A4 capture QR pages as PDF, with the original seven configurable label placeholders and generation-time scope enforcement. The lazy mobile capture route implements live-camera/QR-image scans, camera/flash selection and manual fallback, server-scoped target lookup, A4 capture/device photo, preview and protected upload. Four production Chrome/Chromium sequences pass image and generated live-camera decoding through the unchanged owned worker, normal/inverted/error recovery, scoped lookup, actual A4 preview, upload, native manager preview/deletion and observed worker closure at 1280/390 pixels. Conditional lifecycle tests and an independent raw-Chrome native component/scanner/worker probe pass: actual minimization hides the document, ends the old stream and clears video; native restoration starts a distinct stream without SDK focus emulation or visibility overrides. The complete built Angular application also passes native minimize/stop and restore/resume with synthetic media and real operator authentication. Physical-camera acceptance remains open. The current printed A4/QR-region and camera-facing crop now share one geometry; native workers select only the padded printed region and retain the selected QR in both facing cases' encoded photos. Built Angular image/rear/front flows separately gate upload, preview, deletion and worker closure at 1280/390 pixels. Physical hidden-window acceptance and complete Original capture layout remain open; manual fallback cannot close them. |
+| Durable storage | deployment stack | partial | P0 | File, SQLite and PostgreSQL persistence, migrations and doctor/preflight pass. Live writer probes and HTTP/SSE shutdown drainage are qualified. File version-three process/namespace markers coordinate access and preview/apply compaction; SIGKILL before sidecar/manifest publication and after the manifest switch retains old/old/new committed data and allows safe cleanup. Active/unknown access, unrelated files and directory symlinks are preserved/refused. Actual power-loss and broader operating/performance qualification remain open. |
 | CI and deployability | deployment scripts | done | P0 | the repository-root workflow is the single GitHub-executable authority for static, unit, original-compatibility, memory/file/SQLite/Postgres storage, browser, startup/shutdown, metadata-required runtime preflight, standalone Docker-image, and demo-disabled/demo-enabled Compose gates; the former nested workflow has been removed so documented release checks cannot be silently ignored by GitHub. All seven Angular feature surfaces compile into independent lazy chunks. After the Angular 21 upgrade, the frontend relies on the framework's default zoneless change detection instead of shipping the redundant Zone.js runtime. The root shell hydrates only shared browser/session state and resolves Workspace, Content, Runtime, and Ops services on demand, so no eager shared feature chunk returns. Global error capture and confirmation state remain immediately available, while the standalone dialog surfaces load on first use: the current production build is 448.35 kB raw initial JavaScript/CSS (114.33 kB estimated transfer), down from the 563.85-kB eager-feature baseline. Dedicated Chromium gates cover the public Start route, auth-aware protected-route return, signed-out diagnostic isolation, mobile overflow, async application settings, central error reporting, open-auth direct entry, Participant offline reload/SSE reconnect, Content navigation, and live monitor commands. Production budgets now warn at 450 kB and fail at 470 kB, guarding both root-shell and shared-feature regressions while every complete flow remains lazy-loadable |
 
 Angular no longer delegates destructive workspace, content, result, review,
@@ -4408,3 +9195,47 @@ demo Chromium gate pin the distinction.
 The original Aspect 17.4 package gate now includes its byte-exact companion `testtaker1.xml`: contract and API tests pin its SHA-256, three participant modes, password policy, Custom Text propagation, and password-redacted monitor candidate. The production browser smoke imports that roster and executes the real passwordless `testuser1` account through all three Aspect Units instead of using a synthetic participant.
 
 The original 17.6 showcase is now pinned as one complete seven-file package rather than as separate partial fixtures. Cross-store API coverage uploads the real Booklet, both Units, external HTML definition, Verona 6 player, coding scheme, and nested resource ZIP as loose files; it then proves automatic immutable dependency assembly, both player-reference spellings, deduplication of the repeated player/editor resource dependency, the repeated Unit alias, the original roster, and Participant resource delivery. The importer treats a schema-valid empty `CodingSchemeRef` with `schemer` as a schemer selection instead of a missing packaged scheme, while non-empty references retain strict resolution and version checks. The production Angular smoke executes the external-definition Unit with the original player and passwordless `test-no-pw` account, persists a real form response, fetches the nested resource, and restores the response after reload.
+
+
+## Selected-run Debug diagnostics (2026-10-12)
+
+The pinned Original revision `ee2ab9ab64bd91209ef8534bbe6005838024e46d`
+now has an executable Debug command contract in the rewrite. Monitor delivery
+keeps the existing selected-run ACK/application protocol and immutable argument
+identity. Debug application bypasses the answer drain and does not change the
+Run, parent session, controller status, timers, answers or their clocks. Native
+`window.tc.debug()` uses the existing log-only endpoint with stable entry IDs,
+scoped offline retry and restart recovery. Stable delivery log IDs preserve
+the first persisted contents and server receipt time in all four adapters;
+ordinary non-delivery repository upserts retain their former behavior.
+
+A deferred participant pane provides all ten Source windows, persisted
+`tc-debug` window selection, native pointer dragging, raw configuration and
+mode fields, booklet/Unit properties, tracked variables, adaptive states,
+Custom Text token selection, real rewrite service status and XML condition
+testing. Local pending, optimistic, durable-outbox and non-saving ephemeral
+responses feed the diagnostic projection without advancing their delivery.
+A selected-run snapshot binds tenant, workspace, participant, Run, release and
+booklet; controller replacement aborts old reads and clears prior metadata.
+Parser errors are rendered as escaped text. The existing distributed
+`assets/ORIGINAL-UI-LICENSE.txt` retains the Original MIT notice.
+
+Fresh local validation passed 1,742 unit/frontend checks, 1,195 complete
+PostgreSQL integration checks, 498 HTTP integration checks across Memory, File
+and SQLite, and 61 Original compatibility checks. Typecheck and production build
+passed with the unchanged 470 kB initial limit (469.96 kB); the 450 kB warning,
+four existing style warnings and two CommonJS warnings for the pinned IQB
+coding libraries remain visible. Nine protected production Chromium/SQLite
+scenario groups exercised all ten windows, offline variables, remote delivery,
+paused native logging, production reload, a held former-run snapshot across
+booklet replacement, and Debug after controller ERROR. The existing browser
+regression matrix and clean-archive container gates are recorded separately
+after their authoritative completion.
+
+This closes the missing Debug keyword and basic diagnostic workflow, not the
+full Original UI or production acceptance. Remaining work includes a live
+Original-pane visual comparison, inherited lock/property details, the other
+four native `window.tc` commands and command-service lifetime audit, diagnostics
+when initial loading fails before a complete current-state view exists, and
+Debug behavior/performance with large real Original coding/player packages.
+No push, remote CI, release, deployment or production confirmation is implied.

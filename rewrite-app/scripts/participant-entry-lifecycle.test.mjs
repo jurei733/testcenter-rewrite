@@ -10,29 +10,60 @@ import { productionApiRoutes, resolveRoutePath } from "@testcenter-rewrite-app/c
 const source = readFileSync(new URL("../apps/web/src/app/participant-view.facade.ts", import.meta.url), "utf8");
 const ast = ts.createSourceFile("participant-view.facade.ts", source, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
-const methodNames = ["resumeEntrySessionInternal", "replaceSelectedRunEntryLink", "reloadPage", "reloadAfterControllerError",
-  "starterLaunchInternal", "resumeSessionInternal"];
+const methodNames = ["pendingControllerStatus","resumeEntrySessionInternal", "replaceSelectedRunEntryLink", "reloadPage", "reloadAfterControllerError",
+  "starterLaunchInternal", "resumeSessionInternal", "readCurrentRunState", "hasControllerError", "controllerError"];
 const methods = methodNames.map(name => {
-  const method = declaration?.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(ast) === name);
+  const method = declaration?.members.find(node => (ts.isMethodDeclaration(node) || ts.isGetAccessor(node)) && node.name.getText(ast) === name);
   assert.ok(method, `The production ${name} method must exist.`);
   return method.getText(ast);
 });
-const { outputText } = ts.transpileModule(`export const createEntryHost = (productionApiRoutes, resolveRoutePath, prettyPrintJson) => class EntryHost { ${methods.join("\n")} };`, {
+const { outputText } = ts.transpileModule(`export const createEntryHost = (productionApiRoutes, resolveRoutePath, prettyPrintJson) => class EntryHost { controllerTimerInterruption=Object.assign(()=>null,{set(){}}); controllerCommandPhase=Object.assign(()=>null,{set(){}}); ${methods.join("\n")} };`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 });
 const { createEntryHost } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 const EntryHost = createEntryHost(productionApiRoutes, resolveRoutePath, value => JSON.stringify(value));
 
+const componentSource = readFileSync(new URL('../apps/web/src/app/participant-view.component.ts', import.meta.url), 'utf8');
+const componentAst = ts.createSourceFile('component.ts', componentSource, ts.ScriptTarget.ES2022, true);
+const componentClass = componentAst.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === 'ParticipantViewComponent');
+const initialization = componentClass.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(componentAst) === 'ngOnInit');
+assert.ok(initialization);
+const lifecycleModule = ts.transpileModule(`export class EntryComponent { ${initialization.getText(componentAst)} }`, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
+}).outputText;
+const { EntryComponent } = await import(`data:text/javascript;base64,${Buffer.from(lifecycleModule).toString('base64')}`);
+for (const leaveBeforeEntry of [false, true]) test(`direct-link initialization waits until after parent checking and respects route destruction: ${leaveBeforeEntry}`, async () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: {
+    search: '?tenantKey=owned&workspaceKey=selected&participantSessionId=owned-session&testRunId=selected-run&view=starter'
+  } } });
+  const events = [], component = new EntryComponent();
+  component.destruction = { destroyed: false };
+  component.view = { init() { events.push('init'); }, startFromEntryParameters(parameters) { events.push(parameters); } };
+  component.changeDetector = { markForCheck() { events.push('render'); } };
+  try {
+    component.ngOnInit(); assert.deepEqual(events, ['init']);
+    component.destruction.destroyed = leaveBeforeEntry;
+    await Promise.resolve();
+    if (leaveBeforeEntry) assert.deepEqual(events, ['init']);
+    else {
+      assert.equal(events[1].tenantKey, 'owned'); assert.equal(events[1].workspaceKey, 'selected');
+      assert.equal(events[1].participantSessionId, 'owned-session'); assert.equal(events[1].testRunId, 'selected-run');
+      assert.equal(events[1].openStarter, true); assert.equal(events[2], 'render');
+    }
+  } finally { if (previous) Object.defineProperty(globalThis, 'window', previous); else delete globalThis.window; }
+});
+
 const parameters = testRunId => ({ bookletKey: "BOOKLET#level:beginner", testRunId });
 const state = (mode, overrides = {}) => ({
   executionMode: { mode, saveResponses: !["run-demo", "run-review", "run-simulation"].includes(mode) },
-  testRun: { testRunId: "selected/A", bookletKey: "BOOKLET", bookletAssignmentKey: "BOOKLET#level:advanced",
+  testRun: { participantSessionId: "own-session", testRunId: "selected/A", bookletKey: "BOOKLET", bookletAssignmentKey: "BOOKLET#level:advanced",
     status: "running", locked: false, currentUnitKey: "active-unit", ...overrides }
 });
 const host = currentState => {
   const entry = new EntryHost();
   entry.viewLifecycleSequence = 1;
-  entry.runtime = { testRunId: "selected/A", bookletKey: "stale-browser-assignment" };
+  entry.runtime = { participantSessionId: "own-session", testRunId: "selected/A", bookletKey: "stale-browser-assignment" };
   entry.currentRunState = null;
   const calls = { resumed: 0, applied: 0, refreshed: 0 };
   entry.refreshCurrentStateInternal = async quiet => {
@@ -80,6 +111,57 @@ for (const status of ["running", "paused", "completed"]) {
   });
 }
 
+for (const mode of ["run-hot-return", "run-demo", "run-review", "run-simulation"]) {
+  for (const hasRun of [false, true]) {
+    test(`${mode}: native Starter entry reads its authorized roster without starting or resetting a Run (${hasRun ? "existing" : "none"})`, async () => {
+      const { entry, calls } = host(hasRun ? state(mode) : null);
+      const presentation = { stopped: 0, invalidated: 0, synchronized: 0, persisted: 0, assets: "old" };
+      const roster = { participantSession: { participantSessionId: "own-session" }, participantRosterEntry: { displayName: "Own person" },
+        scope: {tenantKey:"own-tenant",workspaceKey:"own-workspace"}, booklets:[{bookletKey:"own-assignment"}] };
+      const requests = [];
+      entry.runtime.participantSessionId = "own-session"; entry.workspace = {};
+      entry.requestState = { request: async (...args) => { requests.push(args); return { runtimeState: roster }; } };
+      entry.syncParticipantSessionFields = value => assert.equal(value, roster.participantSession);
+      entry.syncParticipantRosterEntry = value => assert.equal(value, roster.participantRosterEntry);
+      entry.syncRuntimeBooklets = value => assert.equal(value, roster.booklets);
+      entry.participantEvents = { stop() { presentation.stopped++; } };
+      entry.invalidateCurrentStateRefreshes = () => { presentation.invalidated++; };
+      entry.loadedBookletAssets = { set(value) { presentation.assets = value; } };
+      entry.activeControllerError = { set(value) { assert.equal(value, null); } };
+      entry.syncParticipantHeaderVisibility = () => { presentation.synchronized++; };
+      entry.persistState = () => { presentation.persisted++; };
+      entry.runtime.currentUnitKey = "previous-unit";
+      entry.runtime.currentUnitResponse = "previous-view";
+      entry.runtime.currentRunStateView = JSON.stringify({ currentRunState: state(mode) });
+      await entry.resumeEntrySessionInternal({ ...parameters(""), openStarter: true });
+      assert.deepEqual(calls, { resumed: 0, applied: 0, refreshed: 0 });
+      assert.deepEqual(requests, [["Participant Starter", "GET", "/api/v1/participant/sessions/own-session/runtime-state", undefined, {quiet:true}]]);
+      assert.deepEqual(entry.workspace, roster.scope);
+      assert.equal(entry.currentRunState, null);
+      assert.equal(entry.runtime.testRunId, ""); assert.equal(entry.runtime.currentUnitKey, ""); assert.equal(entry.runtime.currentUnitResponse, "");
+      assert.deepEqual(presentation, { stopped: 1, invalidated: 1, synchronized: 1, persisted: 1, assets: null });
+      assert.equal(entry.readCurrentRunState(), null, "The render cache must not resurrect the Run in Starter presentation.");
+    });
+  }
+}
+
+test("a denied or stale native Starter read cannot clear another view or start a sibling Run", async () => {
+  for (const stale of [false, true]) {
+    const { entry, calls } = host(state("run-hot-return"));
+    entry.runtime.participantSessionId = "own-session";
+    const denied = new Error("participant_session_access_required");
+    entry.requestState = { request: async () => {
+      if (stale) { entry.viewLifecycleSequence++; return {}; }
+      throw denied;
+    } };
+    const action = entry.resumeEntrySessionInternal({ ...parameters(""), openStarter: true });
+    if (stale) await action;
+    else await assert.rejects(action, error => error === denied);
+    assert.deepEqual(calls, { resumed: 0, applied: 0, refreshed: 0 });
+    assert.equal(entry.runtime.testRunId, "selected/A");
+  }
+});
+
 for (const protectedState of [{ status: "completed" }, { locked: true }, { status: "paused", pauseSource: "monitor" }]) {
   test(`non-saving re-entry respects ${JSON.stringify(protectedState)} instead of resetting it`, async () => {
     const currentState = state("run-simulation", protectedState);
@@ -119,7 +201,7 @@ const withRouter = async (ui, action) => {
   const previousWindow = globalThis.window;
   let resolveNavigation, rejectNavigation;
   const navigation = new Promise((done, fail) => { resolveNavigation = done; rejectNavigation = fail; });
-  const calls = { nativeWrites: 0, reloads: 0, persisted: 0, routed: [], actions: [] };
+  const calls = { nativeWrites: 0, reloads: 0, persisted: 0, settled: 0, routed: [], actions: [] };
   const link = "https://owned.example/participant?participantSessionId=session%2F%C3%A4&testRunId=run%2FA&bookletKey=BOOKLET%23level%3Aadvanced";
   globalThis.window = {
     location: { origin: "https://owned.example", search: `?ui=${ui ?? ""}&password=must-not-persist&unknown=ignored`, reload() { calls.reloads++; } },
@@ -132,7 +214,12 @@ const withRouter = async (ui, action) => {
   entry.viewState = { onActionAsync(fn) { calls.actions.push(fn()); } };
   entry.persistState = () => { calls.persisted++; };
   entry.showReloadButton = true;
-  entry.hasControllerError = true;
+  entry.viewLifecycleSequence = 1;
+  entry.runtime = {participantSessionId:"session/ä",testRunId:"run/A"};
+  entry.currentRunState = {testRun:{participantSessionId:"session/ä",testRunId:"run/A",status:"running"},currentUnit:{unitKey:"active-unit"}};
+  entry.activeControllerError = () => error;
+  const error = {testRunId:"run/A",unitKey:"active-unit",message:"Owned error"};
+  entry.settleVeronaAutoSaveBeforeForegroundAction = async () => { calls.settled++; };
   try { await action({ entry, calls, resolveNavigation, rejectNavigation }); }
   finally {
     resolveNavigation(true);
@@ -160,10 +247,24 @@ for (const ui of ["original", "rewrite", null, "unknown"]) {
   });
 }
 
+test("a terminated controller synchronizes the starter address before reload; a resumed controller clears it", async () => {
+  for (const starter of [true, false]) await withRouter("original", async ({ entry, calls, resolveNavigation }) => {
+    entry.isParticipantStarter = starter;
+    entry.createParticipantSessionEntryLink = () => `https://owned.example/participant?participantSessionId=session${starter ? '' : '&testRunId=run'}`;
+    const result = entry.replaceSelectedRunEntryLink();
+    const target = new URL(calls.routed[0].url, "https://owned.example");
+    assert.equal(target.searchParams.get("view"), starter ? "starter" : null);
+    assert.equal(target.searchParams.get("testRunId"), starter ? null : "run");
+    assert.equal(target.searchParams.get("ui"), "original");
+    resolveNavigation(true); await result;
+  });
+});
+
 for (const method of ["reloadPage", "reloadAfterControllerError"]) {
   test(`${method} waits for the exact Router URL before reloading the page`, async () => {
     await withRouter("original", async ({ entry, calls, resolveNavigation }) => {
       entry[method]();
+      await Promise.resolve();
       assert.equal(calls.persisted, 1);
       assert.equal(calls.reloads, 0, "Reloading early could reopen a stale assignment.");
       assert.equal(calls.routed.length, 1);
@@ -175,7 +276,7 @@ for (const method of ["reloadPage", "reloadAfterControllerError"]) {
   test(`${method} retains its availability guard`, async () => {
     await withRouter("original", async ({ entry, calls }) => {
       entry.showReloadButton = false;
-      entry.hasControllerError = false;
+      entry.activeControllerError = () => null;
       entry[method]();
       assert.equal(calls.routed.length, 0);
       assert.equal(calls.reloads, 0);
@@ -256,7 +357,7 @@ const launchHost = () => {
 };
 
 for (const method of ["starterLaunchInternal", "resumeSessionInternal"]) {
-  test(`${method} awaits the selected Run's Router update after current-state refresh`, async () => {
+  test(`${method} awaits the authorized Run's Router update before loading current-state`, async () => {
     const { entry, calls } = launchHost();
     let finishRoute;
     let enterRoute;
@@ -267,11 +368,12 @@ for (const method of ["starterLaunchInternal", "resumeSessionInternal"]) {
     const result = entry[method]().then(() => { settled = true; });
     await startedRouting;
     assert.equal(settled, false);
-    assert.equal(calls.refreshed, 1);
+    assert.equal(calls.refreshed, 0);
     assert.equal(entry.runtime.testRunId, "selected-run");
     finishRoute();
     await result;
     assert.equal(calls.routed, 1);
+    assert.equal(calls.refreshed, 1);
   });
 
   test(`${method} does not apply a late response after leaving the participant view`, async () => {
@@ -285,7 +387,7 @@ for (const method of ["starterLaunchInternal", "resumeSessionInternal"]) {
   });
 
   for (const change of ["view", "run"]) {
-    test(`${method} does not route a superseded ${change} after refresh`, async () => {
+    test(`${method} does not reroute a superseded ${change} after refresh`, async () => {
       const { entry, calls } = launchHost();
       entry.refreshCurrentStateInternal = async () => {
         calls.refreshed++;
@@ -294,7 +396,7 @@ for (const method of ["starterLaunchInternal", "resumeSessionInternal"]) {
       };
       await entry[method]();
       assert.equal(calls.refreshed, 1);
-      assert.equal(calls.routed, 0);
+      assert.equal(calls.routed, 1, "Only the early authorized URL update is allowed.");
     });
   }
 }
@@ -315,4 +417,43 @@ test("a late launch code challenge cannot change the next participant view", asy
   assert.equal(calls.challenges, 0);
   assert.equal(calls.synchronized, 0);
   assert.equal(calls.routed, 0);
+});
+
+for (const phase of ["save", "router"]) {
+  for (const changed of ["view", "run", "unit", "error"]) {
+    test(`controller-error reload cannot reload after ${changed} changes during ${phase}`, async () => {
+      await withRouter("original", async ({entry, calls, resolveNavigation}) => {
+        let settle;
+        entry.settleVeronaAutoSaveBeforeForegroundAction = () => new Promise(done => { settle = done; });
+        entry.reloadAfterControllerError(entry.controllerError);
+        assert.equal(calls.persisted, 0); assert.equal(calls.routed.length, 0);
+        if (phase === "router") { settle(); await Promise.resolve(); assert.equal(calls.routed.length, 1); }
+        if (changed === "view") entry.viewLifecycleSequence++;
+        if (changed === "run") entry.currentRunState.testRun.testRunId = "other-run";
+        if (changed === "unit") entry.currentRunState.currentUnit.unitKey = "other-unit";
+        if (changed === "error") entry.activeControllerError = () => ({testRunId:"run/A",unitKey:"active-unit",message:"new error"});
+        if (phase === "save") settle();
+        resolveNavigation(true); await Promise.all(calls.actions);
+        assert.equal(calls.reloads, 0);
+        assert.equal(calls.persisted, phase === "save" ? 0 : 1);
+      });
+    });
+  }
+}
+
+test("controller-error reload retains a failed save and never reloads or changes the URL", async () => {
+  await withRouter("original", async ({entry, calls}) => {
+    const failure = Error("owned_save_failure");
+    entry.settleVeronaAutoSaveBeforeForegroundAction = async () => { throw failure; };
+    entry.reloadAfterControllerError(entry.controllerError);
+    await assert.rejects(calls.actions[0], error => error === failure);
+    assert.equal(calls.persisted, 0); assert.equal(calls.routed.length, 0); assert.equal(calls.reloads, 0);
+  });
+});
+
+test("a stale error dialog cannot reload a different active error", async () => {
+  await withRouter("original", async ({entry, calls}) => {
+    entry.reloadAfterControllerError({...entry.controllerError});
+    assert.equal(calls.actions.length, 0); assert.equal(calls.settled, 0);
+  });
 });

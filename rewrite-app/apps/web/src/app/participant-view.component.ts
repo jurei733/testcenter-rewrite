@@ -1,25 +1,38 @@
 import { CommonModule } from "@angular/common";
 import {
+  ChangeDetectorRef,
   Component,
+  DestroyRef,
   ElementRef,
   ViewChild,
+  effect,
   inject,
   signal
 } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { CdkTrapFocus } from "@angular/cdk/a11y";
+import { redactBugReportText } from "@testcenter-rewrite-app/contracts";
 
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
+import type { ParticipantConfirmationDialog } from "./participant-view.facade";
+import { OriginalParticipantConfirmationLauncherComponent } from "./original-participant-confirmation-dialog.component";
+import { OriginalParticipantInformationLauncherComponent } from "./original-participant-information-dialog.component";
+import { OriginalParticipantErrorLauncherComponent } from "./original-participant-error-dialog.component";
 import { ParticipantStatusStylesComponent } from "./participant-status-styles.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
 import { OriginalPlayerToolbarComponent } from "./original-player-toolbar.component";
+import { OriginalPlayerSurfaceStylesComponent } from "./original-player-surface-styles.component";
+import { OriginalParticipantPausedComponent } from "./original-participant-paused.component";
 import { OriginalPlayerSidebarComponent } from "./original-player-sidebar.component";
 import { OriginalReviewPanelComponent } from "./original-review-panel.component";
 import { OriginalToastContainerComponent } from "./original-toast-container.component";
+import { OriginalToastService } from "./original-toast.service";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
+import { ParticipantDebugLauncherComponent } from "./participant-debug-launcher.component";
 
 interface ParticipantVisibleCodeNotice {
   code: string;
@@ -30,16 +43,24 @@ interface ParticipantVisibleCodeNotice {
 @Component({
   selector: "app-participant-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent],
+  imports: [CommonModule, FormsModule, CdkTrapFocus, VeronaPlayerHostComponent, ParticipantDebugLauncherComponent, OriginalParticipantEntryComponent,
+    OriginalPlayerToolbarComponent, OriginalPlayerSurfaceStylesComponent, OriginalParticipantPausedComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent, OriginalParticipantErrorLauncherComponent],
   template: `
     <app-participant-status-styles />
+    @defer (on immediate) {
+      <app-participant-debug-launcher [state]="view.debugRunState" [run]="view.consoleRun" />
+    }
     @defer (when interfaceMode.mode() === 'original') {
       @if (interfaceMode.mode() === 'original') {
         <app-original-toast-container />
       }
     }
     <div class="stack" [class.is-original-player]="interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused">
+      @defer (when interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused) {
+        @if (interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused) {
+          <app-original-player-surface-styles />
+        }
+      }
       @defer (when interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
         @if (interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
           <app-original-participant-entry />
@@ -327,7 +348,7 @@ interface ParticipantVisibleCodeNotice {
         <strong aria-hidden="true">↓</strong>
       </button>
 
-      <article class="card" id="participantRoutePlayer" *ngIf="!(interfaceMode.mode() === 'original' && (view.isParticipantLogin || view.isParticipantStarter))">
+      <article class="card" id="participantRoutePlayer" *ngIf="!view.isParticipantLogin && !view.isParticipantStarter">
         <input
           *ngIf="view.isParticipantPlayerFocused"
           id="participantRouteSessionId"
@@ -358,7 +379,7 @@ interface ParticipantVisibleCodeNotice {
         >
           <div>
             <span>Display Check</span>
-            <strong id="participantRouteFullscreenPromptTitle">{{ view.customText('booklet_requestFullscreen', 'Use fullscreen for this test?') }}</strong>
+            <strong id="participantRouteFullscreenPromptTitle">{{ view.customTextValue('booklet_requestFullscreen') }}</strong>
             <p>The booklet requests a distraction-free fullscreen presentation.</p>
           </div>
           <div class="actions">
@@ -501,7 +522,7 @@ interface ParticipantVisibleCodeNotice {
             </section>
           </ng-container>
           <ng-template #participantActiveRun>
-          <ng-container *ngIf="view.hasControllerError; else participantRunnableState">
+          <ng-container *ngIf="view.hasControllerError && interfaceMode.mode() !== 'original'; else participantRunnableState">
             <section
               id="participantRouteControllerErrorState"
               class="participant-controller-error-state"
@@ -616,9 +637,11 @@ interface ParticipantVisibleCodeNotice {
           </section>
           <ng-container *ngIf="!view.eagerBookletLoading; else eagerBookletLoading">
             <app-verona-player-host
-              *ngIf="view.veronaPlayer as verona; else textResponsePlayer"
+              *ngIf="(interfaceMode.mode() === 'original' ? view.originalVeronaPlayer : view.veronaPlayer) as verona; else textResponsePlayer"
               [playerHtml]="verona.playerHtml"
               [playerKey]="verona.playerKey"
+              [commandReloadSequence]="verona.commandReloadSequence"
+              [unitViewPending]="verona.unitViewPending"
               [testRunId]="verona.testRunId"
               [unitKey]="verona.unitKey"
               [unitTitle]="verona.unitTitle"
@@ -626,6 +649,7 @@ interface ParticipantVisibleCodeNotice {
               [unitDefinitionType]="verona.unitDefinitionType"
               [resourceBasePath]="verona.resourceBasePath"
               [savedResponse]="verona.savedResponse"
+              [responseClocks]="verona.responseClocks"
               [sharedParameters]="verona.sharedParameters"
               [unitNumber]="verona.unitNumber"
               [unitCount]="verona.unitCount"
@@ -1076,7 +1100,13 @@ interface ParticipantVisibleCodeNotice {
           </div>
           </ng-container>
           <ng-template #participantPaused>
+            @defer (when interfaceMode.mode() === 'original') {
+              @if (interfaceMode.mode() === 'original') {
+                <app-original-participant-paused />
+              }
+            }
             <section
+              *ngIf="interfaceMode.mode() !== 'original'"
               id="participantRoutePausedState"
               class="participant-paused-state"
               role="status"
@@ -1099,10 +1129,12 @@ interface ParticipantVisibleCodeNotice {
           </ng-template>
         </div>
       </article>
+      <ng-template #confirmationFallback let-confirmation>
       <section
-        *ngIf="view.confirmationDialog() as confirmation"
         id="participantConfirmationBackdrop"
         class="participant-confirmation-backdrop"
+        cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
+        (keydown.escape)="resolveOriginalConfirmation(confirmation, false); $event.stopPropagation()"
       >
         <article
           class="participant-confirmation-dialog"
@@ -1125,25 +1157,84 @@ interface ParticipantVisibleCodeNotice {
               id="participantConfirmationStayButton"
               class="secondary"
               type="button"
-              autofocus
-              (click)="view.resolveConfirmation(false)"
+              cdkFocusInitial
+              (click)="resolveOriginalConfirmation(confirmation, false)"
             >{{ confirmation.cancelLabel }}</button>
+            @if (confirmation.kind !== 'information') {
             <button
               id="participantConfirmationContinueButton"
               class="ghost"
               type="button"
-              (click)="view.resolveConfirmation(true)"
+              (click)="resolveOriginalConfirmation(confirmation, true)"
             >{{ confirmation.confirmLabel }}</button>
+            }
           </div>
         </article>
       </section>
+      </ng-template>
+      @if (interfaceMode.mode() === 'original' && view.controllerError; as error) {
+        @for (request of [error]; track request) {
+          @defer (on immediate) {
+            <app-original-participant-error-launcher [error]="request" />
+          } @error {
+            <section id="participantRuntimeErrorFallback" class="participant-confirmation-backdrop" role="alertdialog" aria-modal="true"
+              cdkTrapFocus [cdkTrapFocusAutoCapture]="true" aria-labelledby="participantErrorFallbackTitle">
+              <article class="participant-confirmation-dialog">
+                <h2 id="participantErrorFallbackTitle">{{ request.title ?? "Fehler beim Abspielen der Aufgabe" }}</h2>
+                <p style="white-space: pre-wrap">{{ view.customText('booklet_errormessage') }}</p>
+                <details><summary>Fehlerdetails</summary><p [innerHTML]="redactBugReportText(request.description ?? request.message)"></p></details>
+                <button id="participantRouteControllerReloadButton" cdkFocusInitial type="button"
+                  (click)="view.reloadAfterControllerError(request)">Schließen und neu laden</button>
+              </article>
+            </section>
+          }
+        }
+      }
+      @if (view.confirmationDialog(); as confirmation) {
+        @if (interfaceMode.mode() === 'original') {
+          @for (request of [confirmation]; track request) {
+            @if (request.kind === 'information') {
+              @defer (on immediate) {
+                <app-original-participant-information-launcher [confirmation]="request"
+                  (closed)="resolveOriginalConfirmation(request, false)" />
+              } @error {
+                <ng-container [ngTemplateOutlet]="confirmationFallback" [ngTemplateOutletContext]="{$implicit: request}" />
+              }
+            } @else {
+            @defer (on immediate) {
+              <app-original-participant-confirmation-launcher [confirmation]="request"
+                (closed)="resolveOriginalConfirmation(request, $event)" />
+            } @error {
+              <ng-container [ngTemplateOutlet]="confirmationFallback" [ngTemplateOutletContext]="{$implicit: request}" />
+            }
+            }
+          }
+        } @else {
+          <ng-container [ngTemplateOutlet]="confirmationFallback" [ngTemplateOutletContext]="{$implicit: confirmation}" />
+        }
+      }
     </div>
   `
 })
 export class ParticipantViewComponent implements OnInit, OnDestroy {
+  readonly redactBugReportText = redactBugReportText;
+  resolveOriginalConfirmation(request: ParticipantConfirmationDialog, confirmed: boolean): void {
+    if (this.view.confirmationDialog() === request) this.view.resolveConfirmation(confirmed);
+  }
   readonly interfaceMode = inject(InterfaceModeService);
   readonly view = inject(ParticipantViewFacade);
+  private readonly destruction = inject(DestroyRef);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   readonly applicationSettings = inject(ApplicationSettingsService);
+  private readonly originalToasts = inject(OriginalToastService);
+  private consumedNavigationToast: { text: string; additionalTexts?: readonly string[] } | null = null;
+  private readonly presentOriginalNavigationToast = effect(() => {
+    const notice = this.view.originalNavigationToast();
+    const original = this.interfaceMode.mode() === "original";
+    if (!notice || notice === this.consumedNavigationToast) return;
+    this.consumedNavigationToast = notice;
+    if (original) for (const text of [notice.text, ...(notice.additionalTexts ?? [])]) this.originalToasts.show(text);
+  });
   readonly originalPanel = signal<"review" | "units" | null>(null);
 
   toggleOriginalPanel(panel: "review" | "units"): void {
@@ -1247,7 +1338,7 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.view.init();
     const query = new URLSearchParams(window.location.search);
-    this.view.startFromEntryParameters({
+    const parameters = {
       tenantKey: query.get("tenantKey"),
       workspaceKey: query.get("workspaceKey"),
       loginKey: query.get("loginKey"),
@@ -1257,7 +1348,15 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
       testRunId: query.get("testRunId"),
       currentUnitKey: query.get("currentUnitKey"),
       unitResponse: query.get("unitResponse"),
-      legacyShortLink: query.get("legacyShortLink") === "true"
+      legacyShortLink: query.get("legacyShortLink") === "true",
+      openStarter: query.get("view") === "starter"
+    };
+    // Entry parameters also update shared header/workspace state. Apply them
+    // after the current tree check instead of mutating an already checked parent.
+    queueMicrotask(() => {
+      if (this.destruction.destroyed) return;
+      this.view.startFromEntryParameters(parameters);
+      this.changeDetector.markForCheck();
     });
   }
 

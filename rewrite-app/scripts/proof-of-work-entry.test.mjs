@@ -169,7 +169,7 @@ const componentAngular = moduleUrl(`
   export const viewChild = () => () => undefined, afterRenderEffect = () => {};
 `);
 const componentDependencies = moduleUrl(`
-  export const FormsModule = {}, RouterLink = {}, MatButtonModule = {}, MatFormFieldModule = {}, MatInputModule = {}, MatCard = {}, MatCardContent = {};
+  export class NgForm {} export const FormsModule = {}, RouterLink = {}, MatButtonModule = {}, MatFormFieldModule = {}, MatInputModule = {}, MatCard = {}, MatCardContent = {};
   export class ParticipantViewFacade {} export class ApplicationSettingsService {} export class BrowserCompatibilityService {}
   export class RewriteAppApiService {} export class OriginalLoginNoticeComponent {}
 `);
@@ -214,5 +214,32 @@ test("Original inactive or secure protection retains the actual shared sign-in c
     await component.submit(); assert.equal(calls(), 1); assert.equal(component.passwordStep(), false);
     component.passwordStep.set(true); view.runtime.participantPassword = "owned-password";
     await component.submit(); assert.equal(calls(), 2); assert.equal(component.busy(), false);
+  });
+});
+
+test("Original logo reset clears the form, password step, notices and saved credentials", async () => {
+  await withParticipantLogin(async ({ component, view, calls }) => {
+    const resets = []; let persisted = 0;
+    component.form = () => ({ resetForm: value => resets.push(value) });
+    view.persistState = () => persisted++;
+    component.passwordStep.set(true); component.problem.set("Owned rejection");
+    component.capsLock.set(true); component.showPassword.set(true);
+    component.resetEntry({ detail: { preventDefault: () => assert.fail("Idle native navigation must remain available.") } });
+    assert.equal(view.runtime.loginKey, ""); assert.equal(view.runtime.participantPassword, "");
+    assert.equal(component.passwordStep(), false); assert.equal(component.problem(), "");
+    assert.equal(component.capsLock(), false); assert.equal(component.showPassword(), false);
+    assert.deepEqual(resets, [{ name: "", password: "" }]); assert.equal(persisted, 1); assert.equal(calls(), 0);
+  });
+});
+
+test("Original logo reset cannot clear credentials or navigate while the own authentication is pending", async () => {
+  await withParticipantLogin(async ({ component, view, calls }) => {
+    component.form = () => ({ resetForm: () => assert.fail("Pending form must be retained.") });
+    view.persistState = () => assert.fail("Pending credentials must not be overwritten.");
+    component.busy.set(true); component.passwordStep.set(true); let prevented = 0;
+    component.resetEntry({ detail: { preventDefault: () => prevented++ } });
+    assert.equal(prevented, 1); assert.equal(component.passwordStep(), true);
+    assert.equal(view.runtime.loginKey, "owned-login"); assert.equal(view.runtime.participantPassword, "old-secret");
+    assert.equal(calls(), 0);
   });
 });

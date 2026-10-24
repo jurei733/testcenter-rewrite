@@ -17,8 +17,38 @@
     "paths": {
       "@testcenter-rewrite-app/domain": ["packages/domain/src/index.ts"],
       "@testcenter-rewrite-app/contracts": ["packages/contracts/src/index.ts"],
+      "@testcenter-rewrite-app/contracts/system-check-custom-texts": [
+        "packages/contracts/src/system-check-custom-texts.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-response-capture": [
+        "packages/contracts/src/participant-response-capture.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-response-order": [
+        "packages/contracts/src/participant-response-order.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-response-field-timestamps": [
+        "packages/contracts/src/participant-response-field-timestamps.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-run-command": [
+        "packages/contracts/src/participant-run-command.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/booklet-completeness": [
+        "packages/contracts/src/booklet-completeness.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-starter-exit": [
+        "packages/contracts/src/participant-starter-exit.ts"
+      ],
       "@testcenter-rewrite-app/contracts/participant-roster": [
         "packages/contracts/src/participant-roster.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-debug": [
+        "packages/contracts/src/participant-debug.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-debug-runtime": [
+        "packages/contracts/src/participant-debug-runtime.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-debug-condition": [
+        "packages/contracts/src/participant-debug-condition.ts"
       ],
       "@testcenter-rewrite-app/application": ["packages/application/src/index.ts"],
       "@testcenter-rewrite-app/memory-store": ["packages/memory-store/src/index.ts"],

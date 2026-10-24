@@ -1,5 +1,5 @@
-import { Component, ElementRef, afterRenderEffect, inject, signal, viewChild } from "@angular/core";
-import { FormsModule } from "@angular/forms";
+import { Component, inject, signal, viewChild } from "@angular/core";
+import { FormsModule, NgForm } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
@@ -16,7 +16,8 @@ import { OriginalLoginNoticeComponent } from "./original-login-notice.component"
   standalone: true,
   imports: [FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatCard, MatCardContent, OriginalLoginNoticeComponent],
   templateUrl: "./original-participant-login.component.html",
-  styleUrls: ["./original-participant-login.component.css", "./original-login-theme.scss"]
+  styleUrls: ["./original-participant-login.component.css", "./original-login-theme.scss"],
+  host: { "(window:participant-reset-entry)": "resetEntry($event)" }
 })
 export class OriginalParticipantLoginComponent {
   readonly view = inject(ParticipantViewFacade);
@@ -28,17 +29,20 @@ export class OriginalParticipantLoginComponent {
   readonly problem = signal("");
   readonly showPassword = signal(false);
   readonly capsLock = signal(false);
-  private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>("nameInput");
-  private readonly passwordInput = viewChild<ElementRef<HTMLInputElement>>("passwordInput");
+  private readonly form = viewChild(NgForm);
 
-  constructor() {
-    afterRenderEffect(() => {
-      if (this.busy()) return;
-      const input = this.passwordStep() ? this.passwordInput() : this.nameInput();
-      input?.nativeElement.focus();
-    });
+  resetEntry(event: Event): void {
+    const activation = (event as CustomEvent<MouseEvent | undefined>).detail;
+    if (this.busy()) { activation?.preventDefault(); return; }
+    this.passwordStep.set(false);
+    this.problem.set("");
+    this.capsLock.set(false);
+    this.showPassword.set(false);
+    this.view.runtime.loginKey = "";
+    this.view.runtime.participantPassword = "";
+    this.form()?.resetForm({ name: "", password: "" });
+    this.view.persistState();
   }
-
   passwordKeyUp(event: KeyboardEvent): void {
     this.capsLock.set(typeof event.getModifierState === "function" && event.getModifierState("CapsLock"));
     this.problem.set("");
@@ -59,7 +63,7 @@ export class OriginalParticipantLoginComponent {
       (!this.passwordStep() || !this.view.signInProtectionUnavailable);
   }
 
-  async submit(): Promise<void> {
+  async submit(form?: NgForm): Promise<void> {
     if (!this.canSubmit) return;
     const wasPasswordStep = this.passwordStep();
     if (!wasPasswordStep) this.view.runtime.participantPassword = "";
@@ -88,6 +92,7 @@ export class OriginalParticipantLoginComponent {
         this.view.runtime.loginKey = "";
         this.view.runtime.participantPassword = "";
         this.showPassword.set(false);
+        form?.resetForm({ name: "", password: "" });
       }
     } finally {
       this.busy.set(false);

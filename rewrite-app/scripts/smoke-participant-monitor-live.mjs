@@ -454,6 +454,10 @@ try {
       response.url().endsWith("/monitor/open-runs/commands") &&
       response.request().method() === "POST"
   );
+  const terminalApplicationPromise = participantPage.waitForResponse(response =>
+    response.request().method() === "POST" && /\/commands\/[^/]+\/application$/.test(new URL(response.url()).pathname) &&
+    response.request().postDataJSON()?.testRunId === testRunId
+  );
   await operatorPage.locator("#globalConfirmationConfirmButton").click();
   const completeResponse = await completeResponsePromise;
   assert.equal(completeResponse.status(), 200);
@@ -461,14 +465,19 @@ try {
   assert.equal(completePayload.succeededCount, 1);
   assert.equal(completePayload.failedCount, 0);
   assert.equal(completePayload.commands?.[0]?.commandType, "complete_and_lock");
-  assert.equal(completePayload.commands?.[0]?.testRun?.status, "completed");
-  assert.equal(completePayload.commands?.[0]?.testRun?.locked, true);
-  await participantPage
-    .locator("#participantRouteStatus", { hasText: "completed" })
-    .waitFor({ timeout: 15_000 });
-  await participantPage
-    .locator("#participantRouteCompletedState")
-    .waitFor({ timeout: 15_000 });
+  const terminalResponse = await terminalApplicationPromise;
+  assert.equal(terminalResponse.status(), 200);
+  const terminalApplication = (await terminalResponse.json()).application;
+  assert.equal(terminalApplication.command.commandId, completePayload.commands[0].commandId);
+  assert.equal(terminalApplication.command.effectsDeferred, true, "The participant applies the accepted operator intent");
+  const starter = participantPage.locator("#participantRouteEntry");
+  await starter.waitFor({ timeout: 15_000 });
+  await participantPage.waitForFunction(() => document.querySelector("#participantRouteStartOrResumeButton")?.disabled === true);
+  const terminalState = await getJson(baseUrl, `/api/v1/participant/sessions/${participantSessionId}/current-state?testRunId=${encodeURIComponent(testRunId)}`);
+  assert.equal(terminalState.currentRunState.testRun.controllerEntry.active, false);
+  assert.equal(terminalState.currentRunState.testRun.locked, true);
+  assert.equal(terminalState.currentRunState.testRun.status, "paused");
+  assert.equal(terminalState.currentRunState.testRun.completedAt, null);
   assert.equal(
     await participantPage.locator("app-verona-player-host").count(),
     0,

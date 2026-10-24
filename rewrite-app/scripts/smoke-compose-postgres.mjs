@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+import {pollSmokeJson} from './poll-smoke-json.mjs';
 
 const fetch = createParticipantHttpTestActor().fetch;
 
@@ -181,25 +182,8 @@ const readExpectedPostgresSchemaVersion = async () => {
   return Math.max(...versions);
 };
 
-const pollJson = async url => {
-  const deadline = Date.now() + 40_000;
-  let lastError = null;
-
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Unexpected status ${response.status} for ${url}`);
-      }
-      return await response.json();
-    } catch (error) {
-      lastError = error;
-      await delay(1_000);
-    }
-  }
-
-  throw lastError ?? new Error(`Timed out waiting for ${url}`);
-};
+const pollJson = url => pollSmokeJson(url, {fetcher: fetch,
+  onPhase: phase => console.log('compose_json_phase='+JSON.stringify(phase))});
 
 const expectEqual = (label, actual, expected) => {
   if (actual !== expected) {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createServer } from "node:net";
 import { runInNewContext } from "node:vm";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 
@@ -72,4 +73,83 @@ test("synthetic browser fixture bootstrap uses an issued token and preserves exi
     assert.equal(values.get(key), state);
   }
   assert.equal(values.get("pending-answers"), "exact response and delivery ID");
+});
+
+test("fixture HTTP calls await existing credential captures without chasing later browser traffic", async () => {
+  let responseListener, resolveExisting, resolveLater;
+  const existing = new Promise(done => { resolveExisting = done; });
+  const later = new Promise(done => { resolveLater = done; });
+  const token = "a".repeat(43), requests = [];
+  const actor = createParticipantHttpTestActor(async (url, init) => {
+    requests.push(init.headers.get("authorization")); return Response.json({});
+  });
+  actor.observePage({ on(name, callback) { if (name === "response") responseListener = callback; } });
+  const response = (path, body) => ({ ok: () => true,
+    url: () => "http://127.0.0.1:9999/api/v1/participant/" + path,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({ headers: () => ({}) }), json: () => body });
+  responseListener(response("auth/sign-in", existing));
+  const request = actor.fetch("http://127.0.0.1:9999/api/v1/participant/sessions/session-a/resume");
+  assert.equal(requests.length, 0, "The already-issued credential must be captured first");
+  responseListener(response("sessions/other/current-state", later));
+  resolveExisting({ sessionToken: token, participantSession: { participantSessionId: "session-a" } });
+  try {
+    await new Promise(done => setImmediate(done));
+    assert.deepEqual([...requests], [`Bearer ${token}`], "Later unrelated traffic cannot extend the credential barrier");
+    await request;
+  } finally {
+    resolveLater({}); await request;
+  }
+});
+
+test("an unfinished browser body fails credential capture with a bounded secret-free diagnostic", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let responseListener, resolveBody;
+  const body = new Promise(done => { resolveBody = done; });
+  const requests = [], token = "a".repeat(43);
+  const actor = createParticipantHttpTestActor(async (url, init) => {
+    requests.push(init.headers.get("authorization")); return Response.json({});
+  });
+  actor.observePage({ on(name, callback) { if (name === "response") responseListener = callback; } });
+  responseListener({ ok: () => true,
+    url: () => `http://127.0.0.1:9999/api/v1/participant/auth/sign-in?password=${token}`,
+    headers: () => ({ "content-type": "application/json" }),
+    request: () => ({ headers: () => ({ authorization: `Bearer ${token}` }) }), json: () => body });
+  const pending = actor.fetch("http://127.0.0.1:9999/api/v1/participant/sessions/session-a/resume");
+  const rejected = assert.rejects(pending, error => {
+    assert.equal(error.message, "Participant fixture credential capture timed out: /api/v1/participant/auth/sign-in");
+    assert.ok(!error.message.includes(token)); return true;
+  });
+  t.mock.timers.tick(30_000);
+  await rejected;
+  assert.deepEqual(requests, [], "Timeout must fail before issuing a request with guessed credentials");
+  resolveBody({ sessionToken: token, participantSession: { participantSessionId: "session-a" } });
+  await new Promise(done => setImmediate(done));
+  await actor.fetch("http://127.0.0.1:9999/api/v1/participant/sessions/session-a/resume");
+  assert.deepEqual(requests, [`Bearer ${token}`]);
+});
+
+test("a real malformed chunked JSON response remains a protocol failure with a safe owning path", async () => {
+  const sockets = new Set();
+  const server = createServer(socket => {
+    sockets.add(socket); socket.once("close", () => sockets.delete(socket));
+    socket.once("data", () => {
+      socket.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n");
+      setTimeout(() => socket.end("not-a-hex-chunk\r\n{}\r\n0\r\n\r\n"), 25);
+    });
+  });
+  await new Promise(done => server.listen(0, "127.0.0.1", done));
+  const actor = createParticipantHttpTestActor();
+  try {
+    await assert.rejects(actor.fetch(`http://127.0.0.1:${server.address().port}/api/v1/participant/sessions/owned/current-state?token=must-not-appear`), error => {
+      assert.match(error.message, /^Participant fixture GET \/api\/v1\/participant\/sessions\/owned\/current-state JSON capture failed$/);
+      assert.ok(!error.message.includes("must-not-appear"));
+      assert.equal(error.cause.cause.code, "HPE_INVALID_CHUNK_SIZE");
+      assert.deepEqual(actor.headers(`http://127.0.0.1:${server.address().port}/api/v1/participant/test-runs/foreign/save-progress`), {});
+      return true;
+    });
+  } finally {
+    for (const socket of sockets) socket.destroy();
+    await new Promise(done => server.close(done));
+  }
 });

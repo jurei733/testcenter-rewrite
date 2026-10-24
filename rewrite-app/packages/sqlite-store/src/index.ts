@@ -1,12 +1,32 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { defaultParticipantExecutionMode } from "@testcenter-rewrite-app/domain";
 
 import {
+  originalParticipantGroupKeysEqual,
+  prepareOriginalParticipantGroup,
+  prepareOriginalLoginBinding,
+  prepareOriginalParticipantSession,
+  resolveOriginalPerson,
+  assertOriginalPersonUnique,
+  projectOriginalPersonRuns,
+  projectOriginalLoginMode,
+  withOriginalTestRunMode,
+  createContentReleaseActivationRevision,
+  prepareContentReleaseActivation,
+  prepareWorkspaceFilePublication,
+  prepareApplicationAssetDeletion,
+  validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
-  selectParticipantAssignmentRun,
+  prepareParticipantAssignmentRunCreation,
+  prepareParticipantControllerActivation,
+  prepareParticipantRunMutation,
+  appendParticipantRunCommand,
+  acknowledgeParticipantRunCommand,
+  prepareParticipantRunCommandApplication,
   type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
@@ -27,7 +47,11 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  OriginalParticipantGroup,
+  OriginalLoginBinding,
   ParticipantTestLog,
+  ParticipantRunCommand,
+  ParticipantProgressDelivery,
   SourcePackage,
   SourcePackageContentStructure,
   Tenant,
@@ -46,6 +70,18 @@ type SqliteMigration = {
 type WorkspaceRow = Workspace & {
   tenant_key: string;
 };
+
+const mapOriginalParticipantGroup = (row: Record<string, unknown>): OriginalParticipantGroup => ({
+  tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id),
+  groupKey: String(row.group_key), groupLabel: String(row.group_label),
+  createdAt: String(row.created_at), lastModifiedAt: String(row.last_modified_at)
+});
+
+const mapOriginalLoginBinding = (row: Record<string, unknown>): OriginalLoginBinding => ({
+  tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),loginKey:String(row.login_key),
+  groupKey:String(row.group_key),groupSnapshotKey:String(row.group_snapshot_key),
+  createdAt:String(row.created_at),lastAuthenticatedAt:String(row.last_authenticated_at)
+});
 
 const mapTenant = (row: Record<string, unknown> | undefined): Tenant | null =>
   row
@@ -386,6 +422,8 @@ const mapParticipantSession = (
         contentReleaseId: String(row.content_release_id),
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
+        ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
+        ...(row.original_name_suffix === null || row.original_name_suffix === undefined ? {} : {originalNameSuffix:String(row.original_name_suffix)}),
         participantCode:
           row.participant_code === null || row.participant_code === undefined
             ? null
@@ -493,6 +531,7 @@ const mapParticipantRosterEntry = (
               ? undefined
               : (String(row.execution_mode) as ParticipantRosterEntry["executionMode"]),
           groupKey: String(row.group_key),
+          ...(row.original_login_identity ? {originalLoginIdentity:true as const} : {}),
           ...(row.group_label === null || row.group_label === undefined
             ? {}
             : { groupLabel: String(row.group_label) }),
@@ -538,6 +577,10 @@ const mapParticipantRosterEntry = (
 const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
   row
     ? {
+        ...(row.controller_entry_json == null ? {} : { controllerEntry: JSON.parse(String(row.controller_entry_json)) as TestRun["controllerEntry"] }),
+        ...(row.original_result_state_json == null ? {} : { originalResultState: (typeof row.original_result_state_json === "string" ? JSON.parse(row.original_result_state_json) : row.original_result_state_json) as TestRun["originalResultState"] }),
+        ...(row.state_revision == null ? {} : { stateRevision: Number(row.state_revision) }),
+        ...(row.controller_dispatches_json == null ? {} : { controllerDispatches: JSON.parse(String(row.controller_dispatches_json)) as TestRun["controllerDispatches"] }),
         testRunId: String(row.test_run_id),
         participantSessionId: String(row.participant_session_id),
         tenantId: String(row.tenant_id),
@@ -566,6 +609,14 @@ const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
         unitResponses: JSON.parse(
           String(row.unit_responses_json ?? "{}")
         ) as Record<string, string>,
+        ...(() => {
+          const fields = JSON.parse(String(row.response_field_timestamps_json ?? "{}")) as NonNullable<TestRun["unitResponseFieldTimestamps"]>;
+          return Object.keys(fields).length ? { unitResponseFieldTimestamps: fields } : {};
+        })(),
+        ...(() => {
+          const fields = JSON.parse(String(row.shared_parameter_timestamps_json ?? "{}")) as NonNullable<TestRun["sharedParameterTimestamps"]>;
+          return Object.keys(fields).length ? { sharedParameterTimestamps: fields } : {};
+        })(),
         sharedParameters: (() => {
           try {
             const parsed = JSON.parse(
@@ -1528,6 +1579,118 @@ const sqliteMigrations: SqliteMigration[] = [
       CREATE INDEX idx_participant_connection_presence_expiry
         ON participant_connection_presence(next_expiry) WHERE next_expiry IS NOT NULL;
     `
+  },
+  {
+    version: 59,
+    name: "add_participant_run_commands",
+    sql: `
+      CREATE TABLE participant_run_commands (
+        test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        command_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence > 0 AND sequence <= 9007199254740991),
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        command_json TEXT NOT NULL,
+        acknowledged_at TEXT,
+        PRIMARY KEY (test_run_id, command_id),
+        UNIQUE (test_run_id, sequence)
+      );
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
+    `
+  },
+  {
+    version: 60,
+    name: "index_participant_command_application_order",
+    sql: `
+      CREATE UNIQUE INDEX idx_participant_run_commands_execution
+        ON participant_run_commands(test_run_id, json_extract(command_json, '$.executionSequence'))
+        WHERE json_extract(command_json, '$.executionSequence') IS NOT NULL;
+    `
+  },
+  {
+    version: 61,
+    name: "index_pending_participant_command_effects",
+    sql: `
+      DROP INDEX idx_participant_run_commands_pending;
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL OR (json_extract(command_json, '$.effectsDeferred') = 1 AND json_extract(command_json, '$.executedAt') IS NULL);
+    `
+  },
+  {
+    version: 62,
+    name: "index_unacknowledged_participant_commands",
+    sql: `
+      DROP INDEX idx_participant_run_commands_pending;
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
+    `
+  },
+  {
+    version: 63,
+    name: "participant_progress_delivery_and_field_ordering",
+    sql: `
+      ALTER TABLE test_runs ADD COLUMN response_field_timestamps_json TEXT NOT NULL DEFAULT '{}';
+      ALTER TABLE test_runs ADD COLUMN shared_parameter_timestamps_json TEXT NOT NULL DEFAULT '{}';
+      CREATE TABLE participant_progress_deliveries (
+        test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        delivery_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        content_release_id TEXT NOT NULL,
+        delivery_json TEXT NOT NULL,
+        PRIMARY KEY (test_run_id, delivery_id)
+      );
+      CREATE INDEX idx_participant_progress_deliveries_workspace
+        ON participant_progress_deliveries(tenant_id, workspace_id);
+    `
+  },
+  {
+    version: 64,
+    name: "participant_run_controller_entry",
+    sql: `ALTER TABLE test_runs ADD COLUMN controller_entry_json TEXT;`
+  },
+  {
+    version: 65,
+    name: "participant_run_state_revision",
+    sql: `ALTER TABLE test_runs ADD COLUMN state_revision INTEGER; ALTER TABLE test_runs ADD COLUMN controller_dispatches_json TEXT;`
+  },
+  {
+    version: 66,
+    name: "original_test_result_state",
+    sql: `ALTER TABLE test_runs ADD COLUMN original_result_state_json TEXT;`
+  },
+  {
+    version: 67,
+    name: "original_participant_groups",
+    sql: `CREATE TABLE IF NOT EXISTS original_participant_groups (
+      tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, group_key TEXT NOT NULL,
+      group_label TEXT NOT NULL, created_at TEXT NOT NULL, last_modified_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, workspace_id, group_key)
+    );`
+  },
+  {
+    version: 68,
+    name: "original_login_bindings",
+    sql: `CREATE TABLE IF NOT EXISTS original_login_bindings (
+      tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, login_key TEXT NOT NULL,
+      group_key TEXT NOT NULL, group_snapshot_key TEXT NOT NULL,
+      created_at TEXT NOT NULL, last_authenticated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, workspace_id, login_key),
+      FOREIGN KEY (tenant_id, workspace_id, group_snapshot_key)
+        REFERENCES original_participant_groups(tenant_id, workspace_id, group_key) ON DELETE CASCADE
+    );
+    ALTER TABLE participant_sessions ADD COLUMN original_login_key TEXT;
+    ALTER TABLE participant_roster_entries ADD COLUMN original_login_identity INTEGER;
+    CREATE INDEX IF NOT EXISTS participant_sessions_original_login
+      ON participant_sessions(tenant_id, workspace_id, original_login_key);`
+  },
+  {
+    version: 69,
+    name: "original_person_name_suffix",
+    sql: `ALTER TABLE participant_sessions ADD COLUMN original_name_suffix TEXT;`
   }
 ];
 
@@ -1554,6 +1717,24 @@ const getCurrentSchemaVersion = (database: DatabaseSync): number => {
   return row ? Number(row.version) : 0;
 };
 
+function rollbackAfterFailure(database: DatabaseSync, error: unknown): never {
+  try {
+    database.exec("ROLLBACK");
+  } catch (rollbackError) {
+    // SQLite can already have rolled back the entire transaction after FULL,
+    // IOERR or a ROLLBACK conflict. Retain the primary failure for diagnostics
+    // and retry instead of replacing it with "no transaction is active".
+    if (!(rollbackError instanceof Error &&
+      rollbackError.message === "cannot rollback - no transaction is active")) {
+      const message = (failure: unknown) => failure instanceof Error ? failure.message : String(failure);
+      throw new AggregateError([error, rollbackError],
+        `SQLite transaction failed (${message(error)}); rollback failed (${message(rollbackError)}).`,
+        { cause: error });
+    }
+  }
+  throw error;
+}
+
 const applyMigrations = (database: DatabaseSync): void => {
   database.exec("PRAGMA foreign_keys = ON;");
 
@@ -1575,8 +1756,7 @@ const applyMigrations = (database: DatabaseSync): void => {
         .run(migration.version, migration.name, new Date().toISOString());
       database.exec("COMMIT");
     } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
+      rollbackAfterFailure(database, error);
     }
   }
 };
@@ -1638,13 +1818,32 @@ export const migrateSqliteFirstSliceStorage = async (
 export const checkSqliteFirstSliceReadiness = async (
   filePath: string
 ): Promise<void> => {
-  mkdirSync(dirname(filePath), { recursive: true });
+  // Readiness must not create an empty replacement for a missing live database.
+  if (!statSync(filePath, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error("The SQLite storage file is missing or is not a regular file.");
+  }
   const database = openSqliteDatabase(filePath);
 
   try {
-    database.prepare("SELECT 1").get();
+    checkSqliteDatabaseReadiness(database);
   } finally {
     database.close();
+  }
+};
+
+const checkSqliteDatabaseReadiness = (database: DatabaseSync): void => {
+  if (getCurrentSchemaVersion(database) !== SQLITE_FIRST_SLICE_SCHEMA_VERSION) {
+    throw new Error("The SQLite storage schema is not current.");
+  }
+  // BEGIN alone can succeed while SQLite cannot create its rollback journal.
+  // Exercise a real main-database write, then discard the probe and its schema.
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    database.exec(`CREATE TABLE __testcenter_readiness_probe (probe INTEGER NOT NULL);
+      INSERT INTO __testcenter_readiness_probe (probe) VALUES (1);`);
+    database.exec("ROLLBACK");
+  } catch (error) {
+    rollbackAfterFailure(database, error);
   }
 };
 
@@ -1652,8 +1851,8 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
   const result = database
     .prepare(
       `INSERT INTO test_runs (
-        test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ${updateExisting ? `ON CONFLICT(test_run_id) DO UPDATE SET
         participant_session_id = excluded.participant_session_id,
         tenant_id = excluded.tenant_id,
@@ -1678,7 +1877,13 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
         completed_at = excluded.completed_at,
-        pause_source = excluded.pause_source` : "ON CONFLICT(test_run_id) DO NOTHING"}`
+        pause_source = excluded.pause_source,
+        response_field_timestamps_json = excluded.response_field_timestamps_json,
+        shared_parameter_timestamps_json = excluded.shared_parameter_timestamps_json,
+        controller_entry_json = excluded.controller_entry_json,
+        state_revision = excluded.state_revision,
+        controller_dispatches_json = excluded.controller_dispatches_json,
+        original_result_state_json = excluded.original_result_state_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`
     )
     .run(
       testRun.testRunId,
@@ -1705,34 +1910,39 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
       testRun.createdAt,
       testRun.updatedAt,
       testRun.completedAt,
-      testRun.status === "paused" ? testRun.pauseSource ?? null : null
+      testRun.status === "paused" ? testRun.pauseSource ?? null : null,
+      JSON.stringify(testRun.unitResponseFieldTimestamps ?? {}),
+      JSON.stringify(testRun.sharedParameterTimestamps ?? {}),
+      testRun.controllerEntry === undefined ? null : JSON.stringify(testRun.controllerEntry),
+      testRun.stateRevision ?? null,
+      testRun.controllerDispatches === undefined ? null : JSON.stringify(testRun.controllerDispatches),
+      testRun.originalResultState === undefined ? null : JSON.stringify(testRun.originalResultState)
     );
   return Number(result.changes) === 1;
 };
 
-export const createSqliteFirstSliceRepository = (
+export type SqliteFirstSliceStorage = {
+  repository: FirstSliceRepository;
+  readinessCheck: () => Promise<void>;
+  shutdown: () => Promise<void>;
+};
+
+export const createSqliteFirstSliceStorage = (
   filePath: string
-): FirstSliceRepository => {
+): SqliteFirstSliceStorage => {
   mkdirSync(dirname(filePath), { recursive: true });
   const database = openSqliteDatabase(filePath);
-  applyMigrations(database);
+  try { applyMigrations(database); }
+  catch (error) { database.close(); throw error; }
 
-  return {
-    async getApplicationSettings() {
-      const row = database
-        .prepare(
-          `SELECT app_title, main_logo, theme_name, intro_html,
-                  legal_notice_html, privacy_notice, accessibility_notice,
-                  custom_texts_json, asset_assignments_json,
-                  global_warning_text, global_warning_expires_at,
-                  updated_at, updated_by_admin_user_id
-           FROM application_settings
-           WHERE settings_key = 'global'`
-        )
-        .get() as Record<string, unknown> | undefined;
-      return mapApplicationSettings(row);
-    },
-    async saveApplicationSettings(settings) {
+  const assetNames=()=> (database.prepare("SELECT original_name FROM application_assets").all() as Array<{original_name:string}>).map(row=>({originalName:row.original_name}));
+  const withAssetWrite=<Result>(mutation:()=>Result):Result=>{
+    database.exec("BEGIN IMMEDIATE");
+    try{const result=mutation();database.exec("COMMIT");return result;}
+    catch(error){return rollbackAfterFailure(database,error);}
+  };
+
+  const writeSettings=(settings:ApplicationSettings):void=>{
       database
         .prepare(
           `INSERT INTO application_settings (
@@ -1772,6 +1982,139 @@ export const createSqliteFirstSliceRepository = (
           settings.updatedAt,
           settings.updatedByAdminUserId
         );
+
+  };
+
+  const reserveSourcePackageWithActivity = async (input: Parameters<FirstSliceRepository['reserveSourcePackageAssembly']>[0],
+    requiredEventType: 'source_package_assembled' | 'source_package_created'): Promise<boolean> => {
+    const { assembledSourcePackage, assemblyActivityEvent } = input;
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      const sourcePackages = (
+        database
+          .prepare(
+            `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+             FROM source_packages
+             WHERE tenant_id = ? AND workspace_id = ?`
+          )
+          .all(
+            assembledSourcePackage.tenantId,
+            assembledSourcePackage.workspaceId
+          ) as Record<string, unknown>[]
+      )
+        .map(row => mapSourcePackage(row))
+        .filter(Boolean) as SourcePackage[];
+      const activityEvents = (
+        database
+          .prepare(
+            `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+                    subject_type, subject_id, occurred_at, summary, details_json
+             FROM workspace_activity_events
+             WHERE tenant_id = ? AND workspace_id = ?`
+          )
+          .all(
+            assembledSourcePackage.tenantId,
+            assembledSourcePackage.workspaceId
+          ) as Record<string, unknown>[]
+      )
+        .map(row => mapWorkspaceActivityEvent(row))
+        .filter(Boolean) as WorkspaceActivityEvent[];
+      if (
+        assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
+        assemblyActivityEvent.workspaceId !==
+          assembledSourcePackage.workspaceId ||
+        assemblyActivityEvent.eventType !== requiredEventType ||
+        assemblyActivityEvent.subjectId !==
+          assembledSourcePackage.sourcePackageId ||
+        createWorkspaceSourcePackageReferenceRevision({
+          sourcePackages,
+          activityEvents
+        }) !== input.expectedWorkspaceSourcePackageReferenceRevision
+      ) {
+        database.exec("ROLLBACK");
+        return false;
+      }
+      database
+        .prepare(
+          `INSERT INTO source_packages (
+            source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          assembledSourcePackage.sourcePackageId,
+          assembledSourcePackage.tenantId,
+          assembledSourcePackage.workspaceId,
+          assembledSourcePackage.fileName,
+          assembledSourcePackage.mediaType,
+          assembledSourcePackage.contentStructure
+            ? JSON.stringify(assembledSourcePackage.contentStructure)
+            : null,
+          assembledSourcePackage.sourceDocument,
+          assembledSourcePackage.status,
+          assembledSourcePackage.uploadedAt
+        );
+      database
+        .prepare(
+          `INSERT INTO workspace_activity_events (
+            activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          assemblyActivityEvent.activityEventId,
+          assemblyActivityEvent.tenantId,
+          assemblyActivityEvent.workspaceId,
+          assemblyActivityEvent.eventType,
+          assemblyActivityEvent.actorId,
+          assemblyActivityEvent.subjectType,
+          assemblyActivityEvent.subjectId,
+          assemblyActivityEvent.occurredAt,
+          assemblyActivityEvent.summary,
+          JSON.stringify(assemblyActivityEvent.details)
+        );
+      database.exec("COMMIT");
+      return true;
+    } catch (error) {
+      rollbackAfterFailure(database, error);
+    }
+  };
+
+  const readActivationState=(tenantId:string,workspaceId:string)=>{
+    const scope=[tenantId,workspaceId];
+    return {
+      contentReleases:database.prepare("SELECT * FROM content_releases WHERE tenant_id=? AND workspace_id=?").all(...scope).map(row=>mapContentRelease(row)).filter((value):value is ContentRelease=>value!==null),
+      participantSessions:database.prepare("SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=?").all(...scope).map(row=>mapParticipantSession(row)).filter((value):value is ParticipantSession=>value!==null),
+      testRuns:database.prepare("SELECT * FROM test_runs WHERE tenant_id=? AND workspace_id=?").all(...scope).map(row=>mapTestRun(row)).filter((value):value is TestRun=>value!==null)
+    };
+  };
+
+  const repository: FirstSliceRepository = {
+    async getApplicationSettings() {
+      const row = database
+        .prepare(
+          `SELECT app_title, main_logo, theme_name, intro_html,
+                  legal_notice_html, privacy_notice, accessibility_notice,
+                  custom_texts_json, asset_assignments_json,
+                  global_warning_text, global_warning_expires_at,
+                  updated_at, updated_by_admin_user_id
+           FROM application_settings
+           WHERE settings_key = 'global'`
+        )
+        .get() as Record<string, unknown> | undefined;
+      return mapApplicationSettings(row);
+    },
+    async saveApplicationSettings(settings) {
+      return withAssetWrite(()=>{validateApplicationAssetReferences(settings.assetAssignments,assetNames());writeSettings(settings);});
+    },
+    async mutateApplicationSettings(transform) {
+      return withAssetWrite(()=>{
+        const previous=mapApplicationSettings(database.prepare("SELECT * FROM application_settings WHERE settings_key='global'").get() as Record<string,unknown>|undefined);
+        const effect=transform(structuredClone(previous));
+        validateApplicationAssetReferences(effect.settings.assetAssignments,assetNames());
+        writeSettings(effect.settings);
+        const audit=effect.auditEvent;
+        database.prepare("INSERT INTO admin_audit_events(admin_audit_event_id,event_type,actor_admin_user_id,subject_admin_user_id,occurred_at,summary,details_json) VALUES(?,?,?,?,?,?,?)").run(audit.adminAuditEventId,audit.eventType,audit.actorAdminUserId,audit.subjectAdminUserId,audit.occurredAt,audit.summary,JSON.stringify(audit.details));
+        return structuredClone(effect.settings);
+      });
     },
     async listApplicationAssets() {
       const rows = database
@@ -1810,7 +2153,11 @@ export const createSqliteFirstSliceRepository = (
           .get(originalName) as Record<string, unknown> | undefined
       );
     },
-    async saveApplicationAsset(applicationAsset) {
+    async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
+      return withAssetWrite(()=>{
+        const existing=replaceByOriginalName?mapApplicationAsset(database.prepare("SELECT * FROM application_assets WHERE original_name=?").get(applicationAsset.originalName) as Record<string,unknown>|undefined):null;
+        if(existing)applicationAsset={...applicationAsset,applicationAssetId:existing.applicationAssetId,createdAt:existing.createdAt};
+
       database
         .prepare(
           `INSERT INTO application_assets (
@@ -1833,8 +2180,29 @@ export const createSqliteFirstSliceRepository = (
           applicationAsset.createdAt,
           applicationAsset.updatedAt
         );
+        return { applicationAsset, replaced: Boolean(existing) };
+      });
+    },
+    async mutateApplicationAssetDeletion(input) {
+      return withAssetWrite(()=>{
+        const asset=mapApplicationAsset(database.prepare("SELECT * FROM application_assets WHERE application_asset_id = ?").get(input.applicationAssetId) as Record<string,unknown>|undefined);
+        const settings=mapApplicationSettings(database.prepare("SELECT * FROM application_settings WHERE settings_key = 'global'").get() as Record<string,unknown>|undefined);
+        const roster=(database.prepare("SELECT * FROM participant_roster_entries").all() as Record<string,unknown>[]).map(row=>mapParticipantRosterEntry(row)!).map(row=>({...row,assetAssignments:row.assetAssignments??{}}));
+        const operational=(database.prepare("SELECT tenant_id,workspace_id,candidates_json FROM operational_login_migration_candidates").all() as Array<{tenant_id:string;workspace_id:string;candidates_json:string}>).map(row=>({tenantId:row.tenant_id,workspaceId:row.workspace_id,candidates:JSON.parse(row.candidates_json) as OperationalLoginMigrationCandidate[]}));
+        const scopes=(database.prepare("SELECT w.tenant_id,w.workspace_id,w.workspace_key,t.tenant_key FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id").all() as Array<{tenant_id:string;workspace_id:string;workspace_key:string;tenant_key:string}>).map(row=>({tenantId:row.tenant_id,workspaceId:row.workspace_id,workspaceKey:row.workspace_key,tenantKey:row.tenant_key}));
+        const effect=prepareApplicationAssetDeletion(input,{asset,settings,roster,operational,scopes});if(!effect)return null;
+        if(effect.settings)database.prepare("UPDATE application_settings SET asset_assignments_json=?,updated_at=?,updated_by_admin_user_id=? WHERE settings_key='global'").run(JSON.stringify(effect.settings.assetAssignments),effect.settings.updatedAt,effect.settings.updatedByAdminUserId);
+        for(const row of effect.roster)database.prepare("UPDATE participant_roster_entries SET asset_assignments_json=? WHERE participant_roster_entry_id=?").run(JSON.stringify(row.assetAssignments),row.participantRosterEntryId);
+        for(const group of effect.operational)database.prepare("UPDATE operational_login_migration_candidates SET candidates_json=? WHERE tenant_id=? AND workspace_id=?").run(JSON.stringify(group.candidates),group.tenantId,group.workspaceId);
+        database.prepare("DELETE FROM application_assets WHERE application_asset_id=?").run(effect.asset.applicationAssetId);
+        const audit=effect.auditEvent;
+        database.prepare("INSERT INTO admin_audit_events(admin_audit_event_id,event_type,actor_admin_user_id,subject_admin_user_id,occurred_at,summary,details_json) VALUES(?,?,?,?,?,?,?) ON CONFLICT(admin_audit_event_id) DO UPDATE SET details_json=excluded.details_json").run(audit.adminAuditEventId,audit.eventType,audit.actorAdminUserId,audit.subjectAdminUserId,audit.occurredAt,audit.summary,JSON.stringify(audit.details));
+        return effect.asset;
+      });
     },
     async deleteApplicationAsset(applicationAssetId) {
+      return withAssetWrite(()=>{
+
       return (
         database
           .prepare(
@@ -1842,6 +2210,7 @@ export const createSqliteFirstSliceRepository = (
           )
           .run(applicationAssetId).changes > 0
       );
+      });
     },
     async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
       const rows = database
@@ -1986,8 +2355,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return Number(insertion.changes) === 1;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async saveAdminUser(adminUser) {
@@ -2045,8 +2413,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return { deletedRoleAssignmentCount, deletedSessionCount };
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
@@ -2351,6 +2718,8 @@ export const createSqliteFirstSliceRepository = (
           deletedTestLogCount: deleteScoped("participant_test_logs")
         };
         deleteScoped("operational_login_migration_candidates");
+        deleteScoped("original_login_bindings");
+        deleteScoped("original_participant_groups");
         counts.deletedWorkspaceCount = Number(
           database
             .prepare(
@@ -2382,18 +2751,19 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return counts;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
-    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId, eventTypes) {
+      if (eventTypes?.length === 0) return [];
+      const typeClause = eventTypes === undefined ? "" : ` AND event_type IN (${eventTypes.map(() => "?").join(",")})`;
       const rows = database
         .prepare(
           `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
            FROM workspace_activity_events
-           WHERE tenant_id = ? AND workspace_id = ?`
+           WHERE tenant_id = ? AND workspace_id = ?${typeClause}`
         )
-        .all(tenantId, workspaceId) as Record<string, unknown>[];
+        .all(tenantId, workspaceId, ...(eventTypes ?? [])) as Record<string, unknown>[];
       return rows
         .map(row => mapWorkspaceActivityEvent(row))
         .filter(Boolean) as WorkspaceActivityEvent[];
@@ -2490,98 +2860,38 @@ export const createSqliteFirstSliceRepository = (
           sourcePackage.uploadedAt
         );
     },
-    async reserveSourcePackageAssembly(input) {
-      const { assembledSourcePackage, assemblyActivityEvent } = input;
+    reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    async publishWorkspaceFiles(input) {
+      input=structuredClone(input);
+      const source=input.sourcePackage,job=input.importJob,release=input.contentRelease;
       database.exec("BEGIN IMMEDIATE");
       try {
-        const sourcePackages = (
-          database
-            .prepare(
-              `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
-               FROM source_packages
-               WHERE tenant_id = ? AND workspace_id = ?`
-            )
-            .all(
-              assembledSourcePackage.tenantId,
-              assembledSourcePackage.workspaceId
-            ) as Record<string, unknown>[]
-        )
-          .map(row => mapSourcePackage(row))
-          .filter(Boolean) as SourcePackage[];
-        const activityEvents = (
-          database
-            .prepare(
-              `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
-                      subject_type, subject_id, occurred_at, summary, details_json
-               FROM workspace_activity_events
-               WHERE tenant_id = ? AND workspace_id = ?`
-            )
-            .all(
-              assembledSourcePackage.tenantId,
-              assembledSourcePackage.workspaceId
-            ) as Record<string, unknown>[]
-        )
-          .map(row => mapWorkspaceActivityEvent(row))
-          .filter(Boolean) as WorkspaceActivityEvent[];
-        if (
-          assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
-          assemblyActivityEvent.workspaceId !==
-            assembledSourcePackage.workspaceId ||
-          assemblyActivityEvent.eventType !== "source_package_assembled" ||
-          assemblyActivityEvent.subjectId !==
-            assembledSourcePackage.sourcePackageId ||
-          createWorkspaceSourcePackageReferenceRevision({
-            sourcePackages,
-            activityEvents
-          }) !== input.expectedWorkspaceSourcePackageReferenceRevision
-        ) {
-          database.exec("ROLLBACK");
-          return false;
-        }
-        database
-          .prepare(
-            `INSERT INTO source_packages (
-              source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          )
-          .run(
-            assembledSourcePackage.sourcePackageId,
-            assembledSourcePackage.tenantId,
-            assembledSourcePackage.workspaceId,
-            assembledSourcePackage.fileName,
-            assembledSourcePackage.mediaType,
-            assembledSourcePackage.contentStructure
-              ? JSON.stringify(assembledSourcePackage.contentStructure)
-              : null,
-            assembledSourcePackage.sourceDocument,
-            assembledSourcePackage.status,
-            assembledSourcePackage.uploadedAt
-          );
-        database
-          .prepare(
-            `INSERT INTO workspace_activity_events (
-              activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          )
-          .run(
-            assemblyActivityEvent.activityEventId,
-            assemblyActivityEvent.tenantId,
-            assemblyActivityEvent.workspaceId,
-            assemblyActivityEvent.eventType,
-            assemblyActivityEvent.actorId,
-            assemblyActivityEvent.subjectType,
-            assemblyActivityEvent.subjectId,
-            assemblyActivityEvent.occurredAt,
-            assemblyActivityEvent.summary,
-            JSON.stringify(assemblyActivityEvent.details)
-          );
+        const scope=[source.tenantId,source.workspaceId];
+        const workspace=database.prepare(`SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?`).get(...scope);
+        const sourcePackages=(database.prepare(`SELECT * FROM source_packages WHERE tenant_id=? AND workspace_id=?`).all(...scope)).map(row=>mapSourcePackage(row as Record<string,unknown>)).filter(Boolean) as SourcePackage[];
+        const activityEvents=(database.prepare(`SELECT * FROM workspace_activity_events WHERE tenant_id=? AND workspace_id=?`).all(...scope)).map(row=>mapWorkspaceActivityEvent(row as Record<string,unknown>)).filter(Boolean) as WorkspaceActivityEvent[];
+        const contentReleases=(database.prepare(`SELECT * FROM content_releases WHERE tenant_id=? AND workspace_id=?`).all(...scope)).map(row=>mapContentRelease(row as Record<string,unknown>)).filter(Boolean) as ContentRelease[];
+        const occupiedSource=database.prepare(`SELECT source_package_id FROM source_packages WHERE source_package_id=?`).get(...[source.sourcePackageId]);
+        const occupiedJob=database.prepare(`SELECT import_job_id FROM import_jobs WHERE import_job_id=?`).get(...[job.importJobId]);
+        const occupiedRelease=release ? database.prepare(`SELECT content_release_id FROM content_releases WHERE content_release_id=?`).get(...[release.contentReleaseId]) : null;
+        let occupiedEvent=false;
+        for(const event of input.activityEvents)if(database.prepare(`SELECT activity_event_id FROM workspace_activity_events WHERE activity_event_id=?`).get(...[event.activityEventId]))occupiedEvent=true;
+        const superseded=prepareWorkspaceFilePublication(input,{workspaceExists:!!workspace,
+          identitiesAvailable:!occupiedSource && !occupiedJob && !occupiedRelease && !occupiedEvent,
+          sourcePackages,activityEvents,contentReleases});
+        if(!superseded){database.exec("ROLLBACK");return false;}
+        database.prepare(`INSERT INTO source_packages (source_package_id,tenant_id,workspace_id,file_name,media_type,content_structure_json,source_document_text,status,uploaded_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(...[source.sourcePackageId,source.tenantId,source.workspaceId,source.fileName,source.mediaType,source.contentStructure?JSON.stringify(source.contentStructure):null,source.sourceDocument,source.status,source.uploadedAt]);
+        database.prepare(`INSERT INTO import_jobs (import_job_id,tenant_id,workspace_id,source_package_id,status,created_at,finished_at,diagnostics_json) VALUES (?,?,?,?,?,?,?,?)`).run(...[job.importJobId,job.tenantId,job.workspaceId,job.sourcePackageId,job.status,job.createdAt,job.finishedAt,JSON.stringify(job.diagnostics)]);
+        for(const previous of superseded){database.prepare(`UPDATE content_releases SET status='superseded' WHERE content_release_id=?`).run(...[previous.contentReleaseId]);}
+        if(release){database.prepare(`INSERT INTO content_releases (content_release_id,tenant_id,workspace_id,import_job_id,release_label,runtime_snapshot_json,status,created_at,activated_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(...[release.contentReleaseId,release.tenantId,release.workspaceId,release.importJobId,release.releaseLabel,JSON.stringify(release.runtimeSnapshot),release.status,release.createdAt,release.activatedAt]);}
+        for(const event of input.activityEvents){database.prepare(`INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES (?,?,?,?,?,?,?,?,?,?)`).run(...[event.activityEventId,event.tenantId,event.workspaceId,event.eventType,event.actorId,event.subjectType,event.subjectId,event.occurredAt,event.summary,JSON.stringify(event.details)]);}
         database.exec("COMMIT");
         return true;
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
+      }catch(error){database.exec("ROLLBACK");throw error;}
     },
+    reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
+      assemblyActivityEvent:input.createdActivityEvent,
+      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),
     async reserveSourcePackageReplacement(input) {
       const { replacementSourcePackage, replacementActivityEvent } = input;
       database.exec("BEGIN IMMEDIATE");
@@ -2684,8 +2994,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return true;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async deleteSourcePackageAggregate(input) {
@@ -2821,8 +3130,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return Number(deletion.changes) === 1;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async getImportJobById(importJobId) {
@@ -2893,6 +3201,22 @@ export const createSqliteFirstSliceRepository = (
         .map(row => mapContentRelease(row))
         .filter(Boolean) as ContentRelease[];
     },
+    async getContentReleaseActivationRevision(tenantId,workspaceId) {
+      return createContentReleaseActivationRevision(readActivationState(tenantId,workspaceId));
+    },
+    async commitContentReleaseActivation(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try{
+        const workspace=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(input.tenantId,input.workspaceId);
+        const occupied=database.prepare("SELECT activity_event_id FROM workspace_activity_events WHERE activity_event_id=?").get(input.activityEvent.activityEventId);
+        const prepared=prepareContentReleaseActivation(input,{...readActivationState(input.tenantId,input.workspaceId),workspaceExists:!!workspace,eventIdAvailable:!occupied});
+        if(!prepared){database.exec("ROLLBACK");return false;}
+        for(const release of prepared.contentReleases)database.prepare("UPDATE content_releases SET status=?,activated_at=? WHERE content_release_id=?").run(release.status,release.activatedAt,release.contentReleaseId);
+        const event=prepared.activityEvent;
+        database.prepare("INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES (?,?,?,?,?,?,?,?,?,?)").run(event.activityEventId,event.tenantId,event.workspaceId,event.eventType,event.actorId,event.subjectType,event.subjectId,event.occurredAt,event.summary,JSON.stringify(event.details));
+        database.exec("COMMIT");return true;
+      }catch(error){return rollbackAfterFailure(database,error);}
+    },
     async saveContentRelease(contentRelease) {
       database
         .prepare(
@@ -2924,7 +3248,7 @@ export const createSqliteFirstSliceRepository = (
     async getParticipantSessionById(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
            FROM participant_sessions
            WHERE participant_session_id = ?`
         )
@@ -2958,7 +3282,7 @@ export const createSqliteFirstSliceRepository = (
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
            FROM participant_sessions
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -2967,12 +3291,79 @@ export const createSqliteFirstSliceRepository = (
         .map(row => mapParticipantSession(row))
         .filter(Boolean) as ParticipantSession[];
     },
+    async getOrCreateOriginalParticipantGroup(input) {
+      const candidate = prepareOriginalParticipantGroup(input);
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const workspace = database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id = ? AND workspace_id = ?").get(candidate.tenantId, candidate.workspaceId);
+        if (!workspace) { database.exec("ROLLBACK"); return null; }
+        const groups = database.prepare("SELECT * FROM original_participant_groups WHERE tenant_id = ? AND workspace_id = ?").all(candidate.tenantId, candidate.workspaceId).map(mapOriginalParticipantGroup);
+        const existing = groups.find(group => originalParticipantGroupKeysEqual(group.groupKey, candidate.groupKey));
+        if (!existing) database.prepare("INSERT INTO original_participant_groups (tenant_id, workspace_id, group_key, group_label, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(candidate.tenantId, candidate.workspaceId, candidate.groupKey, candidate.groupLabel, candidate.createdAt, candidate.lastModifiedAt);
+        database.exec("COMMIT");
+        return existing ?? candidate;
+      } catch (error) { return rollbackAfterFailure(database, error); }
+    },
+    async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
+      return database.prepare("SELECT * FROM original_participant_groups WHERE tenant_id = ? AND workspace_id = ? ORDER BY group_key").all(tenantId, workspaceId).map(mapOriginalParticipantGroup);
+    },
+    async bindOriginalLoginGroup(input) {
+      const validated=prepareOriginalLoginBinding(input); database.exec("BEGIN IMMEDIATE");
+      try {
+        const parent=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(input.tenantId,input.workspaceId);
+        const group=database.prepare("SELECT group_key FROM original_participant_groups WHERE tenant_id=? AND workspace_id=? AND group_key=?").get(input.tenantId,input.workspaceId,input.groupSnapshotKey);
+        if (!parent || !group) { database.exec("ROLLBACK"); return null; }
+        const previous=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(input.tenantId,input.workspaceId,validated.loginKey);
+        const binding=prepareOriginalLoginBinding(input,previous?mapOriginalLoginBinding(previous):undefined);
+        database.prepare(`INSERT INTO original_login_bindings (tenant_id,workspace_id,login_key,group_key,group_snapshot_key,created_at,last_authenticated_at)
+          VALUES (?,?,?,?,?,?,?) ON CONFLICT (tenant_id,workspace_id,login_key) DO UPDATE SET
+          group_key=excluded.group_key,group_snapshot_key=excluded.group_snapshot_key,last_authenticated_at=excluded.last_authenticated_at`)
+          .run(binding.tenantId,binding.workspaceId,binding.loginKey,binding.groupKey,binding.groupSnapshotKey,binding.createdAt,binding.lastAuthenticatedAt);
+        database.prepare("UPDATE participant_sessions SET group_key=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=?")
+          .run(binding.groupKey,binding.tenantId,binding.workspaceId,binding.loginKey);
+        database.exec("COMMIT"); return binding;
+      } catch (error) { return rollbackAfterFailure(database,error); }
+    },
+    async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
+      return database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? ORDER BY login_key").all(tenantId,workspaceId).map(mapOriginalLoginBinding);
+    },
+    async resolveOriginalParticipantSession(candidate,validate) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const workspace=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(candidate.tenantId,candidate.workspaceId);
+        if(!workspace){database.exec("ROLLBACK");return null;}
+        const binding=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null);
+        const people=database.prepare("SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?").all(candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null).map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+        const result=resolveOriginalPerson(candidate,binding?mapOriginalLoginBinding(binding):null,people,validate),person=result.participantSession;
+        const runs=database.prepare("SELECT * FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)").all(person.tenantId,person.workspaceId,person.originalLoginKey!).map(mapTestRun).filter((run):run is TestRun=>run!==null);
+        projectOriginalPersonRuns(person,runs,people);
+        if(result.created)database.prepare("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").run(...[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null]);
+        database.prepare("UPDATE participant_sessions SET group_key=?,execution_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND (group_key IS NOT ? OR execution_mode IS NOT ?)").run(person.groupKey,person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.groupKey,person.executionMode??null);
+        database.prepare("UPDATE test_runs SET execution_mode=? WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT ?").run(person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.executionMode??null);
+        database.exec("COMMIT");return result;
+      }catch(error){return rollbackAfterFailure(database,error);}
+    },
     async saveParticipantSession(participantSession) {
-      database
+      let previous=mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id=?").get(participantSession.participantSessionId));
+      if (previous?.originalLoginKey === undefined && participantSession.originalLoginKey === undefined) participantSession=prepareOriginalParticipantSession(participantSession,previous,null);
+      const originalLoginKey=previous?.originalLoginKey ?? participantSession.originalLoginKey, native=originalLoginKey!==undefined;
+      if (native) database.exec("BEGIN IMMEDIATE");
+      try {
+        if (native) {
+          previous=mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id=?").get(participantSession.participantSessionId));
+          const parent=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(participantSession.tenantId,participantSession.workspaceId);
+          const binding=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(participantSession.tenantId,participantSession.workspaceId,originalLoginKey!);
+          participantSession=prepareOriginalParticipantSession(participantSession,previous,binding?mapOriginalLoginBinding(binding):undefined);
+          if (!parent) throw new TypeError('Native person requires its current scoped login binding.');
+          const people=database.prepare("SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?").all(participantSession.tenantId,participantSession.workspaceId,originalLoginKey!).map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+          assertOriginalPersonUnique(participantSession,people);
+        }
+        database
         .prepare(
           `INSERT INTO participant_sessions (
-            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(participant_session_id) DO UPDATE SET
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
@@ -2983,7 +3374,9 @@ export const createSqliteFirstSliceRepository = (
             execution_mode = excluded.execution_mode,
             status = excluded.status,
             valid_until = excluded.valid_until,
-            created_at = excluded.created_at`
+            created_at = excluded.created_at,
+            original_login_key = excluded.original_login_key,
+            original_name_suffix = excluded.original_name_suffix`
         )
         .run(
           participantSession.participantSessionId,
@@ -2996,13 +3389,17 @@ export const createSqliteFirstSliceRepository = (
           participantSession.executionMode ?? null,
           participantSession.status,
           participantSession.validUntil ?? null,
-          participantSession.createdAt
+          participantSession.createdAt,
+          participantSession.originalLoginKey ?? null,
+          participantSession.originalNameSuffix ?? null
         );
+        if (native) database.exec("COMMIT");
+      } catch (error) { if (native) return rollbackAfterFailure(database,error); throw error; }
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
            FROM participant_roster_entries
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -3041,6 +3438,9 @@ export const createSqliteFirstSliceRepository = (
       workspaceId,
       candidates
     ) {
+      return withAssetWrite(()=>{
+        const assets=assetNames();
+        for(const candidate of candidates)validateApplicationAssetReferences(candidate.assetAssignments,assets);
       database
         .prepare(
           `INSERT INTO operational_login_migration_candidates (
@@ -3051,6 +3451,7 @@ export const createSqliteFirstSliceRepository = (
             updated_at = excluded.updated_at`
         )
         .run(tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString());
+      });
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
       const row = database
@@ -3067,11 +3468,14 @@ export const createSqliteFirstSliceRepository = (
         : String(row.password_hash);
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
+      return withAssetWrite(()=>{
+        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,assetNames());
+        if(participantRosterEntry.originalLoginIdentity&&!database.prepare('SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(participantRosterEntry.tenantId,participantRosterEntry.workspaceId))throw new Error('Native roster workspace no longer exists.');
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
-            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
             participant_roster_entry_id = excluded.participant_roster_entry_id,
             execution_mode = excluded.execution_mode,
@@ -3089,7 +3493,8 @@ export const createSqliteFirstSliceRepository = (
             custom_texts_json = excluded.custom_texts_json,
             view_settings_json = excluded.view_settings_json,
             asset_assignments_json = excluded.asset_assignments_json,
-            imported_at = excluded.imported_at`
+            imported_at = excluded.imported_at,
+            original_login_identity = excluded.original_login_identity`
         )
         .run(
           participantRosterEntry.participantRosterEntryId,
@@ -3098,7 +3503,7 @@ export const createSqliteFirstSliceRepository = (
           participantRosterEntry.loginKey,
           participantRosterEntry.executionMode ?? null,
           participantRosterEntry.groupKey,
-          participantRosterEntry.groupLabel?.trim() || null,
+          participantRosterEntry.groupLabel ?? null,
           participantRosterEntry.bookletKey,
           participantRosterEntry.bookletKeys?.length
             ? JSON.stringify(participantRosterEntry.bookletKeys)
@@ -3117,8 +3522,19 @@ export const createSqliteFirstSliceRepository = (
           JSON.stringify(participantRosterEntry.customTexts ?? {}),
           JSON.stringify(participantRosterEntry.viewSettings ?? {}),
           JSON.stringify(participantRosterEntry.assetAssignments ?? {}),
-          participantRosterEntry.importedAt
+          participantRosterEntry.importedAt,
+          participantRosterEntry.originalLoginIdentity ? 1 : null
         );
+      if(participantRosterEntry.originalLoginIdentity){
+        const entry=participantRosterEntry;
+        const people=database.prepare('SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?').all(entry.tenantId,entry.workspaceId,entry.loginKey).map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+        // Authorization metadata does not require decoding private responses or Test state.
+        const runs=database.prepare('SELECT test_run_id,participant_session_id,tenant_id,workspace_id,execution_mode FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)').all(entry.tenantId,entry.workspaceId,entry.loginKey).map(row=>({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),executionMode:row.execution_mode==null?undefined:row.execution_mode as TestRun['executionMode']}));
+        const modes=projectOriginalLoginMode(entry,people,runs),mode=entry.executionMode??defaultParticipantExecutionMode;
+        if(modes.participantSessions.some((person,index)=>person!==people[index]))database.prepare('UPDATE participant_sessions SET execution_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND execution_mode IS NOT ?').run(mode,entry.tenantId,entry.workspaceId,entry.loginKey,mode);
+        if(modes.testRuns.some((run,index)=>run!==runs[index]))database.prepare('UPDATE test_runs SET execution_mode=? WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT ?').run(mode,entry.tenantId,entry.workspaceId,entry.loginKey,mode);
+      }
+      });
     },
     async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
       return mapParticipantLoginAttempt(
@@ -3170,7 +3586,7 @@ export const createSqliteFirstSliceRepository = (
     async getTestRunById(testRunId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json
            FROM test_runs
            WHERE test_run_id = ?`
         )
@@ -3180,7 +3596,7 @@ export const createSqliteFirstSliceRepository = (
     async listTestRunsByParticipantSessionId(participantSessionId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json
            FROM test_runs
            WHERE participant_session_id = ?`
         )
@@ -3190,7 +3606,7 @@ export const createSqliteFirstSliceRepository = (
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json
            FROM test_runs
            WHERE participant_session_id = ? AND status != 'completed'
            ORDER BY updated_at ASC
@@ -3202,14 +3618,14 @@ export const createSqliteFirstSliceRepository = (
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json
            FROM test_runs
            WHERE tenant_id = ? AND workspace_id = ?`
         )
         .all(tenantId, workspaceId) as Record<string, unknown>[];
       return rows.map(row => mapTestRun(row)).filter(Boolean) as TestRun[];
     },
-    async getOrCreateTestRunForAssignment(candidate) {
+    async getOrCreateTestRunForAssignment(candidate, initialize) {
       database.exec("BEGIN IMMEDIATE");
       try {
         const session = mapParticipantSession(database.prepare(
@@ -3219,14 +3635,26 @@ export const createSqliteFirstSliceRepository = (
           "SELECT * FROM test_runs WHERE participant_session_id = ? OR test_run_id = ?"
         ).all(candidate.participantSessionId, candidate.testRunId) as Record<string, unknown>[])
           .map(mapTestRun).filter((run): run is TestRun => run !== null);
-        const existing = selectParticipantAssignmentRun(candidate, session, runs);
-        if (existing) {
+        const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize);
+        if (!prepared.created) {
           database.exec("COMMIT");
-          return { testRun: existing, created: false };
+          return { testRun: prepared.testRun, created: false };
         }
-        if (!persistTestRun(database, candidate, false)) {
+        if (!persistTestRun(database, prepared.testRun, false)) {
           throw new Error("Run ID already exists outside the participant assignment reservation.");
         }
+        const effect = prepared.effect!;
+        for (const log of effect.testLogs) database.prepare(`INSERT INTO participant_test_logs
+          (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
+            log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+            log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+        for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
+          (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(event.activityEventId, event.tenantId, event.workspaceId,
+            event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details));
+        if (effect.participantSession) database.prepare("UPDATE participant_sessions SET status = ? WHERE participant_session_id = ?")
+          .run(effect.participantSession.status, candidate.participantSessionId);
         const stored = mapTestRun(database.prepare(
           "SELECT * FROM test_runs WHERE test_run_id = ?"
         ).get(candidate.testRunId) as Record<string, unknown> | undefined);
@@ -3234,12 +3662,174 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return { testRun: stored, created: true };
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async saveTestRun(testRun) {
-      persistTestRun(database, testRun);
+      return withAssetWrite(()=>{
+        const parent=mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(testRun.participantSessionId));
+        persistTestRun(database, withOriginalTestRunMode(testRun,parent));
+      });
+    },
+    async activateParticipantController(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const session = mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id = ?")
+          .get(input.participantSessionId) as Record<string, unknown> | undefined);
+        const run = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const result = prepareParticipantControllerActivation(input, session, run);
+        if (result?.activated) database.prepare("UPDATE participant_sessions SET status = 'launched' WHERE participant_session_id = ?")
+          .run(input.participantSessionId);
+        if (result?.entryChanged) persistTestRun(database, result.testRun);
+        database.exec("COMMIT");
+        return result;
+      } catch (error) { rollbackAfterFailure(database, error); }
+    },
+    async appendParticipantRunCommand(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const run = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const existing = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
+          .get(input.testRunId, input.commandId);
+        const last = database.prepare("SELECT sequence FROM participant_run_commands WHERE test_run_id = ? ORDER BY sequence DESC LIMIT 1")
+          .get(input.testRunId);
+        const command = appendParticipantRunCommand(input, run, {
+          existing: existing ? JSON.parse(String(existing.command_json)) as ParticipantRunCommand : null,
+          lastSequence: Number(last?.sequence ?? 0)
+        });
+        if (command) database.prepare(`INSERT INTO participant_run_commands
+          (test_run_id, command_id, sequence, tenant_id, workspace_id, participant_session_id, command_json, acknowledged_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(test_run_id, command_id) DO NOTHING`)
+          .run(command.testRunId, command.commandId, command.sequence, command.tenantId, command.workspaceId,
+            command.participantSessionId, JSON.stringify(command), command.acknowledgedAt);
+        database.exec("COMMIT");
+        return command;
+      } catch (error) { rollbackAfterFailure(database, error); }
+    },
+    async listPendingParticipantRunCommands(scope) {
+      return database.prepare(`SELECT command.command_json FROM participant_run_commands AS command
+        JOIN test_runs AS run ON run.test_run_id = command.test_run_id
+        WHERE command.test_run_id = ? AND command.tenant_id = ? AND command.workspace_id = ? AND command.participant_session_id = ?
+          AND command.acknowledged_at IS NULL
+          AND run.tenant_id = command.tenant_id AND run.workspace_id = command.workspace_id
+          AND run.participant_session_id = command.participant_session_id
+        ORDER BY command.sequence`)
+        .all(scope.testRunId, scope.tenantId, scope.workspaceId, scope.participantSessionId)
+        .map(row => JSON.parse(String(row.command_json)) as ParticipantRunCommand);
+    },
+    async acknowledgeParticipantRunCommand(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const run = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const row = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
+          .get(input.testRunId, input.commandId);
+        const command = acknowledgeParticipantRunCommand(input, run,
+          row ? JSON.parse(String(row.command_json)) as ParticipantRunCommand : null);
+        if (command) database.prepare(`UPDATE participant_run_commands SET command_json = ?, acknowledged_at = ?
+          WHERE test_run_id = ? AND command_id = ?`).run(JSON.stringify(command), command.acknowledgedAt, input.testRunId, input.commandId);
+        database.exec("COMMIT");
+        return command;
+      } catch (error) { rollbackAfterFailure(database, error); }
+    },
+    async mutateParticipantRun(input, transform) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const testRun = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const participantSession = mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id = ?")
+          .get(input.participantSessionId) as Record<string, unknown> | undefined);
+        const testRuns = database.prepare("SELECT * FROM test_runs WHERE participant_session_id = ?").all(input.participantSessionId)
+          .map(row => mapTestRun(row as Record<string, unknown>)).filter((run): run is TestRun => run !== null);
+        const deliveryRow = input.deliveryId ? database.prepare("SELECT delivery_json FROM participant_progress_deliveries WHERE test_run_id = ? AND delivery_id = ?")
+          .get(input.testRunId, input.deliveryId) : undefined;
+        const progressDelivery = deliveryRow ? JSON.parse(String(deliveryRow.delivery_json)) as ParticipantProgressDelivery : null;
+        const prepared = prepareParticipantRunMutation(input,
+          testRun && participantSession ? { testRun, participantSession, testRuns, progressDelivery } : null, transform);
+        if (prepared?.effect) {
+          const effect = prepared.effect;
+          if (effect.progressDelivery) {
+            const receipt = effect.progressDelivery;
+            database.prepare(`INSERT INTO participant_progress_deliveries
+              (test_run_id, delivery_id, tenant_id, workspace_id, participant_session_id, content_release_id, delivery_json)
+              VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(test_run_id, delivery_id) DO NOTHING`)
+              .run(receipt.testRunId, receipt.deliveryId, receipt.tenantId, receipt.workspaceId, receipt.participantSessionId,
+                receipt.contentReleaseId, JSON.stringify(receipt));
+          }
+          if (effect.commandInput) {
+            const existing = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
+              .get(input.testRunId, effect.commandInput.commandId);
+            const last = database.prepare("SELECT sequence FROM participant_run_commands WHERE test_run_id = ? ORDER BY sequence DESC LIMIT 1")
+              .get(input.testRunId);
+            const command = appendParticipantRunCommand(effect.commandInput, effect.testRun, {
+              existing: existing ? JSON.parse(String(existing.command_json)) as ParticipantRunCommand : null,
+              lastSequence: Number(last?.sequence ?? 0)
+          });
+        if (!command) throw new Error("The Run no longer accepts the projected command.");
+        if (command) database.prepare(`INSERT INTO participant_run_commands
+          (test_run_id, command_id, sequence, tenant_id, workspace_id, participant_session_id, command_json, acknowledged_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(test_run_id, command_id) DO NOTHING`)
+          .run(command.testRunId, command.commandId, command.sequence, command.tenantId, command.workspaceId,
+            command.participantSessionId, JSON.stringify(command), command.acknowledgedAt);
+        }
+          persistTestRun(database, effect.testRun);
+          for (const log of effect.testLogs) database.prepare(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = excluded.tenant_id, workspace_id = excluded.workspace_id, participant_session_id = excluded.participant_session_id, test_run_id = excluded.test_run_id, unit_key = excluded.unit_key, original_unit_id = excluded.original_unit_id, log_key = excluded.log_key, log_content = excluded.log_content, timestamp = excluded.timestamp, recorded_at = excluded.recorded_at, original_timestamp = excluded.original_timestamp`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
+              log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+              log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+          for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
+            (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(activity_event_id) DO UPDATE SET tenant_id = excluded.tenant_id, workspace_id = excluded.workspace_id, event_type = excluded.event_type, actor_id = excluded.actor_id, subject_type = excluded.subject_type, subject_id = excluded.subject_id, occurred_at = excluded.occurred_at, summary = excluded.summary, details_json = excluded.details_json`).run(event.activityEventId, event.tenantId, event.workspaceId,
+              event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details));
+          if (effect.participantSession) database.prepare("UPDATE participant_sessions SET status = ? WHERE participant_session_id = ?")
+            .run(effect.participantSession.status, input.participantSessionId);
+        }
+        database.exec("COMMIT");
+        return prepared?.result ?? null;
+      } catch (error) { rollbackAfterFailure(database, error); }
+    },
+    async applyParticipantRunCommand(input, transform) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const testRun = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const participantSession = mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id = ?")
+          .get(input.participantSessionId) as Record<string, unknown> | undefined);
+        const row = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
+          .get(input.testRunId, input.commandId);
+        const command = row ? JSON.parse(String(row.command_json)) as ParticipantRunCommand : null;
+        const terminal = command?.commandType === "complete" || command?.commandType === "complete_and_lock";
+        const testRuns = terminal ? database.prepare("SELECT * FROM test_runs WHERE participant_session_id = ?").all(input.participantSessionId)
+          .map(row => mapTestRun(row as Record<string, unknown>)).filter((run): run is TestRun => run !== null) : testRun ? [testRun] : [];
+        const last = database.prepare(`SELECT json_extract(command_json, '$.executionSequence') AS sequence
+          FROM participant_run_commands WHERE test_run_id = ? AND json_extract(command_json, '$.executionSequence') IS NOT NULL
+          ORDER BY json_extract(command_json, '$.executionSequence') DESC LIMIT 1`).get(input.testRunId);
+        const prepared = prepareParticipantRunCommandApplication(input,
+          command && testRun && participantSession ? { command, testRun, participantSession, testRuns } : null,
+          Number(last?.sequence ?? 0), transform);
+        if (prepared?.effect) {
+          const effect = prepared.effect;
+          persistTestRun(database, effect.testRun);
+          for (const log of effect.testLogs) database.prepare(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
+              log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+              log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+          for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
+            (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(event.activityEventId, event.tenantId, event.workspaceId,
+              event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details));
+          if (effect.participantSession) database.prepare("UPDATE participant_sessions SET status = ? WHERE participant_session_id = ?")
+            .run(effect.participantSession.status, input.participantSessionId);
+          database.prepare("UPDATE participant_run_commands SET command_json = ? WHERE test_run_id = ? AND command_id = ?")
+            .run(JSON.stringify(prepared.result.command), input.testRunId, input.commandId);
+        }
+        database.exec("COMMIT");
+        return prepared?.result ?? null;
+      } catch (error) { rollbackAfterFailure(database, error); }
     },
     async deleteTestRunsByIds(testRunIds) {
       if (testRunIds.length === 0) {
@@ -3314,7 +3904,8 @@ export const createSqliteFirstSliceRepository = (
           log_content = excluded.log_content,
           timestamp = excluded.timestamp,
           recorded_at = excluded.recorded_at,
-          original_timestamp = excluded.original_timestamp`
+          original_timestamp = excluded.original_timestamp
+        WHERE substr(participant_test_logs.participant_test_log_id, 1, 9) <> 'delivery:'`
       );
       database.exec("BEGIN");
       try {
@@ -3336,8 +3927,7 @@ export const createSqliteFirstSliceRepository = (
         }
         database.exec("COMMIT");
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async updateParticipantPresence(input) {
@@ -3375,8 +3965,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return result;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async listExpiredParticipantPresence(timestamp, limit) {
@@ -3480,4 +4069,18 @@ export const createSqliteFirstSliceRepository = (
       return Number(result.changes);
     }
   };
+  let closed = false;
+  return {
+    repository,
+    readinessCheck: async () => { checkSqliteDatabaseReadiness(database); },
+    shutdown: async () => {
+      if (closed) return;
+      database.close();
+      closed = true;
+    }
+  };
 };
+
+/** Compatibility factory for callers that own their process lifetime. */
+export const createSqliteFirstSliceRepository = (filePath: string): FirstSliceRepository =>
+  createSqliteFirstSliceStorage(filePath).repository;

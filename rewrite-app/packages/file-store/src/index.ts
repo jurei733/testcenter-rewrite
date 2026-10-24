@@ -1,20 +1,45 @@
-import { randomUUID } from "node:crypto";
+import { fileStoreTemporaryIdentity, hasFileStoreReaders, isDeadFileStoreTemporary, registerFileStoreAccess, withFileStoreAccess } from "./access.js";
+import { createHash, randomUUID } from "node:crypto";
 import {
   access,
+  lstat,
   mkdir,
+  open,
   readFile,
   readdir,
   rename,
   rm,
+  stat,
   writeFile
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import {
+  originalParticipantGroupKeysEqual,
+  prepareOriginalParticipantGroup,
+  prepareOriginalLoginBinding,
+  prepareOriginalParticipantSession,
+  resolveOriginalPerson,
+  assertOriginalPersonUnique,
+  projectOriginalPersonRuns,
+  projectOriginalLoginMode,
+  withOriginalTestRunMode,
+  projectOriginalPersonSessions,
+  createContentReleaseActivationRevision,
+  prepareContentReleaseActivation,
+  prepareWorkspaceFilePublication,
+  prepareApplicationAssetDeletion,
+  validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
-  selectParticipantAssignmentRun,
+  prepareParticipantAssignmentRunCreation,
+  prepareParticipantControllerActivation,
+  prepareParticipantRunMutation,
+  appendParticipantRunCommand,
+  acknowledgeParticipantRunCommand,
+  prepareParticipantRunCommandApplication,
+  matchesParticipantRunCommandScope,
   type ParticipantPresence,
   type FirstSliceRepository,
   type ParticipantAccessCredential
@@ -38,7 +63,11 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  OriginalParticipantGroup,
+  OriginalLoginBinding,
   ParticipantTestLog,
+  ParticipantRunCommand,
+  ParticipantProgressDelivery,
   SourcePackage,
   Tenant,
   TestRun,
@@ -68,6 +97,8 @@ type PersistedFirstSliceState = {
   sourcePackages: Record<string, SourcePackage>;
   importJobs: Record<string, ImportJob>;
   contentReleases: Record<string, ContentRelease>;
+  originalParticipantGroups: Record<string, OriginalParticipantGroup>;
+  originalLoginBindings: Record<string, OriginalLoginBinding>;
   participantSessions: Record<string, ParticipantSession>;
   participantAccessCredentials: Record<string, ParticipantAccessCredential>;
   participantRosterEntries: Record<string, ParticipantRosterEntry>;
@@ -78,15 +109,25 @@ type PersistedFirstSliceState = {
   participantRosterPasswordHashes: Record<string, string>;
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
+  participantRunCommands: Record<string, ParticipantRunCommand>;
+  participantProgressDeliveries: Record<string, ParticipantProgressDelivery>;
   participantTestLogs: Record<string, ParticipantTestLog>;
   participantPresence: Record<string, ParticipantPresence>;
 };
 
-type ExternalizedCollectionManifest = {
+type LegacyExternalizedCollectionManifest = {
   version: 1;
   sourcePackageIds: string[];
   contentReleaseIds: string[];
 };
+type VersionedExternalizedCollectionManifest = {
+  version: 2 | 3;
+  sourcePackageIds: string[];
+  contentReleaseIds: string[];
+  sourcePackageHashes: Record<string, string>;
+  contentReleaseHashes: Record<string, string>;
+};
+type ExternalizedCollectionManifest = LegacyExternalizedCollectionManifest | VersionedExternalizedCollectionManifest;
 
 type PersistedFirstSliceDocument = Partial<PersistedFirstSliceState> & {
   externalizedCollections?: unknown;
@@ -94,7 +135,7 @@ type PersistedFirstSliceDocument = Partial<PersistedFirstSliceState> & {
 
 type LoadedFirstSliceState = {
   state: PersistedFirstSliceState;
-  externalizedCollections: boolean;
+  externalizedCollections: ExternalizedCollectionManifest | null;
 };
 
 const createInitialState = (): PersistedFirstSliceState => ({
@@ -115,6 +156,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   sourcePackages: {},
   importJobs: {},
   contentReleases: {},
+  originalParticipantGroups: {},
+  originalLoginBindings: {},
   participantSessions: {},
   participantAccessCredentials: {},
   participantRosterEntries: {},
@@ -122,6 +165,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantRosterPasswordHashes: {},
   participantLoginAttempts: {},
   testRuns: {},
+  participantRunCommands: {},
+  participantProgressDeliveries: {},
   participantTestLogs: {},
   participantPresence: {}
 });
@@ -145,12 +190,18 @@ const externalCollectionDirectory = (
 const externalEntityFilePath = (
   filePath: string,
   collectionName: "source-packages" | "content-releases",
-  entityId: string
+  entityId: string,
+  hash?: string
 ): string =>
   join(
     externalCollectionDirectory(filePath, collectionName),
-    `${encodeURIComponent(entityId)}.json`
+    `${encodeURIComponent(entityId)}${hash ? `.${hash}` : ""}.json`
   );
+
+const isHashIndex = (value: unknown, ids: string[]): value is Record<string, string> =>
+  typeof value === "object" && value !== null && !Array.isArray(value) &&
+  Object.keys(value).length === ids.length &&
+  ids.every(id => Object.hasOwn(value, id) && typeof (value as Record<string, unknown>)[id] === "string" && /^[a-f0-9]{64}$/.test((value as Record<string, string>)[id]!));
 
 const isExternalizedCollectionManifest = (
   value: unknown
@@ -158,27 +209,32 @@ const isExternalizedCollectionManifest = (
   typeof value === "object" &&
   value !== null &&
   "version" in value &&
-  value.version === 1 &&
+  (value.version === 1 || value.version === 2 || value.version === 3) &&
   "sourcePackageIds" in value &&
   Array.isArray(value.sourcePackageIds) &&
   value.sourcePackageIds.every(entityId => typeof entityId === "string") &&
   "contentReleaseIds" in value &&
   Array.isArray(value.contentReleaseIds) &&
-  value.contentReleaseIds.every(entityId => typeof entityId === "string");
+  value.contentReleaseIds.every(entityId => typeof entityId === "string") &&
+  new Set(value.sourcePackageIds).size === value.sourcePackageIds.length &&
+  new Set(value.contentReleaseIds).size === value.contentReleaseIds.length &&
+  (value.version === 1 || ("sourcePackageHashes" in value && "contentReleaseHashes" in value &&
+    isHashIndex(value.sourcePackageHashes, value.sourcePackageIds) && isHashIndex(value.contentReleaseHashes, value.contentReleaseIds)));
 
 const writeJsonAtomically = async (
   targetPath: string,
   value: unknown,
   pretty = false
 ): Promise<void> => {
+  await writeRawAtomically(targetPath, JSON.stringify(value, null, pretty ? 2 : undefined));
+};
+
+const writeRawAtomically = async (targetPath: string, raw: string, storePath = targetPath): Promise<void> => {
   await mkdir(dirname(targetPath), { recursive: true });
-  const temporaryPath = `${targetPath}.${process.pid}.${randomUUID()}.tmp`;
+  const identity = await fileStoreTemporaryIdentity(storePath);
+  const temporaryPath = join(dirname(targetPath), `.pending.${identity.store}.${identity.namespace}.${process.pid}.${randomUUID()}.tmp`);
   try {
-    await writeFile(
-      temporaryPath,
-      JSON.stringify(value, null, pretty ? 2 : undefined),
-      "utf8"
-    );
+    await writeFile(temporaryPath, raw, { encoding: "utf8", flag: "wx", flush: true });
     await rename(temporaryPath, targetPath);
   } finally {
     await rm(temporaryPath, { force: true }).catch(() => undefined);
@@ -189,6 +245,7 @@ const readExternalizedCollection = async <Value>(input: {
   filePath: string;
   collectionName: "source-packages" | "content-releases";
   entityIds: string[];
+  hashes?: Record<string, string>;
   resolveEntityId: (value: Value) => string;
 }): Promise<Record<string, Value>> => {
   const values: Record<string, Value> = {};
@@ -201,9 +258,12 @@ const readExternalizedCollection = async <Value>(input: {
     }
     seenEntityIds.add(entityId);
     const raw = await readFile(
-      externalEntityFilePath(input.filePath, input.collectionName, entityId),
+      externalEntityFilePath(input.filePath, input.collectionName, entityId, input.hashes?.[entityId]),
       "utf8"
     );
+    if (input.hashes && createHash("sha256").update(raw).digest("hex") !== input.hashes[entityId]) {
+      throw new Error(`Externalized ${input.collectionName} entry '${entityId}' has a hash mismatch.`);
+    }
     const value = JSON.parse(raw) as Value;
     if (input.resolveEntityId(value) !== entityId) {
       throw new Error(
@@ -225,13 +285,14 @@ const removeUnreferencedExternalFiles = async (input: {
     input.collectionName
   );
   const expectedFileNames = new Set(
-    input.entityIds.map(entityId => `${encodeURIComponent(entityId)}.json`)
+    input.entityIds.map(entityId => encodeURIComponent(entityId))
   );
   try {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (
         entry.isFile() &&
-        !expectedFileNames.has(entry.name) &&
+        !expectedFileNames.has(entry.name.replace(/\.json$/, "")) &&
+        !expectedFileNames.has(entry.name.replace(/\.[a-f0-9]{64}\.json$/, "")) &&
         (entry.name.endsWith(".json") || entry.name.endsWith(".tmp"))
       ) {
         await rm(join(directory, entry.name), { force: true });
@@ -254,78 +315,77 @@ const removeUnreferencedExternalFiles = async (input: {
 const persistExternalizedState = async (input: {
   filePath: string;
   state: PersistedFirstSliceState;
-  externalizedCollections: boolean;
+  externalizedCollections: ExternalizedCollectionManifest | null;
   dirtySourcePackageIds: Set<string>;
   dirtyContentReleaseIds: Set<string>;
-}): Promise<void> => {
+}): Promise<VersionedExternalizedCollectionManifest> => {
+  const previous = input.externalizedCollections && input.externalizedCollections.version !== 1 ? input.externalizedCollections : null;
   const sourcePackageIds = Object.keys(input.state.sourcePackages).sort();
   const contentReleaseIds = Object.keys(input.state.contentReleases).sort();
-  const sourcePackageIdsToWrite = input.externalizedCollections
-    ? [...input.dirtySourcePackageIds].filter(
-        entityId => input.state.sourcePackages[entityId]
-      )
-    : sourcePackageIds;
-  const contentReleaseIdsToWrite = input.externalizedCollections
-    ? [...input.dirtyContentReleaseIds].filter(
-        entityId => input.state.contentReleases[entityId]
-      )
-    : contentReleaseIds;
-
-  for (const sourcePackageId of sourcePackageIdsToWrite) {
-    await writeJsonAtomically(
-      externalEntityFilePath(
-        input.filePath,
-        "source-packages",
-        sourcePackageId
-      ),
-      input.state.sourcePackages[sourcePackageId]
-    );
-  }
-  for (const contentReleaseId of contentReleaseIdsToWrite) {
-    await writeJsonAtomically(
-      externalEntityFilePath(
-        input.filePath,
-        "content-releases",
-        contentReleaseId
-      ),
-      input.state.contentReleases[contentReleaseId]
-    );
-  }
-
-  const manifest: ExternalizedCollectionManifest = {
-    version: 1,
-    sourcePackageIds,
-    contentReleaseIds
+  const sourcePackageHashes: Record<string, string> = Object.create(null);
+  const contentReleaseHashes: Record<string, string> = Object.create(null);
+  const createdPaths: string[] = [];
+  const persistCollection = async (collectionName: "source-packages" | "content-releases", ids: string[],
+    values: Record<string, unknown>, dirtyIds: Set<string>, previousHashes: Record<string, string> | undefined,
+    hashes: Record<string, string>): Promise<void> => {
+    for (const id of ids) {
+      if (previousHashes && Object.hasOwn(previousHashes, id) && !dirtyIds.has(id)) {
+        hashes[id] = previousHashes[id]!;
+        continue;
+      }
+      const raw = JSON.stringify(values[id]);
+      const hash = createHash("sha256").update(raw).digest("hex");
+      const path = externalEntityFilePath(input.filePath, collectionName, id, hash);
+      let exists = true;
+      try {
+        const existing = await readFile(path, "utf8");
+        if (createHash("sha256").update(existing).digest("hex") !== hash) {
+          throw new Error(`Externalized ${collectionName} entry '${id}' has a hash mismatch.`);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        exists = false;
+      }
+      if (!exists) {
+        await writeRawAtomically(path, raw, input.filePath);
+        createdPaths.push(path);
+      }
+      hashes[id] = hash;
+    }
   };
-  await writeJsonAtomically(
-    input.filePath,
-    {
-      ...input.state,
-      sourcePackages: {},
-      contentReleases: {},
-      externalizedCollections: manifest
-    },
-    true
-  );
-  await Promise.all([
-    removeUnreferencedExternalFiles({
-      filePath: input.filePath,
-      collectionName: "source-packages",
-      entityIds: sourcePackageIds
-    }),
-    removeUnreferencedExternalFiles({
-      filePath: input.filePath,
-      collectionName: "content-releases",
-      entityIds: contentReleaseIds
-    })
+  const manifest: VersionedExternalizedCollectionManifest = {
+    version: 3, sourcePackageIds, contentReleaseIds, sourcePackageHashes, contentReleaseHashes
+  };
+  try {
+    await persistCollection("source-packages", sourcePackageIds, input.state.sourcePackages,
+      input.dirtySourcePackageIds, previous?.sourcePackageHashes, sourcePackageHashes);
+    await persistCollection("content-releases", contentReleaseIds, input.state.contentReleases,
+      input.dirtyContentReleaseIds, previous?.contentReleaseHashes, contentReleaseHashes);
+    // The atomic manifest rename is the publication point for the whole mutation.
+    // Existing sidecars are never overwritten before or after that point.
+    await writeJsonAtomically(input.filePath, {
+      ...input.state, sourcePackages: {}, contentReleases: {}, externalizedCollections: manifest
+    }, true);
+  } catch (error) {
+    await Promise.all(createdPaths.map(path => rm(path, { force: true }).catch(() => undefined)));
+    throw error;
+  }
+  // Keep prior versions of live entities for readers of an earlier manifest.
+  // Deletion prunes all versions of removed entities; cleanup failures retry on the next mutation.
+  if (!await hasFileStoreReaders(input.filePath)) await Promise.all([
+    removeUnreferencedExternalFiles({ filePath: input.filePath, collectionName: "source-packages", entityIds: sourcePackageIds }),
+    removeUnreferencedExternalFiles({ filePath: input.filePath, collectionName: "content-releases", entityIds: contentReleaseIds })
   ]);
+  return manifest;
 };
 
 const readStateFromFile = async (
   filePath: string
 ): Promise<LoadedFirstSliceState> => {
+  let manifestRead = false;
   try {
     const raw = await readFile(filePath, "utf8");
+    manifestRead = true;
     const document = JSON.parse(raw) as PersistedFirstSliceDocument;
     const { externalizedCollections, ...inlineState } = document;
     const state: PersistedFirstSliceState = {
@@ -340,12 +400,14 @@ const readStateFromFile = async (
         filePath,
         collectionName: "source-packages",
         entityIds: externalizedCollections.sourcePackageIds,
+        hashes: externalizedCollections.version !== 1 ? externalizedCollections.sourcePackageHashes : undefined,
         resolveEntityId: sourcePackage => sourcePackage.sourcePackageId
       });
       state.contentReleases = await readExternalizedCollection<ContentRelease>({
         filePath,
         collectionName: "content-releases",
         entityIds: externalizedCollections.contentReleaseIds,
+        hashes: externalizedCollections.version !== 1 ? externalizedCollections.contentReleaseHashes : undefined,
         resolveEntityId: contentRelease => contentRelease.contentReleaseId
       });
     }
@@ -456,26 +518,52 @@ const readStateFromFile = async (
     );
     return {
       state,
-      externalizedCollections: externalizedCollections !== undefined
+      externalizedCollections: (externalizedCollections as ExternalizedCollectionManifest | undefined) ?? null
     };
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
-      return {
-        state: createInitialState(),
-        externalizedCollections: false
-      };
+    // Only an absent main manifest initializes a store, never an absent sidecar.
+    if (!manifestRead && (error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { state: createInitialState(), externalizedCollections: null };
     }
-
     throw error;
   }
 };
 
-export const checkFileFirstSliceReadiness = async (
+const nearestExistingDirectory = async (directory: string): Promise<string> => {
+  try {
+    const info = await stat(directory);
+    if (!info.isDirectory()) throw new Error(`File-store directory '${directory}' is not a directory.`);
+    return directory;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT" || dirname(directory) === directory) throw error;
+    return nearestExistingDirectory(dirname(directory));
+  }
+};
+
+const probeAtomicFileWrite = async (directory: string): Promise<void> => {
+  // Collection cleanup only considers .json/.tmp; it cannot delete an active probe.
+  const from = join(directory, `.readiness-${randomUUID()}.probe`), to = from + ".renamed";
+  let created = false, renamed = false;
+  try {
+    const handle = await open(from, "wx"); created = true;
+    try { await handle.writeFile("ready\n", "utf8"); await handle.sync(); }
+    finally { await handle.close(); }
+    await rename(from, to); renamed = true;
+  } finally {
+    if (created && !renamed) await rm(from, { force: true });
+    if (renamed) await rm(to, { force: true });
+  }
+};
+
+const checkFileWriterDirectories = async (filePath: string): Promise<void> => {
+  const directories = new Set([dirname(filePath)]);
+  for (const collection of ["source-packages", "content-releases"] as const) {
+    directories.add(await nearestExistingDirectory(externalCollectionDirectory(filePath, collection)));
+  }
+  for (const directory of directories) await probeAtomicFileWrite(directory);
+};
+
+const checkFileFirstSliceReadinessUnlocked = async (
   filePath: string
 ): Promise<void> => {
   await mkdir(dirname(filePath), { recursive: true });
@@ -490,6 +578,7 @@ export const checkFileFirstSliceReadiness = async (
       "code" in error &&
       error.code === "ENOENT"
     ) {
+      await checkFileWriterDirectories(filePath);
       return;
     }
 
@@ -503,17 +592,87 @@ export const checkFileFirstSliceReadiness = async (
     for (const sourcePackageId of document.externalizedCollections
       .sourcePackageIds) {
       await access(
-        externalEntityFilePath(filePath, "source-packages", sourcePackageId)
+        externalEntityFilePath(filePath, "source-packages", sourcePackageId,
+          document.externalizedCollections.version !== 1 ? document.externalizedCollections.sourcePackageHashes[sourcePackageId] : undefined)
       );
     }
     for (const contentReleaseId of document.externalizedCollections
       .contentReleaseIds) {
       await access(
-        externalEntityFilePath(filePath, "content-releases", contentReleaseId)
+        externalEntityFilePath(filePath, "content-releases", contentReleaseId,
+          document.externalizedCollections.version !== 1 ? document.externalizedCollections.contentReleaseHashes[contentReleaseId] : undefined)
       );
     }
   }
+  await checkFileWriterDirectories(filePath);
 };
+
+export const checkFileFirstSliceReadiness = (filePath: string): Promise<void> =>
+  withFileStoreAccess(filePath, "reader", () => checkFileFirstSliceReadinessUnlocked(filePath));
+
+export const compactFileFirstSliceStorage = (filePath: string, input: { apply?: boolean } = {}) =>
+  withFileStoreAccess(filePath, "maintenance", async () => {
+    const before = await readFile(filePath);
+    const loaded = await readStateFromFile(filePath);
+    if (loaded.externalizedCollections?.version !== 3) {
+      throw new Error("File compaction requires the version-three access protocol; stop the old writer and migrate first.");
+    }
+    const manifest = loaded.externalizedCollections;
+    const candidates: Array<{ path: string; bytes: number }> = [];
+    const ignoredPaths: string[] = [];
+    for (const collection of ["source-packages", "content-releases"] as const) {
+      const ids = collection === "source-packages" ? manifest.sourcePackageIds : manifest.contentReleaseIds;
+      const hashes = collection === "source-packages" ? manifest.sourcePackageHashes : manifest.contentReleaseHashes;
+      const selected = new Set(ids.map(id => externalEntityFilePath(filePath, collection, id, hashes[id])));
+      const directory = externalCollectionDirectory(filePath, collection);
+      let entries;
+      try {
+        if (!(await lstat(directory)).isDirectory()) { ignoredPaths.push(directory); continue; }
+        entries = await readdir(directory, { withFileTypes: true });
+      }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw error; }
+      for (const entry of entries) {
+        const path = join(directory, entry.name);
+        if (selected.has(path)) continue;
+        if (entry.isFile() && await isDeadFileStoreTemporary(filePath, entry.name)) {
+          candidates.push({ path, bytes: (await stat(path)).size }); continue;
+        }
+        if (!entry.isFile() || !entry.name.endsWith(".json")) { ignoredPaths.push(path); continue; }
+        const hashed = /^(.*)\.([a-f0-9]{64})\.json$/.exec(entry.name);
+        const encodedId = hashed?.[1] ?? entry.name.slice(0, -5);
+        let id;
+        try { id = decodeURIComponent(encodedId!); }
+        catch { ignoredPaths.push(path); continue; }
+        if (encodeURIComponent(id) !== encodedId) { ignoredPaths.push(path); continue; }
+        const raw = await readFile(path, "utf8");
+        let value;
+        try { value = JSON.parse(raw) as Record<string, unknown>; }
+        catch { ignoredPaths.push(path); continue; }
+        const identity = collection === "source-packages" ? "sourcePackageId" : "contentReleaseId";
+        if (value?.[identity] !== id || hashed && createHash("sha256").update(raw).digest("hex") !== hashed[2]) {
+          ignoredPaths.push(path); continue;
+        }
+        candidates.push({ path, bytes: Buffer.byteLength(raw) });
+      }
+    }
+    for (const entry of await readdir(dirname(filePath), { withFileTypes: true })) {
+      if (entry.isFile() && await isDeadFileStoreTemporary(filePath, entry.name)) {
+        const path = join(dirname(filePath), entry.name);
+        candidates.push({ path, bytes: (await stat(path)).size });
+      }
+    }
+    // Participating writers/readers cannot enter while our maintenance marker exists.
+    // Recheck also detects unsupported external modification before any deletion.
+    if (!before.equals(await readFile(filePath))) throw new Error("File manifest changed during compaction.");
+    let removedFiles = 0, reclaimedBytes = 0;
+    if (input.apply === true) for (const candidate of candidates) {
+      await rm(candidate.path);
+      removedFiles++; reclaimedBytes += candidate.bytes;
+    }
+    return { applied: input.apply === true, candidateFiles: candidates.length,
+      candidateBytes: candidates.reduce((sum, item) => sum + item.bytes, 0),
+      removedFiles, reclaimedBytes, ignoredPaths };
+  });
 
 export const migrateFileFirstSliceStorage = async (
   filePath: string
@@ -522,38 +681,51 @@ export const migrateFileFirstSliceStorage = async (
   formatVersion: 1;
   sourcePackageCount: number;
   contentReleaseCount: number;
-}> => {
+}> => withFileStoreAccess(filePath, "writer", async () => {
   const loaded = await readStateFromFile(filePath);
   const sourcePackageCount = Object.keys(loaded.state.sourcePackages).length;
   const contentReleaseCount = Object.keys(loaded.state.contentReleases).length;
-  if (!loaded.externalizedCollections) {
+  if (loaded.externalizedCollections?.version !== 3) {
     await persistExternalizedState({
       filePath,
       state: loaded.state,
-      externalizedCollections: false,
+      externalizedCollections: loaded.externalizedCollections,
       dirtySourcePackageIds: new Set(),
       dirtyContentReleaseIds: new Set()
     });
   }
   return {
-    migrated: !loaded.externalizedCollections,
+    migrated: loaded.externalizedCollections?.version !== 3,
     formatVersion: 1,
     sourcePackageCount,
     contentReleaseCount
   };
-};
+});
 
-export const createFileFirstSliceRepository = (
-  filePath: string
+const createFileRepository = (
+  filePath: string, registeredWriterCheck?: () => void
 ): FirstSliceRepository => {
   let cachePromise: Promise<PersistedFirstSliceState> | null = null;
   let writeQueue: Promise<void> = Promise.resolve();
-  let externalizedCollections = false;
+  let externalizedCollections: ExternalizedCollectionManifest | null = null;
   const dirtySourcePackageIds = new Set<string>();
   const dirtyContentReleaseIds = new Set<string>();
 
   const getState = async (): Promise<PersistedFirstSliceState> => {
-    cachePromise ??= readStateFromFile(filePath).then(loaded => {
+    registeredWriterCheck?.();
+    const read = async () => {
+      try { return await withFileStoreAccess(filePath, "reader", () => readStateFromFile(filePath)); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EACCES") throw error;
+        // Legacy readonly inspectors cannot create access metadata. Compaction
+        // rejects those formats; their upgrade requires stopping all old access.
+        const document = JSON.parse(await readFile(filePath, "utf8")) as PersistedFirstSliceDocument;
+        if (typeof document.externalizedCollections === "object" && document.externalizedCollections !== null &&
+          "version" in document.externalizedCollections && document.externalizedCollections.version === 3) throw error;
+        return readStateFromFile(filePath);
+      }
+    };
+    cachePromise ??= read().then(loaded => {
       externalizedCollections = loaded.externalizedCollections;
       return loaded.state;
     });
@@ -561,32 +733,138 @@ export const createFileFirstSliceRepository = (
   };
 
   const persistState = async (state: PersistedFirstSliceState): Promise<void> => {
-    await persistExternalizedState({
+    externalizedCollections = await persistExternalizedState({
       filePath,
       state,
       externalizedCollections,
       dirtySourcePackageIds,
       dirtyContentReleaseIds
     });
-    externalizedCollections = true;
     dirtySourcePackageIds.clear();
     dirtyContentReleaseIds.clear();
+  };
+
+  const enqueueMutation = <Result>(operation: () => Promise<Result>): Promise<Result> => {
+    const result = writeQueue.then(() => {
+      registeredWriterCheck?.();
+      return registeredWriterCheck ? operation() : withFileStoreAccess(filePath, "writer", operation);
+    });
+    writeQueue = result.then(() => undefined, () => undefined);
+    return result;
   };
 
   const mutate = <Result>(
     updater: (state: PersistedFirstSliceState) => Result
   ): Promise<Result> => {
-    const operation = writeQueue.then(async () => {
-      const state = await getState();
-      const result = updater(state);
-      await persistState(state);
+    return enqueueMutation(async () => {
+      const current = await getState();
+      // Mutators replace rows or edit collection membership; share immutable row payloads,
+      // but isolate every collection map until the manifest has committed.
+      const next = Object.fromEntries(Object.entries(current).map(([key, value]) =>
+        [key, value && typeof value === "object" ? { ...value } : value])) as PersistedFirstSliceState;
+      const sourceDirtyBefore = new Set(dirtySourcePackageIds), releaseDirtyBefore = new Set(dirtyContentReleaseIds);
+      try {
+        const result = updater(next);
+        await persistState(next);
+        cachePromise = Promise.resolve(next);
+        return result;
+      } catch (error) {
+        dirtySourcePackageIds.clear(); dirtyContentReleaseIds.clear();
+        for (const id of sourceDirtyBefore) dirtySourcePackageIds.add(id);
+        for (const id of releaseDirtyBefore) dirtyContentReleaseIds.add(id);
+        throw error;
+      }
+    });
+  };
+
+  const mutateCommandList = <Result>(
+    updater: (state: PersistedFirstSliceState) => Result
+  ): Promise<Result> => {
+    return enqueueMutation(async () => {
+      const current = await getState();
+      const next = { ...current, participantRunCommands: { ...current.participantRunCommands } };
+      const result = updater(next);
+      if (result === null) return result;
+      await persistState(next);
+      // A failed durable receipt must remain pending in the cached state too.
+      cachePromise = Promise.resolve(next);
       return result;
     });
-    writeQueue = operation.then(
-      () => undefined,
-      () => undefined
-    );
-    return operation;
+  };
+
+  const mutateParticipantRunApplication = <Result extends { applied: boolean } | null>(
+    updater: (state: PersistedFirstSliceState) => Result
+  ): Promise<Result> => {
+    return enqueueMutation(async () => {
+      const current = await getState();
+      const next = { ...current, participantRunCommands: { ...current.participantRunCommands },
+        participantProgressDeliveries: { ...current.participantProgressDeliveries },
+        testRuns: { ...current.testRuns }, participantSessions: { ...current.participantSessions },
+        participantTestLogs: { ...current.participantTestLogs }, workspaceActivityEvents: { ...current.workspaceActivityEvents } };
+      const result = updater(next);
+      if (!result?.applied) return result;
+      await persistState(next);
+      cachePromise = Promise.resolve(next);
+      return result;
+    });
+  };
+
+  const mutateControllerActivation = (
+    input: Parameters<FirstSliceRepository["activateParticipantController"]>[0]
+  ): ReturnType<FirstSliceRepository["activateParticipantController"]> => {
+    return enqueueMutation(async () => {
+      const current = await getState();
+      const result = prepareParticipantControllerActivation(input,
+        current.participantSessions[input.participantSessionId] ?? null, current.testRuns[input.testRunId] ?? null);
+      if (!result || !result.activated && !result.entryChanged) return result;
+      const next = { ...current, participantSessions: result.activated ? { ...current.participantSessions,
+        [input.participantSessionId]: structuredClone(result.participantSession) } : current.participantSessions,
+        testRuns: result.entryChanged ? { ...current.testRuns, [input.testRunId]: structuredClone(result.testRun) } : current.testRuns };
+      await persistState(next);
+      cachePromise = Promise.resolve(next);
+      return result;
+    });
+  };
+
+  const reserveSourcePackageWithActivity = async (input: Parameters<FirstSliceRepository['reserveSourcePackageAssembly']>[0],
+    requiredEventType: 'source_package_assembled' | 'source_package_created'): Promise<boolean> => {
+    return mutate(state => {
+      const { assembledSourcePackage, assemblyActivityEvent } = input;
+      const sourcePackages = Object.values(state.sourcePackages).filter(
+        candidate =>
+          candidate.tenantId === assembledSourcePackage.tenantId &&
+          candidate.workspaceId === assembledSourcePackage.workspaceId
+      );
+      const activityEvents = Object.values(
+        state.workspaceActivityEvents
+      ).filter(
+        activityEvent =>
+          activityEvent.tenantId === assembledSourcePackage.tenantId &&
+          activityEvent.workspaceId === assembledSourcePackage.workspaceId
+      );
+      if (
+        assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
+        assemblyActivityEvent.workspaceId !==
+          assembledSourcePackage.workspaceId ||
+        assemblyActivityEvent.eventType !== requiredEventType ||
+        assemblyActivityEvent.subjectId !==
+          assembledSourcePackage.sourcePackageId ||
+        state.sourcePackages[assembledSourcePackage.sourcePackageId] ||
+        state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] ||
+        createWorkspaceSourcePackageReferenceRevision({
+          sourcePackages,
+          activityEvents
+        }) !== input.expectedWorkspaceSourcePackageReferenceRevision
+      ) {
+        return false;
+      }
+      dirtySourcePackageIds.add(assembledSourcePackage.sourcePackageId);
+      state.sourcePackages[assembledSourcePackage.sourcePackageId] =
+        assembledSourcePackage;
+      state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] =
+        assemblyActivityEvent;
+      return true;
+    });
   };
 
   return {
@@ -596,7 +874,18 @@ export const createFileFirstSliceRepository = (
     },
     async saveApplicationSettings(settings) {
       await mutate(state => {
+        validateApplicationAssetReferences(settings.assetAssignments,Object.values(state.applicationAssets));
         state.applicationSettings = { ...settings };
+      });
+    },
+    async mutateApplicationSettings(transform) {
+      return mutate(state => {
+        const effect=transform(structuredClone(state.applicationSettings));
+        if(state.adminAuditEvents[effect.auditEvent.adminAuditEventId])throw Error("Duplicate application settings audit event.");
+        validateApplicationAssetReferences(effect.settings.assetAssignments,Object.values(state.applicationAssets));
+        state.applicationSettings=structuredClone(effect.settings);
+        state.adminAuditEvents[effect.auditEvent.adminAuditEventId]=structuredClone(effect.auditEvent);
+        return structuredClone(effect.settings);
       });
     },
     async listApplicationAssets() {
@@ -615,10 +904,35 @@ export const createFileFirstSliceRepository = (
         ) ?? null
       );
     },
-    async saveApplicationAsset(applicationAsset) {
-      await mutate(state => {
+    async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
+      return mutate(state => {
+        const existing=replaceByOriginalName?Object.values(state.applicationAssets).find(asset=>asset.originalName===applicationAsset.originalName):null;
+        if(existing)applicationAsset={...applicationAsset,applicationAssetId:existing.applicationAssetId,createdAt:existing.createdAt};
         state.applicationAssets[applicationAsset.applicationAssetId] =
           applicationAsset;
+        return { applicationAsset, replaced: Boolean(existing) };
+      });
+    },
+    async mutateApplicationAssetDeletion(input) {
+      return mutate(state=>{
+        const scopes=Object.values(state.workspacesByScope).map(workspace=>({...workspace,
+          tenantKey:Object.values(state.tenants).find(tenant=>tenant.tenantId===workspace.tenantId)?.tenantKey??workspace.tenantId}));
+        const effect=prepareApplicationAssetDeletion(input,{
+          asset:state.applicationAssets[input.applicationAssetId]??null,settings:state.applicationSettings,
+          roster:Object.values(state.participantRosterEntries).map(row=>({...row,assetAssignments:row.assetAssignments??{}})),
+          operational:Object.entries(state.operationalLoginMigrationCandidates).map(([key,candidates])=>{
+          const scope=scopes.find(scope=>scope.tenantId+"::"+scope.workspaceId===key);
+          if(scope)return {...scope,candidates};
+          const parts=key.split("::");if(parts.length!==2)throw Error("Invalid stored operational asset scope.");
+          return {tenantId:parts[0]!,workspaceId:parts[1]!,candidates};
+        }),scopes
+        });
+        if(!effect)return null;
+        if(effect.settings)state.applicationSettings=effect.settings;
+        for(const row of effect.roster)state.participantRosterEntries[row.participantRosterEntryId]={...state.participantRosterEntries[row.participantRosterEntryId]!,assetAssignments:row.assetAssignments};
+        for(const group of effect.operational)state.operationalLoginMigrationCandidates[group.tenantId+"::"+group.workspaceId]=group.candidates;
+        delete state.applicationAssets[effect.asset.applicationAssetId];state.adminAuditEvents[effect.auditEvent.adminAuditEventId]=effect.auditEvent;
+        return effect.asset;
       });
     },
     async deleteApplicationAsset(applicationAssetId) {
@@ -853,6 +1167,10 @@ export const createFileFirstSliceRepository = (
         };
         const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
           value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
+        deleteMatching(state.participantRunCommands, workspaceMatches);
+      deleteMatching(state.participantProgressDeliveries, workspaceMatches);
+        deleteMatching(state.originalLoginBindings, workspaceMatches);
+        deleteMatching(state.originalParticipantGroups, workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
           if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
         }
@@ -921,12 +1239,13 @@ export const createFileFirstSliceRepository = (
         return counts;
       });
     },
-    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId, eventTypes) {
       const state = await getState();
       return Object.values(state.workspaceActivityEvents).filter(
         activityEvent =>
           activityEvent.tenantId === tenantId &&
-          activityEvent.workspaceId === workspaceId
+          activityEvent.workspaceId === workspaceId &&
+          (eventTypes === undefined || eventTypes.includes(activityEvent.eventType))
       );
     },
     async saveWorkspaceActivityEvent(activityEvent) {
@@ -964,45 +1283,40 @@ export const createFileFirstSliceRepository = (
         state.sourcePackages[sourcePackage.sourcePackageId] = sourcePackage;
       });
     },
-    async reserveSourcePackageAssembly(input) {
-      return mutate(state => {
-        const { assembledSourcePackage, assemblyActivityEvent } = input;
-        const sourcePackages = Object.values(state.sourcePackages).filter(
-          candidate =>
-            candidate.tenantId === assembledSourcePackage.tenantId &&
-            candidate.workspaceId === assembledSourcePackage.workspaceId
-        );
-        const activityEvents = Object.values(
-          state.workspaceActivityEvents
-        ).filter(
-          activityEvent =>
-            activityEvent.tenantId === assembledSourcePackage.tenantId &&
-            activityEvent.workspaceId === assembledSourcePackage.workspaceId
-        );
-        if (
-          assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
-          assemblyActivityEvent.workspaceId !==
-            assembledSourcePackage.workspaceId ||
-          assemblyActivityEvent.eventType !== "source_package_assembled" ||
-          assemblyActivityEvent.subjectId !==
-            assembledSourcePackage.sourcePackageId ||
-          state.sourcePackages[assembledSourcePackage.sourcePackageId] ||
-          state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] ||
-          createWorkspaceSourcePackageReferenceRevision({
-            sourcePackages,
-            activityEvents
-          }) !== input.expectedWorkspaceSourcePackageReferenceRevision
-        ) {
-          return false;
+    reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    async publishWorkspaceFiles(input) {
+      input=structuredClone(input);
+      return mutate(state=>{
+        const source=input.sourcePackage,job=input.importJob,release=input.contentRelease;
+        const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===source.tenantId && value.workspaceId===source.workspaceId;
+        const superseded=prepareWorkspaceFilePublication(input,{
+          workspaceExists:Object.values(state.workspacesByScope).some(scoped),
+          identitiesAvailable:!state.sourcePackages[source.sourcePackageId] && !state.importJobs[job.importJobId] &&
+            (!release || !state.contentReleases[release.contentReleaseId]) &&
+            input.activityEvents.every(event=>!state.workspaceActivityEvents[event.activityEventId]),
+          sourcePackages:Object.values(state.sourcePackages).filter(scoped),
+          activityEvents:Object.values(state.workspaceActivityEvents).filter(scoped),
+          contentReleases:Object.values(state.contentReleases).filter(scoped)
+        });
+        if(!superseded)return false;
+        dirtySourcePackageIds.add(source.sourcePackageId);
+        state.sourcePackages[source.sourcePackageId]=structuredClone(source);
+        state.importJobs[job.importJobId]=structuredClone(job);
+        for(const value of superseded){
+          dirtyContentReleaseIds.add(value.contentReleaseId);
+          state.contentReleases[value.contentReleaseId]=structuredClone(value);
         }
-        dirtySourcePackageIds.add(assembledSourcePackage.sourcePackageId);
-        state.sourcePackages[assembledSourcePackage.sourcePackageId] =
-          assembledSourcePackage;
-        state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] =
-          assemblyActivityEvent;
+        if(release){
+          dirtyContentReleaseIds.add(release.contentReleaseId);
+          state.contentReleases[release.contentReleaseId]=structuredClone(release);
+        }
+        for(const event of input.activityEvents)state.workspaceActivityEvents[event.activityEventId]=structuredClone(event);
         return true;
       });
     },
+    reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
+      assemblyActivityEvent:input.createdActivityEvent,
+      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),
     async reserveSourcePackageReplacement(input) {
       return mutate(state => {
         const { replacementSourcePackage, replacementActivityEvent } = input;
@@ -1148,6 +1462,29 @@ export const createFileFirstSliceRepository = (
           contentRelease.workspaceId === workspaceId
       );
     },
+    async getContentReleaseActivationRevision(tenantId, workspaceId) {
+      const state=await getState();
+      const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===tenantId && value.workspaceId===workspaceId;
+      return createContentReleaseActivationRevision({contentReleases:Object.values(state.contentReleases).filter(scoped),
+          participantSessions:Object.values(state.participantSessions).filter(scoped),
+          testRuns:Object.values(state.testRuns).filter(scoped)});
+    },
+    async commitContentReleaseActivation(input) {
+      return mutate(state=>{
+        const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===input.tenantId && value.workspaceId===input.workspaceId;
+        const prepared=prepareContentReleaseActivation(input,{
+          workspaceExists:Object.values(state.workspacesByScope).some(scoped),
+          eventIdAvailable:!state.workspaceActivityEvents[input.activityEvent.activityEventId],
+          contentReleases:Object.values(state.contentReleases).filter(scoped),
+          participantSessions:Object.values(state.participantSessions).filter(scoped),
+          testRuns:Object.values(state.testRuns).filter(scoped)
+        });
+        if(!prepared)return false;
+        for(const release of prepared.contentReleases){dirtyContentReleaseIds.add(release.contentReleaseId);state.contentReleases[release.contentReleaseId]=release;}
+        state.workspaceActivityEvents[prepared.activityEvent.activityEventId]=prepared.activityEvent;
+        return true;
+      });
+    },
     async saveContentRelease(contentRelease) {
       await mutate(state => {
         dirtyContentReleaseIds.add(contentRelease.contentReleaseId);
@@ -1185,10 +1522,70 @@ export const createFileFirstSliceRepository = (
           participantSession.workspaceId === workspaceId
       );
     },
+    async getOrCreateOriginalParticipantGroup(input) {
+      return enqueueMutation(async () => {
+        const state = await getState();
+        const candidate = prepareOriginalParticipantGroup(input);
+        if (!Object.values(state.workspacesByScope).some(workspace => workspace.tenantId === candidate.tenantId && workspace.workspaceId === candidate.workspaceId)) return null;
+        const existing = Object.values(state.originalParticipantGroups).find(group => group.tenantId === candidate.tenantId && group.workspaceId === candidate.workspaceId && originalParticipantGroupKeysEqual(group.groupKey, candidate.groupKey));
+        if (existing) return structuredClone(existing);
+        const next = { ...state, originalParticipantGroups: { ...state.originalParticipantGroups,
+          [JSON.stringify([candidate.tenantId, candidate.workspaceId, candidate.groupKey])]: candidate } };
+        await persistState(next);
+        cachePromise = Promise.resolve(next);
+        return structuredClone(candidate);
+      });
+    },
+    async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return structuredClone(Object.values(state.originalParticipantGroups).filter(group => group.tenantId === tenantId && group.workspaceId === workspaceId));
+    },
+    async bindOriginalLoginGroup(input) {
+      return enqueueMutation(async () => {
+        const state = await getState(), validated = prepareOriginalLoginBinding(input);
+        if (!Object.values(state.workspacesByScope).some(workspace => workspace.tenantId === input.tenantId && workspace.workspaceId === input.workspaceId) ||
+            !Object.values(state.originalParticipantGroups).some(group => group.tenantId === input.tenantId && group.workspaceId === input.workspaceId && group.groupKey === input.groupSnapshotKey)) return null;
+        const previous = state.originalLoginBindings[JSON.stringify([input.tenantId, input.workspaceId, validated.loginKey])];
+        const binding = prepareOriginalLoginBinding(input, previous);
+        const participantSessions = Object.fromEntries(Object.entries(state.participantSessions).map(([id, session]) => [id,
+          session.tenantId === binding.tenantId && session.workspaceId === binding.workspaceId && session.originalLoginKey === binding.loginKey ? {...session, groupKey: binding.groupKey} : session]));
+        const next = {...state, participantSessions, originalLoginBindings: {...state.originalLoginBindings,
+          [JSON.stringify([binding.tenantId,binding.workspaceId,binding.loginKey])]: binding}};
+        await persistState(next); cachePromise = Promise.resolve(next);
+        return structuredClone(binding);
+      });
+    },
+    async listOriginalLoginBindingsByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return structuredClone(Object.values(state.originalLoginBindings).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
+    },
+    async resolveOriginalParticipantSession(candidate,validate) {
+      return enqueueMutation(async()=>{
+        const state=await getState();
+        if(!Object.values(state.workspacesByScope).some(workspace=>workspace.tenantId===candidate.tenantId && workspace.workspaceId===candidate.workspaceId))return null;
+        const binding=Object.values(state.originalLoginBindings).find(binding=>binding.tenantId===candidate.tenantId && binding.workspaceId===candidate.workspaceId && binding.loginKey===candidate.originalLoginKey);
+        const storedPeople=Object.values(state.participantSessions),result=resolveOriginalPerson(candidate,binding,storedPeople,validate);
+        const people=projectOriginalPersonSessions(result.participantSession,storedPeople),storedRuns=Object.values(state.testRuns),runs=projectOriginalPersonRuns(result.participantSession,storedRuns,people);
+        if(!result.created && people.every((person,index)=>person===storedPeople[index]) && runs.every((run,index)=>run===storedRuns[index]))return structuredClone(result);
+        const next={...state,participantSessions:Object.fromEntries(people.map(person=>[person.participantSessionId,person])),
+          testRuns:Object.fromEntries(runs.map(run=>[run.testRunId,run]))};
+        await persistState(next);cachePromise=Promise.resolve(next);return structuredClone(result);
+      });
+    },
     async saveParticipantSession(participantSession) {
-      await mutate(state => {
-        state.participantSessions[participantSession.participantSessionId] =
-          participantSession;
+      await enqueueMutation(async () => {
+        const state = await getState();
+        const previous = state.participantSessions[participantSession.participantSessionId];
+        const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
+        if (originalLoginKey !== undefined) {
+          const binding = Object.values(state.originalLoginBindings).find(binding => binding.tenantId === participantSession.tenantId && binding.workspaceId === participantSession.workspaceId && binding.loginKey === originalLoginKey);
+
+          participantSession = prepareOriginalParticipantSession(participantSession,previous,binding);
+        } else participantSession = prepareOriginalParticipantSession(participantSession,previous,null);
+        assertOriginalPersonUnique(participantSession,Object.values(state.participantSessions));
+        const next = {...state, participantSessions: {...state.participantSessions,
+          [participantSession.participantSessionId]: structuredClone(participantSession)}};
+        await persistState(next); cachePromise = Promise.resolve(next);
       });
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
@@ -1214,6 +1611,7 @@ export const createFileFirstSliceRepository = (
       candidates
     ) {
       await mutate(state => {
+        for(const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Object.values(state.applicationAssets));
         state.operationalLoginMigrationCandidates[
           `${tenantId}::${workspaceId}`
         ] = candidates;
@@ -1229,6 +1627,10 @@ export const createFileFirstSliceRepository = (
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await mutate(state => {
+        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Object.values(state.applicationAssets));
+        const modes=projectOriginalLoginMode(participantRosterEntry,Object.values(state.participantSessions),Object.values(state.testRuns));
+        for(const person of modes.participantSessions)state.participantSessions[person.participantSessionId]=person;
+        for(const run of modes.testRuns)state.testRuns[run.testRunId]=run;
         state.participantRosterEntries[
           participantRosterEntry.participantRosterEntryId
         ] = participantRosterEntry;
@@ -1312,19 +1714,109 @@ export const createFileFirstSliceRepository = (
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
     },
-    async getOrCreateTestRunForAssignment(candidate) {
-      return mutate(state => {
-        const existing = selectParticipantAssignmentRun(candidate,
+    async getOrCreateTestRunForAssignment(candidate, initialize) {
+      const result = await mutateParticipantRunApplication(state => {
+        const prepared = prepareParticipantAssignmentRunCreation(candidate,
           state.participantSessions[candidate.participantSessionId] ?? null,
-          Object.values(state.testRuns));
-        if (existing) return { testRun: structuredClone(existing), created: false };
-        state.testRuns[candidate.testRunId] = structuredClone(candidate);
-        return { testRun: structuredClone(candidate), created: true };
+          Object.values(state.testRuns), initialize);
+        if (prepared.effect) {
+          const effect = prepared.effect;
+          if (effect.testLogs.some(log => state.participantTestLogs[log.participantTestLogId]) ||
+            effect.activityEvents.some(event => state.workspaceActivityEvents[event.activityEventId])) {
+            throw new Error("Initial participant artifacts cannot overwrite existing identities.");
+          }
+          state.testRuns[candidate.testRunId] = effect.testRun;
+          for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
+          for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
+          if (effect.participantSession) state.participantSessions[candidate.participantSessionId] = effect.participantSession;
+        }
+        return { testRun: prepared.testRun, created: prepared.created, applied: prepared.created };
       });
+      return { testRun: result.testRun, created: result.created };
     },
     async saveTestRun(testRun) {
       await mutate(state => {
-        state.testRuns[testRun.testRunId] = testRun;
+        state.testRuns[testRun.testRunId] = withOriginalTestRunMode(testRun,state.participantSessions[testRun.participantSessionId]);
+      });
+    },
+    activateParticipantController: mutateControllerActivation,
+    async appendParticipantRunCommand(input) {
+      return mutateCommandList(state => {
+        const command = appendParticipantRunCommand(input, state.testRuns[input.testRunId] ?? null, {
+          existing: state.participantRunCommands[JSON.stringify([input.testRunId, input.commandId])] ?? null,
+          lastSequence: Object.values(state.participantRunCommands)
+            .reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)
+        });
+        if (command) state.participantRunCommands[JSON.stringify([command.testRunId, command.commandId])] = structuredClone(command);
+        return command;
+      });
+    },
+    async listPendingParticipantRunCommands(scope) {
+      const state = await getState();
+      if (!matchesParticipantRunCommandScope(state.testRuns[scope.testRunId], scope)) return [];
+      return structuredClone(Object.values(state.participantRunCommands)
+        .filter(command => matchesParticipantRunCommandScope(command, scope) && command.acknowledgedAt === null)
+        .sort((a, b) => a.sequence - b.sequence));
+    },
+    async acknowledgeParticipantRunCommand(input) {
+      return mutateCommandList(state => {
+        const key = JSON.stringify([input.testRunId, input.commandId]);
+        const command = acknowledgeParticipantRunCommand(input, state.testRuns[input.testRunId] ?? null,
+          state.participantRunCommands[key] ?? null);
+        if (command) state.participantRunCommands[key] = structuredClone(command);
+        return command;
+      });
+    },
+    async mutateParticipantRun(input, transform) {
+      return mutateParticipantRunApplication(state => {
+      const testRun = state.testRuns[input.testRunId];
+      const participantSession = state.participantSessions[input.participantSessionId];
+      const prepared = prepareParticipantRunMutation(input, testRun && participantSession ? { testRun, participantSession,
+        progressDelivery: input.deliveryId ? state.participantProgressDeliveries[JSON.stringify([input.testRunId, input.deliveryId])] ?? null : null,
+        testRuns: Object.values(state.testRuns).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
+      if (prepared?.effect) {
+        const effect = prepared.effect;
+        const command = effect.commandInput ? appendParticipantRunCommand(effect.commandInput, effect.testRun, {
+          existing: state.participantRunCommands[JSON.stringify([input.testRunId, effect.commandInput.commandId])] ?? null,
+          lastSequence: Object.values(state.participantRunCommands).reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)
+        }) : null;
+        if (effect.commandInput && !command) throw new Error("The Run no longer accepts the projected command.");
+        if (command) state.participantRunCommands[JSON.stringify([command.testRunId, command.commandId])] = command;
+        if (effect.progressDelivery) state.participantProgressDeliveries[JSON.stringify([input.testRunId, effect.progressDelivery.deliveryId])] = effect.progressDelivery;
+        state.testRuns[input.testRunId] = effect.testRun;
+        for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
+        for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
+        if (effect.participantSession) state.participantSessions[input.participantSessionId] = effect.participantSession;
+      }
+      return prepared?.result ?? null;
+      });
+    },
+    async applyParticipantRunCommand(input, transform) {
+      return mutateParticipantRunApplication(state => {
+        const key = JSON.stringify([input.testRunId, input.commandId]);
+        const command = state.participantRunCommands[key];
+        const testRun = state.testRuns[input.testRunId];
+        const participantSession = state.participantSessions[input.participantSessionId];
+        const terminal = command?.commandType === "complete" || command?.commandType === "complete_and_lock";
+        const prepared = prepareParticipantRunCommandApplication(input,
+          command && testRun && participantSession ? { command, testRun, participantSession,
+            testRuns: terminal ? Object.values(state.testRuns).filter(run => run.participantSessionId === input.participantSessionId) : [testRun] } : null,
+          Object.values(state.participantRunCommands).reduce((max, record) =>
+            record.testRunId === input.testRunId ? Math.max(max, record.executionSequence ?? 0) : max, 0), transform);
+        if (!prepared) return null;
+        if (prepared.effect) {
+          const effect = prepared.effect;
+          if (effect.testLogs.some(log => state.participantTestLogs[log.participantTestLogId]) ||
+              effect.activityEvents.some(event => state.workspaceActivityEvents[event.activityEventId])) {
+            throw new Error("A participant command effect cannot overwrite an existing artifact identity.");
+          }
+          state.testRuns[input.testRunId] = effect.testRun;
+          state.participantRunCommands[key] = prepared.result.command;
+          for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
+          for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
+          if (effect.participantSession) state.participantSessions[input.participantSessionId] = effect.participantSession;
+        }
+        return structuredClone(prepared.result);
       });
     },
     async deleteTestRunsByIds(testRunIds) {
@@ -1332,6 +1824,12 @@ export const createFileFirstSliceRepository = (
       await mutate(state => {
         for (const testRunId of testRunIds) {
           delete state.participantPresence[testRunId];
+          for (const [key, command] of Object.entries(state.participantRunCommands)) {
+            if (command.testRunId === testRunId) delete state.participantRunCommands[key];
+          }
+          for (const [key, receipt] of Object.entries(state.participantProgressDeliveries)) {
+            if (receipt.testRunId === testRunId) delete state.participantProgressDeliveries[key];
+          }
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
             deletedCount += 1;
@@ -1364,6 +1862,7 @@ export const createFileFirstSliceRepository = (
     async saveParticipantTestLogs(testLogs) {
       await mutate(state => {
         for (const testLog of testLogs) {
+          if (testLog.participantTestLogId.startsWith("delivery:") && Object.hasOwn(state.participantTestLogs, testLog.participantTestLogId)) continue;
           state.participantTestLogs[testLog.participantTestLogId] = testLog;
         }
       });
@@ -1440,4 +1939,18 @@ export const createFileFirstSliceRepository = (
       return deletedCount;
     }
   };
+};
+
+export const createFileFirstSliceRepository = (filePath: string): FirstSliceRepository => createFileRepository(filePath);
+
+export const createFileFirstSliceStorage = async (filePath: string) => {
+  const registration = await registerFileStoreAccess(filePath, "writer");
+  let closing: Promise<void> | undefined;
+  const ensureOpen = () => { if (closing) throw Object.assign(new Error("File storage is closed."), { code: "FILE_STORE_CLOSED" }); };
+  try {
+    const repository = createFileRepository(filePath, ensureOpen);
+    await repository.listTenants();
+    return { repository, readinessCheck: () => { ensureOpen(); return checkFileFirstSliceReadiness(filePath); },
+      shutdown: (): Promise<void> => closing ??= registration.release() };
+  } catch (error) { await registration.release(); throw error; }
 };

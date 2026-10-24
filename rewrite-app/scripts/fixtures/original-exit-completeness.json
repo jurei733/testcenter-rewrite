@@ -1,0 +1,637 @@
+{
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "sourceCases": 72,
+  "scope": "Unmodified Source frontend on owned API/player fixtures; no Source backend authorization proof",
+  "information": {
+    "Primar-desktop-presentation": {
+      "role": "dialog",
+      "box": {
+        "x": 280,
+        "y": 285,
+        "width": 720,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 935,
+            "y": 311,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(25, 97, 117)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Primar-desktop-response": {
+      "role": "dialog",
+      "box": {
+        "x": 335.0078125,
+        "y": 297,
+        "width": 609.984375,
+        "height": 126,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 879.9921875,
+            "y": 323,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(25, 97, 117)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Primar-desktop-both": {
+      "role": "dialog",
+      "box": {
+        "x": 280,
+        "y": 285,
+        "width": 720,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden. Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 935,
+            "y": 311,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(25, 97, 117)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Primar-mobile-presentation": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 323,
+        "width": 358,
+        "height": 198,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 349,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(25, 97, 117)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Primar-mobile-response": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 347,
+        "width": 358,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 373,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(25, 97, 117)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Primar-mobile-both": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 311,
+        "width": 358,
+        "height": 222,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden. Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 337,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(25, 97, 117)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Sekundar-desktop-presentation": {
+      "role": "dialog",
+      "box": {
+        "x": 280,
+        "y": 285,
+        "width": 720,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 935,
+            "y": 311,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(11, 45, 132)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Sekundar-desktop-response": {
+      "role": "dialog",
+      "box": {
+        "x": 335.0078125,
+        "y": 297,
+        "width": 609.984375,
+        "height": 126,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 879.9921875,
+            "y": 323,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(11, 45, 132)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Sekundar-desktop-both": {
+      "role": "dialog",
+      "box": {
+        "x": 280,
+        "y": 285,
+        "width": 720,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden. Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 935,
+            "y": 311,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(11, 45, 132)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Sekundar-mobile-presentation": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 323,
+        "width": 358,
+        "height": 198,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 349,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(11, 45, 132)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Sekundar-mobile-response": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 347,
+        "width": 358,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 373,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(11, 45, 132)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Sekundar-mobile-both": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 311,
+        "width": 358,
+        "height": 222,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden. Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 337,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(11, 45, 132)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Erwachsene-desktop-presentation": {
+      "role": "dialog",
+      "box": {
+        "x": 280,
+        "y": 285,
+        "width": 720,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 935,
+            "y": 311,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(107, 54, 154)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Erwachsene-desktop-response": {
+      "role": "dialog",
+      "box": {
+        "x": 335.0078125,
+        "y": 297,
+        "width": 609.984375,
+        "height": 126,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 879.9921875,
+            "y": 323,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(107, 54, 154)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Erwachsene-desktop-both": {
+      "role": "dialog",
+      "box": {
+        "x": 280,
+        "y": 285,
+        "width": 720,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden. Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 935,
+            "y": 311,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(107, 54, 154)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Erwachsene-mobile-presentation": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 323,
+        "width": 358,
+        "height": 198,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 349,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(107, 54, 154)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Erwachsene-mobile-response": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 347,
+        "width": 358,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 373,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(107, 54, 154)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Erwachsene-mobile-both": {
+      "role": "dialog",
+      "box": {
+        "x": 16,
+        "y": 311,
+        "width": 358,
+        "height": 222,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden. Es m\u00fcssen erst alle Teilaufgaben bearbeitet werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 560.984375,
+            "y": 337,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(107, 54, 154)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    },
+    "Primar-desktop-legacy": {
+      "role": "dialog",
+      "box": {
+        "x": 280,
+        "y": 285,
+        "width": 720,
+        "height": 150,
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "borderRadius": "0px"
+      },
+      "title": "Aufgabe darf nicht verlassen werden",
+      "content": " Es m\u00fcssen erst alle Audio-Dateien vollst\u00e4ndig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden.",
+      "buttons": [
+        {
+          "text": "",
+          "box": {
+            "x": 935,
+            "y": 311,
+            "width": 40,
+            "height": 40,
+            "font": "24px Arial",
+            "color": "rgb(25, 97, 117)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "8px",
+            "borderRadius": "12px"
+          }
+        }
+      ]
+    }
+  },
+  "closeButtonPixelSha256": {
+    "Primar-desktop-presentation": "c6c26aaf8b6189a4701d51527363d51460dc9ffd4f4e46b48f27fe5778ff93f7",
+    "Primar-desktop-response": "2a73732635945eacba256f91711a1385e697230679f306cd7b647ef2ba60ca65",
+    "Primar-desktop-both": "c6c26aaf8b6189a4701d51527363d51460dc9ffd4f4e46b48f27fe5778ff93f7",
+    "Primar-mobile-presentation": "05800558cd365963adbf9c7fade71d7d736cf03697515cd05e7af03b487096e1",
+    "Primar-mobile-response": "05800558cd365963adbf9c7fade71d7d736cf03697515cd05e7af03b487096e1",
+    "Primar-mobile-both": "05800558cd365963adbf9c7fade71d7d736cf03697515cd05e7af03b487096e1",
+    "Sekundar-desktop-presentation": "cca1d503fba128e82fe662a1045878585b5652a3b7279897e70cc286652ccab7",
+    "Sekundar-desktop-response": "c3028c0ce70103e25a64a219cb57d397ece7012dc709ee2f39950c733d072678",
+    "Sekundar-desktop-both": "cca1d503fba128e82fe662a1045878585b5652a3b7279897e70cc286652ccab7",
+    "Sekundar-mobile-presentation": "aa9b95716251f2334ab839b8314bda578f26439993d1d05701009cf9d312307f",
+    "Sekundar-mobile-response": "aa9b95716251f2334ab839b8314bda578f26439993d1d05701009cf9d312307f",
+    "Sekundar-mobile-both": "aa9b95716251f2334ab839b8314bda578f26439993d1d05701009cf9d312307f",
+    "Erwachsene-desktop-presentation": "f7bc8225415dcda417d1765f9ccfac492b34f4902c5f21f1a1406354de5c1737",
+    "Erwachsene-desktop-response": "16afa38136c3ce9228417e4d9fefd768c8d198e84eda439b6a3bbe0f6df48185",
+    "Erwachsene-desktop-both": "f7bc8225415dcda417d1765f9ccfac492b34f4902c5f21f1a1406354de5c1737",
+    "Erwachsene-mobile-presentation": "82630c09273f0e5d4f6da6d90b1730e0f1350c031bea861dfd4802e613406411",
+    "Erwachsene-mobile-response": "82630c09273f0e5d4f6da6d90b1730e0f1350c031bea861dfd4802e613406411",
+    "Erwachsene-mobile-both": "82630c09273f0e5d4f6da6d90b1730e0f1350c031bea861dfd4802e613406411",
+    "Primar-desktop-legacy": "c6c26aaf8b6189a4701d51527363d51460dc9ffd4f4e46b48f27fe5778ff93f7"
+  },
+  "sourceCloseButtonCases": 72
+}

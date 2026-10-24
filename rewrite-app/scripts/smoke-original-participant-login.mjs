@@ -1,6 +1,7 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -9,6 +10,16 @@ import { chromium } from "playwright";
 
 // Own the API/database; never consume or reset the interactive port 4311.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
+const noticeReference = await loadOriginalVisualReference("original-login-notices");
+const readNotice = element => {
+  const box = el => { const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, color: style.color,
+      font: style.font, margin: style.margin, display: style.display }; };
+  const host = box(element), icon = box(element.querySelector(".mat-icon"));
+  icon.x -= host.x; icon.y -= host.y;
+  host.x = host.y = 0;
+  return { text: element.textContent.trim(), host, icon };
+};
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
 const root = await mkdtemp(join(tmpdir(), "testcenter-original-participant-login-"));
 process.stdout.write(`owned_artifacts=${root}\n`);
@@ -56,6 +67,7 @@ try {
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
     ...(process.env.UI_SMOKE_BROWSER_CHANNEL ? { channel: process.env.UI_SMOKE_BROWSER_CHANNEL } : {}),
     args: ["--host-resolver-rules=MAP testcenter-proof.insecure 127.0.0.1"] });
+  assertOriginalVisualBrowser(browser, noticeReference);
   const protectedParticipant = String(process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES || "").split(/[\s,]+/u).includes("participant");
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
@@ -69,6 +81,13 @@ try {
       insecureUrl.hostname = "testcenter-proof.insecure";
       await page.goto(insecureUrl.href, { waitUntil: "networkidle" });
       assert.equal(await page.evaluate(() => window.isSecureContext), false);
+      assert.deepEqual(await page.locator("#bugReportText").allTextContents(), [],
+        "An HTTP entry must render without a global application error before submitting credentials.");
+      const freshName = mode === "original"
+        ? page.getByLabel("Anmeldename", { exact: true }) : page.locator("#participantLoginKey");
+      assert.equal(await freshName.inputValue(), "", "Both interfaces start without a synthetic login");
+      assert.equal(await (mode === "original" ? page.getByRole("button", { name: "Weiter", exact: true })
+        : page.locator("#participantRouteSignInButton")).isDisabled(), true);
       const notice = page.locator('[data-cy="login-insecure-context"]');
       if (mode === "original") {
         await page.getByLabel("Anmeldename", { exact: true }).fill("student-demo");
@@ -80,8 +99,7 @@ try {
       if (protectedParticipant) {
         await notice.waitFor(); assert.equal(await notice.innerText(), "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.");
         if (mode === "original") {
-          const icon = await notice.locator(".mat-icon").boundingBox();
-          assert.equal(icon.width, 24); assert.equal(icon.height, 24);
+          assert.deepEqual(await notice.evaluate(readNotice), noticeReference.measurements[`${theme}-desktop`].httpsParticipant);
         }
         assert.equal(await submit.isDisabled(), true); assert.equal(credentialRequests.length, 0);
         if (mode === "original") {
@@ -104,6 +122,28 @@ try {
       await context.close();
       process.stdout.write(`insecure_participant_entry=${theme}/${mode}/${protectedParticipant ? "blocked-no-request" : "inactive-authorized"}:passed\n`);
     }
+    for (const mode of ["original", "rewrite"]) {
+      for (const explicit of [false, true]) {
+        const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+        await context.addInitScript(() => localStorage.setItem("testcenter-rewrite-app-shell",
+          JSON.stringify({ loginKey: "own-saved-login", groupKey: "own-saved-group" })));
+        const page = await context.newPage(), credentials = [];
+        page.on("request", request => {
+          if (request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/participant/auth/sign-in") credentials.push(request);
+        });
+        const entry = new URL(`/app/participant?ui=${mode}&tenantKey=demo-tenant&workspaceKey=demo-workspace`, baseUrl);
+        if (explicit) { entry.searchParams.set("loginKey", "own-explicit-login"); entry.searchParams.set("groupKey", "own-explicit-group"); }
+        await page.goto(entry.href, { waitUntil: "networkidle" });
+        const name = mode === "original" ? page.getByLabel("Anmeldename", { exact: true }) : page.locator("#participantLoginKey");
+        assert.equal(await name.inputValue(), explicit ? "own-explicit-login" : "own-saved-login");
+        assert.equal(credentials.length, 0, "Restoring a name or opening an entry link must not sign in");
+        await page.reload({ waitUntil: "networkidle" });
+        assert.equal(await name.inputValue(), explicit ? "own-explicit-login" : "own-saved-login");
+        assert.equal(credentials.length, 0);
+        await context.close();
+        process.stdout.write(`participant_entry_identity=${theme}/${mode}/${explicit ? "explicit" : "saved"}:passed\n`);
+      }
+    }
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
       // This geometry fixture explicitly includes the authored old-browser
       // warning. A newer installed Chrome must not silently remove that state.
@@ -114,17 +154,34 @@ try {
       const errors = [];
       page.on("pageerror", error => errors.push(String(error)));
       await page.goto(`${baseUrl}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=demo-workspace`, { waitUntil: "networkidle" });
-      await page.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+      await page.locator("#originalLoginName").waitFor();
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
+        "Source leaves the fresh name step unfocused");
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(() => document.activeElement.id), "participantApplicationLogoButton");
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(() => document.activeElement.classList.contains("welcome-section")), true,
+        "Source's welcome scroll container is the next native keyboard focus stop");
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(() => document.activeElement.id), "originalLoginName");
+      assert.equal(await page.locator("#originalLoginName").inputValue(), "",
+        "Fresh participant entry must not prefill a synthetic developer login");
+      assert.equal(await page.getByRole("button", { name: "Weiter", exact: true }).isDisabled(), true,
+        "The empty Original name step must wait for the participant's input");
       await page.evaluate(() => document.fonts.ready);
       const geometry = await page.locator("#originalParticipantLogin").evaluate(element => {
         const read = selector => element.querySelector(selector).getBoundingClientRect();
         const footer = document.querySelector("#originalApplicationFooter").getBoundingClientRect();
+        const versionText = document.createRange();
+        versionText.selectNodeContents(document.querySelector("#originalApplicationFooter .version-label"));
         const topbar = document.querySelector("#participantApplicationHeader").getBoundingClientRect();
         const h2 = element.querySelector("h2"), style = getComputedStyle(h2);
         const label = getComputedStyle(element.querySelector(".mdc-floating-label"));
         const icon = element.querySelector(".login-submit [matButtonIcon]");
         return { rootHeight: element.getBoundingClientRect().height,
           footer: [footer.y, footer.height], toolbarHeight: topbar.height,
+          versionBottom: versionText.getBoundingClientRect().bottom,
+          documentHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
           heading: [style.fontSize, style.fontWeight, style.lineHeight],
           direction: getComputedStyle(element).flexDirection, labelGap: label.gap,
           disabledOpacity: getComputedStyle(element.querySelector(".login-submit")).opacity,
@@ -135,6 +192,8 @@ try {
       });
       assert.equal(geometry.rootHeight, height - (width < 600 ? 56 : 64) - 56);
       assert.deepEqual(geometry.footer, [height - 56, 56]);
+      assert.ok(geometry.versionBottom <= geometry.documentHeight + 1,
+        "The Original footer's wrapped text overflow must survive outside the inner scroll container");
       assert.equal(geometry.toolbarHeight, width < 600 ? 56 : 64);
       assert.deepEqual(geometry.heading, ["30px", "400", "normal"]);
       assert.equal(geometry.direction, "row");
@@ -144,7 +203,7 @@ try {
       assert.ok(geometry.iconHeight >= 18 && geometry.iconHeight < 27);
       assert.equal(geometry.warningSizing, "border-box");
       assert.ok(Math.abs(geometry.warningWidth - geometry.columnWidth * .8) <= 1 / 64);
-      await page.screenshot({ path: join(root, `${theme}-${screen}-name.png`) });
+      await page.screenshot({ path: join(root, `${theme}-${screen}-name.png`), fullPage: true });
       const name = page.getByLabel("Anmeldename", { exact: true });
       await name.fill("ab");
       assert.equal(await page.getByRole("button", { name: "Weiter", exact: true }).isDisabled(), true);
@@ -155,6 +214,21 @@ try {
       await page.waitForFunction(() => document.activeElement?.id === "originalLoginPassword");
       const password = page.getByLabel("Kennwort", { exact: true });
       await password.fill("owned-synthetic-password");
+      await password.evaluate(input => input.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "A", modifierCapsLock: true, bubbles: true
+      })));
+      const capsLock = page.locator("#originalLoginCapsLock");
+      await capsLock.waitFor();
+      assert.equal(await capsLock.getAttribute("role"), "status");
+      assert.deepEqual(await capsLock.evaluate(readNotice), noticeReference.measurements[`${theme}-${screen}`].capsLock);
+      assert.equal(await capsLock.evaluate(element => element.getBoundingClientRect().top -
+        element.closest("form").querySelector("mat-form-field").getBoundingClientRect().bottom), 24);
+      assert.equal(await password.getAttribute("aria-describedby"), "originalLoginCapsLock");
+      assert.equal(await page.locator('[data-cy="login-insecure-context"]').count(), 0);
+      await password.evaluate(input => input.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "a", modifierCapsLock: false, bubbles: true
+      })));
+      await capsLock.waitFor({ state: "detached" });
       assert.equal(await password.getAttribute("type"), "password");
       await page.getByRole("button", { name: "Kennwort anzeigen", exact: true }).click();
       await page.getByRole("button", { name: "Kennwort verbergen", exact: true }).waitFor();
@@ -164,8 +238,36 @@ try {
       assert.equal(await password.getAttribute("type"), "password");
       await page.screenshot({ path: join(root, `${theme}-${screen}-password.png`) });
       await page.getByRole("button", { name: "Zurück zum Anmeldenamen", exact: true }).click();
-      await page.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+      await name.waitFor();
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
+        "Source does not force name focus after the password back action");
       assert.equal(await name.inputValue(), `unknown-${theme}-${screen}`);
+      await page.getByRole("button", { name: "Weiter", exact: true }).click();
+      await password.waitFor();
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
+        "Source uses native autofocus, which does not repeatedly steal focus in the same document");
+      await password.fill("owned-invalid-password");
+      const invalidPassword = page.waitForResponse(response => new URL(response.url()).pathname ===
+        "/api/v1/participant/auth/sign-in" && response.request().method() === "POST");
+      await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+      assert.equal((await invalidPassword).status(), 401);
+      await name.waitFor();
+      assert.equal(await name.inputValue(), "");
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
+        "Source returns invalid credentials to an unfocused empty name step");
+      const problem = page.locator("#originalLoginProblem");
+      await problem.waitFor();
+      assert.equal(await problem.getAttribute("role"), "alert");
+      assert.deepEqual(await problem.evaluate(readNotice), noticeReference.measurements[`${theme}-${screen}`].invalidCredentials);
+      assert.equal(await problem.evaluate(element => element.getBoundingClientRect().top -
+        element.closest("form").querySelector("mat-form-field").getBoundingClientRect().bottom), 24);
+      assert.equal(await name.getAttribute("aria-describedby"), "originalLoginProblem");
+      assert.notEqual(await name.getAttribute("aria-invalid"), "true",
+        "Source resets the submitted form so the empty name has no premature validation error");
+      assert.equal(await page.locator("#originalParticipantLogin form.ng-submitted").count(), 0);
+      assert.equal(await name.evaluate(input => input.classList.contains("ng-pristine") && input.classList.contains("ng-untouched")), true);
+      assert.equal(await page.locator('[data-cy="login-insecure-context"]').count(), 0);
+      await page.screenshot({ path: join(root, `${theme}-${screen}-invalid.png`), fullPage: true });
       assert.deepEqual(errors, []);
       await context.close();
       process.stdout.write(`original_login=${theme}/${screen}:passed\n`);
@@ -214,6 +316,28 @@ try {
   }
   await context.close();
   process.stdout.write("Original password login: real authorized session, no persisted password.\n");
+  // Source treats the complete codes="0" attribute as PHP-falsy. It must
+  // continue through password/PoW into the Player without a second-code page.
+  await api("/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster", {
+    rosterText: `<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="OWNED.ZERO" label="Owned zero"><Login name="owned-zero-alone" pw="${password}" mode="run-hot-return"><Booklet codes="0">booklet:demo</Booklet></Login></Group></Testtakers>`
+  });
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } }), page = await context.newPage(), errors = [];
+    page.on("pageerror", error => errors.push(String(error))); observeProofOfWork(page);
+    await page.goto(`${baseUrl}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=demo-workspace`, { waitUntil: "networkidle" });
+    await page.getByLabel("Anmeldename", { exact: true }).fill("owned-zero-alone");
+    await page.getByRole("button", { name: "Weiter", exact: true }).click();
+    await page.getByLabel("Kennwort", { exact: true }).fill(password);
+    const signedIn = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/participant/auth/sign-in" && response.request().method() === "POST");
+    await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+    const response = await signedIn; assert.equal(response.status(), 200);
+    const identity = await response.json(); assert.equal(identity.participantSession.participantCode ?? "", "");
+    assert.equal(identity.participantSession.originalNameSuffix, "");
+    await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+    assert.deepEqual(errors, []);
+    assert.equal(await page.evaluate(secret => Object.keys(localStorage).some(key => localStorage.getItem(key)?.includes(secret)), password), false);
+    await context.close(); process.stdout.write("original_login=zero-only-native-XML-no-code:passed\n");
+  }
   if (!protectedParticipant) {
     // Second-code-only protection must not disable the preceding name login.
     // This roster and all resulting Runs belong exclusively to this test API.

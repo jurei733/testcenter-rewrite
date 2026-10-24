@@ -1,3 +1,4 @@
+import { originalMonitorBookletErrorText } from "./original-monitor-booklet-errors";
 import { Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
@@ -7,7 +8,9 @@ import {
   filterOpenMonitorRunsByProfile,
   resolveOpenMonitorRunSuperState,
   resolveMonitorCustomText,
-  type MonitorCustomTextKey
+  resolveMonitorCustomTextValue,
+  type MonitorCustomTextKey,
+  type MonitorRuntimeCustomTextKey
 } from "@testcenter-rewrite-app/contracts";
 import type {
   GetParticipantSessionResponse,
@@ -197,15 +200,6 @@ const monitorSuperStateSortOrder = [
   "ok"
 ] as const;
 
-const monitorBookletErrorTextKeys: Readonly<
-  Record<NonNullable<OpenMonitorRun["bookletError"]>, MonitorCustomTextKey>
-> = {
-  "missing-id": "gm_booklet_error_missing_id",
-  "missing-file": "gm_booklet_error_missing_file",
-  xml: "gm_booklet_error_xml",
-  general: "gm_booklet_error_general"
-};
-
 @Injectable({ providedIn: "root" })
 export class RuntimeViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -271,7 +265,11 @@ export class RuntimeViewFacade {
     );
   }
 
-  monitorText(key: MonitorCustomTextKey, fallback?: string): string {
+  monitorValue(key: MonitorRuntimeCustomTextKey): string {
+    return resolveMonitorCustomTextValue(this.effectiveMonitorCustomTexts, key);
+  }
+
+  monitorText(key: MonitorRuntimeCustomTextKey, fallback?: string): string {
     return resolveMonitorCustomText(
       this.effectiveMonitorCustomTexts,
       key,
@@ -362,7 +360,8 @@ export class RuntimeViewFacade {
   }> {
     return Object.keys(monitorFilterTargetTextKeys).map(value => ({
       value,
-      label: this.monitorText(monitorFilterTargetTextKeys[value]!)
+      label: this.monitorText(`gm_col_${value}`, "") ||
+        this.monitorText(`gm_filter_target_${value}`, value)
     }));
   }
 
@@ -372,7 +371,7 @@ export class RuntimeViewFacade {
   }> {
     return Object.keys(monitorFilterTypeTextKeys).map(value => ({
       value,
-      label: this.monitorText(monitorFilterTypeTextKeys[value]!)
+      label: this.monitorText(monitorFilterTypeTextKeys[value]!, value)
     }));
   }
 
@@ -2671,9 +2670,7 @@ export class RuntimeViewFacade {
         const bookletStates = Object.entries(openRun.bookletStates).map(
           ([stateKey, optionKey]) => `${stateKey}=${optionKey}`
         );
-        const bookletErrorText = openRun.bookletError
-          ? this.monitorText(monitorBookletErrorTextKeys[openRun.bookletError])
-          : null;
+        const bookletErrorText = originalMonitorBookletErrorText(openRun.bookletError);
         const monitorState = resolveOpenMonitorRunSuperState(openRun);
         const batchSelectable =
           !openRun.bookletError && monitorState !== "pending";
@@ -4287,7 +4284,7 @@ export class RuntimeViewFacade {
     );
     if (restoration) {
       const confirmed = await this.confirmation.confirm({
-        title: this.monitorText(
+        title: this.monitorValue(
           "gm_control_goto_unlock_blocks_confirm_headline"
         ),
         message: this.monitorGotoRestorationMessage(restoration),
@@ -4299,6 +4296,7 @@ export class RuntimeViewFacade {
     }
     this.clearMonitorUnitFilterBeforeGoto();
     this.viewState.onActionAsync(async () => {
+      const targetUnitKey = this.runtime.monitorTargetUnitKey.trim();
       const result = await this.runtimeService.issueMonitorRunCommand(
         "goto",
         restoration
@@ -4307,7 +4305,7 @@ export class RuntimeViewFacade {
       );
       this.selectNextMonitorBlockAfterGoto(
         result.command.testRun.testRunId,
-        result.command.testRun.currentUnitKey,
+        targetUnitKey,
         navigationTargets
       );
     });
@@ -4330,7 +4328,7 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() =>
       this.runtimeService.issueMonitorRunCommand("unlock_test", undefined, () => {
         this.runtime.monitorCommandNoticeKind = "warning";
-        this.runtime.monitorCommandNotice = this.monitorText(
+        this.runtime.monitorCommandNotice = this.monitorValue(
           "gm_control_unlock_success_warning"
         );
       })
@@ -4476,7 +4474,7 @@ export class RuntimeViewFacade {
     const commandConfirmation = `Issue '${commandType}'${targetDescription} for ${testRunIds.length} selected run(s)?`;
     const confirmed = await this.confirmation.confirm({
       title: restoration
-        ? this.monitorText("gm_control_goto_unlock_blocks_confirm_headline")
+        ? this.monitorValue("gm_control_goto_unlock_blocks_confirm_headline")
         : "Issue monitor command?",
       message: restoration
         ? `${this.monitorGotoRestorationMessage(restoration)}\n\n${commandConfirmation}`
@@ -4548,7 +4546,7 @@ export class RuntimeViewFacade {
               commandType === "unlock_test"
             ) {
               this.runtime.monitorCommandNoticeKind = "warning";
-              this.runtime.monitorCommandNotice = this.monitorText(
+              this.runtime.monitorCommandNotice = this.monitorValue(
                 "gm_control_unlock_success_warning"
               );
             } else if (
@@ -4567,11 +4565,17 @@ export class RuntimeViewFacade {
         this.monitorBatchSelection.delete(command.testRun.testRunId);
       }
       if (commandType === "goto" && result.commands[0]) {
-        this.selectNextMonitorBlockAfterGoto(
-          result.commands[0].testRun.testRunId,
-          result.commands[0].testRun.currentUnitKey,
-          navigationTargetsByRun.get(result.commands[0].testRun.testRunId)
-        );
+        const acceptedRunId = result.commands[0].testRun.testRunId;
+        const targetUnitKey = navigationPlan?.groups.find(group =>
+          group.testRunIds.includes(acceptedRunId)
+        )?.targetUnitKey;
+        if (targetUnitKey) {
+          this.selectNextMonitorBlockAfterGoto(
+            acceptedRunId,
+            targetUnitKey,
+            navigationTargetsByRun.get(acceptedRunId)
+          );
+        }
       }
       this.uiState.renderVersion.update(version => version + 1);
     });
@@ -5569,15 +5573,13 @@ export class RuntimeViewFacade {
   private monitorProfileFilterLabel(
     filter: MonitorViewProfile["filters"][number]
   ): string {
-    const targetKey = monitorFilterTargetTextKeys[filter.target];
-    const typeKey = monitorFilterTypeTextKeys[filter.type];
     const filterValue = Array.isArray(filter.value)
       ? filter.value.join(", ")
       : filter.value;
     const generatedLabel = [
-      targetKey ? this.monitorText(targetKey) : filter.target,
-      typeKey ? this.monitorText(typeKey) : filter.type,
-      filter.not ? this.monitorText("gm_filter_not") : "",
+      this.monitorValue(`gm_filter_target_${filter.target}`) || filter.target,
+      this.monitorValue(`gm_filter_type_${filter.type}`) || filter.type,
+      filter.not ? this.monitorValue("gm_filter_not") : "",
       filterValue,
       filter.subValue ?? ""
     ]
@@ -5821,7 +5823,7 @@ export class RuntimeViewFacade {
     const restoredMinutes = this.formatMonitorMinutes(
       restoration.remainingSeconds / 60
     );
-    return `${this.monitorText("gm_control_goto_unlock_blocks_confirm_text")}\n\n${this.monitorFormattedText("gm_timemax_tooltip", [restoredMinutes])} · ${restoration.affectedCount} run${restoration.affectedCount === 1 ? "" : "s"}`;
+    return `${this.monitorValue("gm_control_goto_unlock_blocks_confirm_text")}\n\n${this.monitorFormattedText("gm_timemax_tooltip", [restoredMinutes])} · ${restoration.affectedCount} run${restoration.affectedCount === 1 ? "" : "s"}`;
   }
 
   private clearMonitorUnitFilterBeforeGoto(): void {

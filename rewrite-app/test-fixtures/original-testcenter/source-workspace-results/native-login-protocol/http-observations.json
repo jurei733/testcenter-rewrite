@@ -1,0 +1,1522 @@
+[
+  {
+    "method": "GET",
+    "path": "/version",
+    "status": 200,
+    "wireSha256": "276de21c2e994b71dd74fece42fa92b5763fd6f56141ee5b10c26db1e3b2948f",
+    "value": {
+      "version": "19.0.0"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/admin",
+    "status": 200,
+    "wireSha256": "ffb68359b666929b5569cb681f333350ff309419e739a0ff606fe4aa680e9878",
+    "value": {
+      "token": "[redacted-owned-token-1]",
+      "displayName": "super",
+      "loginName": "super",
+      "groupLabel": null,
+      "id": 1,
+      "pwSetByAdmin": false,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "workspaceAdmin": [],
+        "superAdmin": []
+      },
+      "groupToken": null,
+      "viewSettings": [],
+      "access": {
+        "workspaceAdmin": [],
+        "superAdmin": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/workspace",
+    "status": 201,
+    "wireSha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "value": 1
+  },
+  {
+    "method": "PATCH",
+    "path": "/user/1/workspaces",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "bd245db70e853c20bc238f9ac9b699a23e84c2d2d1e5400fa9303823f3bdf5f9",
+    "value": {
+      "player.html": {
+        "info": [
+          "Verona-Version: 6.0"
+        ],
+        "warning": [
+          "Non-Standard-Filename: `owned-oracle-player-6.0.html` expected.",
+          "Resource is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "c951058edcd4486b1e803bfc8610db0aff19f2e40ba5b4dd6117364e8857df7e",
+    "value": {
+      "unit.xml": {
+        "warning": [
+          "Unit is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "d69b2bc0364f160a19b50bed6a5d84414c9fb5529f3293912e54c7325cf0527f",
+    "value": {
+      "booklet.xml": {
+        "warning": [
+          "Booklet is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "32561c63ecfa9ef921d6166a044bf98cbc8a741a0a286fbc2950858ee56d6679",
+    "value": {
+      "native-logins.xml": []
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "b3f9ec68dfb83cee0da2d786d24f05f16f203b7af419ee90af8faa6ed592d275",
+    "value": {
+      "token": "[redacted-owned-token-2]",
+      "displayName": "Owned native login Ω/owned-native-binary-login",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 400,
+    "wireSha256": "18d3ca3c81d1d0f915904674552a28a7bd20e7709948573730cf09a3c3a79645",
+    "value": "No Login for `OWNED-native-binary-login` with this password."
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "b3f9ec68dfb83cee0da2d786d24f05f16f203b7af419ee90af8faa6ed592d275",
+    "value": {
+      "token": "[redacted-owned-token-2]",
+      "displayName": "Owned native login Ω/owned-native-binary-login",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "b3f9ec68dfb83cee0da2d786d24f05f16f203b7af419ee90af8faa6ed592d275",
+    "value": {
+      "token": "[redacted-owned-token-2]",
+      "displayName": "Owned native login Ω/owned-native-binary-login",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 403,
+    "wireSha256": "2b1a9ed3264caea30736a64f4ed1e1a4aa99ec042be5cedc184bd84a45a6bb5d",
+    "value": "Token `[redacted-owned-token-2]` of type `login` has wrong type - `person` required."
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 403,
+    "wireSha256": "cad0719046187a6440de230a6ff2fc7622452376f7983aa4f2761c2f4d676b5c",
+    "value": "Token `[redacted-owned-token-1]` of type `admin` has wrong type - `login` required."
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "fdeffca993ce812fa5cfbfe5ab9bf88f7af3e47385086fbd7f5be8347bd251e5",
+    "value": {
+      "native-logins.xml": {
+        "warning": [
+          "File of name `native-logins.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "b3f9ec68dfb83cee0da2d786d24f05f16f203b7af419ee90af8faa6ed592d275",
+    "value": {
+      "token": "[redacted-owned-token-2]",
+      "displayName": "Owned native login Ω/owned-native-binary-login",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 200,
+    "wireSha256": "02135bc5dfe43398d96e71b6ff4ac69c58d251a46c69d46ee159d6636446561a",
+    "value": {
+      "token": "[redacted-owned-token-4]",
+      "displayName": "Owned native login Ω/owned-native-binary-login/sHaReD",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "value": 1
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 200,
+    "wireSha256": "22b1d31659c5260ce81cdea168c93592e7ee3037fad0d1f7413981a24c4f31e2",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/1/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "149ed7866924bd0675d549849ab1ef513a2c3470629b3962b90085d62cb32268",
+    "value": {
+      "token": "[redacted-owned-token-5]",
+      "displayName": "Owned native login Ω/OWNED-native-binary-login",
+      "loginName": "OWNED-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 200,
+    "wireSha256": "f4a0e18c28970219fae22563067b67240ae81ecbb42b6df03db062b28428a78a",
+    "value": {
+      "token": "[redacted-owned-token-6]",
+      "displayName": "Owned native login Ω/OWNED-native-binary-login/sHaReD",
+      "loginName": "OWNED-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+    "value": 2
+  },
+  {
+    "method": "GET",
+    "path": "/test/2",
+    "status": 200,
+    "wireSha256": "22b1d31659c5260ce81cdea168c93592e7ee3037fad0d1f7413981a24c4f31e2",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/2/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "ac383cb16b69022989f9563403c97e62350311173f07a278faf8d8a21248c190",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned native login Ω/owned-native-Ä-login",
+      "loginName": "owned-native-Ä-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 200,
+    "wireSha256": "113c7ac3a89a1cc1e6ff4a2cc96b763a3f2d784d76e4c748541d9ce5a4219898",
+    "value": {
+      "token": "[redacted-owned-token-8]",
+      "displayName": "Owned native login Ω/owned-native-Ä-login/sHaReD",
+      "loginName": "owned-native-Ä-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+    "value": 3
+  },
+  {
+    "method": "GET",
+    "path": "/test/3",
+    "status": 200,
+    "wireSha256": "22b1d31659c5260ce81cdea168c93592e7ee3037fad0d1f7413981a24c4f31e2",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/3/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "396bcac19dffd58363dd7bcc3f483a605827205efeccbdede7bef9567e3db54c",
+    "value": {
+      "token": "[redacted-owned-token-9]",
+      "displayName": "Owned native login Ω/owned-native-ä-login",
+      "loginName": "owned-native-ä-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 200,
+    "wireSha256": "588695b39fcb2a827efd2a06d08b2f6c91f5395fcb20095a088ddb9c49626173",
+    "value": {
+      "token": "[redacted-owned-token-10]",
+      "displayName": "Owned native login Ω/owned-native-ä-login/sHaReD",
+      "loginName": "owned-native-ä-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+    "value": 4
+  },
+  {
+    "method": "GET",
+    "path": "/test/4",
+    "status": 200,
+    "wireSha256": "22b1d31659c5260ce81cdea168c93592e7ee3037fad0d1f7413981a24c4f31e2",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/4/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "2d711b3cbb726858e2aeb9c7b82bd332ac160578f05fd6f6435753a412915f19",
+    "value": {
+      "token": "[redacted-owned-token-11]",
+      "displayName": "Owned native login Ω/owned-native-é-login",
+      "loginName": "owned-native-é-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 200,
+    "wireSha256": "dd67f41c9b2cc9b98b4747ae8f26e85c55e05de3c66c6be3fb9cb29b9609c48a",
+    "value": {
+      "token": "[redacted-owned-token-12]",
+      "displayName": "Owned native login Ω/owned-native-é-login/sHaReD",
+      "loginName": "owned-native-é-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+    "value": 5
+  },
+  {
+    "method": "GET",
+    "path": "/test/5",
+    "status": 200,
+    "wireSha256": "22b1d31659c5260ce81cdea168c93592e7ee3037fad0d1f7413981a24c4f31e2",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/5/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "2c15e0a933496abad107cc64a227b43a8daec0ffd9beafc168104bdbe981bc98",
+    "value": {
+      "token": "[redacted-owned-token-13]",
+      "displayName": "Owned native login Ω/owned-native-é-login",
+      "loginName": "owned-native-é-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 200,
+    "wireSha256": "25f75e9fb18f8ff5c4756c9e12ea8b2d9d3b2cb508c3b9a185d813d2695380b2",
+    "value": {
+      "token": "[redacted-owned-token-14]",
+      "displayName": "Owned native login Ω/owned-native-é-login/sHaReD",
+      "loginName": "owned-native-é-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683",
+    "value": 6
+  },
+  {
+    "method": "GET",
+    "path": "/test/6",
+    "status": 200,
+    "wireSha256": "22b1d31659c5260ce81cdea168c93592e7ee3037fad0d1f7413981a24c4f31e2",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/6/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "dc6c1d7588120a08c758964a51ba972ca2d511e98e579d966f6f1ad007461754",
+    "value": "Access to test 1 is not provided."
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "dc6c1d7588120a08c758964a51ba972ca2d511e98e579d966f6f1ad007461754",
+    "value": "Access to test 1 is not provided."
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "dc6c1d7588120a08c758964a51ba972ca2d511e98e579d966f6f1ad007461754",
+    "value": "Access to test 1 is not provided."
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "dc6c1d7588120a08c758964a51ba972ca2d511e98e579d966f6f1ad007461754",
+    "value": "Access to test 1 is not provided."
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "dc6c1d7588120a08c758964a51ba972ca2d511e98e579d966f6f1ad007461754",
+    "value": "Access to test 1 is not provided."
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 200,
+    "wireSha256": "72ac951419d7b6b0ac2f7c9fcf1f55486f48704ad30baf49db5836d8eec04038",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": {
+        "CURRENT_UNIT_ID": "ORACLE.UNIT"
+      },
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "fdeffca993ce812fa5cfbfe5ab9bf88f7af3e47385086fbd7f5be8347bd251e5",
+    "value": {
+      "native-logins.xml": {
+        "warning": [
+          "File of name `native-logins.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "59846dc4f83b46f7231d694e7f2c79a163f416a0fa11f41d19c963c003a2efda",
+    "value": {
+      "token": "[redacted-owned-token-4]",
+      "displayName": "Owned native login Ω/owned-native-binary-login/sHaReD",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 200,
+    "wireSha256": "bbec63566695cc37d00eb44c35522dfc3a6e31b7d6ba0b30737d11cf59ea59ff",
+    "value": {
+      "mode": "run-review",
+      "laststate": {
+        "CURRENT_UNIT_ID": "ORACLE.UNIT"
+      },
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "fdeffca993ce812fa5cfbfe5ab9bf88f7af3e47385086fbd7f5be8347bd251e5",
+    "value": {
+      "native-logins.xml": {
+        "warning": [
+          "File of name `native-logins.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "3a94df250d7170a084ad1fea869d2ec08298465c9c08881745732173811244d4",
+    "value": {
+      "token": "[redacted-owned-token-4]",
+      "displayName": "Owned native login Ω/owned-native-binary-login/sHaReD",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 200,
+    "wireSha256": "72ac951419d7b6b0ac2f7c9fcf1f55486f48704ad30baf49db5836d8eec04038",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": {
+        "CURRENT_UNIT_ID": "ORACLE.UNIT"
+      },
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "fdeffca993ce812fa5cfbfe5ab9bf88f7af3e47385086fbd7f5be8347bd251e5",
+    "value": {
+      "native-logins.xml": {
+        "warning": [
+          "File of name `native-logins.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 400,
+    "wireSha256": "94a219d6cded8726ef1ff01f53c57748d204eda3bba8b4741f37d6efe751c4e9",
+    "value": "No Login for `owned-native-binary-login` with this password."
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 200,
+    "wireSha256": "78b7554a83af92225f81aa1183ceda303f80b407717e521fd0d186110da8620c",
+    "value": {
+      "token": "[redacted-owned-token-15]",
+      "displayName": "Owned native login Ω/owned-native-binary-login/replacement",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 400,
+    "wireSha256": "67ac841cf0c029d4166d2d964d9ae9a9a14df864c7dd815b1bf64f1943f2485b",
+    "value": "`Shared` is no valid code for `owned-native-binary-login`"
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 200,
+    "wireSha256": "b3f9ec68dfb83cee0da2d786d24f05f16f203b7af419ee90af8faa6ed592d275",
+    "value": {
+      "token": "[redacted-owned-token-2]",
+      "displayName": "Owned native login Ω/owned-native-binary-login",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/session",
+    "status": 205,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "b3f9ec68dfb83cee0da2d786d24f05f16f203b7af419ee90af8faa6ed592d275",
+    "value": {
+      "token": "[redacted-owned-token-2]",
+      "displayName": "Owned native login Ω/owned-native-binary-login",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451",
+    "value": 7
+  },
+  {
+    "method": "GET",
+    "path": "/test/7",
+    "status": 200,
+    "wireSha256": "22b1d31659c5260ce81cdea168c93592e7ee3037fad0d1f7413981a24c4f31e2",
+    "value": {
+      "mode": "run-hot-return",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet</Label></Metadata><Units><Unit id=\"ORACLE.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/7/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "DELETE",
+    "path": "/session",
+    "status": 205,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "3eb05a15655828c83467ae323c20176110593902944554c93a900c759722927e",
+    "value": "Invalid token: `[redacted-owned-token-15]`"
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 200,
+    "wireSha256": "ec37ab6b55083ea21932e377e4d56549a2fb264574b25ad9807ccb573bf5c0bd",
+    "value": {
+      "token": "[redacted-owned-token-16]",
+      "displayName": "Owned native login Ω/owned-native-binary-login/replacement",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451",
+    "value": 7
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "fdeffca993ce812fa5cfbfe5ab9bf88f7af3e47385086fbd7f5be8347bd251e5",
+    "value": {
+      "native-logins.xml": {
+        "warning": [
+          "File of name `native-logins.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 410,
+    "wireSha256": "b446d255e749f059de627e8ef016637062beaecbbde48a5e492fdc677b5c0c5d",
+    "value": "Login removed: `[redacted-owned-token-2]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 410,
+    "wireSha256": "07c2cfd3ba7681c9563c763e04af23252e869b7f2c8074af26923d3e8da6c08d",
+    "value": "Login removed: `[redacted-owned-token-16]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "d23a9aa9872eeb584ff84736ef43e261f5c95fb996de00c6fb08ed7af8098477",
+    "value": {
+      "token": "[redacted-owned-token-6]",
+      "displayName": "Owned native login Ω/OWNED-native-binary-login/sHaReD",
+      "loginName": "OWNED-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "15773e5d5f974b293900e1fd599e54f5eb838edb64a55c8697e08808c9d5a03d",
+    "value": {
+      "token": "[redacted-owned-token-8]",
+      "displayName": "Owned native login Ω/owned-native-Ä-login/sHaReD",
+      "loginName": "owned-native-Ä-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "d99d0816cac47d98039b4dfb60921069b44e58643272cc10cd7568668e5243ef",
+    "value": {
+      "token": "[redacted-owned-token-10]",
+      "displayName": "Owned native login Ω/owned-native-ä-login/sHaReD",
+      "loginName": "owned-native-ä-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "8a71ccff34832028ba254a807b2f9a7af61294c3c307c7b57d6ea149debf2620",
+    "value": {
+      "token": "[redacted-owned-token-12]",
+      "displayName": "Owned native login Ω/owned-native-é-login/sHaReD",
+      "loginName": "owned-native-é-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "f81c4689f74abe1bbcf23ef7a12789fa2869b405bbbb910f1ade9b9d8dc1a2ab",
+    "value": {
+      "token": "[redacted-owned-token-14]",
+      "displayName": "Owned native login Ω/owned-native-é-login/sHaReD",
+      "loginName": "owned-native-é-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "fdeffca993ce812fa5cfbfe5ab9bf88f7af3e47385086fbd7f5be8347bd251e5",
+    "value": {
+      "native-logins.xml": {
+        "warning": [
+          "File of name `native-logins.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "b3f9ec68dfb83cee0da2d786d24f05f16f203b7af419ee90af8faa6ed592d275",
+    "value": {
+      "token": "[redacted-owned-token-2]",
+      "displayName": "Owned native login Ω/owned-native-binary-login",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "ec37ab6b55083ea21932e377e4d56549a2fb264574b25ad9807ccb573bf5c0bd",
+    "value": {
+      "token": "[redacted-owned-token-16]",
+      "displayName": "Owned native login Ω/owned-native-binary-login/replacement",
+      "loginName": "owned-native-binary-login",
+      "groupLabel": "Owned native login Ω",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.BOOK.A",
+            "type": "test",
+            "label": "Owned booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-token-3]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.BOOK.A"
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/responses/detailed",
+    "status": 200,
+    "wireSha256": "b144ded57630ebdbbfcbb7acb76996679be411d0b2b18cbdb20f1e5dd4e31793",
+    "value": {
+      "ORACLE.NATIVE.LOGIN": [
+        {
+          "loginName": "owned-native-binary-login",
+          "groupName": "ORACLE.NATIVE.LOGIN",
+          "groupLabel": "Owned native login Ω",
+          "code": "sHaReD",
+          "nameSuffix": "sHaReD",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": "Owned booklet"
+        },
+        {
+          "loginName": "OWNED-native-binary-login",
+          "groupName": "ORACLE.NATIVE.LOGIN",
+          "groupLabel": "Owned native login Ω",
+          "code": "sHaReD",
+          "nameSuffix": "sHaReD",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": "Owned booklet"
+        },
+        {
+          "loginName": "owned-native-Ä-login",
+          "groupName": "ORACLE.NATIVE.LOGIN",
+          "groupLabel": "Owned native login Ω",
+          "code": "sHaReD",
+          "nameSuffix": "sHaReD",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": "Owned booklet"
+        },
+        {
+          "loginName": "owned-native-ä-login",
+          "groupName": "ORACLE.NATIVE.LOGIN",
+          "groupLabel": "Owned native login Ω",
+          "code": "sHaReD",
+          "nameSuffix": "sHaReD",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": "Owned booklet"
+        },
+        {
+          "loginName": "owned-native-é-login",
+          "groupName": "ORACLE.NATIVE.LOGIN",
+          "groupLabel": "Owned native login Ω",
+          "code": "sHaReD",
+          "nameSuffix": "sHaReD",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": "Owned booklet"
+        },
+        {
+          "loginName": "owned-native-é-login",
+          "groupName": "ORACLE.NATIVE.LOGIN",
+          "groupLabel": "Owned native login Ω",
+          "code": "sHaReD",
+          "nameSuffix": "sHaReD",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": "Owned booklet"
+        },
+        {
+          "loginName": "owned-native-binary-login",
+          "groupName": "ORACLE.NATIVE.LOGIN",
+          "groupLabel": "Owned native login Ω",
+          "code": "replacement",
+          "nameSuffix": "replacement",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": "Owned booklet"
+        }
+      ]
+    }
+  }
+]

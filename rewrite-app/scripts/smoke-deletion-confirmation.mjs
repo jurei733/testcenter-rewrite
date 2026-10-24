@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
+import { runOriginalAdminDeletionSmoke } from "./original-admin-deletion-smoke.mjs";
 
 // Real API, owned disposable database, no private interactive-session writes.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
@@ -74,6 +75,12 @@ try {
       await page.locator("#adminUsername").fill("demo-admin");
       await page.locator("#adminPassword").fill(password);
       await page.locator("#adminSignInButton").click();
+      const backdrop = page.locator("#globalConfirmationBackdrop");
+      const secretInput = page.locator("#globalConfirmationPasswordInput");
+      const submit = page.locator("#globalConfirmationConfirmButton");
+      if (ui === "original") {
+        await runOriginalAdminDeletionSmoke({page,users,api,password,wrongPassword,screen,deletions});
+      } else {
       await page.locator("#adminSignOutButton").waitFor();
       await page.locator("#adminUsersButton").click();
       const directory = page.locator("app-record-collection").filter({ has: page.getByRole("heading", { name: "Admin Users", exact: true }) });
@@ -81,9 +88,6 @@ try {
         await directory.locator(".record-card").filter({ has: page.getByRole("heading", { name: user.adminUser.username, exact: true }) })
           .getByRole("button", { name: "Add To Batch", exact: true }).click();
       }
-      const backdrop = page.locator("#globalConfirmationBackdrop");
-      const secretInput = page.locator("#globalConfirmationPasswordInput");
-      const submit = page.locator("#globalConfirmationConfirmButton");
       await page.locator("#adminBatchDeleteButton").click();
       await page.waitForFunction(() => document.activeElement?.id === "globalConfirmationPasswordInput");
       const surface = ui === "original" ? page.locator(".original-password-confirmation-dialog .mat-mdc-dialog-surface")
@@ -128,7 +132,7 @@ try {
       await page.screenshot({ path: join(root, `${fixture}-admin-confirmation.png`) });
       let readFaults = 0;
       const directoryReadPattern = "**/api/v1/admin/users**";
-      if (fixture === "original-mobile") await page.route(directoryReadPattern, async route => {
+      if (fixture === "rewrite-mobile") await page.route(directoryReadPattern, async route => {
         if (route.request().method() === "GET" && readFaults === 0 && deletions.length >= 4) {
           readFaults++;
           await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "owned_directory_read_failure", message: "Owned refresh fault" }) });
@@ -151,6 +155,13 @@ try {
       if (screen === "desktop") {
         await Promise.race([held, delay(10_000).then(() => { throw Error("Pending real DELETE was not observed."); })]);
         try {
+          // The HTTP effect may reach its held reply before Angular's next
+          // zoneless render. Observe the actual busy surface before probing it.
+          await page.waitForFunction(() =>
+            document.querySelector("#globalConfirmationPasswordInput")?.readOnly === true &&
+            document.querySelector("#globalConfirmationConfirmButton")?.disabled === true &&
+            document.querySelector("#globalConfirmationCancelButton")?.disabled === true
+          );
           assert.equal(await secretInput.isEditable(), false);
           assert.equal(await submit.isDisabled(), true);
           assert.equal(await page.locator("#globalConfirmationCancelButton").isDisabled(), true);
@@ -161,7 +172,7 @@ try {
       }
       await backdrop.waitFor({ state: "detached" });
       if (screen === "desktop") await page.unroute(deletePattern);
-      if (fixture === "original-mobile") {
+      if (fixture === "rewrite-mobile") {
         assert.equal(readFaults, 1, "Fault-inject the directory read after acknowledged deletions.");
         await page.unroute(directoryReadPattern);
       }
@@ -169,6 +180,8 @@ try {
       const removed = await api("/api/v1/admin/users?limit=100");
       assert.ok(users.every(user => !removed.items.some(item => item.adminUser.adminUserId === user.adminUser.adminUserId)));
       await page.locator('[data-view-nav="workspace"]').click();
+      }
+      const adminDeleteCount = deletions.length;
       await page.locator("#tenantKey").fill("demo-tenant"); await page.locator("#tenantKey").dispatchEvent("change");
       await page.locator("#workspaceKey").fill(workspaceKey); await page.locator("#workspaceKey").dispatchEvent("change");
       await page.locator("#deleteWorkspaceButton").click();
@@ -180,13 +193,13 @@ try {
       await verification.fill(workspaceKey); await secretInput.fill(wrongPassword);
       await submit.click();
       await page.locator("#globalConfirmationPasswordError").filter({ hasText: "Incorrect current administrator password" }).waitFor();
-      assert.equal(deletions.length, 5); assert.equal(deletions.at(-1).status(), 403);
+      assert.equal(deletions.length, adminDeleteCount + 1); assert.equal(deletions.at(-1).status(), 403);
       await api(workspacePath); // Still exists; wrong-password rejection did not mutate.
       await secretInput.fill(password); await page.screenshot({ path: join(root, `${fixture}-workspace-confirmation.png`) });
       let workspaceReadFaults = 0;
       const workspaceDirectoryPattern = "**/api/v1/tenants/demo-tenant/workspaces";
       if (fixture === "original-mobile") await page.route(workspaceDirectoryPattern, async route => {
-        if (route.request().method() === "GET" && workspaceReadFaults === 0 && deletions.length >= 6) {
+        if (route.request().method() === "GET" && workspaceReadFaults === 0 && deletions.length >= adminDeleteCount + 2) {
           workspaceReadFaults++;
           await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "owned_directory_read_failure", message: "Owned refresh fault" }) });
         } else await route.continue();
@@ -196,7 +209,7 @@ try {
         assert.equal(workspaceReadFaults, 1, "Failed workspace refresh must not reopen the completed destructive operation.");
         await page.unroute(workspaceDirectoryPattern);
       }
-      assert.equal(deletions.length, 6); assert.equal(deletions.at(-1).status(), 200);
+      assert.equal(deletions.length, adminDeleteCount + 2); assert.equal(deletions.at(-1).status(), 200);
       assert.equal((await fetch(`${baseUrl}${workspacePath}`, { headers: { authorization: `Bearer ${token}` } })).status, 404);
       assert.equal(await page.locator("#workspaceKey").inputValue(), "");
       const audit = await api("/api/v1/admin/audit-events?limit=100");
@@ -230,14 +243,11 @@ try {
   await fallbackPage.route(`**/app/${originalRendererChunk}`, async route => { blockedChunks++; await route.abort("failed"); });
   await fallbackPage.goto(`${baseUrl}/app/ops?ui=original`, { waitUntil: "networkidle" });
   await fallbackPage.locator("#adminUsername").fill("demo-admin"); await fallbackPage.locator("#adminPassword").fill(password);
-  await fallbackPage.locator("#adminSignInButton").click(); await fallbackPage.locator("#adminSignOutButton").waitFor();
-  await fallbackPage.locator("#adminUsersButton").click();
-  const fallbackDirectory = fallbackPage.locator("app-record-collection").filter({ has: fallbackPage.getByRole("heading", { name: "Admin Users", exact: true }) });
-  await fallbackDirectory.locator(".record-card").filter({ has: fallbackPage.getByRole("heading", { name: fallbackUser.adminUser.username, exact: true }) })
-    .getByRole("button", { name: "Add To Batch", exact: true }).click();
-  await fallbackPage.locator("#adminBatchDeleteButton").click();
+  await fallbackPage.locator("#adminSignInButton").click(); await fallbackPage.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
+  await fallbackPage.locator('[data-admin-id="' + fallbackUser.adminUser.adminUserId + '"]').click();
+  await fallbackPage.locator('[data-cy="delete-user"]').click();
   await fallbackPage.waitForFunction(() => document.activeElement?.id === "globalConfirmationPasswordInput");
-  try { await fallbackPage.locator("#globalConfirmationConfirmButton").filter({ hasText: "Delete accounts" }).waitFor(); }
+  try { await fallbackPage.locator("#globalConfirmationConfirmButton").filter({ hasText: "Administrator:in löschen" }).waitFor(); }
   catch (error) {
     console.log(JSON.stringify({ originalRendererChunk, blockedChunks, fallbackErrors, currentDialog: await fallbackPage.locator("#globalConfirmationBackdrop").innerText() }));
     await fallbackPage.screenshot({ path: join(root, "original-renderer-fallback-failure.png") }); throw error;
@@ -248,7 +258,7 @@ try {
   await fallbackPage.locator("#globalConfirmationBackdrop").waitFor({ state: "detached" });
   assert.equal(fallbackDeletes.length, 0); assert.deepEqual(fallbackErrors, []);
   assert.ok((await api("/api/v1/admin/users?limit=100")).items.some(item => item.adminUser.adminUserId === fallbackUser.adminUser.adminUserId));
-  assert.equal(await fallbackPage.locator("#adminBatchDeleteButton").isEnabled(), true);
+  assert.equal(await fallbackPage.locator('[data-cy="delete-user"]').isEnabled(), true);
   await fallbackContext.close(); console.log("deletion_confirmation=original-renderer-chunk-fallback:passed");
 } finally {
   await browser?.close(); server.kill("SIGTERM");

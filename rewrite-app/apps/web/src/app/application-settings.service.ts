@@ -119,9 +119,13 @@ export class ApplicationSettingsService {
     return `assets/images/${assetName}`;
   }
 
-  applicationAssetUrl(originalName: string): string {
-    return `${productionApiRoutes.system.getApplicationAsset}?originalName=${encodeURIComponent(originalName)}`;
+  applicationAssetUrl(originalName: string, version?: string): string {
+    const url = `${productionApiRoutes.system.getApplicationAsset}?originalName=${encodeURIComponent(originalName)}`;
+    return version ? `${url}&version=${encodeURIComponent(version)}` : url;
   }
+
+  /** Accept an already verified, current-session response from a settings editor. */
+  applyServerSettings(settings: ApplicationSettings): void { this.apply(settings); }
 
   private apply(settings: ApplicationSettings): void {
     this.settings.set({ ...settings, assetAssignments: settings.assetAssignments ?? {} });

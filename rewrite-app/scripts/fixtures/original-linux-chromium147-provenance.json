@@ -1,0 +1,22 @@
+{
+  "run": "https://github.com/jurei733/testcenter-rewrite/actions/runs/39440889057",
+  "headCommit": "5b97faf64ea05604779ef313c1494a61bf5c2dda",
+  "mergeCommit": "4e822afc6a538a387d8fabbc86112409a443728f",
+  "archives": {
+    "entry": {
+      "id": 12274156676,
+      "sha256": "1a03de6f1357652d43e7867c402f5eb9a129c9fcda1b09f0de08be03aaaeeac2",
+      "file": "source-entry-linux-5b97faf6.zip"
+    },
+    "dialogs": {
+      "id": 12273673178,
+      "sha256": "fe2385f6fc67c5e11a01c5f78dac30a9daea07e2b1feb5058881cec8b8cb831e",
+      "file": "source-dialogs-linux-5b97faf6.zip"
+    },
+    "starter": {
+      "id": 12275381685,
+      "sha256": "0abf90fe8ac93c96fd7985421570bf5bd3591a54dd462318eefcc9ef86c84ffb",
+      "file": "source-starter-linux-5b97faf6.zip"
+    }
+  }
+}

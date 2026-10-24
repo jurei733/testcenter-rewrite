@@ -1,0 +1,643 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "testMode": false,
+  "transport": "production Apache HTTP",
+  "checks": [
+    {
+      "name": "actual Apache readiness and version"
+    },
+    {
+      "name": "superadmin still needs an explicit workspace grant",
+      "unassignedSuperadminStatus": 404,
+      "anonymousStatus": 401
+    },
+    {
+      "name": "actual RO and RW accounts read only their assigned workspace"
+    },
+    {
+      "name": "unchanged native XSD validation and RW multipart upload"
+    },
+    {
+      "name": "complete selected and unfiltered native exports exceed 500 reports",
+      "unfiltered": 505,
+      "selected": 504,
+      "csvSha256": "06df4b9bd489356c210942116c8e76c9dd395ca77ed94a2469c0d96b2eee6101",
+      "selectedFirstTitles": [
+        "owned-source-report-91",
+        "owned-source-report-348",
+        "owned-source-report-445"
+      ],
+      "selectedLastTitles": [
+        "owned-source-report-238",
+        "owned-source-report-498",
+        "owned-source-report-309"
+      ],
+      "rawReportCarriesKeyPhrase": true
+    },
+    {
+      "name": "native statistics retain OS and browser version labels"
+    },
+    {
+      "name": "RO report deletion is denied without losing stored reports"
+    },
+    {
+      "name": "RW deletes every report of the selected Check and retains unrelated reports"
+    },
+    {
+      "name": "native result fixture uses actual XSD-validated roster and two Booklets"
+    },
+    {
+      "name": "native no-code sign-in directly establishes the real person and both Booklet assignments"
+    },
+    {
+      "name": "creating a Test without opening its Booklet creates no result row or stateful Test-Session"
+    },
+    {
+      "name": "opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing"
+    },
+    {
+      "name": "locking and same-value relocking advance Test time without nonempty Test state or Unit rows",
+      "openedTime": 1792807998,
+      "lockedTime": 1792808000,
+      "relockedTime": 1792808001,
+      "unlockedTime": 1792808002,
+      "unopenedRemainedAbsent": true,
+      "emptyStateRemainedAbsent": true
+    },
+    {
+      "name": "a definition read does not create a saved Unit; pre-initialization logs are rejected without a Unit row"
+    },
+    {
+      "name": "actual Unit definition/state/log writes leave Test-level result time unchanged",
+      "testTime": 1792808002
+    },
+    {
+      "name": "a persisted state-and-log Unit counts without answers or a stateful Test-Session"
+    },
+    {
+      "name": "stateful Test-Session listing and opened-Booklet result listing have different inclusion rules"
+    },
+    {
+      "name": "group statistics aggregate saved Unit rows across Booklets including log-only Units",
+      "openedBooklets": 2,
+      "savedUnits": 3,
+      "minimum": 1,
+      "maximum": 2,
+      "average": 1.5
+    },
+    {
+      "name": "RO selected-Test deletion returns 403 without changing results or Test-Session listing"
+    },
+    {
+      "name": "selected-Test deletion retains the same person token, unrelated Booklet answer and assignment; relaunch creates a new empty Test"
+    },
+    {
+      "name": "a review initializes a saved Unit without answers or nonempty Test state; it accepts subsequent actual Unit logs"
+    },
+    {
+      "name": "response exports include initialized state-only and review-only Units with empty response arrays"
+    },
+    {
+      "name": "legacy and enhanced review exports retain distinct category, reviewer and authored label contracts"
+    },
+    {
+      "name": "actual selected responses CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "0cbbb8974992c5890777d2ca81a52ba643ee92f9cc5b7bf6446e5186e051cc44",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"responses\";\"laststate\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected logs CSV and JSON contracts",
+      "rows": 4,
+      "csvSha256": "dd0ed9e1580b3902c768026b15ab68bec6e5489dc48895cf4fee3c6b644f52b6",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"timestamp\";\"logentry\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected reviews-legacy CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "6aa9fc5c14eb6d840920a516896d8dd10cc6a44d4564ff8e48aaeaae6cee73d2",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category: accuracy\";\"category: quality\";\"reviewtime\";\"entry\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected reviews-enhanced CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "ac90dd3f0590352eac4fe4b9c31bdf5cb6e427953039c803c96f9bb43d116f6d",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category_accuracy\";\"category_quality\";\"reviewtime\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\";\"reviewer\";\"entry\";\"unitlabel\";\"bookletlabel\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "deleting a Unit review retains the saved unanswered Unit, its response export and group counts"
+    },
+    {
+      "name": "credential login freezes group label before person code; later roster import does not rewrite the snapshot",
+      "groupName": "ORACLE.SNAPSHOT",
+      "groupLabel": "Before code",
+      "codeRequired": true,
+      "reimportedLabel": "After roster import"
+    },
+    {
+      "name": "production german2_ci merges case and Unicode composition, retains first group label and distinguishes accents",
+      "groups": [
+        {
+          "groupName": "ORACLE.COLL.Cafe",
+          "groupLabel": "Accent distinct",
+          "bookletsStarted": 1
+        },
+        {
+          "groupName": "ORACLE.COLL.Café",
+          "groupLabel": "Case first",
+          "bookletsStarted": 3
+        }
+      ]
+    },
+    {
+      "name": "whole-group result deletion removes the snapshot and next login captures the current authored label",
+      "groupName": "ORACLE.SNAPSHOT",
+      "groupLabel": "After roster import"
+    },
+    {
+      "name": "native XML group label preserves pad",
+      "groupName": "ORACLE.LABEL.PAD",
+      "rawAttribute": "  Padded Ω  ",
+      "groupLabel": "  Padded Ω  "
+    },
+    {
+      "name": "native XML group label preserves white",
+      "groupName": "ORACLE.LABEL.WHITE",
+      "rawAttribute": "   ",
+      "groupLabel": "   "
+    },
+    {
+      "name": "native empty XML group label fails login before password validation and captures no snapshot",
+      "groupName": "ORACLE.LABEL.EMPTY",
+      "rawAttribute": "",
+      "validPasswordStatus": 500,
+      "wrongPasswordStatus": 500,
+      "recoveredLabel": "  Recovered empty Ω  "
+    },
+    {
+      "name": "native XML group label preserves entities",
+      "groupName": "ORACLE.LABEL.ENTITIES",
+      "rawAttribute": "A &amp; B &quot;Q&quot; &apos;S&apos; &lt;tag&gt;",
+      "groupLabel": "A & B \"Q\" 'S' <tag>"
+    },
+    {
+      "name": "native XML group label preserves numeric",
+      "groupName": "ORACLE.LABEL.NUMERIC",
+      "rawAttribute": "A&#10;B&#9;C&#13;D &#x1F680;",
+      "groupLabel": "A\nB\tC\rD 🚀"
+    },
+    {
+      "name": "native XML group label preserves literal",
+      "groupName": "ORACLE.LABEL.LITERAL",
+      "rawAttribute": "A\r\nB\tC\rD\nE",
+      "groupLabel": "A B C D E"
+    },
+    {
+      "name": "native XML group label preserves greater",
+      "groupName": "ORACLE.LABEL.GREATER",
+      "rawAttribute": "  A > B &lt;C&gt;  ",
+      "groupLabel": "  A > B <C>  "
+    },
+    {
+      "name": "native XML group label preserves once",
+      "groupName": "ORACLE.LABEL.ONCE",
+      "rawAttribute": "&amp;lt; &amp;#10; &amp;amp;",
+      "groupLabel": "&lt; &#10; &amp;"
+    },
+    {
+      "name": "native monitor credential login captures the group before any participant person exists",
+      "groupName": "ORACLE.MONITOR-FIRST",
+      "groupLabel": "  Monitor first Ω  ",
+      "reimportedLabel": "After monitor import"
+    },
+    {
+      "name": "repeated and case-equivalent Booklet creation returns the same native Test identity",
+      "firstTest": 20,
+      "repeatedTest": 20,
+      "caseTest": 20,
+      "group": {
+        "groupName": "ORACLE.IDENTITY",
+        "groupLabel": "  Identity original Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792808009
+      }
+    },
+    {
+      "name": "Test listing retains its first stored Booklet label after live file replacement while new Tests use the current label",
+      "existing": {
+        "loginName": "owned-native-identity",
+        "groupName": "ORACLE.IDENTITY",
+        "groupLabel": "  Identity original Ω  ",
+        "code": "",
+        "nameSuffix": "",
+        "bookletName": "ORACLE.BOOK.A",
+        "bookletLabel": "Owned booklet A"
+      },
+      "newTest": {
+        "loginName": "owned-new-booklet-label",
+        "groupName": "ORACLE.NEW-LABEL",
+        "groupLabel": "New label group",
+        "code": "",
+        "nameSuffix": "",
+        "bookletName": "ORACLE.BOOK.A",
+        "bookletLabel": "Replaced live booklet Ω"
+      }
+    },
+    {
+      "name": "case-equivalent group reentry updates result group spelling but Test listing retains snapshot spelling",
+      "personIdentityRetained": true,
+      "personTokenRotated": true,
+      "testId": 20,
+      "result": {
+        "groupName": "oracle.identity",
+        "groupLabel": "  Identity original Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792808009
+      },
+      "testSession": {
+        "loginName": "owned-native-identity",
+        "groupName": "ORACLE.IDENTITY",
+        "groupLabel": "  Identity original Ω  ",
+        "code": "",
+        "nameSuffix": "",
+        "bookletName": "ORACLE.BOOK.A",
+        "bookletLabel": "Owned booklet A"
+      }
+    },
+    {
+      "name": "successful reentry moves existing person Tests to the current Login group without recreating person or Test",
+      "personIdentityRetained": true,
+      "personTokenRotated": true,
+      "testId": 20,
+      "result": {
+        "groupName": "ORACLE.MOVED",
+        "groupLabel": "  Moved current Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792808010
+      },
+      "testSession": {
+        "loginName": "owned-native-identity",
+        "groupName": "ORACLE.MOVED",
+        "groupLabel": "  Moved current Ω  ",
+        "code": "",
+        "nameSuffix": "",
+        "bookletName": "ORACLE.BOOK.A",
+        "bookletLabel": "Owned booklet A"
+      }
+    },
+    {
+      "name": "deleting a former group snapshot retains the person and Test already moved to another group"
+    },
+    {
+      "name": "native whole-group deletion requires RW and invalidates the moved person token and all its Tests",
+      "readOnlyDeleteStatus": 403,
+      "deletedPersonTestStatus": 403
+    },
+    {
+      "name": "native Booklet Test snapshot preserves padded physical XML Label text",
+      "rawLabel": "  Padded Ω\n  ",
+      "testSession": {
+        "loginName": "owned-booklet-label-padded",
+        "groupName": "ORACLE.BOOKLET-LABEL.padded",
+        "groupLabel": "Owned label probe",
+        "code": "",
+        "nameSuffix": "",
+        "bookletName": "ORACLE.BOOK.A",
+        "bookletLabel": "  Padded Ω\n  "
+      }
+    },
+    {
+      "name": "native Booklet Test snapshot preserves empty physical XML Label text",
+      "rawLabel": "",
+      "testSession": {
+        "loginName": "owned-booklet-label-empty",
+        "groupName": "ORACLE.BOOKLET-LABEL.empty",
+        "groupLabel": "Owned label probe",
+        "code": "",
+        "nameSuffix": "",
+        "bookletName": "ORACLE.BOOK.A",
+        "bookletLabel": ""
+      }
+    },
+    {
+      "name": "native code casing records first stored code and actual reentry identity",
+      "assignedCode": "AbC",
+      "firstRequestedCode": "abc",
+      "secondRequestedCode": "ABC",
+      "personIdentityRetained": true,
+      "firstTestId": 24,
+      "secondTestId": 24,
+      "testSessions": [
+        {
+          "loginName": "owned-native-code-case",
+          "groupName": "ORACLE.CODE-CASE",
+          "groupLabel": "Owned code case",
+          "code": "abc",
+          "nameSuffix": "abc",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ],
+      "loginTokenRetained": true,
+      "personTokenRotated": true
+    },
+    {
+      "name": "native always-new person persists plain eight-character suffix",
+      "mode": "run-hot-restart",
+      "assignedCode": "",
+      "requestedCode": "",
+      "testIds": [
+        25,
+        26
+      ],
+      "testSessions": [
+        {
+          "loginName": "owned-native-restart-plain",
+          "groupName": "ORACLE.RESTART.PLAIN",
+          "groupLabel": "Owned restart",
+          "code": "",
+          "nameSuffix": "ypmdw8b4",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        },
+        {
+          "loginName": "owned-native-restart-plain",
+          "groupName": "ORACLE.RESTART.PLAIN",
+          "groupLabel": "Owned restart",
+          "code": "",
+          "nameSuffix": "8x65unod",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "native always-new person persists code-prefixed eight-character suffix",
+      "mode": "run-hot-restart",
+      "assignedCode": "AbC",
+      "requestedCode": "abc",
+      "testIds": [
+        27,
+        28
+      ],
+      "testSessions": [
+        {
+          "loginName": "owned-native-restart-coded",
+          "groupName": "ORACLE.RESTART.CODED",
+          "groupLabel": "Owned restart",
+          "code": "abc",
+          "nameSuffix": "abc/p0bq369a",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        },
+        {
+          "loginName": "owned-native-restart-coded",
+          "groupName": "ORACLE.RESTART.CODED",
+          "groupLabel": "Owned restart",
+          "code": "abc",
+          "nameSuffix": "abc/uce_kcxp",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "native person-code phase uses existing Login token after intervening password replacement",
+      "loginTokenRetained": true,
+      "passwordUpdatedBetweenPhases": true,
+      "testId": 29,
+      "testSession": {
+        "loginName": "owned-native-password-phase",
+        "groupName": "ORACLE.AUTH-PHASE",
+        "groupLabel": "Owned phase",
+        "code": "abc",
+        "nameSuffix": "abc",
+        "bookletName": "ORACLE.BOOK.A",
+        "bookletLabel": ""
+      }
+    },
+    {
+      "name": "native mode change to restart creates a new suffix while retaining the prior person Test",
+      "firstMode": "run-hot-return",
+      "secondMode": "run-hot-restart",
+      "firstTestId": 30,
+      "secondTestId": 31,
+      "testSessions": [
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "abc",
+          "nameSuffix": "abc",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        },
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "abc",
+          "nameSuffix": "abc/8ex-nxgu",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ],
+      "loginTokenRetained": true
+    },
+    {
+      "name": "native return mode reuses the first plain suffix instead of the latest restart person",
+      "requestedCode": "ABC",
+      "testId": 30,
+      "originalTestId": 30,
+      "testSessions": [
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "abc",
+          "nameSuffix": "abc",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        },
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "abc",
+          "nameSuffix": "abc/8ex-nxgu",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "native signout revokes only the person bearer and reentry retains its first Test",
+      "signedOutTokenStatus": 403,
+      "testId": 30,
+      "originalTestId": 30,
+      "personTokenRotated": true
+    },
+    {
+      "name": "existing Login token checks current code assignments without credential reauthentication",
+      "oldCodeStatus": 400,
+      "newCode": "def",
+      "testId": 32,
+      "testSessions": [
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "abc",
+          "nameSuffix": "abc",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        },
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "abc",
+          "nameSuffix": "abc/8ex-nxgu",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        },
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "def",
+          "nameSuffix": "def",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "restoring a code assignment reopens the original person Test after intervening assignments",
+      "testId": 30,
+      "originalTestId": 30,
+      "testSessions": [
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "abc",
+          "nameSuffix": "abc",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        },
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "abc",
+          "nameSuffix": "abc/8ex-nxgu",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        },
+        {
+          "loginName": "owned-native-lifecycle",
+          "groupName": "ORACLE.PERSON-LIFECYCLE",
+          "groupLabel": "Owned lifecycle",
+          "code": "def",
+          "nameSuffix": "def",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "native zero-code to no-code transition records empty suffix reuse and subsequent Test access",
+      "firstCode": "0",
+      "laterCode": "",
+      "testOpenStatus": 201,
+      "testId": 33,
+      "originalTestId": 33,
+      "testSessions": [
+        {
+          "loginName": "owned-native-zero-code",
+          "groupName": "ORACLE.ZERO-CODE",
+          "groupLabel": "Owned zero code",
+          "code": "0",
+          "nameSuffix": "",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "standalone zero codes attribute is PHP-falsy and creates an uncoded native person",
+      "authoredCodes": "0",
+      "codeRequired": false,
+      "testId": 34,
+      "testSessions": [
+        {
+          "loginName": "owned-native-zero-alone",
+          "groupName": "ORACLE.ZERO-ALONE",
+          "groupLabel": "Owned zero alone",
+          "code": "",
+          "nameSuffix": "",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "native person suffix collation retains first spelling for unicode-case with both codes authored",
+      "firstRequestedCode": "Ä",
+      "secondRequestedCode": "ä",
+      "testId": 35,
+      "originalTestId": 35,
+      "testSessions": [
+        {
+          "loginName": "owned-native-unicode-case",
+          "groupName": "ORACLE.UNICODE-CASE",
+          "groupLabel": "Owned suffix collation",
+          "code": "Ä",
+          "nameSuffix": "Ä",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "native person suffix collation retains first spelling for unicode-composition with both codes authored",
+      "firstRequestedCode": "é",
+      "secondRequestedCode": "é",
+      "testId": 36,
+      "originalTestId": 36,
+      "testSessions": [
+        {
+          "loginName": "owned-native-unicode-composition",
+          "groupName": "ORACLE.UNICODE-COMPOSITION",
+          "groupLabel": "Owned suffix collation",
+          "code": "é",
+          "nameSuffix": "é",
+          "bookletName": "ORACLE.BOOK.A",
+          "bookletLabel": ""
+        }
+      ]
+    },
+    {
+      "name": "revocation is enforced against the existing signed-in token"
+    }
+  ],
+  "version": "19.0.0",
+  "success": true
+}

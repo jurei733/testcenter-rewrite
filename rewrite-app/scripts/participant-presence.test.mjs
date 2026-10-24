@@ -115,6 +115,20 @@ for (const kind of kinds) {
         assert.equal((await logs()).length, before);
         await repository.saveParticipantSession(session);
       });
+      await t.test("entry evidence controls registration and renewal inside the current store lock", async () => {
+        const active={...persisted,status:"paused",controllerEntry:{active:true,revision:3}};
+        await repository.saveTestRun(active);await repository.saveParticipantSession({...session,status:"signed_in"});
+        assert.equal((await mutate("open",first,lease*3-5)).accepted,true);
+        assert.equal((await mutate("acknowledge",first,lease*3-4)).presence.mode,"WEBSOCKET");
+        const terminated={...active,controllerEntry:{active:false,revision:4}};await repository.saveTestRun(terminated);
+        await repository.saveParticipantSession(session);
+        for(const action of ["open","acknowledge","poll"]){
+          const result=await mutate(action,first,lease*3-3);assert.equal(result.accepted,false);
+          assert.deepEqual(result.presence.connections,{});assert.equal(result.testLog,null);
+        }
+        assert.deepEqual(await repository.getTestRunById(key),terminated);
+        await repository.saveTestRun(persisted);
+      });
       await t.test("silent expiry never beats another live connection and transitions once", async () => {
         await mutate("open", first, lease * 3);
         await mutate("acknowledge", first, lease * 3 + 1);

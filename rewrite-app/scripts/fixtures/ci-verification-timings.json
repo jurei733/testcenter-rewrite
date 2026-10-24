@@ -1,0 +1,250 @@
+{
+  "runId": 40064366620,
+  "headSha": "a6daa1d25ff9904e4f0fdfa20847988a32528c94",
+  "runUrl": "https://github.com/jurei733/testcenter-rewrite/actions/runs/40064366620",
+  "measurement": "completed_at minus started_at, including setup; successful complete baseline, not a runtime guarantee",
+  "previousMatrix": [
+    {
+      "check": "compatibility",
+      "command": "npm run test:compatibility:built",
+      "playwright": false
+    },
+    {
+      "check": "integration-memory",
+      "command": "npm run test:integration:memory:built",
+      "playwright": false
+    },
+    {
+      "check": "integration-file",
+      "command": "npm run test:integration:file:built",
+      "playwright": false
+    },
+    {
+      "check": "integration-sqlite",
+      "command": "npm run test:integration:sqlite:built",
+      "playwright": false
+    },
+    {
+      "check": "startup-file",
+      "command": "npm run smoke:startup:file:built",
+      "playwright": false
+    },
+    {
+      "check": "shutdown-file",
+      "command": "npm run smoke:shutdown:file:built",
+      "playwright": false
+    },
+    {
+      "check": "startup",
+      "command": "npm run smoke:startup:sqlite:built",
+      "playwright": false
+    },
+    {
+      "check": "shutdown",
+      "command": "npm run smoke:shutdown:sqlite:built",
+      "playwright": false
+    },
+    {
+      "check": "ui-controller-timer",
+      "command": "npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-console-debug",
+      "command": "npm run smoke:ui:participant-debug:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-participant-console",
+      "command": "npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-participant-command-completion",
+      "command": "npm run smoke:ui:participant-command-completion:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-participant-native-routes",
+      "command": "npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-review-readiness",
+      "command": "npm run smoke:ui:review-readiness:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-original-review",
+      "command": "npm run smoke:ui:original-review:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-monitor-review",
+      "command": "npm run smoke:ui:monitor-review:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-monitor-detail-review",
+      "command": "npm run smoke:ui:monitor-detail-review:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-run-detail-review",
+      "command": "npm run smoke:ui:run-detail-review:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-unit-detail-review",
+      "command": "npm run smoke:ui:unit-detail-review:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-participant-detail-review",
+      "command": "npm run smoke:ui:participant-detail-review:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-participant-monitor-live",
+      "command": "npm run smoke:ui:participant-monitor-live:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-monitor-bulk",
+      "command": "npm run smoke:ui:monitor-bulk:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-monitor-auto-next",
+      "command": "npm run smoke:ui:monitor-auto-next:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-monitor-finish-all",
+      "command": "npm run smoke:ui:monitor-finish-all:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-open-run-sync",
+      "command": "npm run smoke:ui:open-run-sync:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-activation-blocking-runtime",
+      "command": "npm run smoke:ui:activation-blocking-runtime:built && npm run smoke:ui:participant-save-retry:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-adaptive-runtime",
+      "command": "npm run smoke:ui:adaptive-runtime:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-ops",
+      "command": "npm run smoke:ui:operator-auth:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-full",
+      "command": "npm run smoke:ui:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-attachments",
+      "command": "npm run smoke:ui:attachments:built && npm run smoke:ui:attachments-live:built && UI_SMOKE_ATTACHMENT_CAMERA_FACING=front npm run smoke:ui:attachments-live:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-verona-development",
+      "command": "npm run smoke:ui:verona-development:built",
+      "playwright": true
+    },
+    {
+      "check": "local-demo",
+      "command": "npm run smoke:local-demo:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-original-xml-schema",
+      "command": "npm run smoke:ui:original-xml-schema:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-original-workspace-files",
+      "command": "npm run smoke:ui:original-workspace-files:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-deletion-confirmation",
+      "command": "npm run smoke:ui:deletion-confirmation:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-delete-group-results",
+      "command": "npm run smoke:ui:delete-group-results:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-admin-workspace-access",
+      "command": "npm run smoke:ui:admin-workspace-access:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-admin-delete",
+      "command": "npm run smoke:ui:admin-delete:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-workspace-rename",
+      "command": "npm run smoke:ui:workspace-rename:built",
+      "playwright": true
+    },
+    {
+      "check": "ui-workspace-delete",
+      "command": "npm run smoke:ui:workspace-delete:built",
+      "playwright": true
+    }
+  ],
+  "secondsByCheck": {
+    "compatibility": 59,
+    "integration-memory": 82,
+    "integration-file": 204,
+    "integration-sqlite": 98,
+    "startup-file": 17,
+    "shutdown-file": 26,
+    "startup": 18,
+    "shutdown": 19,
+    "ui-controller-timer": 355,
+    "ui-console-debug": 69,
+    "ui-participant-console": 193,
+    "ui-participant-command-completion": 63,
+    "ui-participant-native-routes": 188,
+    "ui-review-readiness": 795,
+    "ui-original-review": 157,
+    "ui-monitor-review": 870,
+    "ui-monitor-detail-review": 861,
+    "ui-run-detail-review": 863,
+    "ui-unit-detail-review": 948,
+    "ui-participant-detail-review": 888,
+    "ui-participant-monitor-live": 105,
+    "ui-monitor-bulk": 880,
+    "ui-monitor-auto-next": 872,
+    "ui-monitor-finish-all": 837,
+    "ui-open-run-sync": 866,
+    "ui-activation-blocking-runtime": 906,
+    "ui-adaptive-runtime": 71,
+    "ui-ops": 824,
+    "ui-full": 779,
+    "ui-attachments": 176,
+    "ui-verona-development": 103,
+    "local-demo": 62,
+    "ui-original-xml-schema": 68,
+    "ui-original-workspace-files": 111,
+    "ui-deletion-confirmation": 71,
+    "ui-delete-group-results": 957,
+    "ui-admin-workspace-access": 112,
+    "ui-admin-delete": 179,
+    "ui-workspace-rename": 72,
+    "ui-workspace-delete": 87
+  }
+}

@@ -1,0 +1,66 @@
+name: Rewrite focused services (not acceptance)
+
+on:
+  workflow_dispatch:
+    inputs:
+      check:
+        description: Complete service suite to run with PostgreSQL
+        type: choice
+        required: true
+        default: participant-auth
+        options: [participant-auth, original-results, system-check-reports]
+  workflow_call:
+    inputs:
+      check:
+        description: Complete service suite; validated before installation
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-services-${{ inputs.check }}
+  cancel-in-progress: true
+
+jobs:
+  focused-service:
+    name: Focused service feedback (not complete acceptance)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rewrite_app
+          POSTGRES_USER: rewrite
+          POSTGRES_PASSWORD: rewrite
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rewrite -d rewrite_app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: "true"
+      FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
+      FIRST_SLICE_STORE: postgres
+      FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@127.0.0.1:5432/rewrite_app
+      FOCUS_CHECK: ${{ inputs.check }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate the selected service before installing dependencies
+        run: node -e 'if (!["participant-auth", "original-results", "system-check-reports"].includes(process.env.FOCUS_CHECK)) process.exit(2)'
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Audit the complete locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - name: Verify CI selection and failure-propagation policy
+        run: npm run test:ci-policy
+      - name: Run the complete selected service suite with a fresh core build
+        run: npm run ci:focus -- "$FOCUS_CHECK"

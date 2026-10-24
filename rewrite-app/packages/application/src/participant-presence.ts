@@ -27,6 +27,15 @@ export type ParticipantPresenceTransition = {
   accepted: boolean;
 };
 
+/** Entry evidence belongs to this Run; a sibling may change the shared parent status. */
+export const canStreamParticipantRun = (testRun: TestRun, session: ParticipantSession): boolean => {
+  if (session.status === "closed" ||
+      (testRun.status !== "running" && testRun.status !== "paused")) return false;
+  const entry = testRun.controllerEntry;
+  return entry === undefined ? session.status === "launched"
+    : entry?.active === true && Number.isSafeInteger(entry.revision) && entry.revision >= 1;
+};
+
 /** Pure decision inside the store's atomic run lock. Never writes answers or timers. */
 export const transitionParticipantPresence = (
   input: ParticipantPresenceMutation,
@@ -46,7 +55,8 @@ export const transitionParticipantPresence = (
   }
   if (session.status === "closed" ||
       (session.validUntil && Date.parse(session.validUntil) <= input.timestamp) ||
-      (testRun.status !== "running" && testRun.status !== "paused")) {
+      (testRun.status !== "running" && testRun.status !== "paused") ||
+      (testRun.controllerEntry !== undefined && !canStreamParticipantRun(testRun, session))) {
     // Retain the log sequence if an administrator later reopens the same run.
     return { presence: current ? { ...current, connections: {}, nextExpiry: null } : null,
       testLog: null, accepted: false };

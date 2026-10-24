@@ -1,0 +1,317 @@
+{
+  "referenceRevision": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "measurements": {
+    "Primar-desktop": {
+      "width": 1280,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 64,
+      "logoSize": [
+        111.4375,
+        48
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Primar-mobile": {
+      "width": 390,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 56,
+      "logoSize": [
+        92.8671875,
+        40
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Primar-toolbar-small": {
+      "width": 599,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 56,
+      "logoSize": [
+        92.8671875,
+        40
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Primar-toolbar-large": {
+      "width": 600,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 64,
+      "logoSize": [
+        111.4375,
+        48
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Sekundar-desktop": {
+      "width": 1280,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 64,
+      "logoSize": [
+        111.4375,
+        48
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Sekundar-mobile": {
+      "width": 390,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 56,
+      "logoSize": [
+        92.8671875,
+        40
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Sekundar-toolbar-small": {
+      "width": 599,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 56,
+      "logoSize": [
+        92.8671875,
+        40
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Sekundar-toolbar-large": {
+      "width": 600,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 64,
+      "logoSize": [
+        111.4375,
+        48
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Erwachsene-desktop": {
+      "width": 1280,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 64,
+      "logoSize": [
+        111.4375,
+        48
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Erwachsene-mobile": {
+      "width": 390,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 56,
+      "logoSize": [
+        92.8671875,
+        40
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Erwachsene-toolbar-small": {
+      "width": 599,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 56,
+      "logoSize": [
+        92.8671875,
+        40
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    },
+    "Erwachsene-toolbar-large": {
+      "width": 600,
+      "color": "rgb(25, 28, 29)",
+      "backgrounds": [
+        "rgb(255, 255, 255)",
+        "rgb(255, 255, 255)"
+      ],
+      "disabled": true,
+      "opacity": "1",
+      "iconSize": [
+        24,
+        24
+      ],
+      "tableSizing": "content-box",
+      "topbarHeight": 64,
+      "logoSize": [
+        111.4375,
+        48
+      ],
+      "titleTypography": [
+        "\"Nunito Sans\"",
+        "22px",
+        "28px"
+      ],
+      "titleCentered": true
+    }
+  }
+}

@@ -191,7 +191,7 @@ test("participant custom-text resolution keeps authored copy and safe fallbacks"
       "login_subtitle",
       "Start or Resume Test"
     ),
-    "Project Test Selection"
+    "  Project Test Selection  "
   );
   assert.equal(
     resolveParticipantCustomText(
@@ -199,7 +199,7 @@ test("participant custom-text resolution keeps authored copy and safe fallbacks"
       "login_subtitle",
       "Start or Resume Test"
     ),
-    "Start or Resume Test"
+    "   "
   );
   assert.equal(
     resolveParticipantCustomText(undefined, "login_subtitle"),

@@ -11,12 +11,14 @@ const { compileBookletRuntimePolicy } = await import(policyUrl);
 const astFor = file => ts.createSourceFile(file, readFileSync(new URL(file, import.meta.url), "utf8"), ts.ScriptTarget.ES2022, true);
 const facadeAst = astFor("../apps/web/src/app/participant-view.facade.ts");
 const declaration = facadeAst.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
-const names = ["showUnitTitle", "shortUnitLabel", "unitToolbarLabel", "unitNavigationLabel", "screenHeaderLabel", "unitNavigationLabelMode", "veronaPlayer"];
+const names = ["showUnitTitle", "shortUnitLabel", "unitToolbarLabel", "unitNavigationLabel", "screenHeaderLabel", "unitNavigationLabelMode", "veronaPlayer", "originalVeronaPlayer"];
 const getters = declaration.members.filter(node => ts.isGetAccessorDeclaration(node) && names.includes(node.name.getText(facadeAst)));
 assert.equal(getters.length, names.length, "Execute all actual presentation getters, not a copied label implementation.");
+const playerBuilder = declaration.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(facadeAst) === "buildVeronaPlayer");
+assert.ok(playerBuilder, "Execute the actual shared Verona player builder.");
 const { LabelFacade } = await import(moduleUrl(`
   import { isBookletPlayerEndAllowed } from ${JSON.stringify(policyUrl)};
-  export class LabelFacade { ${getters.map(node => node.getText(facadeAst)).join("\n")} }
+  export class LabelFacade { ${getters.map(node => node.getText(facadeAst)).join("\n")} ${playerBuilder.getText(facadeAst)} }
 `));
 const applicationAst = astFor("../packages/application/src/index.ts");
 const resolvers = [];
@@ -41,6 +43,7 @@ const fixture = config => {
     availableActions: ["save_progress"], navigation: { backwardDeniedReasons: [], forwardDeniedReasons: [] }
   };
   const facade = Object.assign(new LabelFacade(), {
+    commandReloadSequence: () => 0,
     readCurrentRunState: () => state, hasControllerError: false, eagerBookletLoading: false,
     effectiveUnitResponse: (value, key) => value.testRun.unitResponses[key] ?? "",
     player: { canGoPreviousUnit: false, canGoNextUnit: true, canComplete: false }
@@ -196,4 +199,18 @@ test("changing only the host's visual navigation label neither restarts nor reco
   const { Host } = await import(moduleUrl(`export class Host { ${method.getText(ast)} }`));
   const host = Object.assign(new Host(), { viewReady: true, mountPlayer: () => assert.fail("visual label must not restart"), updatePlayerConfig: () => assert.fail("visual label must not replace metadata") });
   host.ngOnChanges({ unitNavigationLabel: {}, unitNavigationLabelMode: {} });
+});
+
+test("Original retains the same errored frame inputs behind its dialog while Rewrite shows its error state", () => {
+  const {state, facade} = fixture({});
+  state.currentUnit.player = {playerKey:"owned-player",html:"<html>owned Player</html>"};
+  state.currentUnit.unitDefinition = "owned definition";
+  const normal = facade.veronaPlayer;
+  facade.hasControllerError = true;
+  assert.equal(facade.veronaPlayer, null);
+  assert.deepEqual(facade.originalVeronaPlayer, normal);
+  for (const status of ["paused", "completed"]) {
+    state.testRun.status = status;
+    assert.equal(facade.originalVeronaPlayer, null);
+  }
 });

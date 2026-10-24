@@ -75,11 +75,16 @@ export const mergeParticipantCustomTextScopes = (
   ...(bookletCustomTexts ?? {})
 });
 
+export const resolveParticipantCustomTextValue = (
+  customTexts: Readonly<Record<string, string>> | null | undefined,
+  key: ParticipantCustomTextKey
+): string => customTexts?.[key] ?? originalParticipantCustomTextDefaults[key];
+
 export const resolveParticipantCustomText = (
   customTexts: Readonly<Record<string, string>> | null | undefined,
   key: ParticipantCustomTextKey,
   fallback: string = originalParticipantCustomTextDefaults[key]
-): string => customTexts?.[key]?.trim() || fallback;
+): string => resolveParticipantCustomTextValue(customTexts, key) || fallback;
 
 export const formatOriginalCustomText = (
   template: string,

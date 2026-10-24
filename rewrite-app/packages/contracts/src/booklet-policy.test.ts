@@ -1,8 +1,8 @@
+import { bookletNavigationDeniedReasons, bookletStarterExitDeniedReasons } from "./booklet-completeness.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
   isBookletPlayerEndAllowed,
   readBookletConfigValues
@@ -290,4 +290,12 @@ test("booklet config arrays and completeness rules are normalized", () => {
     }),
     []
   );
+});
+
+test("Source starter exit treats legacy response completion and missing progress separately", () => {
+  const policy=compileBookletRuntimePolicy({force_presentation_complete:"ALWAYS",force_response_complete:"ALWAYS"});
+  assert.deepEqual(bookletStarterExitDeniedReasons({policy,presentationProgress:"complete-and-valid",responseProgress:"complete-and-valid"}),["presentation_incomplete"]);
+  assert.deepEqual(bookletStarterExitDeniedReasons({policy,presentationProgress:"complete",responseProgress:"complete-and-valid"}),[]);
+  assert.deepEqual(bookletStarterExitDeniedReasons({policy}),["presentation_incomplete"]);
+  assert.deepEqual(bookletStarterExitDeniedReasons({policy,presentationProgress:"complete",responseProgress:"some"}),["response_incomplete"]);
 });

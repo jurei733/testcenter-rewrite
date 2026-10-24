@@ -1,4 +1,5 @@
 .verona-player-shell {
+  position: relative;
   display: grid;
   gap: 10px;
   overflow: hidden;
@@ -144,13 +145,17 @@
 }
 
 .verona-player-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   display: grid;
+  align-content: center;
   gap: 5px;
-  margin: 0 14px;
+  margin: 0;
   padding: 14px;
   border: 1px solid rgba(31, 92, 84, 0.18);
   border-radius: var(--radius-lg);
-  background: rgba(31, 92, 84, 0.06);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .verona-player-loading span {

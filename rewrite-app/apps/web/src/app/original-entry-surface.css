@@ -30,12 +30,17 @@
   min-width: 0;
 }
 
-/* The pinned login occupies the viewport between the toolbar and 56px footer.
-   Its own welcome/root containers scroll; the footer must not grow offscreen. */
+/* Source clips the window at html/body, while AppRoot scrolls independently.
+   Keep the footer's text overflow outside AppRoot, including wrapped versions. */
+:root[data-interface-mode="original"]:has(#originalParticipantLogin, #originalAdminLogin),
+:root[data-interface-mode="original"] body:has(#originalParticipantLogin, #originalAdminLogin) {
+  height: 100%;
+  overflow: hidden;
+}
 :root[data-interface-mode="original"] .page.is-participant-page:has(#originalParticipantLogin) {
   height: 100dvh;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 :root[data-interface-mode="original"] .participant-stage:has(#originalParticipantLogin),
 :root[data-interface-mode="original"] app-participant-view:has(#originalParticipantLogin),
@@ -77,7 +82,7 @@
   min-height: 0;
   max-width: none;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 :root[data-interface-mode="original"] .home-stage:has(#originalAdminLogin),
 :root[data-interface-mode="original"] app-ops-view:has(#originalAdminLogin) {
@@ -101,4 +106,29 @@
 :root[data-interface-mode="original"] .page:has(#originalAdminLogin) .application-logo-button {
   display: block;
   line-height: 0;
+}
+
+/* Source Systemcheck keeps window/header/footer fixed and scrolls its routed
+   content. A window scrollbar incorrectly narrows even the desktop toolbar. */
+:root[data-interface-mode="original"]:has(.original-system-check-shell),
+:root[data-interface-mode="original"] body:has(.original-system-check-shell) {
+  height: 100%;
+  overflow: hidden;
+}
+:root[data-interface-mode="original"] .page:has(.original-system-check-shell) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+}
+:root[data-interface-mode="original"] .participant-stage:has(.original-system-check-shell) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+:root[data-interface-mode="original"] app-system-check-view:has(.original-system-check-shell) {
+  flex: 1;
+  min-width: 0;
 }

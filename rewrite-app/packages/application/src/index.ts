@@ -1,3 +1,38 @@
+import {createOriginalPersonNameSuffix,OriginalPersonIdentityConflictError} from './original-person-identity.js';
+export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix,resolveOriginalPerson,assertOriginalPersonUnique,projectOriginalPersonSessions,projectOriginalPersonRuns,projectOriginalLoginMode,withOriginalTestRunMode,OriginalPersonIdentityConflictError} from './original-person-identity.js';
+import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
+export { originalParticipantGroupKeysEqual, prepareOriginalParticipantGroup } from "./original-participant-group.js";
+export {prepareOriginalLoginBinding, type OriginalLoginBindingInput} from './original-login-binding.js';
+import type {WorkspaceFilePublicationInput} from "./workspace-file-publication.js";
+export {createWorkspaceFilePublicationRevision,prepareWorkspaceFilePublication} from "./workspace-file-publication.js";
+export {createContentReleaseActivationRevision,prepareContentReleaseActivation} from "./content-release-activation.js";
+import type {ContentReleaseActivationCommit} from "./content-release-activation.js";
+import { workspaceFileReplacementConflict } from './workspace-file-replacement.js';
+import { FirstSliceError } from "./first-slice-error.js";
+import { buildWorkspaceFileCatalog, selectCurrentWorkspaceFiles, normalizeWorkspacePlayerResourceId, workspaceFileReplacementIdentity } from './workspace-file-catalog.js';
+import type { WorkspaceFileCatalog } from '@testcenter-rewrite-app/domain';
+export { FirstSliceError } from "./first-slice-error.js";
+export { prepareApplicationAssetDeletion, validateApplicationAssetReferences } from "./application-asset-mutation.js";
+export type { ApplicationAssetDeletionInput, ApplicationAssetDeletionContext, ApplicationAssetAssignmentRow } from "./application-asset-mutation.js";
+import { evaluateAdaptiveStates, buildParticipantDebugSnapshot } from "@testcenter-rewrite-app/contracts/participant-debug-runtime";
+import { evaluateParticipantDebugConditions, parseParticipantDebugConditionElement } from "@testcenter-rewrite-app/contracts/participant-debug-condition";
+import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
+import { isParticipantCommandCompletionRequest, participantNativeCommandKeywords, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult, type ParticipantCommandCompletionRequest, type ParticipantCommandCompletionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { isParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "./participant-native-command.js";
+import { projectSupersededParticipantTermination } from "./participant-terminal-continuation.js";
+import { retainedLegacyTimerPreparation, withLegacyTimerPreparation, legacyTimerInterruptionBalance } from "./participant-legacy-timer.js";
+import { validParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
+import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
+import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
+  ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
+export { prepareParticipantRunMutation } from "./participant-run-mutation.js";
+export type { ParticipantRunMutationInput, ParticipantRunMutationContext,
+  ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
+import { ParticipantControllerActivationError, prepareParticipantControllerActivation, type ParticipantControllerActivationInput,
+  type ParticipantControllerActivationResult } from "./participant-controller-activation.js";
+import { bookletNavigationDeniedReasons, bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
+import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import {
   createHash,
   randomBytes,
@@ -9,9 +44,16 @@ import { TextDecoder } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
-export { selectParticipantAssignmentRun } from "./participant-assignment-runs.js";
+import { decodeUtf7XmlBytes, isUtf7XmlEncoding } from "./xml-utf7.js";
+import type { ParticipantAssignmentRunInitializer } from "./participant-assignment-runs.js";
+export { selectParticipantAssignmentRun, prepareParticipantAssignmentRunCreation } from "./participant-assignment-runs.js";
+export type { ParticipantAssignmentRunInitializer, ParticipantAssignmentRunCreationEffect } from "./participant-assignment-runs.js";
+export { prepareParticipantControllerActivation, ParticipantControllerActivationError,
+  type ParticipantControllerActivationInput, type ParticipantControllerActivationResult } from "./participant-controller-activation.js";
+export { appendParticipantRunCommand, acknowledgeParticipantRunCommand,
+  matchesParticipantRunCommandScope, prepareParticipantRunCommandApplication } from "./participant-run-commands.js";
 import type { ParticipantPresenceMutation, ParticipantPresenceTransition } from "./participant-presence.js";
-export { transitionParticipantPresence, PARTICIPANT_PRESENCE_LEASE_MS,
+export { transitionParticipantPresence, canStreamParticipantRun, PARTICIPANT_PRESENCE_LEASE_MS,
   PARTICIPANT_PRESENCE_MAX_CONNECTIONS } from "./participant-presence.js";
 export type { ParticipantPresence, ParticipantPresenceMutation,
   ParticipantPresenceTransition } from "./participant-presence.js";
@@ -21,6 +63,7 @@ import type {
   Element as XmlElement
 } from "@xmldom/xmldom";
 import { formatOriginalReportCsv, formatOriginalParticipantLogEntry } from "./original-report-csv.js";
+import { selectOriginalSavedUnitKeys, originalReviewUnitEventTypes } from "./original-saved-unit-projection.js";
 import type {
   OriginalXmlRoot, OriginalXmlSchemaValidator, XmlSchemaProfile
 } from "./original-xml-schema.js";
@@ -44,7 +87,6 @@ import type { Response as IqbResponse } from "@iqbspecs/response/response.interf
 
 import {
   adminPasswordPolicy,
-  bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
   isBookletPlayerEndAllowed,
   isSupportedVeronaPlayerApiVersion,
@@ -118,6 +160,7 @@ import type {
   MonitorViewProfile,
   OpenMonitorRun,
   ParticipantCurrentRunState,
+  ParticipantDebugSnapshot,
   ParticipantExecutionMode,
   ParticipantExecutionModeDefinition,
   ParticipantLoginAttempt,
@@ -143,6 +186,13 @@ import type {
   SystemCheckReportStatistics,
   Tenant,
   TestRun,
+  ParticipantRunCommand,
+  ParticipantRunCommandInput,
+  ParticipantRunCommandScope,
+  ParticipantRunCommandApplicationInput,
+  ParticipantRunCommandApplicationContext,
+  ParticipantRunCommandApplicationResult,
+  ParticipantRunCommandEffect,
   TestRunStatus,
   UnitCodingScheme,
   UnitAttachmentRequest,
@@ -273,6 +323,20 @@ export type ContentIntakePort = {
       replacementSourcePackage: SourcePackage;
     }
   >;
+  uploadWorkspaceFile(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    fileName: string;
+    mediaType: string;
+    sourceDocument: string;
+  }): Promise<UploadWorkspaceFileResult>;
+  replaceWorkspaceFile(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    sourcePackageId: string;
+    mediaType: string;
+    sourceDocument: SourceDocumentSource;
+  }): Promise<ReplaceWorkspaceFileResult>;
   deleteSourcePackage(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -287,6 +351,17 @@ export type ContentIntakePort = {
     forceActivation?: boolean;
   }): Promise<ActivateContentReleaseResult>;
 };
+
+export type UploadWorkspaceFileResult = {
+  workspaceAvailability?: WorkspaceFileAvailability;
+  sourcePackage: SourcePackage;
+  replacedSourcePackageId: string | null;
+  importJob: ImportJob | null;
+  stagedContentRelease: ContentRelease | null;
+  participantRosterImport?: CreateImportJobResult['participantRosterImport'];
+};
+
+export type ReplaceWorkspaceFileResult = Omit<Awaited<ReturnType<ContentIntakePort['replaceSourcePackage']>>, 'importJob'> & {importJob: ImportJob | null; workspaceAvailability?: WorkspaceFileAvailability};
 
 export type WorkspaceAdminReadPort = {
   getWorkspaceOverview(input: {
@@ -420,6 +495,7 @@ export type WorkspaceAdminReadPort = {
     sortDirection?: "asc" | "desc";
     limit?: number;
   }): Promise<WorkspaceSourcePackageListResult>;
+  getWorkspaceFileCatalog(input: { tenantKey: string; workspaceKey: string }): Promise<WorkspaceFileCatalog>;
   exportSourcePackagesCsv(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -516,7 +592,8 @@ export type WorkspaceAdminReadPort = {
   exportOriginalResultArchive(input: {
     tenantKey: string;
     workspaceKey: string;
-    groupKeys: string[];
+    /** Omitted selects every workspace group; an explicit empty selection selects none. */
+    groupKeys?: string[];
   }): Promise<WorkspaceOriginalResultArchive>;
   getContentReleaseActivationReadiness(input: {
     tenantKey: string;
@@ -562,24 +639,28 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<SystemCheckReport[]>;
   exportSystemCheckReportsCsv(input: {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<string>;
   exportSystemCheckReportsJson(input: {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<string>;
   getSystemCheckReportStatistics(input: {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
   }): Promise<SystemCheckReportStatistics[]>;
 };
 
@@ -712,6 +793,13 @@ export type WorkspaceReviewPort = {
 };
 
 export type ParticipantRuntimePort = {
+  interruptControllerTimer(input: ParticipantControllerTimerInterruptionRequest & { participantSessionId: string }): Promise<ParticipantControllerTimerInterruptionResult>;
+  getControllerContext(input: { participantSessionId: string; testRunId?: string }): Promise<ParticipantControllerContext>;
+  listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
+  acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
+  executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string; controllerDispatch?: ParticipantNativeCommandRequest["controllerDispatch"]; terminationNoop?: true; commandCompletion?: "browser-v1" }): Promise<ParticipantRunCommandApplicationResult>;
+  executeNativeCommand(input: ParticipantNativeCommandRequest & { participantSessionId: string }): Promise<ParticipantNativeCommandResult>;
+  completeCommand(input: ParticipantCommandCompletionRequest & { participantSessionId: string }): Promise<ParticipantCommandCompletionResult>;
   updateConnection(input: {
     participantSessionId: string; testRunId: string;
     action: "open" | "acknowledge" | "close" | "poll"; connectionId?: string;
@@ -733,18 +821,27 @@ export type ParticipantRuntimePort = {
     testRunId?: string;
     includeBookletAssets?: boolean;
   }): Promise<ParticipantCurrentRunState>;
+  getDebugState(input: {
+    participantSessionId: string;
+    testRunId: string;
+    unitResponses?: Record<string, string>;
+    conditionXml?: string;
+  }): Promise<ParticipantDebugSnapshot>;
   getResource(input: {
     participantSessionId: string;
     resourcePath: string;
   }): Promise<NonNullable<ContentReleaseRuntimeSnapshot["resourceEntries"]>[number]>;
-  launch(input: { participantSessionId: string; bookletKey?: string }): Promise<TestRun>;
+  launch(input: { participantSessionId: string; bookletKey?: string; controllerLifecycle?: "browser-v1" }): Promise<TestRun>;
   resumeSession(input: {
     participantSessionId: string;
     bookletKey?: string;
+    controllerLifecycle?: "browser-v1";
   }): Promise<TestRun>;
   saveProgress(input: {
     testRunId: string;
     deliveryId?: string;
+    responseOnly?: boolean;
+    responseTimestamp?: number;
     currentUnitKey?: string | null;
     responseUnitKey?: string | null;
     transientUnitResponses?: Record<string, string>;
@@ -814,8 +911,13 @@ export type ParticipantRuntimePort = {
     code: string;
   }): Promise<TestRun>;
   resumeRun(input: { testRunId: string }): Promise<TestRun>;
+  prepareStarterExit(input: PrepareParticipantStarterExitRequest & {
+    testRunId: string;
+  }): Promise<PrepareParticipantStarterExitResponse>;
   returnToStarter(input: {
     testRunId: string;
+    currentUnitKey?: string | null;
+    expectedStatus?: TestRun["status"];
     responseUnitKey?: string | null;
     unitResponse?: string | null;
     transientUnitResponses?: Record<string, string>;
@@ -824,6 +926,7 @@ export type ParticipantRuntimePort = {
   }): Promise<TestRun>;
   completeRun(input: {
     testRunId: string;
+    responseTimestamp?: number;
     responseUnitKey?: string | null;
     unitResponse?: string | null;
     transientUnitResponses?: Record<string, string>;
@@ -869,6 +972,7 @@ export type MonitorControlPort = {
     workspaceKey: string;
     testRunId: string;
     commandType: MonitorRunCommandType;
+    debugArguments?: string[];
     actorId?: string | null;
     targetUnitKey?: string | null;
     remainingSeconds?: number | null;
@@ -878,6 +982,7 @@ export type MonitorControlPort = {
     workspaceKey: string;
     testRunIds: string[];
     commandType: MonitorRunCommandType;
+    debugArguments?: string[];
     actorId?: string | null;
     targetUnitKey?: string | null;
     remainingSeconds?: number | null;
@@ -1099,6 +1204,7 @@ export type ApplicationSettingsPort = {
     globalWarningText?: string | null;
     globalWarningExpiresAt?: string | null;
   }): Promise<ApplicationSettings>;
+  patchOriginalApplicationSettings(input: Partial<Omit<Parameters<ApplicationSettingsPort["updateApplicationSettings"]>[0], "sessionToken">> & {sessionToken:string}): Promise<ApplicationSettings>;
   listApplicationAssets(input: {
     sessionToken: string;
   }): Promise<ApplicationAsset[]>;
@@ -1115,6 +1221,7 @@ export type ApplicationSettingsPort = {
   deleteApplicationAsset(input: {
     sessionToken: string;
     applicationAssetId: string;
+    cascadeAssignments?: boolean;
   }): Promise<ApplicationAsset>;
 };
 
@@ -1135,27 +1242,11 @@ export type FirstSlicePorts = {
   systemCheck: SystemCheckPort;
 };
 
-export class FirstSliceError extends Error {
-  readonly statusCode: number;
-  readonly errorCode: string;
-  readonly details: unknown;
-
-  constructor(
-    statusCode: number,
-    errorCode: string,
-    message: string,
-    details?: unknown
-  ) {
-    super(message);
-    this.statusCode = statusCode;
-    this.errorCode = errorCode;
-    this.details = details ?? null;
-  }
-}
 
 export const firstSliceUseCases = {
   getApplicationSettings: "GetApplicationSettings",
   updateApplicationSettings: "UpdateApplicationSettings",
+  patchOriginalApplicationSettings: "PatchOriginalApplicationSettings",
   listAttachments: "ListAttachments",
   getAttachment: "GetAttachment",
   uploadAttachmentFile: "UploadAttachmentFile",
@@ -1202,6 +1293,7 @@ export const firstSliceUseCases = {
   getSourcePackageDetail: "GetSourcePackageDetail",
   getSourcePackageDeletionReadiness: "GetSourcePackageDeletionReadiness",
   listSourcePackages: "ListSourcePackages",
+  getWorkspaceFileCatalog: "GetWorkspaceFileCatalog",
   exportSourcePackagesCsv: "ExportSourcePackagesCsv",
   createSourcePackage: "CreateSourcePackage",
   assembleSourcePackages: "AssembleSourcePackages",
@@ -1231,6 +1323,7 @@ export const firstSliceUseCases = {
   participantSignIn: "ParticipantSignIn",
   getParticipantRuntimeState: "GetParticipantRuntimeState",
   getParticipantCurrentRunState: "GetParticipantCurrentRunState",
+  getParticipantDebugState: "GetParticipantDebugState",
   participantLaunch: "ParticipantLaunch",
   resumeParticipantSession: "ResumeParticipantSession",
   saveTestRunProgress: "SaveTestRunProgress",
@@ -1280,6 +1373,8 @@ export type FirstSliceServices = FirstSlicePorts & {
 export type FirstSliceRepository = ParticipantAccessRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
+  /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
+  mutateApplicationSettings(transform: (previous: ApplicationSettings | null) => {settings:ApplicationSettings; auditEvent:AdminAuditEvent}): Promise<ApplicationSettings>;
   listApplicationAssets(): Promise<ApplicationAsset[]>;
   getApplicationAssetById(
     applicationAssetId: string
@@ -1287,8 +1382,9 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   getApplicationAssetByOriginalName(
     originalName: string
   ): Promise<ApplicationAsset | null>;
-  saveApplicationAsset(applicationAsset: ApplicationAsset): Promise<void>;
+  saveApplicationAsset(applicationAsset: ApplicationAsset, replaceByOriginalName?: boolean): Promise<{ applicationAsset: ApplicationAsset; replaced: boolean }>;
   deleteApplicationAsset(applicationAssetId: string): Promise<boolean>;
+  mutateApplicationAssetDeletion(input: import("./application-asset-mutation.js").ApplicationAssetDeletionInput): Promise<ApplicationAsset | null>;
   listAttachmentFilesByWorkspace(
     tenantId: string,
     workspaceId: string
@@ -1346,9 +1442,11 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     workspaceId: string;
     auditEvent: AdminAuditEvent;
   }): Promise<WorkspaceAggregateDeletionCounts | null>;
+  /** Omitted kinds return all scoped events; an explicit empty list returns none. */
   listWorkspaceActivityEventsByWorkspace(
     tenantId: string,
-    workspaceId: string
+    workspaceId: string,
+    eventTypes?: readonly string[]
   ): Promise<WorkspaceActivityEvent[]>;
   saveWorkspaceActivityEvent(
     activityEvent: WorkspaceActivityEvent
@@ -1363,6 +1461,12 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   reserveSourcePackageAssembly(input: {
     assembledSourcePackage: SourcePackage;
     assemblyActivityEvent: WorkspaceActivityEvent;
+    expectedWorkspaceSourcePackageReferenceRevision: string;
+  }): Promise<boolean>;
+  publishWorkspaceFiles(input: WorkspaceFilePublicationInput): Promise<boolean>;
+  reserveWorkspaceFileUpload(input: {
+    sourcePackage: SourcePackage;
+    createdActivityEvent: WorkspaceActivityEvent;
     expectedWorkspaceSourcePackageReferenceRevision: string;
   }): Promise<boolean>;
   reserveSourcePackageReplacement(input: {
@@ -1391,6 +1495,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     workspaceId: string
   ): Promise<ContentRelease[]>;
   saveContentRelease(contentRelease: ContentRelease): Promise<void>;
+  getContentReleaseActivationRevision(tenantId: string, workspaceId: string): Promise<string>;
+  commitContentReleaseActivation(input: ContentReleaseActivationCommit): Promise<boolean>;
   getParticipantSessionById(
     participantSessionId: string
   ): Promise<ParticipantSession | null>;
@@ -1399,6 +1505,14 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     workspaceId: string
   ): Promise<ParticipantSession[]>;
   saveParticipantSession(participantSession: ParticipantSession): Promise<void>;
+  /** Atomic native Login/suffix lookup and creation; validate runs before any durable effect. */
+  resolveOriginalParticipantSession(candidate: ParticipantSession, validate?: (person: Readonly<ParticipantSession>) => void): Promise<import('./original-person-identity.js').OriginalPersonResolution | null>;
+  /** First validated credential login wins; returns null if the workspace was deleted. */
+  getOrCreateOriginalParticipantGroup(input: Omit<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup, "lastModifiedAt">): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup | null>;
+  listOriginalParticipantGroupsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup[]>;
+  /** Updates one native Login association and all its linked persons atomically. */
+  bindOriginalLoginGroup(input: import('./original-login-binding.js').OriginalLoginBindingInput): Promise<import('@testcenter-rewrite-app/domain').OriginalLoginBinding | null>;
+  listOriginalLoginBindingsByWorkspace(tenantId: string, workspaceId: string): Promise<import('@testcenter-rewrite-app/domain').OriginalLoginBinding[]>;
   listParticipantRosterEntriesByWorkspace(
     tenantId: string,
     workspaceId: string
@@ -1447,10 +1561,27 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   ): Promise<TestRun | null>;
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   saveTestRun(testRun: TestRun): Promise<void>;
-  /** Reserve/reuse one exact assignment atomically; never reset an existing Run. */
+  /** Read current parent/Run and commit the pure projection, logs and activity in one write boundary. */
+  mutateParticipantRun(input: ParticipantRunMutationInput,
+    transform: (context: ParticipantRunMutationContext) => ParticipantRunMutationEffect | null
+  ): Promise<ParticipantRunMutationResult | null>;
+  appendParticipantRunCommand(command: ParticipantRunCommandInput): Promise<ParticipantRunCommand | null>;
+  listPendingParticipantRunCommands(scope: ParticipantRunCommandScope): Promise<ParticipantRunCommand[]>;
+  acknowledgeParticipantRunCommand(input: ParticipantRunCommandScope & {
+    commandId: string;
+    acknowledgedAt: string;
+  }): Promise<ParticipantRunCommand | null>;
+  /** Receipt, Run, logs, activity and optional parent status commit together. */
+  applyParticipantRunCommand(input: ParticipantRunCommandApplicationInput,
+    transform: (context: ParticipantRunCommandApplicationContext) => ParticipantRunCommandEffect
+  ): Promise<ParticipantRunCommandApplicationResult | null>;
+  /** Reserve/reuse one exact assignment; initialize a fresh Run and all its artifacts in that same write. */
   getOrCreateTestRunForAssignment(
-    candidate: TestRun
+    candidate: TestRun,
+    initialize?: ParticipantAssignmentRunInitializer
   ): Promise<{ testRun: TestRun; created: boolean }>;
+  /** Activate the current parent under the same lock as Run eligibility; preserve its other fields. */
+  activateParticipantController(input: ParticipantControllerActivationInput): Promise<ParticipantControllerActivationResult | null>;
   deleteTestRunsByIds(testRunIds: string[]): Promise<number>;
   listParticipantTestLogsByWorkspace(
     tenantId: string,
@@ -1861,7 +1992,7 @@ const normalizeAdminCustomTexts = (value: unknown): Record<string, string> => {
       "Admin custom texts must not contain more than 250 keys."
     );
   }
-  const customTexts: Record<string, string> = {};
+  const customTexts: Array<[string, string]> = [];
   let totalBytes = 0;
   for (const [rawKey, rawValue] of entries) {
     const key = rawKey.trim();
@@ -1876,10 +2007,7 @@ const normalizeAdminCustomTexts = (value: unknown): Record<string, string> => {
         `Admin custom text key '${rawKey || "missing"}' or its value is invalid.`
       );
     }
-    const text = rawValue.trim();
-    if (!text) {
-      continue;
-    }
+    const text = rawValue;
     const valueBytes = Buffer.byteLength(text, "utf8");
     totalBytes += Buffer.byteLength(key, "utf8") + valueBytes;
     if (valueBytes > 10_000 || totalBytes > 250_000) {
@@ -1889,9 +2017,9 @@ const normalizeAdminCustomTexts = (value: unknown): Record<string, string> => {
         "Admin custom texts exceed the supported size limit."
       );
     }
-    customTexts[key] = text;
+    customTexts.push([key, text]);
   }
-  return customTexts;
+  return Object.fromEntries(customTexts);
 };
 
 const normalizeAdminUserStatus = (value: unknown): AdminUserStatus => {
@@ -1936,7 +2064,7 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
     throw new FirstSliceError(
       400,
       "monitor_run_command_type_invalid",
-      "Monitor run command type must be 'pause', 'resume', 'complete', 'complete_and_lock', 'goto', 'lock_test', 'unlock_test', 'unlock_navigation', 'lock_navigation', or 'set_testlet_time'."
+      "Monitor run command type must be 'pause', 'resume', 'complete', 'complete_and_lock', 'goto', 'lock_test', 'unlock_test', 'unlock_navigation', 'lock_navigation', 'set_testlet_time', or 'debug'."
     );
   }
 
@@ -1945,11 +2073,14 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
 
 const formatOriginalMonitorCommandLogContent = (input: {
   commandType: MonitorRunCommandType;
+  debugArguments?: string[];
   targetUnitKey: string | null;
   reopenedClosedTestlet: boolean;
   remainingSeconds: number | null;
 }): string | null => {
   switch (input.commandType) {
+    case "debug":
+      return ["debug", ...input.debugArguments ?? []].join(" ");
     case "pause":
     case "resume":
       return input.commandType;
@@ -2094,6 +2225,39 @@ const normalizeOptionalParticipantDeliveryId = (
     );
   }
   return value.trim();
+};
+
+const normalizeOptionalParticipantResponseTimestamp = (value: unknown): number | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+    throw new FirstSliceError(400, "participant_response_timestamps_invalid", "responseTimestamp must be a positive safe integer when provided.");
+  }
+  return value;
+};
+
+const participantProgressPayloadSha256 = (value: unknown): string => createHash("sha256").update(
+  JSON.stringify(value, (_key, item) => item !== null && typeof item === "object" && !Array.isArray(item)
+    ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item)
+).digest("hex");
+
+const nativeCommandPayloadSha256 = (request: ParticipantNativeCommandRequest): string => participantProgressPayloadSha256({
+  kind: "participant-native-command/v1", keyword: request.keyword, arguments: request.arguments,
+  controllerStatus: request.controllerStatus, timeStamp: request.timeStamp,
+  ...(request.controllerDispatch ? { controllerDispatch: request.controllerDispatch } : {}),
+  ...(request.terminationNoop ? { terminationNoop: true } : {}),
+  ...(request.commandCompletion ? { commandCompletion: request.commandCompletion } : {})
+});
+
+const requireCommandCompletionProtocol = (value: unknown): void => {
+  if (value !== undefined && value !== "browser-v1") throw new FirstSliceError(400,
+    "participant_command_completion_invalid", "Unsupported command completion protocol.");
+};
+
+const usesBrowserControllerLifecycle = (value: unknown): boolean => {
+  if (value !== undefined && value !== "browser-v1") {
+    throw new FirstSliceError(400, "participant_controller_lifecycle_invalid", "Unsupported controller lifecycle.");
+  }
+  return value === "browser-v1";
 };
 
 const normalizeOptionalRuntimeBookletKey = (value: unknown): string | undefined => {
@@ -2633,8 +2797,9 @@ const IBM1141_ENCODING_NAMES = [
 // Node's WHATWG TextDecoder intentionally supports only the browser encoding
 // set. Original Testcenter XML is decoded by libxml/iconv and can therefore use
 // registered legacy encodings outside that set. Keep this fallback explicitly
-// allowlisted so iconv-lite's transport codecs (for example base64, hex, and
-// UTF-7) cannot become XML declaration encodings by accident.
+// allowlisted so iconv-lite's transport codecs (for example base64 and hex)
+// cannot become XML declaration encodings by accident. UTF-7 has a separate
+// strict XML-only decoder rather than iconv-lite's permissive transport path.
 const ICONV_XML_ENCODING_NAMES = new Map<string, string>([
   ["iso-8859-10", "iso-8859-10"],
   ["iso-ir-157", "iso-8859-10"],
@@ -2727,6 +2892,10 @@ const decodeSourceTextBytesWithDeclaredEncoding = (
   declaredEncoding: string
 ): string | null => {
   const normalizedEncoding = normalizeSourceTextEncodingName(declaredEncoding);
+  if (isUtf7XmlEncoding(normalizedEncoding)) {
+    const decoded = decodeUtf7XmlBytes(bytes);
+    return decoded === null ? null : stripTextByteOrderMark(decoded);
+  }
   if (
     ["iso-8859-1", "iso8859-1", "latin1", "latin-1"].includes(
       normalizedEncoding
@@ -2846,10 +3015,13 @@ const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
     }
   }
 
-  const declaredEncoding =
-    readDeclaredXmlEncoding(bytes.subarray(0, 1024).toString("latin1")) ??
+  const declarationProbe = bytes.subarray(0, 1024).toString("latin1");
+  const declaredXmlEncoding = readDeclaredXmlEncoding(declarationProbe);
+  const declaredEncoding = declaredXmlEncoding ??
     mediaType?.match(/;\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
-  if (declaredEncoding) {
+  if (declaredEncoding &&
+      (!isUtf7XmlEncoding(normalizeSourceTextEncodingName(declaredEncoding)) ||
+       (declaredXmlEncoding && /^\s*<\?xml\b/i.test(declarationProbe)))) {
     const decodedSourceDocument = decodeSourceTextBytesWithDeclaredEncoding(
       bytes,
       declaredEncoding
@@ -3869,17 +4041,7 @@ const readStandaloneTestcenterFileIdentity = (
 
 const inferVeronaPlayerResourceIdFromFileName = (
   fileName: string
-): string | null => {
-  const baseName = fileName.split(/[\\/]/).at(-1) ?? fileName;
-  const stem = baseName.replace(/\.html?$/i, "");
-  const versionedName = stem.match(
-    /^(.+?)[@-](\d+)\.(\d+)(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/
-  );
-  if (!versionedName?.[1]) {
-    return null;
-  }
-  return `${versionedName[1]}-${Number.parseInt(versionedName[2] ?? "", 10)}.${Number.parseInt(versionedName[3] ?? "", 10)}`;
-};
+): string | null => normalizeWorkspacePlayerResourceId(fileName);
 
 const readVeronaPlayerResourceId = (
   playerHtml: string,
@@ -5351,7 +5513,7 @@ const normalizeApplicationCustomTexts = (
       `Application custom texts must not contain more than ${MAX_APPLICATION_CUSTOM_TEXT_COUNT} keys.`
     );
   }
-  const customTexts: Record<string, string> = {};
+  const customTexts: Array<[string, string]> = [];
   let totalBytes = 0;
   for (const [rawKey, rawValue] of entries) {
     const key = rawKey.trim();
@@ -5366,10 +5528,7 @@ const normalizeApplicationCustomTexts = (
         `Application custom text key '${rawKey || "missing"}' or its value is invalid.`
       );
     }
-    const text = rawValue.trim();
-    if (!text) {
-      continue;
-    }
+    const text = rawValue;
     const valueBytes = Buffer.byteLength(text, "utf8");
     totalBytes += Buffer.byteLength(key, "utf8") + valueBytes;
     if (
@@ -5382,9 +5541,9 @@ const normalizeApplicationCustomTexts = (
         "Application custom texts exceed the supported size limit."
       );
     }
-    customTexts[key] = text;
+    customTexts.push([key, text]);
   }
-  return customTexts;
+  return Object.fromEntries(customTexts);
 };
 
 const normalizeGlobalWarningText = (value: unknown): string | null => {
@@ -5944,31 +6103,6 @@ const buildParticipantRuntimeBooklets = (input: {
   });
 };
 
-const resolveParticipantSessionStatusAfterCompletion = async (
-  repository: FirstSliceRepository,
-  participantSession: ParticipantSession
-): Promise<ParticipantSessionStatus> => {
-  const [contentRelease, participantRosterEntry, testRuns] = await Promise.all([
-    requireContentRelease(repository, participantSession.contentReleaseId),
-    findParticipantRosterEntryByLoginKey(
-      repository,
-      participantSession.tenantId,
-      participantSession.workspaceId,
-      participantSession.loginKey
-    ),
-    repository.listTestRunsByParticipantSessionId(
-      participantSession.participantSessionId
-    )
-  ]);
-  const hasUnfinishedBooklet = buildParticipantRuntimeBooklets({
-    contentRelease,
-    participantRosterEntry,
-    participantCode: participantSession.participantCode,
-    testRuns: testRuns.map(normalizeTestRun)
-  }).some(booklet => booklet.status !== "completed");
-  return hasUnfinishedBooklet ? "signed_in" : "closed";
-};
-
 const buildParticipantRosterReadItems = (
   entries: ParticipantRosterEntry[],
   activeContentRelease: ContentRelease | undefined
@@ -6380,7 +6514,9 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
   workspaceId: string;
   activeContentRelease: ContentRelease;
   timestamp: string;
+  resolveRelease?: (release: ContentRelease) => Promise<ContentRelease>;
 }): Promise<OpenMonitorRun[]> => {
+  const activeContentRelease = input.resolveRelease ? await input.resolveRelease(input.activeContentRelease) : input.activeContentRelease;
   const [
     participantSessions,
     participantRosterEntries,
@@ -6406,7 +6542,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
       .filter(
         participantSession =>
           participantSession.contentReleaseId ===
-          input.activeContentRelease.contentReleaseId
+          activeContentRelease.contentReleaseId
       )
       .map(participantSession => participantSession.participantSessionId)
   );
@@ -6426,18 +6562,18 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
     .map(testRun => {
       const normalizedTestRun = normalizeTestRun(testRun);
       const bookletError = resolveOpenMonitorBookletError(
-        input.activeContentRelease,
+        activeContentRelease,
         normalizedTestRun
       );
       const testletTimers = bookletError
         ? []
         : buildMonitorTestletTimers(
-            input.activeContentRelease,
+            activeContentRelease,
             normalizedTestRun,
             input.timestamp
           );
       const location = resolveOpenMonitorRunLocation(
-        input.activeContentRelease,
+        activeContentRelease,
         normalizedTestRun,
         testletTimers
       );
@@ -6915,6 +7051,7 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
       ) {
         return [];
       }
+      const legacyPreparation = retainedLegacyTimerPreparation(testRun, timer);
       return [
         [
           normalizedTestletKey,
@@ -6928,7 +7065,10 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
             startedAt: timer.startedAt || testRun.createdAt,
             expiresAt: timer.expiresAt ?? null,
             updatedAt: timer.updatedAt || testRun.updatedAt,
-            endedAt: timer.endedAt ?? null
+            endedAt: timer.endedAt ?? null,
+            ...(status === "paused" && timer.interruptedAtUnitKey
+              ? {interruptedAtUnitKey: timer.interruptedAtUnitKey} : {}),
+            ...(legacyPreparation ? { legacyPreparation } : {})
           }
         ]
       ];
@@ -8573,13 +8713,16 @@ const hasValidXmlByteSequence = (
   if (["utf-32be", "utf32be"].includes(effectiveEncoding)) {
     return isValidUtf32ByteSequence(encodedBytes, "big-endian");
   }
-  if (
-    isSupportedEbcdicEncodingName(effectiveEncoding) ||
-    ICONV_XML_ENCODING_NAMES.has(effectiveEncoding)
-  ) {
-    // Every currently allowlisted iconv fallback is a complete single-byte
-    // code page, so each possible byte has a defined character mapping.
+  if (isSupportedEbcdicEncodingName(effectiveEncoding)) {
     return true;
+  }
+  if (isUtf7XmlEncoding(effectiveEncoding)) {
+    return decodeUtf7XmlBytes(encodedBytes) !== null;
+  }
+  if (ICONV_XML_ENCODING_NAMES.has(effectiveEncoding)) {
+    // These single-byte pages cannot encode an authored U+FFFD. Some have
+    // undefined bytes that iconv substitutes with it; reject before parsing.
+    return !decodedSourceDocument.includes("\uFFFD");
   }
 
   try {
@@ -8614,7 +8757,10 @@ const validateXmlEncoding = (
         ];
   }
 
-  if (!isSupportedSourceTextEncoding(declaredEncoding)) {
+  if (!isSupportedSourceTextEncoding(declaredEncoding) ||
+      (isUtf7XmlEncoding(normalizeSourceTextEncodingName(declaredEncoding)) &&
+       (!readDeclaredXmlEncoding(decodedSourceDocument) ||
+        !/^\s*<\?xml\b/i.test(decodedSourceDocument)))) {
     return [
       createImportDiagnostic(
         "source_document_xml_encoding_unsupported",
@@ -8893,7 +9039,7 @@ const normalizeContentStructure = (
       downloadSpeed: normalizeSpeed(entry.downloadSpeed),
       customTexts: Object.fromEntries(
         Object.entries(entry.customTexts ?? {})
-          .map(([key, value]) => [key.trim(), String(value).trim()] as const)
+          .map(([key, value]) => [key.trim(), String(value)] as const)
           .filter(([key]) => Boolean(key))
       ),
       questions
@@ -8936,8 +9082,8 @@ const normalizeContentStructure = (
       };
     const customTexts = Object.fromEntries(
       Object.entries(bookletEntry.customTexts ?? {})
-        .map(([key, value]) => [key.trim(), String(value).trim()] as const)
-        .filter(([key, value]) => Boolean(key && value))
+        .map(([key, value]) => [key.trim(), String(value)] as const)
+        .filter(([key]) => Boolean(key))
     );
     if (Object.keys(customTexts).length > 0) {
       normalizedBooklet.customTexts = {
@@ -9527,7 +9673,7 @@ const normalizeParsedJsonContentStructure = (
     return Object.fromEntries(
       Object.entries(record).flatMap(([key, entryValue]) =>
         typeof entryValue === "string" && key.trim()
-          ? [[key.trim(), entryValue.trim()] as const]
+          ? [[key.trim(), entryValue] as const]
           : []
       )
     );
@@ -10856,10 +11002,16 @@ const validateTestcenterBookletCondition = (
   return diagnostics;
 };
 
+// Raw-byte validation diagnoses decoder substitutions first. An authored
+// U+FFFD is valid XML; xmldom's heuristic warning does not make it malformed.
+const isXmlReplacementCharacterWarning = (level: string, message: string): boolean =>
+  level === "warning" && message === "Unicode replacement character detected, source encoding issues?";
+
 const validateTestcenterXmlSourceDocument = (
   sourceDocument: string,
   sourceFileName: string,
-  context: XmlValidationContext
+  context: XmlValidationContext,
+  allowPackageManifest = false
 ): ImportJobDiagnostic[] => {
   if (/<!DOCTYPE\b/i.test(sourceDocument)) {
     return [
@@ -10875,7 +11027,9 @@ const validateTestcenterXmlSourceDocument = (
   try {
     document = new DOMParser({
       onError(level, message) {
-        parserErrors.push(`${level}: ${message}`);
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(`${level}: ${message}`);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch (error) {
@@ -10900,6 +11054,9 @@ const validateTestcenterXmlSourceDocument = (
     candidate => candidate.toLowerCase() === rootName.toLowerCase()
   );
   if (!canonicalRootName) {
+    // A selected, well-formed resource manifest has its own graph validation.
+    // DOCTYPE and malformed XML have already been rejected above.
+    if (allowPackageManifest && rootName === "manifest") return [];
     return context.profile === "original-19"
       ? [createImportDiagnostic("testcenter_xml_root_invalid",
           "Original Testcenter XML requires Booklet, Unit, Testtakers or SysCheck as its root element.")]
@@ -14386,7 +14543,7 @@ const collectXmlBookletHierarchies = (
         : []
       ).flatMap(customText => {
         const key = customText.getAttribute("key")?.trim() ?? "";
-        return key ? [[key, xmlElementText(customText).trim()] as const] : [];
+        return key ? [[key, String(customText.textContent ?? "")] as const] : [];
       })
     );
     const testletEntries: SourcePackageTestletEntry[] = [];
@@ -15063,7 +15220,7 @@ const parseSystemCheckSourceDocument = (
   const customTexts = Object.fromEntries(
     (config ? xmlChildrenNamed(config, "CustomText") : []).flatMap(element => {
       const key = readAttribute(element, "key");
-      return key ? [[key, xmlElementText(element)]] : [];
+      return key ? [[key, String(element.textContent ?? "")]] : [];
     })
   );
   const unitKey = readAttribute(config, "unit");
@@ -15812,7 +15969,7 @@ type OriginalResponseReportRow = {
     ts: number;
     responseType: string;
   }>;
-  laststate: string;
+  laststate: string | null;
 };
 
 type OriginalLogReportRow = {
@@ -15883,6 +16040,8 @@ const buildOriginalResponseReportRows = (input: {
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
+  reviews: WorkspaceReview[];
+  activityEvents: WorkspaceActivityEvent[];
   groupKeys: string[];
 }): OriginalResponseReportRow[] => {
   const sessionsById = new Map(
@@ -15892,6 +16051,7 @@ const buildOriginalResponseReportRows = (input: {
     input.contentReleases.map(release => [release.contentReleaseId, release])
   );
   const groupKeys = new Set(input.groupKeys);
+  const savedUnits = selectOriginalSavedUnitKeys(input);
 
   return input.testRuns
     .flatMap(rawTestRun => {
@@ -15902,21 +16062,22 @@ const buildOriginalResponseReportRows = (input: {
       }
       const responseTimestamp = Date.parse(testRun.updatedAt);
       const timestamp = Number.isFinite(responseTimestamp) ? responseTimestamp : 0;
-      return Object.entries(testRun.unitResponses).map(([unitKey, response]) => {
+      return [...(savedUnits.get(testRun.testRunId) ?? [])].map(unitKey => {
+        const response = Object.hasOwn(testRun.unitResponses, unitKey) ? testRun.unitResponses[unitKey] : undefined;
         const unit = resolveOriginalReportUnit({
           contentReleasesById,
           testRun,
           unitKey
         });
-        const veronaResponse = parseVeronaUnitResponse(response);
+        const veronaResponse = response === undefined ? null : parseVeronaUnitResponse(response);
         const responseType = String(
           veronaResponse?.unitState.unitStateDataType ?? ""
         );
-        const responses = veronaResponse?.unitState.dataParts
-          ? Object.entries(veronaResponse.unitState.dataParts).map(
+        const responses = veronaResponse
+          ? Object.entries(veronaResponse.unitState.dataParts ?? {}).map(
               ([id, content]) => ({ id, content, ts: timestamp, responseType })
             )
-          : [{ id: "all", content: response, ts: timestamp, responseType: "" }];
+          : response === undefined ? [] : [{ id: "all", content: response, ts: timestamp, responseType: "" }];
         const lastState = veronaResponse
           ? Object.fromEntries(
               Object.entries(veronaResponse.unitState).filter(
@@ -15935,7 +16096,7 @@ const buildOriginalResponseReportRows = (input: {
           laststate:
             lastState && Object.keys(lastState).length > 0
               ? JSON.stringify(lastState)
-              : ""
+              : response === undefined ? null : ""
         };
       });
     })
@@ -16112,11 +16273,12 @@ const createOriginalResultArchive = (input: {
   testRuns: TestRun[];
   reviews: WorkspaceReview[];
   testLogs: ParticipantTestLog[];
+  activityEvents: WorkspaceActivityEvent[];
   contentReleases: ContentRelease[];
 }): WorkspaceOriginalResultArchive => {
-  const responseRows = buildOriginalResponseReportRows(input);
-  const logRows = buildOriginalLogReportRows(input);
-  const reviewReport = buildOriginalReviewReportRows(input);
+  const responseRows = input.groupKeys.length ? buildOriginalResponseReportRows(input) : [];
+  const logRows = input.groupKeys.length ? buildOriginalLogReportRows(input) : [];
+  const reviewReport = input.groupKeys.length ? buildOriginalReviewReportRows(input) : { rows: [], categoryColumns: [] };
   const counts = {
     responses: responseRows.length,
     logs: logRows.length,
@@ -16428,8 +16590,10 @@ const collectLooseSourcePackageDependencyReferences = (
   let document: XmlDocument | null = null;
   try {
     document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch {
@@ -16462,7 +16626,8 @@ const collectLooseSourcePackageDependencyReferences = (
     const definition =
       xmlChildrenNamed(root, "DefinitionRef")[0] ??
       xmlChildrenNamed(root, "Definition")[0];
-    addReference(definition?.getAttribute("player"));
+    const playerReference = definition?.getAttribute("player");
+    addReference(playerReference ? normalizeWorkspacePlayerResourceId(playerReference) ?? playerReference : null);
     if (definition && xmlElementLocalName(definition) === "DefinitionRef") {
       addReference(
         ["href", "path", "src", "uri", "file", "fileName", "filename"]
@@ -17026,7 +17191,7 @@ const collectWorkspaceSourcePackageReferences = (input: {
       }
       resolution = resolveWorkspaceDependencySourcePackages({
         rootSourcePackage,
-        workspaceSourcePackages: looseSourcePackages
+        workspaceSourcePackages: activeRootSourcePackages
       });
     } catch {
       continue;
@@ -17989,8 +18154,10 @@ const extractDeclaredTestcenterUnitCrossReferences = (
   let document: XmlDocument | null = null;
   try {
     document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch {
@@ -18213,7 +18380,7 @@ const findZipUnitPlayerEntry = (
   playerKey: string,
   manifestResources: Map<string, XmlManifestResource>
 ): ZipEntry | null => {
-  return (
+  const exact = (
     findZipUnitReferencedEntry(
       manifestExtraction,
       unitEntry,
@@ -18227,6 +18394,13 @@ const findZipUnitPlayerEntry = (
       manifestResources
     )
   );
+  if (exact) return exact;
+  const normalized = normalizeWorkspacePlayerResourceId(playerKey);
+  if (!normalized || normalized === playerKey) return null;
+  // Source identifies stored Players by module + major/minor. Use that same
+  // identifier for ZIP hydration and metadata validation, after exact aliases.
+  return findZipUnitReferencedEntry(manifestExtraction, unitEntry, normalized, manifestResources) ??
+    findZipUnitReferencedEntry(manifestExtraction, unitEntry, `${normalized}.html`, manifestResources);
 };
 
 const extractZipUnitDescription = (sourceDocument: string): string | null => {
@@ -18250,8 +18424,10 @@ const extractZipUnitAttachmentRequests = (
   let document: XmlDocument | null = null;
   try {
     document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch {
@@ -18286,8 +18462,10 @@ const parseStandaloneZipUnitEntry = (
   let document: XmlDocument | null = null;
   try {
     document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch {
@@ -18878,8 +19056,10 @@ const parseTestcenterXmlRoot = (sourceDocument: string): XmlElement | null => {
   const parserErrors: string[] = [];
   try {
     const document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
     return parserErrors.length === 0 ? document?.documentElement ?? null : null;
@@ -19309,7 +19489,8 @@ const validateZipXmlEntries = (
       continue;
     }
     diagnostics.push(
-      ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName, context)
+      ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName, context,
+        zipEntryPathIdentity(entry.fileName) === zipEntryPathIdentity(manifestExtraction.manifestFileName))
     );
     const xmlFileIdentity = readTestcenterXmlFileIdentity(sourceDocument);
     let hasDuplicateXmlIdentity = false;
@@ -20635,419 +20816,6 @@ const resolveRuntimeBooklet = (
   };
 };
 
-type AdaptiveResponseVariable = {
-  id: string;
-  status: string;
-  value: unknown;
-  code?: number;
-  score?: number;
-};
-
-const adaptiveStatusOrder = [
-  "UNSET",
-  "NOT_REACHED",
-  "DISPLAYED",
-  "VALUE_CHANGED",
-  "SOURCE_MISSING",
-  "DERIVE_ERROR",
-  "VALUE_DERIVED",
-  "NO_CODING",
-  "INVALID",
-  "CODING_INCOMPLETE",
-  "CODING_ERROR",
-  "CODING_COMPLETE"
-];
-
-// Keep adaptive routing on the same IQB response generation as the current
-// Original Testcenter. Its response-type match is case-sensitive and its
-// package-level compatibility range is min=1/max=1; other generations remain
-// available to the Player for persistence/restoration but must not affect
-// Booklet State selection.
-const adaptiveIqbStandardResponseMajorMin = 1;
-const adaptiveIqbStandardResponseMajorMax = 1;
-
-const adaptiveValueAsNumber = (value: unknown): number => {
-  const truncate = (numberValue: number): number =>
-    Math.floor(numberValue * 1_000_000) / 1_000_000;
-  if (value === undefined || value === null) {
-    return 0;
-  }
-  if (typeof value === "boolean") {
-    return value ? 1 : 0;
-  }
-  if (Array.isArray(value)) {
-    return value.length;
-  }
-  return truncate(Number(value));
-};
-
-const adaptiveValueAsComparable = (value: unknown): unknown => {
-  // Match IqbVariableUtil.variableValueAsComparable at runtime, including its
-  // deliberately shallow handling of malformed Player values. The Original
-  // converts nullish values and arrays/booleans, but leaves every other value
-  // untouched; coercing an object to an empty string could otherwise activate
-  // an authored `Value equal=""` route.
-  if (value == null) {
-    return "null";
-  }
-  if (Array.isArray(value)) {
-    return JSON.stringify([...value].sort());
-  }
-  if (typeof value === "boolean") {
-    return value ? "true" : "false";
-  }
-  return value;
-};
-
-const collectAdaptiveVariableKeys = (
-  booklet: ContentReleaseBookletEntry
-): Map<string, Set<string>> => {
-  const variableKeysByUnitKey = new Map<string, Set<string>>();
-  const registerVariable = (source: BookletStateVariableSource): void => {
-    const variableKeys = variableKeysByUnitKey.get(source.unitKey) ?? new Set();
-    variableKeys.add(source.variableKey);
-    variableKeysByUnitKey.set(source.unitKey, variableKeys);
-  };
-  const registerCondition = (condition: BookletStateCondition): void => {
-    const source = condition.source;
-    if (
-      source.type === "Code" ||
-      source.type === "Value" ||
-      source.type === "Status" ||
-      source.type === "Score"
-    ) {
-      registerVariable(source);
-    } else if (source.type === "Count") {
-      source.conditions.forEach(registerCondition);
-    } else if ("sources" in source) {
-      source.sources.forEach(registerVariable);
-    }
-  };
-  booklet.stateEntries?.forEach(state =>
-    state.options.forEach(option => option.conditions.forEach(registerCondition))
-  );
-  return variableKeysByUnitKey;
-};
-
-const resolveAdaptiveVariables = (
-  booklet: ContentReleaseBookletEntry,
-  testRun: TestRun
-): Map<string, Map<string, AdaptiveResponseVariable>> => {
-  const trackedVariablesByUnitKey = collectAdaptiveVariableKeys(booklet);
-  for (const unitEntry of booklet.unitEntries) {
-    const trackedVariableKeys = trackedVariablesByUnitKey.get(unitEntry.unitKey);
-    if (!unitEntry.codingScheme || !trackedVariableKeys?.size) {
-      continue;
-    }
-    try {
-      const variableCodings = new CodingScheme(
-        unitEntry.codingScheme
-      ).variableCodings;
-      for (const baseVariableKey of CodingSchemeFactory.getBaseVarsList(
-        [...trackedVariableKeys],
-        variableCodings
-      )) {
-        trackedVariableKeys.add(baseVariableKey);
-      }
-    } catch {
-      // Import validation rejects invalid schemes. Keep the condition variables
-      // usable for staged legacy data if an older snapshot still contains one.
-    }
-  }
-  const variablesByUnitKey = new Map(
-    [...trackedVariablesByUnitKey].map(([unitKey, variableKeys]) => [
-      unitKey,
-      new Map(
-        [...variableKeys].map(variableKey => [
-          variableKey,
-          {
-            id: variableKey,
-            status: "UNSET",
-            value: null
-          } satisfies AdaptiveResponseVariable
-        ])
-      )
-    ])
-  );
-  const suppliedResponsesByUnitKey = new Map<string, IqbResponse[]>();
-  for (const [unitKey, response] of Object.entries(testRun.unitResponses)) {
-    const parsedResponse = parseVeronaUnitResponse(response);
-    const iqbStandardVersionMatch =
-      parsedResponse?.unitState.unitStateDataType?.match(
-        /iqb-standard@(\d+)/
-      );
-    const iqbStandardMajor = Number(iqbStandardVersionMatch?.[1]);
-    if (
-      !parsedResponse ||
-      !iqbStandardVersionMatch ||
-      iqbStandardMajor < adaptiveIqbStandardResponseMajorMin ||
-      iqbStandardMajor > adaptiveIqbStandardResponseMajorMax
-    ) {
-      continue;
-    }
-    const variables = variablesByUnitKey.get(unitKey) ?? new Map();
-    const suppliedResponses = suppliedResponsesByUnitKey.get(unitKey) ?? [];
-    for (const dataPart of Object.values(
-      parsedResponse.unitState.dataParts ?? {}
-    )) {
-      try {
-        const values = JSON.parse(dataPart);
-        if (!Array.isArray(values)) {
-          continue;
-        }
-        for (const value of values) {
-          if (
-            typeof value !== "object" ||
-            value === null ||
-            typeof value.id !== "string" ||
-            typeof value.status !== "string" ||
-            !("value" in value)
-          ) {
-            continue;
-          }
-          if (!trackedVariablesByUnitKey.get(unitKey)?.has(value.id)) {
-            continue;
-          }
-          // Original Testcenter tracks adaptive responses by variable ID, not by
-          // subform. Preserve its data-part order: a later repeated ID replaces
-          // the earlier subform value before server-side coding and routing.
-          const suppliedResponse = {
-            id: value.id,
-            status: value.status as IqbResponse["status"],
-            value: value.value as IqbResponse["value"],
-            ...(typeof value.subform === "string"
-              ? { subform: value.subform }
-              : {}),
-            ...(typeof value.code === "number" ? { code: value.code } : {}),
-            ...(typeof value.score === "number" ? { score: value.score } : {})
-          } satisfies IqbResponse;
-          suppliedResponses.push(suppliedResponse);
-          variables.set(value.id, {
-            id: suppliedResponse.id,
-            status: suppliedResponse.status,
-            value: suppliedResponse.value,
-            ...(suppliedResponse.code === undefined
-              ? {}
-              : { code: suppliedResponse.code }),
-            ...(suppliedResponse.score === undefined
-              ? {}
-              : { score: suppliedResponse.score })
-          });
-        }
-      } catch {
-        // Invalid data parts remain persisted for player restoration, but cannot
-        // participate in server-side adaptive decisions.
-      }
-    }
-    variablesByUnitKey.set(unitKey, variables);
-    suppliedResponsesByUnitKey.set(unitKey, suppliedResponses);
-  }
-
-  for (const unitEntry of booklet.unitEntries) {
-    const trackedVariableKeys = trackedVariablesByUnitKey.get(unitEntry.unitKey);
-    if (!unitEntry.codingScheme || !trackedVariableKeys?.size) {
-      continue;
-    }
-    const variables = variablesByUnitKey.get(unitEntry.unitKey) ?? new Map();
-    try {
-      const variableCodings = new CodingScheme(
-        unitEntry.codingScheme
-      ).variableCodings;
-      const baseVariableKeys = CodingSchemeFactory.getBaseVarsList(
-        [...trackedVariableKeys],
-        variableCodings
-      );
-      const baseVariableKeySet = new Set(baseVariableKeys);
-      const suppliedResponses =
-        suppliedResponsesByUnitKey.get(unitEntry.unitKey) ?? [];
-      const suppliedBaseResponses = suppliedResponses.filter(response =>
-        baseVariableKeySet.has(response.id)
-      );
-      const suppliedBaseVariableKeys = new Set(
-        suppliedBaseResponses.map(response => response.id)
-      );
-      // Keep every ordered subform response for the IQB coding engine. The
-      // adaptive read model remains ID-only and is populated from the coded
-      // output below in its original last-write-wins order.
-      const baseResponses = [
-        ...suppliedBaseResponses,
-        ...baseVariableKeys
-          .filter(variableKey => !suppliedBaseVariableKeys.has(variableKey))
-          .map(
-            variableKey =>
-              ({
-                id: variableKey,
-                status: "UNSET",
-                value: null
-              }) satisfies IqbResponse
-          )
-      ];
-      // The current Original feeds only tracked base variables into the coder.
-      // Player-supplied derived values remain persisted for restoration but
-      // cannot override server-side derivation or adaptive routing.
-      for (const codedVariable of CodingSchemeFactory.code(
-        baseResponses,
-        variableCodings
-      )) {
-        if (!trackedVariableKeys.has(codedVariable.id)) {
-          continue;
-        }
-        variables.set(codedVariable.id, {
-          id: codedVariable.id,
-          status: codedVariable.status,
-          value: codedVariable.value,
-          ...(codedVariable.code === undefined
-            ? {}
-            : { code: codedVariable.code }),
-          ...(codedVariable.score === undefined
-            ? {}
-            : { score: codedVariable.score })
-        });
-      }
-      variablesByUnitKey.set(unitEntry.unitKey, variables);
-    } catch {
-      // Keep the player's raw variables available when a staged legacy scheme
-      // cannot code an individual response payload.
-    }
-  }
-  return variablesByUnitKey;
-};
-
-const evaluateAdaptiveStates = (
-  booklet: ContentReleaseBookletEntry | undefined,
-  testRun: TestRun
-): ParticipantCurrentRunState["adaptiveStates"] => {
-  if (!booklet?.stateEntries?.length) {
-    return [];
-  }
-  const variablesByUnitKey = resolveAdaptiveVariables(booklet, testRun);
-  const readVariable = (
-    source: BookletStateVariableSource
-  ): AdaptiveResponseVariable | undefined =>
-    variablesByUnitKey.get(source.unitKey)?.get(source.variableKey);
-  const sourceAsNumber = (source: BookletStateVariableSource): number => {
-    const variable = readVariable(source);
-    if (!variable) {
-      return Number.NaN;
-    }
-    switch (source.type) {
-      case "Code":
-        return variable.code ?? adaptiveValueAsNumber(source.defaultValue);
-      case "Value":
-        return adaptiveValueAsNumber(variable.value);
-      case "Status":
-        return Math.max(adaptiveStatusOrder.indexOf(variable.status), 0);
-      case "Score":
-        return variable.score ?? adaptiveValueAsNumber(source.defaultValue);
-    }
-  };
-  const conditionSatisfied = (condition: BookletStateCondition): boolean => {
-    const source = condition.source;
-    let value: unknown;
-    if (
-      source.type === "Code" ||
-      source.type === "Value" ||
-      source.type === "Status" ||
-      source.type === "Score"
-    ) {
-      const variable = readVariable(source);
-      if (!variable) {
-        return false;
-      }
-      if (condition.expression.type === "greaterThan" ||
-          condition.expression.type === "lowerThan") {
-        value = sourceAsNumber(source);
-      } else if (source.type === "Code") {
-        value = variable.code ?? adaptiveValueAsNumber(source.defaultValue);
-      } else if (source.type === "Value") {
-        value = adaptiveValueAsComparable(variable.value);
-      } else if (source.type === "Status") {
-        value = variable.status ??
-          adaptiveStatusOrder.find(status => status === source.defaultValue) ??
-          "UNSET";
-      } else {
-        value = variable.score ?? adaptiveValueAsNumber(source.defaultValue);
-      }
-    } else if (source.type === "Count") {
-      value = source.conditions.filter(conditionSatisfied).length;
-    } else {
-      const aggregation = source as Extract<
-        BookletStateCondition["source"],
-        { type: "Sum" | "Median" | "Mean" }
-      >;
-      const values = aggregation.sources.map(sourceAsNumber);
-      if (aggregation.type === "Sum") {
-        value = values.reduce((sum: number, item: number) => sum + item, 0);
-      } else if (aggregation.type === "Mean") {
-        value = values.length > 0
-          // Preserve the Original aggregator's evaluation order. Dividing each
-          // summand before adding can differ from dividing the final sum at the
-          // six-decimal truncation boundary used by adaptive comparisons.
-          ? values.reduce(
-              (mean: number, item: number) => mean + item / values.length,
-              0
-            )
-          : Number.NaN;
-      } else {
-        const sorted = [...values].sort((left, right) => left - right);
-        const middle = Math.floor(sorted.length / 2);
-        value = sorted.length === 0
-          ? Number.NaN
-          : sorted.length % 2 === 0
-            ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
-            : sorted[middle] ?? Number.NaN;
-      }
-    }
-    let expected: string | number = condition.expression.value;
-    if (typeof value === "number") {
-      value = adaptiveValueAsNumber(value);
-      expected = adaptiveValueAsNumber(expected);
-    }
-    switch (condition.expression.type) {
-      case "equal":
-        return value === expected ||
-          (typeof value === "number" &&
-            typeof expected === "number" &&
-            Number.isNaN(value) &&
-            Number.isNaN(expected));
-      case "notEqual":
-        return value !== expected;
-      case "greaterThan":
-        return adaptiveValueAsNumber(value) > adaptiveValueAsNumber(expected);
-      case "lowerThan":
-        return adaptiveValueAsNumber(value) < adaptiveValueAsNumber(expected);
-    }
-  };
-
-  return booklet.stateEntries.map(state => {
-    const selected = state.options.find(option =>
-      option.conditions.every(conditionSatisfied)
-    ) ?? state.options.at(-1)!;
-    const presetOptionKey = testRun.presetBookletStates?.[state.stateKey];
-    const presetOption = presetOptionKey
-      ? state.options.find(option => option.optionKey === presetOptionKey)
-      : undefined;
-    const overrideOptionKey = testRun.bookletStateOverrides?.[state.stateKey];
-    const overrideOption = overrideOptionKey
-      ? state.options.find(option => option.optionKey === overrideOptionKey)
-      : undefined;
-    const effectiveOption = overrideOption ?? presetOption ?? selected;
-    return {
-      stateKey: state.stateKey,
-      displayLabel: state.displayLabel,
-      optionKey: effectiveOption.optionKey,
-      optionLabel: effectiveOption.displayLabel,
-      automaticOptionKey: selected.optionKey,
-      automaticOptionLabel: selected.displayLabel,
-      overrideOptionKey: overrideOption?.optionKey ?? null,
-      options: state.options.map(option => ({
-        optionKey: option.optionKey,
-        displayLabel: option.displayLabel
-      }))
-    };
-  });
-};
-
 const resolveAdaptiveStates = (
   booklet: ContentReleaseBookletEntry | undefined,
   testRun: TestRun
@@ -21157,7 +20925,9 @@ const resetNonSavingTestRunForEntry = (input: {
     locked: false,
     currentUnitKey: null,
     unitResponses: {},
+    ...(input.testRun.unitResponseFieldTimestamps ? { unitResponseFieldTimestamps: {} } : {}),
     sharedParameters: [],
+    ...(input.testRun.sharedParameterTimestamps ? { sharedParameterTimestamps: {} } : {}),
     unlockedTestletKeys: [],
     monitorNavigationUnlocked: false,
     testletTimers: {},
@@ -21447,6 +21217,49 @@ const getTestletTimerRemainingSeconds = (
   return Math.max(0, Math.ceil((expiresAtMs - timestampMs) / 1_000));
 };
 
+const participantControllerTestletLocks = (booklet: ContentReleaseBookletEntry, run: TestRun, key: string, timestamp: string,
+  states: Map<string, string>) => {
+  const restrictions = resolveBookletTestletEntry(booklet, key)?.restrictions;
+  const timer = run.testletTimers?.[key];
+  const interruptedZero = timer?.status === "paused" && timer.remainingSeconds === 0 && Boolean(timer.interruptedAtUnitKey) && timer.endedAt == null;
+  return {
+    show: Boolean(restrictions?.show && states.get(restrictions.show.stateKey) !== restrictions.show.optionKey),
+    time: Boolean(restrictions?.timeMax && timer && resolveParticipantExecutionMode(run.executionMode).forceTimeRestrictions &&
+      (["expired", "cancelled"].includes(timer.status) || !interruptedZero && getTestletTimerRemainingSeconds(timer, timestamp) <= 0)),
+    code: Boolean(restrictions?.codeToEnter?.code && !run.unlockedTestletKeys?.includes(key)),
+    afterLeave: Boolean(restrictions?.lockAfterLeaving && run.lockedTestletKeys?.includes(key))
+  };
+};
+
+const participantCurrentUnitParentLocked = (booklet: ContentReleaseBookletEntry | undefined, run: TestRun, timestamp = run.updatedAt): boolean => {
+  const unit = booklet?.unitEntries.find(entry => entry.unitKey === run.currentUnitKey);
+  if (!booklet || !unit) return false;
+  const states = new Map(evaluateAdaptiveStates(booklet, run).map(state => [state.stateKey, state.optionKey]));
+  return [originalBookletRootTestletKey, ...(unit.testletPath ?? [])].some(key => {
+    return Object.values(participantControllerTestletLocks(booklet, run, key, timestamp, states)).some(Boolean);
+  });
+};
+
+const participantControllerUnitAccessible = (booklet: ContentReleaseBookletEntry, run: TestRun,
+  unit: ContentReleaseBookletEntry["unitEntries"][number], timestamp: string, states: Map<string, string>): boolean => {
+  if (run.lockedUnitKeys?.includes(unit.unitKey)) return false;
+  const locks = (key: string) => participantControllerTestletLocks(booklet, run, key, timestamp, states);
+  const cause = [originalBookletRootTestletKey, ...(unit.testletPath ?? [])]
+    .flatMap(key => Object.entries(locks(key)).map(([by, active]) => ({ by, active }))).find(value => value.active);
+  if (!cause) return true;
+  const parentKey = unit.testletPath?.at(-1) ?? originalBookletRootTestletKey, own = locks(parentKey);
+  const first = booklet.unitEntries.find(candidate => (candidate.testletPath?.at(-1) ?? originalBookletRootTestletKey) === parentKey);
+  return cause.by === "code" && first?.unitKey === unit.unitKey && !own.show && !own.time && !own.afterLeave;
+};
+
+const participantCurrentTestletCodeGate = (booklet: ContentReleaseBookletEntry | undefined, run: TestRun) => {
+  const index = booklet?.unitEntries.findIndex(unit => unit.unitKey === run.currentUnitKey) ?? -1;
+  if (!booklet || index < 0 || !participantCurrentUnitParentLocked(booklet, run)) return null;
+  const states = new Map(evaluateAdaptiveStates(booklet, run).map(state => [state.stateKey, state.optionKey]));
+  if (!participantControllerUnitAccessible(booklet, run, booklet.unitEntries[index], run.updatedAt, states)) return null;
+  return findTestletCodeGate({booklet, testRun: run, firstUnitIndex: index, lastUnitIndex: index});
+};
+
 const buildTestletTimeLeftTestStateEntry = (
   testRun: TestRun,
   timestamp: string
@@ -21473,7 +21286,8 @@ const testletTimerStateChanged = (
 const activateCurrentTestletTimer = (
   contentRelease: ContentRelease,
   testRun: TestRun,
-  timestamp: string
+  timestamp: string,
+  explicitEntry = false
 ): { testRun: TestRun; startedTestletKey: string | null } => {
   if (testRun.status !== "running" || !testRun.currentUnitKey) {
     return { testRun, startedTestletKey: null };
@@ -21489,19 +21303,29 @@ const activateCurrentTestletTimer = (
   if (!timedTestlet || !timeMax) {
     return { testRun, startedTestletKey: null };
   }
+  if (participantCurrentUnitParentLocked(booklet, testRun, timestamp)) {
+    return { testRun, startedTestletKey: null };
+  }
   const existingTimer = testRun.testletTimers?.[timedTestlet.testletKey];
   if (existingTimer?.status === "running") {
     return { testRun, startedTestletKey: null };
   }
-  if (existingTimer?.status === "expired" || existingTimer?.status === "cancelled") {
+  if ((existingTimer?.status === "expired" || existingTimer?.status === "cancelled") &&
+      (!explicitEntry || resolveParticipantExecutionMode(testRun.executionMode).forceTimeRestrictions)) {
     return { testRun, startedTestletKey: null };
+  }
+  if (existingTimer?.status === "paused" &&
+      existingTimer.interruptedAtUnitKey === testRun.currentUnitKey && !explicitEntry) {
+    return {testRun, startedTestletKey: null};
   }
   const timestampMs = Date.parse(timestamp);
   const durationSeconds = existingTimer
     ? Math.max(1, existingTimer.durationSeconds)
     : Math.max(1, Math.ceil(timeMax.minutes * 60));
   const remainingSeconds = existingTimer
-    ? Math.max(1, existingTimer.remainingSeconds)
+    ? existingTimer.remainingSeconds > 0
+      ? Math.min(durationSeconds, Math.max(1, existingTimer.remainingSeconds))
+      : explicitEntry ? durationSeconds : 1
     : durationSeconds;
   const expiresAt = Number.isFinite(timestampMs)
     ? new Date(timestampMs + remainingSeconds * 1_000).toISOString()
@@ -21563,6 +21387,7 @@ const transitionTestletTimersForRunStatus = (
           {
             ...timer,
             status: "running",
+            interruptedAtUnitKey: undefined,
             remainingSeconds,
             expiresAt: Number.isFinite(timestampMs)
               ? new Date(timestampMs + remainingSeconds * 1_000).toISOString()
@@ -21803,12 +21628,14 @@ const cancelTestletTimerAfterLeave = (
 const interruptTestletTimerAfterLeave = (
   testRun: TestRun,
   testletKey: string,
-  timestamp: string
+  timestamp: string,
+  workerStep = false
 ): TestRun => {
   const timer = testRun.testletTimers?.[testletKey];
   if (!timer || (timer.status !== "running" && timer.status !== "paused")) {
     return testRun;
   }
+  const remainingSeconds = Math.max(0, getTestletTimerRemainingSeconds(timer, timestamp) - (workerStep && timer.status === "running" ? 1 : 0));
   return normalizeTestRun({
     ...testRun,
     testletTimers: {
@@ -21816,14 +21643,149 @@ const interruptTestletTimerAfterLeave = (
       [testletKey]: {
         ...timer,
         status: "paused",
-        remainingSeconds: getTestletTimerRemainingSeconds(timer, timestamp),
+        remainingSeconds,
         expiresAt: null,
         updatedAt: timestamp,
-        endedAt: null
+        endedAt: null,
+        ...(workerStep && timer.status === "running" && testRun.currentUnitKey
+          ? { interruptedAtUnitKey: testRun.currentUnitKey } : {})
       }
     },
     updatedAt: timestamp
   });
+};
+
+const projectParticipantControllerCommand = (input: {
+  contentRelease: ContentRelease; testRun: TestRun; timestamp: string;
+  request: Pick<ParticipantNativeCommandRequest, "keyword" | "arguments" | "controllerStatus">;
+  workerStep?: boolean;
+}): { testRun: TestRun; startedTestletKey: string | null } => {
+  const { contentRelease, testRun, timestamp, request } = input;
+  const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === testRun.bookletKey);
+  if (!booklet) throw new FirstSliceError(404, "booklet_not_found", "The selected Run's booklet was not found.");
+  const states = new Map(evaluateAdaptiveStates(booklet, testRun).map(state => [state.stateKey, state.optionKey]));
+  let startedTestletKey: string | null = null;
+  const nextRun = projectParticipantNativeCommand({ request, booklet, testRun, timestamp,
+    timedKey: unitKey => resolveTimedTestletForUnit(booklet, unitKey)?.testletKey ?? null,
+    remaining: timer => getTestletTimerRemainingSeconds(timer, timestamp),
+    interrupt: (run, key) => interruptTestletTimerAfterLeave(run, key, timestamp, input.workerStep),
+    cancel: (run, key) => cancelTestletTimerAfterLeave(run, key, timestamp),
+    activate: run => {
+      const activated = activateCurrentTestletTimer(contentRelease, run, timestamp, true);
+      startedTestletKey = activated.startedTestletKey;
+      return activated.testRun;
+    },
+    accessible: (run, unit) => participantControllerUnitAccessible(booklet, run, unit, timestamp, states)
+  });
+  return { testRun: nextRun, startedTestletKey };
+};
+
+const resumeParticipantControllerRun = (contentRelease: ContentRelease, testRun: TestRun, timestamp: string) =>
+  projectParticipantControllerCommand({ contentRelease, testRun, timestamp,
+    request: { keyword: "resume", arguments: [], controllerStatus: testRun.status === "paused" ? "PAUSED" : "RUNNING" } });
+
+/** Project a received controller command without writing outside its store lock. */
+const projectParticipantRunCommand = (input: {
+  contentRelease: ContentRelease; testRun: TestRun; commandType: MonitorRunCommandType;
+  targetUnitKey: string | null; remainingSeconds: number | null; timestamp: string; controllerStatus?: string;
+}): { testRun: TestRun; adjustedTestletKey: string | null; previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null; startedTestletKey?: string | null } => {
+  const { contentRelease, testRun, commandType, targetUnitKey, remainingSeconds, timestamp, controllerStatus } = input;
+  if (commandType === "resume") return { ...resumeParticipantControllerRun(contentRelease, testRun, timestamp), adjustedTestletKey: null, previousTimer: null };
+  let nextStatus: TestRunStatus = testRun.status;
+  if (commandType === "pause") {
+    nextStatus = "paused";
+  } else if (commandType === "goto") {
+    nextStatus = "running";
+  } else if (
+    commandType === "complete" ||
+    commandType === "complete_and_lock"
+  ) {
+    nextStatus = "completed";
+  }
+  let adjustedTestletKey: string | null = null;
+  let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
+    null;
+  const transitionedTestRun: TestRun =
+    commandType === "complete" || commandType === "complete_and_lock"
+      ? {
+          ...transitionTestletTimersForRunStatus(testRun, "paused", timestamp),
+          status: "paused",
+          locked: commandType === "complete_and_lock" || testRun.locked === true,
+          updatedAt: timestamp,
+          completedAt: null
+        }
+      : commandType === "lock_test"
+        ? normalizeTestRun({
+            ...testRun,
+            locked: true,
+            updatedAt: timestamp
+          })
+        : commandType === "unlock_test"
+          ? normalizeTestRun({
+              ...testRun,
+              locked: false,
+              updatedAt: timestamp
+            })
+          : commandType === "goto" && targetUnitKey
+            ? (() => {
+                const adjusted = applyMonitorGoto({
+                  contentRelease,
+                  testRun,
+                  targetUnitKey,
+                  remainingSeconds,
+                  timestamp: timestamp
+                });
+                adjustedTestletKey = adjusted.restoredTestletKey;
+                previousTimer = adjusted.previousTimer;
+                return adjusted.testRun;
+              })()
+            : commandType === "unlock_navigation"
+              ? applyMonitorNavigationUnlock({
+                  contentRelease,
+                  testRun,
+                  timestamp: timestamp
+                })
+              : commandType === "lock_navigation"
+                ? applyMonitorNavigationLock({
+                    testRun,
+                    timestamp: timestamp
+                  })
+                : commandType === "set_testlet_time" &&
+                    targetUnitKey &&
+                    remainingSeconds
+                  ? (() => {
+                      const adjusted = applyMonitorSetTestletTime({
+                        contentRelease,
+                        testRun,
+                        targetUnitKey,
+                        remainingSeconds,
+                        timestamp: timestamp
+                      });
+                      adjustedTestletKey = adjusted.testletKey;
+                      previousTimer = adjusted.previousTimer;
+                      return adjusted.testRun;
+                    })()
+                  : transitionTestletTimersForRunStatus(
+                      testRun,
+                      nextStatus as Extract<
+                        TestRunStatus,
+                        "running" | "paused"
+                      >,
+                      timestamp
+                    );
+  const nextTestRun = normalizeTestRun({
+    ...transitionedTestRun,
+    pauseSource:
+      commandType === "complete" || commandType === "complete_and_lock"
+        ? (controllerStatus ?? testRun.status.toUpperCase()) === "PAUSED" ? "monitor" : "participant"
+        : commandType === "pause"
+        ? "monitor"
+        : commandType === "goto"
+          ? undefined
+          : transitionedTestRun.pauseSource
+  });
+
+  return { testRun: nextTestRun, adjustedTestletKey, previousTimer };
 };
 
 const applyMonitorGoto = (input: {
@@ -22304,7 +22266,7 @@ const resolveBookletNavigationState = (
   addTimerAdvisory(forwardAdvisoryReasons, nextUnitKey);
   const nextTestletGate = testRun.monitorNavigationUnlocked
     ? null
-    : findTestletCodeGate({
+    : participantCurrentTestletCodeGate(booklet, testRun) ?? findTestletCodeGate({
         booklet,
         testRun,
         firstUnitIndex:
@@ -22848,6 +22810,8 @@ const buildStudyMonitorUnitProgress = (input: {
   participantRosterEntries?: ParticipantRosterEntry[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
+  /** Booklet detail passes scoped Runs; retain that scope for roster-only Units. */
+  bookletKey?: string;
 }): WorkspaceStudyMonitorUnitProgress[] => {
   const contentReleasesById = new Map(
     input.contentReleases.map(contentRelease => [
@@ -22946,6 +22910,7 @@ const buildStudyMonitorUnitProgress = (input: {
   }
   for (const rosterEntry of input.participantRosterEntries ?? []) {
     for (const bookletKey of getParticipantRosterBookletKeys(rosterEntry)) {
+      if (input.bookletKey !== undefined && bookletKey !== input.bookletKey) continue;
       if (runLoginKeysByBookletKey.get(bookletKey)?.has(rosterEntry.loginKey)) {
         continue;
       }
@@ -23884,7 +23849,7 @@ const buildStudyMonitorBookletDetail = (input: {
       .map(participantSession => participantSession.loginKey)
   );
   const bookletRosterEntries = input.participantRosterEntries
-    .filter(rosterEntry => rosterEntry.bookletKey?.trim() === bookletKey)
+    .filter(rosterEntry => getParticipantRosterBookletKeys(rosterEntry).includes(bookletKey))
     .sort(
       (left, right) =>
         left.loginKey.localeCompare(right.loginKey) ||
@@ -23965,7 +23930,8 @@ const buildStudyMonitorBookletDetail = (input: {
       participantSessions: input.participantSessions,
       participantRosterEntries: bookletRosterEntries,
       testRuns: bookletTestRuns,
-      contentReleases: input.contentReleases
+      contentReleases: input.contentReleases,
+      bookletKey
     })
   };
 };
@@ -24264,6 +24230,20 @@ export const createFirstSliceServices = (
     lastTimestampMs = nextTimestampMs;
     return new Date(nextTimestampMs).toISOString();
   };
+  const workspaceFiles = createWorkspaceFileRuntime({repository, now, id: idGenerator,
+    project: source => projectWorkspaceFile(source),
+    compile: (sources, scope) => {
+      const {archive, members} = assembleSourcePackageArchive(sources);
+      const sourcePackage: SourcePackage = {sourcePackageId: idGenerator(), ...scope,
+        fileName: 'workspace-files.zip', mediaType: 'application/zip', contentStructure: null,
+        sourceDocument: 'data:application/zip;base64,' + archive.toString('base64'), status: 'accepted', uploadedAt: now()};
+      return {sourcePackage, ...buildRuntimeSnapshot(sourcePackage, xmlValidationContext),
+        members: members.map(member => ({sourcePackageId: member.sourcePackageId, fileName: member.fileName, sizeBytes: member.bytes.length}))};
+    }});
+  const requireRuntimeContentRelease = async (repo: FirstSliceRepository, releaseId: string): Promise<ContentRelease> =>
+    workspaceFiles.projectRelease(await requireContentRelease(repo, releaseId));
+  const listRuntimeContentReleases = async (tenantId: string, workspaceId: string): Promise<ContentRelease[]> =>
+    Promise.all((await repository.listContentReleasesByWorkspace(tenantId, workspaceId)).map(workspaceFiles.projectRelease));
   const testRunMutationTails = new Map<string, Promise<void>>();
   const serializeTestRunMutation = async <Result>(
     testRunId: string,
@@ -24363,7 +24343,7 @@ export const createFirstSliceServices = (
     );
   }
 
-  const recordWorkspaceActivity = async (input: {
+  const buildWorkspaceActivity = (input: {
     activityEventId?: string;
     tenantId: string;
     workspaceId: string;
@@ -24373,8 +24353,7 @@ export const createFirstSliceServices = (
     subjectId: string;
     summary: string;
     details?: Record<string, unknown>;
-  }): Promise<void> => {
-    await repository.saveWorkspaceActivityEvent({
+  }): WorkspaceActivityEvent => ({
       activityEventId: input.activityEventId ?? idGenerator(),
       tenantId: input.tenantId,
       workspaceId: input.workspaceId,
@@ -24385,7 +24364,10 @@ export const createFirstSliceServices = (
       occurredAt: now(),
       summary: input.summary,
       details: input.details ?? {}
-    });
+  });
+
+  const recordWorkspaceActivity = async (input: Parameters<typeof buildWorkspaceActivity>[0]): Promise<void> => {
+    await repository.saveWorkspaceActivityEvent(buildWorkspaceActivity(input));
   };
 
   const assertTenantTesttakersIdentitiesAvailable = async (input: {
@@ -24833,6 +24815,8 @@ export const createFirstSliceServices = (
               testRunId: testRun.testRunId,
               groupKey: participantSession.groupKey,
               loginKey: participantSession.loginKey,
+              participantCode: participantSession.participantCode ?? null,
+              groupLabel: rosterEntry?.groupLabel ?? participantSession.groupKey,
               personLabel:
                 rosterEntry?.displayName?.trim() || participantSession.loginKey,
               bookletKey: booklet.bookletKey,
@@ -25003,6 +24987,18 @@ export const createFirstSliceServices = (
           ? unitKey
           : String(batch.originalUnitId).trim() || unitKey;
       return batch.entries.map(entry => {
+        const clientEntryId = entry?.clientEntryId;
+        if (
+          clientEntryId !== undefined &&
+          (typeof clientEntryId !== "string" ||
+            !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,209}$/.test(clientEntryId))
+        ) {
+          throw new FirstSliceError(
+            400,
+            "participant_test_log_entry_id_invalid",
+            "Test-log entry IDs must contain 1–210 URL-safe identifier characters."
+          );
+        }
         const logKey = typeof entry?.key === "string" ? entry.key.trim() : "";
         const logContent =
           entry?.content == null ? "" : String(entry.content);
@@ -25031,10 +25027,13 @@ export const createFirstSliceServices = (
             "Participant test-log timestamps must be valid non-negative Unix millisecond values."
           );
         }
+        const logIndex = entryIndex++;
         return {
-          participantTestLogId: input.deliveryId
-            ? `delivery:${input.testRun.testRunId}:${input.deliveryId}:log:${entryIndex++}`
-            : idGenerator(),
+          participantTestLogId: clientEntryId
+            ? `delivery:${input.testRun.testRunId}:${clientEntryId}`
+            : input.deliveryId
+              ? `delivery:${input.testRun.testRunId}:${input.deliveryId}:log:${logIndex}`
+              : idGenerator(),
           tenantId: input.testRun.tenantId,
           workspaceId: input.testRun.workspaceId,
           participantSessionId: input.testRun.participantSessionId,
@@ -25102,7 +25101,7 @@ export const createFirstSliceServices = (
         `Execution mode '${executionMode.mode}' does not allow participant reviews.`
       );
     }
-    const contentRelease = await requireContentRelease(
+    const contentRelease = await requireRuntimeContentRelease(
       repository,
       testRun.contentReleaseId
     );
@@ -25145,125 +25144,164 @@ export const createFirstSliceServices = (
     );
   };
 
-  const recordStartedTestletTimer = async (testRun: TestRun, testletKey: string): Promise<void> => {
-    const timer = testRun.testletTimers?.[testletKey];
-    await recordWorkspaceActivity({
-      tenantId: testRun.tenantId,
-      workspaceId: testRun.workspaceId,
-      eventType: "testlet_timer_started",
-      subjectType: "test_run",
-      subjectId: testRun.testRunId,
-      summary: `Timed block '${testletKey}' started for run '${testRun.testRunId}'.`,
-      details: {
-        testletKey,
-        durationSeconds: timer?.durationSeconds ?? null,
-        expiresAt: timer?.expiresAt ?? null,
-        currentUnitKey: testRun.currentUnitKey
-      }
-    });
+  const prepareEffectiveTestletTimerState = (input: {
+    contentRelease: ContentRelease;
+    context: ParticipantRunMutationContext;
+    participantRosterEntry: ParticipantRosterEntry | null;
+    timestamp: string;
+  }): { effect: ParticipantRunMutationEffect; changed: boolean } => {
+    const { context, timestamp, contentRelease } = input;
+    const normalizedRun = normalizeTestRun(context.testRun);
+    const executionMode = resolveParticipantExecutionMode(normalizedRun.executionMode);
+    const reconciled = reconcileExpiredTestletTimers(contentRelease, normalizedRun, timestamp, executionMode.forceTimeRestrictions);
+    const activated = activateCurrentTestletTimer(contentRelease, reconciled.testRun, timestamp);
+    const changed = activated.testRun !== normalizedRun || reconciled.expiredTestletKeys.length > 0 || activated.startedTestletKey != null;
+    // Legacy identity defaults are projections, not changes to an existing Run's identity.
+    const effectiveRun = { ...activated.testRun, executionMode: context.testRun.executionMode,
+      bookletAssignmentKey: context.testRun.bookletAssignmentKey };
+    const testLogs: ParticipantTestLog[] = [];
+    const activityEvents: WorkspaceActivityEvent[] = [];
+    if (executionMode.saveResponses && (reconciled.expiredTestletKeys.length > 0 || activated.startedTestletKey)) {
+      const entries: ParticipantTestLogEntryInput[] = [];
+      if (reconciled.expiredTestletKeys.length > 0) entries.push(buildTestletTimeLeftTestStateEntry(reconciled.testRun, timestamp));
+      if (activated.startedTestletKey) entries.push(buildTestletTimeLeftTestStateEntry(effectiveRun, timestamp));
+      testLogs.push(...buildParticipantTestLogs({ testRun: effectiveRun, batches: [{ entries }] }));
+    }
+    if (activated.startedTestletKey) {
+      const testletKey = activated.startedTestletKey;
+      const timer = effectiveRun.testletTimers?.[testletKey];
+      activityEvents.push(buildWorkspaceActivity({ tenantId: effectiveRun.tenantId, workspaceId: effectiveRun.workspaceId,
+        eventType: "testlet_timer_started", subjectType: "test_run", subjectId: effectiveRun.testRunId,
+        summary: `Timed block '${testletKey}' started for run '${effectiveRun.testRunId}'.`,
+        details: { testletKey, durationSeconds: timer?.durationSeconds ?? null, expiresAt: timer?.expiresAt ?? null, currentUnitKey: effectiveRun.currentUnitKey } }));
+    }
+    for (const testletKey of reconciled.expiredTestletKeys) activityEvents.push(buildWorkspaceActivity({
+      tenantId: effectiveRun.tenantId, workspaceId: effectiveRun.workspaceId, eventType: "testlet_timer_expired",
+      subjectType: "test_run", subjectId: effectiveRun.testRunId,
+      summary: `Timed block '${testletKey}' expired for run '${effectiveRun.testRunId}'.`,
+      details: { testletKey, currentUnitKey: effectiveRun.currentUnitKey, runStatus: effectiveRun.status }
+    }));
+    let participantSession: ParticipantSession | undefined;
+    if (context.testRun.status !== "completed" && effectiveRun.status === "completed") {
+      const parent = context.participantSession;
+      const testRuns = context.testRuns.map(run => normalizeTestRun(run.testRunId === effectiveRun.testRunId ? effectiveRun : run));
+      const hasUnfinishedBooklet = buildParticipantRuntimeBooklets({ contentRelease, participantRosterEntry: input.participantRosterEntry,
+        participantCode: parent.participantCode, testRuns }).some(booklet => booklet.status !== "completed");
+      participantSession = { ...parent, status: hasUnfinishedBooklet ? "signed_in" : "closed" };
+      activityEvents.push(buildWorkspaceActivity({ tenantId: effectiveRun.tenantId, workspaceId: effectiveRun.workspaceId,
+        eventType: "test_run_completed", subjectType: "test_run", subjectId: effectiveRun.testRunId,
+        summary: `Run '${effectiveRun.testRunId}' completed after its final timed block expired.`,
+        details: { completedAt: effectiveRun.completedAt, reason: "testlet_timer_expired" } }));
+    }
+    return { changed, effect: { testRun: effectiveRun, testLogs, activityEvents, ...(participantSession ? { participantSession } : {}) } };
   };
 
   const persistEffectiveTestletTimerState = async (input: {
     contentRelease: ContentRelease;
     testRun: TestRun;
     timestamp: string;
+    ensureBookletStates?: boolean;
   }): Promise<TestRun> => {
-    const normalizedRun = normalizeTestRun(input.testRun);
-    const executionMode = resolveParticipantExecutionMode(
-      normalizedRun.executionMode
-    );
-    const reconciled = reconcileExpiredTestletTimers(
-      input.contentRelease,
-      normalizedRun,
-      input.timestamp,
-      executionMode.forceTimeRestrictions
-    );
-    const activated = activateCurrentTestletTimer(
-      input.contentRelease,
-      reconciled.testRun,
-      input.timestamp
-    );
-    const effectiveRun = activated.testRun;
-    const changed =
-      effectiveRun !== normalizedRun ||
-      reconciled.expiredTestletKeys.length > 0 ||
-      activated.startedTestletKey != null;
-    if (changed) {
-      await repository.saveTestRun(effectiveRun);
+    const parent = await requireParticipantSession(repository, input.testRun.participantSessionId);
+    const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository, parent.tenantId, parent.workspaceId, parent.loginKey);
+    const result = await repository.mutateParticipantRun(input.testRun, context => {
+      const prepared = prepareEffectiveTestletTimerState({ ...input, context, participantRosterEntry });
+      const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(booklet => booklet.bookletKey === context.testRun.bookletKey);
+      const needsBookletStates = input.ensureBookletStates && !hasCompleteBookletStatesSnapshot(booklet, prepared.effect.testRun);
+      if (needsBookletStates) prepared.effect.testRun = withEvaluatedBookletStates(booklet, prepared.effect.testRun);
+      return prepared.changed || needsBookletStates ? prepared.effect : null;
+    });
+    if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run no longer belongs to its participant scope.");
+    return normalizeTestRun(result.testRun);
+  };
+
+  type RuntimeRunProjection = Omit<ParticipantRunMutationEffect, "testLogs" | "activityEvents"> & {
+    testLogs?: ParticipantTestLog[];
+    activityEvents?: WorkspaceActivityEvent[];
+  };
+  const orderedParticipantResponse = (input: Parameters<typeof withOrderedParticipantResponse>[0]): TestRun => {
+    try { return withOrderedParticipantResponse(input); }
+    catch (error) {
+      if (error instanceof RangeError) throw new FirstSliceError(400, "participant_response_timestamps_invalid", error.message);
+      throw error;
     }
-    if (
-      executionMode.saveResponses &&
-      (reconciled.expiredTestletKeys.length > 0 || activated.startedTestletKey)
-    ) {
-      const timerStateEntries: ParticipantTestLogEntryInput[] = [];
-      if (reconciled.expiredTestletKeys.length > 0) {
-        timerStateEntries.push(
-          buildTestletTimeLeftTestStateEntry(
-            reconciled.testRun,
-            input.timestamp
-          )
-        );
-      }
-      if (activated.startedTestletKey) {
-        timerStateEntries.push(
-          buildTestletTimeLeftTestStateEntry(effectiveRun, input.timestamp)
-        );
-      }
-      await repository.saveParticipantTestLogs(
-        buildParticipantTestLogs({
-          testRun: effectiveRun,
-          batches: [{ entries: timerStateEntries }]
-        })
-      );
-    }
-    if (activated.startedTestletKey) {
-      await recordStartedTestletTimer(effectiveRun, activated.startedTestletKey);
-    }
-    for (const testletKey of reconciled.expiredTestletKeys) {
-      await recordWorkspaceActivity({
-        tenantId: effectiveRun.tenantId,
-        workspaceId: effectiveRun.workspaceId,
-        eventType: "testlet_timer_expired",
-        subjectType: "test_run",
-        subjectId: effectiveRun.testRunId,
-        summary: `Timed block '${testletKey}' expired for run '${effectiveRun.testRunId}'.`,
-        details: {
-          testletKey,
-          currentUnitKey: effectiveRun.currentUnitKey,
-          runStatus: effectiveRun.status
+  };
+  const projectCompletedParticipantSession = (input: {
+    context: ParticipantRunMutationContext;
+    contentRelease: ContentRelease;
+    participantRosterEntry: ParticipantRosterEntry | null;
+    testRun: TestRun;
+  }): ParticipantSession => {
+    const parent = input.context.participantSession;
+    const testRuns = input.context.testRuns.map(run => normalizeTestRun(run.testRunId === input.testRun.testRunId ? input.testRun : run));
+    const unfinished = buildParticipantRuntimeBooklets({ contentRelease: input.contentRelease,
+      participantRosterEntry: input.participantRosterEntry, participantCode: parent.participantCode, testRuns })
+      .some(booklet => booklet.status !== "completed");
+    return { ...parent, status: unfinished || input.contentRelease.runtimeSnapshot.workspaceFilePublication ? "signed_in" : "closed" };
+  };
+
+  const mutateRuntimeRun = async (
+    storedRun: TestRun,
+    project: (input: {
+      context: ParticipantRunMutationContext;
+      testRun: TestRun;
+      contentRelease: ContentRelease;
+      participantRosterEntry: ParticipantRosterEntry | null;
+      timestamp: string;
+      reconcileTimers: (testRun: TestRun) => TestRun;
+    }) => RuntimeRunProjection | null,
+    options: { reconcileBefore?: boolean; activateController?: boolean; participantAccess?: boolean } = {}
+  ): Promise<ParticipantRunMutationResult> => {
+    const parent = await requireParticipantSession(repository, storedRun.participantSessionId);
+    const contentRelease = await requireRuntimeContentRelease(repository, storedRun.contentReleaseId);
+    const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository, parent.tenantId, parent.workspaceId, parent.loginKey);
+    let completionError: unknown;
+    let result: ParticipantRunMutationResult | null;
+    try {
+      result = await repository.mutateParticipantRun(storedRun, context => {
+        const timestamp = now();
+        if (options.participantAccess !== false) assertParticipantAccessWindow(participantRosterEntry, timestamp, context.participantSession.validUntil);
+        const activation = options.activateController ? prepareParticipantControllerActivation({ ...context.testRun, activatedAt: timestamp }, context.participantSession, context.testRun) : null;
+        const compatibleRun = (run: TestRun): TestRun => ({ ...run, executionMode: context.testRun.executionMode,
+          bookletAssignmentKey: context.testRun.bookletAssignmentKey });
+        const before = options.reconcileBefore === false
+          ? { changed: false, effect: { testRun: context.testRun, testLogs: [], activityEvents: [] } as ParticipantRunMutationEffect }
+          : prepareEffectiveTestletTimerState({ contentRelease, context, participantRosterEntry, timestamp });
+        const timerEffects = [before.effect];
+        let timerChanged = before.changed;
+        const reconcileTimers = (run: TestRun): TestRun => {
+          const prepared = prepareEffectiveTestletTimerState({ contentRelease, context: { ...context, testRun: compatibleRun(run) }, participantRosterEntry, timestamp });
+          timerEffects.push(prepared.effect); timerChanged ||= prepared.changed;
+          return normalizeTestRun(prepared.effect.testRun);
+        };
+        let projected: RuntimeRunProjection | null;
+        try { projected = project({ context, testRun: normalizeTestRun(before.effect.testRun), contentRelease, participantRosterEntry, timestamp, reconcileTimers }); }
+        catch (error) {
+          // An elapsed final timer still completes durably when the requested
+          // operation rejects the now-completed Run.
+          if (!before.changed || before.effect.testRun.status !== "completed") throw error;
+          completionError = error; projected = null;
         }
+        if (!projected && !timerChanged && !activation?.activated && !activation?.entryChanged) return null;
+        const participantSession = [...timerEffects].reverse().find(effect => effect.participantSession)?.participantSession ??
+          projected?.participantSession ?? (activation?.activated ? activation.participantSession : undefined);
+        return { testRun: projected || timerChanged ? compatibleRun(projected?.testRun ?? timerEffects.at(-1)!.testRun) : context.testRun,
+          testLogs: [...timerEffects.flatMap(effect => effect.testLogs), ...(projected?.testLogs ?? [])],
+          activityEvents: [...timerEffects.flatMap(effect => effect.activityEvents), ...(projected?.activityEvents ?? [])],
+          ...(projected?.controllerEntryActive !== undefined ? { controllerEntryActive: projected.controllerEntryActive } :
+            activation ? { controllerEntryActive: true } : {}),
+          ...(activation ? {originalResultOpenedAt: timestamp} : {}),
+          ...(projected?.originalResultModifiedAt !== undefined ? {originalResultModifiedAt: projected.originalResultModifiedAt} : {}),
+          ...(participantSession ? { participantSession } : {}), ...(projected?.commandInput ? { commandInput: projected.commandInput } : {}) };
       });
+    } catch (error) {
+      if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
+      throw error;
     }
-    if (
-      input.testRun.status !== "completed" &&
-      effectiveRun.status === "completed"
-    ) {
-      const participantSession = await repository.getParticipantSessionById(
-        effectiveRun.participantSessionId
-      );
-      if (participantSession) {
-        await repository.saveParticipantSession({
-          ...participantSession,
-          status: await resolveParticipantSessionStatusAfterCompletion(
-            repository,
-            participantSession
-          )
-        });
-      }
-      await recordWorkspaceActivity({
-        tenantId: effectiveRun.tenantId,
-        workspaceId: effectiveRun.workspaceId,
-        eventType: "test_run_completed",
-        subjectType: "test_run",
-        subjectId: effectiveRun.testRunId,
-        summary: `Run '${effectiveRun.testRunId}' completed after its final timed block expired.`,
-        details: {
-          completedAt: effectiveRun.completedAt,
-          reason: "testlet_timer_expired"
-        }
-      });
-    }
-    return effectiveRun;
+    if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run no longer belongs to its participant scope.");
+    if (completionError) throw completionError;
+    return { ...result, testRun: { ...normalizeTestRun(result.testRun),
+      executionMode: result.testRun.executionMode, bookletAssignmentKey: result.testRun.bookletAssignmentKey } };
   };
 
   const importParticipantRosterDocumentsForWorkspace = async (input: {
@@ -25280,6 +25318,8 @@ export const createFirstSliceServices = (
     );
     const parsedEntries = [] as ReturnType<typeof parseParticipantRosterText>;
     const operationalLoginCandidates = [] as OriginalTestcenterOperationalLoginCandidate[];
+    const nativeEntries = new Set<ReturnType<typeof parseParticipantRosterText>[number]>();
+    const nativeOperationalEntries = new Set<OriginalTestcenterOperationalLoginCandidate>();
 
     for (const rosterDocument of input.rosterDocuments) {
       const jsonInspection = inspectParticipantRosterJsonSource(
@@ -25314,12 +25354,20 @@ export const createFirstSliceServices = (
           );
         }
       }
-      parsedEntries.push(
-        ...parseParticipantRosterText(rosterDocument.rosterText)
-      );
-      operationalLoginCandidates.push(
-        ...parseOriginalTestcenterOperationalLogins(rosterDocument.rosterText)
-      );
+      const documentEntries = parseParticipantRosterText(rosterDocument.rosterText);
+      const documentOperationalEntries = parseOriginalTestcenterOperationalLogins(rosterDocument.rosterText);
+      // Only the server-validated Original XML path can establish native identity.
+      // JSON flags and legacy XML cannot opt into this storage relationship.
+      if (xmlValidationContext.profile === "original-19" && typeof rosterDocument.rosterText === "string" &&
+          rosterDocument.rosterText.trimStart().startsWith("<")) {
+        const root = new DOMParser().parseFromString(rosterDocument.rosterText, "application/xml").documentElement;
+        if (root && xmlElementLocalName(root) === "Testtakers") {
+          for (const entry of documentEntries) nativeEntries.add(entry);
+          for (const entry of documentOperationalEntries) nativeOperationalEntries.add(entry);
+        }
+      }
+      parsedEntries.push(...documentEntries);
+      operationalLoginCandidates.push(...documentOperationalEntries);
     }
 
     if (parsedEntries.length === 0 && operationalLoginCandidates.length === 0) {
@@ -25351,19 +25399,24 @@ export const createFirstSliceServices = (
     }
 
     const seenLoginKeys = new Set<string>();
-    for (const loginKey of [
-      ...parsedEntries.map(entry => entry.loginKey),
-      ...operationalLoginCandidates.map(candidate => candidate.loginKey)
+    const seenFoldedLoginKeys = new Map<string, boolean>();
+    for (const {loginKey,native} of [
+      ...parsedEntries.map(entry => ({loginKey:entry.loginKey,native:nativeEntries.has(entry)})),
+      ...operationalLoginCandidates.map(entry => ({loginKey:entry.loginKey,native:nativeOperationalEntries.has(entry)}))
     ]) {
+      // Original logins.name and login_sessions.name compare exactly. German
+      // case/composition collation applies to groups and person suffixes only.
       const normalizedLoginKey = loginKey.toLocaleLowerCase("en-US");
-      if (seenLoginKeys.has(normalizedLoginKey)) {
+      if (seenLoginKeys.has(loginKey) || seenFoldedLoginKeys.has(normalizedLoginKey) &&
+          (!native || !seenFoldedLoginKeys.get(normalizedLoginKey))) {
         throw new FirstSliceError(
           400,
           "participant_roster_login_duplicate",
           `Participant roster contains duplicate login '${loginKey}'.`
         );
       }
-      seenLoginKeys.add(normalizedLoginKey);
+      seenLoginKeys.add(loginKey);
+      seenFoldedLoginKeys.set(normalizedLoginKey,native);
     }
 
     const referencedAssetNames = Array.from(
@@ -25440,13 +25493,14 @@ export const createFirstSliceServices = (
         tenantId: workspace.tenantId,
         workspaceId: workspace.workspaceId,
         loginKey: parsedEntry.loginKey,
+        ...(nativeEntries.has(parsedEntry) ? {originalLoginIdentity: true as const} : {}),
         executionMode:
           parsedEntry.executionMode ??
           existingEntry?.executionMode ??
           defaultParticipantExecutionMode,
         groupKey: parsedEntry.groupKey,
-        ...(parsedEntry.groupLabel?.trim()
-          ? { groupLabel: parsedEntry.groupLabel.trim() }
+        ...(typeof parsedEntry.groupLabel === "string"
+          ? { groupLabel: parsedEntry.groupLabel }
           : {}),
         bookletKey: parsedEntry.bookletKey,
         ...(parsedEntry.bookletKeys?.length
@@ -25594,6 +25648,7 @@ export const createFirstSliceServices = (
     dependencySelectionRevision?: string;
   }, options: {
     resolveWorkspaceDependencies?: boolean;
+    currentWorkspaceFilesOnly?: boolean;
   } = {}): Promise<CreateImportJobResult> => {
     if (
       input.dependencySourcePackageIds !== undefined &&
@@ -25685,7 +25740,8 @@ export const createFirstSliceServices = (
       const workspaceDependencyResolution =
         resolveWorkspaceDependencySourcePackages({
           rootSourcePackage: sourcePackage,
-          workspaceSourcePackages,
+          workspaceSourcePackages: selectCurrentWorkspaceFiles(workspaceSourcePackages, workspaceActivityEvents)
+            .filter(source => !options.currentWorkspaceFilesOnly || source.status !== 'rejected'),
           dependencySourcePackageIds,
           dependencySelectionRevision: input.dependencySelectionRevision
         });
@@ -25958,6 +26014,28 @@ export const createFirstSliceServices = (
     };
   };
 
+  const currentSystemCheckFiles = (sources: SourcePackage[], events: WorkspaceActivityEvent[]) => {
+    const nativeIds = new Set(events.flatMap(event =>
+      event.eventType === 'source_package_created' && event.details.intakeMode === 'workspace_file' ? [event.subjectId] :
+      event.eventType === 'source_package_replaced' && event.details.replacementMode === 'workspace_file' &&
+        typeof event.details.replacementSourcePackageId === 'string' ? [event.details.replacementSourcePackageId] : []));
+    const physical = selectCurrentWorkspaceFiles(sources, events).filter(source => nativeIds.has(source.sourcePackageId) &&
+      source.status !== 'rejected' && /\.xml$/i.test(source.fileName) && projectWorkspaceFile(source).fileType === 'SysCheck');
+    const metadata = buildWorkspaceFileCatalog(physical.map(projectWorkspaceFile)).items;
+    return physical.map(source => ({source, metadata: metadata.find(file => file.sourcePackageId === source.sourcePackageId)!.metadata}));
+  };
+  const liveSystemCheckPackages = async (workspace: Workspace, sources: SourcePackage[], events: WorkspaceActivityEvent[]) => {
+    const files = currentSystemCheckFiles(sources, events);
+    if (!files.length) return {files, packages: [] as SourcePackage[]};
+    const current = await workspaceFiles.read(workspace);
+    const snapshot = current.compilation?.runtimeSnapshot;
+    const packages = files.flatMap(({source,metadata}) => {
+      const definition = snapshot?.systemCheckEntries?.find(check => check.checkId.toUpperCase() === metadata.identifier.toUpperCase());
+      return definition ? [{...source, contentStructure: {bookletEntries: [],
+        playerEntries: snapshot?.playerEntries, systemCheckEntries: [definition]}}] : [];
+    });
+    return {files, packages};
+  };
   const listWorkspaceSystemChecks = async (input: {
     tenantKey: string;
     workspaceKey: string;
@@ -25967,24 +26045,18 @@ export const createFirstSliceServices = (
       input.tenantKey,
       input.workspaceKey
     );
-    const sourcePackages = (
-      await repository.listSourcePackagesByWorkspace(
-        workspace.tenantId,
-        workspace.workspaceId
-      )
-    )
-      .filter(sourcePackage => sourcePackage.status === "accepted")
-      .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
-    const releases = (
-      await repository.listContentReleasesByWorkspace(
-        workspace.tenantId,
-        workspace.workspaceId
-      )
-    ).sort((left, right) =>
-      (right.activatedAt ?? right.createdAt).localeCompare(
-        left.activatedAt ?? left.createdAt
-      )
-    );
+    const [allSources, events] = await Promise.all([
+      repository.listSourcePackagesByWorkspace(workspace.tenantId, workspace.workspaceId),
+      repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId, workspace.workspaceId)
+    ]);
+    const live = await liveSystemCheckPackages(workspace, allSources, events);
+    const liveIds = new Set(live.files.map(file => file.metadata.identifier.toUpperCase()));
+    const sourcePackages = [...live.packages, ...allSources.filter(source => source.status === 'accepted')
+      .sort((left,right) => right.uploadedAt.localeCompare(left.uploadedAt)).map(source => ({...source,
+        contentStructure: source.contentStructure ? {...source.contentStructure,
+          systemCheckEntries: source.contentStructure.systemCheckEntries?.filter(check => !liveIds.has(check.checkId.toUpperCase()))} : null}))];
+    const releases = (await listRuntimeContentReleases(workspace.tenantId, workspace.workspaceId))
+      .sort((left,right) => (right.activatedAt ?? right.createdAt).localeCompare(left.activatedAt ?? left.createdAt));
     const resolveUnit = (
       systemCheck: SourcePackageSystemCheckEntry,
       sourcePackage: SourcePackage
@@ -26295,6 +26367,7 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<Array<{ activityEventId: string; report: SystemCheckReport }>> => {
     const workspace = await requireWorkspace(
@@ -26303,7 +26376,15 @@ export const createFirstSliceServices = (
       input.workspaceKey
     );
     const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
-    const normalizedCheckId = input.checkId?.trim().toUpperCase();
+    if (input.checkIds !== undefined && (!Array.isArray(input.checkIds) ||
+      input.checkIds.some(id => typeof id !== "string" || !id.trim()))) {
+      throw new FirstSliceError(400, "system_check_report_check_ids_invalid",
+        "System-check report filters must contain nonempty check IDs.");
+    }
+    // Source distinguishes no filter from an explicitly empty selection.
+    const keys = [...(input.checkId?.trim() ? [input.checkId] : []), ...(input.checkIds ?? [])];
+    const selectedCheckIds = input.checkIds === undefined && keys.length === 0 ? null
+      : new Set(keys.map(key => key.trim().toUpperCase()));
     const events = await repository.listWorkspaceActivityEventsByWorkspace(
       workspace.tenantId,
       workspace.workspaceId
@@ -26321,8 +26402,8 @@ export const createFirstSliceServices = (
       })
       .filter(
         record =>
-          !normalizedCheckId ||
-          record.report.checkId.toUpperCase() === normalizedCheckId
+          selectedCheckIds === null ||
+          selectedCheckIds.has(record.report.checkId.toUpperCase())
       )
       .sort((left, right) =>
         right.report.createdAt.localeCompare(left.report.createdAt)
@@ -26334,6 +26415,7 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<SystemCheckReport[]> => {
     const records = await readSystemCheckReportRecords({
@@ -26347,14 +26429,15 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
   }): Promise<SystemCheckReportStatistics[]> => {
     const reports = (await readSystemCheckReportRecords(input)).map(
       record => record.report
     );
-    const breakdown = (values: string[]): Array<{ value: string; count: number }> => {
+    const breakdown = (values: string[], trim = true): Array<{ value: string; count: number }> => {
       const counts = new Map<string, number>();
       for (const rawValue of values) {
-        const value = rawValue.trim() || "unknown";
+        const value = trim ? rawValue.trim() || "unknown" : rawValue;
         counts.set(value, (counts.get(value) ?? 0) + 1);
       }
       return Array.from(counts, ([value, count]) => ({ value, count })).sort(
@@ -26374,6 +26457,11 @@ export const createFirstSliceServices = (
       );
       return String(entry?.value ?? "unknown");
     };
+    // SysCheckReportFile::getDigest uses exact authored labels, not entry IDs.
+    // Preserve its literal separator even when either field is absent; keep
+    // the established name-only canonical distributions independently intact.
+    const originalEnvironment = (report: SystemCheckReport, label: string): string =>
+      String(report.environment.find(entry => entry.label === label)?.value ?? "");
     const byCheckId = new Map<string, SystemCheckReport[]>();
     for (const report of reports) {
       const key = report.checkId.toUpperCase();
@@ -26393,6 +26481,10 @@ export const createFirstSliceServices = (
         browsers: breakdown(
           group.map(report => entryValue(report, "environment", ["browser"], ["browser"]))
         ),
+        operatingSystemVersions: breakdown(group.map(report =>
+          originalEnvironment(report, "Betriebssystem") + " " + originalEnvironment(report, "Betriebssystemversion")), false),
+        browserVersions: breakdown(group.map(report =>
+          originalEnvironment(report, "Browser") + " " + originalEnvironment(report, "Browserversion")), false),
         overallRatings: breakdown(
           group.map(report =>
             entryValue(report, "network", ["nw-overall"], ["gesamtbewertung"])
@@ -26406,9 +26498,10 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<string> => {
-    const reports = await readSystemCheckReports(input);
+    const reports = (await readSystemCheckReportRecords(input)).map(record => record.report);
     const baseHeaders = [
       "Titel",
       "SysCheck-Id",
@@ -26457,9 +26550,10 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<string> => {
-    const reports = await readSystemCheckReports(input);
+    const reports = (await readSystemCheckReportRecords(input)).map(record => record.report);
     return `${JSON.stringify(
       reports.map(legacySystemCheckReportDocument),
       null,
@@ -26591,6 +26685,674 @@ export const createFirstSliceServices = (
     };
   };
 
+  const launchParticipantRun = async (
+    input: Parameters<FirstSliceServices["participantRuntime"]["launch"]>[0],
+    deferExistingActivation = false
+  ): Promise<TestRun> => {
+    const browserControllerLifecycle = usesBrowserControllerLifecycle(input.controllerLifecycle);
+    const participantSessionId = normalizeParticipantSessionId(
+      input.participantSessionId
+    );
+    const participantSession = await requireAccessibleParticipantSession(
+      participantSessionId
+    );
+    const activateSession = async (testRun: TestRun): Promise<TestRun> => {
+      try {
+        const result = await repository.activateParticipantController({ testRunId: testRun.testRunId,
+          participantSessionId, tenantId: testRun.tenantId, workspaceId: testRun.workspaceId,
+          contentReleaseId: testRun.contentReleaseId, activatedAt: now() });
+        if (!result) throw new FirstSliceError(409, "participant_controller_scope_changed", "The controller's parent scope changed during entry.");
+        return result.testRun;
+      } catch (error) {
+        if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
+        throw error;
+      }
+    };
+    const contentRelease = await requireRuntimeContentRelease(
+      repository,
+      participantSession.contentReleaseId
+    );
+
+    const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
+      input.bookletKey
+    );
+    const rosterEntry = await findParticipantRosterEntryByLoginKey(
+      repository,
+      participantSession.tenantId,
+      participantSession.workspaceId,
+      participantSession.loginKey
+    );
+    const assignedBookletKeys = [
+      ...new Set(
+        getParticipantCodeBookletAssignments(
+          rosterEntry,
+          participantSession.participantCode
+        ).map(assignment => assignment.bookletKey)
+      )
+    ];
+    const testRuns = (
+      await repository.listTestRunsByParticipantSessionId(
+        participantSession.participantSessionId
+      )
+    ).map(normalizeTestRun);
+    testRuns.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const runtimeBooklets = buildParticipantRuntimeBooklets({
+      contentRelease,
+      participantRosterEntry: rosterEntry,
+      participantCode: participantSession.participantCode,
+      testRuns
+    });
+    const selectedRuntimeBooklet = requestedBookletKey
+      ? runtimeBooklets.find(booklet => booklet.bookletKey === requestedBookletKey) ??
+        runtimeBooklets.find(
+          booklet => booklet.sourceBookletKey === requestedBookletKey &&
+            (booklet.status === "in_progress" || booklet.status === "locked")
+        ) ??
+        runtimeBooklets.find(
+          booklet =>
+            booklet.sourceBookletKey === requestedBookletKey &&
+            booklet.status === "available"
+        ) ?? runtimeBooklets.find(booklet => booklet.sourceBookletKey === requestedBookletKey)
+      : runtimeBooklets.find(booklet => booklet.bookletKey ===
+          testRuns.find(run => run.status !== "completed")?.bookletAssignmentKey) ??
+        runtimeBooklets.find(booklet => booklet.status === "available");
+    if (requestedBookletKey && assignedBookletKeys.length > 0 && !selectedRuntimeBooklet) {
+      throw new FirstSliceError(
+        403,
+        "booklet_not_assigned",
+        `Booklet assignment '${requestedBookletKey}' is not assigned to participant '${participantSession.loginKey}'.`
+      );
+    }
+    const effectiveBookletKey =
+      selectedRuntimeBooklet?.sourceBookletKey || requestedBookletKey || "";
+    const bookletSource = requestedBookletKey
+      ? "request"
+      : assignedBookletKeys.length > 0
+        ? "participant_roster"
+        : "active_release_default";
+    const selectedBooklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+      booklet => booklet.bookletKey === effectiveBookletKey
+    );
+
+    if (effectiveBookletKey && !selectedBooklet) {
+      throw new FirstSliceError(
+        404,
+        "booklet_not_found",
+        `Booklet '${effectiveBookletKey}' was not found in active content release '${contentRelease.contentReleaseId}'.`
+      );
+    }
+    if (selectedRuntimeBooklet?.status === "completed") {
+      throw new FirstSliceError(
+        409,
+        "booklet_already_completed",
+        `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`
+      );
+    }
+    if (!selectedBooklet) {
+      throw new FirstSliceError(
+        409,
+        participantSession.status === "closed"
+          ? "participant_session_closed"
+          : "participant_session_has_no_available_booklet",
+        participantSession.status === "closed"
+          ? `Participant session '${participantSessionId}' is already closed.`
+          : `Participant session '${participantSessionId}' has no available booklet.`
+      );
+    }
+
+    const existingRun = testRuns.find(run =>
+      (run.bookletAssignmentKey ?? run.bookletKey) ===
+        (selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey));
+    if (existingRun) {
+      requireParticipantTestRunUnlocked(existingRun);
+      if (existingRun.status === "completed") {
+        throw new FirstSliceError(409, "booklet_already_completed",
+          `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
+      }
+      return deferExistingActivation ? existingRun : activateSession(existingRun);
+    }
+
+    const timestamp = now();
+    const executionMode = resolveParticipantExecutionMode(
+      participantSession.executionMode ?? rosterEntry?.executionMode
+    );
+    const initialTestRun = withEvaluatedBookletStates(selectedBooklet, {
+      testRunId: idGenerator(),
+      participantSessionId: participantSession.participantSessionId,
+      tenantId: participantSession.tenantId,
+      workspaceId: participantSession.workspaceId,
+      contentReleaseId: participantSession.contentReleaseId,
+      bookletKey: selectedBooklet.bookletKey,
+      executionMode: executionMode.mode,
+      bookletAssignmentKey:
+        selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
+      presetBookletStates: selectedRuntimeBooklet?.statePreset ?? {},
+      status: "running",
+      locked: false,
+      currentUnitKey: null,
+      unitResponses: {},
+      originalResultState: {lastOpenedAt: null, lastTestStateAt: null, hasTestState: false,
+        ...(participantSession.originalLoginKey === undefined ? {} : {
+          bookletName: selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
+          bookletLabel: selectedBooklet.originalBookletLabel ?? selectedBooklet.displayLabel
+        })},
+      unlockedTestletKeys: [],
+      monitorNavigationUnlocked: false,
+      testletTimers: {},
+      lockedTestletKeys: [],
+      lockedUnitKeys: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      completedAt: null
+    });
+    const firstUnit = resolveVisibleBookletUnits(
+      selectedBooklet,
+      initialTestRun
+    )[0];
+    const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
+      testletKey =>
+        Boolean(
+          selectedBooklet.testletEntries?.find(
+            testlet => testlet.testletKey === testletKey
+          )?.restrictions?.codeToEnter?.code
+        )
+    );
+    const testRun: TestRun = {
+      ...initialTestRun,
+      currentUnitKey: firstUnitRequiresCode
+        ? null
+        : firstUnit?.unitKey ?? null
+    };
+    let reservation: Awaited<ReturnType<FirstSliceRepository["getOrCreateTestRunForAssignment"]>>;
+    try {
+      reservation = await repository.getOrCreateTestRunForAssignment(testRun, context => {
+        const currentParent = context.participantSession;
+        if (currentParent.participantCode !== participantSession.participantCode ||
+          resolveParticipantExecutionMode(currentParent.executionMode ?? rosterEntry?.executionMode).mode !== executionMode.mode) {
+          throw new FirstSliceError(409, "participant_entry_changed",
+            "Participant code or execution mode changed before the new Run could start.");
+        }
+        // Read eligibility and start the timer only after acquiring the parent's
+        // reservation lock. A losing candidate never initializes any artifacts.
+        const activatedAt = now();
+        const activation = prepareParticipantControllerActivation({ ...context.testRun, activatedAt }, currentParent, context.testRun);
+        if (!activation) throw new FirstSliceError(409, "participant_controller_scope_changed",
+          "The controller's parent scope changed during entry.");
+        const activated = activateCurrentTestletTimer(contentRelease, normalizeTestRun(context.testRun), activatedAt);
+        const freshRun = { ...activated.testRun, updatedAt: activatedAt };
+        const entries: ParticipantTestLogEntryInput[] = [];
+        const activityEvents: WorkspaceActivityEvent[] = [];
+        if (activated.startedTestletKey) {
+          if (executionMode.saveResponses) entries.push(buildTestletTimeLeftTestStateEntry(freshRun, activatedAt));
+          const testletKey = activated.startedTestletKey;
+          const timer = freshRun.testletTimers?.[testletKey];
+          activityEvents.push(buildWorkspaceActivity({ tenantId: freshRun.tenantId, workspaceId: freshRun.workspaceId,
+            eventType: "testlet_timer_started", subjectType: "test_run", subjectId: freshRun.testRunId,
+            summary: `Timed block '${testletKey}' started for run '${freshRun.testRunId}'.`,
+            details: { testletKey, durationSeconds: timer?.durationSeconds ?? null,
+              expiresAt: timer?.expiresAt ?? null, currentUnitKey: freshRun.currentUnitKey } }));
+        }
+        if (executionMode.saveResponses) {
+          if (!browserControllerLifecycle) entries.push({ key: "CONTROLLER", timeStamp: Date.parse(activatedAt), content: "RUNNING" });
+          if (freshRun.currentUnitKey) entries.push({ key: "CURRENT_UNIT_ID", timeStamp: Date.parse(activatedAt), content: freshRun.currentUnitKey });
+          if (Object.keys(freshRun.bookletStates ?? {}).length) entries.push(buildBookletStatesTestStateEntry(freshRun, activatedAt));
+        }
+        activityEvents.push(buildWorkspaceActivity({ tenantId: freshRun.tenantId, workspaceId: freshRun.workspaceId,
+          eventType: "participant_session_resumed", subjectType: "test_run", subjectId: freshRun.testRunId,
+          summary: `Participant session '${currentParent.participantSessionId}' started a run.`,
+          details: { participantSessionId: currentParent.participantSessionId, bookletKey: freshRun.bookletKey,
+            bookletAssignmentKey: freshRun.bookletAssignmentKey, currentUnitKey: freshRun.currentUnitKey, bookletSource } }));
+        return { testRun: freshRun,
+          testLogs: executionMode.saveResponses ? buildParticipantTestLogs({ testRun: freshRun, batches: [{ entries }] }) : [],
+          activityEvents, controllerEntryActive: true, originalResultOpenedAt: activatedAt,
+          ...(entries.length ? {originalResultTestStateAt: activatedAt} : {}),
+          ...(activation.activated ? { participantSession: activation.participantSession } : {}) };
+      });
+    } catch (error) {
+      if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
+      throw error;
+    }
+    const effectiveTestRun = normalizeTestRun(reservation.testRun);
+    requireParticipantTestRunUnlocked(effectiveTestRun);
+    if (effectiveTestRun.status === "completed") {
+      throw new FirstSliceError(409, "booklet_already_completed",
+        `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
+    }
+    return !reservation.created && !deferExistingActivation ? activateSession(effectiveTestRun) : effectiveTestRun;
+  };
+
+
+  const updateApplicationSettings = async (
+    input: Parameters<ApplicationSettingsPort["patchOriginalApplicationSettings"]>[0], originalPatch=false
+  ):Promise<ApplicationSettings> => {
+    const currentSession = await requireActiveAdminSession(
+      repository,
+      input.sessionToken,
+      now()
+    );
+    requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+    return repository.mutateApplicationSettings(previous => {
+      const previousSettings = previous ?? defaultApplicationSettings;
+      const updatedSettings: ApplicationSettings = {
+        appTitle: originalPatch && input.appTitle === undefined ? previousSettings.appTitle : normalizeApplicationTitle(input.appTitle),
+        mainLogo:
+          input.mainLogo === undefined
+            ? previousSettings.mainLogo
+            : normalizeApplicationLogo(input.mainLogo),
+        themeName:
+          input.themeName === undefined
+            ? previousSettings.themeName
+            : normalizeApplicationTheme(input.themeName),
+        introHtml:
+          input.introHtml === undefined
+            ? previousSettings.introHtml
+            : normalizeApplicationContentHtml(input.introHtml, "intro"),
+        legalNoticeHtml:
+          input.legalNoticeHtml === undefined
+            ? previousSettings.legalNoticeHtml
+            : normalizeApplicationContentHtml(
+                input.legalNoticeHtml,
+                "legal_notice"
+              ),
+        privacyNotice:
+          input.privacyNotice === undefined
+            ? previousSettings.privacyNotice
+            : normalizeApplicationContentHtml(
+                input.privacyNotice,
+                "privacy_notice"
+              ),
+        accessibilityNotice:
+          input.accessibilityNotice === undefined
+            ? previousSettings.accessibilityNotice
+            : normalizeApplicationContentHtml(
+                input.accessibilityNotice,
+                "accessibility_notice"
+              ),
+        customTexts:
+          input.customTexts === undefined
+            ? previousSettings.customTexts
+            : normalizeApplicationCustomTexts(originalPatch ? {...previousSettings.customTexts,...normalizeApplicationCustomTexts(input.customTexts)} : input.customTexts),
+        assetAssignments: input.assetAssignments === undefined ? previousSettings.assetAssignments :
+          Object.fromEntries(Object.entries(input.assetAssignments).map(([slot,originalName]) => {
+            if (!(applicationAssetSlotNames as readonly string[]).includes(slot) || typeof originalName !== "string" || !originalName.trim()) {
+              throw new FirstSliceError(400,"application_asset_assignment_invalid",`Application asset assignment '${slot}' is invalid.`);
+            }
+            return [slot, originalName.trim()];
+          })),
+        globalWarningText: originalPatch && input.globalWarningText === undefined ? previousSettings.globalWarningText : normalizeGlobalWarningText(input.globalWarningText),
+        globalWarningExpiresAt: originalPatch && input.globalWarningExpiresAt === undefined ? previousSettings.globalWarningExpiresAt : normalizeGlobalWarningExpiration(input.globalWarningExpiresAt),
+        updatedAt: now(),
+        updatedByAdminUserId: currentSession.adminUser.adminUserId
+      };
+      const changedCustomTextKeys = [
+        ...new Set([
+          ...Object.keys(previousSettings.customTexts),
+          ...Object.keys(updatedSettings.customTexts)
+        ])
+      ].filter(
+        key =>
+          previousSettings.customTexts[key] !== updatedSettings.customTexts[key]
+      );
+      const changedAssetAssignmentSlots = applicationAssetSlotNames.filter(
+        slot =>
+          previousSettings.assetAssignments[slot] !==
+          updatedSettings.assetAssignments[slot]
+      );
+      const auditEvent:AdminAuditEvent = {
+        adminAuditEventId:idGenerator(),subjectAdminUserId:null,occurredAt:now(),
+        eventType: "application_settings_updated",
+        actorAdminUserId: currentSession.adminUser.adminUserId,
+        summary: `Platform admin '${currentSession.adminUser.username}' updated application settings.`,
+        details: {
+          previousAppTitle: previousSettings.appTitle,
+          nextAppTitle: updatedSettings.appTitle,
+          previousThemeName: previousSettings.themeName,
+          nextThemeName: updatedSettings.themeName,
+          introHtmlChanged:
+            previousSettings.introHtml !== updatedSettings.introHtml,
+          previousIntroHtmlBytes: Buffer.byteLength(
+            previousSettings.introHtml,
+            "utf8"
+          ),
+          nextIntroHtmlBytes: Buffer.byteLength(
+            updatedSettings.introHtml,
+            "utf8"
+          ),
+          legalNoticeHtmlChanged:
+            previousSettings.legalNoticeHtml !==
+            updatedSettings.legalNoticeHtml,
+          previousLegalNoticeHtmlBytes: Buffer.byteLength(
+            previousSettings.legalNoticeHtml,
+            "utf8"
+          ),
+          nextLegalNoticeHtmlBytes: Buffer.byteLength(
+            updatedSettings.legalNoticeHtml,
+            "utf8"
+          ),
+          privacyNoticeChanged:
+            previousSettings.privacyNotice !== updatedSettings.privacyNotice,
+          previousPrivacyNoticeBytes: Buffer.byteLength(
+            previousSettings.privacyNotice,
+            "utf8"
+          ),
+          nextPrivacyNoticeBytes: Buffer.byteLength(
+            updatedSettings.privacyNotice,
+            "utf8"
+          ),
+          accessibilityNoticeChanged:
+            previousSettings.accessibilityNotice !==
+            updatedSettings.accessibilityNotice,
+          previousAccessibilityNoticeBytes: Buffer.byteLength(
+            previousSettings.accessibilityNotice,
+            "utf8"
+          ),
+          nextAccessibilityNoticeBytes: Buffer.byteLength(
+            updatedSettings.accessibilityNotice,
+            "utf8"
+          ),
+          previousCustomLogo:
+            previousSettings.mainLogo !== defaultApplicationSettings.mainLogo,
+          nextCustomLogo:
+            updatedSettings.mainLogo !== defaultApplicationSettings.mainLogo,
+          previousCustomTextCount: Object.keys(previousSettings.customTexts).length,
+          nextCustomTextCount: Object.keys(updatedSettings.customTexts).length,
+          changedCustomTextKeys,
+          previousAssetAssignmentCount: Object.keys(
+            previousSettings.assetAssignments
+          ).length,
+          nextAssetAssignmentCount: Object.keys(updatedSettings.assetAssignments)
+            .length,
+          changedAssetAssignmentSlots,
+          previousGlobalWarningText: previousSettings.globalWarningText,
+          nextGlobalWarningText: updatedSettings.globalWarningText,
+          previousGlobalWarningExpiresAt:
+            previousSettings.globalWarningExpiresAt,
+          nextGlobalWarningExpiresAt:
+            updatedSettings.globalWarningExpiresAt
+        }
+      };
+      return {settings:updatedSettings,auditEvent};
+    });
+  };
+
+  // Source loose files are typed by extension/root, never by a caller's MIME
+  // hint or a supplied runtime structure. The decoded bytes remain unchanged.
+  const projectWorkspaceFile = (source: SourcePackage) => {
+    const decoded = decodePersistedSourceDocument(source);
+    return {sourcePackageId:source.sourcePackageId, fileName:source.fileName,
+      fileType:/\.xml$/i.test(source.fileName) ? classifyWorkspaceSourcePackage(
+        {...source, mediaType:'application/xml', contentStructure:null}, decoded ? {...decoded,mediaType:'application/xml'} : null)
+        : /\.zip$/i.test(source.fileName) && !/\.itcr\.zip$/i.test(source.fileName) ? 'Package' as const : 'Resource' as const,
+      status:source.status, uploadedAt:source.uploadedAt, fileSizeBytes:decoded?.bytes.byteLength ?? null,
+      sourceText:decoded ? readPersistedSourceText(source,decoded) : null,
+      resourceIdentifier:/\.html$/i.test(source.fileName) ? readStandaloneVeronaPlayerResourceId(source) : null};
+  };
+  const validateWorkspaceFile = (source: SourcePackage) => {
+    const decoded = decodePersistedSourceDocument(source);
+    if (source.sourceDocument === null || !decoded) throw new FirstSliceError(400,
+      'workspace_file_document_invalid', 'A workspace file requires actual source bytes.');
+    const file = projectWorkspaceFile(source);
+    if (/\.xml$/i.test(source.fileName)) {
+      const diagnostics = [
+        ...(/^data:/i.test(source.sourceDocument) ? validateXmlEncoding(decoded.bytes,file.sourceText ?? '',source.fileName,decoded.mediaType) : []),
+        ...validateTestcenterXmlSourceDocument(file.sourceText ?? '',source.fileName,xmlValidationContext)
+      ];
+      if (diagnostics.some(value=>value.severity==='error') || file.fileType==='Resource' || file.fileType==='Package') {
+        throw new FirstSliceError(400,'workspace_file_validation_failed',
+          'The file did not pass Testcenter XML validation.',{diagnostics});
+      }
+    }
+    return file;
+  };
+  const assertWorkspaceFileDependencies = (source: SourcePackage, sources: SourcePackage[], events: WorkspaceActivityEvent[], excludedId?: string) => {
+    const file = projectWorkspaceFile(source);
+    const effective = selectCurrentWorkspaceFiles(sources,events)
+      .filter(value=>value.status!=='rejected' && value.sourcePackageId!==excludedId);
+    const catalog = buildWorkspaceFileCatalog([...effective.map(projectWorkspaceFile),file], {requireDependencies:true});
+    const unresolved = catalog.items.find(value=>value.sourcePackageId===source.sourcePackageId)?.unresolvedReferences ?? [];
+    if (unresolved.length) throw new FirstSliceError(409,'workspace_file_dependencies_unresolved',
+      'The workspace file has missing or ambiguous dependencies.',{unresolvedReferences:unresolved});
+  };
+  const assertWorkspaceFileIdentity = (source: SourcePackage, sources: SourcePackage[], events: WorkspaceActivityEvent[], excludedId?: string) => {
+    const identity=workspaceFileReplacementIdentity(projectWorkspaceFile(source));
+    const duplicate=selectCurrentWorkspaceFiles(sources,events).find(value=>{
+      if (value.status==='rejected' || value.sourcePackageId===excludedId) return false;
+      const existing=workspaceFileReplacementIdentity(projectWorkspaceFile(value));
+      return existing.fileType===identity.fileType && existing.identifier===identity.identifier;
+    });
+    if (duplicate) throw new FirstSliceError(409,'workspace_file_identifier_duplicate',
+      'A current file of the same type already uses this identifier.',{conflictingSourcePackageId:duplicate.sourcePackageId});
+  };
+  const uploadWorkspaceFile = async (input: Parameters<ContentIntakePort['uploadWorkspaceFile']>[0]): Promise<UploadWorkspaceFileResult> => {
+    const workspace = await requireWorkspace(repository,input.tenantKey,input.workspaceKey);
+    if (typeof input.fileName!=='string' || !input.fileName.trim() || /[\\/\x00-\x1f\x7f]/.test(input.fileName) ||
+        input.fileName==='.' || input.fileName==='..') throw new FirstSliceError(400,
+      'workspace_file_name_invalid','A workspace file requires a basename without paths or control characters.');
+    // Keep authored whitespace; Source limits the basename to 120 UTF-8 bytes.
+    if (Buffer.byteLength(input.fileName,'utf8')>ORIGINAL_SOURCE_PACKAGE_FILE_NAME_MAX_BYTES) throw new FirstSliceError(400,
+      'source_package_file_name_too_long','Source package file names must not exceed 120 UTF-8 bytes.');
+    if (typeof input.sourceDocument!=='string') throw new FirstSliceError(400,
+      'workspace_file_document_invalid','A workspace file requires a string or encoded bytes.');
+    const sourcePackage: SourcePackage = {sourcePackageId:idGenerator(),tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,
+      fileName:input.fileName,mediaType:normalizeSourcePackageText(input.mediaType,'mediaType','source_package_media_type_required'),
+      sourceDocument:input.sourceDocument,contentStructure:null,status:'uploaded',uploadedAt:now()};
+    const file = validateWorkspaceFile(sourcePackage);
+    if (file.fileType==='Package' || /\.zip$/i.test(input.fileName)) throw new FirstSliceError(400,
+      'workspace_file_container_upload_unsupported','This loose-file endpoint does not yet materialize ZIP archive members.');
+    // Type folders let a Unit and Booklet share their original basename.
+    sourcePackage.fileName = file.fileType+'/'+input.fileName;
+    if (/\.xml$/i.test(input.fileName)) sourcePackage.mediaType='application/xml';
+    const [sourcePackages,activityEvents] = await Promise.all([
+      repository.listSourcePackagesByWorkspace(workspace.tenantId,workspace.workspaceId),
+      repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId,workspace.workspaceId)
+    ]);
+    const current = selectCurrentWorkspaceFiles(sourcePackages,activityEvents).filter(value=>value.status!=='rejected');
+    const sameName = current.find(value=>projectWorkspaceFile(value).fileType===file.fileType &&
+      value.fileName.split(/[\\/]/).at(-1)===input.fileName);
+    if (sameName) {
+      const result = await replaceSourcePackageInternal({...input,sourcePackageId:sameName.sourcePackageId},true,
+        createWorkspaceSourcePackageReferenceRevision({sourcePackages:[sameName],activityEvents:[]}));
+      return {sourcePackage:result.replacementSourcePackage,replacedSourcePackageId:sameName.sourcePackageId,
+        importJob:result.importJob,stagedContentRelease:result.stagedContentRelease,workspaceAvailability:result.workspaceAvailability,
+        ...(result.participantRosterImport ? {participantRosterImport:result.participantRosterImport} : {})};
+    }
+    assertWorkspaceFileIdentity(sourcePackage,sourcePackages,activityEvents);
+    assertWorkspaceFileDependencies(sourcePackage,sourcePackages,activityEvents);
+    if (file.fileType==='Testtakers') await assertTenantTesttakersIdentitiesAvailable({workspace,sourcePackage});
+    const independent = file.fileType==='Unit' || file.fileType==='Resource';
+    sourcePackage.status='accepted';
+    const createdActivityEvent: WorkspaceActivityEvent = {activityEventId:idGenerator(),tenantId:workspace.tenantId,
+      workspaceId:workspace.workspaceId,eventType:'source_package_created',actorId:null,subjectType:'source_package',
+      subjectId:sourcePackage.sourcePackageId,occurredAt:now(),summary:`Workspace file '${input.fileName}' uploaded.`,
+      details:{fileName:sourcePackage.fileName,mediaType:sourcePackage.mediaType,intakeMode:'workspace_file'}};
+    if (!await repository.reserveWorkspaceFileUpload({sourcePackage,createdActivityEvent,
+      expectedWorkspaceSourcePackageReferenceRevision:createWorkspaceSourcePackageReferenceRevision({sourcePackages,activityEvents})})) {
+      throw new FirstSliceError(409,'workspace_file_upload_conflict','Workspace files changed during upload. Refresh and retry.');
+    }
+    if (independent) return {sourcePackage,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null, workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
+    const result = await createImportJobWithRelease({tenantKey:input.tenantKey,workspaceKey:input.workspaceKey,
+      sourcePackageId:sourcePackage.sourcePackageId},{currentWorkspaceFilesOnly:true});
+    return {...result,sourcePackage:(await repository.getSourcePackageById(sourcePackage.sourcePackageId)) ?? sourcePackage,
+      replacedSourcePackageId:null, workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
+  };
+
+  function replaceSourcePackageInternal(input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile: true, expectedSourceRevision?: string): Promise<ReplaceWorkspaceFileResult>;
+  function replaceSourcePackageInternal(input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile?: false): ReturnType<ContentIntakePort['replaceSourcePackage']>;
+  async function replaceSourcePackageInternal(
+    input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile = false, expectedSourceRevision?: string
+  ): Promise<ReplaceWorkspaceFileResult> {
+    const workspace = await requireWorkspace(
+      repository,
+      input.tenantKey,
+      input.workspaceKey
+    );
+    const replacedSourcePackage = await requireSourcePackage(
+      repository,
+      input.sourcePackageId
+    );
+    if (
+      replacedSourcePackage.tenantId !== workspace.tenantId ||
+      replacedSourcePackage.workspaceId !== workspace.workspaceId
+    ) {
+      throw new FirstSliceError(
+        404,
+        "source_package_not_found",
+        `Source package '${input.sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
+      );
+    }
+
+    if (expectedSourceRevision && expectedSourceRevision!==createWorkspaceSourcePackageReferenceRevision({
+      sourcePackages:[replacedSourcePackage],activityEvents:[]})) throw new FirstSliceError(409,
+      'source_package_replacement_conflict','The selected workspace file changed during upload. Refresh and retry.');
+
+    const replacementSourcePackage: SourcePackage = {
+      sourcePackageId: idGenerator(),
+      tenantId: workspace.tenantId,
+      workspaceId: workspace.workspaceId,
+      fileName: workspaceFile ? replacedSourcePackage.fileName : normalizeSourcePackageFileName(input.fileName),
+      mediaType: normalizeSourcePackageText(
+        input.mediaType,
+        "mediaType",
+        "source_package_media_type_required"
+      ),
+      contentStructure: input.contentStructure ?? null,
+      sourceDocument: workspaceFile && typeof input.sourceDocument==='string'
+        ? input.sourceDocument : normalizeOptionalSourceDocument(input.sourceDocument) ?? null,
+      status: "uploaded",
+      uploadedAt: now()
+    };
+    const [sourcePackages, activityEvents] = await Promise.all([
+      repository.listSourcePackagesByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      ),
+      repository.listWorkspaceActivityEventsByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      )
+    ]);
+    if (
+      hasActiveSourcePackageReplacement({
+        sourcePackageId: replacedSourcePackage.sourcePackageId,
+        sourcePackages,
+        activityEvents
+      })
+    ) {
+      throw new FirstSliceError(
+        409,
+        "source_package_replacement_superseded",
+        `Source package '${replacedSourcePackage.fileName}' already has a replacement. Replace the latest version to preserve a linear history.`
+      );
+    }
+    let independentWorkspaceFile = false;
+    if (workspaceFile) {
+      if (replacementSourcePackage.sourceDocument === null) throw new FirstSliceError(400,
+        'workspace_file_document_required', 'A workspace file replacement requires an actual source document or encoded bytes.');
+      if (!decodePersistedSourceDocument(replacementSourcePackage)) throw new FirstSliceError(400,
+        'workspace_file_document_invalid', 'The replacement source bytes could not be decoded.');
+      const captured = sourcePackages.find(source => source.sourcePackageId === replacedSourcePackage.sourcePackageId);
+      if (!captured || createWorkspaceSourcePackageReferenceRevision({sourcePackages:[captured], activityEvents:[]}) !==
+          createWorkspaceSourcePackageReferenceRevision({sourcePackages:[replacedSourcePackage], activityEvents:[]})) {
+        throw new FirstSliceError(409, 'source_package_replacement_conflict',
+          'The existing file changed before its replacement snapshot was captured. Refresh the files and retry.');
+      }
+      const oldFile = projectWorkspaceFile(replacedSourcePackage), newFile = validateWorkspaceFile(replacementSourcePackage);
+      if (/\.xml$/i.test(replacementSourcePackage.fileName)) replacementSourcePackage.mediaType='application/xml';
+      const conflict = workspaceFileReplacementConflict(oldFile, newFile);
+      if (conflict) throw new FirstSliceError(409, conflict.code, conflict.message);
+      independentWorkspaceFile = newFile.fileType === 'Unit' ||
+        (newFile.fileType === 'Resource' && !/\.zip$/i.test(replacementSourcePackage.fileName));
+      if (newFile.fileType==='Unit') assertWorkspaceFileDependencies(replacementSourcePackage,sourcePackages,activityEvents,
+        replacedSourcePackage.sourcePackageId);
+      // A valid loose file is accepted in the same reservation as its lineage.
+      // The generated dependency snapshot's import status is separate from the
+      // original physical file. Independent Units/resources need no runtime job.
+      replacementSourcePackage.status = 'accepted';
+    }
+    if (workspaceFile) {
+      assertWorkspaceFileIdentity(replacementSourcePackage,sourcePackages,activityEvents,replacedSourcePackage.sourcePackageId);
+    } else await assertWorkspaceSourcePackageIdentitiesAvailable({
+      workspace,sourcePackage:replacementSourcePackage,excludedSourcePackageIds:[replacedSourcePackage.sourcePackageId],
+      sourcePackages,activityEvents
+    });
+    if (!workspaceFile || projectWorkspaceFile(replacementSourcePackage).fileType==='Testtakers') {
+      await assertTenantTesttakersIdentitiesAvailable({workspace,sourcePackage:replacementSourcePackage,
+        excludedSourcePackageIds:[replacedSourcePackage.sourcePackageId]});
+    }
+    const replacementActivityEvent: WorkspaceActivityEvent = {
+      activityEventId: idGenerator(),
+      tenantId: workspace.tenantId,
+      workspaceId: workspace.workspaceId,
+      eventType: "source_package_replaced",
+      actorId: null,
+      subjectType: "source_package",
+      subjectId: replacedSourcePackage.sourcePackageId,
+      occurredAt: now(),
+      summary: independentWorkspaceFile
+        ? `Workspace file '${replacedSourcePackage.fileName}' replaced by '${replacementSourcePackage.fileName}'.`
+        : `Source package '${replacedSourcePackage.fileName}' replacement reserved for '${replacementSourcePackage.fileName}'.`,
+      details: {
+        ...(workspaceFile ? {replacementMode:'workspace_file'} : {}),
+        replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
+        replacementSourcePackageId:
+          replacementSourcePackage.sourcePackageId,
+        importJobId: null,
+        stagedContentReleaseId: null
+      }
+    };
+    const reserved = await repository.reserveSourcePackageReplacement({
+      replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
+      replacementSourcePackage,
+      replacementActivityEvent,
+      expectedWorkspaceSourcePackageReferenceRevision:
+        createWorkspaceSourcePackageReferenceRevision({
+          sourcePackages,
+          activityEvents
+        })
+    });
+    if (!reserved) {
+      throw new FirstSliceError(
+        409,
+        "source_package_replacement_conflict",
+        "Source package lineage changed while the replacement was being prepared. Refresh the source packages and retry against the latest version."
+      );
+    }
+    if (independentWorkspaceFile) return {replacedSourcePackage, replacementSourcePackage,
+      importJob:null, stagedContentRelease:null,workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
+    const result = await createImportJobWithRelease({
+      tenantKey: input.tenantKey,
+      workspaceKey: input.workspaceKey,
+      sourcePackageId: replacementSourcePackage.sourcePackageId
+    }, {currentWorkspaceFilesOnly:workspaceFile});
+    const persistedReplacement =
+      (await repository.getSourcePackageById(
+        replacementSourcePackage.sourcePackageId
+      )) ?? replacementSourcePackage;
+
+    await repository.saveWorkspaceActivityEvent({
+      ...replacementActivityEvent,
+      summary: `Source package '${replacedSourcePackage.fileName}' replaced by '${persistedReplacement.fileName}'.`,
+      details: {
+        ...(workspaceFile ? {replacementMode:'workspace_file'} : {}),
+        replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
+        replacementSourcePackageId: persistedReplacement.sourcePackageId,
+        importJobId: result.importJob.importJobId,
+        stagedContentReleaseId: result.stagedContentRelease?.contentReleaseId ?? null
+      }
+    });
+
+    return {
+      replacedSourcePackage,
+      replacementSourcePackage: persistedReplacement,
+      ...(workspaceFile ? {workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)} : {}),
+      importJob: result.importJob,
+      stagedContentRelease: result.stagedContentRelease,
+      ...(result.participantRosterImport
+        ? { participantRosterImport: result.participantRosterImport }
+        : {})
+    };
+  };
+
   return {
     applicationSettings: {
       async getApplicationSettings() {
@@ -26634,28 +27396,23 @@ export const createFirstSliceServices = (
         );
         requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
         const normalized = normalizeApplicationAssetInput(input);
-        const existing = await repository.getApplicationAssetByOriginalName(
-          normalized.originalName
-        );
         const timestamp = now();
-        const applicationAsset: ApplicationAsset = {
-          applicationAssetId:
-            existing?.applicationAssetId ?? `asset:${idGenerator()}`,
-          ...normalized,
-          createdAt: existing?.createdAt ?? timestamp,
-          updatedAt: timestamp
+        const candidate: ApplicationAsset = {
+          applicationAssetId: `asset:${idGenerator()}`,
+          ...normalized, createdAt: timestamp, updatedAt: timestamp
         };
-        await repository.saveApplicationAsset(applicationAsset);
+        // Resolve filename identity under the same registry lock as deletion.
+        const { applicationAsset, replaced } = await repository.saveApplicationAsset(candidate, true);
         await recordAdminAuditEvent({
           eventType: "application_asset_uploaded",
           actorAdminUserId: currentSession.adminUser.adminUserId,
-          summary: `Platform admin '${currentSession.adminUser.username}' ${existing ? "replaced" : "uploaded"} application asset '${applicationAsset.originalName}'.`,
+          summary: `Platform admin '${currentSession.adminUser.username}' ${replaced ? "replaced" : "uploaded"} application asset '${applicationAsset.originalName}'.`,
           details: {
             applicationAssetId: applicationAsset.applicationAssetId,
             originalName: applicationAsset.originalName,
             mediaType: applicationAsset.mediaType,
             byteLength: applicationAsset.byteLength,
-            replaced: Boolean(existing)
+            replaced
           }
         });
         return applicationAsset;
@@ -26667,285 +27424,20 @@ export const createFirstSliceServices = (
           now()
         );
         requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
-        const applicationAsset = await repository.getApplicationAssetById(
-          input.applicationAssetId.trim()
-        );
-        if (!applicationAsset) {
-          throw new FirstSliceError(
-            404,
-            "application_asset_not_found",
-            "The requested application asset was not found."
-          );
-        }
-        const applicationSettings = await repository.getApplicationSettings();
-        const assignedSlots = Object.entries(
-          applicationSettings?.assetAssignments ?? {}
-        ).flatMap(([slot, originalName]) =>
-          originalName === applicationAsset.originalName ? [slot] : []
-        );
-        const tenants = await repository.listTenants();
-        const scopedWorkspaces = (
-          await Promise.all(
-            tenants.map(async tenant =>
-              (await repository.listWorkspacesByTenantId(tenant.tenantId)).map(
-                workspace => ({ tenant, workspace })
-              )
-            )
-          )
-        ).flat();
-        const rosterReferences = (
-          await Promise.all(
-            scopedWorkspaces.map(async ({ tenant, workspace }) => {
-              const [participants, operationalLogins] = await Promise.all([
-                repository.listParticipantRosterEntriesByWorkspace(
-                  tenant.tenantId,
-                  workspace.workspaceId
-                ),
-                repository.listOperationalLoginMigrationCandidatesByWorkspace(
-                  tenant.tenantId,
-                  workspace.workspaceId
-                )
-              ]);
-              return [
-                ...participants.map(entry => ({
-                  source: "participant" as const,
-                  loginKey: entry.loginKey,
-                  assetAssignments: entry.assetAssignments ?? {}
-                })),
-                ...operationalLogins.map(entry => ({
-                  source: "operational" as const,
-                  loginKey: entry.loginKey,
-                  assetAssignments: entry.assetAssignments ?? {}
-                }))
-              ].flatMap(entry => {
-                const slots = Object.entries(entry.assetAssignments).flatMap(
-                  ([slot, originalName]) =>
-                    originalName === applicationAsset.originalName ? [slot] : []
-                );
-                return slots.length > 0
-                  ? [
-                      {
-                        tenantKey: tenant.tenantKey,
-                        workspaceKey: workspace.workspaceKey,
-                        loginKey: entry.loginKey,
-                        source: entry.source,
-                        slots
-                      }
-                    ]
-                  : [];
-              });
-            })
-          )
-        ).flat();
-        if (assignedSlots.length > 0 || rosterReferences.length > 0) {
-          throw new FirstSliceError(
-            409,
-            "application_asset_in_use",
-            `Application asset '${applicationAsset.originalName}' is still assigned.`,
-            {
-              assignedSlots,
-              rosterReferenceCount: rosterReferences.length,
-              rosterReferences: rosterReferences.slice(0, 50)
-            }
-          );
-        }
-        await repository.deleteApplicationAsset(
-          applicationAsset.applicationAssetId
-        );
-        await recordAdminAuditEvent({
-          eventType: "application_asset_deleted",
-          actorAdminUserId: currentSession.adminUser.adminUserId,
-          summary: `Platform admin '${currentSession.adminUser.username}' deleted application asset '${applicationAsset.originalName}'.`,
-          details: {
-            applicationAssetId: applicationAsset.applicationAssetId,
-            originalName: applicationAsset.originalName
-          }
+        if(input.cascadeAssignments!==undefined&&typeof input.cascadeAssignments!=="boolean")throw new FirstSliceError(
+          400,"application_asset_deletion_policy_invalid","cascadeAssignments must be a boolean.");
+        const applicationAsset=await repository.mutateApplicationAssetDeletion({
+          applicationAssetId:input.applicationAssetId.trim(),cascadeAssignments:input.cascadeAssignments===true,
+          auditEvent:{adminAuditEventId:idGenerator(),eventType:"application_asset_deleted",
+            actorAdminUserId:currentSession.adminUser.adminUserId,subjectAdminUserId:null,occurredAt:now(),
+            summary:"Platform administrator deleted an application asset.",
+            details:{applicationAssetId:input.applicationAssetId}}
         });
+        if(!applicationAsset)throw new FirstSliceError(404,"application_asset_not_found","The requested application asset was not found.");
         return applicationAsset;
       },
-      async updateApplicationSettings(input) {
-        const currentSession = await requireActiveAdminSession(
-          repository,
-          input.sessionToken,
-          now()
-        );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
-        const previousSettings =
-          (await repository.getApplicationSettings()) ?? defaultApplicationSettings;
-        const updatedSettings: ApplicationSettings = {
-          appTitle: normalizeApplicationTitle(input.appTitle),
-          mainLogo:
-            input.mainLogo === undefined
-              ? previousSettings.mainLogo
-              : normalizeApplicationLogo(input.mainLogo),
-          themeName:
-            input.themeName === undefined
-              ? previousSettings.themeName
-              : normalizeApplicationTheme(input.themeName),
-          introHtml:
-            input.introHtml === undefined
-              ? previousSettings.introHtml
-              : normalizeApplicationContentHtml(input.introHtml, "intro"),
-          legalNoticeHtml:
-            input.legalNoticeHtml === undefined
-              ? previousSettings.legalNoticeHtml
-              : normalizeApplicationContentHtml(
-                  input.legalNoticeHtml,
-                  "legal_notice"
-                ),
-          privacyNotice:
-            input.privacyNotice === undefined
-              ? previousSettings.privacyNotice
-              : normalizeApplicationContentHtml(
-                  input.privacyNotice,
-                  "privacy_notice"
-                ),
-          accessibilityNotice:
-            input.accessibilityNotice === undefined
-              ? previousSettings.accessibilityNotice
-              : normalizeApplicationContentHtml(
-                  input.accessibilityNotice,
-                  "accessibility_notice"
-                ),
-          customTexts:
-            input.customTexts === undefined
-              ? previousSettings.customTexts
-              : normalizeApplicationCustomTexts(input.customTexts),
-          assetAssignments:
-            input.assetAssignments === undefined
-              ? previousSettings.assetAssignments
-              : Object.fromEntries(
-                  await Promise.all(
-                    Object.entries(input.assetAssignments).map(
-                      async ([slot, originalName]) => {
-                        if (
-                          !(applicationAssetSlotNames as readonly string[]).includes(
-                            slot
-                          ) ||
-                          typeof originalName !== "string" ||
-                          !originalName.trim()
-                        ) {
-                          throw new FirstSliceError(
-                            400,
-                            "application_asset_assignment_invalid",
-                            `Application asset assignment '${slot}' is invalid.`
-                          );
-                        }
-                        const normalizedName = originalName.trim();
-                        if (
-                          !(await repository.getApplicationAssetByOriginalName(
-                            normalizedName
-                          ))
-                        ) {
-                          throw new FirstSliceError(
-                            400,
-                            "application_asset_assignment_missing",
-                            `Application asset '${normalizedName}' does not exist.`
-                          );
-                        }
-                        return [slot, normalizedName] as const;
-                      }
-                    )
-                  )
-                ),
-          globalWarningText: normalizeGlobalWarningText(
-            input.globalWarningText
-          ),
-          globalWarningExpiresAt: normalizeGlobalWarningExpiration(
-            input.globalWarningExpiresAt
-          ),
-          updatedAt: now(),
-          updatedByAdminUserId: currentSession.adminUser.adminUserId
-        };
-        await repository.saveApplicationSettings(updatedSettings);
-        const changedCustomTextKeys = [
-          ...new Set([
-            ...Object.keys(previousSettings.customTexts),
-            ...Object.keys(updatedSettings.customTexts)
-          ])
-        ].filter(
-          key =>
-            previousSettings.customTexts[key] !== updatedSettings.customTexts[key]
-        );
-        const changedAssetAssignmentSlots = applicationAssetSlotNames.filter(
-          slot =>
-            previousSettings.assetAssignments[slot] !==
-            updatedSettings.assetAssignments[slot]
-        );
-        await recordAdminAuditEvent({
-          eventType: "application_settings_updated",
-          actorAdminUserId: currentSession.adminUser.adminUserId,
-          summary: `Platform admin '${currentSession.adminUser.username}' updated application settings.`,
-          details: {
-            previousAppTitle: previousSettings.appTitle,
-            nextAppTitle: updatedSettings.appTitle,
-            previousThemeName: previousSettings.themeName,
-            nextThemeName: updatedSettings.themeName,
-            introHtmlChanged:
-              previousSettings.introHtml !== updatedSettings.introHtml,
-            previousIntroHtmlBytes: Buffer.byteLength(
-              previousSettings.introHtml,
-              "utf8"
-            ),
-            nextIntroHtmlBytes: Buffer.byteLength(
-              updatedSettings.introHtml,
-              "utf8"
-            ),
-            legalNoticeHtmlChanged:
-              previousSettings.legalNoticeHtml !==
-              updatedSettings.legalNoticeHtml,
-            previousLegalNoticeHtmlBytes: Buffer.byteLength(
-              previousSettings.legalNoticeHtml,
-              "utf8"
-            ),
-            nextLegalNoticeHtmlBytes: Buffer.byteLength(
-              updatedSettings.legalNoticeHtml,
-              "utf8"
-            ),
-            privacyNoticeChanged:
-              previousSettings.privacyNotice !== updatedSettings.privacyNotice,
-            previousPrivacyNoticeBytes: Buffer.byteLength(
-              previousSettings.privacyNotice,
-              "utf8"
-            ),
-            nextPrivacyNoticeBytes: Buffer.byteLength(
-              updatedSettings.privacyNotice,
-              "utf8"
-            ),
-            accessibilityNoticeChanged:
-              previousSettings.accessibilityNotice !==
-              updatedSettings.accessibilityNotice,
-            previousAccessibilityNoticeBytes: Buffer.byteLength(
-              previousSettings.accessibilityNotice,
-              "utf8"
-            ),
-            nextAccessibilityNoticeBytes: Buffer.byteLength(
-              updatedSettings.accessibilityNotice,
-              "utf8"
-            ),
-            previousCustomLogo:
-              previousSettings.mainLogo !== defaultApplicationSettings.mainLogo,
-            nextCustomLogo:
-              updatedSettings.mainLogo !== defaultApplicationSettings.mainLogo,
-            previousCustomTextCount: Object.keys(previousSettings.customTexts).length,
-            nextCustomTextCount: Object.keys(updatedSettings.customTexts).length,
-            changedCustomTextKeys,
-            previousAssetAssignmentCount: Object.keys(
-              previousSettings.assetAssignments
-            ).length,
-            nextAssetAssignmentCount: Object.keys(updatedSettings.assetAssignments)
-              .length,
-            changedAssetAssignmentSlots,
-            previousGlobalWarningText: previousSettings.globalWarningText,
-            nextGlobalWarningText: updatedSettings.globalWarningText,
-            previousGlobalWarningExpiresAt:
-              previousSettings.globalWarningExpiresAt,
-            nextGlobalWarningExpiresAt:
-              updatedSettings.globalWarningExpiresAt
-          }
-        });
-        return updatedSettings;
-      }
+      updateApplicationSettings: input => updateApplicationSettings(input),
+      patchOriginalApplicationSettings: input => updateApplicationSettings(input,true)
     },
     attachments: {
       async listAttachments(input) {
@@ -28541,7 +29033,7 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const contentReleases = await repository.listContentReleasesByWorkspace(
+        const contentReleases = await listRuntimeContentReleases(
           workspace.tenantId,
           workspace.workspaceId
         );
@@ -28628,7 +29120,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -28678,7 +29170,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -28738,7 +29230,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -28799,7 +29291,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -28854,7 +29346,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -28909,7 +29401,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -28977,7 +29469,7 @@ export const createFirstSliceServices = (
               workspace.tenantId,
               workspace.workspaceId
             ),
-            repository.listContentReleasesByWorkspace(
+            listRuntimeContentReleases(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -29304,6 +29796,56 @@ export const createFirstSliceServices = (
               activityEvents
             })
         });
+      },
+      async getWorkspaceFileCatalog(input) {
+        const workspace = await requireWorkspace(repository, input.tenantKey, input.workspaceKey);
+        const [sourcePackages, activityEvents] = await Promise.all([
+          repository.listSourcePackagesByWorkspace(workspace.tenantId, workspace.workspaceId),
+          repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId, workspace.workspaceId)
+        ]);
+        // Assemblies and replaced immutable revisions stay available through
+        // canonical history/download APIs, but are not current loose files.
+        const sourceFileIds = new Set(activityEvents.flatMap(event=>
+          event.eventType==='source_package_created' && event.details.intakeMode==='workspace_file' ? [event.subjectId] :
+          event.eventType==='source_package_replaced' && event.details.replacementMode==='workspace_file' &&
+            typeof event.details.replacementSourcePackageId==='string' ? [event.details.replacementSourcePackageId] : []));
+        const currentFiles=selectCurrentWorkspaceFiles(sourcePackages,activityEvents);
+        const catalog=buildWorkspaceFileCatalog(currentFiles
+          .map(source => {
+            if (sourceFileIds.has(source.sourcePackageId)) return projectWorkspaceFile(source);
+            const decoded = decodePersistedSourceDocument(source);
+            return {sourcePackageId: source.sourcePackageId, fileName: source.fileName,
+              fileType: classifyWorkspaceSourcePackage(source, decoded), status: source.status,
+              uploadedAt: source.uploadedAt, fileSizeBytes: decoded?.bytes.byteLength ?? null,
+              sourceText: decoded ? readPersistedSourceText(source, decoded) : null,
+              resourceIdentifier: readStandaloneVeronaPlayerResourceId(source)};
+          }));
+        const byId=new Map(currentFiles.map(source=>[source.sourcePackageId,source]));
+        for (const file of catalog.items) {
+          const source=byId.get(file.sourcePackageId);
+          if (!source || !/\.xml$/i.test(source.fileName)) continue;
+          const decoded=decodePersistedSourceDocument(source), text=decoded ? readPersistedSourceText(source,decoded) ?? '' : '';
+          const diagnostics=[
+            ...(decoded && /^data:/i.test(source.sourceDocument ?? '') ? validateXmlEncoding(decoded.bytes,text,source.fileName,decoded.mediaType) : []),
+            ...validateTestcenterXmlSourceDocument(text,source.fileName,xmlValidationContext)
+          ];
+          // A catalog never publishes parser/XSD excerpts or roster contents.
+          // Full Source validation-report wording remains a separate contract.
+          const messages:Record<string,string>={
+            source_document_xml_malformed:'Die Datei enthält fehlerhaftes XML.',
+            source_document_xml_doctype_unsupported:'DOCTYPE-Deklarationen werden nicht akzeptiert.',
+            source_document_xml_encoding_invalid:'Die Zeichenkodierung der XML-Datei ist ungültig.',
+            testcenter_xml_schema_reference_missing:'Für diese XML-Datei fehlt die XSD-Referenz.',
+            testcenter_xml_schema_version_unsupported:'Die angegebene XML-Schemaversion wird nicht unterstützt.',
+            testcenter_xml_schema_reference_invalid:'Die XSD-Referenz ist ungültig.',
+            testcenter_xml_root_invalid:'Die Datei enthält keinen unterstützten Testcenter-XML-Typ.',
+            testcenter_xml_xsd_invalid:'Die XML-Datei entspricht nicht dem angegebenen Schema.',
+            testcenter_xml_schema_validator_unavailable:'Die XML-Schemaprüfung ist derzeit nicht verfügbar.'
+          };
+          file.validationDiagnostics=diagnostics.map(({code,severity})=>({code,severity,
+            message:messages[code]??'Die XML-Datei konnte nicht vollständig geprüft werden.'}));
+        }
+        return catalog;
       },
       async listSourcePackages(input) {
         const workspace = await requireWorkspace(
@@ -29719,7 +30261,7 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const contentReleases = await repository.listContentReleasesByWorkspace(
+        const contentReleases = await listRuntimeContentReleases(
           workspace.tenantId,
           workspace.workspaceId
         );
@@ -30072,17 +30614,10 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const groupKeys = Array.from(
+        const selectedGroupKeys = input.groupKeys === undefined ? undefined : Array.from(
           new Set(input.groupKeys.map(groupKey => groupKey.trim()).filter(Boolean))
         ).sort();
-        if (groupKeys.length === 0) {
-          throw new FirstSliceError(
-            400,
-            "result_archive_group_required",
-            "At least one result group must be selected."
-          );
-        }
-        if (groupKeys.length > 100) {
+        if (selectedGroupKeys && selectedGroupKeys.length > 100) {
           throw new FirstSliceError(
             400,
             "result_archive_group_limit_exceeded",
@@ -30095,7 +30630,8 @@ export const createFirstSliceServices = (
           testRuns,
           reviews,
           testLogs,
-          contentReleases
+          contentReleases,
+          activityEvents
         ] = await Promise.all([
           repository.listParticipantSessionsByWorkspace(
             workspace.tenantId,
@@ -30120,8 +30656,12 @@ export const createFirstSliceServices = (
           repository.listContentReleasesByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
-          )
+          ),
+          repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId, workspace.workspaceId, originalReviewUnitEventTypes)
         ]);
+        const groupKeys = selectedGroupKeys ?? Array.from(
+          new Set(participantSessions.map(session => session.groupKey))
+        ).sort();
         return createOriginalResultArchive({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
@@ -30132,7 +30672,8 @@ export const createFirstSliceServices = (
           testRuns,
           reviews,
           testLogs,
-          contentReleases
+          contentReleases,
+          activityEvents
         });
       },
       async getContentReleaseActivationReadiness(input) {
@@ -30170,6 +30711,7 @@ export const createFirstSliceServices = (
                 tenantId: workspace.tenantId,
                 workspaceId: workspace.workspaceId,
                 activeContentRelease: activeRelease,
+                resolveRelease: workspaceFiles.projectRelease,
                 timestamp: now()
               })
             : [];
@@ -30594,7 +31136,7 @@ export const createFirstSliceServices = (
         const normalizedUnitKey = normalizeOptionalUnitKey(input.unitKey);
         let originalUnitId: string | null = null;
         if (normalizedUnitKey) {
-          const contentRelease = await requireContentRelease(
+          const contentRelease = await requireRuntimeContentRelease(
             repository,
             testRun.contentReleaseId
           );
@@ -30729,7 +31271,7 @@ export const createFirstSliceServices = (
             );
           }
 
-          const contentRelease = await requireContentRelease(
+          const contentRelease = await requireRuntimeContentRelease(
             repository,
             testRun.contentReleaseId
           );
@@ -31190,143 +31732,9 @@ export const createFirstSliceServices = (
             : {})
         };
       },
-      async replaceSourcePackage(input) {
-        const workspace = await requireWorkspace(
-          repository,
-          input.tenantKey,
-          input.workspaceKey
-        );
-        const replacedSourcePackage = await requireSourcePackage(
-          repository,
-          input.sourcePackageId
-        );
-        if (
-          replacedSourcePackage.tenantId !== workspace.tenantId ||
-          replacedSourcePackage.workspaceId !== workspace.workspaceId
-        ) {
-          throw new FirstSliceError(
-            404,
-            "source_package_not_found",
-            `Source package '${input.sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
-          );
-        }
-
-        const replacementSourcePackage: SourcePackage = {
-          sourcePackageId: idGenerator(),
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          fileName: normalizeSourcePackageFileName(input.fileName),
-          mediaType: normalizeSourcePackageText(
-            input.mediaType,
-            "mediaType",
-            "source_package_media_type_required"
-          ),
-          contentStructure: input.contentStructure ?? null,
-          sourceDocument: normalizeOptionalSourceDocument(input.sourceDocument) ?? null,
-          status: "uploaded",
-          uploadedAt: now()
-        };
-        const [sourcePackages, activityEvents] = await Promise.all([
-          repository.listSourcePackagesByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listWorkspaceActivityEventsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          )
-        ]);
-        if (
-          hasActiveSourcePackageReplacement({
-            sourcePackageId: replacedSourcePackage.sourcePackageId,
-            sourcePackages,
-            activityEvents
-          })
-        ) {
-          throw new FirstSliceError(
-            409,
-            "source_package_replacement_superseded",
-            `Source package '${replacedSourcePackage.fileName}' already has a replacement. Replace the latest version to preserve a linear history.`
-          );
-        }
-        await assertWorkspaceSourcePackageIdentitiesAvailable({
-          workspace,
-          sourcePackage: replacementSourcePackage,
-          excludedSourcePackageIds: [replacedSourcePackage.sourcePackageId],
-          sourcePackages,
-          activityEvents
-        });
-        await assertTenantTesttakersIdentitiesAvailable({
-          workspace,
-          sourcePackage: replacementSourcePackage,
-          excludedSourcePackageIds: [replacedSourcePackage.sourcePackageId]
-        });
-        const replacementActivityEvent: WorkspaceActivityEvent = {
-          activityEventId: idGenerator(),
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "source_package_replaced",
-          actorId: null,
-          subjectType: "source_package",
-          subjectId: replacedSourcePackage.sourcePackageId,
-          occurredAt: now(),
-          summary: `Source package '${replacedSourcePackage.fileName}' replacement reserved for '${replacementSourcePackage.fileName}'.`,
-          details: {
-            replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
-            replacementSourcePackageId:
-              replacementSourcePackage.sourcePackageId,
-            importJobId: null,
-            stagedContentReleaseId: null
-          }
-        };
-        const reserved = await repository.reserveSourcePackageReplacement({
-          replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
-          replacementSourcePackage,
-          replacementActivityEvent,
-          expectedWorkspaceSourcePackageReferenceRevision:
-            createWorkspaceSourcePackageReferenceRevision({
-              sourcePackages,
-              activityEvents
-            })
-        });
-        if (!reserved) {
-          throw new FirstSliceError(
-            409,
-            "source_package_replacement_conflict",
-            "Source package lineage changed while the replacement was being prepared. Refresh the source packages and retry against the latest version."
-          );
-        }
-        const result = await createImportJobWithRelease({
-          tenantKey: input.tenantKey,
-          workspaceKey: input.workspaceKey,
-          sourcePackageId: replacementSourcePackage.sourcePackageId
-        });
-        const persistedReplacement =
-          (await repository.getSourcePackageById(
-            replacementSourcePackage.sourcePackageId
-          )) ?? replacementSourcePackage;
-
-        await repository.saveWorkspaceActivityEvent({
-          ...replacementActivityEvent,
-          summary: `Source package '${replacedSourcePackage.fileName}' replaced by '${persistedReplacement.fileName}'.`,
-          details: {
-            replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
-            replacementSourcePackageId: persistedReplacement.sourcePackageId,
-            importJobId: result.importJob.importJobId,
-            stagedContentReleaseId: result.stagedContentRelease?.contentReleaseId ?? null
-          }
-        });
-
-        return {
-          replacedSourcePackage,
-          replacementSourcePackage: persistedReplacement,
-          importJob: result.importJob,
-          stagedContentRelease: result.stagedContentRelease,
-          ...(result.participantRosterImport
-            ? { participantRosterImport: result.participantRosterImport }
-            : {})
-        };
-      },
+      replaceSourcePackage: input => replaceSourcePackageInternal(input),
+      uploadWorkspaceFile,
+      replaceWorkspaceFile: input => replaceSourcePackageInternal({...input, fileName: ''}, true),
       async deleteSourcePackage(input) {
         const workspace = await requireWorkspace(
           repository,
@@ -31458,6 +31866,7 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
+        const expectedRevision = await repository.getContentReleaseActivationRevision(workspace.tenantId, workspace.workspaceId);
         const targetRelease = await requireContentRelease(
           repository,
           input.contentReleaseId
@@ -31489,6 +31898,7 @@ export const createFirstSliceServices = (
                 tenantId: workspace.tenantId,
                 workspaceId: workspace.workspaceId,
                 activeContentRelease: activeRelease,
+                resolveRelease: workspaceFiles.projectRelease,
                 timestamp: activatedAt
               })
             : [];
@@ -31524,41 +31934,25 @@ export const createFirstSliceServices = (
           );
         }
 
-        for (const release of workspaceReleases) {
-          if (release.contentReleaseId === targetRelease.contentReleaseId) {
-            continue;
-          }
-
-          if (release.status === "active") {
-            await repository.saveContentRelease({
-              ...release,
-              status: "superseded"
-            });
-          }
-        }
-
-        const activatedRelease: ContentRelease = {
-          ...targetRelease,
-          status: "active",
-          activatedAt
-        };
-        await repository.saveContentRelease(activatedRelease);
+        const activatedRelease: ContentRelease = {...targetRelease, status: "active", activatedAt};
         const activation: ContentReleaseActivationSummary = {
           forced: Boolean(input.forceActivation),
           previousActiveContentReleaseId: activeRelease?.contentReleaseId ?? null,
           supersededOpenRunCount: supersededOpenRuns.length,
           supersededOpenRuns
         };
-        await recordWorkspaceActivity({
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "content_release_activated",
-          actorId: input.activatedByActorId,
-          subjectType: "content_release",
-          subjectId: activatedRelease.contentReleaseId,
-          summary: `Content release '${activatedRelease.contentReleaseId}' activated.`,
-          details: activation
+        const committed = await repository.commitContentReleaseActivation({
+          tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+          contentReleaseId: targetRelease.contentReleaseId, activatedAt, expectedRevision,
+          activityEvent: {
+            activityEventId: idGenerator(), tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+            eventType: "content_release_activated", actorId: input.activatedByActorId ?? null,
+            subjectType: "content_release", subjectId: targetRelease.contentReleaseId, occurredAt: activatedAt,
+            summary: `Content release '${targetRelease.contentReleaseId}' activated.`, details: activation
+          }
         });
+        if (!committed) throw new FirstSliceError(409, "content_release_activation_conflict",
+          "Workspace content or participant state changed during activation. Reload and try again.");
         return {
           contentRelease: activatedRelease,
           activation
@@ -31659,6 +32053,13 @@ export const createFirstSliceServices = (
           );
         }
         const signInTimestamp = now();
+        // Original accepts the XML attribute but stores an empty label as NULL.
+        // Its Login construction then fails before checking the password. Keep
+        // that invalid stored metadata visible; never invent a group-key label.
+        if (rosterEntry?.groupLabel === "") {
+          assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+          throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
+        }
         if (requireLoginPassword || rosterEntry?.passwordRequired) {
           const loginAttempt = await repository.getParticipantLoginAttempt(
             workspace.tenantId,
@@ -31715,7 +32116,30 @@ export const createFirstSliceServices = (
             );
           }
         }
-        const participantCode = String(input.participantCode ?? "").trim();
+        // Source creates login_session_groups after credential/absolute-window
+        // validation, before the separate person-code step (which may fail).
+        assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+        const requestedGroupKey = String(input.groupKey ?? "").trim();
+        const groupKey = rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
+        const originalGroup = await repository.getOrCreateOriginalParticipantGroup({
+          tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+          groupKey, groupLabel: rosterEntry?.groupLabel ?? groupKey, createdAt: signInTimestamp
+        });
+        if (!originalGroup) {
+          throw new FirstSliceError(404, "workspace_not_found", "Participant workspace was not found.");
+        }
+        const nativeBinding = rosterEntry?.originalLoginIdentity
+          ? await repository.bindOriginalLoginGroup({tenantId:workspace.tenantId,
+              workspaceId:workspace.workspaceId,loginKey:rosterEntry.loginKey,groupKey,
+              groupSnapshotKey:originalGroup.groupKey,authenticatedAt:signInTimestamp})
+          : null;
+        if (rosterEntry?.originalLoginIdentity && !nativeBinding) {
+          throw new FirstSliceError(409, "participant_login_scope_changed", "The login group changed during authentication.");
+        }
+        const matchesLogin = (session: ParticipantSession): boolean => nativeBinding
+          ? session.originalLoginKey === nativeBinding.loginKey
+          : session.loginKey === loginKey && session.originalLoginKey === undefined;
+        const participantCode = nativeBinding ? String(input.participantCode ?? "") : String(input.participantCode ?? "").trim();
         const codeRequired = participantRosterRequiresCode(rosterEntry);
         if (codeRequired && !participantCode) {
           throw new FirstSliceError(
@@ -31732,8 +32156,9 @@ export const createFirstSliceServices = (
           ? getParticipantRosterBookletAssignments(rosterEntry)
               .flatMap(assignment => assignment.accessCodes ?? [])
               .find(code =>
-                normalizeParticipantCode(code) ===
-                  normalizeParticipantCode(participantCode)
+                nativeBinding
+                  ? code.replace(/[A-Z]/g,letter=>letter.toLowerCase()) === participantCode.replace(/[A-Z]/g,letter=>letter.toLowerCase())
+                  : normalizeParticipantCode(code) === normalizeParticipantCode(participantCode)
               )
           : undefined;
         if (codeRequired && matchedParticipantCode === undefined) {
@@ -31747,15 +32172,12 @@ export const createFirstSliceServices = (
             }
           );
         }
-        const effectiveParticipantCode = matchedParticipantCode ?? null;
-        const requestedGroupKey = String(input.groupKey ?? "").trim();
-        const groupKey =
-          rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
+        const effectiveParticipantCode = matchedParticipantCode === undefined ? null : nativeBinding ? participantCode : matchedParticipantCode;
         const executionMode = resolveParticipantExecutionMode(
           rosterEntry?.executionMode
         );
 
-        const workspaceParticipantSessions =
+        const workspaceParticipantSessions = nativeBinding ? [] :
           await repository.listParticipantSessionsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
@@ -31763,24 +32185,24 @@ export const createFirstSliceServices = (
         const loginSessions = workspaceParticipantSessions
           .filter(
             participantSession =>
-              participantSession.loginKey === loginKey &&
+              matchesLogin(participantSession) &&
               normalizeParticipantCode(participantSession.participantCode) ===
                 normalizeParticipantCode(effectiveParticipantCode)
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-        const accessStartedAt = loginSessions[0]?.createdAt ?? signInTimestamp;
+        const accessStartedAt = nativeBinding ? signInTimestamp : loginSessions[0]?.createdAt ?? signInTimestamp;
         const validUntil = resolveParticipantSessionValidUntil(
           rosterEntry,
           accessStartedAt
         );
         assertParticipantAccessWindow(rosterEntry, signInTimestamp, validUntil);
 
-        const reusableSession = executionMode.alwaysNewSession
+        const reusableSession = executionMode.alwaysNewSession || nativeBinding
           ? undefined
           : workspaceParticipantSessions
               .filter(
                 participantSession =>
-                  participantSession.loginKey === loginKey &&
+                  matchesLogin(participantSession) &&
                   participantSession.groupKey === groupKey &&
                   normalizeParticipantCode(participantSession.participantCode) ===
                     normalizeParticipantCode(effectiveParticipantCode) &&
@@ -31821,12 +32243,14 @@ export const createFirstSliceServices = (
           return reusableSession;
         }
 
-        const participantSession: ParticipantSession = {
+        let participantSession: ParticipantSession = {
           participantSessionId: idGenerator(),
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
           contentReleaseId: activeRelease.contentReleaseId,
-          loginKey,
+          loginKey: nativeBinding?.loginKey ?? loginKey,
+          ...(nativeBinding ? {originalLoginKey:nativeBinding.loginKey,
+            originalNameSuffix:createOriginalPersonNameSuffix(effectiveParticipantCode,executionMode.alwaysNewSession)} : {}),
           groupKey,
           participantCode: effectiveParticipantCode,
           executionMode: executionMode.mode,
@@ -31834,21 +32258,33 @@ export const createFirstSliceServices = (
           validUntil,
           createdAt: signInTimestamp
         };
-        await repository.saveParticipantSession(participantSession);
+        let nativeReused=false;
+        if(nativeBinding){
+          try{
+            const resolved=await repository.resolveOriginalParticipantSession(participantSession,
+              person=>assertParticipantAccessWindow(rosterEntry,signInTimestamp,person.validUntil));
+            if(!resolved)throw new FirstSliceError(409,"participant_login_scope_changed","The native person workspace changed during authentication.");
+            participantSession=resolved.participantSession;nativeReused=!resolved.created;
+          }catch(error){
+            if(error instanceof OriginalPersonIdentityConflictError)throw new FirstSliceError(409,"original_person_identity_conflict",error.message);
+            throw error;
+          }
+        }else await repository.saveParticipantSession(participantSession);
         await recordWorkspaceActivity({
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
           eventType: "participant_signed_in",
           subjectType: "participant_session",
           subjectId: participantSession.participantSessionId,
-          summary: `Participant '${participantSession.loginKey}' signed in.`,
+          summary: nativeReused?`Participant '${participantSession.loginKey}' re-entered an existing session.`:`Participant '${participantSession.loginKey}' signed in.`,
           details: {
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey,
             contentReleaseId: participantSession.contentReleaseId,
             participantCodeRequired: codeRequired,
             executionMode: executionMode.mode,
-            rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry)
+            rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
+            ...(nativeReused?{reused:true}:{})
           }
         });
         await repository.resetParticipantLoginAttempts(
@@ -31879,7 +32315,7 @@ export const createFirstSliceServices = (
           participantSession.workspaceId,
           participantSession.loginKey
         );
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           participantSession.contentReleaseId
         );
@@ -31960,6 +32396,415 @@ export const createFirstSliceServices = (
           availableAction: "resume"
         };
       },
+      async listPendingCommands(input) {
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const run = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!run || !resolveParticipantExecutionMode(run.executionMode).receiveRemoteCommands) return [];
+        return repository.listPendingParticipantRunCommands({
+          tenantId: session.tenantId, workspaceId: session.workspaceId,
+          participantSessionId: session.participantSessionId, testRunId: run.testRunId
+        });
+      },
+      async acknowledgeCommand(input) {
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const run = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!run || !resolveParticipantExecutionMode(run.executionMode).receiveRemoteCommands) {
+          throw new FirstSliceError(409, "participant_commands_disabled", "This Run does not receive remote commands.");
+        }
+        const commandId = input.commandId?.trim();
+        if (!commandId || commandId.length > 160) {
+          throw new FirstSliceError(400, "invalid_participant_command_id", "A command identifier is required.");
+        }
+        const command = await repository.acknowledgeParticipantRunCommand({
+          tenantId: session.tenantId, workspaceId: session.workspaceId,
+          participantSessionId: session.participantSessionId, testRunId: run.testRunId,
+          commandId, acknowledgedAt: now()
+        });
+        if (!command) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
+        return command;
+      },
+      async executeCommand(input) {
+        requireCommandCompletionProtocol(input.commandCompletion);
+        if (input.controllerDispatch !== undefined && !validParticipantControllerDispatch(input.controllerDispatch)) {
+          throw new FirstSliceError(400, "participant_controller_dispatch_invalid", "The controller dispatch is invalid.");
+        }
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!selected || !resolveParticipantExecutionMode(selected.executionMode).receiveRemoteCommands) {
+          throw new FirstSliceError(409, "participant_commands_disabled", "This Run does not receive remote commands.");
+        }
+        const commandId = input.commandId?.trim();
+        if (!commandId || commandId.length > 160) throw new FirstSliceError(400, "invalid_participant_command_id", "A command identifier is required.");
+        if (input.controllerStatus !== undefined && !["RUNNING", "PAUSED", "ERROR", "TERMINATED", "TERMINATED_PAUSED"].includes(input.controllerStatus) ||
+            input.terminationNoop !== undefined && (input.terminationNoop !== true || input.controllerStatus !== "TERMINATED")) {
+          throw new FirstSliceError(400, "participant_command_controller_status_invalid", "The observed controller status is invalid.");
+        }
+        const contentRelease = await requireRuntimeContentRelease(repository, selected.contentReleaseId);
+        const executedAt = now();
+        try {
+          const result = await serializeTestRunMutation(selected.testRunId, () => repository.applyParticipantRunCommand({
+            tenantId: session.tenantId, workspaceId: session.workspaceId, participantSessionId: session.participantSessionId,
+            testRunId: selected.testRunId, commandId, executedAt
+          }, context => {
+            const project = (): ParticipantRunCommandEffect => {
+            if (input.terminationNoop && (!context.command.effectsDeferred || !["complete", "complete_and_lock"].includes(context.command.commandType))) {
+              throw new FirstSliceError(400, "participant_command_controller_status_invalid", "Only a deferred terminal command can take the terminal early return.");
+            }
+            // Legacy records already changed the Run at issuance. Do not repeat their effects.
+            if (!context.command.effectsDeferred) return { testRun: context.testRun, testLogs: [], activityEvents: [] };
+            const { command, participantSession } = context;
+            const testRun = normalizeTestRun(context.testRun);
+            const mode = resolveParticipantExecutionMode(testRun.executionMode);
+            if (!mode.receiveRemoteCommands) throw new FirstSliceError(409, "participant_commands_disabled", "This Run does not receive remote commands.");
+            if (input.terminationNoop) {
+              const content = formatOriginalMonitorCommandLogContent({ commandType: command.commandType, targetUnitKey: command.targetUnitKey,
+                reopenedClosedTestlet: false, remainingSeconds: command.remainingSeconds });
+              return { terminationNoop: true, testRun: context.testRun,
+                testLogs: mode.saveResponses && content ? buildParticipantTestLogs({ testRun: context.testRun,
+                  batches: [{ entries: [{ key: "command executed", timeStamp: Date.parse(executedAt), content }] }] }) : [], activityEvents: [] };
+            }
+            if (command.commandType !== "debug" && participantControllerDispatchSuperseded(context.testRun, input.controllerDispatch)) {
+              const content = formatOriginalMonitorCommandLogContent({ commandType: command.commandType, targetUnitKey: command.targetUnitKey,
+                reopenedClosedTestlet: false, remainingSeconds: command.remainingSeconds });
+              if (input.commandCompletion === "browser-v1" && ["complete", "complete_and_lock"].includes(command.commandType)) {
+                const entries: ParticipantTestLogEntryInput[] = [{ key: "command executed", timeStamp: Date.parse(executedAt), content: content ?? "" }];
+                if (command.commandType === "complete_and_lock") entries.unshift({ key: "locked by monitor", timeStamp: Date.parse(executedAt), content: command.actorId ?? "" });
+                return { ...projectSupersededParticipantTermination(context.testRun, participantSession, command.commandType === "complete_and_lock", executedAt),
+                  testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: context.testRun, batches: [{ entries }] }) : [], activityEvents: [] };
+              }
+              return { testRun: context.testRun, superseded: true, controllerDispatch: input.controllerDispatch,
+                testLogs: mode.saveResponses && content ? buildParticipantTestLogs({ testRun: context.testRun,
+                  batches: [{ entries: [{ key: "command executed", timeStamp: Date.parse(executedAt), content }] }] }) : [], activityEvents: [] };
+            }
+            if (command.commandType === "debug") {
+              // Debug changes the browser pane only. It must not resume an
+              // ERROR/paused controller, restart timers or rewrite Run data.
+              const content = formatOriginalMonitorCommandLogContent({ commandType: "debug", debugArguments: command.debugArguments,
+                targetUnitKey: null, reopenedClosedTestlet: false, remainingSeconds: null })!;
+              return { testRun: context.testRun,
+                testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: context.testRun,
+                  batches: [{ entries: [{ key: "command executed", timeStamp: Date.parse(executedAt), content }] }] }) : [],
+                activityEvents: [{ activityEventId: idGenerator(), tenantId: testRun.tenantId, workspaceId: testRun.workspaceId,
+                  eventType: "monitor_run_command_executed", actorId: command.actorId, subjectType: "test_run", subjectId: testRun.testRunId,
+                  occurredAt: executedAt, summary: `Monitor command 'debug' executed for run '${testRun.testRunId}'.`,
+                  details: { commandId: command.commandId, commandType: "debug", debugArguments: command.debugArguments ?? [],
+                    previousStatus: testRun.status, nextStatus: testRun.status, previousUnitKey: testRun.currentUnitKey,
+                    currentUnitKey: testRun.currentUnitKey, participantSessionId: participantSession.participantSessionId } }] };
+            }
+            const projected = projectParticipantRunCommand({ contentRelease, testRun, commandType: command.commandType,
+              targetUnitKey: command.targetUnitKey, remainingSeconds: command.remainingSeconds, timestamp: executedAt, controllerStatus: input.controllerStatus });
+            const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
+            const activated = terminal || command.commandType === "resume" ? { testRun: projected.testRun, startedTestletKey: projected.startedTestletKey ?? null }
+              : activateCurrentTestletTimer(contentRelease, projected.testRun, executedAt);
+            // Runtime normalization supplies defaults for legacy snapshots,
+            // but a command must retain the stored immutable assignment and
+            // execution-mode identities under the repository's strict guard.
+            const nextRun: TestRun = { ...activated.testRun,
+              executionMode: context.testRun.executionMode,
+              bookletAssignmentKey: context.testRun.bookletAssignmentKey };
+            const logs: ParticipantTestLogEntryInput[] = [];
+            const previousController = input.controllerStatus ?? testRun.status.toUpperCase();
+            const controller = terminal ? previousController === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : nextRun.status.toUpperCase();
+            if (terminal || controller !== previousController) logs.push({ key: "CONTROLLER", timeStamp: Date.parse(executedAt), content: controller });
+            if (nextRun.currentUnitKey !== testRun.currentUnitKey) logs.push({ key: "CURRENT_UNIT_ID", timeStamp: Date.parse(executedAt), content: nextRun.currentUnitKey ?? "" });
+            if (testletTimerStateChanged(testRun, nextRun)) logs.unshift(buildTestletTimeLeftTestStateEntry(nextRun, executedAt));
+            const reopened = command.commandType === "goto" && projected.adjustedTestletKey != null && command.remainingSeconds != null &&
+              projected.previousTimer != null && (projected.previousTimer.status === "expired" || projected.previousTimer.status === "cancelled" ||
+              getTestletTimerRemainingSeconds(projected.previousTimer, executedAt) <= 0);
+            const logContent = formatOriginalMonitorCommandLogContent({ commandType: command.commandType, targetUnitKey: command.targetUnitKey,
+              reopenedClosedTestlet: reopened, remainingSeconds: command.remainingSeconds });
+            if (logContent) logs.push({ key: "command executed", timeStamp: Date.parse(executedAt), content: logContent });
+            if (command.commandType === "complete_and_lock") logs.push({ key: "locked by monitor", timeStamp: Date.parse(executedAt), content: command.actorId ?? "" });
+            const activityEvents: WorkspaceActivityEvent[] = [{ activityEventId: idGenerator(), tenantId: testRun.tenantId,
+              workspaceId: testRun.workspaceId, eventType: "monitor_run_command_executed", actorId: command.actorId, subjectType: "test_run",
+              subjectId: testRun.testRunId, occurredAt: executedAt, summary: `Monitor command '${command.commandType}' executed for run '${testRun.testRunId}'.`,
+              details: { commandId: command.commandId, commandType: command.commandType, previousStatus: testRun.status, nextStatus: nextRun.status,
+                previousLocked: testRun.locked === true, locked: nextRun.locked === true, targetUnitKey: command.targetUnitKey,
+                targetTestletKey: projected.adjustedTestletKey, previousTimerStatus: projected.previousTimer?.status ?? null,
+                previousRemainingSeconds: projected.previousTimer ? getTestletTimerRemainingSeconds(projected.previousTimer, executedAt) : null,
+                remainingSeconds: command.remainingSeconds } }];
+            const timerKey = activated.startedTestletKey ?? (reopened ? projected.adjustedTestletKey : null);
+            if (timerKey) activityEvents.push({ activityEventId: idGenerator(), tenantId: testRun.tenantId, workspaceId: testRun.workspaceId,
+              eventType: "testlet_timer_started", actorId: command.actorId, subjectType: "test_run", subjectId: testRun.testRunId,
+              occurredAt: executedAt, summary: `Timed block '${timerKey}' started for run '${testRun.testRunId}'.`,
+              details: { testletKey: timerKey, durationSeconds: nextRun.testletTimers?.[timerKey]?.durationSeconds ?? command.remainingSeconds,
+                expiresAt: nextRun.testletTimers?.[timerKey]?.expiresAt ?? null, currentUnitKey: nextRun.currentUnitKey, restoredByMonitor: reopened } });
+            return { testRun: nextRun, controllerDispatch: input.controllerDispatch,
+              ...(["lock_test", "unlock_test"].includes(command.commandType) ? {originalResultModifiedAt: executedAt} : {}),
+              testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: nextRun, batches: [{ entries: logs }] }) : [],
+              activityEvents, ...(terminal || ["pause", "resume", "goto"].includes(command.commandType)
+                ? { controllerEntryActive: !terminal, participantSession: { ...participantSession, status: terminal ? "signed_in" as const : "launched" as const } } : {}) };
+            };
+            const effect = project();
+            if (input.commandCompletion === "browser-v1" && context.command.effectsDeferred) {
+              const completion = effect.testLogs.find(log => log.logKey === "command executed");
+              effect.commandCompletion = "browser-v1";
+              effect.commandCompletionContent = completion?.logContent ?? "";
+              effect.testLogs = effect.testLogs.filter(log => log.logKey !== "command executed");
+            }
+            return effect;
+          }));
+          if (!result) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
+          if (Boolean(result.command.terminationNoop) !== Boolean(input.terminationNoop)) {
+            throw new FirstSliceError(409, "participant_command_application_conflict", "An executed terminal command cannot change its early-return decision.");
+          }
+          return { ...result, ...(result.command.commandCompletion === "browser-v1" && !result.command.terminationNoop &&
+            ["complete", "complete_and_lock"].includes(result.command.commandType) ? { terminalContinuation: true as const } : {}),
+            ...(input.controllerDispatch ? { controllerDispatch: input.controllerDispatch,
+            ...(input.controllerDispatch.sequence < (result.testRun.controllerDispatches?.[input.controllerDispatch.controllerId] ?? 0) ? { superseded: true as const } : {}) } : {}) };
+        } catch (error) {
+          if (error instanceof ParticipantRunCommandApplicationError) throw new FirstSliceError(409, error.errorCode, error.message);
+          if (error instanceof ParticipantNativeCommandError) throw new FirstSliceError(409, error.errorCode, error.message);
+          throw error;
+        }
+      },
+      async interruptControllerTimer(input) {
+        if (!isParticipantControllerTimerInterruptionRequest(input)) throw new FirstSliceError(400,
+          "participant_controller_timer_interruption_invalid", "A controller timer interruption requires its immutable timer identity, balance and dispatch.");
+        const request = structuredClone(input);
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(request.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(request.testRunId));
+        if (!selected) throw new FirstSliceError(404, "test_run_not_found", "The selected Run was not found.");
+        if (selected.contentReleaseId !== request.contentReleaseId || selected.bookletKey !== request.bookletKey) {
+          throw new FirstSliceError(409, "test_run_scope_changed", "The timer interruption belongs to another immutable content snapshot.");
+        }
+        const release = await requireRuntimeContentRelease(repository, selected.contentReleaseId);
+        if (release.tenantId !== selected.tenantId || release.workspaceId !== selected.workspaceId) {
+          throw new FirstSliceError(404, "test_run_not_found", "The selected Run's content was not found.");
+        }
+        const booklet = release.runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === selected.bookletKey);
+        const timed = booklet && resolveTimedTestletForUnit(booklet, request.unitKey);
+        if (!timed || timed.testletKey !== request.testletKey) throw new FirstSliceError(400,
+          "participant_controller_timer_interruption_invalid", "The interrupted timer must belong to the observed Unit.");
+        const roster = await findParticipantRosterEntryByLoginKey(repository, session.tenantId, session.workspaceId, session.loginKey);
+        const deliveryId = `controller-timer:${request.deliveryId}`;
+        const payloadSha256 = participantProgressPayloadSha256({ kind: "participant-controller-timer-interruption/v1", ...request });
+        let acceptedAt = "";
+        const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
+          if (context.progressDelivery) {
+            if (context.progressDelivery.payloadSha256 !== payloadSha256) throw new FirstSliceError(409,
+              "participant_delivery_conflict", "An accepted timer interruption cannot change its timer, balance or dispatch.");
+            acceptedAt = context.progressDelivery.acceptedAt;
+            return null;
+          }
+          const timestamp = now(); acceptedAt = timestamp;
+          assertParticipantAccessWindow(roster, timestamp, context.participantSession.validUntil);
+          if (context.testRun.status === "completed") throw new FirstSliceError(400,
+            "participant_controller_timer_interruption_completed", "The selected Run is completed.");
+          if (context.testRun.bookletAssignmentKey !== selected.bookletAssignmentKey) throw new FirstSliceError(409,
+            "test_run_scope_changed", "The timer interruption belongs to another immutable assignment.");
+          const timer = context.testRun.testletTimers?.[request.testletKey];
+          if (timer && request.remainingSeconds > timer.durationSeconds) throw new FirstSliceError(400,
+            "participant_controller_timer_interruption_invalid", "The interrupted balance cannot exceed the timer's authored duration.");
+          // This receipt precedes the answer drain. It must not advance the
+          // command state highwater or alter Run/controller/parent state.
+          const legacy = request.legacyCommand;
+          const legacyHash = legacy ? participantProgressPayloadSha256({ kind: "participant-native-command/v1", keyword: legacy.keyword,
+            arguments: legacy.arguments, controllerStatus: legacy.controllerStatus, timeStamp: legacy.timeStamp }) : undefined;
+          const legacyBalance = timer ? legacyTimerInterruptionBalance({ run: context.testRun, timer, request, payloadSha256: legacyHash, timestamp }) : undefined;
+          const current = !participantControllerDispatchSuperseded(context.testRun, request.controllerDispatch) &&
+            context.testRun.currentUnitKey === request.unitKey && timer?.status === "running" &&
+            (timer.startedAt === request.startedAt && timer.expiresAt === request.expiresAt || legacyBalance !== undefined);
+          const testRun = current ? normalizeTestRun({ ...context.testRun,
+            testletTimers: { ...context.testRun.testletTimers, [request.testletKey]: { ...timer,
+              status: "paused", remainingSeconds: legacyBalance ?? Math.min(timer.remainingSeconds, request.remainingSeconds),
+              expiresAt: null, updatedAt: timestamp, endedAt: null, interruptedAtUnitKey: request.unitKey } }, updatedAt: timestamp }) : context.testRun;
+          return { testRun, testLogs: [], activityEvents: [],
+            progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
+              tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
+              deliveryId, payloadSha256, acceptedAt: timestamp } };
+        }));
+        if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run's scope changed.");
+        return { ...request, scope: { tenantId: result.testRun.tenantId, workspaceId: result.testRun.workspaceId,
+          participantSessionId: result.testRun.participantSessionId, testRunId: result.testRun.testRunId,
+          contentReleaseId: result.testRun.contentReleaseId, bookletKey: result.testRun.bookletKey }, acceptedAt, applied: result.applied };
+      },
+      async executeNativeCommand(input) {
+        requireCommandCompletionProtocol(input.commandCompletion);
+        if (input.controllerDispatch !== undefined && !validParticipantControllerDispatch(input.controllerDispatch)) {
+          throw new FirstSliceError(400, "participant_controller_dispatch_invalid", "The controller dispatch is invalid.");
+        }
+        if (!participantNativeCommandKeywords.includes(input.keyword) || !Array.isArray(input.arguments) ||
+            input.arguments.some(argument => typeof argument !== "string") ||
+            !["LOADING", "RUNNING", "PAUSED", "ERROR", "TERMINATED", "TERMINATED_PAUSED"].includes(input.controllerStatus) ||
+            input.terminationNoop !== undefined && (input.terminationNoop !== true || input.keyword !== "terminate" || input.controllerStatus !== "TERMINATED") ||
+            !Number.isSafeInteger(input.timeStamp) || input.timeStamp < 0 ||
+            typeof input.contentReleaseId !== "string" || !input.contentReleaseId || typeof input.bookletKey !== "string" || !input.bookletKey ||
+            typeof input.deliveryId !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(input.deliveryId)) {
+          throw new FirstSliceError(400, "participant_native_command_invalid", "A native command requires its immutable identifier, keyword, string arguments, controller status and timestamp.");
+        }
+        const request = structuredClone(input);
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(request.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(request.testRunId));
+        if (!selected) throw new FirstSliceError(404, "test_run_not_found", "The selected Run was not found.");
+        if (selected.contentReleaseId !== request.contentReleaseId || selected.bookletKey !== request.bookletKey) {
+          throw new FirstSliceError(409, "test_run_scope_changed", "The native command belongs to another immutable content snapshot.");
+        }
+        const release = await requireRuntimeContentRelease(repository, selected.contentReleaseId);
+        if (release.tenantId !== selected.tenantId || release.workspaceId !== selected.workspaceId) {
+          throw new FirstSliceError(404, "test_run_not_found", "The selected Run's content was not found.");
+        }
+        const booklet = release.runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === selected.bookletKey);
+        if (!booklet) throw new FirstSliceError(404, "booklet_not_found", "The selected Run's booklet was not found.");
+        const roster = await findParticipantRosterEntryByLoginKey(repository, session.tenantId, session.workspaceId, session.loginKey);
+        const deliveryId = `console:${request.deliveryId}`;
+        const payloadSha256 = nativeCommandPayloadSha256(request);
+        let executedAt = "";
+        try {
+          const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
+            const project = (): ParticipantRunMutationEffect | null => {
+            if (context.progressDelivery) {
+              if (context.progressDelivery.payloadSha256 !== payloadSha256) throw new FirstSliceError(409,
+                "participant_delivery_conflict", "An accepted native command cannot change its arguments or observed identity.");
+              executedAt = context.progressDelivery.acceptedAt;
+              return null;
+            }
+            const timestamp = now(); executedAt = timestamp;
+            assertParticipantAccessWindow(roster, timestamp, context.participantSession.validUntil);
+            if (context.testRun.bookletKey !== selected.bookletKey || context.testRun.bookletAssignmentKey !== selected.bookletAssignmentKey) {
+              throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run's immutable assignment changed.");
+            }
+            if (request.terminationNoop) {
+              if (context.testRun.status === "completed") throw new FirstSliceError(400, "participant_native_run_completed", "The selected Run is completed.");
+              // Log the accepted early return without advancing the state-effect
+              // highwater: an earlier real Terminate may still await its buffers.
+              return { terminationNoop: true, testRun: context.testRun,
+                testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: context.testRun,
+                  deliveryId, batches: [{ entries: [{ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") }] }] }) : [],
+                activityEvents: [], progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
+                  tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
+                  deliveryId, payloadSha256, acceptedAt: timestamp } };
+            }
+            const observedController = request.controllerDispatch || request.controllerStatus === "TERMINATED" || request.controllerStatus === "TERMINATED_PAUSED" ? request.controllerStatus : request.controllerStatus === "ERROR" ? "ERROR" :
+              request.controllerStatus === "PAUSED" || context.testRun.status === "paused" ? "PAUSED" : request.controllerStatus;
+            const projected = projectParticipantControllerCommand({ contentRelease: release, testRun: context.testRun, timestamp,
+              request: { ...request, controllerStatus: observedController }, workerStep: ["goto", "resume"].includes(request.keyword) }).testRun;
+            if (participantControllerDispatchSuperseded(context.testRun, request.controllerDispatch)) {
+              if (request.keyword === "terminate" && request.commandCompletion === "browser-v1") {
+                const entries: ParticipantTestLogEntryInput[] = [{ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") }];
+                if (request.arguments.includes("lock")) entries.unshift({ key: "BOOKLETLOCKEDbyOPERATOR", timeStamp: Date.parse(timestamp), content: "" });
+                return { ...projectSupersededParticipantTermination(context.testRun, context.participantSession, request.arguments.includes("lock"), timestamp),
+                  testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: context.testRun, deliveryId, batches: [{ entries }] }) : [],
+                  activityEvents: [], progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
+                    tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
+                    deliveryId, payloadSha256, acceptedAt: timestamp } };
+              }
+              return { testRun: context.testRun, superseded: true, controllerDispatch: request.controllerDispatch,
+                testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: context.testRun,
+                  deliveryId, batches: [{ entries: [{ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") }] }] }) : [],
+                activityEvents: [], progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
+                  tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
+                  deliveryId, payloadSha256, acceptedAt: timestamp } };
+            }
+            const nextRun = withLegacyTimerPreparation({ before: context.testRun,
+              after: { ...projected, executionMode: context.testRun.executionMode, bookletAssignmentKey: context.testRun.bookletAssignmentKey },
+              request, payloadSha256, testletKey: resolveTimedTestletForUnit(booklet, context.testRun.currentUnitKey)?.testletKey ?? null });
+            const terminal = request.keyword === "terminate";
+            const controller = terminal ? observedController === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : nextRun.status.toUpperCase();
+            const entries: ParticipantTestLogEntryInput[] = [];
+            if (controller !== observedController) entries.push({ key: "CONTROLLER", timeStamp: request.timeStamp, content: controller });
+            if (testletTimerStateChanged(context.testRun, nextRun)) entries.push(buildTestletTimeLeftTestStateEntry(nextRun, timestamp));
+            for (const [field, key] of [["unlockedTestletKeys", "TESTLETS_CLEARED_CODE"], ["lockedTestletKeys", "TESTLETS_LOCKED_AFTER_LEAVE"], ["lockedUnitKeys", "UNITS_LOCKED_AFTER_LEAVE"]] as const) {
+              if (JSON.stringify(context.testRun[field] ?? []) !== JSON.stringify(nextRun[field] ?? [])) entries.push({ key, timeStamp: request.timeStamp, content: JSON.stringify(nextRun[field] ?? []) });
+            }
+            if (nextRun.currentUnitKey !== context.testRun.currentUnitKey) entries.push({ key: "CURRENT_UNIT_ID", timeStamp: request.timeStamp, content: nextRun.currentUnitKey ?? "" });
+            if (terminal && request.arguments.includes("lock")) entries.push({ key: "BOOKLETLOCKEDbyOPERATOR", timeStamp: request.timeStamp, content: "" });
+            entries.push({ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") });
+            return { testRun: nextRun, controllerEntryActive: !terminal, controllerDispatch: request.controllerDispatch,
+              participantSession: { ...context.participantSession, status: terminal ? "signed_in" : "launched" },
+              testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: nextRun, deliveryId, batches: [{ entries }] }) : [],
+              activityEvents: [{ activityEventId: `delivery:${nextRun.testRunId}:${deliveryId}:activity:native`, tenantId: nextRun.tenantId,
+                workspaceId: nextRun.workspaceId, eventType: "participant_command_executed", actorId: null, subjectType: "test_run", subjectId: nextRun.testRunId,
+                occurredAt: timestamp, summary: `Participant console command '${request.keyword}' executed.`,
+                details: { deliveryId: request.deliveryId, keyword: request.keyword, arguments: request.arguments,
+                  previousStatus: context.testRun.status, nextStatus: nextRun.status, currentUnitKey: nextRun.currentUnitKey } }],
+              progressDelivery: { testRunId: nextRun.testRunId, participantSessionId: nextRun.participantSessionId, tenantId: nextRun.tenantId,
+                workspaceId: nextRun.workspaceId, contentReleaseId: nextRun.contentReleaseId, deliveryId, payloadSha256, acceptedAt: timestamp } };
+            };
+            const effect = project();
+            if (effect && request.commandCompletion === "browser-v1") effect.testLogs = effect.testLogs.filter(log => log.logKey !== "command executed");
+            return effect;
+          }));
+          if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run's scope changed.");
+          return { ...request, scope: { tenantId: result.testRun.tenantId, workspaceId: result.testRun.workspaceId,
+            participantSessionId: result.testRun.participantSessionId, testRunId: result.testRun.testRunId,
+            contentReleaseId: result.testRun.contentReleaseId, bookletKey: result.testRun.bookletKey },
+            executedAt, applied: result.applied,
+            ...(request.keyword === "terminate" && !request.terminationNoop && request.commandCompletion === "browser-v1" ? { terminalContinuation: true as const } : {}),
+            ...(result.superseded || request.controllerDispatch && request.controllerDispatch.sequence < (result.testRun.controllerDispatches?.[request.controllerDispatch.controllerId] ?? 0)
+              ? { superseded: true as const } : {}), testRun: result.testRun, participantSession: result.participantSession };
+        } catch (error) {
+          if (error instanceof ParticipantNativeCommandError) throw new FirstSliceError(400, error.errorCode, error.message);
+          throw error;
+        }
+      },
+      async completeCommand(input) {
+        if (!input || !isParticipantCommandCompletionRequest({ testRunId: input.testRunId, contentReleaseId: input.contentReleaseId,
+          bookletKey: input.bookletKey, timeStamp: input.timeStamp, command: input.command })) {
+          throw new FirstSliceError(400, "participant_command_completion_invalid", "A completion requires its accepted command, immutable Run and completion timestamp.");
+        }
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!selected || selected.contentReleaseId !== input.contentReleaseId || selected.bookletKey !== input.bookletKey) {
+          throw new FirstSliceError(409, "test_run_scope_changed", "The command completion belongs to another immutable Run.");
+        }
+        const command = structuredClone(input.command);
+        let content: string, identity: string;
+        if (command.kind === "native") {
+          const request = command.request;
+          if (!request || request.commandCompletion !== "browser-v1" ||
+            !["testRunId", "contentReleaseId", "bookletKey"].every(key => request[key as "testRunId"] === input[key as "testRunId"]) ||
+            !participantNativeCommandKeywords.includes(request.keyword) || !Array.isArray(request.arguments) || !request.arguments.every(value => typeof value === "string") ||
+            !Number.isSafeInteger(request.timeStamp) || request.timeStamp < 0 || typeof request.deliveryId !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(request.deliveryId) ||
+            !["LOADING", "RUNNING", "PAUSED", "ERROR", "TERMINATED", "TERMINATED_PAUSED"].includes(request.controllerStatus) ||
+            request.controllerDispatch !== undefined && !validParticipantControllerDispatch(request.controllerDispatch) ||
+            request.terminationNoop !== undefined && (request.terminationNoop !== true || request.keyword !== "terminate" || request.controllerStatus !== "TERMINATED")) {
+            throw new FirstSliceError(400, "participant_command_completion_invalid", "The native completion proof is invalid.");
+          }
+          await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId: `console:${request.deliveryId}` }, context => {
+            if (!context.progressDelivery || context.progressDelivery.payloadSha256 !== nativeCommandPayloadSha256(request)) {
+              throw new FirstSliceError(409, "participant_command_not_applied", "Only the exact accepted native command can complete.");
+            }
+            return null;
+          }));
+          content = [request.keyword, ...request.arguments].join(" "); identity = request.deliveryId;
+        } else {
+          if (typeof command.commandId !== "string" || !command.commandId.trim() || command.commandId.length > 160) {
+            throw new FirstSliceError(400, "participant_command_completion_invalid", "A remote command identifier is required.");
+          }
+          const application = await serializeTestRunMutation(selected.testRunId, () => repository.applyParticipantRunCommand({
+            ...selected, commandId: command.commandId, executedAt: now()
+          }, () => { throw new FirstSliceError(409, "participant_command_not_applied", "Only an already applied command can complete."); })).catch(error => {
+            if (error instanceof ParticipantRunCommandApplicationError) throw new FirstSliceError(409, "participant_command_not_applied", "Only an already applied command can complete.");
+            throw error;
+          });
+          if (!application?.command.executedAt || application.command.commandCompletion !== "browser-v1" || typeof application.command.commandCompletionContent !== "string") {
+            throw new FirstSliceError(409, "participant_command_not_applied", "The accepted command does not use browser completion.");
+          }
+          content = application.command.commandCompletionContent; identity = command.commandId;
+        }
+        const deliveryId = `command-completion:${participantProgressPayloadSha256({ kind: command.kind, identity })}`;
+        const payloadSha256 = participantProgressPayloadSha256({ kind: "participant-command-completion/v1", command, timeStamp: input.timeStamp });
+        let acceptedAt = "";
+        const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
+          if (context.progressDelivery) {
+            if (context.progressDelivery.payloadSha256 !== payloadSha256) throw new FirstSliceError(409, "participant_delivery_conflict", "An accepted command completion cannot change its timestamp or identity.");
+            acceptedAt = context.progressDelivery.acceptedAt; return null;
+          }
+          acceptedAt = now();
+          return { testRun: context.testRun, activityEvents: [],
+            testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses && content ? buildParticipantTestLogs({
+              testRun: context.testRun, deliveryId, batches: [{ entries: [{ key: "command executed", timeStamp: input.timeStamp, content }] }]
+            }) : [],
+            progressDelivery: { testRunId: selected.testRunId, participantSessionId: selected.participantSessionId,
+              tenantId: selected.tenantId, workspaceId: selected.workspaceId, contentReleaseId: selected.contentReleaseId, deliveryId, payloadSha256, acceptedAt } };
+        }));
+        if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The command completion's Run no longer exists.");
+        return { testRunId: input.testRunId, contentReleaseId: input.contentReleaseId, bookletKey: input.bookletKey,
+          command, timeStamp: input.timeStamp, scope: { tenantId: selected.tenantId, workspaceId: selected.workspaceId,
+            participantSessionId: session.participantSessionId, testRunId: selected.testRunId, contentReleaseId: selected.contentReleaseId, bookletKey: selected.bookletKey },
+          acceptedAt, applied: result.applied };
+      },
       async getCurrentRunState(input) {
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
@@ -31986,28 +32831,20 @@ export const createFirstSliceServices = (
         }
 
         const storedCurrentTestRun = normalizeTestRun(latestTestRun);
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           storedCurrentTestRun.contentReleaseId
         );
         const currentTimestamp = now();
-        const timerAdjustedTestRun = await persistEffectiveTestletTimerState({
+        const currentTestRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: storedCurrentTestRun,
-          timestamp: currentTimestamp
+          timestamp: currentTimestamp,
+          ensureBookletStates: true
         });
         const currentBooklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          booklet => booklet.bookletKey === timerAdjustedTestRun.bookletKey
+          booklet => booklet.bookletKey === currentTestRun.bookletKey
         );
-        const currentTestRun = hasCompleteBookletStatesSnapshot(
-          currentBooklet,
-          timerAdjustedTestRun
-        )
-          ? timerAdjustedTestRun
-          : withEvaluatedBookletStates(currentBooklet, timerAdjustedTestRun);
-        if (currentTestRun !== timerAdjustedTestRun) {
-          await repository.saveTestRun(currentTestRun);
-        }
         const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
           repository,
           participantSession.tenantId,
@@ -32092,11 +32929,17 @@ export const createFirstSliceServices = (
           executionMode,
           testRun: currentTestRun,
           booklet: participantBooklet,
-          currentUnit: resolveRuntimeUnit(
-            contentRelease,
-            currentTestRun.bookletKey,
-            currentTestRun.currentUnitKey
-          ),
+          currentUnit: {
+            ...resolveRuntimeUnit(contentRelease, currentTestRun.bookletKey, currentTestRun.currentUnitKey),
+            parentLocked: participantCurrentUnitParentLocked(currentBooklet, currentTestRun, currentTimestamp),
+            completenessPolicy: isUnitLeaveLocked(currentBooklet, currentTestRun, currentTestRun.currentUnitKey)
+              ? { requirePresentationComplete: "off", requireResponseComplete: "off" }
+              : (() => {
+                  const policy = resolveTestletCompletenessPolicy(currentBooklet, currentTestRun.currentUnitKey, runtimeBooklet.policy);
+                  return { requirePresentationComplete: policy.navigation.requirePresentationComplete,
+                    requireResponseComplete: policy.navigation.requireResponseComplete };
+                })()
+          },
           ...(input.includeBookletAssets
             ? {
                 bookletAssets: resolveRuntimeBookletAssets(
@@ -32105,7 +32948,7 @@ export const createFirstSliceServices = (
                 )
               }
             : {}),
-          ...(contentRelease.runtimeSnapshot.resourceEntries?.length
+          ...((contentRelease.runtimeSnapshot.resourceEntries?.length || contentRelease.runtimeSnapshot.workspaceFilePublication)
             ? {
                 resourceBasePath: `/api/v1/participant/sessions/${encodeURIComponent(participantSessionId)}/resources`
               }
@@ -32138,6 +32981,54 @@ export const createFirstSliceServices = (
           availableActions
         };
       },
+      async getControllerContext(input) {
+        const participantSession = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const testRun = await getSelectedParticipantSessionRun(repository, participantSession, input.testRunId);
+        if (!testRun) throw new FirstSliceError(409, "participant_session_has_no_current_run", "The participant session has no selected Run.");
+        if (testRun.tenantId !== participantSession.tenantId || testRun.workspaceId !== participantSession.workspaceId) {
+          throw new FirstSliceError(404, "test_run_not_found", "The selected Run was not found.");
+        }
+        return { participantSession, testRun: normalizeTestRun(testRun) };
+      },
+      async getDebugState(input) {
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!selected) throw new FirstSliceError(404, "test_run_not_found", "The selected Run was not found.");
+        const release = await requireRuntimeContentRelease(repository, selected.contentReleaseId);
+        if (release.tenantId !== selected.tenantId || release.workspaceId !== selected.workspaceId) {
+          throw new FirstSliceError(404, "test_run_not_found", "The selected Run's content was not found.");
+        }
+        const booklet = release.runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === selected.bookletKey);
+        if (!booklet) throw new FirstSliceError(404, "booklet_not_found", "The selected Run's booklet was not found.");
+        const overrides = input.unitResponses;
+        const units = new Set(booklet.unitEntries.map(unit => unit.unitKey));
+        if (overrides !== undefined && (!overrides || typeof overrides !== "object" || Array.isArray(overrides) ||
+          Object.entries(overrides).some(([key, value]) => !units.has(key) || typeof value !== "string"))) {
+          throw new FirstSliceError(400, "participant_debug_responses_invalid", "Debug responses must contain strings for Units in the selected booklet.");
+        }
+        const snapshot = buildParticipantDebugSnapshot(booklet, { ...selected, unitResponses: { ...selected.unitResponses, ...overrides } });
+        // Diagnostics retain the same access-code visibility as participant navigation.
+        if (!resolveParticipantExecutionMode(selected.executionMode).showCode) {
+          for (const testlet of snapshot.booklet.testletEntries ?? []) {
+            if (testlet.restrictions?.codeToEnter) testlet.restrictions.codeToEnter.code = "";
+          }
+        }
+        if (input.conditionXml !== undefined) {
+          const xml = input.conditionXml;
+          if (typeof xml !== "string" || xml.length > 32_768 || /<!DOCTYPE|<!ENTITY/i.test(xml)) {
+            throw new FirstSliceError(400, "participant_debug_condition_invalid", "A condition must be XML without a document type and at most 32768 characters.");
+          }
+          try {
+            const document = new DOMParser({ onError(level, message) { throw new Error(`${level}: ${message}`); } })
+              .parseFromString(xml.replace(/^\uFEFF/gm, ""), "application/xml");
+            if (!document.documentElement) throw new Error("The XML condition has no root element.");
+            snapshot.conditionResults = evaluateParticipantDebugConditions(snapshot, parseParticipantDebugConditionElement(document.documentElement));
+          } catch (error) {
+            throw new FirstSliceError(400, "participant_debug_condition_invalid", error instanceof Error ? error.message : String(error));
+          }
+        }
+        return snapshot;
+      },
       async selectAdaptiveState(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
         const storedTestRun = await repository.getTestRunById(testRunId);
@@ -32148,110 +33039,105 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' was not found.`
           );
         }
-        const testRun = normalizeTestRun(storedTestRun);
-        requireParticipantTestRunUnlocked(testRun);
-        requireParticipantTestRunNotMonitorPaused(testRun);
-        const participantSession = await requireAccessibleParticipantSession(
-          testRun.participantSessionId
-        );
-        const executionMode = resolveParticipantExecutionMode(
-          testRun.executionMode ?? participantSession.executionMode
-        );
-        if (!executionMode.canChangeStateOptions) {
-          throw new FirstSliceError(
-            403,
-            "participant_state_option_change_not_allowed",
-            `Execution mode '${executionMode.mode}' does not allow adaptive state choices.`
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, timestamp }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          requireParticipantTestRunNotMonitorPaused(testRun);
+          const participantSession = context.participantSession;
+          const executionMode = resolveParticipantExecutionMode(
+            testRun.executionMode ?? participantSession.executionMode
           );
-        }
-        if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
+          if (!executionMode.canChangeStateOptions) {
+            throw new FirstSliceError(
+              403,
+              "participant_state_option_change_not_allowed",
+              `Execution mode '${executionMode.mode}' does not allow adaptive state choices.`
+            );
+          }
+          if (testRun.status === "completed") {
+            throw new FirstSliceError(
+              409,
+              "test_run_already_completed",
+              `Test run '${testRunId}' is already completed.`
+            );
+          }
+          const stateKey = String(input.stateKey ?? "").trim();
+          if (!stateKey) {
+            throw new FirstSliceError(
+              400,
+              "participant_state_key_required",
+              "stateKey is required."
+            );
+          }
+          const optionKey = String(input.optionKey ?? "").trim();
+          if (!optionKey) {
+            throw new FirstSliceError(
+              400,
+              "participant_state_option_key_required",
+              "optionKey is required."
+            );
+          }
+
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
           );
-        }
-        const stateKey = String(input.stateKey ?? "").trim();
-        if (!stateKey) {
-          throw new FirstSliceError(
-            400,
-            "participant_state_key_required",
-            "stateKey is required."
+          const state = booklet?.stateEntries?.find(
+            candidate => candidate.stateKey === stateKey
           );
-        }
-        const optionKey = String(input.optionKey ?? "").trim();
-        if (!optionKey) {
-          throw new FirstSliceError(
-            400,
-            "participant_state_option_key_required",
-            "optionKey is required."
-          );
-        }
-        const contentRelease = await requireContentRelease(
-          repository,
-          testRun.contentReleaseId
-        );
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          candidate => candidate.bookletKey === testRun.bookletKey
-        );
-        const state = booklet?.stateEntries?.find(
-          candidate => candidate.stateKey === stateKey
-        );
-        if (!state) {
-          throw new FirstSliceError(
-            404,
-            "participant_adaptive_state_not_found",
-            `Adaptive state '${stateKey}' was not found in booklet '${testRun.bookletKey}'.`
-          );
-        }
-        if (!state.options.some(option => option.optionKey === optionKey)) {
-          throw new FirstSliceError(
-            400,
-            "participant_adaptive_state_option_invalid",
-            `Option '${optionKey}' is not valid for adaptive state '${stateKey}'.`
-          );
-        }
-        const timestamp = now();
-        const updatedRun = withEvaluatedBookletStates(booklet, {
-          ...testRun,
-          bookletStateOverrides: {
-            ...(testRun.bookletStateOverrides ?? {}),
-            [stateKey]: optionKey
-          },
-          updatedAt: timestamp
-        });
-        await repository.saveTestRun(updatedRun);
-        if (
-          executionMode.saveResponses &&
-          Object.keys(updatedRun.bookletStates ?? {}).length > 0
-        ) {
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          if (!state) {
+            throw new FirstSliceError(
+              404,
+              "participant_adaptive_state_not_found",
+              `Adaptive state '${stateKey}' was not found in booklet '${testRun.bookletKey}'.`
+            );
+          }
+          if (!state.options.some(option => option.optionKey === optionKey)) {
+            throw new FirstSliceError(
+              400,
+              "participant_adaptive_state_option_invalid",
+              `Option '${optionKey}' is not valid for adaptive state '${stateKey}'.`
+            );
+          }
+          const updatedRun = withEvaluatedBookletStates(booklet, {
+            ...testRun,
+            bookletStateOverrides: {
+              ...(testRun.bookletStateOverrides ?? {}),
+              [stateKey]: optionKey
+            },
+            updatedAt: timestamp
+          });
+          if (
+            executionMode.saveResponses &&
+            Object.keys(updatedRun.bookletStates ?? {}).length > 0
+          ) {
+            testLogs.push(...buildParticipantTestLogs({
               testRun: updatedRun,
               batches: [{
                 entries: [
                   buildBookletStatesTestStateEntry(updatedRun, timestamp)
                 ]
               }]
-            })
-          );
-        }
-        await recordWorkspaceActivity({
-          tenantId: updatedRun.tenantId,
-          workspaceId: updatedRun.workspaceId,
-          eventType: "test_run_progress_saved",
-          actorId: participantSession.loginKey,
-          subjectType: "test_run",
-          subjectId: updatedRun.testRunId,
-          summary: `Participant selected adaptive state '${stateKey}=${optionKey}'.`,
-          details: {
-            participantSessionId: updatedRun.participantSessionId,
-            stateKey,
-            optionKey,
-            participantStateOverride: true
+            }));
           }
-        });
-        return updatedRun;
+          activityEvents.push(buildWorkspaceActivity({
+            tenantId: updatedRun.tenantId,
+            workspaceId: updatedRun.workspaceId,
+            eventType: "test_run_progress_saved",
+            actorId: participantSession.loginKey,
+            subjectType: "test_run",
+            subjectId: updatedRun.testRunId,
+            summary: `Participant selected adaptive state '${stateKey}=${optionKey}'.`,
+            details: {
+              participantSessionId: updatedRun.participantSessionId,
+              stateKey,
+              optionKey,
+              participantStateOverride: true
+            }
+          }));
+          return { testRun: updatedRun, testLogs, activityEvents };
+        }, { reconcileBefore: false });
+        return result.testRun;
       },
       async listReviews(input) {
         const { testRun } = await requireParticipantReviewContext(input.testRunId);
@@ -32537,10 +33423,21 @@ export const createFirstSliceServices = (
             "Participant resource path is invalid."
           );
         }
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           participantSession.contentReleaseId
         );
+        if (contentRelease.runtimeSnapshot.workspaceFilePublication) {
+          const [sources, events] = await Promise.all([
+            repository.listSourcePackagesByWorkspace(participantSession.tenantId,participantSession.workspaceId),
+            repository.listWorkspaceActivityEventsByWorkspace(participantSession.tenantId,participantSession.workspaceId)
+          ]);
+          const source = selectCurrentWorkspaceFiles(sources,events).find(value => value.status !== 'rejected' &&
+            value.fileName.startsWith('Resource/') && projectWorkspaceFile(value).fileType === 'Resource' &&
+            [value.fileName, value.fileName.replace(/^Resource\//,'')].some(name => name.toLowerCase() === resourcePath.toLowerCase()));
+          const decoded = source ? decodePersistedSourceDocument(source) : null;
+          if (decoded) return {resourcePath,mediaType:decoded.mediaType,dataBase64:decoded.bytes.toString('base64')};
+        }
         const resourceEntry = contentRelease.runtimeSnapshot.resourceEntries?.find(
           entry => entry.resourcePath.toLowerCase() === resourcePath.toLowerCase()
         );
@@ -32553,231 +33450,9 @@ export const createFirstSliceServices = (
         }
         return resourceEntry;
       },
-      async launch(input) {
-        const participantSessionId = normalizeParticipantSessionId(
-          input.participantSessionId
-        );
-        const participantSession = await requireAccessibleParticipantSession(
-          participantSessionId
-        );
-        const contentRelease = await requireContentRelease(
-          repository,
-          participantSession.contentReleaseId
-        );
-
-        const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
-          input.bookletKey
-        );
-        const rosterEntry = await findParticipantRosterEntryByLoginKey(
-          repository,
-          participantSession.tenantId,
-          participantSession.workspaceId,
-          participantSession.loginKey
-        );
-        const assignedBookletKeys = [
-          ...new Set(
-            getParticipantCodeBookletAssignments(
-              rosterEntry,
-              participantSession.participantCode
-            ).map(assignment => assignment.bookletKey)
-          )
-        ];
-        const testRuns = (
-          await repository.listTestRunsByParticipantSessionId(
-            participantSession.participantSessionId
-          )
-        ).map(normalizeTestRun);
-        testRuns.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-        const runtimeBooklets = buildParticipantRuntimeBooklets({
-          contentRelease,
-          participantRosterEntry: rosterEntry,
-          participantCode: participantSession.participantCode,
-          testRuns
-        });
-        const selectedRuntimeBooklet = requestedBookletKey
-          ? runtimeBooklets.find(booklet => booklet.bookletKey === requestedBookletKey) ??
-            runtimeBooklets.find(
-              booklet => booklet.sourceBookletKey === requestedBookletKey &&
-                (booklet.status === "in_progress" || booklet.status === "locked")
-            ) ??
-            runtimeBooklets.find(
-              booklet =>
-                booklet.sourceBookletKey === requestedBookletKey &&
-                booklet.status === "available"
-            ) ?? runtimeBooklets.find(booklet => booklet.sourceBookletKey === requestedBookletKey)
-          : runtimeBooklets.find(booklet => booklet.bookletKey ===
-              testRuns.find(run => run.status !== "completed")?.bookletAssignmentKey) ??
-            runtimeBooklets.find(booklet => booklet.status === "available");
-        if (requestedBookletKey && assignedBookletKeys.length > 0 && !selectedRuntimeBooklet) {
-          throw new FirstSliceError(
-            403,
-            "booklet_not_assigned",
-            `Booklet assignment '${requestedBookletKey}' is not assigned to participant '${participantSession.loginKey}'.`
-          );
-        }
-        const effectiveBookletKey =
-          selectedRuntimeBooklet?.sourceBookletKey || requestedBookletKey || "";
-        const bookletSource = requestedBookletKey
-          ? "request"
-          : assignedBookletKeys.length > 0
-            ? "participant_roster"
-            : "active_release_default";
-        const selectedBooklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          booklet => booklet.bookletKey === effectiveBookletKey
-        );
-
-        if (effectiveBookletKey && !selectedBooklet) {
-          throw new FirstSliceError(
-            404,
-            "booklet_not_found",
-            `Booklet '${effectiveBookletKey}' was not found in active content release '${contentRelease.contentReleaseId}'.`
-          );
-        }
-        if (selectedRuntimeBooklet?.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "booklet_already_completed",
-            `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`
-          );
-        }
-        if (!selectedBooklet) {
-          throw new FirstSliceError(
-            409,
-            participantSession.status === "closed"
-              ? "participant_session_closed"
-              : "participant_session_has_no_available_booklet",
-            participantSession.status === "closed"
-              ? `Participant session '${participantSessionId}' is already closed.`
-              : `Participant session '${participantSessionId}' has no available booklet.`
-          );
-        }
-
-        const existingRun = testRuns.find(run =>
-          (run.bookletAssignmentKey ?? run.bookletKey) ===
-            (selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey));
-        if (existingRun) {
-          requireParticipantTestRunUnlocked(existingRun);
-          if (existingRun.status === "completed") {
-            throw new FirstSliceError(409, "booklet_already_completed",
-              `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
-          }
-          return existingRun;
-        }
-
-        const timestamp = now();
-        const executionMode = resolveParticipantExecutionMode(
-          participantSession.executionMode ?? rosterEntry?.executionMode
-        );
-        const initialTestRun = withEvaluatedBookletStates(selectedBooklet, {
-          testRunId: idGenerator(),
-          participantSessionId: participantSession.participantSessionId,
-          tenantId: participantSession.tenantId,
-          workspaceId: participantSession.workspaceId,
-          contentReleaseId: participantSession.contentReleaseId,
-          bookletKey: selectedBooklet.bookletKey,
-          executionMode: executionMode.mode,
-          bookletAssignmentKey:
-            selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
-          presetBookletStates: selectedRuntimeBooklet?.statePreset ?? {},
-          status: "running",
-          locked: false,
-          currentUnitKey: null,
-          unitResponses: {},
-          unlockedTestletKeys: [],
-          monitorNavigationUnlocked: false,
-          testletTimers: {},
-          lockedTestletKeys: [],
-          lockedUnitKeys: [],
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          completedAt: null
-        });
-        const firstUnit = resolveVisibleBookletUnits(
-          selectedBooklet,
-          initialTestRun
-        )[0];
-        const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
-          testletKey =>
-            Boolean(
-              selectedBooklet.testletEntries?.find(
-                testlet => testlet.testletKey === testletKey
-              )?.restrictions?.codeToEnter?.code
-            )
-        );
-        const testRun: TestRun = {
-          ...initialTestRun,
-          currentUnitKey: firstUnitRequiresCode
-            ? null
-            : firstUnit?.unitKey ?? null
-        };
-        // Initialize the timer inside the candidate before reservation. A loser
-        // must never overwrite the winner's timer, answer or current Unit.
-        const activated = activateCurrentTestletTimer(contentRelease, testRun, timestamp);
-        const reservation = await repository.getOrCreateTestRunForAssignment(activated.testRun);
-        const effectiveTestRun = normalizeTestRun(reservation.testRun);
-        requireParticipantTestRunUnlocked(effectiveTestRun);
-        if (effectiveTestRun.status === "completed") {
-          throw new FirstSliceError(409, "booklet_already_completed",
-            `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
-        }
-        if (!reservation.created) return effectiveTestRun;
-        if (activated.startedTestletKey) {
-          if (executionMode.saveResponses) {
-            await repository.saveParticipantTestLogs(buildParticipantTestLogs({
-              testRun: effectiveTestRun,
-              batches: [{ entries: [buildTestletTimeLeftTestStateEntry(effectiveTestRun, timestamp)] }]
-            }));
-          }
-          await recordStartedTestletTimer(effectiveTestRun, activated.startedTestletKey);
-        }
-        if (executionMode.saveResponses) {
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
-            testRun: effectiveTestRun,
-            batches: [{
-              entries: [
-                {
-                  key: "CONTROLLER",
-                  timeStamp: Date.parse(timestamp),
-                  content: "RUNNING"
-                },
-                ...(effectiveTestRun.currentUnitKey
-                  ? [{
-                      key: "CURRENT_UNIT_ID",
-                      timeStamp: Date.parse(timestamp),
-                      content: effectiveTestRun.currentUnitKey
-                    }]
-                  : []),
-                ...(Object.keys(effectiveTestRun.bookletStates ?? {}).length > 0
-                  ? [buildBookletStatesTestStateEntry(effectiveTestRun, timestamp)]
-                  : [])
-              ]
-            }]
-            })
-          );
-        }
-        await repository.saveParticipantSession({
-          ...participantSession,
-          status: "launched"
-        });
-        await recordWorkspaceActivity({
-          tenantId: effectiveTestRun.tenantId,
-          workspaceId: effectiveTestRun.workspaceId,
-          eventType: "participant_session_resumed",
-          subjectType: "test_run",
-          subjectId: effectiveTestRun.testRunId,
-          summary: `Participant session '${participantSession.participantSessionId}' started a run.`,
-          details: {
-            participantSessionId: participantSession.participantSessionId,
-            bookletKey: effectiveTestRun.bookletKey,
-            bookletAssignmentKey: effectiveTestRun.bookletAssignmentKey,
-            currentUnitKey: effectiveTestRun.currentUnitKey,
-            bookletSource
-          }
-        });
-        return effectiveTestRun;
-      },
+      async launch(input) { return launchParticipantRun(input); },
       async resumeSession(input) {
+        const browserControllerLifecycle = usesBrowserControllerLifecycle(input.controllerLifecycle);
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
         );
@@ -32792,118 +33467,50 @@ export const createFirstSliceServices = (
         );
         // Use launch's exact assignment resolution and authorization for both
         // new and existing entries; never choose an arbitrary open sibling.
-        const selectedRun = await this.launch({ participantSessionId, bookletKey: requestedBookletKey });
+        const selectedRun = await launchParticipantRun({ participantSessionId, bookletKey: requestedBookletKey, controllerLifecycle: input.controllerLifecycle }, true);
         if (!previousRuns.some(run => run.testRunId === selectedRun.testRunId)) return selectedRun;
         return serializeTestRunMutation(selectedRun.testRunId, async () => {
-          const existingRun = await repository.getTestRunById(selectedRun.testRunId);
-          if (!existingRun) throw new FirstSliceError(404, "test_run_not_found", `Test run '${selectedRun.testRunId}' was not found.`);
-          let normalizedExistingRun = normalizeTestRun(existingRun);
-          requireParticipantTestRunUnlocked(normalizedExistingRun);
-          if (normalizedExistingRun.status === "completed") {
-            throw new FirstSliceError(409, "booklet_already_completed",
-              `Booklet '${normalizedExistingRun.bookletKey}' is already completed in participant session '${participantSessionId}'.`);
-          }
-          // Monitor authority wins even in non-saving modes; entry cannot
-          // reset a paused Run and thereby resume it implicitly.
-          if (normalizedExistingRun.status === "paused" && normalizedExistingRun.pauseSource === "monitor") {
-            return normalizedExistingRun;
-          }
-
-          const executionMode = resolveParticipantExecutionMode(
-            normalizedExistingRun.executionMode ?? participantSession.executionMode
-          );
-          if (!executionMode.saveResponses) {
-            const contentRelease = await requireContentRelease(
-              repository,
-              normalizedExistingRun.contentReleaseId
-            );
-            const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-              candidate => candidate.bookletKey === normalizedExistingRun.bookletKey
-            );
-            const resetRun = resetNonSavingTestRunForEntry({
-              booklet,
-              testRun: normalizedExistingRun,
-              timestamp: now()
-            });
-            if (
-              normalizedExistingRun.status !== resetRun.status ||
-              normalizedExistingRun.completedAt !== resetRun.completedAt ||
-              normalizedExistingRun.currentUnitKey !== resetRun.currentUnitKey ||
-              Object.keys(normalizedExistingRun.unitResponses).length > 0 ||
-              normalizedExistingRun.locked ||
-              normalizedExistingRun.monitorNavigationUnlocked ||
-              JSON.stringify(normalizedExistingRun.unlockedTestletKeys ?? []) !==
-                JSON.stringify(resetRun.unlockedTestletKeys ?? []) ||
-              Object.keys(normalizedExistingRun.testletTimers ?? {}).length > 0 ||
-              (normalizedExistingRun.lockedTestletKeys ?? []).length > 0 ||
-              (normalizedExistingRun.lockedUnitKeys ?? []).length > 0 ||
-              JSON.stringify(normalizedExistingRun.bookletStates ?? {}) !==
-                JSON.stringify(resetRun.bookletStates ?? {})
-            ) {
-              normalizedExistingRun = resetRun;
-              await repository.saveTestRun(normalizedExistingRun);
+          const result = await mutateRuntimeRun(selectedRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+            if (testRun.status === "paused" && testRun.pauseSource === "monitor") return null;
+            const executionMode = resolveParticipantExecutionMode(testRun.executionMode ?? context.participantSession.executionMode);
+            if (!executionMode.saveResponses) {
+              const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(candidate => candidate.bookletKey === testRun.bookletKey);
+              const resetRun = resetNonSavingTestRunForEntry({ booklet, testRun, timestamp });
+              const changed = testRun.status !== resetRun.status || testRun.completedAt !== resetRun.completedAt ||
+                testRun.currentUnitKey !== resetRun.currentUnitKey || Object.keys(testRun.unitResponses).length > 0 || testRun.locked ||
+                testRun.monitorNavigationUnlocked || JSON.stringify(testRun.unlockedTestletKeys ?? []) !== JSON.stringify(resetRun.unlockedTestletKeys ?? []) ||
+                Object.keys(testRun.testletTimers ?? {}).length > 0 || (testRun.lockedTestletKeys ?? []).length > 0 ||
+                (testRun.lockedUnitKeys ?? []).length > 0 || JSON.stringify(testRun.bookletStates ?? {}) !== JSON.stringify(resetRun.bookletStates ?? {});
+              return changed ? { testRun: resetRun } : null;
             }
-          }
-
-          if (normalizedExistingRun.status === "paused") {
-            const timestamp = now();
-            const contentRelease = await requireContentRelease(
-              repository,
-              existingRun.contentReleaseId
-            );
-            const resumedRun = transitionTestletTimersForRunStatus(
-              normalizedExistingRun,
-              "running",
-              timestamp
-            );
-            await repository.saveTestRun(resumedRun);
-            if (
-              executionMode.saveResponses
-            ) {
-              const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
-                key: "CONTROLLER",
-                timeStamp: Date.parse(timestamp),
-                content: "RUNNING"
-              }];
-              if (testletTimerStateChanged(normalizedExistingRun, resumedRun)) {
-                resumedStateEntries.unshift(
-                  buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
-                );
-              }
-              await repository.saveParticipantTestLogs(
-                buildParticipantTestLogs({
-                  testRun: resumedRun,
-                  batches: [{
-                    entries: resumedStateEntries
-                  }]
-                })
-              );
-            }
-            const effectiveRun = await persistEffectiveTestletTimerState({
-              contentRelease,
-              testRun: resumedRun,
-              timestamp
-            });
-            await recordWorkspaceActivity({
-              tenantId: effectiveRun.tenantId,
-              workspaceId: effectiveRun.workspaceId,
-              eventType: "participant_session_resumed",
-              subjectType: "test_run",
-              subjectId: effectiveRun.testRunId,
-              summary: `Participant session '${participantSession.participantSessionId}' resumed an existing run.`,
-              details: {
-                participantSessionId: participantSession.participantSessionId,
-                currentUnitKey: effectiveRun.currentUnitKey
-              }
-            });
-            return effectiveRun;
-          }
-
-          return normalizedExistingRun;
+            if (testRun.status !== "paused") return null;
+            const resumedRun = resumeParticipantControllerRun(contentRelease, testRun, timestamp).testRun;
+            const entries: ParticipantTestLogEntryInput[] = browserControllerLifecycle ? [] : [{ key: "CONTROLLER", timeStamp: Date.parse(timestamp), content: "RUNNING" }];
+            if (testletTimerStateChanged(testRun, resumedRun)) entries.unshift(buildTestletTimeLeftTestStateEntry(resumedRun, timestamp));
+            const testLogs = buildParticipantTestLogs({ testRun: resumedRun, batches: [{ entries }] });
+            const effectiveRun = reconcileTimers(resumedRun);
+            return { testRun: effectiveRun, testLogs, activityEvents: [buildWorkspaceActivity({
+              tenantId: effectiveRun.tenantId, workspaceId: effectiveRun.workspaceId, eventType: "participant_session_resumed",
+              subjectType: "test_run", subjectId: effectiveRun.testRunId,
+              summary: `Participant session '${context.participantSession.participantSessionId}' resumed an existing run.`,
+              details: { participantSessionId: context.participantSession.participantSessionId, currentUnitKey: effectiveRun.currentUnitKey }
+            })] };
+          }, { reconcileBefore: false, activateController: true });
+          return result.testRun;
         });
       },
       async saveProgress(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
+        const responseTimestamp = normalizeOptionalParticipantResponseTimestamp(input.responseTimestamp);
+        const responseOnly = input.responseOnly === undefined ? false : input.responseOnly;
+        if (typeof responseOnly !== "boolean" || responseOnly && (
+          input.currentUnitKey !== undefined || !normalizeOptionalResponseUnitKey(input.responseUnitKey) ||
+          input.confirmTestletTimeLeave !== undefined && input.confirmTestletTimeLeave !== false ||
+          input.confirmTestletLeaveLock !== undefined && input.confirmTestletLeaveLock !== false
+        )) {
+          throw new FirstSliceError(400, "participant_response_delivery_invalid",
+            "Response-only deliveries require an explicit responseUnitKey and cannot request navigation or leave confirmations.");
+        }
         return serializeTestRunMutation(testRunId, async () => {
           const deliveryId = normalizeOptionalParticipantDeliveryId(
             input.deliveryId
@@ -32918,11 +33525,10 @@ export const createFirstSliceServices = (
           );
         }
 
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
+        const parent = await requireAccessibleParticipantSession(storedTestRun.participantSessionId);
+        const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository, parent.tenantId, parent.workspaceId, parent.loginKey);
 
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           storedTestRun.contentReleaseId
         );
@@ -32945,25 +33551,48 @@ export const createFirstSliceServices = (
             );
           }
         }
+        let timerCompletedBeforeProgress = false;
+        const result = await repository.mutateParticipantRun({ ...storedTestRun, deliveryId }, context => {
         const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
+        assertParticipantAccessWindow(participantRosterEntry, timestamp, context.participantSession.validUntil);
+        const before = prepareEffectiveTestletTimerState({ contentRelease, context, participantRosterEntry, timestamp });
+        const testRun = normalizeTestRun(before.effect.testRun);
         const executionMode = resolveParticipantExecutionMode(
           testRun.executionMode
         );
+        const deliveryPayload = {
+          status: normalizeTestRunProgressStatus(input.status),
+          currentUnitKey: input.currentUnitKey,
+          responseUnitKey: input.responseUnitKey,
+          confirmTestletTimeLeave: input.confirmTestletTimeLeave ?? false,
+          confirmTestletLeaveLock: input.confirmTestletLeaveLock ?? false,
+          ...(executionMode.saveResponses ? {
+            unitResponse: normalizeOptionalUnitResponse(input.unitResponse), responseTimestamp,
+            transientUnitResponses: input.transientUnitResponses, logs: incomingLogBatches
+          } : {})
+        };
+        const legacyPayloadSha256 = deliveryId ? participantProgressPayloadSha256(deliveryPayload) : undefined;
+        const payloadSha256 = responseOnly && deliveryId
+          ? participantProgressPayloadSha256({ ...deliveryPayload, responseOnly: true }) : legacyPayloadSha256;
+        if (context.progressDelivery) {
+          // Upgraded outbox transport can acknowledge the same legacy request.
+          // A newly accepted response-only receipt still binds its delivery mode.
+          if (context.progressDelivery.payloadSha256 !== payloadSha256 &&
+            (!responseOnly || context.progressDelivery.payloadSha256 !== legacyPayloadSha256)) {
+            throw new FirstSliceError(409, "participant_delivery_conflict", "An accepted deliveryId cannot be reused for different progress.");
+          }
+          return before.changed ? before.effect : null;
+        }
+        // Original's owned response/state writes remain valid after a booklet
+        // lock. Response-only packets cannot navigate, resume, unlock or replace
+        // the accepted controller projection; late buffered answers still save.
+        if (!responseOnly) requireParticipantTestRunUnlocked(testRun);
         const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
           candidate => candidate.bookletKey === testRun.bookletKey
         );
         if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
-          );
+          timerCompletedBeforeProgress = true;
+          return before.changed ? before.effect : null;
         }
 
         const hasCurrentUnitKeyInput = input.currentUnitKey !== undefined;
@@ -32983,7 +33612,7 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' is paused by a monitor and cannot navigate until the monitor resumes it.`
           );
         }
-        const nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+        let nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
         const hasResponseUnitKeyInput = input.responseUnitKey !== undefined;
         const responseUnitKey = hasResponseUnitKeyInput
           ? normalizeOptionalResponseUnitKey(input.responseUnitKey)
@@ -33017,11 +33646,17 @@ export const createFirstSliceServices = (
             transientUnitKey
           );
         }
+        const responseRun = executionMode.saveResponses && responseUnitKey && nextUnitResponse != null
+          ? orderedParticipantResponse({ testRun, unitKey: responseUnitKey, response: nextUnitResponse, responseTimestamp, timestamp })
+          : testRun;
+        if (executionMode.saveResponses && responseUnitKey && nextUnitResponse != null) {
+          nextUnitResponse = responseRun.unitResponses[responseUnitKey]!;
+        }
         const hasTransientEvaluation =
           Object.keys(transientUnitResponses).length > 0 ||
           Boolean(responseUnitKey && nextUnitResponse != null);
         const transientEvaluationResponses = {
-          ...testRun.unitResponses,
+          ...responseRun.unitResponses,
           ...transientUnitResponses,
           ...(responseUnitKey && nextUnitResponse != null
             ? { [responseUnitKey]: nextUnitResponse }
@@ -33030,11 +33665,11 @@ export const createFirstSliceServices = (
         const transientEvaluationRun =
           hasTransientEvaluation
             ? withEvaluatedBookletStates(booklet, {
-                ...testRun,
+                ...responseRun,
                 unitResponses: transientEvaluationResponses
               })
-            : testRun;
-        let navigationTestRun = testRun;
+            : responseRun;
+        let navigationTestRun = responseRun;
         let activatedLeaveLock: ReturnType<
           typeof resolveCurrentLeaveLock
         > = null;
@@ -33108,15 +33743,14 @@ export const createFirstSliceServices = (
             ? undefined
             : parseVeronaUnitResponse(nextUnitResponse)?.playerState
                 ?.sharedParameters;
-        const nextSharedParameters = mergeVeronaSharedParameters(
-          navigationTestRun.sharedParameters,
-          reportedSharedParameters
+        const nextSharedParameters = executionMode.saveResponses ? navigationTestRun.sharedParameters : mergeVeronaSharedParameters(
+          navigationTestRun.sharedParameters, reportedSharedParameters
         );
         const requestedStatus = normalizeTestRunProgressStatus(input.status);
-        const nextStatus = monitorPauseActive ? "paused" : requestedStatus;
-        const statusAdjustedRun = transitionTestletTimersForRunStatus(
+        const nextStatus = responseOnly ? testRun.status : monitorPauseActive ? "paused" : requestedStatus;
+        const statusAdjustedRun = responseOnly ? navigationTestRun : transitionTestletTimersForRunStatus(
           navigationTestRun,
-          nextStatus,
+          monitorPauseActive ? "paused" : requestedStatus,
           timestamp
         );
 
@@ -33124,7 +33758,7 @@ export const createFirstSliceServices = (
           ...statusAdjustedRun,
           status: nextStatus,
           pauseSource:
-            nextStatus === "paused"
+            responseOnly ? testRun.pauseSource : nextStatus === "paused"
               ? monitorPauseActive
                 ? "monitor"
                 : "participant"
@@ -33217,16 +33851,12 @@ export const createFirstSliceServices = (
               batches: [...incomingLogBatches, ...runtimeLogBatches]
             })
           : [];
-        await repository.saveTestRun(updatedRun);
-        if (participantTestLogs.length > 0) {
-          await repository.saveParticipantTestLogs(participantTestLogs);
-        }
-        const effectiveRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: updatedRun,
-          timestamp
-        });
-        await recordWorkspaceActivity({
+        const after = prepareEffectiveTestletTimerState({ contentRelease, participantRosterEntry, timestamp,
+          context: { ...context, testRun: { ...updatedRun, executionMode: context.testRun.executionMode,
+            bookletAssignmentKey: context.testRun.bookletAssignmentKey } } });
+        const effectiveRun = after.effect.testRun;
+        const activityEvents = [...before.effect.activityEvents, ...after.effect.activityEvents];
+        activityEvents.push(buildWorkspaceActivity({
           ...(deliveryId
             ? {
                 activityEventId:
@@ -33246,9 +33876,9 @@ export const createFirstSliceServices = (
             executionMode: executionMode.mode,
             responsesPersisted: executionMode.saveResponses
           }
-        });
+        }));
         if (activatedLeaveLock) {
-          await recordWorkspaceActivity({
+          activityEvents.push(buildWorkspaceActivity({
             ...(deliveryId
               ? {
                   activityEventId:
@@ -33270,9 +33900,22 @@ export const createFirstSliceServices = (
               unitKey: activatedLeaveLock.unit.unitKey,
               nextUnitKey: effectiveRun.currentUnitKey
             }
-          });
+          }));
         }
-          return effectiveRun;
+        const participantSession = after.effect.participantSession ?? before.effect.participantSession;
+        return { testRun: effectiveRun,
+          testLogs: [...before.effect.testLogs, ...participantTestLogs, ...after.effect.testLogs], activityEvents,
+          ...(executionMode.saveResponses && (hasCurrentUnitKeyInput || testStateEntries.length) ? {originalResultTestStateAt: timestamp} : {}),
+          ...(deliveryId && payloadSha256 ? { progressDelivery: {
+            testRunId, participantSessionId: context.testRun.participantSessionId,
+            tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId,
+            contentReleaseId: context.testRun.contentReleaseId, deliveryId, payloadSha256, acceptedAt: timestamp
+          } } : {}),
+          ...(participantSession ? { participantSession } : {}) };
+        });
+        if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run no longer belongs to its participant scope.");
+        if (timerCompletedBeforeProgress) throw new FirstSliceError(409, "test_run_already_completed", `Test run '${testRunId}' is already completed.`);
+        return normalizeTestRun(result.testRun);
         });
       },
       async saveTestLogs(input) {
@@ -33292,7 +33935,7 @@ export const createFirstSliceServices = (
         await requireAccessibleParticipantSession(
           storedTestRun.participantSessionId
         );
-        const contentRelease = await requireContentRelease(
+        const contentRelease = await requireRuntimeContentRelease(
           repository,
           storedTestRun.contentReleaseId
         );
@@ -33357,137 +34000,125 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' was not found.`
           );
         }
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedTestRun.contentReleaseId
-        );
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
-        requireParticipantTestRunNotMonitorPaused(testRun);
-        if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
-          );
-        }
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          candidate => candidate.bookletKey === testRun.bookletKey
-        );
-        const testlet = booklet?.testletEntries?.find(
-          candidate => candidate.testletKey === testletKey
-        );
-        const expectedCode = testlet?.restrictions?.codeToEnter?.code;
-        if (!testlet || !expectedCode) {
-          throw new FirstSliceError(
-            404,
-            "testlet_code_gate_not_found",
-            `Block '${testletKey}' has no code gate in booklet '${testRun.bookletKey}'.`
-          );
-        }
-        if (testRun.unlockedTestletKeys?.includes(testletKey)) {
-          return testRun;
-        }
-        const navigation = resolveBookletNavigationState(contentRelease, testRun);
-        if (navigation.nextTestletGate?.testletKey !== testletKey) {
-          throw new FirstSliceError(
-            409,
-            "testlet_code_gate_not_reachable",
-            `Block '${testletKey}' is not the next reachable code gate for run '${testRunId}'.`
-          );
-        }
-        // The original participant dialog normalizes letters to uppercase while
-        // imported booklet codes may use mixed case. Compare the normalized
-        // forms so the UI behavior does not invalidate otherwise compatible
-        // source packages.
-        const expectedCodeBuffer = Buffer.from(expectedCode.toUpperCase(), "utf8");
-        const providedCodeBuffer = Buffer.from(
-          input.code.trim().toUpperCase(),
-          "utf8"
-        );
-        if (
-          expectedCodeBuffer.length !== providedCodeBuffer.length ||
-          !timingSafeEqual(expectedCodeBuffer, providedCodeBuffer)
-        ) {
-          throw new FirstSliceError(
-            403,
-            "testlet_unlock_code_invalid",
-            "The block unlock code is invalid."
-          );
-        }
-        const unlockedRun = normalizeTestRun({
-          ...testRun,
-          unlockedTestletKeys: [
-            ...(testRun.unlockedTestletKeys ?? []),
-            testletKey
-          ],
-          updatedAt: timestamp
-        });
-        const navigationAfterUnlock = resolveBookletNavigationState(
-          contentRelease,
-          unlockedRun
-        );
-        const updatedRun: TestRun = {
-          ...unlockedRun,
-          ...(navigationAfterUnlock.nextTestletGate == null &&
-          navigationAfterUnlock.forwardDeniedReasons.length === 0 &&
-          navigation.nextUnitKey
-            ? { currentUnitKey: navigation.nextUnitKey }
-            : {})
-        };
-        await repository.saveTestRun(updatedRun);
-        const executionMode = resolveParticipantExecutionMode(
-          updatedRun.executionMode
-        );
-        if (executionMode.saveResponses) {
-          const testStateEntries: ParticipantTestLogEntryInput[] = [{
-            key: "TESTLETS_CLEARED_CODE",
-            timeStamp: Date.parse(timestamp),
-            content: JSON.stringify(updatedRun.unlockedTestletKeys ?? [])
-          }];
-          if (updatedRun.currentUnitKey !== testRun.currentUnitKey) {
-            testStateEntries.push({
-              key: "CURRENT_UNIT_ID",
-              timeStamp: Date.parse(timestamp),
-              content: updatedRun.currentUnitKey ?? ""
-            });
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          requireParticipantTestRunNotMonitorPaused(testRun);
+          if (testRun.status === "completed") {
+            throw new FirstSliceError(
+              409,
+              "test_run_already_completed",
+              `Test run '${testRunId}' is already completed.`
+            );
           }
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
+          );
+          const testlet = booklet?.testletEntries?.find(
+            candidate => candidate.testletKey === testletKey
+          );
+          const expectedCode = testlet?.restrictions?.codeToEnter?.code;
+          if (!testlet || !expectedCode) {
+            throw new FirstSliceError(
+              404,
+              "testlet_code_gate_not_found",
+              `Block '${testletKey}' has no code gate in booklet '${testRun.bookletKey}'.`
+            );
+          }
+          if (testRun.unlockedTestletKeys?.includes(testletKey)) {
+            return null;
+          }
+          const navigation = resolveBookletNavigationState(contentRelease, testRun);
+          const currentGate = participantCurrentTestletCodeGate(booklet, testRun);
+          if (navigation.nextTestletGate?.testletKey !== testletKey) {
+            throw new FirstSliceError(
+              409,
+              "testlet_code_gate_not_reachable",
+              `Block '${testletKey}' is not the next reachable code gate for run '${testRunId}'.`
+            );
+          }
+          // The original participant dialog normalizes letters to uppercase while
+          // imported booklet codes may use mixed case. Compare the normalized
+          // forms so the UI behavior does not invalidate otherwise compatible
+          // source packages.
+          const expectedCodeBuffer = Buffer.from(expectedCode.toUpperCase(), "utf8");
+          const providedCodeBuffer = Buffer.from(
+            input.code.trim().toUpperCase(),
+            "utf8"
+          );
+          if (
+            expectedCodeBuffer.length !== providedCodeBuffer.length ||
+            !timingSafeEqual(expectedCodeBuffer, providedCodeBuffer)
+          ) {
+            throw new FirstSliceError(
+              403,
+              "testlet_unlock_code_invalid",
+              "The block unlock code is invalid."
+            );
+          }
+          const unlockedRun = normalizeTestRun({
+            ...testRun,
+            unlockedTestletKeys: [
+              ...(testRun.unlockedTestletKeys ?? []),
+              testletKey
+            ],
+            updatedAt: timestamp
+          });
+          const navigationAfterUnlock = resolveBookletNavigationState(
+            contentRelease,
+            unlockedRun
+          );
+          const updatedRun: TestRun = {
+            ...unlockedRun,
+            ...(!currentGate && navigationAfterUnlock.nextTestletGate == null &&
+              navigationAfterUnlock.forwardDeniedReasons.length === 0 &&
+              navigation.nextUnitKey
+              ? { currentUnitKey: navigation.nextUnitKey }
+              : {})
+          };
+          const executionMode = resolveParticipantExecutionMode(
+            updatedRun.executionMode
+          );
+          if (executionMode.saveResponses) {
+            const testStateEntries: ParticipantTestLogEntryInput[] = [{
+              key: "TESTLETS_CLEARED_CODE",
+              timeStamp: Date.parse(timestamp),
+              content: JSON.stringify(updatedRun.unlockedTestletKeys ?? [])
+            }];
+            if (updatedRun.currentUnitKey !== testRun.currentUnitKey) {
+              testStateEntries.push({
+                key: "CURRENT_UNIT_ID",
+                timeStamp: Date.parse(timestamp),
+                content: updatedRun.currentUnitKey ?? ""
+              });
+            }
+            testLogs.push(...buildParticipantTestLogs({
               testRun: updatedRun,
               batches: [{
                 entries: testStateEntries
               }]
-            })
-          );
-        }
-        const effectiveRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: updatedRun,
-          timestamp
-        });
-        await recordWorkspaceActivity({
-          tenantId: effectiveRun.tenantId,
-          workspaceId: effectiveRun.workspaceId,
-          eventType: "testlet_unlocked",
-          subjectType: "test_run",
-          subjectId: effectiveRun.testRunId,
-          summary: `Block '${testletKey}' unlocked for run '${effectiveRun.testRunId}'.`,
-          details: {
-            testletKey,
-            participantSessionId: effectiveRun.participantSessionId,
-            currentUnitKey: effectiveRun.currentUnitKey
+            }));
           }
+          const effectiveRun = reconcileTimers(currentGate
+            ? activateCurrentTestletTimer(contentRelease, updatedRun, timestamp, true).testRun
+            : updatedRun);
+          activityEvents.push(buildWorkspaceActivity({
+            tenantId: effectiveRun.tenantId,
+            workspaceId: effectiveRun.workspaceId,
+            eventType: "testlet_unlocked",
+            subjectType: "test_run",
+            subjectId: effectiveRun.testRunId,
+            summary: `Block '${testletKey}' unlocked for run '${effectiveRun.testRunId}'.`,
+            details: {
+              testletKey,
+              participantSessionId: effectiveRun.participantSessionId,
+              currentUnitKey: effectiveRun.currentUnitKey
+            }
+          }));
+          return { testRun: effectiveRun, testLogs, activityEvents };
         });
-        return effectiveRun;
+        return result.testRun;
       },
       async resumeRun(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
@@ -33501,78 +34132,127 @@ export const createFirstSliceServices = (
           );
         }
 
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
-
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedTestRun.contentReleaseId
-        );
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
-        if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
-          );
-        }
-
-        if (testRun.status === "running") {
-          return testRun;
-        }
-
-        requireParticipantTestRunNotMonitorPaused(testRun);
-
-        const resumedRun = transitionTestletTimersForRunStatus(
-          testRun,
-          "running",
-          timestamp
-        );
-        await repository.saveTestRun(resumedRun);
-        if (resolveParticipantExecutionMode(testRun.executionMode).saveResponses) {
-          const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
-            key: "CONTROLLER",
-            timeStamp: Date.parse(timestamp),
-            content: "RUNNING"
-          }];
-          if (testletTimerStateChanged(testRun, resumedRun)) {
-            resumedStateEntries.unshift(
-              buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          if (testRun.status === "completed") {
+            throw new FirstSliceError(
+              409,
+              "test_run_already_completed",
+              `Test run '${testRunId}' is already completed.`
             );
           }
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
-            testRun: resumedRun,
-            batches: [{
-              entries: resumedStateEntries
-            }]
-            })
-          );
-        }
-        const effectiveRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: resumedRun,
-          timestamp
-        });
-        await recordWorkspaceActivity({
-          tenantId: effectiveRun.tenantId,
-          workspaceId: effectiveRun.workspaceId,
-          eventType: "test_run_resumed",
-          subjectType: "test_run",
-          subjectId: effectiveRun.testRunId,
-          summary: `Run '${effectiveRun.testRunId}' resumed.`,
-          details: {
-            currentUnitKey: effectiveRun.currentUnitKey
+
+          if (testRun.status === "running") {
+            return null;
           }
+
+          requireParticipantTestRunNotMonitorPaused(testRun);
+
+          const resumedRun = resumeParticipantControllerRun(contentRelease, testRun, timestamp).testRun;
+          if (resolveParticipantExecutionMode(testRun.executionMode).saveResponses) {
+            const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
+              key: "CONTROLLER",
+              timeStamp: Date.parse(timestamp),
+              content: "RUNNING"
+            }];
+            if (testletTimerStateChanged(testRun, resumedRun)) {
+              resumedStateEntries.unshift(
+                buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
+              );
+            }
+            testLogs.push(...buildParticipantTestLogs({
+              testRun: resumedRun,
+              batches: [{
+                entries: resumedStateEntries
+              }]
+            }));
+          }
+          const effectiveRun = reconcileTimers(resumedRun);
+          activityEvents.push(buildWorkspaceActivity({
+            tenantId: effectiveRun.tenantId,
+            workspaceId: effectiveRun.workspaceId,
+            eventType: "test_run_resumed",
+            subjectType: "test_run",
+            subjectId: effectiveRun.testRunId,
+            summary: `Run '${effectiveRun.testRunId}' resumed.`,
+            details: {
+              currentUnitKey: effectiveRun.currentUnitKey
+            }
+          }));
+          return { testRun: effectiveRun, testLogs, activityEvents, controllerEntryActive: true,
+            participantSession: { ...context.participantSession, status: "launched" } };
         });
-        return effectiveRun;
+        return result.testRun;
+      },
+      async prepareStarterExit(input) {
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const storedRun = await repository.getTestRunById(testRunId);
+        if (!storedRun) throw new FirstSliceError(404, "test_run_not_found", `Test run '${testRunId}' was not found.`);
+        let timerEffect: "cancelled" | "interrupted" | null = null;
+        const result = await mutateRuntimeRun(storedRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          if (testRun.status !== "running") throw new FirstSliceError(409, "test_run_not_running", "Only a running Run can prepare a starter exit.");
+          const currentUnitKey = normalizeOptionalResponseUnitKey(input.currentUnitKey);
+          if (!currentUnitKey || currentUnitKey !== testRun.currentUnitKey) {
+            throw new FirstSliceError(409, "starter_exit_unit_changed", "The current unit changed before starter exit preparation.");
+          }
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(candidate => candidate.bookletKey === testRun.bookletKey);
+          const executionMode = resolveParticipantExecutionMode(testRun.executionMode);
+          const responseUnitKey = input.responseUnitKey === undefined ? currentUnitKey : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+          const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+          if (responseUnitKey) requireRuntimeUnitForBooklet(contentRelease, testRun.bookletKey, responseUnitKey);
+          const transient = normalizeTransientUnitResponses(input.transientUnitResponses);
+          if (executionMode.saveResponses && Object.keys(transient).length) {
+            throw new FirstSliceError(400, "transient_unit_responses_not_allowed", "transientUnitResponses are only accepted for non-saving execution modes.");
+          }
+          for (const unitKey of Object.keys(transient)) requireRuntimeUnitForBooklet(contentRelease, testRun.bookletKey, unitKey);
+          const evaluationRun = executionMode.saveResponses ? testRun : withEvaluatedBookletStates(booklet, {
+            ...testRun, unitResponses: {
+              ...testRun.unitResponses, ...transient,
+              ...(responseUnitKey && unitResponse != null ? { [responseUnitKey]: unitResponse } : {})
+            }
+          });
+          const response = evaluationRun.unitResponses[currentUnitKey];
+          const parsed = response === undefined ? null : parseVeronaUnitResponse(response);
+          if (executionMode.forceNaviRestrictions && !testRun.monitorNavigationUnlocked && !isUnitLeaveLocked(booklet, evaluationRun, currentUnitKey)) {
+            const reasons = bookletStarterExitDeniedReasons({
+              policy: resolveTestletCompletenessPolicy(booklet, currentUnitKey, booklet?.policy ?? compileBookletRuntimePolicy({})),
+              presentationProgress: parsed ? parsed.unitState.presentationProgress : response === undefined ? undefined : "complete",
+              responseProgress: parsed ? parsed.unitState.responseProgress : response === undefined ? undefined : response.trim() ? "complete" : "none"
+            });
+            if (reasons.length) throw new FirstSliceError(409, "booklet_starter_return_denied", "The current unit is incomplete.", { currentUnitKey, deniedReasons: reasons });
+          }
+          const timed = resolveLeavingTimedTestlet(booklet, evaluationRun, null);
+          const timer = timed ? testRun.testletTimers?.[timed.testletKey] : null;
+          if (!timed || timer?.status !== "running") return null;
+          const leave = timed.restrictions?.timeMax?.leave;
+          timerEffect = leave === "allowed" ? "cancelled" : !executionMode.forceTimeRestrictions ? "interrupted" : null;
+          if (!timerEffect) return null;
+          let prepared = timerEffect === "cancelled" ? cancelTestletTimerAfterLeave(testRun, timed.testletKey, timestamp)
+            : interruptTestletTimerAfterLeave(testRun, timed.testletKey, timestamp);
+          if (timerEffect === "interrupted") {
+            prepared = normalizeTestRun({
+              ...prepared, testletTimers: {
+                ...prepared.testletTimers,
+                [timed.testletKey]: { ...prepared.testletTimers![timed.testletKey]!, interruptedAtUnitKey: currentUnitKey }
+              }
+            });
+          }
+          if (executionMode.saveResponses && timerEffect === "cancelled") {
+            testLogs.push(...buildParticipantTestLogs({
+              testRun: prepared,
+              batches: [{ entries: [buildTestletTimeLeftTestStateEntry(prepared, timestamp)] }]
+            }));
+          }
+          // Neither preparation nor cancelled confirmation may apply a leave lock,
+          // stop the Run, or persist a non-saving Player packet.
+          return { testRun: prepared, testLogs, activityEvents };
+        });
+        return { testRun: result.testRun, timerEffect };
       },
       async returnToStarter(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
@@ -33586,69 +34266,73 @@ export const createFirstSliceServices = (
           );
         }
 
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          if (input.expectedStatus !== undefined && input.expectedStatus !== context.testRun.status) {
+            throw new FirstSliceError(409, "starter_exit_state_changed", "The Run status changed before starter exit confirmation.");
+          }
+          requireParticipantTestRunUnlocked(testRun);
+          if (testRun.status === "completed") {
+            return null;
+          }
 
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedTestRun.contentReleaseId
-        );
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
-        if (testRun.status === "completed") {
-          return testRun;
-        }
-
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          candidate => candidate.bookletKey === testRun.bookletKey
-        );
-        const executionMode = resolveParticipantExecutionMode(
-          testRun.executionMode
-        );
-        const responseUnitKey =
-          input.responseUnitKey === undefined
-            ? testRun.currentUnitKey
-            : normalizeOptionalResponseUnitKey(input.responseUnitKey);
-        const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
-        if (responseUnitKey) {
-          requireRuntimeUnitForBooklet(
-            contentRelease,
-            testRun.bookletKey,
-            responseUnitKey
+          if (input.currentUnitKey !== undefined &&
+            normalizeOptionalResponseUnitKey(input.currentUnitKey) !== testRun.currentUnitKey) {
+            throw new FirstSliceError(409, "starter_exit_unit_changed", "The current unit changed before starter exit confirmation.");
+          }
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
           );
-        }
-        const transientUnitResponses = normalizeTransientUnitResponses(
-          input.transientUnitResponses
-        );
-        if (
-          executionMode.saveResponses &&
-          Object.keys(transientUnitResponses).length > 0
-        ) {
-          throw new FirstSliceError(
-            400,
-            "transient_unit_responses_not_allowed",
-            "transientUnitResponses are only accepted for non-saving execution modes."
+          const executionMode = resolveParticipantExecutionMode(
+            testRun.executionMode
           );
-        }
-        for (const transientUnitKey of Object.keys(transientUnitResponses)) {
-          requireRuntimeUnitForBooklet(
-            contentRelease,
-            testRun.bookletKey,
-            transientUnitKey
+          const pausedStatusExit = testRun.status === "paused";
+          const terminatePausedTest = executionMode.saveResponses && booklet?.policy?.display.silentMode === true &&
+            (executionMode.forceTimeRestrictions || executionMode.forceNaviRestrictions);
+          if (pausedStatusExit && !terminatePausedTest) {
+            // Source's visible status page leaves without a termination, timer
+            // change, leave lock or new participant test-state write.
+            return null;
+          }
+          const responseUnitKey =
+            input.responseUnitKey === undefined
+              ? testRun.currentUnitKey
+              : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+          const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+          if (responseUnitKey) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              testRun.bookletKey,
+              responseUnitKey
+            );
+          }
+          const transientUnitResponses = normalizeTransientUnitResponses(
+            input.transientUnitResponses
           );
-        }
-        const hasTransientEvaluation =
-          !executionMode.saveResponses &&
-          (Object.keys(transientUnitResponses).length > 0 ||
-            Boolean(responseUnitKey && unitResponse != null));
-        const returnEvaluationRun = hasTransientEvaluation
-          ? withEvaluatedBookletStates(booklet, {
+          if (
+            executionMode.saveResponses &&
+            Object.keys(transientUnitResponses).length > 0
+          ) {
+            throw new FirstSliceError(
+              400,
+              "transient_unit_responses_not_allowed",
+              "transientUnitResponses are only accepted for non-saving execution modes."
+            );
+          }
+          for (const transientUnitKey of Object.keys(transientUnitResponses)) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              testRun.bookletKey,
+              transientUnitKey
+            );
+          }
+          const hasTransientEvaluation =
+            !executionMode.saveResponses &&
+            (Object.keys(transientUnitResponses).length > 0 ||
+              Boolean(responseUnitKey && unitResponse != null));
+          const returnEvaluationRun = hasTransientEvaluation
+            ? withEvaluatedBookletStates(booklet, {
               ...testRun,
               unitResponses: {
                 ...testRun.unitResponses,
@@ -33658,84 +34342,105 @@ export const createFirstSliceServices = (
                   : {})
               }
             })
-          : testRun;
-        const leavingTimedTestlet = resolveLeavingTimedTestlet(
-          booklet,
-          returnEvaluationRun,
-          null
-        );
-        const leavePolicy =
-          leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
-        if (
-          executionMode.forceTimeRestrictions &&
-          leavePolicy === "forbidden"
-        ) {
-          throw new FirstSliceError(
-            409,
-            "booklet_starter_return_denied",
-            `Run '${testRunId}' cannot return to the starter while the active timed block forbids leaving.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: ["testlet_time_leave_forbidden"]
-            }
+            : testRun;
+          // A logo exit leaves the current unit in the forward direction. Source
+          // checks completeness before any timer/leave-lock confirmation, and a
+          // direct API caller must not bypass that decision with confirm flags.
+          const currentResponse = returnEvaluationRun.currentUnitKey
+            ? returnEvaluationRun.unitResponses[returnEvaluationRun.currentUnitKey] : undefined;
+          const parsedResponse = currentResponse === undefined ? null : parseVeronaUnitResponse(currentResponse);
+          const completenessDeniedReasons = pausedStatusExit || !returnEvaluationRun.currentUnitKey ||
+            !executionMode.forceNaviRestrictions || returnEvaluationRun.monitorNavigationUnlocked ||
+            isUnitLeaveLocked(booklet, returnEvaluationRun, returnEvaluationRun.currentUnitKey) ? []
+            : bookletStarterExitDeniedReasons({
+              policy: resolveTestletCompletenessPolicy(booklet, returnEvaluationRun.currentUnitKey, booklet?.policy ?? compileBookletRuntimePolicy({})),
+              presentationProgress: parsedResponse ? parsedResponse.unitState.presentationProgress : currentResponse === undefined ? undefined : "complete",
+              responseProgress: parsedResponse ? parsedResponse.unitState.responseProgress : currentResponse === undefined ? undefined : currentResponse.trim() ? "complete" : "none"
+            });
+          if (completenessDeniedReasons.length > 0) {
+            throw new FirstSliceError(409, "booklet_starter_return_denied",
+              `Run '${testRunId}' cannot return to the starter before completing the current unit.`, {
+              currentUnitKey: testRun.currentUnitKey, deniedReasons: completenessDeniedReasons
+            });
+          }
+          const leavingTimedTestlet = pausedStatusExit ? null : resolveLeavingTimedTestlet(
+            booklet,
+            returnEvaluationRun,
+            null
           );
-        }
-        if (
-          executionMode.forceTimeRestrictions &&
-          leavePolicy === "confirm" &&
-          !input.confirmTestletTimeLeave
-        ) {
-          throw new FirstSliceError(
-            409,
-            "booklet_starter_return_denied",
-            `Run '${testRunId}' cannot return to the starter without confirming that the active timed block will be closed.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: ["testlet_time_leave_confirmation_required"]
-            }
-          );
-        }
-        const leavingLock = executionMode.forceNaviRestrictions
-          ? resolveCurrentLeaveLock(booklet, returnEvaluationRun, null)
-          : null;
-        if (leavingLock?.confirm && !input.confirmTestletLeaveLock) {
-          throw new FirstSliceError(
-            409,
-            "booklet_starter_return_denied",
-            `Run '${testRunId}' cannot return to the starter without confirming that the active leave lock will be applied.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: ["testlet_leave_confirmation_required"]
-            }
-          );
-        }
+          const leavePolicy =
+            leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
+          if (
+            executionMode.forceTimeRestrictions &&
+            leavePolicy === "forbidden"
+          ) {
+            throw new FirstSliceError(
+              409,
+              "booklet_starter_return_denied",
+              `Run '${testRunId}' cannot return to the starter while the active timed block forbids leaving.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: ["testlet_time_leave_forbidden"]
+              }
+            );
+          }
+          if (
+            executionMode.forceTimeRestrictions &&
+            leavePolicy === "confirm" &&
+            !input.confirmTestletTimeLeave
+          ) {
+            throw new FirstSliceError(
+              409,
+              "booklet_starter_return_denied",
+              `Run '${testRunId}' cannot return to the starter without confirming that the active timed block will be closed.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: ["testlet_time_leave_confirmation_required"]
+              }
+            );
+          }
+          const leavingLock = !pausedStatusExit && executionMode.forceNaviRestrictions &&
+            !(executionMode.forceTimeRestrictions && leavePolicy === "confirm")
+            ? resolveCurrentLeaveLock(booklet, returnEvaluationRun, null)
+            : null;
+          if (leavingLock?.confirm && !input.confirmTestletLeaveLock) {
+            throw new FirstSliceError(
+              409,
+              "booklet_starter_return_denied",
+              `Run '${testRunId}' cannot return to the starter without confirming that the active leave lock will be applied.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: ["testlet_leave_confirmation_required"]
+              }
+            );
+          }
 
-        const timeAdjustedRun =
-          leavingTimedTestlet &&
-          (leavePolicy === "allowed" ||
-            (executionMode.forceTimeRestrictions &&
-              leavePolicy === "confirm" &&
-              input.confirmTestletTimeLeave))
-            ? cancelTestletTimerAfterLeave(
+          const timeAdjustedRun =
+            leavingTimedTestlet &&
+              (leavePolicy === "allowed" ||
+                (executionMode.forceTimeRestrictions &&
+                  leavePolicy === "confirm" &&
+                  input.confirmTestletTimeLeave))
+              ? cancelTestletTimerAfterLeave(
                 returnEvaluationRun,
                 leavingTimedTestlet.testletKey,
                 timestamp
               )
-            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
-              ? interruptTestletTimerAfterLeave(
+              : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+                ? interruptTestletTimerAfterLeave(
                   returnEvaluationRun,
                   leavingTimedTestlet.testletKey,
                   timestamp
                 )
-              : returnEvaluationRun;
-        const returnBaseRun = leavingLock
-          ? activateCurrentLeaveLock(timeAdjustedRun, leavingLock)
-          : timeAdjustedRun;
-        const lockOnTermination =
-          executionMode.monitorable &&
-          booklet?.policy?.completion.lockOnTermination === true;
-        const returnedRun = executionMode.saveResponses
-          ? normalizeTestRun({
+                : returnEvaluationRun;
+          const returnBaseRun = leavingLock
+            ? activateCurrentLeaveLock(timeAdjustedRun, leavingLock)
+            : timeAdjustedRun;
+          const lockOnTermination =
+            executionMode.monitorable &&
+            booklet?.policy?.completion.lockOnTermination === true;
+          const returnedRun = executionMode.saveResponses
+            ? normalizeTestRun({
               ...transitionTestletTimersForRunStatus(
                 returnBaseRun,
                 "paused",
@@ -33745,88 +34450,91 @@ export const createFirstSliceServices = (
               updatedAt: timestamp,
               completedAt: null
             })
-          : resetNonSavingTestRunForEntry({
+            : resetNonSavingTestRunForEntry({
               booklet,
               testRun: returnBaseRun,
               timestamp
             });
 
-        await repository.saveTestRun(returnedRun);
-        if (executionMode.saveResponses) {
-          const returnedStateEntries: ParticipantTestLogEntryInput[] = [];
-          if (testletTimerStateChanged(testRun, returnedRun)) {
-            returnedStateEntries.push(
-              buildTestletTimeLeftTestStateEntry(returnedRun, timestamp)
-            );
-          }
-          if (leavingLock) {
-            returnedStateEntries.push(
-              buildLeaveLockTestStateEntry({
-                booklet,
-                testRun: returnedRun,
-                leaveLock: leavingLock,
-                timestamp: Date.parse(timestamp)
-              })
-            );
-          }
-          returnedStateEntries.push({
-            key: "CONTROLLER",
-            timeStamp: Date.parse(timestamp),
-            content: lockOnTermination
-              ? "LOCKED"
-              : testRun.status === "paused" && testRun.pauseSource === "monitor"
+          if (executionMode.saveResponses) {
+            const returnedStateEntries: ParticipantTestLogEntryInput[] = [];
+            if (testletTimerStateChanged(testRun, returnedRun)) {
+              returnedStateEntries.push(
+                buildTestletTimeLeftTestStateEntry(returnedRun, timestamp)
+              );
+            }
+            if (leavingLock) {
+              returnedStateEntries.push(
+                buildLeaveLockTestStateEntry({
+                  booklet,
+                  testRun: returnedRun,
+                  leaveLock: leavingLock,
+                  timestamp: Date.parse(timestamp)
+                })
+              );
+            }
+            returnedStateEntries.push({
+              key: "CONTROLLER",
+              timeStamp: Date.parse(timestamp),
+              content: pausedStatusExit
                 ? "TERMINATED_PAUSED"
-                : "TERMINATED"
-          });
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+                : lockOnTermination ? "LOCKED" : "TERMINATED"
+            });
+            if (pausedStatusExit && lockOnTermination) {
+              // Source patchLock stores this event separately from CONTROLLER;
+              // it keeps the terminal paused state when setting tests.locked.
+              returnedStateEntries.push({ key: "BOOKLETLOCKEDbyTESTEE", timeStamp: Date.parse(timestamp), content: "" });
+            }
+            testLogs.push(...buildParticipantTestLogs({
               testRun: returnedRun,
               batches: [{ entries: returnedStateEntries }]
-            })
-          );
-        }
-
-        await recordWorkspaceActivity({
-          tenantId: returnedRun.tenantId,
-          workspaceId: returnedRun.workspaceId,
-          eventType: lockOnTermination
-            ? "test_run_locked"
-            : "test_run_returned_to_starter",
-          subjectType: "test_run",
-          subjectId: returnedRun.testRunId,
-          summary: lockOnTermination
-            ? `Run '${returnedRun.testRunId}' locked after participant termination.`
-            : `Run '${returnedRun.testRunId}' returned to the participant starter.`,
-          details: {
-            currentUnitKey: returnedRun.currentUnitKey,
-            lockOnTermination,
-            executionMode: executionMode.mode
+            }));
           }
-        });
-        if (leavingLock) {
-          await recordWorkspaceActivity({
+
+          activityEvents.push(buildWorkspaceActivity({
             tenantId: returnedRun.tenantId,
             workspaceId: returnedRun.workspaceId,
-            eventType: "testlet_leave_lock_activated",
+            eventType: lockOnTermination
+              ? "test_run_locked"
+              : "test_run_returned_to_starter",
             subjectType: "test_run",
             subjectId: returnedRun.testRunId,
-            summary:
-              leavingLock.scope === "testlet"
-                ? `Block '${leavingLock.testlet.testletKey}' locked while returning to the starter.`
-                : `Unit '${leavingLock.unit.unitKey}' locked while returning to the starter.`,
+            summary: lockOnTermination
+              ? `Run '${returnedRun.testRunId}' locked after participant termination.`
+              : `Run '${returnedRun.testRunId}' returned to the participant starter.`,
             details: {
-              scope: leavingLock.scope,
-              testletKey: leavingLock.testlet.testletKey,
-              unitKey: leavingLock.unit.unitKey,
-              reason: "participant_starter_return"
+              currentUnitKey: returnedRun.currentUnitKey,
+              lockOnTermination,
+              executionMode: executionMode.mode
             }
-          });
-        }
+          }));
+          if (leavingLock) {
+            activityEvents.push(buildWorkspaceActivity({
+              tenantId: returnedRun.tenantId,
+              workspaceId: returnedRun.workspaceId,
+              eventType: "testlet_leave_lock_activated",
+              subjectType: "test_run",
+              subjectId: returnedRun.testRunId,
+              summary:
+                leavingLock.scope === "testlet"
+                  ? `Block '${leavingLock.testlet.testletKey}' locked while returning to the starter.`
+                  : `Unit '${leavingLock.unit.unitKey}' locked while returning to the starter.`,
+              details: {
+                scope: leavingLock.scope,
+                testletKey: leavingLock.testlet.testletKey,
+                unitKey: leavingLock.unit.unitKey,
+                reason: "participant_starter_return"
+              }
+            }));
+          }
 
-        return returnedRun;
+          return { testRun: returnedRun, testLogs, activityEvents, controllerEntryActive: false };
+        });
+        return result.testRun;
       },
       async completeRun(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
+        const responseTimestamp = normalizeOptionalParticipantResponseTimestamp(input.responseTimestamp);
         const storedTestRun = await repository.getTestRunById(testRunId);
 
         if (!storedTestRun) {
@@ -33837,70 +34545,63 @@ export const createFirstSliceServices = (
           );
         }
 
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
-
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedTestRun.contentReleaseId
-        );
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
-        requireParticipantTestRunNotMonitorPaused(testRun);
-        if (testRun.status === "completed") {
-          return testRun;
-        }
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          candidate => candidate.bookletKey === testRun.bookletKey
-        );
-        const executionMode = resolveParticipantExecutionMode(
-          testRun.executionMode
-        );
-        const responseUnitKey =
-          input.responseUnitKey === undefined
-            ? testRun.currentUnitKey
-            : normalizeOptionalResponseUnitKey(input.responseUnitKey);
-        const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
-        if (responseUnitKey) {
-          requireRuntimeUnitForBooklet(
-            contentRelease,
-            testRun.bookletKey,
-            responseUnitKey
+        let completionView: TestRun | undefined;
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, participantRosterEntry, timestamp }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          requireParticipantTestRunNotMonitorPaused(testRun);
+          if (testRun.status === "completed") {
+            return null;
+          }
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
           );
-        }
-        const transientUnitResponses = normalizeTransientUnitResponses(
-          input.transientUnitResponses
-        );
-        if (
-          executionMode.saveResponses &&
-          Object.keys(transientUnitResponses).length > 0
-        ) {
-          throw new FirstSliceError(
-            400,
-            "transient_unit_responses_not_allowed",
-            "transientUnitResponses are only accepted for non-saving execution modes."
+          const executionMode = resolveParticipantExecutionMode(
+            testRun.executionMode
           );
-        }
-        for (const transientUnitKey of Object.keys(transientUnitResponses)) {
-          requireRuntimeUnitForBooklet(
-            contentRelease,
-            testRun.bookletKey,
-            transientUnitKey
+          const responseUnitKey =
+            input.responseUnitKey === undefined
+              ? testRun.currentUnitKey
+              : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+          const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+          if (responseUnitKey) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              testRun.bookletKey,
+              responseUnitKey
+            );
+          }
+          const transientUnitResponses = normalizeTransientUnitResponses(
+            input.transientUnitResponses
           );
-        }
-        const hasTransientEvaluation =
-          !executionMode.saveResponses &&
-          (Object.keys(transientUnitResponses).length > 0 ||
-            Boolean(responseUnitKey && unitResponse != null));
-        const completionEvaluationRun =
-          hasTransientEvaluation
-            ? withEvaluatedBookletStates(booklet, {
+          if (
+            executionMode.saveResponses &&
+            Object.keys(transientUnitResponses).length > 0
+          ) {
+            throw new FirstSliceError(
+              400,
+              "transient_unit_responses_not_allowed",
+              "transientUnitResponses are only accepted for non-saving execution modes."
+            );
+          }
+          for (const transientUnitKey of Object.keys(transientUnitResponses)) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              testRun.bookletKey,
+              transientUnitKey
+            );
+          }
+          const hasTransientEvaluation =
+            !executionMode.saveResponses &&
+            (Object.keys(transientUnitResponses).length > 0 ||
+              Boolean(responseUnitKey && unitResponse != null));
+          const responseRun = executionMode.saveResponses && responseUnitKey && unitResponse != null
+            ? orderedParticipantResponse({ testRun, unitKey: responseUnitKey, response: unitResponse, responseTimestamp, timestamp })
+            : testRun;
+          const completionEvaluationRun =
+            hasTransientEvaluation
+              ? withEvaluatedBookletStates(booklet, {
                 ...testRun,
                 unitResponses: {
                   ...testRun.unitResponses,
@@ -33910,207 +34611,191 @@ export const createFirstSliceServices = (
                     : {})
                 }
               })
-            : testRun;
-        const leavingTimedTestlet = resolveLeavingTimedTestlet(
-          booklet,
-          completionEvaluationRun,
-          null
-        );
-        const leavePolicy =
-          leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
-        if (
-          executionMode.forceTimeRestrictions &&
-          leavePolicy === "confirm" &&
-          !input.confirmTestletTimeLeave
-        ) {
-          throw new FirstSliceError(
-            409,
-            "booklet_completion_denied",
-            `Run '${testRunId}' cannot be completed without confirming that the active timed block will be closed.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: [
-                "testlet_time_leave_confirmation_required"
-              ]
-            }
+              : withEvaluatedBookletStates(booklet, responseRun);
+          const leavingTimedTestlet = resolveLeavingTimedTestlet(
+            booklet,
+            completionEvaluationRun,
+            null
           );
-        }
-        const leavingLock = executionMode.forceNaviRestrictions
-          ? resolveCurrentLeaveLock(booklet, completionEvaluationRun, null)
-          : null;
-        if (
-          leavingLock?.confirm &&
-          !input.confirmTestletLeaveLock
-        ) {
-          throw new FirstSliceError(
-            409,
-            "booklet_completion_denied",
-            `Run '${testRunId}' cannot be completed without confirming that the active leave lock will be applied.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: [
-                "testlet_leave_confirmation_required"
-              ]
-            }
-          );
-        }
-        const timeAdjustedCompletionRun =
-          leavingTimedTestlet &&
-          (leavePolicy === "allowed" ||
-            (executionMode.forceTimeRestrictions &&
-              leavePolicy === "confirm" &&
-              input.confirmTestletTimeLeave))
-            ? cancelTestletTimerAfterLeave(
+          const leavePolicy =
+            leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
+          if (
+            executionMode.forceTimeRestrictions &&
+            leavePolicy === "confirm" &&
+            !input.confirmTestletTimeLeave
+          ) {
+            throw new FirstSliceError(
+              409,
+              "booklet_completion_denied",
+              `Run '${testRunId}' cannot be completed without confirming that the active timed block will be closed.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: [
+                  "testlet_time_leave_confirmation_required"
+                ]
+              }
+            );
+          }
+          const leavingLock = executionMode.forceNaviRestrictions
+            ? resolveCurrentLeaveLock(booklet, completionEvaluationRun, null)
+            : null;
+          if (
+            leavingLock?.confirm &&
+            !input.confirmTestletLeaveLock
+          ) {
+            throw new FirstSliceError(
+              409,
+              "booklet_completion_denied",
+              `Run '${testRunId}' cannot be completed without confirming that the active leave lock will be applied.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: [
+                  "testlet_leave_confirmation_required"
+                ]
+              }
+            );
+          }
+          const timeAdjustedCompletionRun =
+            leavingTimedTestlet &&
+              (leavePolicy === "allowed" ||
+                (executionMode.forceTimeRestrictions &&
+                  leavePolicy === "confirm" &&
+                  input.confirmTestletTimeLeave))
+              ? cancelTestletTimerAfterLeave(
                 completionEvaluationRun,
                 leavingTimedTestlet.testletKey,
                 timestamp
               )
-            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
-              ? interruptTestletTimerAfterLeave(
+              : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+                ? interruptTestletTimerAfterLeave(
                   completionEvaluationRun,
                   leavingTimedTestlet.testletKey,
                   timestamp
                 )
-            : completionEvaluationRun;
-        const completionBaseRun = leavingLock
-          ? activateCurrentLeaveLock(timeAdjustedCompletionRun, leavingLock)
-          : timeAdjustedCompletionRun;
-        const navigation = resolveBookletNavigationState(
-          contentRelease,
-          completionBaseRun
-        );
-        if (!navigation.canComplete) {
-          throw new FirstSliceError(
-            409,
-            "booklet_completion_denied",
-            `Run '${testRunId}' cannot be completed because the current unit completion policy is not satisfied.`,
-            {
-              currentUnitKey: completionBaseRun.currentUnitKey,
-              deniedReasons: navigation.forwardDeniedReasons
-            }
+                : completionEvaluationRun;
+          const completionBaseRun = leavingLock
+            ? activateCurrentLeaveLock(timeAdjustedCompletionRun, leavingLock)
+            : timeAdjustedCompletionRun;
+          const navigation = resolveBookletNavigationState(
+            contentRelease,
+            completionBaseRun
           );
-        }
+          if (!navigation.canComplete) {
+            throw new FirstSliceError(
+              409,
+              "booklet_completion_denied",
+              `Run '${testRunId}' cannot be completed because the current unit completion policy is not satisfied.`,
+              {
+                currentUnitKey: completionBaseRun.currentUnitKey,
+                deniedReasons: navigation.forwardDeniedReasons
+              }
+            );
+          }
 
-        const lockOnTermination =
-          executionMode.monitorable &&
-          booklet?.policy?.completion.lockOnTermination === true;
-        const completedRun: TestRun = {
-          ...(lockOnTermination
-            ? transitionTestletTimersForRunStatus(
+          const lockOnTermination =
+            executionMode.monitorable &&
+            booklet?.policy?.completion.lockOnTermination === true;
+          const completedRun: TestRun = {
+            ...(lockOnTermination
+              ? transitionTestletTimersForRunStatus(
                 completionBaseRun,
                 "paused",
                 timestamp
               )
-            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
-              ? completionBaseRun
-            : closeRunningTestletTimers(completionBaseRun, timestamp)),
-          status: lockOnTermination ? "paused" : "completed",
-          locked: lockOnTermination,
-          currentUnitKey: lockOnTermination
-            ? completionBaseRun.currentUnitKey
-            : null,
-          updatedAt: timestamp,
-          completedAt: lockOnTermination ? null : timestamp
-        };
-        if (!executionMode.saveResponses) {
-          completedRun.unitResponses = testRun.unitResponses;
-          completedRun.bookletStates = withEvaluatedBookletStates(booklet, {
-            ...completedRun,
-            unitResponses: testRun.unitResponses
-          }).bookletStates;
-        }
-        const persistedRun = executionMode.saveResponses
-          ? completedRun
-          : resetNonSavingTestRunForEntry({
+              : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+                ? completionBaseRun
+                : closeRunningTestletTimers(completionBaseRun, timestamp)),
+            status: lockOnTermination ? "paused" : "completed",
+            locked: lockOnTermination,
+            currentUnitKey: lockOnTermination
+              ? completionBaseRun.currentUnitKey
+              : null,
+            updatedAt: timestamp,
+            completedAt: lockOnTermination ? null : timestamp
+          };
+          if (!executionMode.saveResponses) {
+            completedRun.unitResponses = testRun.unitResponses;
+            completedRun.bookletStates = withEvaluatedBookletStates(booklet, {
+              ...completedRun,
+              unitResponses: testRun.unitResponses
+            }).bookletStates;
+          }
+          const persistedRun = executionMode.saveResponses
+            ? completedRun
+            : resetNonSavingTestRunForEntry({
               booklet,
               testRun: completedRun,
               timestamp
             });
-        await repository.saveTestRun(persistedRun);
-        if (executionMode.saveResponses) {
-          const completedStateEntries: ParticipantTestLogEntryInput[] = [];
-          if (testletTimerStateChanged(testRun, completedRun)) {
-            completedStateEntries.push(
-              buildTestletTimeLeftTestStateEntry(completedRun, timestamp)
-            );
-          }
-          if (leavingLock) {
-            completedStateEntries.push(
-              buildLeaveLockTestStateEntry({
-                booklet,
-                testRun: completedRun,
-                leaveLock: leavingLock,
-                timestamp: Date.parse(timestamp)
-              })
-            );
-          }
-          completedStateEntries.push({
-            key: "CONTROLLER",
-            timeStamp: Date.parse(timestamp),
-            content: lockOnTermination ? "LOCKED" : "TERMINATED"
-          });
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          if (executionMode.saveResponses) {
+            const completedStateEntries: ParticipantTestLogEntryInput[] = [];
+            if (testletTimerStateChanged(testRun, completedRun)) {
+              completedStateEntries.push(
+                buildTestletTimeLeftTestStateEntry(completedRun, timestamp)
+              );
+            }
+            if (leavingLock) {
+              completedStateEntries.push(
+                buildLeaveLockTestStateEntry({
+                  booklet,
+                  testRun: completedRun,
+                  leaveLock: leavingLock,
+                  timestamp: Date.parse(timestamp)
+                })
+              );
+            }
+            completedStateEntries.push({
+              key: "CONTROLLER",
+              timeStamp: Date.parse(timestamp),
+              content: lockOnTermination ? "LOCKED" : "TERMINATED"
+            });
+            testLogs.push(...buildParticipantTestLogs({
               testRun: completedRun,
               batches: [{ entries: completedStateEntries }]
-            })
-          );
-        }
-
-        const participantSession = await repository.getParticipantSessionById(
-          testRun.participantSessionId
-        );
-        if (
-          participantSession &&
-          !lockOnTermination &&
-          executionMode.saveResponses
-        ) {
-          const nextSessionStatus =
-            await resolveParticipantSessionStatusAfterCompletion(
-              repository,
-              participantSession
-            );
-          await repository.saveParticipantSession({
-            ...participantSession,
-            status: nextSessionStatus
-          });
-        }
-
-        await recordWorkspaceActivity({
-          tenantId: completedRun.tenantId,
-          workspaceId: completedRun.workspaceId,
-          eventType: lockOnTermination ? "test_run_locked" : "test_run_completed",
-          subjectType: "test_run",
-          subjectId: completedRun.testRunId,
-          summary: lockOnTermination
-            ? `Run '${completedRun.testRunId}' locked after participant termination.`
-            : `Run '${completedRun.testRunId}' completed.`,
-          details: {
-            completedAt: completedRun.completedAt,
-            lockOnTermination
+            }));
           }
-        });
-        if (leavingLock) {
-          await recordWorkspaceActivity({
+
+          const participantSession = !lockOnTermination && executionMode.saveResponses
+            ? projectCompletedParticipantSession({ context, contentRelease, participantRosterEntry, testRun: persistedRun }) : undefined;
+
+          activityEvents.push(buildWorkspaceActivity({
             tenantId: completedRun.tenantId,
             workspaceId: completedRun.workspaceId,
-            eventType: "testlet_leave_lock_activated",
+            eventType: lockOnTermination ? "test_run_locked" : "test_run_completed",
             subjectType: "test_run",
             subjectId: completedRun.testRunId,
-            summary:
-              leavingLock.scope === "testlet"
-                ? `Block '${leavingLock.testlet.testletKey}' locked during participant completion.`
-                : `Unit '${leavingLock.unit.unitKey}' locked during participant completion.`,
+            summary: lockOnTermination
+              ? `Run '${completedRun.testRunId}' locked after participant termination.`
+              : `Run '${completedRun.testRunId}' completed.`,
             details: {
-              scope: leavingLock.scope,
-              testletKey: leavingLock.testlet.testletKey,
-              unitKey: leavingLock.unit.unitKey,
-              reason: "participant_completion"
+              completedAt: completedRun.completedAt,
+              lockOnTermination
             }
-          });
-        }
+          }));
+          if (leavingLock) {
+            activityEvents.push(buildWorkspaceActivity({
+              tenantId: completedRun.tenantId,
+              workspaceId: completedRun.workspaceId,
+              eventType: "testlet_leave_lock_activated",
+              subjectType: "test_run",
+              subjectId: completedRun.testRunId,
+              summary:
+                leavingLock.scope === "testlet"
+                  ? `Block '${leavingLock.testlet.testletKey}' locked during participant completion.`
+                  : `Unit '${leavingLock.unit.unitKey}' locked during participant completion.`,
+              details: {
+                scope: leavingLock.scope,
+                testletKey: leavingLock.testlet.testletKey,
+                unitKey: leavingLock.unit.unitKey,
+                reason: "participant_completion"
+              }
+            }));
+          }
 
-        return completedRun;
+          completionView = completedRun;
+          return { testRun: persistedRun, testLogs, activityEvents, controllerEntryActive: false, ...(participantSession ? { participantSession } : {}) };
+        });
+        return completionView ? { ...completionView, controllerEntry: result.testRun.controllerEntry, stateRevision: result.testRun.stateRevision } : result.testRun;
       }
     },
     monitorRead: {
@@ -34124,7 +34809,7 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const contentReleases = await repository.listContentReleasesByWorkspace(
+        const contentReleases = await listRuntimeContentReleases(
           workspace.tenantId,
           workspace.workspaceId
         );
@@ -34268,6 +34953,11 @@ export const createFirstSliceServices = (
         );
         const testRunId = normalizeTestRunId(input.testRunId);
         const commandType = normalizeMonitorRunCommandType(input.commandType);
+        if (input.debugArguments !== undefined && (commandType !== "debug" || !Array.isArray(input.debugArguments) ||
+          !input.debugArguments.every(argument => typeof argument === "string"))) {
+          throw new FirstSliceError(400, "monitor_debug_arguments_invalid", "Debug arguments must be an array of strings on a debug command.");
+        }
+        const debugArguments = commandType === "debug" ? [...input.debugArguments ?? []] : undefined;
         const targetUnitKey =
           commandType === "goto"
             ? normalizeMonitorGotoTargetUnitKey(input.targetUnitKey)
@@ -34276,7 +34966,7 @@ export const createFirstSliceServices = (
               : null;
         const remainingSeconds =
           commandType === "set_testlet_time" ||
-          (commandType === "goto" && input.remainingSeconds != null)
+            (commandType === "goto" && input.remainingSeconds != null)
             ? normalizeMonitorTimeRemainingSeconds(input.remainingSeconds)
             : null;
         const actorId =
@@ -34317,51 +35007,76 @@ export const createFirstSliceServices = (
           );
         }
 
-        const issuedAt = now();
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedNormalizedRun.contentReleaseId
-        );
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: storedNormalizedRun,
-          timestamp: issuedAt
-        });
-        if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
-          );
+        if (["pause", "resume", "goto", "complete", "complete_and_lock", "debug"].includes(commandType)) {
+          let issued: MonitorRunCommandResult | undefined;
+          const result = await mutateRuntimeRun(storedNormalizedRun, ({ context, testRun, contentRelease, participantRosterEntry, timestamp }) => {
+            const mode = resolveParticipantExecutionMode(testRun.executionMode);
+            if (!mode.receiveRemoteCommands) throw new FirstSliceError(409, "monitor_run_commands_disabled", `Execution mode '${mode.mode}' does not accept monitor commands.`);
+            if (testRun.status === "completed") throw new FirstSliceError(409, "test_run_already_completed", `Test run '${testRunId}' is already completed.`);
+            if (commandType !== "debug") projectParticipantRunCommand({ contentRelease, testRun, commandType, targetUnitKey, remainingSeconds, timestamp });
+            const participantSession = context.participantSession;
+            const commandId = idGenerator();
+            const commandInput = {
+              tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+              participantSessionId: participantSession.participantSessionId, testRunId, commandId, commandType, targetUnitKey,
+              remainingSeconds, actorId, issuedAt: timestamp, effectsDeferred: true as const,
+              ...(debugArguments ? { debugArguments } : {})
+            };
+            const activityEvents = [buildWorkspaceActivity({
+              tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+              eventType: "monitor_run_command_issued", actorId, subjectType: "test_run", subjectId: testRunId,
+              summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
+              details: {
+                commandId, commandType, previousStatus: testRun.status, nextStatus: testRun.status,
+                previousLocked: testRun.locked === true, locked: testRun.locked === true, participantSessionId: participantSession.participantSessionId,
+                loginKey: participantSession.loginKey, groupKey: participantSession.groupKey, bookletKey: testRun.bookletKey, targetUnitKey, remainingSeconds,
+                displayName: participantRosterEntry?.displayName ?? null, effectsDeferred: true,
+                ...(debugArguments ? { debugArguments } : {})
+              }
+            })];
+            issued = {
+              commandId, commandType, actorId, issuedAt: timestamp, previousStatus: testRun.status,
+              previousLocked: testRun.locked === true, testRun, participantSession,
+              ...(debugArguments ? { debugArguments } : {})
+            };
+            return { testRun: commandType === "debug" ? context.testRun : testRun, activityEvents, commandInput };
+          }, { reconcileBefore: false, participantAccess: false });
+          if (!issued) throw new Error("Monitor intent projection did not produce a receipt.");
+          return { ...issued, testRun: result.testRun, participantSession: result.participantSession };
         }
+        let issued: MonitorRunCommandResult | undefined;
+        const result = await mutateRuntimeRun(storedNormalizedRun, ({ context, testRun, contentRelease, participantRosterEntry, timestamp, reconcileTimers }) => {
+          const issuedAt = timestamp;
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          const executionMode = resolveParticipantExecutionMode(testRun.executionMode);
+          if (!executionMode.receiveRemoteCommands) throw new FirstSliceError(409, "monitor_run_commands_disabled", `Execution mode '${executionMode.mode}' does not accept monitor commands.`);
+          if (testRun.status === "completed") {
+            throw new FirstSliceError(
+              409,
+              "test_run_already_completed",
+              `Test run '${testRunId}' is already completed.`
+            );
+          }
 
-        const participantSession = await requireParticipantSession(
-          repository,
-          testRun.participantSessionId
-        );
-        const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
-          repository,
-          workspace.tenantId,
-          workspace.workspaceId,
-          participantSession.loginKey
-        );
-        let nextStatus: TestRunStatus = testRun.status;
-        if (commandType === "pause") {
-          nextStatus = "paused";
-        } else if (commandType === "resume" || commandType === "goto") {
-          nextStatus = "running";
-        } else if (
-          commandType === "complete" ||
-          commandType === "complete_and_lock"
-        ) {
-          nextStatus = "completed";
-        }
-        let adjustedTestletKey: string | null = null;
-        let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
-          null;
-        const transitionedTestRun: TestRun =
-          commandType === "complete" || commandType === "complete_and_lock"
-            ? {
+          const participantSession = context.participantSession;
+          let nextStatus: TestRunStatus = testRun.status;
+          if (commandType === "pause") {
+            nextStatus = "paused";
+          } else if (commandType === "resume" || commandType === "goto") {
+            nextStatus = "running";
+          } else if (
+            commandType === "complete" ||
+            commandType === "complete_and_lock"
+          ) {
+            nextStatus = "completed";
+          }
+          let adjustedTestletKey: string | null = null;
+          let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
+            null;
+          const transitionedTestRun: TestRun =
+            commandType === "complete" || commandType === "complete_and_lock"
+              ? {
                 ...closeRunningTestletTimers(testRun, issuedAt),
                 status: "completed",
                 locked: commandType === "complete_and_lock",
@@ -34369,20 +35084,20 @@ export const createFirstSliceServices = (
                 updatedAt: issuedAt,
                 completedAt: issuedAt
               }
-            : commandType === "lock_test"
-              ? normalizeTestRun({
+              : commandType === "lock_test"
+                ? normalizeTestRun({
                   ...testRun,
                   locked: true,
                   updatedAt: issuedAt
                 })
-              : commandType === "unlock_test"
-                ? normalizeTestRun({
+                : commandType === "unlock_test"
+                  ? normalizeTestRun({
                     ...testRun,
                     locked: false,
                     updatedAt: issuedAt
                   })
-                : commandType === "goto" && targetUnitKey
-                  ? (() => {
+                  : commandType === "goto" && targetUnitKey
+                    ? (() => {
                       const adjusted = applyMonitorGoto({
                         contentRelease,
                         testRun,
@@ -34394,21 +35109,21 @@ export const createFirstSliceServices = (
                       previousTimer = adjusted.previousTimer;
                       return adjusted.testRun;
                     })()
-                  : commandType === "unlock_navigation"
-                    ? applyMonitorNavigationUnlock({
+                    : commandType === "unlock_navigation"
+                      ? applyMonitorNavigationUnlock({
                         contentRelease,
                         testRun,
                         timestamp: issuedAt
                       })
-                    : commandType === "lock_navigation"
-                      ? applyMonitorNavigationLock({
+                      : commandType === "lock_navigation"
+                        ? applyMonitorNavigationLock({
                           testRun,
                           timestamp: issuedAt
                         })
-                      : commandType === "set_testlet_time" &&
+                        : commandType === "set_testlet_time" &&
                           targetUnitKey &&
                           remainingSeconds
-                        ? (() => {
+                          ? (() => {
                             const adjusted = applyMonitorSetTestletTime({
                               contentRelease,
                               testRun,
@@ -34420,7 +35135,9 @@ export const createFirstSliceServices = (
                             previousTimer = adjusted.previousTimer;
                             return adjusted.testRun;
                           })()
-                        : transitionTestletTimersForRunStatus(
+                          : commandType === "resume"
+                            ? resumeParticipantControllerRun(contentRelease, testRun, issuedAt).testRun
+                            : transitionTestletTimersForRunStatus(
                             testRun,
                             nextStatus as Extract<
                               TestRunStatus,
@@ -34428,183 +35145,177 @@ export const createFirstSliceServices = (
                             >,
                             issuedAt
                           );
-        const nextTestRun = normalizeTestRun({
-          ...transitionedTestRun,
-          pauseSource:
-            commandType === "pause"
-              ? "monitor"
-              : commandType === "resume" ||
+          const nextTestRun = normalizeTestRun({
+            ...transitionedTestRun,
+            pauseSource:
+              commandType === "pause"
+                ? "monitor"
+                : commandType === "resume" ||
                   commandType === "goto" ||
                   commandType === "complete" ||
                   commandType === "complete_and_lock"
-                ? undefined
-                : transitionedTestRun.pauseSource
-        });
-        if (nextTestRun !== testRun) {
-          await repository.saveTestRun(nextTestRun);
-        }
-        const monitorTestLogEntries: ParticipantTestLogEntryInput[] = [];
-        if (nextTestRun.status !== testRun.status) {
-          monitorTestLogEntries.push({
-            key: "CONTROLLER",
-            timeStamp: Date.parse(issuedAt),
-            content:
-              nextTestRun.status === "completed"
-                ? "TERMINATED"
+                  ? undefined
+                  : transitionedTestRun.pauseSource
+          });
+          const monitorTestLogEntries: ParticipantTestLogEntryInput[] = [];
+          if (nextTestRun.status !== testRun.status) {
+            monitorTestLogEntries.push({
+              key: "CONTROLLER",
+              timeStamp: Date.parse(issuedAt),
+              content:
+                nextTestRun.status === "completed"
+                  ? "TERMINATED"
+                  : nextTestRun.status.toUpperCase()
+            });
+          }
+          if (nextTestRun.locked !== testRun.locked) {
+            monitorTestLogEntries.push({
+              key: "CONTROLLER",
+              timeStamp: Date.parse(issuedAt),
+              content: nextTestRun.locked
+                ? "LOCKED"
                 : nextTestRun.status.toUpperCase()
+            });
+          }
+          if (nextTestRun.currentUnitKey !== testRun.currentUnitKey) {
+            monitorTestLogEntries.push({
+              key: "CURRENT_UNIT_ID",
+              timeStamp: Date.parse(issuedAt),
+              content: nextTestRun.currentUnitKey ?? ""
+            });
+          }
+          if (testletTimerStateChanged(testRun, nextTestRun)) {
+            monitorTestLogEntries.unshift(
+              buildTestletTimeLeftTestStateEntry(nextTestRun, issuedAt)
+            );
+          }
+          const reopenedClosedTestlet =
+            commandType === "goto" &&
+            adjustedTestletKey != null &&
+            remainingSeconds != null &&
+            previousTimer != null &&
+            (previousTimer.status === "expired" ||
+              previousTimer.status === "cancelled" ||
+              getTestletTimerRemainingSeconds(previousTimer, issuedAt) <= 0);
+          const originalCommandLogContent = formatOriginalMonitorCommandLogContent({
+            commandType,
+            targetUnitKey,
+            reopenedClosedTestlet,
+            remainingSeconds
           });
-        }
-        if (nextTestRun.locked !== testRun.locked) {
-          monitorTestLogEntries.push({
-            key: "CONTROLLER",
-            timeStamp: Date.parse(issuedAt),
-            content: nextTestRun.locked
-              ? "LOCKED"
-              : nextTestRun.status.toUpperCase()
-          });
-        }
-        if (nextTestRun.currentUnitKey !== testRun.currentUnitKey) {
-          monitorTestLogEntries.push({
-            key: "CURRENT_UNIT_ID",
-            timeStamp: Date.parse(issuedAt),
-            content: nextTestRun.currentUnitKey ?? ""
-          });
-        }
-        if (testletTimerStateChanged(testRun, nextTestRun)) {
-          monitorTestLogEntries.unshift(
-            buildTestletTimeLeftTestStateEntry(nextTestRun, issuedAt)
-          );
-        }
-        const reopenedClosedTestlet =
-          commandType === "goto" &&
-          adjustedTestletKey != null &&
-          remainingSeconds != null &&
-          previousTimer != null &&
-          (previousTimer.status === "expired" ||
-            previousTimer.status === "cancelled" ||
-            getTestletTimerRemainingSeconds(previousTimer, issuedAt) <= 0);
-        const originalCommandLogContent = formatOriginalMonitorCommandLogContent({
-          commandType,
-          targetUnitKey,
-          reopenedClosedTestlet,
-          remainingSeconds
-        });
-        if (originalCommandLogContent) {
-          monitorTestLogEntries.push({
-            key: "command executed",
-            timeStamp: Date.parse(issuedAt),
-            content: originalCommandLogContent
-          });
-        }
-        if (commandType === "lock_test" || commandType === "complete_and_lock") {
-          monitorTestLogEntries.push({
-            key: "locked by monitor",
-            timeStamp: Date.parse(issuedAt),
-            content: actorId ?? ""
-          });
-        }
-        if (executionMode.saveResponses && monitorTestLogEntries.length > 0) {
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          if (originalCommandLogContent) {
+            monitorTestLogEntries.push({
+              key: "command executed",
+              timeStamp: Date.parse(issuedAt),
+              content: originalCommandLogContent
+            });
+          }
+          if (commandType === "lock_test" || commandType === "complete_and_lock") {
+            monitorTestLogEntries.push({
+              key: "locked by monitor",
+              timeStamp: Date.parse(issuedAt),
+              content: actorId ?? ""
+            });
+          }
+          if (executionMode.saveResponses && monitorTestLogEntries.length > 0) {
+            testLogs.push(...buildParticipantTestLogs({
               testRun: nextTestRun,
               batches: [{ entries: monitorTestLogEntries }]
-            })
-          );
-        }
-        const effectiveNextTestRun =
-          commandType === "complete" || commandType === "complete_and_lock"
-            ? nextTestRun
-            : await persistEffectiveTestletTimerState({
-                contentRelease,
-                testRun: nextTestRun,
-                timestamp: issuedAt
-              });
-        if (
-          reopenedClosedTestlet &&
-          adjustedTestletKey &&
-          remainingSeconds != null &&
-          previousTimer
-        ) {
-          const restoredTimer =
-            effectiveNextTestRun.testletTimers?.[adjustedTestletKey];
-          await recordWorkspaceActivity({
-            tenantId: effectiveNextTestRun.tenantId,
-            workspaceId: effectiveNextTestRun.workspaceId,
-            eventType: "testlet_timer_started",
+            }));
+          }
+          const effectiveNextTestRun =
+            commandType === "complete" || commandType === "complete_and_lock"
+              ? nextTestRun
+              : reconcileTimers(nextTestRun);
+          if (
+            reopenedClosedTestlet &&
+            adjustedTestletKey &&
+            remainingSeconds != null &&
+            previousTimer
+          ) {
+            const restoredTimer =
+              effectiveNextTestRun.testletTimers?.[adjustedTestletKey];
+            activityEvents.push(buildWorkspaceActivity({
+              tenantId: effectiveNextTestRun.tenantId,
+              workspaceId: effectiveNextTestRun.workspaceId,
+              eventType: "testlet_timer_started",
+              actorId,
+              subjectType: "test_run",
+              subjectId: effectiveNextTestRun.testRunId,
+              summary: `Timed block '${adjustedTestletKey}' reopened by monitor for run '${effectiveNextTestRun.testRunId}'.`,
+              details: {
+                testletKey: adjustedTestletKey,
+                durationSeconds: restoredTimer?.durationSeconds ?? remainingSeconds,
+                expiresAt: restoredTimer?.expiresAt ?? null,
+                currentUnitKey: effectiveNextTestRun.currentUnitKey,
+                restoredByMonitor: true
+              }
+            }));
+          }
+          const nextParticipantSession = commandType === "complete" || commandType === "complete_and_lock"
+            ? projectCompletedParticipantSession({ context, contentRelease, participantRosterEntry, testRun: effectiveNextTestRun }) : participantSession;
+
+          const commandId = idGenerator();
+          const commandInput = commandType !== "complete" && commandType !== "complete_and_lock" ? {
+            tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+            participantSessionId: participantSession.participantSessionId, testRunId,
+            commandId, commandType, targetUnitKey, remainingSeconds, actorId, issuedAt
+          } : undefined;
+          activityEvents.push(buildWorkspaceActivity({
+            tenantId: workspace.tenantId,
+            workspaceId: workspace.workspaceId,
+            eventType: "monitor_run_command_issued",
             actorId,
             subjectType: "test_run",
-            subjectId: effectiveNextTestRun.testRunId,
-            summary: `Timed block '${adjustedTestletKey}' reopened by monitor for run '${effectiveNextTestRun.testRunId}'.`,
+            subjectId: testRunId,
+            summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
             details: {
-              testletKey: adjustedTestletKey,
-              durationSeconds: restoredTimer?.durationSeconds ?? remainingSeconds,
-              expiresAt: restoredTimer?.expiresAt ?? null,
-              currentUnitKey: effectiveNextTestRun.currentUnitKey,
-              restoredByMonitor: true
+              commandId,
+              commandType,
+              previousStatus: testRun.status,
+              nextStatus: effectiveNextTestRun.status,
+              previousLocked: testRun.locked === true,
+              locked: effectiveNextTestRun.locked === true,
+              completedAt: effectiveNextTestRun.completedAt ?? null,
+              previousUnitKey: testRun.currentUnitKey,
+              targetUnitKey,
+              targetTestletKey: adjustedTestletKey,
+              previousTimerStatus: previousTimer?.status ?? null,
+              previousRemainingSeconds: previousTimer
+                ? getTestletTimerRemainingSeconds(previousTimer, issuedAt)
+                : null,
+              remainingSeconds,
+              previousNavigationUnlocked:
+                testRun.monitorNavigationUnlocked === true,
+              navigationUnlocked:
+                effectiveNextTestRun.monitorNavigationUnlocked === true,
+              participantSessionId: participantSession.participantSessionId,
+              loginKey: participantSession.loginKey,
+              groupKey: participantSession.groupKey,
+              bookletKey: testRun.bookletKey,
+              displayName: participantRosterEntry?.displayName ?? null
             }
-          });
-        }
-        const nextParticipantSession =
-          commandType === "complete" || commandType === "complete_and_lock"
-            ? {
-                ...participantSession,
-                status: await resolveParticipantSessionStatusAfterCompletion(
-                  repository,
-                  participantSession
-                )
-              }
-            : participantSession;
-        if (nextParticipantSession !== participantSession) {
-          await repository.saveParticipantSession(nextParticipantSession);
-        }
+          }));
 
-        const commandId = idGenerator();
-        await recordWorkspaceActivity({
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "monitor_run_command_issued",
-          actorId,
-          subjectType: "test_run",
-          subjectId: testRunId,
-          summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
-          details: {
+          issued = {
             commandId,
             commandType,
+            actorId,
+            issuedAt,
             previousStatus: testRun.status,
-            nextStatus: effectiveNextTestRun.status,
             previousLocked: testRun.locked === true,
-            locked: effectiveNextTestRun.locked === true,
-            completedAt: effectiveNextTestRun.completedAt ?? null,
-            previousUnitKey: testRun.currentUnitKey,
-            targetUnitKey,
-            targetTestletKey: adjustedTestletKey,
-            previousTimerStatus: previousTimer?.status ?? null,
-            previousRemainingSeconds: previousTimer
-              ? getTestletTimerRemainingSeconds(previousTimer, issuedAt)
-              : null,
-            remainingSeconds,
-            previousNavigationUnlocked:
-              testRun.monitorNavigationUnlocked === true,
-            navigationUnlocked:
-              effectiveNextTestRun.monitorNavigationUnlocked === true,
-            participantSessionId: participantSession.participantSessionId,
-            loginKey: participantSession.loginKey,
-            groupKey: participantSession.groupKey,
-            bookletKey: testRun.bookletKey,
-            displayName: participantRosterEntry?.displayName ?? null
-          }
-        });
-
-        return {
-          commandId,
-          commandType,
-          actorId,
-          issuedAt,
-          previousStatus: testRun.status,
-          previousLocked: testRun.locked === true,
-          testRun: effectiveNextTestRun,
-          participantSession: nextParticipantSession
-        };
+            testRun: effectiveNextTestRun,
+            participantSession: nextParticipantSession
+          };
+          return {
+            testRun: effectiveNextTestRun, testLogs, activityEvents,
+            ...(["lock_test", "unlock_test"].includes(commandType) ? {originalResultModifiedAt: issuedAt} : {}),
+            ...(nextParticipantSession !== participantSession ? { participantSession: nextParticipantSession } : {}),
+            ...(commandInput ? { commandInput } : {})
+          };
+        }, { participantAccess: false });
+        if (!issued) throw new Error("Monitor command projection did not produce a receipt.");
+        return { ...issued, testRun: result.testRun, participantSession: result.participantSession };
       },
       async issueRunCommands(input) {
         const commands: MonitorRunCommandResult[] = [];
@@ -34623,6 +35334,7 @@ export const createFirstSliceServices = (
                 workspaceKey: input.workspaceKey,
                 testRunId,
                 commandType: input.commandType,
+                debugArguments: input.debugArguments,
                 actorId: input.actorId,
                 targetUnitKey: input.targetUnitKey,
                 remainingSeconds: input.remainingSeconds
@@ -34659,7 +35371,12 @@ export const createFirstSliceServices = (
           const packages = (await repository.listSourcePackagesByWorkspace(workspace.tenantId, workspace.workspaceId))
             .filter(item => item.status === "accepted")
             .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
+          const events = await repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId,workspace.workspaceId);
           const seen = new Set<string>();
+          for (const {metadata} of currentSystemCheckFiles(packages, events)) {
+            seen.add(metadata.identifier.toUpperCase());
+            choices.push({...scope,checkId:metadata.identifier,displayLabel:metadata.label || metadata.identifier,description:metadata.description});
+          }
           for (const source of packages) {
             for (const check of source.contentStructure?.systemCheckEntries ?? []) {
               const key = check.checkId.toUpperCase();
@@ -34699,7 +35416,13 @@ export const createFirstSliceServices = (
           repository,
           systemCheck.sourcePackageId
         );
-        const storedDefinition = sourcePackage.contentStructure?.systemCheckEntries?.find(
+        const [currentSources, currentEvents] = await Promise.all([
+          repository.listSourcePackagesByWorkspace(workspace.tenantId,workspace.workspaceId),
+          repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId,workspace.workspaceId)
+        ]);
+        const live = await liveSystemCheckPackages(workspace,currentSources,currentEvents);
+        const definitionSource = live.packages.find(source => source.sourcePackageId === systemCheck.sourcePackageId) ?? sourcePackage;
+        const storedDefinition = definitionSource.contentStructure?.systemCheckEntries?.find(
           entry => entry.checkId.toUpperCase() === systemCheck.checkId.toUpperCase()
         );
         if (

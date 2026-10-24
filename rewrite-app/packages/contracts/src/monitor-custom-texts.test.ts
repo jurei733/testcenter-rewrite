@@ -21,7 +21,8 @@ test("monitor custom-text scopes follow original global-login precedence", () =>
 });
 
 test("monitor custom-text catalog retains the original settings keys", () => {
-  assert.equal(originalMonitorCustomTextKeys.length, 58);
+  assert.equal(originalMonitorCustomTextKeys.length, 54);
+  assert.ok(!originalMonitorCustomTextKeys.some(key => key.startsWith("gm_booklet_error_")));
   assert.ok(originalMonitorCustomTextKeys.includes("gm_headline"));
   assert.ok(originalMonitorCustomTextKeys.includes("gm_control_finish_everything"));
   assert.ok(originalMonitorCustomTextKeys.includes("gm_selection_text_scheduled"));

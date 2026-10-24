@@ -1,0 +1,48 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "probeCommit": "64a0e1e3fb6e8617342512b54a762558ab53cab3",
+  "probeTree": "7b0f5f76d991b20242de148af761e0aaec77f1a0",
+  "qualifiedCodeTree": "670ee6b5c76a688449d4402705fd4465ac0266c1",
+  "runId": 40038272672,
+  "jobId": 120702998397,
+  "status": "completed",
+  "conclusion": "success",
+  "checks": 41,
+  "artifact": {
+    "id": 12538530961,
+    "bytes": 6455,
+    "sha256": "378eafeb8e83e5cc82dcd2495dd7bb0edb844665e8f8d340bed7402c51a4e3f3"
+  },
+  "scriptSha256": "3afbbc881e105ada0b6eb115cdc11a023890ddaa02d33db6814d27c865972091",
+  "scriptBlob": "1083b0ce41f06f6eac83ae705bd0a5759c620a51",
+  "workflowSha256": "65ceaa1ccc26f5473ab847d1f6e37c04544a0fc424531b45e5239ab40601aa40",
+  "composeSha256": "0808c7690308371e619ce1d42584f23888a9c32443304a798afec6c0df42528d",
+  "sourceFiles": {
+    "backend/src/files/XMLFileTesttakers.class.php": "20bd5e27314507982ba81f9f947b488ab86655290d8bf714c6ab7a9f8ba221f7",
+    "backend/src/dao/WorkspaceDAO.class.php": "74e8df283418921640d4e4ddb780ce95483f319bca974b7464a17f5d1bb341f4",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/data-collection/Login.class.php": "e33fdd4458b8d429b93341bb1294931415cfe3004f3ca3610af9ccbc8affda3c"
+  },
+  "files": {
+    "image-id.txt": "0a104c14892c30da3b8ceccfd891f93252210fa7b105b75fefdd245682ed7558",
+    "logs.csv": "80a2da5d329a08e4f3ea16d5a7e7770c69d52704f4ba1bbf096b2bba279f1b43",
+    "logs.json": "3e7599a9a10c648f80e6de657c792d77a1f706ac593afdeb61c28c8853201862",
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
+    "receipt.json": "81d028d96d0877d461e83750b42c4fcf83c6395ffc952b040364a8c46a9fe759",
+    "responses.csv": "be5a11515db85477ec0daaef909520f858161e388baf1e91e293c53b35dab6e4",
+    "responses.json": "41092725541fdd425e2464cfe8b8eefb84d037d218c5ad13e8747d797e3f3bde",
+    "reviews-enhanced.csv": "b64aba25e03a3c5565c98fde21a79098926fa39d0a3662071543eb5f2a562a40",
+    "reviews-enhanced.json": "ed0c0612078b116397ff25077a33a435e65a86be0aeeda9e9140d9809847e0d3",
+    "reviews-legacy.csv": "8cd85902a068e951c83e7a405ff742ca52ccd154882bfa4cbf050e1ce9b162b5",
+    "reviews-legacy.json": "a5d4827db617d21ac2b8a5d3bf9acac39ea5d6c20bce39b37729c15aeac71283"
+  },
+  "precedingFailedProbe": {
+    "runId": 40037662093,
+    "jobId": 120700987949,
+    "commit": "d123f74955687766b0c270aefec676516b949755",
+    "artifact": 12537138839,
+    "artifactSha256": "ca1f713f76a31b4b29ad03b1872aa251aa11d1c1debcad943cc1879a7aade714",
+    "reason": "Initial expected success for an empty native label contradicted actual login HTTP500. Corrected probe asserts actual failure and repair, retaining all prior checks."
+  },
+  "scope": "Unchanged production Source, TestMode=false, actual XSD upload/authentication/HTTP; no direct SQL seeding. Monitor-first evidence defines remaining Rewrite work; it does not qualify a Rewrite monitor-creation implementation."
+}

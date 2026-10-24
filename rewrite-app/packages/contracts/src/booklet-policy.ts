@@ -1,6 +1,5 @@
 import type {
   BookletLeaveRestriction,
-  BookletNavigationDeniedReason,
   BookletPageNavigationLabel,
   BookletPlayerEndPolicy,
   BookletRuntimePolicy,
@@ -330,33 +329,4 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
       )
     }
   };
-};
-
-export const bookletNavigationDeniedReasons = (input: {
-  policy: BookletRuntimePolicy;
-  direction: "forward" | "backward";
-  presentationProgress?: string | null;
-  responseProgress?: string | null;
-}): BookletNavigationDeniedReason[] => {
-  const applies = (restriction: BookletLeaveRestriction): boolean =>
-    restriction === "always" ||
-    (restriction === "forward" && input.direction === "forward");
-  const complete = (progress: string | null | undefined): boolean =>
-    ["complete", "complete-and-valid"].includes(progress?.toLowerCase() ?? "");
-  const reasons: BookletNavigationDeniedReason[] = [];
-
-  if (
-    applies(input.policy.navigation.requirePresentationComplete) &&
-    !complete(input.presentationProgress)
-  ) {
-    reasons.push("presentation_incomplete");
-  }
-  if (
-    applies(input.policy.navigation.requireResponseComplete) &&
-    input.responseProgress &&
-    !complete(input.responseProgress)
-  ) {
-    reasons.push("response_incomplete");
-  }
-  return reasons;
 };

@@ -1,3 +1,9 @@
+import { observeParticipantCommandCompletionSession, queueParticipantCommandCompletion } from "./participant-command-completion";
+import { createParticipantSaveBarriers, type ParticipantSaveBarrier } from "./participant-save-barrier";
+import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
+import type { ParticipantControllerContext, ParticipantNativeCommandRequest, ParticipantNativeCommandResult, ParticipantControllerTimerInterruptionRequest, ParticipantCommandCompletionRequest, ParticipantCommandCompletionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { isParticipantControllerDispatches } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import type { ParticipantCommandExecution } from "./participant-command-receiver";
 import { Injectable, effect, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 
@@ -39,6 +45,7 @@ import {
   productionApiRoutes,
   resolveAndFormatParticipantCustomText,
   resolveParticipantCustomText,
+  resolveParticipantCustomTextValue,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import {
@@ -46,10 +53,15 @@ import {
   participantExecutionModeDefinitions,
   participantCodeInputTypes,
   type ParticipantExecutionMode,
+  type ParticipantRunCommand,
+  type ParticipantRunCommandApplicationResult,
+  type ParticipantControllerDispatch,
   type ParticipantCodeInputType,
   type ParticipantRosterEntry,
   type ParticipantViewSettings,
   type ParticipantRuntimeBooklet,
+  type ParticipantRuntimeState,
+  type TestRun,
   type ParticipantTestLogEntryInput,
   type WorkspaceReview
 } from "@testcenter-rewrite-app/domain";
@@ -61,12 +73,14 @@ import {
   discardParticipantSaveOutboxForRun,
   findParticipantSaveOutboxEntry,
   findParticipantSaveOutboxEntryForUnit,
+  listParticipantSaveOutboxEntriesForRun,
   persistParticipantSaveOutboxEntry,
   queueParticipantSaveOutboxEntryForBackgroundDelivery,
   queueParticipantSaveOutboxForRunForBackgroundDelivery,
   removeParticipantSaveOutboxEntry,
   type ParticipantSaveOutboxEntry
 } from "./participant-save-outbox";
+import { carriedParticipantTestLogBatches, identifyParticipantTestLogEntries } from "./participant-test-log-identities";
 import { buildParticipantSessionEntryUrl, withSelectedParticipantRun } from "./participant-session-links";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
@@ -186,6 +200,8 @@ type ParticipantPlayerUnitItem = {
 };
 
 export type ParticipantVeronaPlayerState = {
+  unitViewPending: boolean;
+  commandReloadSequence: number;
   playerKey: string;
   playerHtml: string;
   testRunId: string;
@@ -195,6 +211,7 @@ export type ParticipantVeronaPlayerState = {
   unitDefinitionType: string;
   resourceBasePath: string;
   savedResponse: string;
+  responseClocks?: TestRun["unitResponseFieldTimestamps"];
   sharedParameters: Array<{ key: string; value: string }>;
   unitNumber: number;
   unitCount: number;
@@ -233,6 +250,7 @@ type ParticipantEntryParameters = {
   currentUnitKey?: string | null;
   unitResponse?: string | null;
   legacyShortLink?: boolean;
+  openStarter?: boolean;
 };
 
 type NormalizedParticipantEntryParameters = {
@@ -247,6 +265,7 @@ type NormalizedParticipantEntryParameters = {
   unitResponse: string;
   hasUnitResponse: boolean;
   legacyShortLink: boolean;
+  openStarter: boolean;
 };
 
 type ParticipantTestLogBatch = {
@@ -260,11 +279,19 @@ type SettledVeronaResponse = Pick<
   "testRunId" | "unitKey" | "response"
 >;
 
-type ParticipantConfirmationDialog = {
+export type ParticipantConfirmationDialog = {
+  kind?: "information";
   title: string;
   message: string;
   cancelLabel: string;
   confirmLabel: string;
+  original?: {
+    title: string;
+    message: string;
+    cancelLabel: string;
+    confirmLabel: string;
+    confirmMeansContinue: boolean;
+  };
 };
 
 const VERONA_FOREGROUND_STATE_GRACE_MS = 200;
@@ -320,7 +347,7 @@ export class ParticipantViewFacade {
   }
 
   get isParticipantStarter(): boolean {
-    return !this.isParticipantLogin && !this.currentRunState && !this.hasControllerError;
+    return !this.isParticipantLogin && !this.consoleRun && !this.currentRunState && !this.hasControllerError;
   }
 
   get noAssignedBookletsLabel(): string {
@@ -380,6 +407,7 @@ export class ParticipantViewFacade {
   private readonly activeControllerError = signal<VeronaControllerError | null>(
     null
   );
+  private participantErrorReceptionSuspended = false;
   private copiedSessionEntryLink = "";
   private fullscreenPromptDismissedRunId = "";
   private fullscreenStatusRunId = "";
@@ -401,6 +429,8 @@ export class ParticipantViewFacade {
   private readonly presentedActiveTimers = new Set<string>();
   private readonly seenTimerWarnings = new Set<string>();
   private readonly timerRemainingSeconds = new Map<string, number>();
+  private readonly controllerTimerInterruption = signal<{ participantSessionId: string; request: ParticipantControllerTimerInterruptionRequest } | null>(null);
+  private readonly commandTimerInterruptions = new WeakMap<ParticipantRunCommand, ParticipantControllerTimerInterruptionRequest | undefined>();
   private currentRunState: ParticipantCurrentRunStateResponse["currentRunState"] | null =
     null;
   private readonly loadedBookletAssets = signal<{
@@ -430,9 +460,12 @@ export class ParticipantViewFacade {
     entries: ParticipantTestLogEntryInput[];
   }> = [];
   private veronaSaveDrainPromise: Promise<void> | null = null;
+  private readonly veronaSaveBarriers = createParticipantSaveBarriers();
+  private veronaSaveInFlight: ParticipantSaveOutboxEntry | null = null;
   private veronaSaveRetrySequence = 0;
   private veronaSaveRetryRunId: string | null = null;
   private veronaForegroundSaveSettlement = false;
+  private veronaForegroundSaveSettlements = 0;
   private veronaSaveBufferTimeout: number | null = null;
   private veronaSaveBufferDueAtMs: number | null = null;
   private currentStateRefreshSequence = 0;
@@ -446,6 +479,8 @@ export class ParticipantViewFacade {
   readonly confirmationDialog = signal<ParticipantConfirmationDialog | null>(
     null
   );
+  // Each attempt has its own identity, including repeated blocked clicks.
+  readonly originalNavigationToast = signal<{ text: string; additionalTexts?: readonly string[] } | null>(null);
   private confirmationResolver: ((confirmed: boolean) => void) | null = null;
   private navigationAdvisoryTimeout: number | null = null;
   private readonly fullscreenChangeListener = (): void => {
@@ -464,6 +499,431 @@ export class ParticipantViewFacade {
   };
   private readonly refreshFromParticipantEvents = (): Promise<void> =>
     this.refreshCurrentStateInternal(true);
+  private readonly commandReloadSequence = signal(0);
+  private remoteTerminalErrorRunId: string | null = null;
+  private commandControllerState: { testRunId: string; status: string; entryRevision?: number } | null = null;
+  private debugCommandDispatch: ParticipantRunCommandApplicationResult["controllerDispatch"];
+  private readonly controllerCommandPhase = signal<{ testRunId: string; dispatch: ParticipantControllerDispatch; status: "RUNNING" | "PAUSED" | "TERMINATED" | "TERMINATED_PAUSED"; pending: boolean; interrupted?: true } | null>(null);
+  private readonly terminalCommandPhases = new WeakMap<ParticipantRunCommand, { dispatch: ParticipantControllerDispatch; status: Exclude<ParticipantNativeCommandRequest["controllerStatus"], "LOADING">; terminationNoop?: true }>();
+  private readonly consoleTestRun = signal<TestRun | null>(null);
+  get consoleRun(): TestRun | null {
+    const run = this.consoleTestRun();
+    return run?.participantSessionId === this.runtime.participantSessionId &&
+      run.testRunId === this.runtime.testRunId ? run : null;
+  }
+  get consoleControllerGeneration(): number { return this.viewLifecycleSequence; }
+  captureControllerTimerInterruption(input: { testRunId: string; deliveryId: string; keyword: string; controllerStatus: ParticipantNativeCommandRequest["controllerStatus"] },
+    allocate: () => ParticipantControllerDispatch): ParticipantControllerTimerInterruptionRequest | undefined {
+    const state = this.debugRunState, run = this.consoleRun, timer = state?.activeTestletTimer;
+    if (!state || !run || run.testRunId !== input.testRunId || !timer || timer.status !== "running" || !timer.expiresAt ||
+        this.isControllerTimerInterrupted(state) || !["pause", "terminate", "complete", "complete_and_lock"].includes(input.keyword)) return;
+    const keyword = input.keyword === "pause" ? "pause" : "terminate";
+    if (keyword === "terminate" && (input.controllerStatus === "ERROR" || input.controllerStatus === "TERMINATED" ||
+        !state.currentUnit?.unitKey || state.currentUnit.parentLocked !== false)) return;
+    const unitKey = state.currentUnit?.unitKey;
+    if (!unitKey || unitKey !== run.currentUnitKey || !Number.isFinite(Date.parse(timer.expiresAt))) return;
+    const request: ParticipantControllerTimerInterruptionRequest = {
+      testRunId: run.testRunId, contentReleaseId: run.contentReleaseId, bookletKey: run.bookletKey,
+      deliveryId: input.deliveryId, controllerDispatch: allocate(), keyword, controllerStatus: input.controllerStatus,
+      unitKey, testletKey: timer.testletKey, startedAt: timer.startedAt, expiresAt: timer.expiresAt,
+      remainingSeconds: Math.max(0, Math.min(timer.durationSeconds, Math.floor((Date.parse(timer.expiresAt) - Date.now()) / 1_000)))
+    };
+    this.controllerTimerInterruption.set({ participantSessionId: run.participantSessionId, request });
+    return request;
+  }
+  private isControllerTimerInterrupted(state: ParticipantCurrentRunStateResponse["currentRunState"]): boolean {
+    const captured = this.controllerTimerInterruption?.(), timer = state.activeTestletTimer;
+    if (!captured || !timer || captured.participantSessionId !== state.testRun.participantSessionId ||
+        captured.request.testRunId !== state.testRun.testRunId || captured.request.contentReleaseId !== state.testRun.contentReleaseId ||
+        captured.request.bookletKey !== state.testRun.bookletKey || captured.request.unitKey !== state.currentUnit?.unitKey ||
+        captured.request.testletKey !== timer.testletKey || captured.request.startedAt !== timer.startedAt) return false;
+    if (timer.status === "running" && (timer.expiresAt !== captured.request.expiresAt ||
+        (state.testRun.controllerDispatches?.[captured.request.controllerDispatch.controllerId] ?? 0) > captured.request.controllerDispatch.sequence)) return false;
+    return true;
+  }
+  private get pendingControllerStatus(): "RUNNING" | "PAUSED" | "TERMINATED" | "TERMINATED_PAUSED" | undefined {
+    const phase = this.controllerCommandPhase(), run = this.consoleRun;
+    return phase && run && phase.pending && !phase.interrupted && phase.testRunId === run.testRunId && run.status !== "completed" ? phase.status : undefined;
+  }
+  beginControllerCommand(testRunId: string, keyword: string, dispatch?: ParticipantControllerDispatch, observedStatus?: ParticipantNativeCommandRequest["controllerStatus"]): void {
+    const run = this.consoleRun, previous = this.controllerCommandPhase();
+    const terminal = ["terminate", "complete", "complete_and_lock"].includes(keyword);
+    if (!run || run.testRunId !== testRunId || run.status === "completed" || !dispatch || !terminal && !["pause", "resume", "goto"].includes(keyword) ||
+      previous?.testRunId === testRunId && previous.dispatch.controllerId === dispatch.controllerId && previous.dispatch.sequence >= dispatch.sequence) return;
+    this.controllerCommandPhase.set({ testRunId, dispatch, status: terminal ? observedStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : keyword === "pause" ? "PAUSED" : "RUNNING", pending: true });
+    if (terminal) this.participantEvents.suspend();
+    else this.startAcceptedParticipantReception();
+  }
+  private isOlderControllerPhase(dispatch?: ParticipantControllerDispatch): boolean {
+    const phase = this.controllerCommandPhase();
+    return Boolean(dispatch && phase && phase.testRunId === this.consoleRun?.testRunId && phase.dispatch.controllerId === dispatch.controllerId &&
+      (dispatch.sequence < phase.dispatch.sequence || phase.interrupted && dispatch.sequence === phase.dispatch.sequence));
+  }
+  private finishControllerPhase(dispatch?: ParticipantControllerDispatch): void {
+    const phase = this.controllerCommandPhase();
+    if (dispatch && phase && phase.testRunId === this.consoleRun?.testRunId && phase.dispatch.controllerId === dispatch.controllerId && dispatch.sequence >= phase.dispatch.sequence) {
+      this.controllerCommandPhase.set({ ...phase, pending: false });
+    }
+  }
+  get debugControllerStatus(): string {
+    if (this.pendingControllerStatus) return this.pendingControllerStatus;
+    const run = this.consoleRun;
+    const command = this.commandControllerState?.testRunId === run?.testRunId ? this.commandControllerState : null;
+    if (run?.status !== "completed" && command?.status.startsWith("TERMINATED")) return command.status;
+    if (this.hasControllerError) return "ERROR";
+    if (run?.status === "paused") return "PAUSED";
+    if (run?.status === "completed") return "TERMINATED";
+    return command?.status === "RUNNING" || this.debugRunState && !this.eagerBookletLoading ? "RUNNING" : "LOADING";
+  }
+  get nativeControllerStatus(): ParticipantNativeCommandRequest["controllerStatus"] {
+    const pending = this.pendingControllerStatus;
+    const command = this.commandControllerState?.testRunId === this.consoleRun?.testRunId ? this.commandControllerState : null;
+    if (pending) return pending;
+    if (!this.controllerCommandPhase()?.interrupted && (command?.status === "TERMINATED" || command?.status === "TERMINATED_PAUSED")) return command.status;
+    if (this.hasControllerError) return "ERROR";
+    if (command?.status === "TERMINATED" || command?.status === "TERMINATED_PAUSED") return command.status;
+    return this.consoleRun?.status === "paused" ? "PAUSED" :
+      this.debugControllerStatus === "LOADING" ? "LOADING" : "RUNNING";
+  }
+  get controllerLogState() {
+    const run = this.consoleRun;
+    if (!run || run.status === "completed") return null;
+    const command = this.commandControllerState?.testRunId === run.testRunId ? this.commandControllerState : null;
+    const status = this.pendingControllerStatus ?? ((!this.debugRunState || this.eagerBookletLoading) && !command && !this.hasControllerError
+      ? "LOADING" : this.debugControllerStatus);
+    return { testRun: run, status, alreadyRecorded: Boolean(this.pendingControllerStatus) || command?.status === status, ready: Boolean(this.debugRunState && !this.eagerBookletLoading) };
+  }
+  async prepareNativeConsoleCommand(isCurrent: () => boolean, keyword: ParticipantNativeCommandRequest["keyword"] = "terminate", dispatch?: ParticipantControllerDispatch): Promise<void> {
+    const runId = this.consoleRun?.testRunId;
+    const entries = (): ParticipantSaveOutboxEntry[] => {
+      if (!runId) return [];
+      const current = [...listParticipantSaveOutboxEntriesForRun(runId), ...this.veronaSaveBarriers.entries(runId),
+        ...(this.pendingVeronaSave?.testRunId === runId ? [this.pendingVeronaSave] : [])];
+      return [...new Map(current.map(entry => [entry.deliveryId, entry])).values()];
+    };
+    if (keyword !== "terminate") {
+      // Original Pause/Goto flush closed buffers, not their saved-event
+      // barrier; Resume navigates directly. Keep answer drainage independent
+      // so these handlers can finish while an older Terminate is still saving.
+      if (!this.debugRunState || keyword === "resume") return;
+      if (this.veronaPlayer) {
+        // Capture the Player's debounced input before retiring its frame,
+        // while keeping its HTTP acknowledgement independent of this handler.
+        await new Promise<void>(resolve => globalThis.setTimeout(resolve, VERONA_FOREGROUND_STATE_GRACE_MS));
+        if (!isCurrent() || this.consoleRun?.testRunId !== runId) return;
+      }
+      const barrier = this.veronaSaveBarriers.close(entries(), dispatch);
+      this.clearVeronaSaveBuffer();
+      void this.drainVeronaSaveQueue({ allowForegroundSettlement: true, refreshCurrentState: false, deliveryIds: barrier.deliveryIds }).catch(error => {
+        if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(String(error)));
+      });
+      return;
+    }
+    if (!this.debugRunState && entries().length === 0) return;
+    const barrier = this.veronaSaveBarriers.close(entries(), dispatch);
+    const settled = await this.settleVeronaAutoSaveBeforeForegroundAction(barrier, () => this.veronaSaveBarriers.close(entries(), dispatch));
+    const state = this.debugRunState;
+    const response = this.runtime.currentUnitResponse;
+    const draftChanged = response !== (state?.testRun.unitResponses[state.currentUnit.unitKey ?? ""] ?? "");
+    // Trusted pending Player reports were drained above. An untouched loading
+    // shell is not an answer and must not be introduced by a console action.
+    if (state && state.currentUnit.unitKey === this.consoleRun?.currentUnitKey && isCurrent() && draftChanged && (!parseVeronaUnitResponse(response) || hasMeaningfulVeronaResponse(response))) {
+      await this.saveCurrentDraftBeforeCompleteInternal(settled);
+    }
+  }
+  private observedCommandCompletionSession = "";
+  observeCommandCompletions(): void {
+    const sessionId = this.consoleRun?.participantSessionId ?? this.runtime.participantSessionId.trim();
+    if (!sessionId || sessionId === this.observedCommandCompletionSession) return;
+    this.observedCommandCompletionSession = sessionId;
+    observeParticipantCommandCompletionSession(sessionId);
+  }
+  private queueCommandCompletion(scope: ParticipantCommandCompletionResult["scope"], command: ParticipantCommandCompletionRequest["command"]): void {
+    queueParticipantCommandCompletion(scope, { testRunId: scope.testRunId, contentReleaseId: scope.contentReleaseId,
+      bookletKey: scope.bookletKey, command, timeStamp: Date.now() });
+  }
+  completeNativeConsoleCommand(scope: ParticipantCommandCompletionResult["scope"], request: ParticipantNativeCommandRequest): void {
+    this.queueCommandCompletion(scope, { kind: "native", request });
+  }
+  nativeConsoleCommandFailed(error: Error): void {
+    this.uiState.errorMessage.set(error.message);
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+  async applyNativeConsoleCommand(result: ParticipantNativeCommandResult, isCurrent: () => boolean, dispatch?: ParticipantControllerDispatch): Promise<void> {
+    if (!isCurrent()) return;
+    if (result.terminationNoop) return;
+    const entry = result.testRun.controllerEntry;
+    if (result.superseded || this.isOlderRunState(result.testRun) || this.isOlderControllerPhase(dispatch)) {
+      if (result.terminalContinuation) {
+        const execution = await import("./participant-command-execution");
+        if (!isCurrent()) return;
+        await execution.settleAcceptedParticipantCommand({ isCurrent,
+          reconcile: () => this.reconcileParticipantTerminalState(result.testRun, false, isCurrent, true),
+          failed: (error: Error) => { if (isCurrent()) this.nativeConsoleCommandFailed(error); } });
+        return;
+      }
+      if (this.hasControllerError) return;
+      void this.refreshCurrentStateInternal(true, true).catch(error => {
+        if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+      });
+      return;
+    }
+    this.finishControllerPhase(dispatch);
+    this.invalidateCurrentStateRefreshes();
+    const terminal = result.keyword === "terminate" && result.testRun.status === "paused" &&
+      (entry ? !entry.active : result.participantSession.status === "signed_in");
+    this.syncRun(result.testRun);
+    this.commandControllerState = { testRunId: result.testRun.testRunId, entryRevision: result.testRun.controllerEntry?.revision,
+      status: terminal ? result.controllerStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : result.testRun.status.toUpperCase() };
+    if (terminal) {
+      this.participantEvents.suspend();
+      const execution = await import("./participant-command-execution");
+      if (!isCurrent()) return;
+      const continuation = { isCurrent,
+        reconcile: () => this.reconcileParticipantTerminalState(result.testRun, false, isCurrent),
+        failed: (error: Error) => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
+      };
+      if (result.commandCompletion === "browser-v1") await execution.settleAcceptedParticipantCommand(continuation);
+      else execution.reconcileAcceptedParticipantCommand(continuation);
+      return;
+    }
+    this.participantErrorReceptionSuspended = false;
+    if ((result.keyword === "resume" || result.keyword === "goto") && result.testRun.status === "running") {
+      this.activeControllerError.set(null);
+      this.remoteTerminalErrorRunId = null;
+      this.commandReloadSequence.update(sequence => sequence + 1);
+    }
+    this.startAcceptedParticipantReception();
+    if (result.commandCompletion === "browser-v1") await this.refreshCurrentStateInternal(true, true);
+    else void this.refreshCurrentStateInternal(true, true).catch(error => {
+      if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+    });
+  }
+  private readonly receiveParticipantCommand: ParticipantCommandExecution = (command, signal, allocate) =>
+    this.applyReceivedParticipantCommand(command, signal, allocate);
+
+  private startAcceptedParticipantReception(): void {
+    const state = this.debugRunState;
+    // A lightweight context alone is still initial LOADING. A confirmed
+    // transition of an already loaded controller can reopen reception before
+    // its next Unit view arrives, as in the Original state subscription.
+    if (!state || this.eagerBookletLoading || this.hasControllerError || state.testRun.status === "completed" ||
+      this.pendingControllerStatus?.startsWith("TERMINATED") || !this.pendingControllerStatus && this.commandControllerState?.status.startsWith("TERMINATED")) return;
+    this.participantEvents.start(state.participantSession.participantSessionId,
+      this.refreshFromParticipantEvents, null, state.testRun.testRunId,
+      state.executionMode?.receiveRemoteCommands ? this.receiveParticipantCommand : null);
+  }
+
+  private async reconcileParticipantTerminalState(run: TestRun, legacy: boolean, isCurrent: () => boolean, preserveControllerState = false): Promise<void> {
+    const readRuntime = () => this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
+      resolveRoutePath(productionApiRoutes.participant.getRuntimeState, { participantSessionId: run.participantSessionId }), undefined, { quiet: true });
+    let runtimeView = this.currentStateAppliedRefreshSequence;
+    let payload = await readRuntime();
+    if (!isCurrent()) return;
+    if (runtimeView !== this.currentStateAppliedRefreshSequence) {
+      runtimeView = this.currentStateAppliedRefreshSequence;
+      payload = await readRuntime();
+      if (!isCurrent()) return;
+      if (runtimeView !== this.currentStateAppliedRefreshSequence) {
+        throw Object.assign(new Error("The controller changed while reconciling its terminal receipt."), { retryable: true });
+      }
+    }
+    if (!(["tenantId", "workspaceId", "participantSessionId", "contentReleaseId"] as const)
+      .every(key => payload.runtimeState.participantSession[key] === run[key])) {
+      throw Object.assign(new Error("The terminal command runtime state does not match the selected Run."), { retryable: false });
+    }
+    if (!legacy && run.controllerEntry) {
+      const { participantControllerContextRoute } = await import("@testcenter-rewrite-app/contracts/participant-native-command");
+      if (!isCurrent()) return;
+      const { controllerContext } = await this.requestState.request<{ controllerContext: ParticipantControllerContext }>(
+        "Participant Controller", "GET", withSelectedParticipantRun(resolveRoutePath(participantControllerContextRoute,
+          { participantSessionId: run.participantSessionId }), run.testRunId), undefined, { quiet: true });
+      if (!isCurrent()) return;
+      if (runtimeView !== this.currentStateAppliedRefreshSequence) {
+        throw Object.assign(new Error("The controller changed while reconciling its entry evidence."), { retryable: true });
+      }
+      const selected = this.validateParticipantControllerContext(controllerContext, run.participantSessionId, run.testRunId);
+      if (!(["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+        .every(key => selected[key] === run[key]) || !selected.controllerEntry) {
+        throw Object.assign(new Error("The terminal entry evidence does not match its immutable Run."), { retryable: false });
+      }
+      if (selected.controllerEntry.revision < run.controllerEntry.revision) {
+        throw Object.assign(new Error("The terminal entry evidence is older than its application receipt."), { retryable: true });
+      }
+      if (!preserveControllerState && (this.commandControllerState?.testRunId !== run.testRunId || !this.commandControllerState.status.startsWith("TERMINATED"))) return;
+      if (selected.controllerEntry.active) {
+        if (selected.controllerEntry.revision === run.controllerEntry.revision) {
+          throw Object.assign(new Error("The terminal entry evidence contradicts its application receipt."), { retryable: false });
+        }
+        void this.refreshCurrentStateInternal(true, true).catch(error => {
+          if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+        });
+      } else {
+        this.presentParticipantStarter(payload.runtimeState, run.testRunId, true);
+        await this.replaceSelectedRunEntryLink();
+      }
+      return;
+    }
+    if (legacy || payload.runtimeState.participantSession.status === "signed_in") {
+      this.presentParticipantStarter(payload.runtimeState, run.testRunId, true);
+      await this.replaceSelectedRunEntryLink();
+    } else if (this.commandControllerState?.testRunId === run.testRunId &&
+      this.commandControllerState.status.startsWith("TERMINATED")) {
+      // A confirmed newer local receipt already owns its own Unit refresh.
+      // Do not start an older terminal refresh across that accepted selection.
+      void this.refreshCurrentStateInternal(true, true).catch(error => {
+        if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+      });
+    }
+  }
+
+  private async applyReceivedParticipantCommand(command: ParticipantRunCommand, signal: AbortSignal, allocate?: Parameters<ParticipantCommandExecution>[2]): Promise<void> {
+    const run = this.consoleRun;
+    if (signal.aborted || !run || !command.acknowledgedAt || run.status === "completed" ||
+        command.participantSessionId !== run.participantSessionId ||
+        command.testRunId !== run.testRunId || command.tenantId !== run.tenantId ||
+        command.workspaceId !== run.workspaceId) return;
+    const lifecycle = this.viewLifecycleSequence;
+    const isCurrent = (): boolean => !signal.aborted && lifecycle === this.viewLifecycleSequence &&
+      (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+        .every(key => this.consoleRun?.[key] === run[key]);
+    const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
+    const readStatus = (): Exclude<ParticipantNativeCommandRequest["controllerStatus"], "LOADING"> => {
+      const status = this.nativeControllerStatus;
+      return status === "LOADING" ? "RUNNING" : status;
+    };
+    const initialStatus = readStatus();
+    const invocationStatus = initialStatus === "TERMINATED" || initialStatus === "TERMINATED_PAUSED"
+      ? run.status === "paused" ? "PAUSED" : "RUNNING" : initialStatus;
+    const nonterminalDispatch = !terminal && allocate ? allocate(run.controllerDispatches) : undefined;
+    if (nonterminalDispatch) this.beginControllerCommand(run.testRunId, command.commandType, nonterminalDispatch);
+    if (!this.commandTimerInterruptions.has(command)) {
+      const captured = allocate && (!terminal || initialStatus !== "TERMINATED") ? this.captureControllerTimerInterruption({
+        testRunId: run.testRunId, deliveryId: command.commandId, keyword: command.commandType, controllerStatus: initialStatus },
+        () => nonterminalDispatch ?? allocate(run.controllerDispatches)) : undefined;
+      this.commandTimerInterruptions.set(command, captured);
+    }
+    const timerInterruption = this.commandTimerInterruptions.get(command);
+    let terminalPhase = terminal ? this.terminalCommandPhases.get(command) : undefined;
+    if (terminal && !terminalPhase && allocate) {
+      const terminationNoop = initialStatus === "TERMINATED";
+      if (!terminationNoop) await Promise.resolve();
+      if (!isCurrent()) return;
+      terminalPhase = { dispatch: allocate(this.consoleRun?.controllerDispatches), status: readStatus(), ...(terminationNoop ? { terminationNoop: true } : {}) };
+      this.terminalCommandPhases.set(command, terminalPhase);
+      if (!terminationNoop) this.beginControllerCommand(run.testRunId, command.commandType, terminalPhase.dispatch, terminalPhase.status);
+    }
+    let observedView = this.currentStateAppliedRefreshSequence;
+    let observedRun = run;
+    let observedStatus: Exclude<ParticipantNativeCommandRequest["controllerStatus"], "LOADING"> = "RUNNING";
+    const execution = await import("./participant-command-execution");
+    let preparationDispatch = terminalPhase?.dispatch ?? nonterminalDispatch;
+    if (timerInterruption) {
+      await execution.deliverParticipantControllerTimerInterruption(timerInterruption, run, { signal, isCurrent });
+      if (!isCurrent()) return;
+    }
+    await execution.executeReceivedParticipantCommand(command, signal, {
+      scope: run, isCurrent, terminationNoop: terminalPhase ? Boolean(terminalPhase.terminationNoop) : undefined, controllerStatus: () => {
+        observedView = this.currentStateAppliedRefreshSequence;
+        observedRun = this.consoleRun ?? run;
+        observedStatus = terminal ? terminalPhase?.status ?? readStatus() : invocationStatus;
+        return observedStatus;
+      },
+      observed: (dispatch, status, terminationNoop) => {
+        if (!terminalPhase) {
+          terminalPhase = { dispatch, status, ...(terminationNoop ? { terminationNoop } : {}) };
+          this.terminalCommandPhases.set(command, terminalPhase);
+        }
+      },
+      prepare: async () => {
+        // Accepted nonterminal commands must not wait for an older answer
+        // receipt. The response-only outbox keeps that answer independently.
+        if (terminal) await this.prepareNativeConsoleCommand(isCurrent, "terminate", preparationDispatch);
+        else if (command.commandType === "pause" || command.commandType === "resume" || command.commandType === "goto") await this.prepareNativeConsoleCommand(isCurrent, command.commandType, preparationDispatch);
+      },
+      started: dispatch => {
+        preparationDispatch = dispatch;
+        if (terminal && !terminalPhase) {
+          terminalPhase = { dispatch, status: observedStatus };
+          this.terminalCommandPhases.set(command, terminalPhase);
+        }
+        this.beginControllerCommand(run.testRunId, command.commandType, dispatch, observedStatus);
+      },
+      completed: receipt => this.queueCommandCompletion(run, { kind: "remote", commandId: receipt.commandId }),
+      apply: async (application, acceptedDispatch) => {
+        if (!isCurrent() || signal.aborted) return;
+        if (application.command.terminationNoop) return;
+        if (command.commandType === "debug") {
+          const dispatch = application.controllerDispatch;
+          if (dispatch && this.debugCommandDispatch?.controllerId === dispatch.controllerId && dispatch.sequence <= this.debugCommandDispatch.sequence) return;
+          if (dispatch) this.debugCommandDispatch = dispatch;
+          const debug = await import("./participant-debug-control");
+          if (isCurrent() && (!dispatch || this.debugCommandDispatch === dispatch)) debug.applyParticipantDebugArguments(command.debugArguments ?? [], command);
+          return;
+        }
+        // An ordinary refresh of the identical Run is not a newer effect.
+        // Keep the conservative fence for changed answers, selection or state.
+        const appliedEntry = application.testRun.controllerEntry;
+        const currentRevision = this.consoleRun?.stateRevision;
+        const newer = currentRevision !== undefined && application.testRun.stateRevision !== undefined && application.testRun.stateRevision > currentRevision;
+        const superseded = application.superseded || this.isOlderRunState(application.testRun) || !newer &&
+          observedView !== this.currentStateAppliedRefreshSequence && JSON.stringify(observedRun) !== JSON.stringify(this.consoleRun);
+        if (application.superseded || this.isOlderControllerPhase(acceptedDispatch) || application.terminalContinuation && superseded) {
+          if (application.terminalContinuation) {
+            await execution.settleAcceptedParticipantCommand({ signal, isCurrent,
+              reconcile: () => this.reconcileParticipantTerminalState(application.testRun, false, isCurrent, true),
+              failed: (error: Error) => { if (isCurrent()) this.nativeConsoleCommandFailed(error); } });
+            return;
+          }
+          if (this.hasControllerError) return;
+          void this.refreshCurrentStateInternal(true, true).catch(error => { if (isCurrent()) this.nativeConsoleCommandFailed(error); });
+          return;
+        }
+        this.finishControllerPhase(acceptedDispatch);
+        if (terminal && appliedEntry?.active !== true) {
+          if (!superseded) {
+            this.invalidateCurrentStateRefreshes();
+            this.syncRun(application.testRun);
+            this.commandControllerState = { testRunId: command.testRunId, entryRevision: application.testRun.controllerEntry?.revision,
+              status: observedStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" };
+            this.participantEvents.suspend();
+          }
+          const continuation = { signal, isCurrent,
+            reconcile: () => this.reconcileParticipantTerminalState(application.testRun, !command.effectsDeferred, isCurrent),
+            failed: (error: Error) => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
+          };
+          if (application.command.commandCompletion === "browser-v1") await execution.settleAcceptedParticipantCommand(continuation);
+          else execution.reconcileAcceptedParticipantCommand(continuation);
+          return;
+        }
+        // Another accepted view or native receipt can supersede this snapshot
+        // while its application request is in flight. Reconcile from the API
+        // without projecting the older snapshot over that newer local state.
+        if (superseded) {
+          void this.refreshCurrentStateInternal(true, true).catch(error => {
+            if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+          });
+          return;
+        }
+        this.invalidateCurrentStateRefreshes();
+        this.syncRun(application.testRun);
+        const changesControllerState = ["pause", "resume", "goto"].includes(command.commandType) || terminal && appliedEntry?.active === true;
+        if (changesControllerState || !this.commandControllerState?.status.startsWith("TERMINATED")) {
+          this.commandControllerState = { testRunId: command.testRunId, entryRevision: application.testRun.controllerEntry?.revision,
+            status: application.testRun.status.toUpperCase() };
+        }
+        this.participantErrorReceptionSuspended = false;
+        if ((command.commandType === "resume" || command.commandType === "goto") && application.testRun.status === "running") {
+          this.commandReloadSequence.update(sequence => sequence + 1);
+        }
+        if (changesControllerState) this.startAcceptedParticipantReception();
+        if (application.command.commandCompletion === "browser-v1") await this.refreshCurrentStateInternal(true, true);
+        else void this.refreshCurrentStateInternal(true, true).catch(error => {
+          if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+        });
+      }
+    });
+  }
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -492,6 +952,7 @@ export class ParticipantViewFacade {
 
   get isParticipantPlayerFocused(): boolean {
     const currentState = this.readCurrentRunState();
+    if (!currentState) return Boolean(this.consoleRun && this.consoleRun.status !== "completed");
     return Boolean(
       currentState &&
         currentState.testRun.status !== "completed" &&
@@ -519,6 +980,12 @@ export class ParticipantViewFacade {
 
   destroy(): void {
     this.viewLifecycleSequence += 1;
+    this.consoleTestRun.set(null);
+    this.commandControllerState = null;
+    this.controllerCommandPhase.set(null);
+    this.controllerTimerInterruption.set(null);
+    this.debugCommandDispatch = undefined;
+    this.remoteTerminalErrorRunId = null;
     // Stopping event delivery does not cancel requests already in flight.
     // Their responses must not restore participant scope after a route change.
     this.invalidateCurrentStateRefreshes();
@@ -549,6 +1016,7 @@ export class ParticipantViewFacade {
   }
 
   updateCurrentTextResponse(response: string): void {
+    if (this.unitViewPending) return;
     this.runtime.currentUnitResponse = response;
     const currentState = this.readCurrentRunState();
     const unitKey = currentState?.currentUnit.unitKey;
@@ -596,7 +1064,8 @@ export class ParticipantViewFacade {
       currentUnitKey: parameters.currentUnitKey?.trim() ?? "",
       unitResponse: parameters.unitResponse ?? "",
       hasUnitResponse: parameters.unitResponse != null,
-      legacyShortLink: parameters.legacyShortLink === true
+      legacyShortLink: parameters.legacyShortLink === true,
+      openStarter: parameters.openStarter === true
     };
     const previousTenantKey = this.workspace.tenantKey.trim();
     const previousWorkspaceKey = this.workspace.workspaceKey.trim();
@@ -721,10 +1190,23 @@ export class ParticipantViewFacade {
     this.restoreEntryDraft(normalized);
   }
 
+  get debugRunState(): ParticipantCurrentRunStateResponse["currentRunState"] | null {
+    const state = this.readCurrentRunState(), run = this.consoleRun;
+    return state && run && (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+      .every(key => state.testRun[key] === run[key]) ? state : null;
+  }
+
+  get debugResponseCaptures() {
+    return { pending: this.pendingVeronaSave, optimistic: this.optimisticVeronaResponse, ephemeral: this.ephemeralUnitResponses };
+  }
+
   get player(): ParticipantPlayerState {
     const currentState = this.readCurrentRunState();
     if (!currentState) {
       const hasParticipantSession = Boolean(this.runtime.participantSessionId.trim());
+      const controller = this.consoleRun;
+      const mode = controller ? participantExecutionModeDefinitions[controller.executionMode ?? defaultParticipantExecutionMode] : null;
+      const booklet = controller ? this.assignedBooklets.find(entry => entry.bookletKey === controller.bookletAssignmentKey || entry.sourceBookletKey === controller.bookletKey) : null;
       return {
         headline: hasParticipantSession
           ? "Session ready"
@@ -744,15 +1226,15 @@ export class ParticipantViewFacade {
         groupLabel: this.participantGroupLabel || this.runtime.groupKey.trim() || "No group yet",
         sessionLabel: this.runtime.participantSessionId.trim() || "No session yet",
         sessionEntryLink: this.createParticipantSessionEntryLink(),
-        bookletLabel: "No booklet loaded",
+        bookletLabel: booklet?.displayLabel ?? "No booklet loaded",
         unitLabel: "No unit loaded",
         unitDescription: "No unit description available yet.",
         unitContent: "Start or resume a session to load the current unit prompt.",
         unitKey: "n/a",
         unitPosition: "n/a",
         unitNavigationLabel: "",
-        executionMode: "n/a",
-        executionModeLabel: "No execution mode loaded",
+        executionMode: mode?.mode ?? "n/a",
+        executionModeLabel: mode?.label ?? "No execution mode loaded",
         responsePersistenceLabel: "No run loaded",
         unitOverviewLabel: "No units loaded",
         unitItems: [],
@@ -767,7 +1249,7 @@ export class ParticipantViewFacade {
         isComplete: false,
         previousUnitKey: null,
         nextUnitKey: null,
-        runStatus: hasParticipantSession ? "signed_in" : "idle",
+        runStatus: controller?.status ?? (hasParticipantSession ? "signed_in" : "idle"),
         runId: this.runtime.testRunId.trim() || "no run yet",
         nextStepLabel: hasParticipantSession ? "Start test" : "Sign in",
         nextStepDetail: hasParticipantSession
@@ -908,7 +1390,7 @@ export class ParticipantViewFacade {
     const displayNameLabel =
       currentState.participantRosterEntry?.displayName?.trim() ||
       currentState.participantSession.loginKey;
-    const activeTestletTimer = currentState.activeTestletTimer;
+    const activeTestletTimer = this.isControllerTimerInterrupted(currentState) ? null : currentState.activeTestletTimer;
     const testletTimer = activeTestletTimer
       ? (() => {
           const expiresAtMs = activeTestletTimer.expiresAt
@@ -921,7 +1403,7 @@ export class ParticipantViewFacade {
                   0,
                   Math.min(
                     activeTestletTimer.durationSeconds,
-                    Math.ceil((expiresAtMs - this.timerTick()) / 1_000)
+                    Math.floor((expiresAtMs - this.timerTick()) / 1_000)
                   )
                 )
               : activeTestletTimer.remainingSeconds;
@@ -958,11 +1440,7 @@ export class ParticipantViewFacade {
                   : "Leaving this block requires confirmation.",
             showTimeLeft: activeTestletTimer.showTimeLeft,
             warningMessage: activeWarning
-              ? this.customTextFormat(
-                  "booklet_msgSoonTimeOver",
-                  `You have ${activeWarning.minutes} minute${activeWarning.minutes === 1 ? "" : "s"} left for this timed block.`,
-                  activeWarning.minutes
-                )
+              ? this.customTextValue("booklet_msgSoonTimeOver").replace("%s", activeWarning.minutes.toString(10))
               : null
           };
         })()
@@ -1054,7 +1532,7 @@ export class ParticipantViewFacade {
           }),
       actions: hasControllerError ? [] : availableActions,
       canSaveProgress:
-        !hasControllerError && availableActions.includes("save_progress"),
+        !hasControllerError && !this.unitViewPending && availableActions.includes("save_progress"),
       showUnitMenu: !hasControllerError && policy.navigation.unitMenuEnabled,
       showUnitNavigationList:
         !hasControllerError && Boolean(policy.navigation.unitListEnabled),
@@ -1102,10 +1580,7 @@ export class ParticipantViewFacade {
       navigationNoticeTitle: policy.display.silentMode
         ? ""
         : persistentNavigationDenial
-          ? this.customText(
-              "booklet_msgNavigationDeniedTitle",
-              "This unit cannot be left yet"
-            )
+          ? this.customTextValue("booklet_msgNavigationDeniedTitle")
           : navigationAdvisory?.title ?? "",
       navigationNotice: policy.display.silentMode
         ? ""
@@ -1278,7 +1753,7 @@ export class ParticipantViewFacade {
 
   get bookletLoadedUnitCount(): number {
     return this.readCurrentRunState()?.testRun.status === "completed" ||
-      this.hasControllerError
+      this.hasControllerError || this.loadedBookletAssets()?.testRunId !== this.consoleRun?.testRunId
       ? 0
       : (this.loadedBookletAssets()?.assets?.units.length ?? 0);
   }
@@ -1302,10 +1777,7 @@ export class ParticipantViewFacade {
   }
 
   get veronaErrorText(): string {
-    return this.customText(
-      "booklet_errormessage",
-      "The unit could not be loaded. Reload the player or ask the test supervisor for help."
-    );
+    return this.customTextValue("booklet_errormessage");
   }
 
   reloadPage(): void {
@@ -1319,13 +1791,21 @@ export class ParticipantViewFacade {
     });
   }
 
-  reloadAfterControllerError(): void {
-    if (!this.hasControllerError) {
+  reloadAfterControllerError(expectedError?: VeronaControllerError): void {
+    const error = this.controllerError;
+    if (!error || expectedError && expectedError !== error) {
       return;
     }
+    const sequence = this.viewLifecycleSequence;
+    const unitKey = this.readCurrentRunState()?.currentUnit.unitKey;
+    const isCurrent = (): boolean => sequence === this.viewLifecycleSequence &&
+      this.controllerError === error && this.readCurrentRunState()?.currentUnit.unitKey === unitKey;
     this.viewState.onActionAsync(async () => {
+      await this.settleVeronaAutoSaveBeforeForegroundAction();
+      if (!isCurrent()) return;
       this.persistState();
       await this.replaceSelectedRunEntryLink();
+      if (!isCurrent()) return;
       globalThis.window?.location.reload();
     });
   }
@@ -1336,6 +1816,7 @@ export class ParticipantViewFacade {
     const url = new URL(entryLink, globalThis.window.location.origin);
     const ui = new URLSearchParams(globalThis.window.location.search).get("ui");
     if (ui === "original" || ui === "rewrite") url.searchParams.set("ui", ui);
+    if (this.isParticipantStarter) url.searchParams.set("view", "starter");
     const routeUrl = this.router.serializeUrl(
       this.router.parseUrl(`${url.pathname}${url.search}`)
     );
@@ -1414,14 +1895,20 @@ export class ParticipantViewFacade {
 
   get eagerBookletLoading(): boolean {
     const currentState = this.readCurrentRunState();
+    if (!currentState && this.consoleRun) return true;
     return Boolean(
       currentState?.booklet.policy.player.loadingMode === "eager" &&
         this.loadedBookletAssets()?.testRunId !== currentState.testRun.testRunId
     );
   }
 
+  get unitViewPending(): boolean {
+    const state = this.readCurrentRunState();
+    return Boolean(state && state.testRun.currentUnitKey !== state.currentUnit.unitKey);
+  }
+
   get isRunPaused(): boolean {
-    return this.readCurrentRunState()?.testRun.status === "paused";
+    return (this.readCurrentRunState()?.testRun ?? this.consoleRun)?.status === "paused";
   }
 
   get isMonitorPaused(): boolean {
@@ -1437,12 +1924,14 @@ export class ParticipantViewFacade {
   }
 
   get hasControllerError(): boolean {
-    const currentState = this.readCurrentRunState();
+    if (this.pendingControllerStatus) return false;
+    const testRun = this.consoleRun ?? this.readCurrentRunState()?.testRun;
     const controllerError = this.activeControllerError();
     return Boolean(
-      currentState &&
-        currentState.testRun.status !== "completed" &&
-        controllerError?.testRunId === currentState.testRun.testRunId
+      testRun &&
+        testRun.status !== "completed" &&
+        controllerError?.testRunId === testRun.testRunId &&
+        this.participantErrorReceptionSuspended
     );
   }
 
@@ -1452,11 +1941,14 @@ export class ParticipantViewFacade {
       : "";
   }
 
+  get controllerError(): VeronaControllerError | null {
+    const currentState = this.readCurrentRunState();
+    const error = this.activeControllerError();
+    return error && (error.testRunId === (this.consoleRun ?? currentState?.testRun)?.testRunId || error.testRunId === this.remoteTerminalErrorRunId) ? error : null;
+  }
+
   get controllerErrorText(): string {
-    return this.customText(
-      "booklet_errormessage",
-      "A technical problem occurred. Reload the page and ask the test supervisor for help if the problem continues."
-    );
+    return this.customTextValue("booklet_errormessage");
   }
 
   handleVeronaControllerError(controllerError: VeronaControllerError): void {
@@ -1469,9 +1961,21 @@ export class ParticipantViewFacade {
       return;
     }
     this.activeControllerError.set(controllerError);
+    const phase = this.controllerCommandPhase();
+    if (phase?.testRunId === controllerError.testRunId && phase.pending) this.controllerCommandPhase.set({ ...phase, interrupted: true });
+    this.participantErrorReceptionSuspended = true;
+    this.participantEvents.suspend();
   }
 
   get veronaPlayer(): ParticipantVeronaPlayerState | null {
+    return this.buildVeronaPlayer(false);
+  }
+
+  get originalVeronaPlayer(): ParticipantVeronaPlayerState | null {
+    return this.buildVeronaPlayer(true);
+  }
+
+  private buildVeronaPlayer(retainErroredPlayer: boolean): ParticipantVeronaPlayerState | null {
     const currentState = this.readCurrentRunState();
     const player = currentState?.currentUnit.player;
     const unitDefinition = currentState?.currentUnit.unitDefinition?.trim();
@@ -1479,7 +1983,8 @@ export class ParticipantViewFacade {
     if (
       !currentState ||
       currentState.testRun.status !== "running" ||
-      this.hasControllerError ||
+      currentState.currentUnit.parentLocked === true ||
+      (!retainErroredPlayer && this.hasControllerError) ||
       this.eagerBookletLoading ||
       !player?.html.trim() ||
       !unitDefinition ||
@@ -1496,6 +2001,8 @@ export class ParticipantViewFacade {
     );
     return {
       playerKey: player.playerKey,
+      unitViewPending: this.unitViewPending,
+      commandReloadSequence: this.commandReloadSequence(),
       playerHtml: player.html,
       testRunId: currentState.testRun.testRunId,
       unitKey,
@@ -1510,6 +2017,7 @@ export class ParticipantViewFacade {
         this.optimisticVeronaResponse.unitKey === unitKey
           ? this.optimisticVeronaResponse.response
           : this.effectiveUnitResponse(currentState, unitKey),
+      responseClocks: currentState.testRun.unitResponseFieldTimestamps,
       sharedParameters: currentState.testRun.sharedParameters ?? [],
       unitNumber: Math.max(unitIndex + 1, 1),
       unitCount: currentState.bookletUnits.length,
@@ -1566,18 +2074,12 @@ export class ParticipantViewFacade {
     const messages: string[] = [];
     if (reasons.includes("presentation_incomplete")) {
       messages.push(
-        this.customText(
-          "booklet_msgNavigationDeniedText_presentationIncomplete",
-          "View all required unit content before moving forward or completing the test."
-        )
+        this.customTextValue("booklet_msgNavigationDeniedText_presentationIncomplete")
       );
     }
     if (reasons.includes("response_incomplete")) {
       messages.push(
-        this.customText(
-          "booklet_msgNavigationDeniedText_responsesIncomplete",
-          "Complete the required response before moving forward or completing the test."
-        )
+        this.customTextValue("booklet_msgNavigationDeniedText_responsesIncomplete")
       );
     }
     if (messages.length > 0) {
@@ -1635,10 +2137,7 @@ export class ParticipantViewFacade {
       return;
     }
     this.navigationAdvisory.set({
-      title: this.customText(
-        "booklet_msgNavigationDeniedTitle",
-        "This unit cannot be left yet"
-      ),
+      title: this.customTextValue("booklet_msgNavigationDeniedTitle"),
       message
     });
     this.uiState.renderVersion.update(version => version + 1);
@@ -1724,6 +2223,7 @@ export class ParticipantViewFacade {
   }
 
   private clearNavigationAdvisory(): void {
+    this.originalNavigationToast.set(null);
     if (this.navigationAdvisoryTimeout != null) {
       globalThis.window?.clearTimeout(this.navigationAdvisoryTimeout);
       this.navigationAdvisoryTimeout = null;
@@ -1738,7 +2238,8 @@ export class ParticipantViewFacade {
     this.timerTickerHandle = globalThis.window.setInterval(() => {
       const currentTick = Date.now();
       this.timerTick.set(currentTick);
-      const activeTimer = this.readCurrentRunState()?.activeTestletTimer;
+      const state = this.readCurrentRunState();
+      const activeTimer = state && !this.isControllerTimerInterrupted(state) ? state.activeTestletTimer : null;
       const expiresAtMs = activeTimer?.expiresAt
         ? Date.parse(activeTimer.expiresAt)
         : Number.NaN;
@@ -1759,7 +2260,7 @@ export class ParticipantViewFacade {
       if (activeTimer?.status === "running" && Number.isFinite(expiresAtMs)) {
         const remainingSeconds = Math.max(
           0,
-          Math.ceil((expiresAtMs - currentTick) / 1_000)
+          Math.floor((expiresAtMs - currentTick) / 1_000)
         );
         const timerKey = `${activeTimer.testletKey}:${activeTimer.startedAt}`;
         const previousRemainingSeconds = this.timerRemainingSeconds.get(timerKey);
@@ -1821,30 +2322,17 @@ export class ParticipantViewFacade {
       return null;
     }
     if (event.kind === "started") {
-      const minutes = Math.floor(event.durationSeconds / 60);
-      const seconds = event.durationSeconds % 60;
       return {
         kind: event.kind,
-        message: `${
-          this.customText(
-            "booklet_msgTimerStarted",
-            "The time for this block has started: "
-          ).trimEnd()
-        } ${minutes}:${String(seconds).padStart(2, "0")}`
+        message: `${this.customTextValue("booklet_msgTimerStarted")}${Math.round(event.durationSeconds / 60)} min`
       };
     }
     return {
       kind: event.kind,
       message:
         event.kind === "expired"
-          ? this.customText(
-              "booklet_msgTimeOver",
-              "The time for this block has ended."
-            )
-          : this.customText(
-              "booklet_msgTimerCancelled",
-              "The timed block was cancelled."
-            )
+          ? this.customTextValue("booklet_msgTimeOver")
+          : this.customTextValue("booklet_msgTimerCancelled")
     };
   }
 
@@ -2072,6 +2560,8 @@ export class ParticipantViewFacade {
     }
     const currentRunState = this.readCurrentRunState();
     if (!currentRunState) {
+      const selectedBooklet = this.assignedBooklets.find(booklet => booklet.bookletKey === this.runtime.bookletKey.trim());
+      if (selectedBooklet?.status === "locked" || selectedBooklet?.status === "completed") return false;
       return true;
     }
     if (
@@ -2352,13 +2842,15 @@ export class ParticipantViewFacade {
       return;
     }
 
-    if (currentState.currentUnit.unitKey === unitKey) {
+    const logOnlyChange = change.unitDataChanged === false && change.unitStateChanged === false && change.playerStateChanged === false;
+    if (!logOnlyChange && currentState.currentUnit.unitKey === unitKey) {
       this.runtime.currentUnitResponse = change.response;
       if (currentState.executionMode.saveResponses) {
         this.persistState();
       }
     }
     if (!currentState.executionMode.saveResponses) {
+      if (logOnlyChange) return;
       this.rememberEphemeralUnitResponse(
         currentState.testRun.testRunId,
         unitKey,
@@ -2384,23 +2876,25 @@ export class ParticipantViewFacade {
         batch.testRunId !== currentState.testRun.testRunId ||
         (batch.unitKey !== unitKey && batch.unitKey !== null)
     );
-    const pendingLogs =
+    const carriedSave =
       this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId &&
       this.pendingVeronaSave.unitKey === unitKey
-        ? this.pendingVeronaSave.logs
-        : [];
+        ? this.pendingVeronaSave
+        : findParticipantSaveOutboxEntryForUnit(currentState.testRun.testRunId, unitKey);
     const logs = this.compactParticipantTestLogBatches([
-      ...pendingLogs,
+      ...carriedParticipantTestLogBatches(carriedSave),
       ...queuedEntries
     ]);
+    const logOnly = logOnlyChange && (!carriedSave || carriedSave.logOnly === true);
     const save = createParticipantSaveOutboxEntry({
       testRunId: currentState.testRun.testRunId,
       unitKey,
-      response: change.response,
+      response: logOnly ? currentState.testRun.unitResponses[unitKey] ?? "" : logOnlyChange && carriedSave ? carriedSave.response : change.response,
+      ...(logOnly ? { logOnly: true as const } : {}),
       status: currentState.testRun.status === "paused" ? "paused" : "running",
       logs
     });
-    this.optimisticVeronaResponse = {
+    if (!logOnly) this.optimisticVeronaResponse = {
       testRunId: save.testRunId,
       unitKey: save.unitKey,
       response: save.response
@@ -2427,7 +2921,7 @@ export class ParticipantViewFacade {
       testRunId: change.testRunId,
       unitKey,
       originalUnitId: unitKey,
-      entries: change.entries
+      entries: identifyParticipantTestLogEntries(change.entries)
     });
   }
 
@@ -2441,50 +2935,44 @@ export class ParticipantViewFacade {
     ) {
       return;
     }
+    entries = entries.filter(entry => {
+      if (entry.key !== "CONTROLLER") return true;
+      const previous = this.commandControllerState;
+      this.commandControllerState = { testRunId: currentState.testRun.testRunId, status: String(entry.content),
+        entryRevision: currentState.testRun.controllerEntry?.revision };
+      return previous?.testRunId !== currentState.testRun.testRunId || previous.status !== String(entry.content);
+    });
+    if (!entries.length) return;
     const batch: ParticipantTestLogBatch & { testRunId: string } = {
       testRunId: currentState.testRun.testRunId,
       unitKey: null,
       originalUnitId: null,
-      entries
+      entries: identifyParticipantTestLogEntries(entries)
     };
-    if (
-      this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId
-    ) {
-      this.queuedVeronaLogs.push(batch);
-      this.saveVeronaResponse({
-        testRunId: this.pendingVeronaSave.testRunId,
-        unitKey: this.pendingVeronaSave.unitKey,
-        response: this.pendingVeronaSave.response,
-        unitDataChanged: false,
-        unitStateChanged: false,
-        playerStateChanged: false
-      });
+    const pending = this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId
+      ? this.pendingVeronaSave : null;
+    const unitKey = pending?.unitKey ?? currentState.currentUnit.unitKey;
+    if (!unitKey) {
       return;
     }
-
-    const deliveryId =
-      globalThis.crypto?.randomUUID?.() ??
-      `testlog-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    void this.requestState
-      .request<SaveParticipantTestLogsResponse>(
-        "Participant Test Logs",
-        "POST",
-        resolveRoutePath(productionApiRoutes.participant.saveTestLogs, {
-          testRunId: currentState.testRun.testRunId
-        }),
-        {
-          deliveryId,
-          logs: [{
-            unitKey: batch.unitKey,
-            originalUnitId: batch.originalUnitId,
-            entries: batch.entries
-          }]
-        } satisfies SaveParticipantTestLogsRequest,
-        { quiet: true }
-      )
-      .catch(() => {
-        this.queuedVeronaLogs.push(batch);
-      });
+    const durable = pending ?? findParticipantSaveOutboxEntryForUnit(
+      currentState.testRun.testRunId, unitKey
+    );
+    const response = durable?.response ??
+      (this.runtime.currentUnitKey === unitKey
+        ? this.runtime.currentUnitResponse
+        : this.effectiveUnitResponse(currentState, unitKey));
+    // Controller/focus logs must survive reload even after the last answer
+    // packet was delivered. Use the same durable, idempotent queue as answers.
+    this.queuedVeronaLogs.push(batch);
+    this.saveVeronaResponse({
+      testRunId: currentState.testRun.testRunId,
+      unitKey,
+      response,
+      unitDataChanged: false,
+      unitStateChanged: false,
+      playerStateChanged: false
+    });
   }
 
   retryVeronaSave(): void {
@@ -2699,6 +3187,10 @@ export class ParticipantViewFacade {
     }
   }
 
+  customTextValue(key: ParticipantCustomTextKey): string {
+    return resolveParticipantCustomTextValue(this.participantCustomTexts, key);
+  }
+
   customText(key: ParticipantCustomTextKey, fallback?: string): string {
     return resolveParticipantCustomText(
       this.participantCustomTexts,
@@ -2727,22 +3219,16 @@ export class ParticipantViewFacade {
       return "Continue?";
     }
     return leaveLock.scope === "unit"
-      ? this.customText(
-          "booklet_warningLeaveTextPrompt-unit",
-          `${leaveLock.detail} Continue?`
-        )
-      : this.customText(
-          "booklet_warningLeaveTextPrompt-testlet",
-          `${leaveLock.detail} Continue?`
-        );
+      ? this.customTextValue("booklet_warningLeaveTextPrompt-unit")
+      : this.customTextValue("booklet_warningLeaveTextPrompt-testlet");
   }
 
   private leaveLockConfirmationTitle(
     leaveLock: ParticipantPlayerState["leaveLock"]
   ): string {
     return leaveLock?.scope === "unit"
-      ? this.customText("booklet_warningLeaveTitle-unit", "Leave task?")
-      : this.customText("booklet_warningLeaveTitle-testlet", "Leave section?");
+      ? this.customTextValue("booklet_warningLeaveTitle-unit")
+      : this.customTextValue("booklet_warningLeaveTitle-testlet");
   }
 
   private requestConfirmation(
@@ -2763,14 +3249,8 @@ export class ParticipantViewFacade {
     if (
       confirmTestletTimeLeave &&
       !(await this.requestConfirmation({
-        title: this.customText(
-          "booklet_warningLeaveTimerBlockTitle",
-          "Leave timed block?"
-        ),
-        message: this.customText(
-          "booklet_warningLeaveTimerBlockTextPrompt",
-          `Leave the timed block "${player.testletTimer?.displayLabel}" and close it permanently?`
-        ),
+        title: this.customTextValue("booklet_warningLeaveTimerBlockTitle"),
+        message: this.customTextValue("booklet_warningLeaveTimerBlockTextPrompt"),
         cancelLabel: "Stay here",
         confirmLabel: "Leave anyway"
       }))
@@ -2808,76 +3288,65 @@ export class ParticipantViewFacade {
   }
 
   private async returnToStarterWithConfirmation(): Promise<void> {
+    let initialState = this.readCurrentRunState();
+    if (!initialState) {
+      // Resume projects its authorized Run before the Unit context finishes
+      // loading. Keep that visible controller's click until its context arrives.
+      const run = this.consoleRun;
+      const sessionId = this.runtime.participantSessionId.trim();
+      const lifecycle = this.viewLifecycleSequence;
+      if (!run || run.testRunId !== this.runtime.testRunId ||
+          run.participantSessionId !== sessionId || run.status === "completed") return;
+      const { testRunId, currentUnitKey, status } = run;
+      await this.refreshCurrentStateInternal(true);
+      if (this.viewLifecycleSequence !== lifecycle || this.runtime.participantSessionId.trim() !== sessionId ||
+          this.runtime.testRunId !== testRunId) return;
+      initialState = this.readCurrentRunState();
+      if (!initialState || initialState.testRun.testRunId !== testRunId ||
+          initialState.currentUnit.unitKey !== currentUnitKey || initialState.testRun.status !== status) return;
+    }
+    if (!initialState) return;
+    const testRunId = initialState.testRun.testRunId;
+    const currentUnitKey = initialState.currentUnit.unitKey;
+    const runStatus = initialState.testRun.status;
+    const viewLifecycleSequence = this.viewLifecycleSequence;
+    const { planParticipantStarterExit, participantStarterExitPreparationRoute } = await import("./participant-exit-policy");
     const currentState = this.readCurrentRunState();
-    if (!currentState) {
+    if (!currentState || currentState.testRun.testRunId !== testRunId ||
+        currentState.currentUnit.unitKey !== currentUnitKey || currentState.testRun.status !== runStatus ||
+        this.viewLifecycleSequence !== viewLifecycleSequence) return;
+    const plan = planParticipantStarterExit({ state: currentState,
+      response: this.runtime.currentUnitResponse, timer: this.player.testletTimer,
+      lock: this.player.leaveLock, customText: this.customTextValue.bind(this) });
+    this.clearNavigationAdvisory();
+    if (plan.originalNotices.length) this.originalNavigationToast.set({
+      text: plan.originalNotices[0], additionalTexts: plan.originalNotices.slice(1)
+    });
+    if (plan.information) {
+      await this.requestConfirmation(plan.information);
       return;
     }
-    const timer = this.player.testletTimer;
-    if (
-      currentState.executionMode.forceTimeRestrictions &&
-      timer?.leave === "forbidden"
-    ) {
-      this.clearNavigationAdvisory();
-      this.navigationAdvisory.set({
-        title: this.customText(
-          "booklet_warningLeaveTimerBlockTitle",
-          "Leave timed block?"
-        ),
-        message: this.customText(
-          "booklet_warningLeaveTimerBlockTextPrompt",
-          `The timed block "${timer.displayLabel}" cannot be left while its timer is active.`
-        )
-      });
+    if (plan.advisory) {
+      this.resolveConfirmation(false);
+      this.navigationAdvisory.set(plan.advisory);
       return;
     }
-    const confirmTestletTimeLeave =
-      currentState.executionMode.forceTimeRestrictions &&
-      timer?.leave === "confirm";
-    const confirmTestletLeaveLock = this.player.leaveLock?.confirm === true;
-    const restrictionConfirmation = confirmTestletTimeLeave
-      ? {
-        title: this.customText(
-          "booklet_warningLeaveTimerBlockTitle",
-          "Leave timed block?"
-        ),
-        message: this.customText(
-          "booklet_warningLeaveTimerBlockTextPrompt",
-          `Leave the timed block "${timer.displayLabel}" and close it permanently?`
-        ),
-        cancelLabel: "Stay here",
-        confirmLabel: "Leave anyway"
-      }
-      : confirmTestletLeaveLock
-        ? {
-        title: this.leaveLockConfirmationTitle(this.player.leaveLock),
-        message: this.leaveLockConfirmationText(this.player.leaveLock),
-        cancelLabel: "Stay here",
-        confirmLabel: "Leave anyway"
-      }
-        : null;
-    const confirmation = restrictionConfirmation
-      ? {
-          ...restrictionConfirmation,
-          title: currentState.executionMode.saveResponses
-            ? "Return to test selection?"
-            : restrictionConfirmation.title
-        }
-      : currentState.executionMode.saveResponses
-        ? {
-            title: "Return to test selection?",
-            message: "Your saved progress will remain available.",
-            cancelLabel: "Continue working",
-            confirmLabel: "Return to tests"
-          }
-        : null;
-    if (confirmation && !(await this.requestConfirmation(confirmation))) {
-      return;
+    if (plan.prepareTimer && !(await this.prepareStarterExitTimer(participantStarterExitPreparationRoute))) return;
+    if (this.viewLifecycleSequence !== viewLifecycleSequence ||
+        this.readCurrentRunState()?.testRun.testRunId !== testRunId ||
+        this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey || this.readCurrentRunState()?.testRun.status !== runStatus) return;
+    if (plan.afterTimerNotices.length) {
+      const notices = plan.prepareTimer ? plan.afterTimerNotices : [...plan.originalNotices, ...plan.afterTimerNotices];
+      this.originalNavigationToast.set({text: notices[0], additionalTexts: notices.slice(1)});
     }
-
-    await this.returnToStarterInternal(
-      confirmTestletTimeLeave,
-      confirmTestletLeaveLock
-    );
+    if (plan.confirmation && !(await this.requestConfirmation(plan.confirmation))) return;
+    if (this.viewLifecycleSequence !== viewLifecycleSequence ||
+        this.readCurrentRunState()?.testRun.testRunId !== testRunId ||
+        this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey || this.readCurrentRunState()?.testRun.status !== runStatus) return;
+    if (plan.confirmedNotices.length) this.originalNavigationToast.set({
+      text: plan.confirmedNotices[0], additionalTexts: plan.confirmedNotices.slice(1)
+    });
+    await this.returnToStarterInternal(plan.confirmTestletTimeLeave, plan.confirmTestletLeaveLock);
   }
 
   async copySessionEntryLink(sessionEntryLink: string): Promise<void> {
@@ -2938,6 +3407,36 @@ export class ParticipantViewFacade {
     // Do not let a booklet from a previously persisted browser session
     // constrain which assigned booklet the server starts when no run exists.
     this.runtime.bookletKey = normalized.bookletKey;
+    if (normalized.openStarter) {
+      // Read only the authorized roster. Loading player state would restore a
+      // pending save outbox, emit logs and start the Run's event stream.
+      const payload = await this.requestState.request<ParticipantRuntimeStateResponse>(
+        "Participant Starter", "GET",
+        resolveRoutePath(productionApiRoutes.participant.getRuntimeState, {
+          participantSessionId: this.runtime.participantSessionId.trim()
+        }), undefined, { quiet: true }
+      );
+      if (lifecycleSequence !== this.viewLifecycleSequence) return;
+      this.participantEvents.stop();
+      this.invalidateCurrentStateRefreshes();
+      this.currentRunState = null;
+      this.activeControllerError.set(null);
+      this.loadedBookletAssets.set(null);
+      this.runtime.testRunId = "";
+      this.runtime.currentUnitKey = "";
+      this.runtime.currentUnitResponse = "";
+      this.workspace.tenantKey = payload.runtimeState.scope.tenantKey;
+      this.workspace.workspaceKey = payload.runtimeState.scope.workspaceKey;
+      this.syncParticipantSessionFields(payload.runtimeState.participantSession);
+      this.syncParticipantRosterEntry(payload.runtimeState.participantRosterEntry);
+      this.syncRuntimeBooklets(payload.runtimeState.booklets);
+      this.runtime.currentRunStateView = prettyPrintJson({
+        status: "participant_starter_entry", runtimeState: payload.runtimeState
+      }, this.runtime.currentRunStateView);
+      this.syncParticipantHeaderVisibility();
+      this.persistState();
+      return;
+    }
     try {
       await this.refreshCurrentStateInternal(true);
       if (lifecycleSequence !== this.viewLifecycleSequence) {
@@ -3194,6 +3693,7 @@ export class ParticipantViewFacade {
         productionApiRoutes.participant.launch,
         {
           ...credentials,
+          controllerLifecycle: "browser-v1",
           bookletKey: this.runtime.bookletKey.trim() || undefined,
         } satisfies ParticipantLaunchRequest
       );
@@ -3214,6 +3714,9 @@ export class ParticipantViewFacade {
     this.syncParticipantSessionFields(payload.participantSession);
     this.syncParticipantRosterEntry(payload.participantRosterEntry);
     this.syncRun(payload.testRun);
+    this.commandControllerState = null;
+    this.controllerCommandPhase.set(null);
+    this.controllerTimerInterruption.set(null);
     this.syncRuntimeBooklets(payload.booklets);
     this.participantCodeRequired = false;
     this.runtime.participantCode = "";
@@ -3222,11 +3725,9 @@ export class ParticipantViewFacade {
       this.runtime.runtimeMonitorView
     );
     this.persistState();
+    await this.replaceSelectedRunEntryLink();
+    if (lifecycleSequence !== this.viewLifecycleSequence || this.runtime.testRunId !== payload.testRun.testRunId) return;
     await this.refreshCurrentStateInternal(true);
-    if (lifecycleSequence === this.viewLifecycleSequence &&
-        this.runtime.testRunId === payload.testRun.testRunId) {
-      await this.replaceSelectedRunEntryLink();
-    }
   }
 
   private async downloadParticipantReviewsInternal(): Promise<"empty" | "downloaded" | undefined> {
@@ -3264,7 +3765,8 @@ export class ParticipantViewFacade {
         participantSessionId: this.runtime.participantSessionId.trim()
       }),
       {
-        bookletKey: this.runtime.bookletKey.trim() || undefined
+        bookletKey: this.runtime.bookletKey.trim() || undefined,
+        controllerLifecycle: "browser-v1"
       } satisfies ResumeParticipantSessionRequest,
       { quiet: options.quiet ?? false }
     );
@@ -3282,16 +3784,17 @@ export class ParticipantViewFacade {
       this.runtime.currentUnitResponse = "";
     }
     this.syncRun(payload.testRun);
+    this.commandControllerState = null;
+    this.controllerCommandPhase.set(null);
+    this.controllerTimerInterruption.set(null);
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
       this.runtime.runtimeMonitorView
     );
     this.persistState();
+    await this.replaceSelectedRunEntryLink();
+    if (lifecycleSequence !== this.viewLifecycleSequence || this.runtime.testRunId !== payload.testRun.testRunId) return;
     await this.refreshCurrentStateInternal(true);
-    if (lifecycleSequence === this.viewLifecycleSequence &&
-        this.runtime.testRunId === payload.testRun.testRunId) {
-      await this.replaceSelectedRunEntryLink();
-    }
   }
 
   private async saveProgressInternal(
@@ -3344,7 +3847,8 @@ export class ParticipantViewFacade {
     this.removeMatchingDeliveredOutbox(
       testRunId,
       currentUnitKey,
-      unitResponse
+      unitResponse,
+      status
     );
 
     if (matchingLogBatches.length > 0) {
@@ -3440,20 +3944,24 @@ export class ParticipantViewFacade {
 
   private async drainVeronaSaveQueue(
     options: {
+      deliveryIds?: ReadonlySet<string>;
       allowForegroundSettlement?: boolean;
       refreshCurrentState?: boolean;
     } = {}
   ): Promise<void> {
     while (
       this.pendingVeronaSave &&
+      (!options.deliveryIds || options.deliveryIds.has(this.pendingVeronaSave.deliveryId)) &&
       (options.allowForegroundSettlement ||
         !this.veronaForegroundSaveSettlement)
     ) {
       const save = this.pendingVeronaSave;
       const retrySequence = this.veronaSaveRetrySequence;
+      const appliedRefreshSequence = this.currentStateAppliedRefreshSequence;
       this.pendingVeronaSave = null;
+      this.veronaSaveInFlight = save;
       try {
-        const payload = await this.requestState.request<SaveTestRunProgressResponse>(
+        const request = this.requestState.request<SaveTestRunProgressResponse>(
           "Verona Auto Save",
           "POST",
           resolveRoutePath(productionApiRoutes.participant.saveProgress, {
@@ -3461,13 +3969,17 @@ export class ParticipantViewFacade {
           }),
           {
             deliveryId: save.deliveryId,
+            responseOnly: true,
+            responseTimestamp: save.logOnly ? undefined : Date.parse(save.queuedAt),
             responseUnitKey: save.unitKey,
             status: save.status,
-            unitResponse: save.response,
+            unitResponse: save.logOnly ? undefined : save.response,
             logs: save.logs
           } satisfies SaveTestRunProgressRequest,
           { quiet: true }
         );
+        this.veronaSaveBarriers.track(save, request);
+        const payload = await request;
         const removedFromOutbox = removeParticipantSaveOutboxEntry(
           save.testRunId,
           save.deliveryId
@@ -3477,7 +3989,14 @@ export class ParticipantViewFacade {
             save.testRunId
           );
         }
-        this.syncRun(payload.testRun);
+        // A durable save receipt acknowledges data, not a new control command.
+        // ERROR keeps its local state until an accepted channel update or reload.
+        if (this.readCurrentRunState()?.testRun.testRunId === save.testRunId &&
+          !this.pendingControllerStatus &&
+          !this.hasControllerError &&
+          appliedRefreshSequence === this.currentStateAppliedRefreshSequence) {
+          this.syncRun(payload.testRun);
+        }
         this.runtime.runtimeMonitorView = prettyPrintJson(
           payload,
           this.runtime.runtimeMonitorView
@@ -3506,6 +4025,10 @@ export class ParticipantViewFacade {
           continue;
         }
         return;
+      } finally {
+        if (this.veronaSaveInFlight === save) {
+          this.veronaSaveInFlight = null;
+        }
       }
     }
 
@@ -3517,9 +4040,12 @@ export class ParticipantViewFacade {
     this.persistState();
     if (
       options.refreshCurrentState !== false &&
+      !this.pendingControllerStatus &&
       !this.veronaForegroundSaveSettlement
     ) {
-      await this.refreshCurrentStateInternal(true);
+      // The durable delivery is settled. A slow Unit view must not keep this
+      // save in flight and block a later foreground command's answer drain.
+      this.viewState.onActionAsync(() => this.refreshCurrentStateInternal(true));
     }
   }
 
@@ -3583,14 +4109,8 @@ export class ParticipantViewFacade {
       if (
         confirmTestletTimeLeave &&
         !(await this.requestConfirmation({
-          title: this.customText(
-            "booklet_warningLeaveTimerBlockTitle",
-            "Leave timed block?"
-          ),
-          message: this.customText(
-            "booklet_warningLeaveTimerBlockTextPrompt",
-            `Leave the timed block "${activeTimer.displayLabel}" and close it permanently?`
-          ),
+          title: this.customTextValue("booklet_warningLeaveTimerBlockTitle"),
+          message: this.customTextValue("booklet_warningLeaveTimerBlockTextPrompt"),
           cancelLabel: "Stay here",
           confirmLabel: "Leave anyway"
         }))
@@ -3790,6 +4310,38 @@ export class ParticipantViewFacade {
     }
   }
 
+  private async prepareStarterExitTimer(route: string): Promise<boolean> {
+    const state = this.readCurrentRunState();
+    const currentUnitKey = state?.currentUnit.unitKey;
+    if (!state || !currentUnitKey) return false;
+    const timerBeforePreparation = state.activeTestletTimer;
+    const runStatus = state.testRun.status;
+    const testRunId = state.testRun.testRunId, viewLifecycleSequence = this.viewLifecycleSequence;
+    const isCurrent = (): boolean => this.viewLifecycleSequence === viewLifecycleSequence &&
+      this.readCurrentRunState()?.testRun.testRunId === testRunId &&
+      this.readCurrentRunState()?.currentUnit.unitKey === currentUnitKey && this.readCurrentRunState()?.testRun.status === runStatus && this.runtime.testRunId.trim() === testRunId;
+    const settled = await this.settleVeronaAutoSaveBeforeForegroundAction();
+    if (!isCurrent()) return false;
+    await this.saveCurrentDraftBeforeCompleteInternal(settled);
+    if (!isCurrent()) return false;
+    const payload = await this.requestState.request<PrepareParticipantStarterExitResponse>(
+      "Participant Prepare Starter Exit", "POST", resolveRoutePath(route, {testRunId}), {
+        currentUnitKey,
+        responseUnitKey: state.executionMode.saveResponses ? undefined : currentUnitKey,
+        unitResponse: state.executionMode.saveResponses ? undefined : this.runtime.currentUnitResponse,
+        transientUnitResponses: state.executionMode.saveResponses ? undefined : this.ephemeralUnitResponseRecord(testRunId)
+      } satisfies PrepareParticipantStarterExitRequest
+    );
+    if (!isCurrent()) return false;
+    this.syncRun(payload.testRun);
+    await this.refreshCurrentStateInternal(true);
+    if (!isCurrent()) return false;
+    if (payload.timerEffect === "cancelled" && timerBeforePreparation) {
+      this.showTimerLifecycleEvent(testRunId, "cancelled", timerBeforePreparation);
+    }
+    return true;
+  }
+
   private async returnToStarterInternal(
     confirmTestletTimeLeave: boolean,
     confirmTestletLeaveLock: boolean
@@ -3798,19 +4350,37 @@ export class ParticipantViewFacade {
     if (!currentState) {
       return;
     }
+    const testRunId = currentState.testRun.testRunId;
+    const currentUnitKey = currentState.currentUnit.unitKey;
+    const runStatus = currentState.testRun.status;
+    const viewLifecycleSequence = this.viewLifecycleSequence;
+    const isCurrent = (returnedRun?: ReturnTestRunToStarterResponse["testRun"]): boolean => {
+      const live = this.readCurrentRunState();
+      // SSE can publish this action's own paused result before HTTP returns.
+      // Accept that exact stored result; a newer remote status remains fenced.
+      const ownStatusUpdate = returnedRun?.updatedAt && live?.testRun.updatedAt === returnedRun.updatedAt &&
+        live.testRun.status === returnedRun.status;
+      return this.viewLifecycleSequence === viewLifecycleSequence && live?.testRun.testRunId === testRunId &&
+        live.currentUnit.unitKey === currentUnitKey && (live.testRun.status === runStatus || Boolean(ownStatusUpdate)) &&
+        this.runtime.testRunId.trim() === testRunId;
+    };
     const saveResponses = currentState.executionMode.saveResponses;
     const settledVeronaResponse =
       await this.settleVeronaAutoSaveBeforeForegroundAction();
+    if (!isCurrent()) return;
     await this.saveCurrentDraftBeforeCompleteInternal(settledVeronaResponse);
+    if (!isCurrent()) return;
 
     const payload =
       await this.requestState.request<ReturnTestRunToStarterResponse>(
         "Participant Return To Starter",
         "POST",
         resolveRoutePath(productionApiRoutes.participant.returnToStarter, {
-          testRunId: this.runtime.testRunId.trim()
+          testRunId
         }),
         {
+          currentUnitKey,
+          expectedStatus: runStatus,
           responseUnitKey: saveResponses
             ? undefined
             : this.runtime.currentUnitKey.trim() || undefined,
@@ -3827,22 +4397,8 @@ export class ParticipantViewFacade {
         } satisfies ReturnTestRunToStarterRequest
       );
 
-    this.participantEvents.stop();
-    this.invalidateCurrentStateRefreshes();
-    discardParticipantSaveOutboxForRun(payload.testRun.testRunId);
-    this.pendingVeronaSave = null;
-    this.optimisticVeronaResponse = null;
-    this.ephemeralUnitResponses.delete(payload.testRun.testRunId);
-    this.currentRunState = null;
-    this.activeControllerError.set(null);
-    this.loadedBookletAssets.set(null);
-    this.runtime.testRunId = "";
-    this.runtime.currentUnitKey = "";
-    this.runtime.currentUnitResponse = "";
-    this.syncParticipantSessionFields(payload.runtimeState.participantSession);
-    this.syncParticipantRosterEntry(payload.runtimeState.participantRosterEntry);
-    this.syncRuntimeBooklets(payload.runtimeState.booklets);
-    this.syncParticipantHeaderVisibility();
+    if (!isCurrent(payload.testRun)) return;
+    this.presentParticipantStarter(payload.runtimeState, payload.testRun.testRunId);
     this.runtime.currentRunStateView = prettyPrintJson(
       {
         status: "participant_returned_to_starter",
@@ -3855,6 +4411,32 @@ export class ParticipantViewFacade {
       payload,
       this.runtime.runtimeMonitorView
     );
+    this.resetTimerLifecyclePresentation();
+    this.persistState();
+  }
+
+  private presentParticipantStarter(runtimeState: ParticipantRuntimeState, testRunId: string, preserveControllerError = false): void {
+    this.participantEvents.stop();
+    this.invalidateCurrentStateRefreshes();
+    discardParticipantSaveOutboxForRun(testRunId);
+    this.pendingVeronaSave = null;
+    this.optimisticVeronaResponse = null;
+    this.ephemeralUnitResponses.delete(testRunId);
+    this.currentRunState = null;
+    // readCurrentRunState can restore its cache from this serialized view.
+    // Clear that fallback before rendering the starter or the terminated Run
+    // would be reconstructed during the next getter evaluation.
+    this.runtime.currentRunStateView = "";
+    this.remoteTerminalErrorRunId = preserveControllerError ? this.activeControllerError()?.testRunId ?? null : null;
+    if (!preserveControllerError) this.activeControllerError.set(null);
+    this.loadedBookletAssets.set(null);
+    this.runtime.testRunId = "";
+    this.runtime.currentUnitKey = "";
+    this.runtime.currentUnitResponse = "";
+    this.syncParticipantSessionFields(runtimeState.participantSession);
+    this.syncParticipantRosterEntry(runtimeState.participantRosterEntry);
+    this.syncRuntimeBooklets(runtimeState.booklets);
+    this.syncParticipantHeaderVisibility();
     this.resetTimerLifecyclePresentation();
     this.persistState();
   }
@@ -3879,6 +4461,17 @@ export class ParticipantViewFacade {
       return;
     }
 
+    const currentState = this.readCurrentRunState();
+    if (currentState?.testRun.testRunId === this.runtime.testRunId.trim() &&
+        currentState.currentUnit.unitKey === currentUnitKey &&
+        this.runtime.currentUnitResponse === this.effectiveUnitResponse(currentState, currentUnitKey)) {
+      // Closing an empty Source response buffer sends no data update. An
+      // unchanged shell must not manufacture '' merely because log flushing
+      // happened to finish before this foreground action. Real edits/clears
+      // still differ from the saved (or non-saving ephemeral) response.
+      return;
+    }
+
     await this.saveProgressInternal(
       player.runStatus === "paused" ? "paused" : "running",
       currentUnitKey,
@@ -3886,9 +4479,10 @@ export class ParticipantViewFacade {
     );
   }
 
-  private async settleVeronaAutoSaveBeforeForegroundAction(): Promise<
+  private async settleVeronaAutoSaveBeforeForegroundAction(nativeBarrier?: ParticipantSaveBarrier, captureAfterGrace?: () => ParticipantSaveBarrier): Promise<
     SettledVeronaResponse | null
   > {
+    let requestBarrier = nativeBarrier ?? this.veronaSaveBarriers.active(this.consoleRun?.testRunId ?? this.runtime.testRunId);
     if (this.veronaPlayer) {
       // Players may debounce stateChanged after an input event. Keep the frame
       // alive briefly so an immediate host navigation cannot retire it before
@@ -3896,6 +4490,12 @@ export class ParticipantViewFacade {
       await new Promise<void>(resolve => {
         globalThis.setTimeout(resolve, VERONA_FOREGROUND_STATE_GRACE_MS);
       });
+    }
+    if (nativeBarrier && captureAfterGrace) {
+      const first = nativeBarrier, additional = captureAfterGrace();
+      nativeBarrier = { deliveryIds: new Set([...first.deliveryIds, ...additional.deliveryIds]),
+        wait: async () => { await Promise.all([first.wait(), additional.wait()]); } };
+      requestBarrier = nativeBarrier;
     }
     const unsettledResponse = this.pendingVeronaSave
       ? {
@@ -3905,22 +4505,23 @@ export class ParticipantViewFacade {
         }
       : this.optimisticVeronaResponse;
     this.clearVeronaSaveBuffer();
-    const previousForegroundSettlement =
-      this.veronaForegroundSaveSettlement;
+    this.veronaForegroundSaveSettlements += 1;
     this.veronaForegroundSaveSettlement = true;
     try {
+      await requestBarrier.wait();
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const activeSave = this.veronaSaveDrainPromise;
-        if (activeSave) {
+        if (!nativeBarrier && activeSave) {
           await activeSave;
         }
-        if (this.pendingVeronaSave) {
+        if (this.pendingVeronaSave && (!nativeBarrier || nativeBarrier.deliveryIds.has(this.pendingVeronaSave.deliveryId))) {
           await this.drainVeronaSaveQueue({
             allowForegroundSettlement: true,
+            deliveryIds: nativeBarrier?.deliveryIds,
             refreshCurrentState: false
           });
         }
-        if (!this.pendingVeronaSave) {
+        if (!this.pendingVeronaSave || nativeBarrier && !nativeBarrier.deliveryIds.has(this.pendingVeronaSave.deliveryId)) {
           return unsettledResponse;
         }
         if (attempt < 2) {
@@ -3936,10 +4537,11 @@ export class ParticipantViewFacade {
       }
       return unsettledResponse;
     } finally {
-      this.veronaForegroundSaveSettlement = previousForegroundSettlement;
+      this.veronaForegroundSaveSettlements -= 1;
+      this.veronaForegroundSaveSettlement = this.veronaForegroundSaveSettlements > 0;
       if (
         this.pendingVeronaSave &&
-        !previousForegroundSettlement &&
+        !this.veronaForegroundSaveSettlement &&
         this.veronaSaveStatus !== "save_failed" &&
         this.veronaSaveStatus !== "queued_offline"
       ) {
@@ -4128,28 +4730,59 @@ export class ParticipantViewFacade {
     await this.refreshParticipantReviewsInternal(currentState, true);
   }
 
-  private async refreshCurrentStateInternal(quiet: boolean): Promise<void> {
-    if (!this.runtime.participantSessionId.trim()) {
+  private async refreshCurrentStateInternal(
+    quiet: boolean,
+    acceptedParticipantEvent = false
+  ): Promise<void> {
+    if (!this.runtime.participantSessionId.trim() ||
+      this.hasControllerError && !acceptedParticipantEvent) {
       return;
     }
 
     const refreshSequence = ++this.currentStateRefreshSequence;
+    const expectedSessionId = this.runtime.participantSessionId.trim();
+    let expectedRunId = this.runtime.testRunId;
     const loadStartedAtMs = Date.now();
     try {
+      if (!this.consoleRun) {
+        const { participantControllerContextRoute } = await import("@testcenter-rewrite-app/contracts/participant-native-command");
+        const sessionId = this.runtime.participantSessionId.trim(), requestedRunId = this.runtime.testRunId;
+        try {
+          const { controllerContext } = await this.requestState.request<{ controllerContext: ParticipantControllerContext }>(
+            "Participant Controller", "GET", withSelectedParticipantRun(resolveRoutePath(participantControllerContextRoute,
+              { participantSessionId: sessionId }), requestedRunId), undefined, { quiet });
+          if (refreshSequence < this.currentStateAppliedRefreshSequence || sessionId !== this.runtime.participantSessionId.trim() || requestedRunId !== this.runtime.testRunId) return;
+          const run = this.validateParticipantControllerContext(controllerContext, sessionId, requestedRunId);
+          this.syncRun(run);
+          expectedRunId = run.testRunId;
+        } catch (error) {
+          // An older API has the authorized current-state route. Ownership or
+          // missing-Run failures must never downgrade to another selection.
+          if (!this.requestState.isApiError(error) || error.statusCode !== 404 || error.error !== "route_not_found") throw error;
+        }
+      }
+      if (refreshSequence < this.currentStateAppliedRefreshSequence || expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
       let payload =
         await this.requestState.request<ParticipantCurrentRunStateResponse>(
           "Participant Current State",
           "GET",
           withSelectedParticipantRun(resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {
-            participantSessionId: this.runtime.participantSessionId.trim()
-          }), this.runtime.testRunId),
+            participantSessionId: expectedSessionId
+          }), expectedRunId),
           undefined,
           { quiet }
         );
-      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+      if (refreshSequence < this.currentStateAppliedRefreshSequence ||
+        this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
-      const testRunId = payload.currentRunState.testRun.testRunId;
+      if (expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
+      const run = this.validateParticipantControllerContext(payload.currentRunState, expectedSessionId, expectedRunId);
+      const testRunId = run.testRunId;
+      if (this.isOlderRunState(run)) return;
+      // The authenticated response establishes scope before eager assets finish.
+      this.syncRun(run);
+      expectedRunId = testRunId;
       if (!this.bookletAssetLoadStartedAtMs.has(testRunId)) {
         this.bookletAssetLoadStartedAtMs.set(testRunId, loadStartedAtMs);
       }
@@ -4159,9 +4792,13 @@ export class ParticipantViewFacade {
       ) {
         payload = await this.loadBookletAssets(payload);
       }
-      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+      if (refreshSequence < this.currentStateAppliedRefreshSequence ||
+        this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
+      if (expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
+      const readyRun = this.validateParticipantControllerContext(payload.currentRunState, expectedSessionId, expectedRunId);
+      if (this.isOlderRunState(readyRun)) return;
       this.currentStateAppliedRefreshSequence = refreshSequence;
       if (payload.currentRunState.bookletAssets) {
         this.recordLoadedBookletAssets(payload, testRunId);
@@ -4181,7 +4818,23 @@ export class ParticipantViewFacade {
       );
       const preserveCurrentTextDraft =
         this.shouldPreserveCurrentTextDraft(payload.currentRunState);
+      if (acceptedParticipantEvent && this.hasControllerError &&
+        (payload.currentRunState.testRun.status !== this.readCurrentRunState()?.testRun.status ||
+          payload.currentRunState.currentUnit.unitKey !== this.readCurrentRunState()?.currentUnit.unitKey)) {
+        // An accepted channel update can move the controller out of ERROR.
+        // Its already-open error dialog remains until the user reloads.
+        this.participantErrorReceptionSuspended = false;
+      }
       this.syncCurrentRunState(payload.currentRunState);
+      if (this.commandControllerState?.testRunId === testRunId &&
+        this.commandControllerState.status.startsWith("TERMINATED") &&
+        (readyRun.controllerEntry ? ["running", "paused"].includes(readyRun.status) && readyRun.controllerEntry.active &&
+          readyRun.controllerEntry.revision > (this.commandControllerState.entryRevision ?? 0) :
+          readyRun.status === "running" && payload.currentRunState.participantSession.status === "launched")) {
+        // This Run's newer entry proves reentry even when it remains paused.
+        // Legacy servers can only prove the former running/parent combination.
+        this.commandControllerState = { testRunId, status: readyRun.status.toUpperCase(), entryRevision: readyRun.controllerEntry?.revision };
+      }
       if (!preserveCurrentTextDraft) {
         this.syncCurrentUnitResponse(payload.currentRunState);
       }
@@ -4197,17 +4850,23 @@ export class ParticipantViewFacade {
       }
       if (payload.currentRunState.testRun.status === "completed") {
         this.participantEvents.stop();
+      } else if (this.hasControllerError || this.commandControllerState?.testRunId === testRunId &&
+        this.commandControllerState.status.startsWith("TERMINATED")) {
+        this.participantEvents.suspend();
       } else {
         this.participantEvents.start(
           payload.currentRunState.participantSession.participantSessionId,
           this.refreshFromParticipantEvents,
           null,
-          payload.currentRunState.testRun.testRunId
+          payload.currentRunState.testRun.testRunId,
+          this.receiveParticipantCommand
         );
       }
       this.persistState();
     } catch (error) {
-      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+      if (expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
+      if (refreshSequence < this.currentStateAppliedRefreshSequence ||
+        this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
       if (
@@ -4215,6 +4874,7 @@ export class ParticipantViewFacade {
         error.error === "participant_session_has_no_current_run"
       ) {
         this.participantEvents.stop();
+        this.consoleTestRun.set(null);
         this.currentRunState = null;
         this.syncParticipantHeaderVisibility();
         this.runtime.currentRunStateView = prettyPrintJson(
@@ -4224,8 +4884,47 @@ export class ParticipantViewFacade {
         this.persistState();
         return;
       }
+      if (this.requestState.isApiError(error) && [401, 403, 404].includes(error.statusCode ?? 0)) this.consoleTestRun.set(null);
+      if (!this.readCurrentRunState() && this.consoleRun) {
+        const run = this.consoleRun;
+        this.activeControllerError.set({ testRunId: run.testRunId, unitKey: run.currentUnitKey ?? "",
+          message: this.veronaErrorText, timestamp: Date.now() });
+        this.participantErrorReceptionSuspended = true;
+        this.participantEvents.suspend();
+      }
       throw error;
     }
+  }
+
+  private isOlderRunState(run: TestRun): boolean {
+    const current = this.consoleRun, entry = current?.controllerEntry;
+    return Boolean(current?.stateRevision !== undefined && (run.stateRevision === undefined || run.stateRevision < current.stateRevision) ||
+      entry && (!run.controllerEntry || run.controllerEntry.revision < entry.revision ||
+        run.controllerEntry.revision === entry.revision && run.controllerEntry.active !== entry.active));
+  }
+
+  private validateParticipantControllerContext(context: ParticipantControllerContext | null | undefined, sessionId: string, requestedRunId: string): TestRun {
+    const run = context?.testRun;
+    const entry = run?.controllerEntry;
+    if (run?.controllerDispatches !== undefined && !isParticipantControllerDispatches(run.controllerDispatches)) {
+      throw Object.assign(new Error("The controller dispatches are invalid."), { retryable: false });
+    }
+    if (run?.stateRevision !== undefined && (!Number.isSafeInteger(run.stateRevision) || run.stateRevision < 1)) {
+      throw Object.assign(new Error("The controller Run revision is invalid."), { retryable: false });
+    }
+    if (entry !== undefined && (!entry || typeof entry.active !== "boolean" || !Number.isSafeInteger(entry.revision) || entry.revision < 1)) {
+      throw Object.assign(new Error("The controller entry evidence is invalid."), { retryable: false });
+    }
+    if (!run ||
+        (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+          .some(key => typeof run[key] !== "string" || !run[key]) ||
+        !run.unitResponses || typeof run.unitResponses !== "object" || Array.isArray(run.unitResponses) ||
+        context?.participantSession?.participantSessionId !== sessionId || run.participantSessionId !== sessionId ||
+        run.tenantId !== context.participantSession.tenantId || run.workspaceId !== context.participantSession.workspaceId ||
+        requestedRunId && run.testRunId !== requestedRunId) {
+      throw Object.assign(new Error("The controller context does not belong to the selected participant Run."), { retryable: false });
+    }
+    return run;
   }
 
   private invalidateCurrentStateRefreshes(): void {
@@ -4360,6 +5059,12 @@ export class ParticipantViewFacade {
     > &
       Partial<ParticipantCurrentRunStateResponse["currentRunState"]["testRun"]>
   ): void {
+    if (testRun.participantSessionId === this.runtime.participantSessionId &&
+        testRun.tenantId && testRun.workspaceId && testRun.contentReleaseId && testRun.bookletKey && testRun.unitResponses) {
+      this.consoleTestRun.set(testRun as TestRun);
+    } else if (this.consoleRun?.testRunId === testRun.testRunId) {
+      this.consoleTestRun.set({ ...this.consoleRun, ...testRun });
+    }
     this.captureTimerLifecycleTransitions(testRun);
     if (this.currentRunState?.testRun.testRunId === testRun.testRunId) {
       this.currentRunState = {
@@ -4626,7 +5331,21 @@ export class ParticipantViewFacade {
     if (!saved) {
       return;
     }
-    if (currentState.testRun.unitResponses[saved.unitKey] === saved.response) {
+    // Only the actual packet in transit is protected. The drain also awaits a
+    // final status refresh; a retry during that refresh must restore new work.
+    if (
+      this.veronaSaveInFlight?.testRunId === saved.testRunId &&
+      this.veronaSaveInFlight.deliveryId === saved.deliveryId
+    ) {
+      return;
+    }
+    // An unchanged answer does not acknowledge the packet's new logs or status.
+    // Log-bearing packets need their own idempotent delivery acknowledgement.
+    if (
+      saved.logs.length === 0 &&
+      currentState.testRun.status === saved.status &&
+      currentState.testRun.unitResponses[saved.unitKey] === saved.response
+    ) {
       removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
       this.veronaSaveStatus = "saved";
       return;
@@ -4636,13 +5355,13 @@ export class ParticipantViewFacade {
       return;
     }
     this.pendingVeronaSave = saved;
-    this.optimisticVeronaResponse = {
+    if (!saved.logOnly) this.optimisticVeronaResponse = {
       testRunId: saved.testRunId,
       unitKey: saved.unitKey,
       response: saved.response
     };
     this.veronaSaveStatus = "queued_offline";
-    if (currentState.currentUnit.unitKey === saved.unitKey) {
+    if (!saved.logOnly && currentState.currentUnit.unitKey === saved.unitKey) {
       this.runtime.currentUnitResponse = saved.response;
     }
     if (
@@ -4671,7 +5390,8 @@ export class ParticipantViewFacade {
   private removeMatchingDeliveredOutbox(
     testRunId: string,
     unitKey: string | undefined,
-    unitResponse: string | null | undefined
+    unitResponse: string | null | undefined,
+    status: "running" | "paused"
   ): void {
     if (!unitKey || unitResponse == null) {
       return;
@@ -4680,7 +5400,9 @@ export class ParticipantViewFacade {
     if (
       saved &&
       saved.unitKey === unitKey &&
-      saved.response === unitResponse
+      saved.response === unitResponse &&
+      saved.status === status &&
+      saved.logs.length === 0
     ) {
       removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
     }
@@ -4820,7 +5542,7 @@ export class ParticipantViewFacade {
       return {
         label: "Ready to complete",
         detail: args.hasUnsavedResponse
-          ? "All units will be answered after Complete Test saves the current draft."
+          ? "All units will be answered after finishing saves the current draft."
           : "All units already have saved responses.",
         state: "ready"
       };
@@ -4829,7 +5551,7 @@ export class ParticipantViewFacade {
     return {
       label: `${missingUnitCount} ${missingUnitCount === 1 ? "response" : "responses"} missing`,
       detail: args.hasUnsavedResponse
-        ? `Complete Test will save this draft, but ${missingResponseLabel}.`
+        ? `Finishing will save this draft, but ${missingResponseLabel}.`
         : `${missingResponseLabel} before the test is fully answered.`,
       state: "incomplete"
     };
@@ -4863,7 +5585,7 @@ export class ParticipantViewFacade {
       return "This test is complete; responses are no longer editable.";
     }
     if (args.hasUnsavedResponse) {
-      return "Use save, navigation, or Complete Test to store this answer. Complete Test saves this draft before closing.";
+      return "Use save, navigation, or finish the test to store this answer. Finishing the test saves this draft before closing.";
     }
     if (args.savedUnitResponse.length > 0) {
       return "The answer shown here matches the saved response for this unit.";
@@ -4905,7 +5627,9 @@ export class ParticipantViewFacade {
     | ParticipantCurrentRunStateResponse["currentRunState"]
     | null {
     if (this.currentRunState) {
-      return this.currentRunState;
+      const run = this.currentRunState.testRun;
+      return run.participantSessionId === this.runtime.participantSessionId &&
+        run.testRunId === this.runtime.testRunId ? this.currentRunState : null;
     }
     try {
       const payload = JSON.parse(this.runtime.currentRunStateView) as Partial<
@@ -4913,7 +5637,7 @@ export class ParticipantViewFacade {
       >;
       this.currentRunState = payload.currentRunState ?? null;
       this.syncParticipantHeaderVisibility();
-      return this.currentRunState;
+      return this.currentRunState ? this.readCurrentRunState() : null;
     } catch {
       return null;
     }
