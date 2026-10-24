@@ -4,6 +4,7 @@ import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
+  prepareOriginalParticipantSession,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -398,6 +399,7 @@ const mapParticipantSession = (row: Row | undefined): ParticipantSession | null 
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
         ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
+        ...(row.original_name_suffix === null || row.original_name_suffix === undefined ? {} : {originalNameSuffix:String(row.original_name_suffix)}),
         participantCode:
           row.participant_code === null || row.participant_code === undefined
             ? null
@@ -1612,6 +1614,11 @@ const migrations: PostgresMigration[] = [
     ALTER TABLE participant_roster_entries ADD COLUMN original_login_identity BOOLEAN;
     CREATE INDEX IF NOT EXISTS participant_sessions_original_login
       ON participant_sessions(tenant_id, workspace_id, original_login_key);`
+  },
+  {
+    version: 63,
+    name: "original_person_name_suffix",
+    sql: `ALTER TABLE participant_sessions ADD COLUMN original_name_suffix TEXT;`
   }
 ];
 
@@ -3077,7 +3084,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getParticipantSessionById(participantSessionId) {
       return one(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
          FROM participant_sessions
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -3111,7 +3118,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
          FROM participant_sessions
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -3161,21 +3168,21 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async saveParticipantSession(participantSession) {
       const previous = mapParticipantSession((await pool.query("SELECT * FROM participant_sessions WHERE participant_session_id=$1",[participantSession.participantSessionId])).rows[0]);
+      if (previous?.originalLoginKey === undefined && participantSession.originalLoginKey === undefined) participantSession=prepareOriginalParticipantSession(participantSession,previous,null);
       const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
       const native = originalLoginKey !== undefined, client = native ? await pool.connect() : null;
       try {
         if (native) {
           await client!.query("BEGIN");
-          if (previous?.originalLoginKey && (previous.tenantId !== participantSession.tenantId || previous.workspaceId !== participantSession.workspaceId || previous.originalLoginKey !== (participantSession.originalLoginKey ?? originalLoginKey) || previous.loginKey !== participantSession.loginKey)) throw new TypeError('Native person cannot change its login identity.');
           const parent = await client!.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE",[participantSession.tenantId,participantSession.workspaceId]);
           const binding = (await client!.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[participantSession.tenantId,participantSession.workspaceId,originalLoginKey])).rows[0];
-          if (!parent.rowCount || !binding || participantSession.loginKey !== binding.login_key) throw new TypeError('Native person requires its current scoped login binding.');
-          participantSession = {...participantSession,originalLoginKey,groupKey:String(binding.group_key)};
+          participantSession = prepareOriginalParticipantSession(participantSession,previous,binding?mapOriginalLoginBinding(binding):undefined);
+          if (!parent.rowCount) throw new TypeError('Native person requires its current scoped login binding.');
         }
         await (client ?? pool).query(
         `INSERT INTO participant_sessions (
-          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT(participant_session_id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
@@ -3187,7 +3194,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           status = EXCLUDED.status,
           valid_until = EXCLUDED.valid_until,
           created_at = EXCLUDED.created_at,
-          original_login_key = EXCLUDED.original_login_key`,
+          original_login_key = EXCLUDED.original_login_key,
+          original_name_suffix = EXCLUDED.original_name_suffix`,
         [
           participantSession.participantSessionId,
           participantSession.tenantId,
@@ -3200,7 +3208,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantSession.status,
           participantSession.validUntil ?? null,
           participantSession.createdAt,
-          participantSession.originalLoginKey ?? null
+          participantSession.originalLoginKey ?? null,
+          participantSession.originalNameSuffix ?? null
         ]
       );
         if (native) await client!.query("COMMIT");

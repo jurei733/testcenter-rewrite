@@ -2,6 +2,7 @@ import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
+  prepareOriginalParticipantSession,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -748,11 +749,10 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const previous = state.participantSessions.get(participantSession.participantSessionId);
       const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
       if (originalLoginKey !== undefined) {
-        if (previous?.originalLoginKey && (previous.tenantId !== participantSession.tenantId || previous.workspaceId !== participantSession.workspaceId || previous.originalLoginKey !== (participantSession.originalLoginKey ?? originalLoginKey) || previous.loginKey !== participantSession.loginKey)) throw new TypeError('Native person cannot change its login identity.');
         const binding = Array.from(state.originalLoginBindings.values()).find(binding => binding.tenantId === participantSession.tenantId && binding.workspaceId === participantSession.workspaceId && binding.loginKey === originalLoginKey);
-        if (!binding || participantSession.loginKey !== binding.loginKey) throw new TypeError('Native person requires its current scoped login binding.');
-        participantSession = {...participantSession, originalLoginKey, groupKey: binding.groupKey};
-      }
+
+        participantSession = prepareOriginalParticipantSession(participantSession,previous,binding);
+      } else participantSession = prepareOriginalParticipantSession(participantSession,previous,null);
       state.participantSessions.set(participantSession.participantSessionId, structuredClone(participantSession));
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {

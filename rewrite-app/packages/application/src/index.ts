@@ -1,3 +1,5 @@
+import {createOriginalPersonNameSuffix} from './original-person-identity.js';
+export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix} from './original-person-identity.js';
 import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
 export { originalParticipantGroupKeysEqual, prepareOriginalParticipantGroup } from "./original-participant-group.js";
 export {prepareOriginalLoginBinding, type OriginalLoginBindingInput} from './original-login-binding.js';
@@ -32129,7 +32131,7 @@ export const createFirstSliceServices = (
         const matchesLogin = (session: ParticipantSession): boolean => nativeBinding
           ? session.originalLoginKey === nativeBinding.loginKey
           : session.loginKey === loginKey && session.originalLoginKey === undefined;
-        const participantCode = String(input.participantCode ?? "").trim();
+        const participantCode = nativeBinding ? String(input.participantCode ?? "") : String(input.participantCode ?? "").trim();
         const codeRequired = participantRosterRequiresCode(rosterEntry);
         if (codeRequired && !participantCode) {
           throw new FirstSliceError(
@@ -32146,8 +32148,9 @@ export const createFirstSliceServices = (
           ? getParticipantRosterBookletAssignments(rosterEntry)
               .flatMap(assignment => assignment.accessCodes ?? [])
               .find(code =>
-                normalizeParticipantCode(code) ===
-                  normalizeParticipantCode(participantCode)
+                nativeBinding
+                  ? code.replace(/[A-Z]/g,letter=>letter.toLowerCase()) === participantCode.replace(/[A-Z]/g,letter=>letter.toLowerCase())
+                  : normalizeParticipantCode(code) === normalizeParticipantCode(participantCode)
               )
           : undefined;
         if (codeRequired && matchedParticipantCode === undefined) {
@@ -32161,7 +32164,7 @@ export const createFirstSliceServices = (
             }
           );
         }
-        const effectiveParticipantCode = matchedParticipantCode ?? null;
+        const effectiveParticipantCode = matchedParticipantCode === undefined ? null : nativeBinding ? participantCode : matchedParticipantCode;
         const executionMode = resolveParticipantExecutionMode(
           rosterEntry?.executionMode
         );
@@ -32238,7 +32241,8 @@ export const createFirstSliceServices = (
           workspaceId: workspace.workspaceId,
           contentReleaseId: activeRelease.contentReleaseId,
           loginKey: nativeBinding?.loginKey ?? loginKey,
-          ...(nativeBinding ? {originalLoginKey:nativeBinding.loginKey} : {}),
+          ...(nativeBinding ? {originalLoginKey:nativeBinding.loginKey,
+            originalNameSuffix:createOriginalPersonNameSuffix(effectiveParticipantCode,executionMode.alwaysNewSession)} : {}),
           groupKey,
           participantCode: effectiveParticipantCode,
           executionMode: executionMode.mode,

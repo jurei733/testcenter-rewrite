@@ -12,6 +12,7 @@ import {productionApiRoutes,resolveRoutePath,parseVeronaUnitResponse} from '@tes
 import {localDemoSourcePackage} from '../apps/api/dist/apps/api/src/local-demo-bootstrap.js';
 import {createServerRequestFailureGate} from './server-request-failure-gate.mjs';
 import {createSmokeRouteFailureGate,describeSmokeRouteFailure} from './smoke-route-failure-gate.mjs';
+import {fetchHeldSmokeRoute} from './fetch-held-smoke-route.mjs';
 
 const root=resolve(process.env.UI_SMOKE_FRONTEND_ROOT||'.');
 await access(join(root,'dist/apps/web/browser/index.html'));
@@ -101,7 +102,7 @@ try{
     legacyPacket={testRunId:initial.testRunId,contentReleaseId:initial.contentReleaseId,bookletKey:initial.bookletKey,deliveryId:id,keyword:'goto',arguments:['id','first-unit','give 0'],controllerStatus:'RUNNING',timeStamp:Date.now()};
     holdLegacyRoute=async route=>{
      const packet=route.request().postDataJSON();assert.deepEqual(packet,legacyPacket);heldLegacy=true;await (scenario.appliedLegacy?applyGate:legacyGate);
-     const response=await route.fetch(),body=await response.json();legacyApplications.push(body);
+     const response=await fetchHeldSmokeRoute(route),body=await response.json();legacyApplications.push(body);
      if(scenario.appliedLegacy){
       if(scenario.lostLegacyReply&&legacyApplications.length===1){
        await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_legacy_reply'})});return;
@@ -148,26 +149,26 @@ try{
    const sibling={...structuredClone(initial),testRunId:crypto.randomUUID(),bookletKey:'second',bookletAssignmentKey:'second',currentUnitKey:'sibling-unit',testletTimers:{},unitResponses:{'sibling-unit':'Protected sibling'},unitResponseFieldTimestamps:{'sibling-unit':{opaque:99}}};await repository.saveTestRun(sibling);
    const siblingBefore=await repository.getTestRunById(sibling.testRunId);let parentBefore=await repository.getParticipantSessionById(initial.participantSessionId);
    await intercept('**/save-progress',async route=>{
-    const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);
+    const request=route.request().postDataJSON(),response=await fetchHeldSmokeRoute(route);assert.equal(response.status(),200);
     if(parseVeronaUnitResponse(request.unitResponse)?.unitState.dataParts?.answer==='Owned timer answer '+index){heldAnswer=true;await answerGate;}
     await route.fulfill({response});
    });
    await intercept('**/controller-timer-interruptions',async route=>{
-    const packet=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);const receipt=(await response.json()).interruption;
+    const packet=route.request().postDataJSON(),response=await fetchHeldSmokeRoute(route);assert.equal(response.status(),200);const receipt=(await response.json()).interruption;
     timerPackets.push({packet,receipt});
     if(loseReply){loseReply=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_timer_reply'})});}
     else await route.fulfill({response});
    });
    const captureApplication=async route=>{
     if(scenario.legacy&&route.request().postDataJSON().deliveryId===legacyPacket.deliveryId)return holdLegacyRoute(route);
-    heldApplication=true;await applicationGate;const response=await route.fetch();assert.equal(response.status(),200);applications.push(await response.json());await route.fulfill({response});
+    heldApplication=true;await applicationGate;const response=await fetchHeldSmokeRoute(route);assert.equal(response.status(),200);applications.push(await response.json());await route.fulfill({response});
    };
    await intercept('**/native-commands',captureApplication);await intercept('**/commands/*/application',captureApplication);
    await page.frameLocator('iframe').locator('#demoPlayerAnswer').fill('Owned timer answer '+index);
    await poll(()=>Promise.resolve(heldAnswer),'The timer fixture did not hold its committed Player answer');
    let before=await repository.getTestRunById(runId);
    if(scenario.appliedLegacy){
-    if(scenario.stale)await intercept('**/current-state**',async route=>{await freshStateGate;const response=await route.fetch();await route.fulfill({response});});
+    if(scenario.stale)await intercept('**/current-state**',async route=>{await freshStateGate;const response=await fetchHeldSmokeRoute(route);await route.fulfill({response});});
     await delay(scenario.legacyZero?Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)-650-Date.now()):333);
     releaseApply();await poll(()=>Promise.resolve(legacyApplications.length>=(scenario.lostLegacyReply?2:1)),'The old command did not commit before its held reply');
     before=await repository.getTestRunById(runId);parentBefore=await repository.getParticipantSessionById(initial.participantSessionId);
@@ -175,7 +176,7 @@ try{
     if(scenario.legacyZero)await delay(Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)+150-Date.now()));
    }
    if(scenario.zero&&scenario.origin==='remote'){
-    await intercept('**/commands/*/acknowledgement',async route=>{const response=await route.fetch();assert.equal(response.status(),200);heldAck=true;await ackGate;await route.fulfill({response});});
+    await intercept('**/commands/*/acknowledgement',async route=>{const response=await fetchHeldSmokeRoute(route);assert.equal(response.status(),200);heldAck=true;await ackGate;await route.fulfill({response});});
     await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator);await poll(()=>Promise.resolve(heldAck),'The zero-tick remote Pause did not reach its held ACK');
    }
    if(scenario.zero)await delay(Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)-950-Date.now()));

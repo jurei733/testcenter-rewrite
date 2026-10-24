@@ -315,7 +315,7 @@ if (kinds.includes("postgres")) {
       const before = await storage.repository.getTestRunById(run.testRunId);
       await storage.shutdown();
       storage = undefined;
-      await control.query(`DROP TABLE original_login_bindings; DROP TABLE original_participant_groups; DROP INDEX participant_sessions_original_login; ALTER TABLE participant_sessions DROP COLUMN original_login_key; ALTER TABLE participant_roster_entries DROP COLUMN original_login_identity; ALTER TABLE test_runs DROP COLUMN original_result_state_json; ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries;
+      await control.query(`DROP TABLE original_login_bindings; DROP TABLE original_participant_groups; DROP INDEX participant_sessions_original_login; ALTER TABLE participant_sessions DROP COLUMN original_name_suffix; ALTER TABLE participant_sessions DROP COLUMN original_login_key; ALTER TABLE participant_roster_entries DROP COLUMN original_login_identity; ALTER TABLE test_runs DROP COLUMN original_result_state_json; ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries;
         ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
         ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json;
         DROP TABLE participant_run_commands;
