@@ -1,0 +1,15 @@
+name: Service focus qualification
+on:
+  push:
+    branches: [codex/service-focus-native-binary-20261024]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [participant-auth, original-results, system-check-reports]
+    uses: ./.github/workflows/rewrite-service-focus.yml
+    with:
+      check: ${{ matrix.check }}
