@@ -388,6 +388,8 @@ export type ParticipantRosterEntry = {
   groupKey: string;
   /** Authored Original Testtakers Group/@label; the key remains the stable scope. */
   groupLabel?: string | null;
+  /** Server-recorded provenance; only validated Original Testtakers XML sets this. */
+  originalLoginIdentity?: true;
   bookletKey: string | null;
   bookletKeys?: string[];
   bookletStatePresets?: Record<string, Record<string, string>>;
@@ -1109,6 +1111,17 @@ export type OriginalParticipantGroup = {
   lastModifiedAt: string;
 };
 
+/** Mutable Source login_sessions association; separate from the frozen group label. */
+export type OriginalLoginBinding = {
+  tenantId: string;
+  workspaceId: string;
+  loginKey: string;
+  groupKey: string;
+  groupSnapshotKey: string;
+  createdAt: string;
+  lastAuthenticatedAt: string;
+};
+
 export type ParticipantSession = {
   participantSessionId: string;
   tenantId: string;
@@ -1116,6 +1129,8 @@ export type ParticipantSession = {
   contentReleaseId: string;
   loginKey: string;
   groupKey: string;
+  /** First captured native login identity; absent for canonical/unknown legacy sessions. */
+  originalLoginKey?: string;
   participantCode?: string | null;
   executionMode?: ParticipantExecutionMode;
   status: ParticipantSessionStatus;

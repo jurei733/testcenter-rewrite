@@ -1,6 +1,7 @@
 import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
+  prepareOriginalLoginBinding,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -37,6 +38,7 @@ import type {
   ParticipantRosterEntry,
   ParticipantSession,
   OriginalParticipantGroup,
+  OriginalLoginBinding,
   ParticipantTestLog,
   ParticipantRunCommand,
   ParticipantProgressDelivery,
@@ -71,6 +73,7 @@ type InMemoryFirstSliceState = {
   importJobs: Map<string, ImportJob>;
   contentReleases: Map<string, ContentRelease>;
   originalParticipantGroups: Map<string, OriginalParticipantGroup>;
+  originalLoginBindings: Map<string, OriginalLoginBinding>;
   participantSessions: Map<string, ParticipantSession>;
   participantAccessCredentials: Map<string, ParticipantAccessCredential>;
   participantRosterEntries: Map<string, ParticipantRosterEntry>;
@@ -107,6 +110,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   importJobs: new Map(),
   contentReleases: new Map(),
   originalParticipantGroups: new Map(),
+  originalLoginBindings: new Map(),
   participantSessions: new Map(),
   participantAccessCredentials: new Map(),
   participantRosterEntries: new Map(),
@@ -404,6 +408,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
       deleteMatching(state.participantRunCommands, workspaceMatches);
       deleteMatching(state.participantProgressDeliveries, workspaceMatches);
+      deleteMatching(state.originalLoginBindings, workspaceMatches);
       deleteMatching(state.originalParticipantGroups, workspaceMatches);
       for (const run of state.testRuns.values()) {
         if (workspaceMatches(run)) state.participantPresence.delete(run.testRunId);
@@ -724,11 +729,31 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
       return structuredClone(Array.from(state.originalParticipantGroups.values()).filter(group => group.tenantId === tenantId && group.workspaceId === workspaceId));
     },
+    async bindOriginalLoginGroup(input) {
+      const validated = prepareOriginalLoginBinding(input);
+      if (!Array.from(state.workspacesByScope.values()).some(workspace => workspace.tenantId === input.tenantId && workspace.workspaceId === input.workspaceId) ||
+          !Array.from(state.originalParticipantGroups.values()).some(group => group.tenantId === input.tenantId && group.workspaceId === input.workspaceId && group.groupKey === input.groupSnapshotKey)) return null;
+      const previous = Array.from(state.originalLoginBindings.values()).find(binding => binding.tenantId === input.tenantId && binding.workspaceId === input.workspaceId && originalParticipantGroupKeysEqual(binding.loginKey, validated.loginKey));
+      const binding = prepareOriginalLoginBinding(input, previous);
+      state.originalLoginBindings.set(JSON.stringify([binding.tenantId, binding.workspaceId, binding.loginKey]), binding);
+      for (const [id, session] of state.participantSessions) if (session.tenantId === binding.tenantId && session.workspaceId === binding.workspaceId && session.originalLoginKey === binding.loginKey) {
+        state.participantSessions.set(id, {...session, groupKey: binding.groupKey});
+      }
+      return structuredClone(binding);
+    },
+    async listOriginalLoginBindingsByWorkspace(tenantId, workspaceId) {
+      return structuredClone(Array.from(state.originalLoginBindings.values()).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
+    },
     async saveParticipantSession(participantSession) {
-      state.participantSessions.set(
-        participantSession.participantSessionId,
-        participantSession
-      );
+      const previous = state.participantSessions.get(participantSession.participantSessionId);
+      const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
+      if (originalLoginKey !== undefined) {
+        if (previous?.originalLoginKey && (previous.tenantId !== participantSession.tenantId || previous.workspaceId !== participantSession.workspaceId || previous.originalLoginKey !== (participantSession.originalLoginKey ?? originalLoginKey) || previous.loginKey !== participantSession.loginKey)) throw new TypeError('Native person cannot change its login identity.');
+        const binding = Array.from(state.originalLoginBindings.values()).find(binding => binding.tenantId === participantSession.tenantId && binding.workspaceId === participantSession.workspaceId && binding.loginKey === originalLoginKey);
+        if (!binding || participantSession.loginKey !== binding.loginKey) throw new TypeError('Native person requires its current scoped login binding.');
+        participantSession = {...participantSession, originalLoginKey, groupKey: binding.groupKey};
+      }
+      state.participantSessions.set(participantSession.participantSessionId, structuredClone(participantSession));
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return Array.from(state.participantRosterEntries.values()).filter(

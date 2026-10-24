@@ -1,5 +1,58 @@
 # Original participant group snapshots
 
+## Stable native people across current Login group changes (2026-10-24)
+
+[Unchanged production Source47 run 40041716400](https://github.com/jurei733/testcenter-rewrite/actions/runs/40041716400)
+proves that reentry after case-only group spelling changes and moves to another
+group retains the existing person and Test IDs while rotating the person bearer.
+Current result group spelling can differ from the frozen detailed-Test group
+spelling. A live Booklet replacement also preserves an existing Test's label.
+The complete 13 public files and exact run/script/source hashes are retained in
+[the native identity manifest](../test-fixtures/original-testcenter/source-workspace-results/native-identities/manifest.json).
+The initial token-equality assumption is recorded as a failed probe; the final
+probe requires distinct bearer tokens, equal Test IDs and current-token access.
+
+The Rewrite now records server-validated native XML provenance and a separate
+`OriginalLoginBinding`. A credential login updates its current group and frozen
+group-snapshot reference before the person-code step. All already linked people
+move in one store transaction; their Test runs, answers and clocks are untouched.
+Case-only changes retain the first snapshot key/label. A new group captures its
+own label. Reentry on the same active release/mode finds the existing person;
+the existing HTTP credential issuer then rotates that person's bearer and rejects
+the preceding token. Canonical JSON/CSV and unmarked historical people retain
+their prior contracts. A JSON provenance flag cannot opt into native identity.
+
+Memory uses one synchronous update, File publishes one queued replacement,
+SQLite uses `BEGIN IMMEDIATE`, and PostgreSQL locks the workspace in a transaction.
+Stale parent saves resolve the current binding and cannot detach its identity,
+change its login/scope, or restore the former group. Late SQL and file-publication
+failures preserve both binding and all people. Workspace cascade removes only
+its bindings; unrelated workspace people remain unchanged.
+
+SQLite migration **68** and PostgreSQL migration **62** add the binding table,
+nullable native person pointer and nullable roster provenance. Older file
+manifests default to no bindings. Upgrade controls retain unknown old people
+without inventing login history. Historical migration fixtures remove all later
+native structures before rewinding their version ledger; production migrations
+still reject inconsistent schemas rather than silently ignoring duplicate columns.
+
+The focused PostgreSQL command passes **191 checks in 6.40 seconds after core
+build**, including all four stores and protected HTTP token rotation. Full local
+unit/frontend qualification passes **3,981** checks and the complete PostgreSQL
+gate passes **2,121**, with no failures or skips. CI policy passes 266 checks
+with its one explicit GNU-timeout-only macOS skip. Core/web typechecking and
+production build pass; the initial bundle remains 468.39 kB under 470 kB. All
+owned schemas and sessions are gone before removing the owned database and
+stopping its initially stopped cluster. Hosted qualification for this new tree
+is recorded separately when terminal.
+
+This closes the demonstrated group-move prerequisite under one fixed active
+release/mode. The native two-step authentication protocol, changed-release/mode
+identity, monitor-first login, native Results/Tests DTOs and pages, deletion/grants,
+individual downloads and eight broad visual rows remain open. The retained Source
+Booklet-label observations are requirements for those pages, not implemented
+native listing parity. No complete Original-parity claim follows from green CI.
+
 ## Exact imported XML labels (2026-10-24)
 
 Native Testtakers XML now retains the parsed `Group/@label` string through the

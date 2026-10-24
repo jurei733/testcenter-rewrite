@@ -1,5 +1,34 @@
 # CI iteration and complete acceptance
 
+## Current green baseline and faster service iteration (2026-10-24)
+
+The published baseline `856dfd8d5d09dd659033938c3cb84599d37977d0`
+qualifies all **89/89** actual Linux jobs in
+[run 40040342490](https://github.com/jurei733/testcenter-rewrite/actions/runs/40040342490),
+including 3,945 unit/frontend checks, 2,073 PostgreSQL checks and the complete
+participant console. Its merge tree is exactly the published source tree. This
+supersedes the earlier pending qualification below, without changing the recorded
+failed predecessor. It does not qualify later changes or full Original parity.
+
+`ci:focus` now includes `original-results` and `system-check-reports`. Selecting
+only these service/store checks runs one core build and every existing leaf.
+A mixed/browser/unknown build consumer retains the complete production build;
+policy and no-emit typecheck still need none. A failed core build stops every
+selected test with its exact status. The complete workflow and all mandatory
+gates stay unchanged, and these regression cases remain in unit/PostgreSQL CI.
+
+A real `npm run ci:focus -- original-results` passes **148** local non-PostgreSQL
+checks: an incremental core build takes 0.33 seconds and the test command takes
+7.74 seconds on this machine. The full fresh production build observed during
+qualification takes 23.55 seconds for Angular alone; that work is unnecessary for
+this selected service suite. These are individual local observations under other
+concurrent tests, not a cold-build or hosted critical-path speed guarantee.
+The focused PostgreSQL variant passes **191** checks in 6.40 seconds after core
+build. Full local qualification passes **3,981 unit/frontend checks** and
+**2,121 PostgreSQL checks**, including every new regression. Native identity and
+rollback coverage is described in
+[the group lifecycle evidence](ORIGINAL-RESULT-GROUPS.md).
+
 ## Exact timer-preparation result clocks in the console gate (2026-10-24)
 
 Full [run 40037128795](https://github.com/jurei733/testcenter-rewrite/actions/runs/40037128795)
@@ -975,18 +1004,20 @@ it does not weaken the real installer bound or qualify that failed matrix.
 
 From `rewrite-app`, `npm run ci:focus -- --list` lists the actual Quick,
 extended-qualification and memory/SQLite workflow shards, plus `policy`,
-`typecheck` and `unit`. Select one or several, for example:
+`typecheck`, `unit`, `original-results` and `system-check-reports`. Select one or several, for example:
 
 ```sh
 npm run ci:focus -- --plan ui-participant-console original-login
 npm run ci:focus -- ui-participant-console original-login
 npm run ci:focus -- policy typecheck
+npm run ci:focus -- original-results
 ```
 
 The runner reads `.github/workflows/rewrite-app-ci.yml` on each invocation and
 keeps every command in the selected shard, including the second console
 compatibility check and the third front-camera attachment check. It performs
-one fresh production build before selected build-dependent checks; policy and
+one core build when only the explicitly listed service suites are selected, or
+one fresh production build for other build-dependent selections; policy and
 no-emit type checking need none. There is no stale-build bypass. A failing build
 or test stops the sequence and preserves its status. Per-command elapsed times
 are printed for actual local measurements. No arbitrary shell input is accepted;
@@ -998,7 +1029,7 @@ This is a focused local check, explicitly marked `completeAcceptance: false`.
 It does not replace PostgreSQL, Docker/Compose, unchanged-Original references,
 the remaining workflow shards or the full CI acceptance gate. Local platform and
 fixture environment still matter. Listing/planning launches no build or test
-and does not export inherited environment values. Nine controls cover complete
+and does not export inherited environment values. Eleven controls cover complete
 workflow enumeration, command ordering, one-build reuse, failure propagation,
 unknown selections, shell injection, secret-free planning and the exact failure
 status from an actual npm-child subprocess. A real focused invocation freshly

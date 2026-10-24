@@ -17,6 +17,7 @@ import { dirname, join } from "node:path";
 import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
+  prepareOriginalLoginBinding,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -56,6 +57,7 @@ import type {
   ParticipantRosterEntry,
   ParticipantSession,
   OriginalParticipantGroup,
+  OriginalLoginBinding,
   ParticipantTestLog,
   ParticipantRunCommand,
   ParticipantProgressDelivery,
@@ -89,6 +91,7 @@ type PersistedFirstSliceState = {
   importJobs: Record<string, ImportJob>;
   contentReleases: Record<string, ContentRelease>;
   originalParticipantGroups: Record<string, OriginalParticipantGroup>;
+  originalLoginBindings: Record<string, OriginalLoginBinding>;
   participantSessions: Record<string, ParticipantSession>;
   participantAccessCredentials: Record<string, ParticipantAccessCredential>;
   participantRosterEntries: Record<string, ParticipantRosterEntry>;
@@ -147,6 +150,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   importJobs: {},
   contentReleases: {},
   originalParticipantGroups: {},
+  originalLoginBindings: {},
   participantSessions: {},
   participantAccessCredentials: {},
   participantRosterEntries: {},
@@ -1158,6 +1162,7 @@ const createFileRepository = (
           value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
         deleteMatching(state.participantRunCommands, workspaceMatches);
       deleteMatching(state.participantProgressDeliveries, workspaceMatches);
+        deleteMatching(state.originalLoginBindings, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
           if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
@@ -1528,10 +1533,39 @@ const createFileRepository = (
       const state = await getState();
       return structuredClone(Object.values(state.originalParticipantGroups).filter(group => group.tenantId === tenantId && group.workspaceId === workspaceId));
     },
+    async bindOriginalLoginGroup(input) {
+      return enqueueMutation(async () => {
+        const state = await getState(), validated = prepareOriginalLoginBinding(input);
+        if (!Object.values(state.workspacesByScope).some(workspace => workspace.tenantId === input.tenantId && workspace.workspaceId === input.workspaceId) ||
+            !Object.values(state.originalParticipantGroups).some(group => group.tenantId === input.tenantId && group.workspaceId === input.workspaceId && group.groupKey === input.groupSnapshotKey)) return null;
+        const previous = Object.values(state.originalLoginBindings).find(binding => binding.tenantId === input.tenantId && binding.workspaceId === input.workspaceId && originalParticipantGroupKeysEqual(binding.loginKey, validated.loginKey));
+        const binding = prepareOriginalLoginBinding(input, previous);
+        const participantSessions = Object.fromEntries(Object.entries(state.participantSessions).map(([id, session]) => [id,
+          session.tenantId === binding.tenantId && session.workspaceId === binding.workspaceId && session.originalLoginKey === binding.loginKey ? {...session, groupKey: binding.groupKey} : session]));
+        const next = {...state, participantSessions, originalLoginBindings: {...state.originalLoginBindings,
+          [JSON.stringify([binding.tenantId,binding.workspaceId,binding.loginKey])]: binding}};
+        await persistState(next); cachePromise = Promise.resolve(next);
+        return structuredClone(binding);
+      });
+    },
+    async listOriginalLoginBindingsByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return structuredClone(Object.values(state.originalLoginBindings).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
+    },
     async saveParticipantSession(participantSession) {
-      await mutate(state => {
-        state.participantSessions[participantSession.participantSessionId] =
-          participantSession;
+      await enqueueMutation(async () => {
+        const state = await getState();
+        const previous = state.participantSessions[participantSession.participantSessionId];
+        const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
+        if (originalLoginKey !== undefined) {
+          if (previous?.originalLoginKey && (previous.tenantId !== participantSession.tenantId || previous.workspaceId !== participantSession.workspaceId || previous.originalLoginKey !== (participantSession.originalLoginKey ?? originalLoginKey) || previous.loginKey !== participantSession.loginKey)) throw new TypeError('Native person cannot change its login identity.');
+          const binding = Object.values(state.originalLoginBindings).find(binding => binding.tenantId === participantSession.tenantId && binding.workspaceId === participantSession.workspaceId && binding.loginKey === originalLoginKey);
+          if (!binding || participantSession.loginKey !== binding.loginKey) throw new TypeError('Native person requires its current scoped login binding.');
+          participantSession = {...participantSession,originalLoginKey,groupKey:binding.groupKey};
+        }
+        const next = {...state, participantSessions: {...state.participantSessions,
+          [participantSession.participantSessionId]: structuredClone(participantSession)}};
+        await persistState(next); cachePromise = Promise.resolve(next);
       });
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {

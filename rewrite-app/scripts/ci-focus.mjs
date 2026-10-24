@@ -7,6 +7,9 @@ import { parse } from 'yaml';
 
 const appRoot = fileURLToPath(new URL('../', import.meta.url));
 const readJson = path => JSON.parse(readFileSync(path, 'utf8'));
+// These service/store suites consume only TypeScript core output. Unknown or
+// mixed selections retain the complete production build by default.
+const coreOnlyScripts = new Set(['test:original-results:built', 'test:system-check-reports:built']);
 
 // Read the actual workflow on every invocation. No second scenario inventory or
 // arbitrary shell command can silently diverge from the complete CI gates.
@@ -22,7 +25,9 @@ export function focusChecks(workflow, scripts) {
     }
   }
   for (const [id, script, build] of [['policy', 'test:ci-policy', false],
-    ['typecheck', 'typecheck', false], ['unit', 'test:unit:built', true]]) {
+    ['typecheck', 'typecheck', false], ['unit', 'test:unit:built', true],
+    ['original-results', 'test:original-results:built', true],
+    ['system-check-reports', 'test:system-check-reports:built', true]]) {
     checks.push({ id, check: id, build, headed: false, browser: false,
       steps: parseFocusCommand(`npm run ${script}`, scripts) });
   }
@@ -56,13 +61,17 @@ export function planFocus(args, checks) {
     if (matches.length !== 1) throw Error(`Unknown or ambiguous CI check: ${name}. Use --list`);
     return matches[0];
   }).filter((check, index, all) => all.findIndex(item => item.id === check.id) === index);
+  const builtChecks = selected.filter(check => check.build);
+  const buildScript = !builtChecks.length ? null : builtChecks.every(check =>
+    !check.browser && check.steps.length > 0 && check.steps.every(step => coreOnlyScripts.has(step.script)))
+    ? 'build:core' : 'build';
   return { dryRun: options.includes('--plan'), completeAcceptance: false,
-    build: selected.some(check => check.build), checks: selected };
+    build: buildScript !== null, buildScript, checks: selected };
 }
 
 export function executeFocus(plan, run) {
   if (plan.build) {
-    const status = run({ script: 'build', env: {} }, { headed: false, browser: false });
+    const status = run({ script: plan.buildScript ?? 'build', env: {} }, { headed: false, browser: false });
     if (status !== 0) return status;
   }
   for (const check of plan.checks) {
