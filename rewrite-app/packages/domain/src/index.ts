@@ -955,6 +955,8 @@ export type ContentReleaseResourceEntry = {
 export type ContentReleaseBookletEntry = {
   bookletKey: string;
   displayLabel: string;
+  /** Raw physical XML label when canonical display normalization differs. */
+  originalBookletLabel?: string;
   customTexts?: Record<string, string>;
   policy?: BookletRuntimePolicy;
   rootRestrictions?: BookletRootRestrictions;
@@ -1157,9 +1159,12 @@ export type ParticipantProgressDelivery = {
   acceptedAt: string;
 };
 
-/** Original's opened-Test and Test-state evidence is independent of Run.updatedAt.
+/** Original's first Test identity and opened/state evidence are independent of Run.updatedAt.
  * Missing fields on legacy rows mean unknown; null is an observed absent write. */
 export type OriginalTestResultState = {
+  /** Native Test identity captured on creation, independent of later live-file edits. */
+  bookletName?: string;
+  bookletLabel?: string;
   lastOpenedAt?: string | null;
   lastTestStateAt?: string | null;
   /** Source tests.timestamp_server also advances on lock/open without nonempty state. */
