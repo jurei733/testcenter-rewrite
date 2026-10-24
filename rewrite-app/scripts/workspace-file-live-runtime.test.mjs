@@ -137,7 +137,14 @@ for(const kind of kinds)test(kind+': Source files become live without manual act
   delete canonical.runtimeSnapshot.workspaceFilePublication;
   await repository.saveContentRelease(canonical);
   await services.contentIntake.activateContentRelease({...scope,contentReleaseId:canonical.contentReleaseId});
-  const pinned=await services.participantRuntime.signIn({...scope,loginKey:'live-person'});
+  // An active release is not part of native person identity. Establish the
+  // separate canonical contract through an actual canonical roster account.
+  const nativeUnderCanonical=await services.participantRuntime.signIn({...scope,loginKey:'live-person'});
+  assert.equal(nativeUnderCanonical.participantSessionId,parent.participantSessionId);
+  assert.equal(nativeUnderCanonical.contentReleaseId,initialOrigin.contentReleaseId);
+  await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:JSON.stringify([{loginKey:'canonical-person',groupKey:'owned',booklets:[{id:'LIVE.A'}]}])});
+  const pinned=await services.participantRuntime.signIn({...scope,loginKey:'canonical-person'});
+  assert.equal(pinned.originalLoginKey,undefined);assert.equal(pinned.contentReleaseId,canonical.contentReleaseId);
   assert.notEqual(pinned.participantSessionId,parent.participantSessionId);
   const pinnedRun=await services.participantRuntime.launch({participantSessionId:pinned.participantSessionId,bookletKey:'LIVE.A'});
   await services.participantRuntime.saveProgress({testRunId:pinnedRun.testRunId,status:'paused',unitResponse:'Pinned canonical answer Ω'});

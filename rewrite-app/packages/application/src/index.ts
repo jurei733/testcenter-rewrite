@@ -1,5 +1,5 @@
-import {createOriginalPersonNameSuffix} from './original-person-identity.js';
-export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix} from './original-person-identity.js';
+import {createOriginalPersonNameSuffix,OriginalPersonIdentityConflictError} from './original-person-identity.js';
+export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix,resolveOriginalPerson,assertOriginalPersonUnique,projectOriginalPersonSessions,projectOriginalPersonRuns,OriginalPersonIdentityConflictError} from './original-person-identity.js';
 import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
 export { originalParticipantGroupKeysEqual, prepareOriginalParticipantGroup } from "./original-participant-group.js";
 export {prepareOriginalLoginBinding, type OriginalLoginBindingInput} from './original-login-binding.js';
@@ -1505,6 +1505,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     workspaceId: string
   ): Promise<ParticipantSession[]>;
   saveParticipantSession(participantSession: ParticipantSession): Promise<void>;
+  /** Atomic native Login/suffix lookup and creation; validate runs before any durable effect. */
+  resolveOriginalParticipantSession(candidate: ParticipantSession, validate?: (person: Readonly<ParticipantSession>) => void): Promise<import('./original-person-identity.js').OriginalPersonResolution | null>;
   /** First validated credential login wins; returns null if the workspace was deleted. */
   getOrCreateOriginalParticipantGroup(input: Omit<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup, "lastModifiedAt">): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup | null>;
   listOriginalParticipantGroupsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup[]>;
@@ -32169,7 +32171,7 @@ export const createFirstSliceServices = (
           rosterEntry?.executionMode
         );
 
-        const workspaceParticipantSessions =
+        const workspaceParticipantSessions = nativeBinding ? [] :
           await repository.listParticipantSessionsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
@@ -32182,14 +32184,14 @@ export const createFirstSliceServices = (
                 normalizeParticipantCode(effectiveParticipantCode)
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-        const accessStartedAt = loginSessions[0]?.createdAt ?? signInTimestamp;
+        const accessStartedAt = nativeBinding ? signInTimestamp : loginSessions[0]?.createdAt ?? signInTimestamp;
         const validUntil = resolveParticipantSessionValidUntil(
           rosterEntry,
           accessStartedAt
         );
         assertParticipantAccessWindow(rosterEntry, signInTimestamp, validUntil);
 
-        const reusableSession = executionMode.alwaysNewSession
+        const reusableSession = executionMode.alwaysNewSession || nativeBinding
           ? undefined
           : workspaceParticipantSessions
               .filter(
@@ -32235,7 +32237,7 @@ export const createFirstSliceServices = (
           return reusableSession;
         }
 
-        const participantSession: ParticipantSession = {
+        let participantSession: ParticipantSession = {
           participantSessionId: idGenerator(),
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
@@ -32250,21 +32252,33 @@ export const createFirstSliceServices = (
           validUntil,
           createdAt: signInTimestamp
         };
-        await repository.saveParticipantSession(participantSession);
+        let nativeReused=false;
+        if(nativeBinding){
+          try{
+            const resolved=await repository.resolveOriginalParticipantSession(participantSession,
+              person=>assertParticipantAccessWindow(rosterEntry,signInTimestamp,person.validUntil));
+            if(!resolved)throw new FirstSliceError(409,"participant_login_scope_changed","The native person workspace changed during authentication.");
+            participantSession=resolved.participantSession;nativeReused=!resolved.created;
+          }catch(error){
+            if(error instanceof OriginalPersonIdentityConflictError)throw new FirstSliceError(409,"original_person_identity_conflict",error.message);
+            throw error;
+          }
+        }else await repository.saveParticipantSession(participantSession);
         await recordWorkspaceActivity({
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
           eventType: "participant_signed_in",
           subjectType: "participant_session",
           subjectId: participantSession.participantSessionId,
-          summary: `Participant '${participantSession.loginKey}' signed in.`,
+          summary: nativeReused?`Participant '${participantSession.loginKey}' re-entered an existing session.`:`Participant '${participantSession.loginKey}' signed in.`,
           details: {
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey,
             contentReleaseId: participantSession.contentReleaseId,
             participantCodeRequired: codeRequired,
             executionMode: executionMode.mode,
-            rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry)
+            rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
+            ...(nativeReused?{reused:true}:{})
           }
         });
         await repository.resetParticipantLoginAttempts(

@@ -5,6 +5,9 @@ import {
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
   prepareOriginalParticipantSession,
+  resolveOriginalPerson,
+  assertOriginalPersonUnique,
+  projectOriginalPersonRuns,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -3150,7 +3153,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       const validated = prepareOriginalLoginBinding(input), client = await pool.connect();
       try {
         await client.query("BEGIN");
-        const parent = await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE",[input.tenantId,input.workspaceId]);
+        const parent = await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE",[input.tenantId,input.workspaceId]);
         const group = await client.query("SELECT group_key FROM original_participant_groups WHERE tenant_id=$1 AND workspace_id=$2 AND group_key=$3",[input.tenantId,input.workspaceId,input.groupSnapshotKey]);
         if (!parent.rowCount || !group.rowCount) { await client.query("ROLLBACK"); return null; }
         const bindings = (await client.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2",[input.tenantId,input.workspaceId])).rows.map(mapOriginalLoginBinding);
@@ -3166,18 +3169,40 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
       return (await pool.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY login_key",[tenantId,workspaceId])).rows.map(mapOriginalLoginBinding);
     },
+    async resolveOriginalParticipantSession(candidate,validate) {
+      const client=await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Fence deletion/other native writers, without blocking the KEY SHARE
+        // workspace reference held by an in-flight Run's activity insert.
+        const workspace=await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE",[candidate.tenantId,candidate.workspaceId]);
+        if(!workspace.rowCount){await client.query("ROLLBACK");return null;}
+        const binding=(await client.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null])).rows[0];
+        const people=(await client.query("SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3 ORDER BY participant_session_id FOR UPDATE",[candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null])).rows.map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+        const result=resolveOriginalPerson(candidate,binding?mapOriginalLoginBinding(binding):null,people,validate),person=result.participantSession;
+        const runs=(await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE`,[person.tenantId,person.workspaceId,person.originalLoginKey])).rows.map(mapTestRun).filter((run):run is TestRun=>run!==null);
+        projectOriginalPersonRuns(person,runs,people);
+        if(result.created)await client.query("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null]);
+        await client.query("UPDATE participant_sessions SET group_key=$1,execution_mode=$2 WHERE tenant_id=$3 AND workspace_id=$4 AND original_login_key=$5 AND (group_key IS DISTINCT FROM $1 OR execution_mode IS DISTINCT FROM $2)",[person.groupKey,person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey]);
+        await client.query("UPDATE test_runs SET execution_mode=$1 WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4) AND execution_mode IS DISTINCT FROM $1",[person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey]);
+        await client.query("COMMIT");return result;
+      }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+    },
     async saveParticipantSession(participantSession) {
-      const previous = mapParticipantSession((await pool.query("SELECT * FROM participant_sessions WHERE participant_session_id=$1",[participantSession.participantSessionId])).rows[0]);
+      let previous = mapParticipantSession((await pool.query("SELECT * FROM participant_sessions WHERE participant_session_id=$1",[participantSession.participantSessionId])).rows[0]);
       if (previous?.originalLoginKey === undefined && participantSession.originalLoginKey === undefined) participantSession=prepareOriginalParticipantSession(participantSession,previous,null);
       const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
       const native = originalLoginKey !== undefined, client = native ? await pool.connect() : null;
       try {
         if (native) {
           await client!.query("BEGIN");
-          const parent = await client!.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE",[participantSession.tenantId,participantSession.workspaceId]);
+          const parent = await client!.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE",[participantSession.tenantId,participantSession.workspaceId]);
+          previous=mapParticipantSession((await client!.query("SELECT * FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE",[participantSession.participantSessionId])).rows[0]);
           const binding = (await client!.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[participantSession.tenantId,participantSession.workspaceId,originalLoginKey])).rows[0];
           participantSession = prepareOriginalParticipantSession(participantSession,previous,binding?mapOriginalLoginBinding(binding):undefined);
           if (!parent.rowCount) throw new TypeError('Native person requires its current scoped login binding.');
+          const people=(await client!.query("SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3",[participantSession.tenantId,participantSession.workspaceId,originalLoginKey])).rows.map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+          assertOriginalPersonUnique(participantSession,people);
         }
         await (client ?? pool).query(
         `INSERT INTO participant_sessions (

@@ -3,6 +3,10 @@ import {
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
   prepareOriginalParticipantSession,
+  resolveOriginalPerson,
+  assertOriginalPersonUnique,
+  projectOriginalPersonRuns,
+  projectOriginalPersonSessions,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -745,6 +749,15 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async listOriginalLoginBindingsByWorkspace(tenantId, workspaceId) {
       return structuredClone(Array.from(state.originalLoginBindings.values()).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
     },
+    async resolveOriginalParticipantSession(candidate,validate) {
+      if(!Array.from(state.workspacesByScope.values()).some(workspace=>workspace.tenantId===candidate.tenantId && workspace.workspaceId===candidate.workspaceId))return null;
+      const binding=Array.from(state.originalLoginBindings.values()).find(binding=>binding.tenantId===candidate.tenantId && binding.workspaceId===candidate.workspaceId && binding.loginKey===candidate.originalLoginKey);
+      const storedPeople=Array.from(state.participantSessions.values()),result=resolveOriginalPerson(candidate,binding,storedPeople,validate);
+      const people=projectOriginalPersonSessions(result.participantSession,storedPeople),runs=projectOriginalPersonRuns(result.participantSession,Array.from(state.testRuns.values()),people);
+      for(const person of people)state.participantSessions.set(person.participantSessionId,person);
+      for(const run of runs)state.testRuns.set(run.testRunId,run);
+      return structuredClone(result);
+    },
     async saveParticipantSession(participantSession) {
       const previous = state.participantSessions.get(participantSession.participantSessionId);
       const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
@@ -753,6 +766,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
 
         participantSession = prepareOriginalParticipantSession(participantSession,previous,binding);
       } else participantSession = prepareOriginalParticipantSession(participantSession,previous,null);
+      assertOriginalPersonUnique(participantSession,Array.from(state.participantSessions.values()));
       state.participantSessions.set(participantSession.participantSessionId, structuredClone(participantSession));
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
