@@ -26821,7 +26821,11 @@ export const createFirstSliceServices = (
       locked: false,
       currentUnitKey: null,
       unitResponses: {},
-      originalResultState: {lastOpenedAt: null, lastTestStateAt: null, hasTestState: false},
+      originalResultState: {lastOpenedAt: null, lastTestStateAt: null, hasTestState: false,
+        ...(participantSession.originalLoginKey === undefined ? {} : {
+          bookletName: selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
+          bookletLabel: selectedBooklet.originalBookletLabel ?? selectedBooklet.displayLabel
+        })},
       unlockedTestletKeys: [],
       monitorNavigationUnlocked: false,
       testletTimers: {},

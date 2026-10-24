@@ -1,0 +1,40 @@
+[
+  {
+    "groupname": "ORACLE.REVIEWS",
+    "loginname": "owned-source-reviewer",
+    "code": "",
+    "bookletname": "ORACLE.BOOK.B",
+    "unitname": "ORACLE.UNIT2",
+    "priority": 2,
+    "category_accuracy": true,
+    "category_quality": true,
+    "reviewtime": "2026-10-24 03:04:45",
+    "page": 2,
+    "pagelabel": "Owned page",
+    "originalUnitId": "ORACLE.UNIT2",
+    "userAgent": "Owned Oracle browser",
+    "reviewer": "Owned Reviewer Ω",
+    "entry": "Owned Unit review Ω\n\"; exact",
+    "unitlabel": "Owned second unit",
+    "bookletlabel": "Owned booklet B"
+  },
+  {
+    "groupname": "ORACLE.REVIEWS",
+    "loginname": "owned-source-reviewer",
+    "code": "",
+    "bookletname": "ORACLE.BOOK.B",
+    "unitname": "",
+    "priority": 1,
+    "category_accuracy": true,
+    "category_quality": false,
+    "reviewtime": "2026-10-24 03:04:45",
+    "page": null,
+    "pagelabel": null,
+    "originalUnitId": "",
+    "userAgent": "Owned Oracle browser",
+    "reviewer": "Owned Reviewer Ω",
+    "entry": "Owned Booklet review Ω",
+    "unitlabel": "",
+    "bookletlabel": "Owned booklet B"
+  }
+]

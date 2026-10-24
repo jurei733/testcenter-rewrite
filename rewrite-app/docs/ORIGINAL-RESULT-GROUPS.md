@@ -1,5 +1,66 @@
 # Original participant group snapshots
 
+## First native Test Booklet identity survives live file edits (2026-10-24)
+
+The inherited Source47 production observation distinguishes an existing Test's
+`bookletName`/`bookletLabel` from a new Test created after replacing the live
+Booklet XML. The Rewrite now captures both strings at native Test creation in
+`originalResultState`, using the server-resolved assignment name and physical
+Booklet label. Native XML file projections retain a separate raw label when
+canonical display trimming/fallback would differ, including padding, newlines
+and the empty string. The unchanged Source `XMLFile::xmlGetNodeContentIfPresent`
+and `FileData::getLabel` preserve that node text. Existing canonical display
+normalization remains unchanged. Later opening, response writes and live-file
+replacement preserve the first Test identity. A later new person/Test captures the current label. This metadata belongs
+to the Test and is independent of current roster/group labels and current files.
+
+Only server-marked native people establish this snapshot. Canonical and unknown
+legacy Test metadata remain unchanged. Existing Tests without captured names or
+labels stay unknown after reopening; no current file is used to invent history.
+Atomic Run projections ignore attempts to replace a first identity, and invalid
+persisted partial/type metadata rejects a mutation before any partial effect.
+All four stores already persist the evidence JSON, so no new SQL migration is
+required. SQLite remains at 68 and PostgreSQL at 62.
+
+`original-test-identity.test.mjs` imports actual schema-validated Player, Unit,
+Booklet and Testtakers files through the normal live-content path. It replaces
+the same Booklet XML, reenters the same person, starts a new person/Test and
+compares both ordinary and raw labels against the complete SHA-bound
+[Source53 production receipt](../test-fixtures/original-testcenter/source-workspace-results/native-person-labels/manifest.json). It
+also covers exact saved answers, unchanged pre-reentry Test clocks, ignored
+caller/projection metadata, malformed-record rollback/recovery, durable reopening
+and unknown legacy history in Memory, File, SQLite and PostgreSQL. It runs in
+the required unit/PostgreSQL suites and core-only Original-results focus command.
+
+Final local qualification passes **4,007 unit/frontend checks** and **2,130 full
+PostgreSQL checks**, without failures/skips. The focused PostgreSQL command passes
+**200** checks; its observed 12.58 seconds runs concurrently with full suites and
+is not a cold-build or hosted speed claim. CI policy passes 266 checks with its
+one explicit GNU-timeout-only macOS skip. Core/web typechecking and production
+build pass; the initial bundle remains 468.39 kB under 470 kB. Owned test schemas
+and connections are absent before removing the owned database and stopping its
+initially stopped cluster. Hosted acceptance of this follow-up tree is separate
+from the still-running security-patch pipeline.
+
+
+[Unchanged production Source53 run 40047944217](https://github.com/jurei733/testcenter-rewrite/actions/runs/40047944217)
+passes all 47 previous HTTP controls plus six new controls. Independent verification
+checks the complete 13-member ZIP, 11,684 bytes, SHA256
+`0449871bacc0a28efe6600b466fe9832a9e59c0505212fe2ea2dde822b52ffac`.
+The new production observations confirm padded/newline and empty Booklet labels.
+They additionally prove first raw person-code spelling survives case-equivalent
+reentry, Login tokens remain stable while person tokens rotate, always-new people
+store plain or code-prefixed eight-character suffixes, and the person-code step
+can use an existing Login token after an intervening password reimport. Source
+is unchanged, TestMode stays false, and owned containers/volumes retire. Those
+person/code/token observations define the next Rewrite auth/identity work; this
+Booklet patch does not implement them.
+
+This implements the observed immutable Test-label prerequisite. Native detailed
+Test DTOs/pages, durable Original person suffixes and the remaining auth/deletion/
+export/grant/visual requirements below are still open; this is not a native
+listing or full Original-parity claim.
+
 ## Stable native people across current Login group changes (2026-10-24)
 
 [Unchanged production Source47 run 40041716400](https://github.com/jurei733/testcenter-rewrite/actions/runs/40041716400)
