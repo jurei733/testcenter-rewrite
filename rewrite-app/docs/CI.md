@@ -1,5 +1,27 @@
 # CI iteration and complete acceptance
 
+## Complete security-patch acceptance and first native Test labels (2026-10-24)
+
+[Run 40046280241](https://github.com/jurei733/testcenter-rewrite/actions/runs/40046280241)
+qualifies published security head `f0d653bc914d28c0d30625d49a1ba5c4e9feca1a`
+with **89/89 Linux jobs successful**, no skipped/cancelled/failed jobs. Its actual
+PR merge `2de353cb4d7dddf46a202e4e36a531996b6b6ccf` has the exact published tree
+`0d360189411ac648eb7122731fc8b1420a03b46a`. Actual job logs verify **3,981 unit/
+frontend checks**, **2,121 full PostgreSQL checks**, zero complete-lock audit
+findings and the successful complete console journey. Every other required
+browser/reference/runtime/integration group and final acceptance passes.
+
+The next native Test-label change uses that green tree as its base. Local
+implementation qualification passes **4,007 unit/frontend** and **2,130 full
+PostgreSQL** checks. Its focused command retains all cases in the mandatory
+suites and adds actual schema-validated live-file replacement controls. Complete
+Source53 production evidence now confirms ordinary, padded/newline and empty
+Booklet labels, while identifying further still-open person-code/suffix and
+two-step-login requirements. See [the exact scope and evidence](ORIGINAL-RESULT-GROUPS.md).
+The later receipt-only update passes the final 174-check non-PostgreSQL focus and
+nine direct PostgreSQL native-label checks. Hosted acceptance of this follow-up
+tree remains separate from the green security-patch run above.
+
 ## Current green baseline and faster service iteration (2026-10-24)
 
 The published baseline `856dfd8d5d09dd659033938c3cb84599d37977d0`
