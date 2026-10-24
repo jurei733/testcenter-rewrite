@@ -12,6 +12,42 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+test('manual service feedback retains full selected suites, a fresh core build and the full security gate',()=>{
+ const focused=parse(read('../../.github/workflows/rewrite-service-focus.yml'));
+ assert.deepEqual(Object.keys(focused.on).sort(),['workflow_call','workflow_dispatch']);
+ assert.deepEqual(focused.permissions,{contents:'read'});
+ assert.deepEqual(Object.keys(focused.jobs),['focused-service']);
+ const job=focused.jobs['focused-service'];
+ assert.equal(job['runs-on'],'ubuntu-24.04');assert.equal(job['timeout-minutes'],15);
+ assert.equal(job.env.FIRST_SLICE_STORE,'postgres');
+ assert.equal(job.env.FIRST_SLICE_POSTGRES_URL,workflow.jobs['verify-postgres'].env.FIRST_SLICE_POSTGRES_URL);
+ assert.deepEqual(job.services,workflow.jobs['verify-postgres'].services);
+ const checkout=job.steps.find(step=>step.uses?.startsWith('actions/checkout@'));
+ assert.equal(checkout.uses,`actions/checkout@${actionVersions.checkout.sha}`);
+ assert.equal(checkout.with['persist-credentials'],false);
+ const setup=job.steps.findIndex(step=>step.uses==='./.github/actions/rewrite-runtime');
+ assert.equal(job.steps[setup].with,undefined,'fresh checkout and locked installation; no output reuse');
+ const validate=job.steps.findIndex(step=>step.name==='Validate the selected service before installing dependencies');
+ assert.ok(validate<setup);
+ assert.equal(job.env.FOCUS_CHECK,'${{ inputs.check }}');
+ assert.equal(job.steps.at(-1).run,'npm run ci:focus -- "$FOCUS_CHECK"');
+ assert.equal(job.steps.at(-3).run,'npm audit --package-lock-only --include=dev --include=optional --audit-level=high');
+ assert.equal(job.steps.at(-2).run,'npm run test:ci-policy');
+ assert.ok(!job.steps.some(step=>step['continue-on-error']||/upload-artifact|download-artifact/.test(step.uses??'')));
+ assert.notEqual(job['continue-on-error'],true);
+ assert.match(focused.name,/not acceptance/);assert.match(job.name,/not complete acceptance/);
+});
+test('the actual service input validator rejects broader suites and shell payloads without evaluating or printing them',()=>{
+ const focused=parse(read('../../.github/workflows/rewrite-service-focus.yml'));
+ const command=focused.jobs['focused-service'].steps.find(step=>step.name==='Validate the selected service before installing dependencies').run;
+ const match=/^node -e '([^']+)'$/.exec(command);assert.ok(match);
+ const allowed=focused.on.workflow_dispatch.inputs.check.options;
+ assert.deepEqual(allowed,['participant-auth','original-results','system-check-reports']);
+ for(const check of [...allowed,'unit','original-login','--list','participant-auth original-results','participant-auth; echo owned','$(echo owned)','']){
+  const child=spawnSync(process.execPath,['-e',match[1]],{encoding:'utf8',env:{...process.env,FOCUS_CHECK:check}});
+  assert.equal(child.status,allowed.includes(check)?0:2,check);assert.equal(child.stdout,'');assert.equal(child.stderr,'');
+ }
+});
 test('dependency audit skips installation while preserving the complete locked graph and high-severity gate',()=>{
  const audit=workflow.jobs.dependencies;
  assert.ok(!audit.steps.some(step=>step.uses==='./.github/actions/rewrite-runtime'||/npm (?:ci|install|update)|audit fix|--force|--omit/.test(step.run??'')));
