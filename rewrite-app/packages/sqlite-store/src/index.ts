@@ -7,6 +7,9 @@ import {
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
   prepareOriginalParticipantSession,
+  resolveOriginalPerson,
+  assertOriginalPersonUnique,
+  projectOriginalPersonRuns,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -3322,17 +3325,36 @@ export const createSqliteFirstSliceStorage = (
     async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
       return database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? ORDER BY login_key").all(tenantId,workspaceId).map(mapOriginalLoginBinding);
     },
+    async resolveOriginalParticipantSession(candidate,validate) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const workspace=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(candidate.tenantId,candidate.workspaceId);
+        if(!workspace){database.exec("ROLLBACK");return null;}
+        const binding=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null);
+        const people=database.prepare("SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?").all(candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null).map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+        const result=resolveOriginalPerson(candidate,binding?mapOriginalLoginBinding(binding):null,people,validate),person=result.participantSession;
+        const runs=database.prepare("SELECT * FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)").all(person.tenantId,person.workspaceId,person.originalLoginKey!).map(mapTestRun).filter((run):run is TestRun=>run!==null);
+        projectOriginalPersonRuns(person,runs,people);
+        if(result.created)database.prepare("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").run(...[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null]);
+        database.prepare("UPDATE participant_sessions SET group_key=?,execution_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND (group_key IS NOT ? OR execution_mode IS NOT ?)").run(person.groupKey,person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.groupKey,person.executionMode??null);
+        database.prepare("UPDATE test_runs SET execution_mode=? WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT ?").run(person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.executionMode??null);
+        database.exec("COMMIT");return result;
+      }catch(error){return rollbackAfterFailure(database,error);}
+    },
     async saveParticipantSession(participantSession) {
-      const previous=mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id=?").get(participantSession.participantSessionId));
+      let previous=mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id=?").get(participantSession.participantSessionId));
       if (previous?.originalLoginKey === undefined && participantSession.originalLoginKey === undefined) participantSession=prepareOriginalParticipantSession(participantSession,previous,null);
       const originalLoginKey=previous?.originalLoginKey ?? participantSession.originalLoginKey, native=originalLoginKey!==undefined;
       if (native) database.exec("BEGIN IMMEDIATE");
       try {
         if (native) {
+          previous=mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id=?").get(participantSession.participantSessionId));
           const parent=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(participantSession.tenantId,participantSession.workspaceId);
           const binding=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(participantSession.tenantId,participantSession.workspaceId,originalLoginKey!);
           participantSession=prepareOriginalParticipantSession(participantSession,previous,binding?mapOriginalLoginBinding(binding):undefined);
           if (!parent) throw new TypeError('Native person requires its current scoped login binding.');
+          const people=database.prepare("SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?").all(participantSession.tenantId,participantSession.workspaceId,originalLoginKey!).map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+          assertOriginalPersonUnique(participantSession,people);
         }
         database
         .prepare(

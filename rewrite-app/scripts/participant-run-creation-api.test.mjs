@@ -120,6 +120,18 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       const canonical=await request('POST',routes.participant.signIn,{...canonicalInput,participantCode:'0'});
       assert.equal(canonical.participantSession.participantCode,'0');assert.equal(canonical.participantSession.originalNameSuffix,undefined);
     });
+    await t.test('native HTTP concurrent first credentials resolve one person and rotate only that identity',async()=>{
+      const doc=`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="HTTP.SUFFIX" label="Native suffix"><Login name="http-suffix-race" pw="Owned-suffix-secret" mode="run-hot-return"><Booklet codes="AbC">${bookletKey}</Booklet></Login></Group></Testtakers>`;
+      await request('POST',workspace+'/participant-roster',{rosterText:doc},operator,201);
+      const input={tenantKey,workspaceKey,loginKey:'http-suffix-race',password:'Owned-suffix-secret'};
+      const people=await Promise.all(Array.from({length:8},(_,index)=>request('POST',routes.participant.signIn,{...input,participantCode:index%2?'ABC':'abc'})));
+      assert.equal(new Set(people.map(row=>row.participantSession.participantSessionId)).size,1);
+      assert.equal(new Set(people.map(row=>row.sessionToken)).size,8);
+      for(const row of people)assert.equal(row.participantSession.participantCode,people[0].participantSession.participantCode);
+      const path=resolveRoutePath(routes.participant.getRuntimeState,{participantSessionId:people[0].participantSession.participantSessionId});
+      const statuses=await Promise.all(people.map(async row=>(await fetch(base+path,{headers:{authorization:'Bearer '+row.sessionToken}})).status));
+      assert.equal(statuses.filter(status=>status===200).length,1);assert.ok(statuses.every(status=>status===200||status===401));
+    });
     await t.test('native HTTP preserves first raw code and durable suffix while canonical code normalization remains separate',async()=>{
       const document=`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="HTTP.NATIVE.CODE" label="Native code"><Login name="http-native-coded" pw="Owned-native-code-secret" mode="run-hot-return"><Booklet codes="AbC">${bookletKey}</Booklet></Login><Login name="http-native-restart" pw="Owned-native-code-secret" mode="run-hot-restart"><Booklet codes="AbC">${bookletKey}</Booklet></Login></Group></Testtakers>`;
       await request('POST',workspace+'/participant-roster',{rosterText:document},operator,201);

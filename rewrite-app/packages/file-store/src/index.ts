@@ -19,6 +19,10 @@ import {
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
   prepareOriginalParticipantSession,
+  resolveOriginalPerson,
+  assertOriginalPersonUnique,
+  projectOriginalPersonRuns,
+  projectOriginalPersonSessions,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -1553,6 +1557,19 @@ const createFileRepository = (
       const state = await getState();
       return structuredClone(Object.values(state.originalLoginBindings).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
     },
+    async resolveOriginalParticipantSession(candidate,validate) {
+      return enqueueMutation(async()=>{
+        const state=await getState();
+        if(!Object.values(state.workspacesByScope).some(workspace=>workspace.tenantId===candidate.tenantId && workspace.workspaceId===candidate.workspaceId))return null;
+        const binding=Object.values(state.originalLoginBindings).find(binding=>binding.tenantId===candidate.tenantId && binding.workspaceId===candidate.workspaceId && binding.loginKey===candidate.originalLoginKey);
+        const storedPeople=Object.values(state.participantSessions),result=resolveOriginalPerson(candidate,binding,storedPeople,validate);
+        const people=projectOriginalPersonSessions(result.participantSession,storedPeople),storedRuns=Object.values(state.testRuns),runs=projectOriginalPersonRuns(result.participantSession,storedRuns,people);
+        if(!result.created && people.every((person,index)=>person===storedPeople[index]) && runs.every((run,index)=>run===storedRuns[index]))return structuredClone(result);
+        const next={...state,participantSessions:Object.fromEntries(people.map(person=>[person.participantSessionId,person])),
+          testRuns:Object.fromEntries(runs.map(run=>[run.testRunId,run]))};
+        await persistState(next);cachePromise=Promise.resolve(next);return structuredClone(result);
+      });
+    },
     async saveParticipantSession(participantSession) {
       await enqueueMutation(async () => {
         const state = await getState();
@@ -1563,6 +1580,7 @@ const createFileRepository = (
 
           participantSession = prepareOriginalParticipantSession(participantSession,previous,binding);
         } else participantSession = prepareOriginalParticipantSession(participantSession,previous,null);
+        assertOriginalPersonUnique(participantSession,Object.values(state.participantSessions));
         const next = {...state, participantSessions: {...state.participantSessions,
           [participantSession.participantSessionId]: structuredClone(participantSession)}};
         await persistState(next); cachePromise = Promise.resolve(next);

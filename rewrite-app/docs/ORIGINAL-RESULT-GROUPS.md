@@ -1,5 +1,68 @@
 # Original participant group snapshots
 
+## Atomic native person suffix identity (2026-10-24)
+
+The three controlled Source62 differences below now have matching Rewrite
+behavior. Known native people resolve by scoped Login and `german2_ci` suffix
+comparison, independently of the current normalized code, release, mode or
+parent status. Both-authored `Ä/ä`, composed/decomposed `é`, and mixed code `0`
+followed by uncoded reentry retain the first person, first raw stored code,
+suffix and existing Tests. ASCII-only code authorization stays separate from
+Unicode/canonical-composition identity comparison. No lowercase Unicode key is
+invented. Unknown old suffixes retain their preceding compatibility lookup and
+remain unknown; ambiguous known history fails rather than merging or deleting
+people. Ordinary parent saves cannot create a duplicate known native suffix.
+
+The new repository operation resolves/creates the person and projects the
+current Login mode to every linked native person/Test in one write. It preserves
+first codes/suffixes, answers, Test identities, timers, revisions and Original
+clocks; the mode is current authorization metadata, not a Test-state edit.
+Stale ordinary parent saves cannot restore a preceding mode. A real Source62
+return/restart/return cycle retains its first plain person, creates a distinct
+restart suffix, and restores the original person while updating the entire
+Login cohort's cached mode. Reusable people retain their first expiry; each
+always-new person receives a fresh relative window. A random suffix collision
+allocates a fresh suffix instead of aliasing the winning person.
+
+Memory commits synchronously, File uses its existing exclusive registered writer
+and mutation queue, SQLite uses `BEGIN IMMEDIATE`, and PostgreSQL locks the
+workspace, native parents and then Tests. PostgreSQL's workspace lock uses
+`FOR NO KEY UPDATE`: deletion and competing native writes stay fenced while a
+runtime activity insert may acquire its foreign-key `KEY SHARE`. An actual
+held-parent/blocked-resolver/activity-insert test proves that ordering without
+a deadlock. Validation receives a cloned readonly parent before any effect.
+Late new-person/cohort-mode/Test-write failures roll back all records together;
+durable reopening and a later successful login remain covered. No migration is
+needed (SQLite69/PostgreSQL63). Unchanged reentry avoids unnecessary File writes
+and unchanged SQL mode updates.
+
+Native users also keep their Source origin when a canonical release becomes
+active. Canonical pinning is tested with an actual JSON roster account, which
+remains separate from native identity; the former fixture incorrectly used a
+native account to establish a new canonical person. The corrected control keeps
+every pinned-answer/asset assertion and additionally proves native identity is
+independent of active release selection.
+
+The required existing native identity and HTTP suites cover both SQL clients,
+twelve concurrent sign-ins, first-code/suffix preservation, the entire Login
+cohort, one valid latest bearer after eight simultaneous HTTP sign-ins, collision
+recovery, first expiry, validation mutation/throw isolation and late publication
+failure. Targeted imports change only the relevant test Login instead of
+rehashing unrelated fixture passwords. The complete Source62 bytes stay unchanged.
+
+Local qualification passes **4,068 unit/frontend checks** and **2,210 complete
+PostgreSQL checks**, plus **233/280** focused non-PostgreSQL/PostgreSQL checks.
+The targeted fixture follow-up retains all **77** native controls across four
+stores. Core/web typechecking, production build (468.39 kB under 470 kB) and CI
+policy (267 passes/one explicit GNU-timeout-only macOS skip) pass. The exact
+hosted qualification of this follow-up remains separate from its green baseline.
+
+This closes the demonstrated suffix lookup/creation gaps. Full native two-stage
+Login-token authentication, all transitions of already-open controllers after
+roster edits, monitor-first lifecycle, Native Results/Tests DTOs/pages, deletion,
+grants, individual downloads and all eight broad visual rows remain open.
+Successful reentry's mode projection does not prove those remaining behaviors.
+
 ## Standalone zero code attribute and native suffix lookup evidence (2026-10-24)
 
 The [unchanged production Source62 run](https://github.com/jurei733/testcenter-rewrite/actions/runs/40052775596)
@@ -27,11 +90,9 @@ transition with stored code `0`, suffix `""` and HTTP201 reopening. When both
 Unicode codes are authored, `Ä/ä` and composed/decomposed `é` retain one first
 person/Test and first stored spelling. Code authorization still folds only
 ASCII; durable suffix lookup uses Source's German case/composition comparison.
-A controlled validated-XML Rewrite comparison creates two people in all three
-cases. Those suffix lookup/atomicity gaps remain open; fixture integrity alone
-does not implement them. The next person resolver must use the native suffix
-and scoped Login identity, with durable concurrency protection, rather than
-the current normalized-code/release/mode/status filters.
+At that checkpoint, a controlled validated-XML Rewrite comparison created two
+people in all three cases. The atomic resolver above now addresses those exact
+differences; Source fixture integrity alone was not implementation evidence.
 
 This parser correction needs no migration (SQLite69/PostgreSQL63). It does not
 close native two-step auth, Results/Tests pages or the eight broad visual rows.
@@ -62,9 +123,9 @@ The required unit, PostgreSQL and core-only Original-results suites cover real
 validated XML sign-in, protected HTTP/token rotation, exact raw code spelling,
 ASCII/whitespace authorization boundaries, fresh restart suffixes, rejected
 identity changes, durable failures and upgrades from the preceding schema.
-This closes the earlier controlled first-code gap below. The native two-stage
-Login-token protocol, atomic native person lookup/uniqueness and its behavior
-across release/mode/status changes remain open. Native Results/Tests DTOs and
+That patch closed the earlier controlled first-code gap below. Atomic native
+person lookup was still open then and is addressed above. The native two-stage
+Login-token protocol and complete lifecycle behavior remain open. Native Results/Tests DTOs and
 pages, grants, deletion, downloads and all eight broad visual rows also remain
 open. This is an identity-data prerequisite, not complete auth/listing parity.
 

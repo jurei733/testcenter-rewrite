@@ -1,5 +1,42 @@
 # CI iteration and complete acceptance
 
+## Complete zero-code baseline and atomic native person follow-up (2026-10-24)
+
+[Run 40054649901](https://github.com/jurei733/testcenter-rewrite/actions/runs/40054649901)
+qualifies published head `6af24f42f11dbca121bb8db156ae97ce5b422338` with
+**89/89 jobs successful**, no failures, skips or cancellations. Its actual merge
+`ead812d6cb583a03837e7148fd9291da26e68311` has exactly the published tree
+`1d64534afe71a44d95653909b7a7be96d390d9a5`. Actual logs verify **4,041 unit/
+frontend checks**, **2,173 PostgreSQL checks** and zero complete-lock audit
+findings with dev/optional dependencies included. The full PostgreSQL UI and
+all remaining required groups pass. The historical Linux navigation failure
+did not recur; a green rerun does not establish its root cause. Failure-only
+diagnostics remain available for any recurrence.
+
+The native suffix resolver builds on that green tree. Local implementation
+qualification passes **4,068 unit/frontend checks** and **2,210 complete
+PostgreSQL checks**, with no failures/skips. The focused SQL/native/HTTP/live-file
+controls pass 101 checks, including the real blocked-parent/FK lock sequence,
+late rollback and eight concurrent protected HTTP credentials resolving one
+person with one latest valid bearer. The later targeted-fixture-only follow-up
+passes all 77 native controls across four stores. CI policy passes 267 checks
+with its one explicit GNU-timeout-only macOS skip. Core/web typechecking and
+production build pass; initial entry remains 468.39 kB under 470 kB.
+
+The existing required suites retain every new regression. Mode/assignment edits
+in the fixture import only the changed Login, preserving assertions while
+avoiding rehashing unrelated test passwords. Native authentication no longer
+loads every workspace person for a service-layer scan: resolution reads its
+scoped Login under the durable writer lock. File no-op reentry and unchanged
+SQL mode projections avoid extra writes. These changes do not remove any
+mandatory acceptance gate. See [identity scope and remaining work](ORIGINAL-RESULT-GROUPS.md).
+
+The final real focus command passes **233 non-PostgreSQL checks in 10.81 seconds**
+after its incremental core build; the PostgreSQL focus passes **280 checks**.
+These are local observations under other qualification work, not hosted/cold-build
+speed promises. The complete suites retain all cases.
+
+
 ## PostgreSQL UI failure evidence without extra success captures (2026-10-24)
 
 [Run 40051919357](https://github.com/jurei733/testcenter-rewrite/actions/runs/40051919357)
