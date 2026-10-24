@@ -12,9 +12,9 @@ const request=async(method,path,{token,body,status=200,accept='application/json'
   ...(body===undefined?{}:{body:body instanceof FormData?body:JSON.stringify(body)}),signal:AbortSignal.timeout(20000)});
  const bytes=Buffer.from(await response.arrayBuffer());
  if(response.status!==status && method==='POST' && path.endsWith('/file'))console.error('owned_upload_diagnostic='+bytes.toString('utf8'));
- assert.equal(response.status,status,method+' '+path+' returned '+response.status);
+ if(Array.isArray(status))assert.ok(status.includes(response.status),method+' '+path+' returned '+response.status);else assert.equal(response.status,status,method+' '+path+' returned '+response.status);
  let value=null;if(bytes.length){const text=bytes.toString('utf8');try{value=JSON.parse(text);}catch{value=text;}}
- return {value,bytes,headers:response.headers};
+ return {value,bytes,headers:response.headers,status:response.status};
 };
 try{
  const deadline=Date.now()+90000;
@@ -451,11 +451,54 @@ try{
  const phaseRow=(await sessions()).find(row=>row.loginName===phaseName);assert.equal(phaseRow.code,'abc');assert.equal(phaseRow.nameSuffix,'abc');
  check('native person-code phase uses existing Login token after intervening password replacement',{loginTokenRetained:true,passwordUpdatedBetweenPhases:true,testId:phaseTest,testSession:phaseRow});
 
+
+ // Native person identity is independent of the current Login mode or token deletion.
+ const lifecycleName='owned-native-lifecycle',lifecycleFile='native-lifecycle.xml';
+ const lifecycleRoster=(mode='run-hot-return',code='AbC')=>groupRoster('ORACLE.PERSON-LIFECYCLE','Owned lifecycle',lifecycleName,code).replace('mode="run-hot-return"','mode="'+mode+'"');
+ await uploadGroups(lifecycleRoster(),lifecycleFile);
+ const lifecycleLogin=await groupLogin(lifecycleName);
+ const personFor=async(code,login=lifecycleLogin)=> (await request('PUT','/session/person',{token:login.token,body:{code}})).value;
+ const initialLifecyclePerson=await personFor('abc'),initialLifecycleTest=await openGroupTest(initialLifecyclePerson);
+ await stateful(initialLifecyclePerson,initialLifecycleTest);
+ await uploadGroups(lifecycleRoster('run-hot-restart'),lifecycleFile);
+ const restartLogin=await groupLogin(lifecycleName);assert.ok(restartLogin.token===lifecycleLogin.token);
+ const restartPerson=await personFor('abc',restartLogin),restartTest=await openGroupTest(restartPerson);await stateful(restartPerson,restartTest);
+ assert.notEqual(restartTest,initialLifecycleTest);
+ let lifecycleRows=(await sessions()).filter(row=>row.loginName===lifecycleName);assert.equal(lifecycleRows.length,2);
+ assert.ok(lifecycleRows.some(row=>row.nameSuffix==='abc'));assert.ok(lifecycleRows.some(row=>/^abc\/[a-z0-9_-]{8}$/.test(row.nameSuffix)));
+ check('native mode change to restart creates a new suffix while retaining the prior person Test',{firstMode:'run-hot-return',secondMode:'run-hot-restart',firstTestId:initialLifecycleTest,secondTestId:restartTest,testSessions:lifecycleRows,loginTokenRetained:true});
+ await uploadGroups(lifecycleRoster(),lifecycleFile);
+ const returnPerson=await personFor('ABC'),returnTest=await openGroupTest(returnPerson);assert.equal(returnTest,initialLifecycleTest);
+ check('native return mode reuses the first plain suffix instead of the latest restart person',{requestedCode:'ABC',testId:returnTest,originalTestId:initialLifecycleTest,testSessions:(await sessions()).filter(row=>row.loginName===lifecycleName)});
+ await request('DELETE','/session',{token:returnPerson.token,status:205});
+ await request('GET','/session',{token:returnPerson.token,status:403});
+ const afterLogout=await personFor('abc'),afterLogoutTest=await openGroupTest(afterLogout);assert.equal(afterLogoutTest,initialLifecycleTest);
+ assert.ok(afterLogout.token!==returnPerson.token);
+ check('native signout revokes only the person bearer and reentry retains its first Test',{signedOutTokenStatus:403,testId:afterLogoutTest,originalTestId:initialLifecycleTest,personTokenRotated:true});
+ await uploadGroups(lifecycleRoster('run-hot-return','DeF'),lifecycleFile);
+ await request('PUT','/session/person',{token:lifecycleLogin.token,body:{code:'abc'},status:400});
+ const changedAssignmentPerson=await personFor('def'),changedAssignmentTest=await openGroupTest(changedAssignmentPerson);await stateful(changedAssignmentPerson,changedAssignmentTest);
+ assert.notEqual(changedAssignmentTest,initialLifecycleTest);
+ const changedRows=(await sessions()).filter(row=>row.loginName===lifecycleName);assert.ok(changedRows.some(row=>row.code==='def'&&row.nameSuffix==='def'));
+ check('existing Login token checks current code assignments without credential reauthentication',{oldCodeStatus:400,newCode:'def',testId:changedAssignmentTest,testSessions:changedRows});
+ await uploadGroups(lifecycleRoster(),lifecycleFile);
+ const restoredPerson=await personFor('ABC'),restoredTest=await openGroupTest(restoredPerson);assert.equal(restoredTest,initialLifecycleTest);
+ check('restoring a code assignment reopens the original person Test after intervening assignments',{testId:restoredTest,originalTestId:initialLifecycleTest,testSessions:(await sessions()).filter(row=>row.loginName===lifecycleName)});
+ const zeroName='owned-native-zero-code',zeroFile='native-zero-code.xml';
+ const zeroRoster=code=>groupRoster('ORACLE.ZERO-CODE','Owned zero code',zeroName,code);
+ await uploadGroups(zeroRoster('0'),zeroFile);const zeroLogin=await groupLogin(zeroName);
+ const zeroPerson=(await request('PUT','/session/person',{token:zeroLogin.token,body:{code:'0'}})).value,zeroTest=await openGroupTest(zeroPerson);await stateful(zeroPerson,zeroTest);
+ await uploadGroups(zeroRoster(''),zeroFile);const noCodePerson=await groupLogin(zeroName);
+ const noCodeTestReply=await request('PUT','/test',{token:noCodePerson.token,body:{bookletName:'ORACLE.BOOK.A'},status:[201,400,403]});
+ const noCodeTest=noCodeTestReply.status===201?Number(noCodeTestReply.value):null;if(noCodeTest!==null)assert.equal(noCodeTest,zeroTest);
+ const zeroRows=(await sessions()).filter(row=>row.loginName===zeroName);assert.equal(zeroRows.length,1);assert.equal(zeroRows[0].code,'0');assert.equal(zeroRows[0].nameSuffix,'');
+ check('native zero-code to no-code transition records empty suffix reuse and subsequent Test access',{firstCode:'0',laterCode:'',testOpenStatus:noCodeTestReply.status,testId:noCodeTest,originalTestId:zeroTest,testSessions:zeroRows});
+
  }
  await request('PATCH','/user/'+users.RO.id+'/workspaces',{token,body:{ws:[{id:ownedId,role:''}]}});
  await request('GET',overview,{token:ro,status:404});
  check('revocation is enforced against the existing signed-in token');
- assert.equal(receipt.checks.length,53);
+ assert.equal(receipt.checks.length,59);
  receipt.success=true;
 }finally{
  const directory=process.env.SOURCE_ORACLE_ARTIFACT_DIR;assert.ok(directory);await mkdir(directory,{recursive:true});
