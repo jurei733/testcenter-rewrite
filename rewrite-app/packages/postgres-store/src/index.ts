@@ -3156,8 +3156,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         const parent = await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE",[input.tenantId,input.workspaceId]);
         const group = await client.query("SELECT group_key FROM original_participant_groups WHERE tenant_id=$1 AND workspace_id=$2 AND group_key=$3",[input.tenantId,input.workspaceId,input.groupSnapshotKey]);
         if (!parent.rowCount || !group.rowCount) { await client.query("ROLLBACK"); return null; }
-        const bindings = (await client.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2",[input.tenantId,input.workspaceId])).rows.map(mapOriginalLoginBinding);
-        const binding = prepareOriginalLoginBinding(input,bindings.find(row=>originalParticipantGroupKeysEqual(row.loginKey,validated.loginKey)));
+        const previous = (await client.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[input.tenantId,input.workspaceId,validated.loginKey])).rows[0];
+        const binding = prepareOriginalLoginBinding(input,previous?mapOriginalLoginBinding(previous):undefined);
         await client.query(`INSERT INTO original_login_bindings (tenant_id,workspace_id,login_key,group_key,group_snapshot_key,created_at,last_authenticated_at)
           VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (tenant_id,workspace_id,login_key) DO UPDATE SET
           group_key=EXCLUDED.group_key,group_snapshot_key=EXCLUDED.group_snapshot_key,last_authenticated_at=EXCLUDED.last_authenticated_at`,

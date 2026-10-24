@@ -1,5 +1,40 @@
 # CI iteration and complete acceptance
 
+## Native Login isolation qualification after focused pipeline adoption (2026-10-24)
+
+The focused service runner catches the next real Original discrepancy: exact
+native Login names were being folded like group names. The correction and its
+actual Source21 evidence are described in
+[the native identity scope](ORIGINAL-RESULT-GROUPS.md). Existing mandatory suites
+now include six independently authenticated case/composition peers, concurrent
+first entry, preserved private Test data and 30 denied protected peer reads,
+plus complete integrity checks for all four Source21 artifact members. No
+required suite or acceptance job is removed.
+
+The final complete local unit/frontend command passes **4,073 checks**
+(121 + 325 + 1,577 + 2,050), with no failures/skips. The final real
+`ci:focus -- participant-auth` passes **166 non-PostgreSQL checks**; selected
+tests take **10.57 seconds** after its incremental core build. These are local
+observations, not hosted or cold-build speed promises. Full hosted acceptance
+of the final follow-up remains required.
+
+The complete local PostgreSQL command also passes **2,216 checks**, with no
+failures/skips, and the PostgreSQL authentication focus passes **211**. All
+test schemas and other connections are absent before dropping the owned
+database and stopping its initially stopped cluster. Core typechecking/build,
+CI policy (271 passes/one explicit GNU-timeout-only macOS skip), Actionlint
+and diff checks pass. No new Angular build is needed for these core-only
+changes; complete hosted acceptance still performs its fresh shared production
+build and every mandatory browser gate.
+
+The predecessor [run 40060887122](https://github.com/jurei733/testcenter-rewrite/actions/runs/40060887122)
+is now terminal: **87 successful jobs**, the one starter-prefix browser failure
+below and failed final acceptance. No jobs are cancelled or skipped. Its
+successful complete PostgreSQL UI and remaining useful jobs finish normally.
+The focused pipeline and native-isolation follow-up can therefore be published
+without discarding useful running qualification. The historical failure stays
+visible; the follow-up's evidence retention does not claim its root cause fixed.
+
 ## Standalone Linux service feedback with complete security checks (2026-10-24)
 
 `.github/workflows/rewrite-service-focus.yml` provides a separate manual/reusable

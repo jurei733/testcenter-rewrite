@@ -1,5 +1,87 @@
 # Original participant group snapshots
 
+## Exact native Login principals and live-mode reference (2026-10-24)
+
+The focused [unchanged production Source21 run](https://github.com/jurei733/testcenter-rewrite/actions/runs/40063392830)
+proves that `logins.name` and `login_sessions.name` compare **exactly**, unlike
+German-collated group names and person suffixes. Six authored native names that
+differ in ASCII case, Unicode case or NFC/NFD composition authenticate with
+their own passwords, obtain six distinct Login/person identities and six
+separate Tests for the same code. A case alias that is not authored fails.
+Every peer is denied another Login's Test. This agrees with the pinned database
+schema's explicit binary-name contract; Unicode folding is not Login identity.
+
+A controlled Rewrite regression reproduced a real discrepancy: independently
+imported/authenticated names collapsed to three people rather than six in
+Memory, File and SQLite. A combined validated XML import was also incorrectly
+rejected by a generic case-folded duplicate guard. Both paths now preserve
+exact native names. Native-to-native duplicate checks use exact identity;
+canonical JSON/CSV and mixed canonical/native batches retain their preceding
+case-folded collision protection. The same validated native provenance applies
+to participant and operational Login candidates. Exact duplicates still fail
+before any roster mutation.
+
+All four stores now resolve the scoped binding by its exact Login key, with
+direct keyed Memory/File reads and primary-key SQL reads under the existing
+writer/transaction locks. The immutable binding guard rejects case/composition
+renames. Group and person-suffix German comparison stays unchanged. No migration,
+dependency change, inferred ownership backfill or historical Test reassignment
+is introduced (SQLite69/PostgreSQL63).
+
+The required native and protected HTTP suites exercise all six names, concurrent
+first entry, independent passwords/people/Tests/answers, durable reopening,
+exact-name group moves, rejected renames and unchanged canonical collision
+rules. Thirty peer credential/current-state combinations return HTTP401.
+Reentry rotates only the correct person's bearer, preserves its first code,
+suffix and private answer, and leaves every other person's bearer/data usable.
+Complete persisted JSON records, including Original clocks/revisions, remain
+equal across reentry and exact-name moves.
+
+Final local qualification passes **4,073 unit/frontend** and **2,216 complete
+PostgreSQL** checks without failures/skips. The authentication focus passes
+**166/211** non-PostgreSQL/PostgreSQL checks. CI policy passes 271, with its
+explicit GNU-timeout-only macOS skip; core typechecking/build and Actionlint
+pass. Exact full hosted acceptance of this follow-up remains required.
+
+[The complete public Source21 receipt](../test-fixtures/original-testcenter/source-workspace-results/native-login-protocol/manifest.json)
+binds 21 groups and 83 actual HTTP observations to immutable head
+`0a81b3bf5e8cbe6a112c7d7092e1c5d4b488ce03`, job `120781481935`, four artifact
+members, 7,228 ZIP bytes and SHA256
+`8e4a14425ced1657e2c5076010ea1cf636ae50f049ce1dd1f3245fad332a0cce`.
+Eleven Source file hashes match unchanged `eedae41840cbe90e5547c0211da818bdf620f5aa`.
+All setup uses granted admin HTTP and real XSD validation; TestMode is false.
+The actual owned containers/volumes retire. Response tokens are replaced with
+consistent aliases and known tokens are removed from errors; request passwords
+and bearer headers are never recorded. Structure and relationships remain
+visible alongside original wire hashes; generated secret-byte equality is not
+claimed. This focused probe does not rerun or replace the earlier Source62.
+
+Its predecessor `40063083871` completed 20 groups, then incorrectly expected a
+replacement Test without state to appear in the stateful detailed listing.
+The corrected fixture saves that Test's state through actual HTTP PATCH before
+the unchanged seven-row assertion. No Source code or endpoint behavior changes;
+the failed run/artifact remain recorded in the manifest.
+
+Source21 also establishes still-open protocol requirements: coded credentials
+return a stable Login AccessSet without person/Test claims; existing Login
+tokens survive password replacement and use current assignments; Login logout
+is a no-op; person logout rotates only its bearer on reentry while retaining
+its Test. Removing a Login makes its tokens return 410 while peers remain
+valid; restoring the exact unexpired Login makes its retained tokens readable.
+These are Source observations, not implementation claims for the Rewrite's
+current scoped sign-in RPC.
+
+An already-open Source person additionally observes `run-hot-return` →
+`run-review` → `run-hot-return` immediately through GET session/Test, without
+reentry or bearer rotation and without changing saved Test state. A controlled
+validated-XML Rewrite comparison still returns `run-hot-return` for its person,
+Test and runtime after importing `run-review`; the same bearer remains valid.
+This is now an observed remaining difference. Reentry-only mode projection
+does not close it. Full native two-stage AuthToken/AccessSet behavior, global
+cross-workspace name-conflict policy, Results/Tests DTOs/pages, monitor-first
+lifecycle, grants, deletion, downloads and all eight broad visual rows remain
+open. The exact-name correction is a prerequisite for those flows.
+
 ## Atomic native person suffix identity (2026-10-24)
 
 The three controlled Source62 differences below now have matching Rewrite

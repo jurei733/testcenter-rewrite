@@ -1,0 +1,54 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "testMode": false,
+  "transport": "unchanged production Apache HTTP; real XSD validation; no SQL seeds",
+  "runId": 40063392830,
+  "jobId": 120781481935,
+  "branch": "codex/source-native-login-protocol-20261024",
+  "head": "0a81b3bf5e8cbe6a112c7d7092e1c5d4b488ce03",
+  "tree": "2557275d2b0f2761847e03a9efdf5d9c7df21235",
+  "artifact": {
+    "id": 12548058821,
+    "bytes": 7228,
+    "sha256": "8e4a14425ced1657e2c5076010ea1cf636ae50f049ce1dd1f3245fad332a0cce"
+  },
+  "files": {
+    "receipt.json": "059ae3edd731fc46179b4dde6ba06a9bfc4189d3dcef497bba7280157d93ebc1",
+    "http-observations.json": "2ab54a76545961ec584b4545df3039ddee420e63afa9ee0d15748985c5fb86f9",
+    "image-id.txt": "04467151bac48ebfb434200a2bcdccc3634142a0128214eaf8573c8ee1a5e6b7",
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc"
+  },
+  "probeFiles": {
+    ".github/probes/source-native-login-protocol-oracle.mjs": "302d7605774c4754e1a697a66c6e04d9650b4a58df822d4aa4e0e3a9f41c5071",
+    ".github/workflows/source-native-login-protocol.yml": "09944d93da24e8b9268d6d15da83e95dda84d1882b233265fb4214832f4b67f7",
+    ".github/probes/source-workspace-oracle.compose.yml": "0808c7690308371e619ce1d42584f23888a9c32443304a798afec6c0df42528d"
+  },
+  "redaction": "Response token/groupToken values are replaced with stable aliases; known tokens in error strings are replaced too. Request passwords and bearer headers are never recorded. Per-response original wire SHA256 is retained. This proves public structure and relationships, not equality of generated secret bytes.",
+  "checks": 21,
+  "httpObservations": 83,
+  "sourceFiles": {
+    "scripts/database/full.sql": "9ac4b941ba40d75a563cbe4fb9d55075f27e46894902eb50100eb7263594ed08",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/data-collection/AccessSet.class.php": "e76d5c03c642a8d178c583766ffc66b27355c3606bb34add287e55ccb6cdca6c",
+    "backend/src/files/XMLFileTesttakers.class.php": "20bd5e27314507982ba81f9f947b488ab86655290d8bf714c6ab7a9f8ba221f7",
+    "backend/src/helper/Token.class.php": "d57516492d6f68fecfb070d3a9fd81edb245bd7c365c389c419504bcbaa87cf9",
+    "backend/src/helper/CacheService.class.php": "0b793acfe34a6bdb20729e2c76dc95c186103553406aba3f9ec29aaa06a0cdbd",
+    "backend/src/helper/DBSchema.class.php": "d4da64210ef5358a893a065893d719e2ff00d4ede2446e6a73e054206999b45e",
+    "backend/src/workspace/Workspace.class.php": "5866681acead26a9dc570e0fd50a32a963e6e8f1b4098b98f3803d3d5a378ac0"
+  },
+  "failedPredecessor": {
+    "runId": 40063083871,
+    "jobId": 120780566033,
+    "head": "ddc6adbd3928142fd2f984ae44c8dc4f73a8e1d0",
+    "completedGroups": 20,
+    "failure": "Final detailed-list assertion expected seven stateful Tests; replacement Test had not received Test state and correctly remained outside that native listing. Follow-up saves its state through real PATCH /test/id/state; Source code, API behavior and final seven-row assertion stay unchanged.",
+    "artifact": {
+      "id": 12548241704,
+      "bytes": 7004,
+      "sha256": "854b3ad3c6020aac294616776ce00ecd25e742e949373bd512bf93634402e9f1"
+    }
+  }
+}

@@ -149,6 +149,37 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       assert.notEqual(restarted[0].participantSession.originalNameSuffix,restarted[1].participantSession.originalNameSuffix);
       for(const entry of restarted)assert.match(entry.participantSession.originalNameSuffix,/^abc\/[a-z0-9_-]{8}$/);
     });
+    await t.test('protected HTTP keeps binary native Login peers, credentials and private answers isolated',async()=>{
+      const names=['http-binary-login','HTTP-binary-login','http-Ä-login','http-ä-login','http-é-login','http-e\u0301-login'];
+      const password=index=>'Owned-HTTP-binary-'+index+'-secret';
+      const document=`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="HTTP.BINARY.LOGINS" label="Owned HTTP binary logins">${names.map((name,index)=>`<Login name="${name}" pw="${password(index)}" mode="run-hot-return"><Booklet codes="Shared">${bookletKey}</Booklet></Login>`).join('')}</Group></Testtakers>`;
+      await request('POST',workspace+'/participant-roster',{rosterText:document},operator,201);
+      const signIn=(index,code='Shared')=>request('POST',routes.participant.signIn,{tenantKey,workspaceKey,loginKey:names[index],password:password(index),participantCode:code});
+      const identities=await Promise.all(names.map((_,index)=>signIn(index)));
+      assert.equal(new Set(identities.map(identity=>identity.participantSession.participantSessionId)).size,names.length);
+      const currentPath=identity=>resolveRoutePath(routes.participant.getCurrentRunState,{participantSessionId:identity.participantSession.participantSessionId});
+      const tests=[],answers=names.map(name=>'Private native answer '+name);
+      for(let index=0;index<names.length;index++){
+        assert.equal(identities[index].participantSession.originalLoginKey,names[index]);
+        const run=(await resume(identities[index])).testRun;tests.push(run);
+        await request('POST',resolveRoutePath(routes.participant.saveProgress,{testRunId:run.testRunId}),{
+          deliveryId:randomUUID(),status:'running',responseOnly:true,responseUnitKey:run.currentUnitKey,unitResponse:answers[index],responseTimestamp:Date.now()
+        },identities[index].sessionToken);
+      }
+      assert.equal(new Set(tests.map(run=>run.testRunId)).size,names.length);
+      for(let owner=0;owner<names.length;owner++){
+        const state=(await request('GET',currentPath(identities[owner]),undefined,identities[owner].sessionToken)).currentRunState;
+        assert.equal(state.testRun.testRunId,tests[owner].testRunId);assert.equal(state.testRun.unitResponses[tests[owner].currentUnitKey],answers[owner]);
+        for(let peer=0;peer<names.length;peer++)if(peer!==owner)await request('GET',currentPath(identities[owner]),undefined,identities[peer].sessionToken,401);
+      }
+      const renewed=await signIn(0,'sHaReD');assert.equal(renewed.participantSession.participantSessionId,identities[0].participantSession.participantSessionId);
+      await request('GET',currentPath(identities[0]),undefined,identities[0].sessionToken,401);
+      for(let index=0;index<names.length;index++){
+        const active=index===0?renewed:identities[index];
+        const state=(await request('GET',currentPath(active),undefined,active.sessionToken)).currentRunState;
+        assert.equal(state.testRun.testRunId,tests[index].testRunId);assert.equal(state.testRun.unitResponses[tests[index].currentUnitKey],answers[index]);
+      }
+    });
     await t.test('protected XML roster HTTP retains exact labels and empty-label login failure without inventing a snapshot',async()=>{
       const scope=await repository.getWorkspaceByScope(tenantKey,workspaceKey);
       const cases=JSON.parse(await readFile(new URL('./fixtures/original-group-label-cases.json',import.meta.url),'utf8'));

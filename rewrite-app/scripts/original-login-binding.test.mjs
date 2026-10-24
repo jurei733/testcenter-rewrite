@@ -6,7 +6,7 @@ import {join,resolve} from 'node:path';
 import test from 'node:test';
 import {DatabaseSync} from 'node:sqlite';
 import {Pool} from 'pg';
-import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
+import {createFirstSliceServices,prepareOriginalLoginBinding} from '@testcenter-rewrite-app/application';
 import {compileBookletRuntimePolicy} from '@testcenter-rewrite-app/contracts';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
@@ -34,6 +34,33 @@ test('unchanged production Source47 proves retained person/Test identity with ro
  assert.equal(sourceMove.result.groupLabel,'  Moved current Ω  ');assert.equal(sourceMove.testSession.bookletLabel,'Owned booklet A');
 });
 const stamp=n=>new Date(Date.parse('2026-10-24T10:00:00Z')+n*60000).toISOString();
+test('actual Source native Login protocol proves exact principal isolation and keeps later protocol gaps visible',async()=>{
+ const root=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-login-protocol/',import.meta.url);
+ const manifest=JSON.parse(await readFile(new URL('manifest.json',root),'utf8'));
+ assert.equal(manifest.sourceCommit,'eedae41840cbe90e5547c0211da818bdf620f5aa');assert.equal(manifest.runId,40063392830);
+ assert.equal(manifest.head,'0a81b3bf5e8cbe6a112c7d7092e1c5d4b488ce03');assert.equal(manifest.testMode,false);
+ assert.equal(manifest.artifact.bytes,7228);assert.equal(manifest.artifact.sha256,'8e4a14425ced1657e2c5076010ea1cf636ae50f049ce1dd1f3245fad332a0cce');
+ assert.equal(Object.keys(manifest.files).length,4);
+ for(const [name,sha]of Object.entries(manifest.files)){
+  assert.match(name,/^[a-z0-9][a-z0-9.-]*$/);assert.equal(createHash('sha256').update(await readFile(new URL(name,root))).digest('hex'),sha,name);
+ }
+ const receipt=JSON.parse(await readFile(new URL('receipt.json',root),'utf8'));
+ assert.equal(receipt.success,true);assert.equal(receipt.checks.length,21);assert.equal(receipt.testMode,false);
+ assert.deepEqual(receipt.sourceFiles,manifest.sourceFiles);assert.equal(Object.keys(receipt.sourceFiles).length,11);
+ const cases=receipt.checks.filter(row=>row.name.startsWith('exact native Login identity is isolated for '));
+ const names=['owned-native-binary-login','OWNED-native-binary-login','owned-native-Ä-login','owned-native-ä-login','owned-native-é-login','owned-native-e\u0301-login'];
+ assert.deepEqual(cases.map(row=>row.loginName),names);assert.equal(new Set(cases.map(row=>row.testId)).size,6);
+ for(const row of cases){assert.equal(row.accessSet.loginName,row.loginName);assert.match(row.accessSet.token,/^\[redacted-owned-token-\d+\]$/);}
+ const login=receipt.checks.find(row=>row.name.startsWith('coded credential phase')).accessSet;
+ assert.deepEqual(login.flags,['codeRequired']);assert.deepEqual(login.claims,{});assert.deepEqual(login.access,{});
+ const live=receipt.checks.find(row=>row.name.startsWith('already-open native person observes imported review mode'));
+ assert.equal(live.testMode,'run-review');assert.deepEqual(live.accessSet.claims.review,[]);
+ assert.equal(receipt.checks.at(-1).testSessions.length,7);
+ const observations=JSON.parse(await readFile(new URL('http-observations.json',root),'utf8'));assert.equal(observations.length,83);
+ for(const row of observations)if(row.value&&typeof row.value==='object')for(const key of ['token','groupToken']){
+  if(typeof row.value[key]==='string')assert.match(row.value[key],/^\[redacted-owned-token-\d+\]$/);
+ }
+});
 const kinds=['memory','file','sqlite'];
 if(process.env.FIRST_SLICE_STORE==='postgres'){assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);kinds.push('postgres');}
 for(const kind of kinds)test(`${kind}: validated native login moves all existing people atomically without changing Test data`,async t=>{
@@ -156,6 +183,53 @@ for(const kind of kinds)test(`${kind}: validated native login moves all existing
    const current=(await bindings())[0];assert.equal((await bindings()).length,1);assert.ok((await parents()).filter(row=>row.originalLoginKey).every(row=>row.groupKey===current.groupKey));
    assert.equal((await parents()).find(row=>row.loginKey==='canonical').groupKey,'Canonical');
    assert.deepEqual(await repository.getParticipantSessionById(legacy.participantSessionId),legacy);
+  });
+  await t.test('binary native Login names isolate ASCII case, Unicode case and normalization peers with the same person code',async()=>{
+   const json=value=>JSON.parse(JSON.stringify(value)); // Absent optional fields have one durable JSON representation.
+   const names=['owned-native-binary-login','OWNED-native-binary-login','owned-native-Ä-login','owned-native-ä-login','owned-native-é-login','owned-native-e\u0301-login'];
+   const password=index=>'Owned-binary-'+index+'-secret';
+   const roster=selected=>`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="ORACLE.BINARY.LOGINS" label="Owned exact Login names">${selected.map(name=>`<Login name="${name}" pw="${password(names.indexOf(name))}" mode="run-hot-return"><Booklet codes="Shared">owned</Booklet></Login>`).join('')}</Group></Testtakers>`;
+   const upload=selected=>service().workspaceAdminRead.importParticipantRoster({tenantKey:tenant.tenantKey,workspaceKey:'owned',rosterText:roster(selected)});
+   for(const name of names)await upload([name]);
+   const signIn=(index,participantCode='Shared',extra={})=>service().participantRuntime.signIn({tenantKey:tenant.tenantKey,workspaceKey:'owned',loginKey:names[index],password:password(index),participantCode,...extra});
+   const people=await Promise.all(names.map((_,index)=>signIn(index)));
+   assert.equal(new Set(people.map(person=>person.participantSessionId)).size,names.length,'Each exact native Login owns a separate person, even with the same code');
+   await upload(names);
+   const tests=[];
+   for(let index=0;index<names.length;index++){
+    assert.equal(people[index].loginKey,names[index]);assert.equal(people[index].originalLoginKey,names[index]);
+    const run=await service().participantRuntime.launch({participantSessionId:people[index].participantSessionId,bookletKey:'owned'});
+    const saved=json({...run,unitResponses:{unit:'Exact private answer for '+names[index]}});await repository.saveTestRun(saved);tests.push(saved);
+    await assert.rejects(signIn(index,'Shared',{password:password((index+1)%names.length)}),error=>error.errorCode==='participant_password_invalid');
+   }
+   assert.equal(new Set(tests.map(run=>run.testRunId)).size,names.length);
+   for(let index=0;index<names.length;index++){
+    const reentry=await signIn(index,'sHaReD');assert.equal(reentry.participantSessionId,people[index].participantSessionId);
+    assert.equal(reentry.participantCode,'Shared');assert.equal(reentry.originalNameSuffix,'Shared');
+    const current=await repository.listTestRunsByParticipantSessionId(reentry.participantSessionId);
+    assert.equal(current.length,1);assert.deepEqual(json(current[0]),tests[index]);
+   }
+   const exactBindings=(await bindings()).filter(binding=>names.includes(binding.loginKey));
+   assert.deepEqual(exactBindings.map(binding=>binding.loginKey).sort(),[...names].sort());
+   for(const [left,right]of [[0,1],[2,3],[4,5]]){
+    const previous=exactBindings.find(binding=>binding.loginKey===names[left]);
+    assert.throws(()=>prepareOriginalLoginBinding({...previous,loginKey:names[right],authenticatedAt:stamp(5)},previous),/cannot change its identity/);
+   }
+   const priorRoster=await repository.listParticipantRosterEntriesByWorkspace(scope.tenantId,scope.workspaceId);
+   await assert.rejects(service().workspaceAdminRead.importParticipantRoster({tenantKey:tenant.tenantKey,workspaceKey:'owned',rosterText:'loginKey,password,groupKey,displayName\nCanonical-Case,Owned-canonical-secret,canonical,First\ncanonical-case,Owned-canonical-secret,canonical,Second'}),error=>error.errorCode==='participant_roster_login_duplicate');
+   await assert.rejects(upload([names[0],names[0]]));
+   assert.deepEqual(await repository.listParticipantRosterEntriesByWorkspace(scope.tenantId,scope.workspaceId),priorRoster);
+   const before=await repository.getParticipantSessionById(people[0].participantSessionId);
+   const target=await repository.getOrCreateOriginalParticipantGroup({...scope,groupKey:'ORACLE.BINARY.MOVE',groupLabel:'Owned exact Login move',createdAt:stamp(5)});
+   await repository.bindOriginalLoginGroup({...scope,loginKey:names[1],groupKey:target.groupKey,groupSnapshotKey:target.groupKey,authenticatedAt:stamp(5)});
+   assert.deepEqual(await repository.getParticipantSessionById(people[0].participantSessionId),before,'Moving uppercase Login cannot move its lowercase peer');
+   assert.equal((await repository.getParticipantSessionById(people[1].participantSessionId)).groupKey,target.groupKey);
+   for(const run of tests)assert.deepEqual(json(await repository.getTestRunById(run.testRunId)),run);
+   if(kind!=='memory'){
+    await storage.shutdown();await open();
+    const restored=(await bindings()).filter(binding=>names.includes(binding.loginKey));assert.equal(restored.length,names.length);
+    for(const run of tests)assert.deepEqual(json(await repository.getTestRunById(run.testRunId)),run);
+   }
   });
   await t.test('workspace cascade removes bindings and cannot recreate missing-workspace orphans',async()=>{
    const input={...(await bindings())[0],authenticatedAt:stamp(6)};
