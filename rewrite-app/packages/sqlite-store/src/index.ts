@@ -3311,8 +3311,8 @@ export const createSqliteFirstSliceStorage = (
         const parent=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(input.tenantId,input.workspaceId);
         const group=database.prepare("SELECT group_key FROM original_participant_groups WHERE tenant_id=? AND workspace_id=? AND group_key=?").get(input.tenantId,input.workspaceId,input.groupSnapshotKey);
         if (!parent || !group) { database.exec("ROLLBACK"); return null; }
-        const bindings=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=?").all(input.tenantId,input.workspaceId).map(mapOriginalLoginBinding);
-        const binding=prepareOriginalLoginBinding(input,bindings.find(row=>originalParticipantGroupKeysEqual(row.loginKey,validated.loginKey)));
+        const previous=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(input.tenantId,input.workspaceId,validated.loginKey);
+        const binding=prepareOriginalLoginBinding(input,previous?mapOriginalLoginBinding(previous):undefined);
         database.prepare(`INSERT INTO original_login_bindings (tenant_id,workspace_id,login_key,group_key,group_snapshot_key,created_at,last_authenticated_at)
           VALUES (?,?,?,?,?,?,?) ON CONFLICT (tenant_id,workspace_id,login_key) DO UPDATE SET
           group_key=excluded.group_key,group_snapshot_key=excluded.group_snapshot_key,last_authenticated_at=excluded.last_authenticated_at`)

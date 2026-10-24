@@ -18,7 +18,7 @@ export function prepareOriginalLoginBinding(input: OriginalLoginBindingInput,
   if (typeof input.authenticatedAt !== 'string' || !Number.isFinite(Date.parse(input.authenticatedAt)) ||
       !originalParticipantGroupKeysEqual(input.groupKey,input.groupSnapshotKey)) throw new TypeError('Invalid Original login binding metadata.');
   if (previous && (previous.tenantId !== input.tenantId || previous.workspaceId !== input.workspaceId ||
-      !originalParticipantGroupKeysEqual(previous.loginKey,input.loginKey))) throw new TypeError('Original login binding cannot change its identity.');
+      previous.loginKey !== input.loginKey)) throw new TypeError('Original login binding cannot change its identity.');
   return {tenantId:input.tenantId,workspaceId:input.workspaceId,loginKey:previous?.loginKey ?? input.loginKey,
     groupKey:input.groupKey,groupSnapshotKey:input.groupSnapshotKey,
     createdAt:previous?.createdAt ?? input.authenticatedAt,lastAuthenticatedAt:input.authenticatedAt};

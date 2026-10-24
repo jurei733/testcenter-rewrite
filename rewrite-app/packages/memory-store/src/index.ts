@@ -738,7 +738,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const validated = prepareOriginalLoginBinding(input);
       if (!Array.from(state.workspacesByScope.values()).some(workspace => workspace.tenantId === input.tenantId && workspace.workspaceId === input.workspaceId) ||
           !Array.from(state.originalParticipantGroups.values()).some(group => group.tenantId === input.tenantId && group.workspaceId === input.workspaceId && group.groupKey === input.groupSnapshotKey)) return null;
-      const previous = Array.from(state.originalLoginBindings.values()).find(binding => binding.tenantId === input.tenantId && binding.workspaceId === input.workspaceId && originalParticipantGroupKeysEqual(binding.loginKey, validated.loginKey));
+      const previous = state.originalLoginBindings.get(JSON.stringify([input.tenantId, input.workspaceId, validated.loginKey]));
       const binding = prepareOriginalLoginBinding(input, previous);
       state.originalLoginBindings.set(JSON.stringify([binding.tenantId, binding.workspaceId, binding.loginKey]), binding);
       for (const [id, session] of state.participantSessions) if (session.tenantId === binding.tenantId && session.workspaceId === binding.workspaceId && session.originalLoginKey === binding.loginKey) {

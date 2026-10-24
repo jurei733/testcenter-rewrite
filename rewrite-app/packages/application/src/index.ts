@@ -25319,6 +25319,7 @@ export const createFirstSliceServices = (
     const parsedEntries = [] as ReturnType<typeof parseParticipantRosterText>;
     const operationalLoginCandidates = [] as OriginalTestcenterOperationalLoginCandidate[];
     const nativeEntries = new Set<ReturnType<typeof parseParticipantRosterText>[number]>();
+    const nativeOperationalEntries = new Set<OriginalTestcenterOperationalLoginCandidate>();
 
     for (const rosterDocument of input.rosterDocuments) {
       const jsonInspection = inspectParticipantRosterJsonSource(
@@ -25354,6 +25355,7 @@ export const createFirstSliceServices = (
         }
       }
       const documentEntries = parseParticipantRosterText(rosterDocument.rosterText);
+      const documentOperationalEntries = parseOriginalTestcenterOperationalLogins(rosterDocument.rosterText);
       // Only the server-validated Original XML path can establish native identity.
       // JSON flags and legacy XML cannot opt into this storage relationship.
       if (xmlValidationContext.profile === "original-19" && typeof rosterDocument.rosterText === "string" &&
@@ -25361,12 +25363,11 @@ export const createFirstSliceServices = (
         const root = new DOMParser().parseFromString(rosterDocument.rosterText, "application/xml").documentElement;
         if (root && xmlElementLocalName(root) === "Testtakers") {
           for (const entry of documentEntries) nativeEntries.add(entry);
+          for (const entry of documentOperationalEntries) nativeOperationalEntries.add(entry);
         }
       }
       parsedEntries.push(...documentEntries);
-      operationalLoginCandidates.push(
-        ...parseOriginalTestcenterOperationalLogins(rosterDocument.rosterText)
-      );
+      operationalLoginCandidates.push(...documentOperationalEntries);
     }
 
     if (parsedEntries.length === 0 && operationalLoginCandidates.length === 0) {
@@ -25398,19 +25399,24 @@ export const createFirstSliceServices = (
     }
 
     const seenLoginKeys = new Set<string>();
-    for (const loginKey of [
-      ...parsedEntries.map(entry => entry.loginKey),
-      ...operationalLoginCandidates.map(candidate => candidate.loginKey)
+    const seenFoldedLoginKeys = new Map<string, boolean>();
+    for (const {loginKey,native} of [
+      ...parsedEntries.map(entry => ({loginKey:entry.loginKey,native:nativeEntries.has(entry)})),
+      ...operationalLoginCandidates.map(entry => ({loginKey:entry.loginKey,native:nativeOperationalEntries.has(entry)}))
     ]) {
+      // Original logins.name and login_sessions.name compare exactly. German
+      // case/composition collation applies to groups and person suffixes only.
       const normalizedLoginKey = loginKey.toLocaleLowerCase("en-US");
-      if (seenLoginKeys.has(normalizedLoginKey)) {
+      if (seenLoginKeys.has(loginKey) || seenFoldedLoginKeys.has(normalizedLoginKey) &&
+          (!native || !seenFoldedLoginKeys.get(normalizedLoginKey))) {
         throw new FirstSliceError(
           400,
           "participant_roster_login_duplicate",
           `Participant roster contains duplicate login '${loginKey}'.`
         );
       }
-      seenLoginKeys.add(normalizedLoginKey);
+      seenLoginKeys.add(loginKey);
+      seenFoldedLoginKeys.set(normalizedLoginKey,native);
     }
 
     const referencedAssetNames = Array.from(

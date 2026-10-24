@@ -1543,7 +1543,7 @@ const createFileRepository = (
         const state = await getState(), validated = prepareOriginalLoginBinding(input);
         if (!Object.values(state.workspacesByScope).some(workspace => workspace.tenantId === input.tenantId && workspace.workspaceId === input.workspaceId) ||
             !Object.values(state.originalParticipantGroups).some(group => group.tenantId === input.tenantId && group.workspaceId === input.workspaceId && group.groupKey === input.groupSnapshotKey)) return null;
-        const previous = Object.values(state.originalLoginBindings).find(binding => binding.tenantId === input.tenantId && binding.workspaceId === input.workspaceId && originalParticipantGroupKeysEqual(binding.loginKey, validated.loginKey));
+        const previous = state.originalLoginBindings[JSON.stringify([input.tenantId, input.workspaceId, validated.loginKey])];
         const binding = prepareOriginalLoginBinding(input, previous);
         const participantSessions = Object.fromEntries(Object.entries(state.participantSessions).map(([id, session]) => [id,
           session.tenantId === binding.tenantId && session.workspaceId === binding.workspaceId && session.originalLoginKey === binding.loginKey ? {...session, groupKey: binding.groupKey} : session]));
