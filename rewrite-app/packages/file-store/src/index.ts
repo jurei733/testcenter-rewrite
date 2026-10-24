@@ -22,6 +22,8 @@ import {
   resolveOriginalPerson,
   assertOriginalPersonUnique,
   projectOriginalPersonRuns,
+  projectOriginalLoginMode,
+  withOriginalTestRunMode,
   projectOriginalPersonSessions,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
@@ -1626,6 +1628,9 @@ const createFileRepository = (
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await mutate(state => {
         validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Object.values(state.applicationAssets));
+        const modes=projectOriginalLoginMode(participantRosterEntry,Object.values(state.participantSessions),Object.values(state.testRuns));
+        for(const person of modes.participantSessions)state.participantSessions[person.participantSessionId]=person;
+        for(const run of modes.testRuns)state.testRuns[run.testRunId]=run;
         state.participantRosterEntries[
           participantRosterEntry.participantRosterEntryId
         ] = participantRosterEntry;
@@ -1731,7 +1736,7 @@ const createFileRepository = (
     },
     async saveTestRun(testRun) {
       await mutate(state => {
-        state.testRuns[testRun.testRunId] = testRun;
+        state.testRuns[testRun.testRunId] = withOriginalTestRunMode(testRun,state.participantSessions[testRun.participantSessionId]);
       });
     },
     activateParticipantController: mutateControllerActivation,

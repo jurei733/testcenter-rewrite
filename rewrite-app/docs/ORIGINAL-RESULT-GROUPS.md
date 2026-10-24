@@ -1,5 +1,59 @@
 # Original participant group snapshots
 
+## Current native mode without reentry (2026-10-24)
+
+The observed Source21 live-mode gap below now has matching Rewrite controls.
+Importing a validated native Login changes its existing people's and Tests'
+current mode immediately. The old valid bearer remains usable; no credential
+reentry, token rotation or new person/Test is required. Hot-return → review →
+hot-return updates runtime mode and review authorization on the next protected
+read, while retaining complete saved answers, states, first metadata, timers,
+revisions and Original clocks. Case/composition peers and canonical people,
+including a legacy person with the same Login spelling, keep their own modes.
+
+The roster row/password hash and all linked mode projections commit together
+inside Memory's synchronous mutation, File's registered writer/isolated queued
+manifest, SQLite's `BEGIN IMMEDIATE`, or PostgreSQL's transaction. Matching uses
+the exact scoped `originalLoginKey`; there is no inferred history or ownership
+backfill. Mode import does not move groups or update credential-stage bindings,
+frozen group labels or authentication timestamps. Existing reentry group-move
+semantics stay separate. No schema/dependency changes are needed
+(SQLite69/PostgreSQL63).
+
+PostgreSQL locks the workspace with `FOR NO KEY UPDATE`, then native parents
+and Tests in stable ID order. A real held-parent/import/FK-activity sequence
+proves runtime foreign-key writes can finish while import waits, followed by
+successful mode publication. SQL projection selects only Run scope/mode
+columns; it does not fetch/decode private answers or saved Test state. Actual
+decoder-fence controls reject the preceding full-payload read and pass the
+metadata projection in both SQL stores, with the raw response bytes unchanged.
+
+Ordinary/delayed Test saves use the current locked native parent mode instead
+of restoring an obsolete one. A fresh assignment initializer likewise receives
+the current native mode; existing entry-eligibility checks remain under lock.
+Canonical Test-save and release contracts remain unchanged. Owned late SQL or
+File publication failures roll back roster, parent and Test modes together;
+after removing the fault, an explicit later import succeeds. The failure
+control now targets import, where Source's mode effect occurs, rather than
+waiting until a later person login.
+
+Required existing all-store and protected HTTP suites cover old-bearer runtime
+reads, immediate grant/revocation of review access, private answers and full
+metadata equality, exact-name peers, stale saves, fresh reservations, reopening,
+late rollback and real PostgreSQL lock ordering. The controlled validated-XML
+comparison now reports current review mode for the same person, Test and valid
+bearer, matching Source21. This closes that demonstrated mode difference; it
+does not establish full native AuthToken/AccessSet, removal/restoration,
+global-name, monitor-first, Results/Tests-page or visual parity.
+
+Final local qualification passes **4,078 unit/frontend** and **2,224 complete
+PostgreSQL checks**, without failures/skips. The authentication focus passes
+**171/219** non-PostgreSQL/PostgreSQL checks; core typechecking/build and CI
+policy (271 passes/one explicit GNU-timeout-only macOS skip) pass. The complete
+owned PostgreSQL database has no remaining schemas or other sessions before
+removal, and its initially stopped cluster is stopped again. Exact full hosted
+acceptance of this follow-up remains required.
+
 ## Exact native Login principals and live-mode reference (2026-10-24)
 
 The focused [unchanged production Source21 run](https://github.com/jurei733/testcenter-rewrite/actions/runs/40063392830)
@@ -73,11 +127,12 @@ current scoped sign-in RPC.
 
 An already-open Source person additionally observes `run-hot-return` →
 `run-review` → `run-hot-return` immediately through GET session/Test, without
-reentry or bearer rotation and without changing saved Test state. A controlled
-validated-XML Rewrite comparison still returns `run-hot-return` for its person,
-Test and runtime after importing `run-review`; the same bearer remains valid.
-This is now an observed remaining difference. Reentry-only mode projection
-does not close it. Full native two-stage AuthToken/AccessSet behavior, global
+reentry or bearer rotation and without changing saved Test state. The initial
+validated-XML Rewrite comparison returned `run-hot-return` for its person,
+Test and runtime after importing `run-review`, with the same valid bearer.
+That demonstrated difference is addressed by the live-mode correction above;
+reentry-only mode projection was insufficient. Full native two-stage
+AuthToken/AccessSet behavior, global
 cross-workspace name-conflict policy, Results/Tests DTOs/pages, monitor-first
 lifecycle, grants, deletion, downloads and all eight broad visual rows remain
 open. The exact-name correction is a prerequisite for those flows.
@@ -140,7 +195,7 @@ policy (267 passes/one explicit GNU-timeout-only macOS skip) pass. The exact
 hosted qualification of this follow-up remains separate from its green baseline.
 
 This closes the demonstrated suffix lookup/creation gaps. Full native two-stage
-Login-token authentication, all transitions of already-open controllers after
+Login-token authentication, remaining transitions of already-open controllers after
 roster edits, monitor-first lifecycle, Native Results/Tests DTOs/pages, deletion,
 grants, individual downloads and all eight broad visual rows remain open.
 Successful reentry's mode projection does not prove those remaining behaviors.

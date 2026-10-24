@@ -180,6 +180,34 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
         assert.equal(state.testRun.testRunId,tests[index].testRunId);assert.equal(state.testRun.unitResponses[tests[index].currentUnitKey],answers[index]);
       }
     });
+    await t.test('existing protected native bearers observe imported mode and review permissions without reauthentication',async()=>{
+      const names=['http-live-mode','HTTP-live-mode'];
+      const document=(mode,peer=false)=>`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="HTTP.LIVE.MODE" label="Owned live mode"><Login name="${names[0]}" pw="Owned-live-mode-secret" mode="${mode}"><Booklet codes="AbC">${bookletKey}</Booklet></Login>${peer?`<Login name="${names[1]}" pw="Owned-live-mode-secret" mode="run-hot-return"><Booklet codes="AbC">${bookletKey}</Booklet></Login>`:''}</Group></Testtakers>`;
+      const upload=(mode,peer=false)=>request('POST',workspace+'/participant-roster',{rosterText:document(mode,peer)},operator,201);
+      await upload('run-hot-return',true);
+      const identities=await Promise.all(names.map(loginKey=>request('POST',routes.participant.signIn,{tenantKey,workspaceKey,loginKey,password:'Owned-live-mode-secret',participantCode:'abc'})));
+      const runs=[];
+      for(let index=0;index<identities.length;index++){
+        const run=(await resume(identities[index])).testRun;runs.push(run);
+        await request('POST',resolveRoutePath(routes.participant.saveProgress,{testRunId:run.testRunId}),{
+          deliveryId:randomUUID(),status:'running',responseOnly:true,responseUnitKey:run.currentUnitKey,unitResponse:'Retained native live-mode answer '+index,responseTimestamp:Date.now()
+        },identities[index].sessionToken);
+      }
+      const currentPath=index=>resolveRoutePath(routes.participant.getCurrentRunState,{participantSessionId:identities[index].participantSession.participantSessionId});
+      const before=await Promise.all(identities.map(async(identity,index)=>(await request('GET',currentPath(index),undefined,identity.sessionToken)).currentRunState));
+      const reviewPath=resolveRoutePath(routes.participant.listReviews,{testRunId:runs[0].testRunId});
+      await request('GET',reviewPath,undefined,identities[0].sessionToken,403);
+      for(const mode of ['run-review','run-hot-return']){
+        await upload(mode);
+        const changed=(await request('GET',currentPath(0),undefined,identities[0].sessionToken)).currentRunState;
+        assert.equal(changed.participantSession.executionMode,mode);assert.equal(changed.testRun.executionMode,mode);
+        assert.deepEqual({...changed.testRun,executionMode:before[0].testRun.executionMode},before[0].testRun);
+        assert.deepEqual({...changed.participantSession,executionMode:before[0].participantSession.executionMode},before[0].participantSession);
+        await request('GET',reviewPath,undefined,identities[0].sessionToken,mode==='run-review'?200:403);
+        const peer=(await request('GET',currentPath(1),undefined,identities[1].sessionToken)).currentRunState;
+        assert.deepEqual(peer.testRun,before[1].testRun);assert.deepEqual(peer.participantSession,before[1].participantSession);
+      }
+    });
     await t.test('protected XML roster HTTP retains exact labels and empty-label login failure without inventing a snapshot',async()=>{
       const scope=await repository.getWorkspaceByScope(tenantKey,workspaceKey);
       const cases=JSON.parse(await readFile(new URL('./fixtures/original-group-label-cases.json',import.meta.url),'utf8'));

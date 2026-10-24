@@ -1,5 +1,42 @@
 # CI iteration and complete acceptance
 
+## Complete exact-Login baseline and current native modes (2026-10-24)
+
+[Run 40064366620](https://github.com/jurei733/testcenter-rewrite/actions/runs/40064366620)
+qualifies head `a6daa1d25ff9904e4f0fdfa20847988a32528c94` with **89/89 successful
+jobs**, no failures/skips/cancellations. Actual checkout merge
+`89390babc33ce0659f970889df38ae22d4e59021` has exactly published tree
+`b97a3ef2273afe5d56d9f907e287624bcf84876a`. Actual logs independently verify
+**4,073 unit/frontend** and **2,216 PostgreSQL** checks, plus zero complete-lock
+audit findings with dev/optional dependencies included. Full PostgreSQL UI and
+every other required group pass. The historical starter-prefix failure does
+not recur; this does not establish its root cause. Narrow failure retention
+remains available for any recurrence.
+
+The follow-up applies Source21's current Login mode immediately to already-open
+native people/Tests at roster import, with existing bearers and exact saved
+state preserved. It includes current-mode guards for delayed Test saves/fresh
+reservations, exact-name and canonical separation, atomic roster/parent/Test
+rollback and a real PostgreSQL held-parent/import/FK-activity control. SQL
+projection uses scope/mode metadata without loading private response payloads;
+a decoder-fence regression proves that distinction. See
+[the implementation scope and remaining parity](ORIGINAL-RESULT-GROUPS.md).
+Full hosted acceptance of this later tree remains separate from its qualified
+baseline; every mandatory acceptance group remains required.
+
+Final local qualification of the live-mode/metadata follow-up passes **4,078
+unit/frontend checks** (121 + 325 + 1,582 + 2,050) and **2,224 complete PostgreSQL
+checks**, without failures/skips. The real authentication focus passes **171**
+non-PostgreSQL checks in 11.21 seconds after its incremental core build, and
+**219** PostgreSQL checks. These are local observations, not hosted/cold-build
+speed promises. Core typechecking/build, CI policy 271/one explicit
+GNU-timeout-only macOS skip and diff checks pass. SQL decoder fences, late
+roster publication failure and blocked-parent/FK controls remain in the existing
+required suites. All schemas and other connections retire before dropping the
+owned database and stopping its initially stopped cluster. No additional
+Angular production build is needed for this core-only local change; the full
+hosted workflow still performs its fresh shared production build.
+
 ## Native Login isolation qualification after focused pipeline adoption (2026-10-24)
 
 The focused service runner catches the next real Original discrepancy: exact

@@ -1,10 +1,36 @@
 import {randomInt} from 'node:crypto';
 import {defaultParticipantExecutionMode,participantExecutionModeDefinitions} from '@testcenter-rewrite-app/domain';
-import type {OriginalLoginBinding,ParticipantSession,TestRun} from '@testcenter-rewrite-app/domain';
+import type {OriginalLoginBinding,ParticipantRosterEntry,ParticipantSession,TestRun} from '@testcenter-rewrite-app/domain';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 
 export type OriginalPersonResolution = {participantSession:ParticipantSession;created:boolean};
 export class OriginalPersonIdentityConflictError extends Error {}
+
+/** Native mode is current Login authorization, independent of saved Test evidence and group binding. */
+type NativeModePerson=Pick<ParticipantSession,'participantSessionId'|'tenantId'|'workspaceId'|'originalLoginKey'|'executionMode'>;
+type NativeModeRun=Pick<TestRun,'testRunId'|'participantSessionId'|'tenantId'|'workspaceId'|'executionMode'>;
+export function projectOriginalLoginMode<Person extends NativeModePerson,Run extends NativeModeRun>(entry:ParticipantRosterEntry,people:Person[],runs:Run[]):{
+  participantSessions:Person[];testRuns:Run[];
+} {
+  if(!entry.originalLoginIdentity)return {participantSessions:people,testRuns:runs};
+  const mode=entry.executionMode??defaultParticipantExecutionMode;
+  if(!Object.hasOwn(participantExecutionModeDefinitions,mode))throw new TypeError('Invalid native Login mode.');
+  const ids=new Set(people.filter(person=>person.tenantId===entry.tenantId&&person.workspaceId===entry.workspaceId&&person.originalLoginKey===entry.loginKey).map(person=>person.participantSessionId));
+  const participantSessions=people.map(person=>ids.has(person.participantSessionId)&&person.executionMode!==mode?{...person,executionMode:mode}:person);
+  const testRuns=runs.map(run=>{
+    if(!ids.has(run.participantSessionId))return run;
+    if(run.tenantId!==entry.tenantId||run.workspaceId!==entry.workspaceId)throw new OriginalPersonIdentityConflictError('Native person has an inconsistent Test scope.');
+    return run.executionMode===mode?run:{...run,executionMode:mode};
+  });
+  return {participantSessions,testRuns};
+}
+
+/** A delayed Test save cannot restore an obsolete native Login mode. */
+export function withOriginalTestRunMode(run:TestRun,person:ParticipantSession|null|undefined):TestRun {
+  if(person?.originalLoginKey===undefined)return run;
+  if(person.participantSessionId!==run.participantSessionId||person.tenantId!==run.tenantId||person.workspaceId!==run.workspaceId)throw new OriginalPersonIdentityConflictError('Native person has an inconsistent Test scope.');
+  return run.executionMode===person.executionMode?run:{...run,executionMode:person.executionMode};
+}
 
 /** Login mode is current authorization metadata, not a saved Test-state edit. */
 export function projectOriginalPersonSessions(person:ParticipantSession,people:ParticipantSession[]):ParticipantSession[] {

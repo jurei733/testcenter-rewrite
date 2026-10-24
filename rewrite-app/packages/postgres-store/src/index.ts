@@ -1,4 +1,5 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { defaultParticipantExecutionMode } from "@testcenter-rewrite-app/domain";
 
 import {
   originalParticipantGroupKeysEqual,
@@ -8,6 +9,8 @@ import {
   resolveOriginalPerson,
   assertOriginalPersonUnique,
   projectOriginalPersonRuns,
+  projectOriginalLoginMode,
+  withOriginalTestRunMode,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -3296,6 +3299,10 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       return withAssetWrite(async client=>{
         validateApplicationAssetReferences(participantRosterEntry.assetAssignments,await assetNames(client));
+        if(participantRosterEntry.originalLoginIdentity){
+          const workspace=await client.query('SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE',[participantRosterEntry.tenantId,participantRosterEntry.workspaceId]);
+          if(!workspace.rowCount)throw new Error('Native roster workspace no longer exists.');
+        }
       await client.query(
         `INSERT INTO participant_roster_entries (
           participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
@@ -3349,6 +3356,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantRosterEntry.originalLoginIdentity ?? null
         ]
       );
+      if(participantRosterEntry.originalLoginIdentity){
+        const entry=participantRosterEntry;
+        const people=(await client.query('SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3 ORDER BY participant_session_id FOR UPDATE',[entry.tenantId,entry.workspaceId,entry.loginKey])).rows.map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+        // Authorization metadata does not require decoding private responses or Test state.
+        const runs=(await client.query('SELECT test_run_id,participant_session_id,tenant_id,workspace_id,execution_mode FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE',[entry.tenantId,entry.workspaceId,entry.loginKey])).rows.map(row=>({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),executionMode:row.execution_mode==null?undefined:row.execution_mode as TestRun['executionMode']}));
+        const modes=projectOriginalLoginMode(entry,people,runs),mode=entry.executionMode??defaultParticipantExecutionMode;
+        if(modes.participantSessions.some((person,index)=>person!==people[index]))await client.query('UPDATE participant_sessions SET execution_mode=$1 WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4 AND execution_mode IS DISTINCT FROM $1',[mode,entry.tenantId,entry.workspaceId,entry.loginKey]);
+        if(modes.testRuns.some((run,index)=>run!==runs[index]))await client.query('UPDATE test_runs SET execution_mode=$1 WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4) AND execution_mode IS DISTINCT FROM $1',[mode,entry.tenantId,entry.workspaceId,entry.loginKey]);
+      }
       });
     },
     async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
@@ -3480,7 +3496,12 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       }
     },
     async saveTestRun(testRun) {
-      await persistTestRun(pool, testRun);
+      const client=await pool.connect();
+      try{
+        await client.query('BEGIN');
+        const parent=mapParticipantSession((await client.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE',[testRun.participantSessionId])).rows[0]);
+        await persistTestRun(client,withOriginalTestRunMode(testRun,parent));await client.query('COMMIT');
+      }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
     },
     async activateParticipantController(input) {
       const client = await pool.connect();

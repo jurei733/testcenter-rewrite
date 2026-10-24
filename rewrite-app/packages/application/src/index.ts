@@ -1,5 +1,5 @@
 import {createOriginalPersonNameSuffix,OriginalPersonIdentityConflictError} from './original-person-identity.js';
-export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix,resolveOriginalPerson,assertOriginalPersonUnique,projectOriginalPersonSessions,projectOriginalPersonRuns,OriginalPersonIdentityConflictError} from './original-person-identity.js';
+export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix,resolveOriginalPerson,assertOriginalPersonUnique,projectOriginalPersonSessions,projectOriginalPersonRuns,projectOriginalLoginMode,withOriginalTestRunMode,OriginalPersonIdentityConflictError} from './original-person-identity.js';
 import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
 export { originalParticipantGroupKeysEqual, prepareOriginalParticipantGroup } from "./original-participant-group.js";
 export {prepareOriginalLoginBinding, type OriginalLoginBindingInput} from './original-login-binding.js';
