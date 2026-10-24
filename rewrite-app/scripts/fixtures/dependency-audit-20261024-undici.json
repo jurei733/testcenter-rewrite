@@ -1,0 +1,119 @@
+{
+  "qualification": "Live complete lock audit before/after, no installation or node_modules; dev and optional explicitly included under NODE_ENV=production",
+  "predecessorRun": 40045340388,
+  "failedAuditJob": 120725650220,
+  "predecessorHead": "2d015c8f608b12a59ae876e9395a3db1c405199c",
+  "command": [
+    "npm",
+    "audit",
+    "--package-lock-only",
+    "--include=dev",
+    "--include=optional",
+    "--audit-level=high",
+    "--json"
+  ],
+  "scans": [
+    {
+      "name": "before",
+      "status": 1,
+      "elapsedMs": 732,
+      "lockSha256": "da95e3fca6ff3289ad83876878eb9294c5f793016d0e62ac73acdf71d42466c8",
+      "manifestSha256": "f243bf0f3fde4a0cf8d84b36f3d705ede522630b677132d0c16112286292c46c",
+      "nodeModulesBeforeAndAfter": false,
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 2,
+        "high": 1,
+        "critical": 0,
+        "total": 3
+      },
+      "packages": {
+        "@angular/build": {
+          "severity": "moderate",
+          "nodes": [
+            "node_modules/@angular/build"
+          ],
+          "advisories": []
+        },
+        "fast-uri": {
+          "severity": "moderate",
+          "nodes": [
+            "node_modules/fast-uri"
+          ],
+          "advisories": [
+            "https://github.com/advisories/GHSA-w74x-v6f9-j3xg",
+            "https://github.com/advisories/GHSA-xhq7-xmqj-769h",
+            "https://github.com/advisories/GHSA-wjr9-j795-jxcr",
+            "https://github.com/advisories/GHSA-333x-w4r6-6crp"
+          ]
+        },
+        "undici": {
+          "severity": "high",
+          "nodes": [
+            "node_modules/node-gyp/node_modules/undici",
+            "node_modules/undici"
+          ],
+          "advisories": [
+            "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+            "https://github.com/advisories/GHSA-f72v-6w45-q472",
+            "https://github.com/advisories/GHSA-xjj6-f33q-929c"
+          ]
+        }
+      }
+    },
+    {
+      "name": "after",
+      "status": 0,
+      "elapsedMs": 691,
+      "lockSha256": "3233a688ed7d47e5b70045d24d29bb1613e0567405ae18a0235bb085072f14e3",
+      "manifestSha256": "983eabdac8a6e75fc97b99faefb6f64b3300f8f1c9eda218ffd267163ab60b44",
+      "nodeModulesBeforeAndAfter": false,
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "packages": {}
+    }
+  ],
+  "patches": {
+    "node_modules/fast-uri": {
+      "from": "3.1.8",
+      "to": "3.1.9"
+    },
+    "node_modules/node-gyp/node_modules/undici": {
+      "from": "6.29.0",
+      "to": "6.29.1"
+    },
+    "node_modules/undici": {
+      "from": "7.29.1",
+      "to": "7.30.1"
+    }
+  },
+  "override": {
+    "parent": "@angular/build",
+    "dependency": "undici",
+    "version": "7.30.1",
+    "reason": "Current Angular21 build releases pin vulnerable undici7.29.1 exactly; scoped override keeps the existing Angular21 API rather than accepting audit --force major upgrade."
+  },
+  "node": "v22.23.3",
+  "npm": "10.9.9",
+  "isolatedLinux": {
+    "run": 40045840545,
+    "job": 120727246868,
+    "head": "e5b43571679374a640d82c9599e7e8dbd32909be",
+    "tree": "5061c3de277c0e2c9036a06d2b47bc58876d7336",
+    "conclusion": "success",
+    "vulnerabilities": 0,
+    "node": "22.23.3",
+    "npm": "10.9.9",
+    "actualMainJobCopiedExactly": true,
+    "noInstallation": true,
+    "noCacheRestoration": true,
+    "qualification": "Exact full-scope audit job only, not complete application CI"
+  }
+}

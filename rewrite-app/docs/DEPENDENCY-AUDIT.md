@@ -5,6 +5,60 @@ It includes development and optional dependencies and still fails at severity
 `high`. Build and runtime jobs retain clean `npm ci` and verify manifest/lockfile
 consistency independently.
 
+## Targeted undici and URI-parser patches (2026-10-24)
+
+The complete dependency job in
+[run 40045340388, job 120725650220](https://github.com/jurei733/testcenter-rewrite/actions/runs/40045340388/job/120725650220)
+correctly rejects new registry findings with the unchanged complete high-severity
+threshold. The committed graph has one high and two moderate package findings:
+undici, its Angular-build metavulnerability and fast-uri. The earlier 89/89 green
+run records the advisory state at its own time and does not exempt later scans.
+
+Only three lock records change: **undici 7.29.1 → 7.30.1**, nested node-gyp
+**undici 6.29.0 → 6.29.1**, and **fast-uri 3.1.8 → 3.1.9**, including registry
+integrities. Node-gyp and AJV accept their compatible patch releases normally.
+Current Angular 21 build releases pin the older undici version exactly, so a
+scoped `@angular/build` override selects 7.30.1 while retaining the existing
+Angular 21 build/framework packages. The automatic audit suggestion to force an
+Angular 22 major upgrade is unnecessary. Remove the scoped override when the
+upstream Angular 21 builder selects a patched undici itself.
+
+Primary advisories identify
+[undici excessive-content-encoding process termination](https://github.com/advisories/GHSA-xjj6-f33q-929c),
+[unbounded EventSource state](https://github.com/advisories/GHSA-4qv8-2p9j-2685),
+[Subresource Integrity algorithm normalization](https://github.com/advisories/GHSA-f72v-6w45-q472), and
+[fast-uri encoded-scheme confusion](https://github.com/advisories/GHSA-w74x-v6f9-j3xg).
+The URI patch also clears the three additional path/host/suffix advisories recorded
+in [the complete audit receipt](../scripts/fixtures/dependency-audit-20261024-undici.json).
+These installed paths are development/build dependencies; the required audit
+continues to include them and optional dependencies.
+
+Independent owned temporary workspaces contain only each manifest and exact lock,
+no `node_modules`, and run with `NODE_ENV=production`. Explicit dev/optional scans
+still reject the old graph (exit 1, three findings) and accept the patched graph
+(exit 0, zero findings). Observed scan times are 0.732 and 0.691 seconds on this
+machine. The receipt binds both exact lock/manifest digests. A clean `npm ci`
+succeeds and `npm ls undici fast-uri --all` shows both patched undici generations
+and fast-uri, with no invalid dependencies. The audit command, thresholds and
+workflow permissions are unchanged; new lock digests invalidate old build and
+browser artifacts through the existing protocol.
+
+Fresh qualification passes **3,981 unit/frontend checks**, core/web typechecking,
+production build and the complete headed SQLite participant-entry/reentry smoke.
+The initial entry remains **468.39 kB** under the unchanged 470 kB limit. Owned
+browser/server teardown completes. The complete main workflow remains a separate
+qualification, not inferred from these local checks.
+
+[Isolated Linux run 40045840545](https://github.com/jurei733/testcenter-rewrite/actions/runs/40045840545),
+job **120727246868**, passes the exact unchanged dependency job copied from the
+main workflow, with the patched manifest/lock and Node **22.23.3** / npm **10.9.9**.
+It reports **zero vulnerabilities**, without installation or npm cache restoration.
+The probe's exact commit/tree and limited scope are retained in the receipt. This
+qualifies the audit patch, not the ongoing failed predecessor or full application
+acceptance. Publication waits for the remaining useful predecessor browser-reference jobs
+to finish.
+
+
 ## Audit without installation
 
 The audit job uses the existing SHA-pinned Node setup with package-manager cache
