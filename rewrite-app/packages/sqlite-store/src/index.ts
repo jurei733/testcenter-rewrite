@@ -6,6 +6,7 @@ import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
+  prepareOriginalParticipantSession,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -416,6 +417,7 @@ const mapParticipantSession = (
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
         ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
+        ...(row.original_name_suffix === null || row.original_name_suffix === undefined ? {} : {originalNameSuffix:String(row.original_name_suffix)}),
         participantCode:
           row.participant_code === null || row.participant_code === undefined
             ? null
@@ -1678,6 +1680,11 @@ const sqliteMigrations: SqliteMigration[] = [
     ALTER TABLE participant_roster_entries ADD COLUMN original_login_identity INTEGER;
     CREATE INDEX IF NOT EXISTS participant_sessions_original_login
       ON participant_sessions(tenant_id, workspace_id, original_login_key);`
+  },
+  {
+    version: 69,
+    name: "original_person_name_suffix",
+    sql: `ALTER TABLE participant_sessions ADD COLUMN original_name_suffix TEXT;`
   }
 ];
 
@@ -3235,7 +3242,7 @@ export const createSqliteFirstSliceStorage = (
     async getParticipantSessionById(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
            FROM participant_sessions
            WHERE participant_session_id = ?`
         )
@@ -3269,7 +3276,7 @@ export const createSqliteFirstSliceStorage = (
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
            FROM participant_sessions
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -3317,21 +3324,21 @@ export const createSqliteFirstSliceStorage = (
     },
     async saveParticipantSession(participantSession) {
       const previous=mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id=?").get(participantSession.participantSessionId));
+      if (previous?.originalLoginKey === undefined && participantSession.originalLoginKey === undefined) participantSession=prepareOriginalParticipantSession(participantSession,previous,null);
       const originalLoginKey=previous?.originalLoginKey ?? participantSession.originalLoginKey, native=originalLoginKey!==undefined;
       if (native) database.exec("BEGIN IMMEDIATE");
       try {
         if (native) {
-          if (previous?.originalLoginKey && (previous.tenantId!==participantSession.tenantId || previous.workspaceId!==participantSession.workspaceId || previous.originalLoginKey!==(participantSession.originalLoginKey ?? originalLoginKey) || previous.loginKey!==participantSession.loginKey)) throw new TypeError('Native person cannot change its login identity.');
           const parent=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(participantSession.tenantId,participantSession.workspaceId);
           const binding=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(participantSession.tenantId,participantSession.workspaceId,originalLoginKey!);
-          if (!parent || !binding || participantSession.loginKey !== binding.login_key) throw new TypeError('Native person requires its current scoped login binding.');
-          participantSession={...participantSession,originalLoginKey,groupKey:String(binding.group_key)};
+          participantSession=prepareOriginalParticipantSession(participantSession,previous,binding?mapOriginalLoginBinding(binding):undefined);
+          if (!parent) throw new TypeError('Native person requires its current scoped login binding.');
         }
         database
         .prepare(
           `INSERT INTO participant_sessions (
-            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(participant_session_id) DO UPDATE SET
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
@@ -3343,7 +3350,8 @@ export const createSqliteFirstSliceStorage = (
             status = excluded.status,
             valid_until = excluded.valid_until,
             created_at = excluded.created_at,
-            original_login_key = excluded.original_login_key`
+            original_login_key = excluded.original_login_key,
+            original_name_suffix = excluded.original_name_suffix`
         )
         .run(
           participantSession.participantSessionId,
@@ -3357,7 +3365,8 @@ export const createSqliteFirstSliceStorage = (
           participantSession.status,
           participantSession.validUntil ?? null,
           participantSession.createdAt,
-          participantSession.originalLoginKey ?? null
+          participantSession.originalLoginKey ?? null,
+          participantSession.originalNameSuffix ?? null
         );
         if (native) database.exec("COMMIT");
       } catch (error) { if (native) return rollbackAfterFailure(database,error); throw error; }

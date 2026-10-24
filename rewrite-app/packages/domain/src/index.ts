@@ -1133,6 +1133,8 @@ export type ParticipantSession = {
   groupKey: string;
   /** First captured native login identity; absent for canonical/unknown legacy sessions. */
   originalLoginKey?: string;
+  /** First server-generated Original person suffix; absent means unknown legacy history. */
+  originalNameSuffix?: string;
   participantCode?: string | null;
   executionMode?: ParticipantExecutionMode;
   status: ParticipantSessionStatus;

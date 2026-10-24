@@ -104,6 +104,23 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       }
       assert.equal((await repository.listParticipantSessionsByWorkspace(scope.tenantId,scope.workspaceId)).filter(row=>row.loginKey===input.loginKey).length,1);
     });
+    await t.test('native HTTP preserves first raw code and durable suffix while canonical code normalization remains separate',async()=>{
+      const document=`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="HTTP.NATIVE.CODE" label="Native code"><Login name="http-native-coded" pw="Owned-native-code-secret" mode="run-hot-return"><Booklet codes="AbC">${bookletKey}</Booklet></Login><Login name="http-native-restart" pw="Owned-native-code-secret" mode="run-hot-restart"><Booklet codes="AbC">${bookletKey}</Booklet></Login></Group></Testtakers>`;
+      await request('POST',workspace+'/participant-roster',{rosterText:document},operator,201);
+      const input={tenantKey,workspaceKey,loginKey:'http-native-coded',password:'Owned-native-code-secret',participantCode:'abc',originalNameSuffix:'forged'};
+      const first=await request('POST',routes.participant.signIn,input);
+      assert.equal(first.participantSession.participantCode,'abc');assert.equal(first.participantSession.originalNameSuffix,'abc');
+      const id=first.participantSession.participantSessionId;
+      const reentry=await request('POST',routes.participant.signIn,{...input,participantCode:'ABC'});
+      assert.equal(reentry.participantSession.participantSessionId,id);assert.equal(reentry.participantSession.participantCode,'abc');assert.equal(reentry.participantSession.originalNameSuffix,'abc');
+      assert.notEqual(reentry.sessionToken,first.sessionToken);
+      await request('GET',resolveRoutePath(routes.participant.getRuntimeState,{participantSessionId:id}),undefined,first.sessionToken,401);
+      const saved=await repository.getParticipantSessionById(id);assert.equal(saved.participantCode,'abc');assert.equal(saved.originalNameSuffix,'abc');
+      const restarted=[];for(let i=0;i<2;i++)restarted.push(await request('POST',routes.participant.signIn,{...input,loginKey:'http-native-restart'}));
+      assert.notEqual(restarted[0].participantSession.participantSessionId,restarted[1].participantSession.participantSessionId);
+      assert.notEqual(restarted[0].participantSession.originalNameSuffix,restarted[1].participantSession.originalNameSuffix);
+      for(const entry of restarted)assert.match(entry.participantSession.originalNameSuffix,/^abc\/[a-z0-9_-]{8}$/);
+    });
     await t.test('protected XML roster HTTP retains exact labels and empty-label login failure without inventing a snapshot',async()=>{
       const scope=await repository.getWorkspaceByScope(tenantKey,workspaceKey);
       const cases=JSON.parse(await readFile(new URL('./fixtures/original-group-label-cases.json',import.meta.url),'utf8'));

@@ -1,5 +1,19 @@
 # Testcenter parity checklist
 
+### Native first person code and suffix foundation (2026-10-24)
+
+Validated native XML sign-in now preserves the first requested raw code (`abc`
+for assignment `AbC`) and its durable Original person suffix. Case-equivalent
+reentry retains the person/Test and first spelling; restart modes create the
+Source-shaped eight-character suffix. Scoped store saves preserve that identity
+through group moves, upgrades and durable failures without inventing unknown
+history. The required unit/PG/focused suites exercise the Rewrite behavior
+against the unchanged production Source53 receipt. See [exact scope and remaining
+auth/listing work](ORIGINAL-RESULT-GROUPS.md). Native two-step Login-token auth,
+atomic person lookup and changed-release/mode/status semantics remain partial.
+The formal ledger remains **27 done / 22 partial**, all eight broad visual rows
+open; this data prerequisite does not close a broad parity row.
+
 ### Group snapshot foundation (2026-10-23)
 
 First validated participant credentials now capture a server-owned group label

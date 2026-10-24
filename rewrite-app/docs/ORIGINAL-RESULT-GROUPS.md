@@ -1,5 +1,45 @@
 # Original participant group snapshots
 
+## First raw native person code and durable suffix (2026-10-24)
+
+The [unchanged production Source53 receipt](../test-fixtures/original-testcenter/source-workspace-results/native-person-labels/manifest.json)
+now has corresponding executable Rewrite controls. A validated native XML
+assignment `AbC` with first requested code `abc` stores `abc` and suffix `abc`.
+Reentry with `ABC` preserves that first code, person and existing Test, while
+the issued person bearer rotates. Native authorization follows Source's ASCII
+case folding without trimming; canonical JSON/CSV code handling keeps its
+existing behavior. Always-new native people store an independently generated
+eight-character `[a-z0-9_-]` suffix, prefixed by the first code and `/` when
+the PHP-truthy code is present. Source's `"0"` prefix exception is derived from
+the pinned PHP implementation, separately from the 53 HTTP observations.
+
+`originalNameSuffix` is immutable native parent metadata, resolved against the
+current scoped Login binding on every store save. Neither client metadata nor
+an old canonical person can establish a native identity. Missing old suffixes
+remain unknown; reopening or reentry never guesses their historical value.
+SQLite **69** and PostgreSQL **63** add a nullable column without backfill.
+The first code and suffix survive group moves and durable reopening. Late
+parent-publication failures leave no partial person; earlier successful Login
+group changes remain valid independent credential-stage effects.
+
+The required unit, PostgreSQL and core-only Original-results suites cover real
+validated XML sign-in, protected HTTP/token rotation, exact raw code spelling,
+ASCII/whitespace authorization boundaries, fresh restart suffixes, rejected
+identity changes, durable failures and upgrades from the preceding schema.
+This closes the earlier controlled first-code gap below. The native two-stage
+Login-token protocol, atomic native person lookup/uniqueness and its behavior
+across release/mode/status changes remain open. Native Results/Tests DTOs and
+pages, grants, deletion, downloads and all eight broad visual rows also remain
+open. This is an identity-data prerequisite, not complete auth/listing parity.
+
+Local implementation qualification passes **4,039 unit/frontend checks** and
+**2,172 complete PostgreSQL checks**, with no failures or skips; the final focused
+PostgreSQL/non-PostgreSQL commands pass **242/205** checks. Core/web typechecking,
+the 468.39 kB production build and CI policy (266 passes/one explicit GNU-timeout
+macOS skip) pass. The owned database is removed after checking no test schemas
+or other sessions remain; the initially stopped cluster is stopped again.
+Hosted qualification of this exact follow-up tree is tracked separately.
+
 ## First native Test Booklet identity survives live file edits (2026-10-24)
 
 The inherited Source47 production observation distinguishes an existing Test's
@@ -20,7 +60,7 @@ labels stay unknown after reopening; no current file is used to invent history.
 Atomic Run projections ignore attempts to replace a first identity, and invalid
 persisted partial/type metadata rejects a mutation before any partial effect.
 All four stores already persist the evidence JSON, so no new SQL migration is
-required. SQLite remains at 68 and PostgreSQL at 62.
+required for that Booklet-label patch (then SQLite 68/PostgreSQL 62).
 
 `original-test-identity.test.mjs` imports actual schema-validated Player, Unit,
 Booklet and Testtakers files through the normal live-content path. It replaces
@@ -55,16 +95,18 @@ can use an existing Login token after an intervening password reimport. Source
 is unchanged, TestMode stays false, and owned containers/volumes retire. Those
 person/code/token observations define the next Rewrite auth/identity work; this
 Booklet patch does not implement them.
-A controlled validated-XML Rewrite comparison confirms the first-code gap:
-assigned `AbC`, first requested `abc`, Source stores `abc`; the current Rewrite
-stores `AbC`. Native person suffixes and an issued Login-token phase are also
-still absent. The next auth work must preserve the first raw native code,
+At that checkpoint, a controlled validated-XML Rewrite comparison confirmed the first-code gap:
+assigned `AbC`, first requested `abc`, Source stored `abc`; that Rewrite
+stored `AbC`. Native person suffixes and an issued Login-token phase were also
+absent. The first-code/suffix follow-up above now addresses the data gap; the
+remaining auth work must support the separate credential/person stages.
+The original next-step requirement was to preserve the first raw native code,
 persist the actual suffix, and support the separate credential/person stages;
 source-fixture integrity assertions do not substitute for those Rewrite behaviors.
 
 
-This implements the observed immutable Test-label prerequisite. Native detailed
-Test DTOs/pages, durable Original person suffixes and the remaining auth/deletion/
+That patch implemented the observed immutable Test-label prerequisite. Native detailed
+Test DTOs/pages and the remaining auth/deletion/
 export/grant/visual requirements below are still open; this is not a native
 listing or full Original-parity claim.
 

@@ -1,7 +1,50 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:net";
 import test from "node:test";
+import { createServer as createHttpServer } from "node:http";
+import { request } from "playwright";
+import { fetchHeldSmokeRoute } from "./fetch-held-smoke-route.mjs";
 import { createSmokeRouteFailureGate, describeSmokeRouteFailure } from "./smoke-route-failure-gate.mjs";
+
+test("held forwarding uses separate real HTTP connections and never replays a lost mutation reply", async () => {
+  const received = [], sockets = new Set();
+  const server = createHttpServer(async (req, res) => {
+    let body = ""; for await (const part of req) body += part;
+    received.push({ socket: req.socket, body, headers: req.headers, path: req.url });
+    if (req.url === "/lost") { req.socket.destroy(); return; }
+    res.writeHead(req.url === "/error" ? 500 : 200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ committed: body }));
+  });
+  server.on("connection", socket => { sockets.add(socket); socket.once("close", () => sockets.delete(socket)); });
+  await new Promise(done => server.listen(0, "127.0.0.1", done));
+  const client = await request.newContext();
+  const headers = { authorization: "Bearer owned-http-test", "content-type": "application/json" };
+  const forward = (path, body) => fetchHeldSmokeRoute({
+    request: () => ({ headers: () => headers }),
+    fetch: options => client.fetch(`http://127.0.0.1:${server.address().port}${path}`, { method: "POST", data: Buffer.from(body), ...options })
+  });
+  try {
+    for (const body of ["first committed mutation", "second committed mutation"]) {
+      const response = await forward("/ok", body);
+      assert.equal(response.status(), 200); assert.deepEqual(await response.json(), { committed: body });
+    }
+    assert.notEqual(received[0].socket, received[1].socket);
+    assert.ok(received.every(item => item.headers.connection === "close"));
+    assert.ok(received.every(item => item.headers.authorization === headers.authorization));
+    const gate = createSmokeRouteFailureGate(); let aborted = 0;
+    await gate.wrap("owned lost mutation", async () => forward("/lost", "committed without reply"))({ abort: async () => { aborted++; } });
+    await gate.settle(); assert.equal(aborted, 1);
+    assert.throws(() => gate.assertHealthy(), /Owned browser route operation failed/);
+    assert.equal(received.filter(item => item.path === "/lost").length, 1, "A committed POST cannot be replayed by the forwarding transport");
+    assert.equal((await forward("/error", "failed mutation")).status(), 500);
+    assert.equal(received.filter(item => item.path === "/error").length, 1);
+    assert.deepEqual(headers, { authorization: "Bearer owned-http-test", "content-type": "application/json" });
+  } finally {
+    await client.dispose();
+    for (const socket of sockets) socket.destroy();
+    await new Promise(done => server.close(done));
+  }
+});
 
 test("failure artifacts retain nested phases/codes without copying a wire header call log", () => {
   const cause = Object.assign(Error("route.fetch: read ECONNRESET\nCall log:\nAuthorization: owned-secret"), { code: "ECONNRESET" });

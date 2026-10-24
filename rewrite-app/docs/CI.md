@@ -1,5 +1,43 @@
 # CI iteration and complete acceptance
 
+## Strict held-route transport and dialog fallback (2026-10-24)
+
+[Run 40049080532](https://github.com/jurei733/testcenter-rewrite/actions/runs/40049080532)
+finishes all 89 jobs: 86 succeed, two browser leaves fail and final acceptance
+fails. The successful security predecessor remains independently qualified;
+this later tree must not be described as fully green.
+
+The timer leaf passes all nine paired Original Worker cases, then its owned
+`route.fetch` fails with `ECONNRESET` in a held save-progress request. The API log
+shows successful surrounding requests and a six-second idle interval, consistent
+with retirement of a pooled test connection. This is a transport diagnosis,
+not proof of an application timer failure. Held-route forwarding now requests
+`Connection: close` from its first request and explicitly disables retries.
+A real Playwright HTTP regression proves distinct sockets, preserved payload/
+authorization, one server-observed POST when its committed reply is lost,
+an unchanged failing route gate and no HTTP500 replay. No mutation, assertion,
+deadline or entire job is retried to turn an error green.
+
+The player-exit leaf separately times out closing the missing-lazy-bundle
+fallback. Its trusted input trace contains no button event, and focus remains
+in the Player iframe. The fallback now uses the existing CDK focus trap with
+safe initial focus and Escape cancellation. Its real browser gate additionally
+checks forward/backward Tab confinement before the existing pointer-driven
+cancel/confirm and protected return assertions. Full hosted verification of
+these fixes remains required on their exact published tree.
+
+The native person-data follow-up passes 4,039 local unit/frontend checks and
+2,172 full PostgreSQL checks, with no failures/skips. CI policy passes 266
+checks with its one explicit GNU-timeout-only macOS skip. Core/web typechecking
+and production build pass; initial entry remains 468.39 kB under 470 kB.
+The final `ci:focus -- original-results` passes 205 non-PostgreSQL checks:
+incremental core build 0.241 seconds, selected tests 5.736 seconds. Its focused
+PostgreSQL variant passes 242 checks. These are local observations under
+concurrent work, not hosted/cold-build speed guarantees. All cases remain in
+the mandatory suites; no complete acceptance gate is removed. Owned PostgreSQL
+schemas/connections are absent before removing the database and returning the
+initially stopped cluster to its stopped state.
+
 ## Complete security-patch acceptance and first native Test labels (2026-10-24)
 
 [Run 40046280241](https://github.com/jurei733/testcenter-rewrite/actions/runs/40046280241)

@@ -18,6 +18,7 @@ import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
+  prepareOriginalParticipantSession,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -1558,11 +1559,10 @@ const createFileRepository = (
         const previous = state.participantSessions[participantSession.participantSessionId];
         const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
         if (originalLoginKey !== undefined) {
-          if (previous?.originalLoginKey && (previous.tenantId !== participantSession.tenantId || previous.workspaceId !== participantSession.workspaceId || previous.originalLoginKey !== (participantSession.originalLoginKey ?? originalLoginKey) || previous.loginKey !== participantSession.loginKey)) throw new TypeError('Native person cannot change its login identity.');
           const binding = Object.values(state.originalLoginBindings).find(binding => binding.tenantId === participantSession.tenantId && binding.workspaceId === participantSession.workspaceId && binding.loginKey === originalLoginKey);
-          if (!binding || participantSession.loginKey !== binding.loginKey) throw new TypeError('Native person requires its current scoped login binding.');
-          participantSession = {...participantSession,originalLoginKey,groupKey:binding.groupKey};
-        }
+
+          participantSession = prepareOriginalParticipantSession(participantSession,previous,binding);
+        } else participantSession = prepareOriginalParticipantSession(participantSession,previous,null);
         const next = {...state, participantSessions: {...state.participantSessions,
           [participantSession.participantSessionId]: structuredClone(participantSession)}};
         await persistState(next); cachePromise = Promise.resolve(next);

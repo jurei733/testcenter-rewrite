@@ -1133,6 +1133,8 @@ interface ParticipantVisibleCodeNotice {
       <section
         id="participantConfirmationBackdrop"
         class="participant-confirmation-backdrop"
+        cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
+        (keydown.escape)="resolveOriginalConfirmation(confirmation, false); $event.stopPropagation()"
       >
         <article
           class="participant-confirmation-dialog"
@@ -1155,7 +1157,7 @@ interface ParticipantVisibleCodeNotice {
               id="participantConfirmationStayButton"
               class="secondary"
               type="button"
-              autofocus
+              cdkFocusInitial
               (click)="resolveOriginalConfirmation(confirmation, false)"
             >{{ confirmation.cancelLabel }}</button>
             @if (confirmation.kind !== 'information') {

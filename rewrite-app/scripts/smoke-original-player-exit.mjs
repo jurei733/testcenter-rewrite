@@ -426,6 +426,11 @@ try {
     const logo=page.locator("#participantApplicationLogoButton");await logo.click();
     await page.getByRole("alertdialog",{name:"Return to test selection?",exact:true}).waitFor();
     assert.ok(blocked>0);assert.equal(await page.locator("mat-dialog-container").count(),0);
+    await page.waitForFunction(()=>document.activeElement?.id==='participantConfirmationStayButton');
+    await page.keyboard.press('Shift+Tab');
+    await page.waitForFunction(()=>document.activeElement?.id==='participantConfirmationContinueButton');
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(()=>document.activeElement?.id==='participantConfirmationStayButton');
     await page.locator("#participantConfirmationStayButton").click();await page.locator("#participantConfirmationBackdrop").waitFor({state:"detached"});
     await logo.click();await page.locator("#participantConfirmationContinueButton").waitFor();
     const returned=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/v1/participant/test-runs/${current.testRun.testRunId}/return-to-starter`&&r.request().method()==="POST");
