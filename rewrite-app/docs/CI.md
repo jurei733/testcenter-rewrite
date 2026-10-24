@@ -1,5 +1,106 @@
 # CI iteration and complete acceptance
 
+## Standalone Linux service feedback with complete security checks (2026-10-24)
+
+`.github/workflows/rewrite-service-focus.yml` provides a separate manual/reusable
+workflow for `participant-auth`, `original-results` or `system-check-reports`.
+Each invocation validates that exact selection before installation, checks out
+without persisted credentials, installs the locked Node/dependency runtime,
+audits the entire lock including dev/optional dependencies, runs CI policy and
+freshly builds core before executing every selected test. It starts its own
+PostgreSQL 16 service; the existing test suites own and retire their schemas.
+There is no browser download, production Angular build, borrowed build artifact
+or upload of databases, request bodies or credentials. Invalid/reusable-call
+input fails with status 2. Audit, policy, build and test failures remain fatal.
+
+Actual [Linux qualification 40062029384](https://github.com/jurei733/testcenter-rewrite/actions/runs/40062029384)
+runs the exact reusable workflow from an isolated push wrapper on
+`codex/service-focus-qualification-20261024`, head
+`6af21a4e8caf56864cb710235b161c231d6365ff`. All three jobs pass:
+
+| Complete selected suite | Checks passed | Whole job | Fresh core build | Selected tests |
+| --- | ---: | ---: | ---: | ---: |
+| Participant authentication | 205 | 59 s | 9.01 s | 15.39 s |
+| Original results | 280 | 74 s | 9.44 s | 20.44 s |
+| Systemcheck reports (PostgreSQL) | 9 | 47 s | 7.67 s | 2.24 s |
+
+Each job also passes all **272 Linux CI-policy checks**, without skips, and
+reports **zero complete-lock audit vulnerabilities**. The three-job wrapper
+finishes in 77 seconds. These are observed targeted runs with warm dependency
+availability; they do not measure or replace complete acceptance. Both workflow
+and job names explicitly distinguish service feedback from acceptance. The
+existing full workflow, PostgreSQL UI, Docker/Compose, Original browser evidence
+and final required aggregate remain mandatory for a release.
+
+Manual dispatch becomes available when this new workflow is present on the
+default branch, as [GitHub documents](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+After that, select the workflow in Actions or use, for example:
+
+```sh
+gh workflow run rewrite-service-focus.yml --ref YOUR_BRANCH -f check=participant-auth
+```
+
+The isolated qualification does not change the active PR branch or cancel its
+useful full-CI jobs. Its production workflow blob is
+`2e5b9145d387ef972397271cdd71af5682983983`. The later generic failure-document
+retention and its additional policy control below are separate follow-up work.
+
+## Preserve the actual failing starter document (2026-10-24)
+
+Full [run 40060887122](https://github.com/jurei733/testcenter-rewrite/actions/runs/40060887122)
+qualifies its **4,068 unit/frontend** and **2,210 PostgreSQL** checks, but leaf
+[`ui-monitor-finish-all` 120774941703](https://github.com/jurei733/testcenter-rewrite/actions/runs/40060887122/job/120774941703)
+fails in the earlier `participant-entry-review-comments` prefix, waiting for
+`#participantStarterScrollButton`. That does not qualify the leaf's later
+finish-all cases or the full tree. Its actual checkout merge
+`50328dd7aa8f3231a474b6a1610f692bde9470cc` has exactly published head
+`ee09f710466c92025f894c950b2694a0f6e6c831`'s tree
+`12c1de2be2250fe71b611dac8219bc9be4fbc260`.
+
+The process writes its failure screenshot/JSON, but the existing specialized
+artifact uploads do not retain either file at this prefix. Extended browser
+leaves now retain precisely `failure.json` and `failure.png` on failure or
+cancellation, under a unique leaf/attempt name, for seven days. No success
+captures or directory-wide store/log uploads are added. The original test
+command, input, assertions and deadlines stay unchanged. This repairs evidence
+retention; the historical starter failure's root cause remains open. The later
+local CI-policy gate passes **271**, with its one explicit GNU-timeout-only
+macOS skip, and Actionlint passes both workflows.
+
+The complete preceding prefix through `participant-entry-review-comments` also
+passes locally with a real headed Chromium, the unchanged production frontend
+and owned SQLite database, in 93.26 seconds. Browser/API teardown completes and
+the owned SQLite file is removed. This local non-recurrence is not a Linux
+reproduction or a fix for the historical failure.
+
+## Focused participant authentication and core-only unit iteration (2026-10-24)
+
+`npm run ci:focus -- participant-auth` runs the existing native group/Login/
+person, protected HTTP sign-in, browser credential-selection and logout suites
+after one fresh core build. These six files remain in mandatory unit/frontend
+CI. The command selects complete suites, accepts no arbitrary shell command and
+preserves the first failure's status. PostgreSQL cases run too with
+`FIRST_SLICE_STORE=postgres` and `FIRST_SLICE_POSTGRES_URL` pointing to an owned
+test database, as in the complete PostgreSQL runner. This is preparation for the
+remaining native Login-token protocol work, not proof of that protocol's parity.
+
+`npm run ci:focus -- unit` now follows the same core-only dependency as the
+regular `npm run test:unit`, instead of compiling an unused Angular production
+frontend. Unknown or browser consumers still select the complete production
+build; policy/no-emit typechecking need none. The hosted workflow still restores
+the verified same-run production build and retains its separate terminal-overlap
+parity gate and every other required acceptance job.
+
+An actual focused authentication run passes **161 checks**, zero failures/skips,
+with `dist/apps/web` moved outside the checkout for the entire run. Total elapsed
+time is **11.55 seconds**, including a **0.22-second incremental core build**.
+The complete focused unit command also passes all **4,068 checks** (121 + 325 +
+1,572 + 2,050), zero failures/skips, with web output absent throughout: **70.12
+seconds** total, including a **0.18-second incremental core build**. Neither
+command generates web output. These are local measurements, not hosted
+or cold-build speed guarantees. The owned verification restores the original
+web directory on exit.
+
 ## Complete zero-code baseline and atomic native person follow-up (2026-10-24)
 
 [Run 40054649901](https://github.com/jurei733/testcenter-rewrite/actions/runs/40054649901)
@@ -1145,19 +1246,22 @@ it does not weaken the real installer bound or qualify that failed matrix.
 
 From `rewrite-app`, `npm run ci:focus -- --list` lists the actual Quick,
 extended-qualification and memory/SQLite workflow shards, plus `policy`,
-`typecheck`, `unit`, `original-results` and `system-check-reports`. Select one or several, for example:
+`typecheck`, `unit`, `participant-auth`, `original-results` and
+`system-check-reports`. Select one or several, for example:
 
 ```sh
 npm run ci:focus -- --plan ui-participant-console original-login
 npm run ci:focus -- ui-participant-console original-login
 npm run ci:focus -- policy typecheck
+npm run ci:focus -- participant-auth
+npm run ci:focus -- unit
 npm run ci:focus -- original-results
 ```
 
 The runner reads `.github/workflows/rewrite-app-ci.yml` on each invocation and
 keeps every command in the selected shard, including the second console
 compatibility check and the third front-camera attachment check. It performs
-one core build when only the explicitly listed service suites are selected, or
+one core build when only the explicitly listed unit/service suites are selected, or
 one fresh production build for other build-dependent selections; policy and
 no-emit type checking need none. There is no stale-build bypass. A failing build
 or test stops the sequence and preserves its status. Per-command elapsed times
@@ -1170,7 +1274,7 @@ This is a focused local check, explicitly marked `completeAcceptance: false`.
 It does not replace PostgreSQL, Docker/Compose, unchanged-Original references,
 the remaining workflow shards or the full CI acceptance gate. Local platform and
 fixture environment still matter. Listing/planning launches no build or test
-and does not export inherited environment values. Eleven controls cover complete
+and does not export inherited environment values. Twelve controls cover complete
 workflow enumeration, command ordering, one-build reuse, failure propagation,
 unknown selections, shell injection, secret-free planning and the exact failure
 status from an actual npm-child subprocess. A real focused invocation freshly

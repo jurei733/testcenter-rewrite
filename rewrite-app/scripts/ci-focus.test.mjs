@@ -17,7 +17,7 @@ const cli = fileURLToPath(new URL('./ci-focus.mjs', import.meta.url));
 test('every actual Quick, qualification and memory/SQLite shard has an executable focused plan', () => {
   const actual = ['quick', 'quick-extended', 'verify-memory-sqlite']
     .flatMap(job => workflow.jobs[job].strategy.matrix.include);
-  assert.equal(checks.length, actual.length + 5);
+  assert.equal(checks.length, actual.length + 6);
   for (const item of actual) {
     const plan = planFocus([item.check], checks);
     assert.equal(plan.checks[0].check, item.check);
@@ -52,9 +52,10 @@ test('a failing first leaf stops later leaves and selected shards without a retr
   assert.deepEqual(calls, ['build', 'smoke:ui:participant-console-loading:built']);
 });
 
-test('policy and no-emit typecheck need no production build; unit retains one', () => {
+test('policy and no-emit typecheck need no build; unit uses its declared core dependency', () => {
   assert.equal(planFocus(['policy', 'typecheck'], checks).build, false);
-  assert.equal(planFocus(['unit'], checks).build, true);
+  assert.equal(scripts['test:unit'], 'npm run build:core && npm run test:unit:built');
+  assert.equal(planFocus(['unit'], checks).buildScript, 'build:core');
   assert.equal(planFocus(['original-login'], checks).checks[0].headed, true);
   assert.equal(planFocus(['integration-sqlite'], checks).checks[0].browser, false);
 });
@@ -111,7 +112,7 @@ test('Original service suites build core once; mixed and unknown consumers requi
   assert.equal(executeFocus(plan, step => {calls.push(step.script);return 0;}), 0);
   assert.deepEqual(calls, ['build:core', 'test:original-results:built']);
   assert.equal(planFocus(['original-results', 'ui-participant-console'], checks).buildScript, 'build');
-  assert.equal(planFocus(['original-results', 'unit'], checks).buildScript, 'build');
+  assert.equal(planFocus(['original-results', 'unit'], checks).buildScript, 'build:core');
   assert.equal(planFocus(['policy'], checks).buildScript, null);
   const unknown = [{id:'future',check:'future',build:true,browser:false,steps:[{script:'future:built',env:{}}]}];
   assert.equal(planFocus(['future'], unknown).buildScript, 'build');
@@ -121,4 +122,21 @@ test('a failing core build blocks all selected checks and keeps its status', () 
   const calls=[];
   assert.equal(executeFocus(planFocus(['original-results'], checks),step=>{calls.push(step.script);return 43;}),43);
   assert.deepEqual(calls,['build:core']);
+});
+
+test('participant authentication focus retains all existing identity, HTTP, credential and logout checks', () => {
+  const plan=planFocus(['participant-auth'],checks),calls=[];
+  assert.equal(plan.buildScript,'build:core');
+  assert.equal(plan.completeAcceptance,false);
+  assert.equal(scripts['test:participant-auth'],'npm run build:core && npm run test:participant-auth:built');
+  const files=scripts['test:participant-auth:built'].replace(/^node --test /,'').split(' ');
+  assert.deepEqual(files,['scripts/original-participant-group.test.mjs','scripts/original-login-binding.test.mjs',
+    'scripts/original-person-identity.test.mjs','scripts/participant-run-creation-api.test.mjs',
+    'scripts/participant-access-credentials.test.mjs','scripts/participant-sign-out.test.mjs']);
+  const mandatory=(scripts['test:unit:built']+' '+scripts['test:frontend-state']).split(/\s+/);
+  for(const file of files)assert.ok(mandatory.includes(file),`${file} remains in required unit CI`);
+  assert.equal(executeFocus(plan,step=>{calls.push(step.script);return 0;}),0);
+  assert.deepEqual(calls,['build:core','test:participant-auth:built']);
+  assert.equal(planFocus(['participant-auth','original-results','unit'],checks).buildScript,'build:core');
+  assert.equal(planFocus(['participant-auth','original-login'],checks).buildScript,'build');
 });

@@ -637,6 +637,16 @@ jobs:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
           UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT: ${{ runner.temp }}/controller-timer-diagnostics
         run: ${{ matrix.command }}
+      - name: Retain the exact failing browser document
+        if: (failure() || cancelled()) && matrix.playwright
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ui-failure-${{ matrix.check }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/failure.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/failure.png
+          if-no-files-found: warn
+          retention-days: 7
       - name: Retain failed console loading evidence
         if: (failure() || cancelled()) && matrix.check == 'ui-participant-console'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
