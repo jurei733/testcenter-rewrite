@@ -17,7 +17,7 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
   const directory = await mkdtemp(join(tmpdir(),'testcenter-run-creation-api-'));
   const file = join(directory,'owned.sqlite'), schema = 'owned_creation_api_'+randomUUID().replaceAll('-','');
   const environment = {FIRST_SLICE_STORE:postgres?'postgres':'sqlite',FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',
-    FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'legacy-compatibility',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',REQUIRE_LOGIN_PASSWORD:'false'};
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',REQUIRE_LOGIN_PASSWORD:'false'};
   let rootPool,storage,control,server,created=false;
   if(postgres) {
     assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);
@@ -80,6 +80,29 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       const identity=await request('POST',routes.participant.signIn,{...input,participantCode:'abc'});
       assert.equal(identity.participantSession.participantCode,'AbC');assert.deepEqual(await metadata(),[saved]);
       await request('POST',routes.participant.signIn,{...input,participantCode:'ABC'});assert.deepEqual(await metadata(),[saved]);
+    });
+    await t.test('native group reentry keeps person and Test while rotating credentials and rejecting the old bearer',async()=>{
+      const scope=await repository.getWorkspaceByScope(tenantKey,workspaceKey);
+      const document=(group,label)=>`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="${group}" label="${label}"><Login name="owned-native-http" pw="Owned-native-http-secret" mode="run-hot-return"><Booklet>${bookletKey}</Booklet></Login></Group></Testtakers>`;
+      const upload=(group,label)=>request('POST',workspace+'/participant-roster',{rosterText:document(group,label)},operator,201);
+      const input={tenantKey,workspaceKey,loginKey:'owned-native-http',password:'Owned-native-http-secret'};
+      await upload('NATIVE.HTTP','  Original HTTP Ω  ');
+      let current=await request('POST',routes.participant.signIn,input);
+      const parentId=current.participantSession.participantSessionId;
+      await resume(current);const testsBefore=await repository.listTestRunsByParticipantSessionId(parentId);
+      assert.equal(testsBefore.length,1);
+      const runtime=resolveRoutePath(routes.participant.getRuntimeState,{participantSessionId:parentId});
+      for(const [group,label,snapshot] of [['native.http','Replacement label','NATIVE.HTTP'],['NATIVE.MOVED','  Moved HTTP Ω  ','NATIVE.MOVED']]){
+        const previous=current;await upload(group,label);current=await request('POST',routes.participant.signIn,input);
+        assert.equal(current.participantSession.participantSessionId,parentId);assert.equal(current.participantSession.groupKey,group);
+        assert.notEqual(current.sessionToken,previous.sessionToken);
+        await request('GET',runtime,undefined,previous.sessionToken,401);
+        await request('GET',runtime,undefined,current.sessionToken);
+        assert.deepEqual(await repository.listTestRunsByParticipantSessionId(parentId),testsBefore);
+        const binding=(await repository.listOriginalLoginBindingsByWorkspace(scope.tenantId,scope.workspaceId)).find(row=>row.loginKey===input.loginKey);
+        assert.equal(binding.groupSnapshotKey,snapshot);
+      }
+      assert.equal((await repository.listParticipantSessionsByWorkspace(scope.tenantId,scope.workspaceId)).filter(row=>row.loginKey===input.loginKey).length,1);
     });
     await t.test('protected XML roster HTTP retains exact labels and empty-label login failure without inventing a snapshot',async()=>{
       const scope=await repository.getWorkspaceByScope(tenantKey,workspaceKey);

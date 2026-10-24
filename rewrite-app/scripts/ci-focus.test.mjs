@@ -17,7 +17,7 @@ const cli = fileURLToPath(new URL('./ci-focus.mjs', import.meta.url));
 test('every actual Quick, qualification and memory/SQLite shard has an executable focused plan', () => {
   const actual = ['quick', 'quick-extended', 'verify-memory-sqlite']
     .flatMap(job => workflow.jobs[job].strategy.matrix.include);
-  assert.equal(checks.length, actual.length + 3);
+  assert.equal(checks.length, actual.length + 5);
   for (const item of actual) {
     const plan = planFocus([item.check], checks);
     assert.equal(plan.checks[0].check, item.check);
@@ -102,4 +102,23 @@ test('the actual CLI preserves a failing npm child status and does not dispatch 
       ['build', 'smoke:ui:participant-console-loading:built']);
     assert.ok(result.stdout.includes('"status":37'));
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('Original service suites build core once; mixed and unknown consumers require the full production build', () => {
+  const plan = planFocus(['original-results'], checks), calls = [];
+  assert.equal(plan.buildScript, 'build:core');
+  assert.equal(executeFocus(plan, step => {calls.push(step.script);return 0;}), 0);
+  assert.deepEqual(calls, ['build:core', 'test:original-results:built']);
+  assert.equal(planFocus(['original-results', 'ui-participant-console'], checks).buildScript, 'build');
+  assert.equal(planFocus(['original-results', 'unit'], checks).buildScript, 'build');
+  assert.equal(planFocus(['policy'], checks).buildScript, null);
+  const unknown = [{id:'future',check:'future',build:true,browser:false,steps:[{script:'future:built',env:{}}]}];
+  assert.equal(planFocus(['future'], unknown).buildScript, 'build');
+});
+
+test('a failing core build blocks all selected checks and keeps its status', () => {
+  const calls=[];
+  assert.equal(executeFocus(planFocus(['original-results'], checks),step=>{calls.push(step.script);return 43;}),43);
+  assert.deepEqual(calls,['build:core']);
 });

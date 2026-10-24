@@ -3,6 +3,7 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
+  prepareOriginalLoginBinding,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -38,6 +39,7 @@ import type {
   ParticipantRosterEntry,
   ParticipantSession,
   OriginalParticipantGroup,
+  OriginalLoginBinding,
   ParticipantTestLog,
   ParticipantRunCommand,
   ParticipantProgressDelivery,
@@ -62,6 +64,12 @@ const mapOriginalParticipantGroup = (row: Record<string, unknown>): OriginalPart
   tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id),
   groupKey: String(row.group_key), groupLabel: String(row.group_label),
   createdAt: String(row.created_at), lastModifiedAt: String(row.last_modified_at)
+});
+
+const mapOriginalLoginBinding = (row: Record<string, unknown>): OriginalLoginBinding => ({
+  tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),loginKey:String(row.login_key),
+  groupKey:String(row.group_key),groupSnapshotKey:String(row.group_snapshot_key),
+  createdAt:String(row.created_at),lastAuthenticatedAt:String(row.last_authenticated_at)
 });
 
 const mapTenant = (row: Row | undefined): Tenant | null =>
@@ -389,6 +397,7 @@ const mapParticipantSession = (row: Row | undefined): ParticipantSession | null 
         contentReleaseId: String(row.content_release_id),
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
+        ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
         participantCode:
           row.participant_code === null || row.participant_code === undefined
             ? null
@@ -503,6 +512,7 @@ const mapParticipantRosterEntry = (
               ? undefined
               : (String(row.execution_mode) as ParticipantRosterEntry["executionMode"]),
           groupKey: String(row.group_key),
+          ...(row.original_login_identity ? {originalLoginIdentity:true as const} : {}),
           ...(row.group_label === null || row.group_label === undefined
             ? {}
             : { groupLabel: String(row.group_label) }),
@@ -1586,6 +1596,22 @@ const migrations: PostgresMigration[] = [
       group_label TEXT NOT NULL, created_at TEXT NOT NULL, last_modified_at TEXT NOT NULL,
       PRIMARY KEY (tenant_id, workspace_id, group_key)
     );`
+  },
+  {
+    version: 62,
+    name: "original_login_bindings",
+    sql: `CREATE TABLE IF NOT EXISTS original_login_bindings (
+      tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, login_key TEXT NOT NULL,
+      group_key TEXT NOT NULL, group_snapshot_key TEXT NOT NULL,
+      created_at TEXT NOT NULL, last_authenticated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, workspace_id, login_key),
+      FOREIGN KEY (tenant_id, workspace_id, group_snapshot_key)
+        REFERENCES original_participant_groups(tenant_id, workspace_id, group_key) ON DELETE CASCADE
+    );
+    ALTER TABLE participant_sessions ADD COLUMN original_login_key TEXT;
+    ALTER TABLE participant_roster_entries ADD COLUMN original_login_identity BOOLEAN;
+    CREATE INDEX IF NOT EXISTS participant_sessions_original_login
+      ON participant_sessions(tenant_id, workspace_id, original_login_key);`
   }
 ];
 
@@ -2514,6 +2540,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           "participant_roster_entries"
         );
         await deleteScoped("operational_login_migration_candidates");
+        await deleteScoped("original_login_bindings");
         await deleteScoped("original_participant_groups");
         const deletedLoginAttemptCount = await deleteScoped(
           "participant_login_attempts"
@@ -3050,7 +3077,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getParticipantSessionById(participantSessionId) {
       return one(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
          FROM participant_sessions
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -3084,7 +3111,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
          FROM participant_sessions
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -3112,11 +3139,43 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
       return (await pool.query("SELECT * FROM original_participant_groups WHERE tenant_id = $1 AND workspace_id = $2 ORDER BY group_key", [tenantId, workspaceId])).rows.map(mapOriginalParticipantGroup);
     },
+    async bindOriginalLoginGroup(input) {
+      const validated = prepareOriginalLoginBinding(input), client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const parent = await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE",[input.tenantId,input.workspaceId]);
+        const group = await client.query("SELECT group_key FROM original_participant_groups WHERE tenant_id=$1 AND workspace_id=$2 AND group_key=$3",[input.tenantId,input.workspaceId,input.groupSnapshotKey]);
+        if (!parent.rowCount || !group.rowCount) { await client.query("ROLLBACK"); return null; }
+        const bindings = (await client.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2",[input.tenantId,input.workspaceId])).rows.map(mapOriginalLoginBinding);
+        const binding = prepareOriginalLoginBinding(input,bindings.find(row=>originalParticipantGroupKeysEqual(row.loginKey,validated.loginKey)));
+        await client.query(`INSERT INTO original_login_bindings (tenant_id,workspace_id,login_key,group_key,group_snapshot_key,created_at,last_authenticated_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (tenant_id,workspace_id,login_key) DO UPDATE SET
+          group_key=EXCLUDED.group_key,group_snapshot_key=EXCLUDED.group_snapshot_key,last_authenticated_at=EXCLUDED.last_authenticated_at`,
+          [binding.tenantId,binding.workspaceId,binding.loginKey,binding.groupKey,binding.groupSnapshotKey,binding.createdAt,binding.lastAuthenticatedAt]);
+        await client.query("UPDATE participant_sessions SET group_key=$1 WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4",[binding.groupKey,binding.tenantId,binding.workspaceId,binding.loginKey]);
+        await client.query("COMMIT"); return binding;
+      } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    },
+    async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
+      return (await pool.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY login_key",[tenantId,workspaceId])).rows.map(mapOriginalLoginBinding);
+    },
     async saveParticipantSession(participantSession) {
-      await pool.query(
+      const previous = mapParticipantSession((await pool.query("SELECT * FROM participant_sessions WHERE participant_session_id=$1",[participantSession.participantSessionId])).rows[0]);
+      const originalLoginKey = previous?.originalLoginKey ?? participantSession.originalLoginKey;
+      const native = originalLoginKey !== undefined, client = native ? await pool.connect() : null;
+      try {
+        if (native) {
+          await client!.query("BEGIN");
+          if (previous?.originalLoginKey && (previous.tenantId !== participantSession.tenantId || previous.workspaceId !== participantSession.workspaceId || previous.originalLoginKey !== (participantSession.originalLoginKey ?? originalLoginKey) || previous.loginKey !== participantSession.loginKey)) throw new TypeError('Native person cannot change its login identity.');
+          const parent = await client!.query("SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE",[participantSession.tenantId,participantSession.workspaceId]);
+          const binding = (await client!.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[participantSession.tenantId,participantSession.workspaceId,originalLoginKey])).rows[0];
+          if (!parent.rowCount || !binding || participantSession.loginKey !== binding.login_key) throw new TypeError('Native person requires its current scoped login binding.');
+          participantSession = {...participantSession,originalLoginKey,groupKey:String(binding.group_key)};
+        }
+        await (client ?? pool).query(
         `INSERT INTO participant_sessions (
-          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT(participant_session_id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
@@ -3127,7 +3186,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           execution_mode = EXCLUDED.execution_mode,
           status = EXCLUDED.status,
           valid_until = EXCLUDED.valid_until,
-          created_at = EXCLUDED.created_at`,
+          created_at = EXCLUDED.created_at,
+          original_login_key = EXCLUDED.original_login_key`,
         [
           participantSession.participantSessionId,
           participantSession.tenantId,
@@ -3139,13 +3199,17 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantSession.executionMode ?? null,
           participantSession.status,
           participantSession.validUntil ?? null,
-          participantSession.createdAt
+          participantSession.createdAt,
+          participantSession.originalLoginKey ?? null
         ]
       );
+        if (native) await client!.query("COMMIT");
+      } catch (error) { if (native) await client!.query("ROLLBACK"); throw error; }
+      finally { client?.release(); }
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
          FROM participant_roster_entries
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -3200,8 +3264,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         validateApplicationAssetReferences(participantRosterEntry.assetAssignments,await assetNames(client));
       await client.query(
         `INSERT INTO participant_roster_entries (
-          participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+          participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
         ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
           participant_roster_entry_id = EXCLUDED.participant_roster_entry_id,
           execution_mode = EXCLUDED.execution_mode,
@@ -3219,7 +3283,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           custom_texts_json = EXCLUDED.custom_texts_json,
           view_settings_json = EXCLUDED.view_settings_json,
           asset_assignments_json = EXCLUDED.asset_assignments_json,
-          imported_at = EXCLUDED.imported_at`,
+          imported_at = EXCLUDED.imported_at,
+          original_login_identity = EXCLUDED.original_login_identity`,
         [
           participantRosterEntry.participantRosterEntryId,
           participantRosterEntry.tenantId,
@@ -3246,7 +3311,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           JSON.stringify(participantRosterEntry.customTexts ?? {}),
           JSON.stringify(participantRosterEntry.viewSettings ?? {}),
           JSON.stringify(participantRosterEntry.assetAssignments ?? {}),
-          participantRosterEntry.importedAt
+          participantRosterEntry.importedAt,
+          participantRosterEntry.originalLoginIdentity ?? null
         ]
       );
       });

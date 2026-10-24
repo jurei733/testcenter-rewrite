@@ -1,5 +1,6 @@
 import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
 export { originalParticipantGroupKeysEqual, prepareOriginalParticipantGroup } from "./original-participant-group.js";
+export {prepareOriginalLoginBinding, type OriginalLoginBindingInput} from './original-login-binding.js';
 import type {WorkspaceFilePublicationInput} from "./workspace-file-publication.js";
 export {createWorkspaceFilePublicationRevision,prepareWorkspaceFilePublication} from "./workspace-file-publication.js";
 export {createContentReleaseActivationRevision,prepareContentReleaseActivation} from "./content-release-activation.js";
@@ -1505,6 +1506,9 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   /** First validated credential login wins; returns null if the workspace was deleted. */
   getOrCreateOriginalParticipantGroup(input: Omit<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup, "lastModifiedAt">): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup | null>;
   listOriginalParticipantGroupsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup[]>;
+  /** Updates one native Login association and all its linked persons atomically. */
+  bindOriginalLoginGroup(input: import('./original-login-binding.js').OriginalLoginBindingInput): Promise<import('@testcenter-rewrite-app/domain').OriginalLoginBinding | null>;
+  listOriginalLoginBindingsByWorkspace(tenantId: string, workspaceId: string): Promise<import('@testcenter-rewrite-app/domain').OriginalLoginBinding[]>;
   listParticipantRosterEntriesByWorkspace(
     tenantId: string,
     workspaceId: string
@@ -25310,6 +25314,7 @@ export const createFirstSliceServices = (
     );
     const parsedEntries = [] as ReturnType<typeof parseParticipantRosterText>;
     const operationalLoginCandidates = [] as OriginalTestcenterOperationalLoginCandidate[];
+    const nativeEntries = new Set<ReturnType<typeof parseParticipantRosterText>[number]>();
 
     for (const rosterDocument of input.rosterDocuments) {
       const jsonInspection = inspectParticipantRosterJsonSource(
@@ -25344,9 +25349,17 @@ export const createFirstSliceServices = (
           );
         }
       }
-      parsedEntries.push(
-        ...parseParticipantRosterText(rosterDocument.rosterText)
-      );
+      const documentEntries = parseParticipantRosterText(rosterDocument.rosterText);
+      // Only the server-validated Original XML path can establish native identity.
+      // JSON flags and legacy XML cannot opt into this storage relationship.
+      if (xmlValidationContext.profile === "original-19" && typeof rosterDocument.rosterText === "string" &&
+          rosterDocument.rosterText.trimStart().startsWith("<")) {
+        const root = new DOMParser().parseFromString(rosterDocument.rosterText, "application/xml").documentElement;
+        if (root && xmlElementLocalName(root) === "Testtakers") {
+          for (const entry of documentEntries) nativeEntries.add(entry);
+        }
+      }
+      parsedEntries.push(...documentEntries);
       operationalLoginCandidates.push(
         ...parseOriginalTestcenterOperationalLogins(rosterDocument.rosterText)
       );
@@ -25470,6 +25483,7 @@ export const createFirstSliceServices = (
         tenantId: workspace.tenantId,
         workspaceId: workspace.workspaceId,
         loginKey: parsedEntry.loginKey,
+        ...(nativeEntries.has(parsedEntry) ? {originalLoginIdentity: true as const} : {}),
         executionMode:
           parsedEntry.executionMode ??
           existingEntry?.executionMode ??
@@ -32100,6 +32114,17 @@ export const createFirstSliceServices = (
         if (!originalGroup) {
           throw new FirstSliceError(404, "workspace_not_found", "Participant workspace was not found.");
         }
+        const nativeBinding = rosterEntry?.originalLoginIdentity
+          ? await repository.bindOriginalLoginGroup({tenantId:workspace.tenantId,
+              workspaceId:workspace.workspaceId,loginKey:rosterEntry.loginKey,groupKey,
+              groupSnapshotKey:originalGroup.groupKey,authenticatedAt:signInTimestamp})
+          : null;
+        if (rosterEntry?.originalLoginIdentity && !nativeBinding) {
+          throw new FirstSliceError(409, "participant_login_scope_changed", "The login group changed during authentication.");
+        }
+        const matchesLogin = (session: ParticipantSession): boolean => nativeBinding
+          ? session.originalLoginKey === nativeBinding.loginKey
+          : session.loginKey === loginKey && session.originalLoginKey === undefined;
         const participantCode = String(input.participantCode ?? "").trim();
         const codeRequired = participantRosterRequiresCode(rosterEntry);
         if (codeRequired && !participantCode) {
@@ -32145,7 +32170,7 @@ export const createFirstSliceServices = (
         const loginSessions = workspaceParticipantSessions
           .filter(
             participantSession =>
-              participantSession.loginKey === loginKey &&
+              matchesLogin(participantSession) &&
               normalizeParticipantCode(participantSession.participantCode) ===
                 normalizeParticipantCode(effectiveParticipantCode)
           )
@@ -32162,7 +32187,7 @@ export const createFirstSliceServices = (
           : workspaceParticipantSessions
               .filter(
                 participantSession =>
-                  participantSession.loginKey === loginKey &&
+                  matchesLogin(participantSession) &&
                   participantSession.groupKey === groupKey &&
                   normalizeParticipantCode(participantSession.participantCode) ===
                     normalizeParticipantCode(effectiveParticipantCode) &&
@@ -32208,7 +32233,8 @@ export const createFirstSliceServices = (
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
           contentReleaseId: activeRelease.contentReleaseId,
-          loginKey,
+          loginKey: nativeBinding?.loginKey ?? loginKey,
+          ...(nativeBinding ? {originalLoginKey:nativeBinding.loginKey} : {}),
           groupKey,
           participantCode: effectiveParticipantCode,
           executionMode: executionMode.mode,

@@ -1,0 +1,66 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "probeCommit": "06a4a878554f07b72c968f8be9f168edd3d1c6d6",
+  "probeTree": "0452dd0529951a3d477c3fb05111eaf3ac2fb557",
+  "baseCodeTree": "05307f416b343d681676bb6120323a58df76e663",
+  "runId": 40041716400,
+  "jobId": 120714092193,
+  "status": "completed",
+  "conclusion": "success",
+  "checks": 47,
+  "artifact": {
+    "id": 12539821732,
+    "bytes": 10600,
+    "sha256": "7020c671737631cd0a5d3f3e7d0c619c677a0c5a375cf1c6884b926eca3b8ed1"
+  },
+  "scriptBlob": "20561fe74c7c262efa8dee588b37586959201322",
+  "scriptSha256": "8d48fff74ef55043c6c5ab38f938969b94d4f883d1cc2e3292d8ad16f8f9e13a",
+  "workflowSha256": "d649b5aaa25ac305909822b731049df55e5c8518a6f1a0d2611d6c75a303044d",
+  "composeSha256": "0808c7690308371e619ce1d42584f23888a9c32443304a798afec6c0df42528d",
+  "files": {
+    "groups-history.json": "62f038da17605f29b5472f01192bd28e20bfb9c26b70b515f42ba71493eae126",
+    "image-id.txt": "e0b9f5135e292b0f1459d7e500c3084992d0bdc9ec91d19063873058469bea50",
+    "logs.csv": "deef8f4b2e47a0bac22d2c5651b8f6818e532d22f7b746f5cdc6ca3b0390da99",
+    "logs.json": "2fb53e636c70a9c5e4fceb48e6f1617b2d5959a4a749c28532d9e6bd0d17c8e8",
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
+    "receipt.json": "fdb9f7a6b78509e0faf6aa38d0b52d431c9d4af7407c0b14862c8ed0f24e7439",
+    "responses.csv": "8c25cff7a0795d1f9d4e2ffb73f2845bf738e50ca80e4f4a7c288273756beb6d",
+    "responses.json": "d516e2f758f68949e169bf2b56b2ac16c3896b78746b00dbe84b9fbe7e559408",
+    "reviews-enhanced.csv": "59f377288f89817c8f1dbb663ec603524fafa82f18bc03ca843ebf081e1ea48a",
+    "reviews-enhanced.json": "307e766a4aad18e659fd298313a52905f36812996245668b7be57950928ac6ec",
+    "reviews-legacy.csv": "a2108787b0216b32a3e0610462cebd918a5e8dd8b90fa5c87285a9c78adccd7d",
+    "reviews-legacy.json": "9f4cac0cafa55ce935ff46396e168bef4653e477881fa72c0906123bb2f8ef73",
+    "test-sessions-history.json": "5a13d6d28fc9a0d7cde0441e89a2964deae7a0ee65e67e88d5e733e856dfc87d"
+  },
+  "sourceFiles": {
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/middleware/RequireToken.class.php": "f2d19714051837e46c07adec45bc1c52205cc9a282b37441a248bf9916f3c35a",
+    "backend/src/data-collection/TestSession.class.php": "a7beb6d00a1a05ce03c8bdca62ae6e4a888bedac041326a6a15bdcffad1dc5eb"
+  },
+  "verification": {
+    "publicMembers": 13,
+    "rawGroupObservations": 44,
+    "rawTestSessionObservations": 20,
+    "groupRowFields": 8,
+    "testSessionFields": 7,
+    "emptyTestSessionWirePayload": [],
+    "allNativePrevious41ControlsRetained": true,
+    "actualGroupMovesAndBookletLabelsVerified": true
+  },
+  "precedingProbe": {
+    "runId": 40041186568,
+    "jobId": 120712397727,
+    "commit": "343c93fa3d6c0ba2852fe215f25da0eb15b04f24",
+    "artifact": 12539512519,
+    "artifactBytes": 9753,
+    "artifactSha256": "d015b51275a08eb04cf53f0d886a369d763bd3e27939d2f4661e0c3d7d851068",
+    "conclusion": "failure",
+    "reason": "Incorrect identical-bearer assumption. Source renews the person token while retaining person/Test identity. Final probe requires distinct bearer tokens and equal TestIDs and uses current tokens. This is a corrected measurement, not a Source modification or blind retry."
+  },
+  "qualification": "Actual unchanged production Source47 HTTP controls only; does not claim Rewrite identity/projection parity.",
+  "testMode": false
+}

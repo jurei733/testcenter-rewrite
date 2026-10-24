@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
+  prepareOriginalLoginBinding,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -40,6 +41,7 @@ import type {
   ParticipantRosterEntry,
   ParticipantSession,
   OriginalParticipantGroup,
+  OriginalLoginBinding,
   ParticipantTestLog,
   ParticipantRunCommand,
   ParticipantProgressDelivery,
@@ -66,6 +68,12 @@ const mapOriginalParticipantGroup = (row: Record<string, unknown>): OriginalPart
   tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id),
   groupKey: String(row.group_key), groupLabel: String(row.group_label),
   createdAt: String(row.created_at), lastModifiedAt: String(row.last_modified_at)
+});
+
+const mapOriginalLoginBinding = (row: Record<string, unknown>): OriginalLoginBinding => ({
+  tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),loginKey:String(row.login_key),
+  groupKey:String(row.group_key),groupSnapshotKey:String(row.group_snapshot_key),
+  createdAt:String(row.created_at),lastAuthenticatedAt:String(row.last_authenticated_at)
 });
 
 const mapTenant = (row: Record<string, unknown> | undefined): Tenant | null =>
@@ -407,6 +415,7 @@ const mapParticipantSession = (
         contentReleaseId: String(row.content_release_id),
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
+        ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
         participantCode:
           row.participant_code === null || row.participant_code === undefined
             ? null
@@ -514,6 +523,7 @@ const mapParticipantRosterEntry = (
               ? undefined
               : (String(row.execution_mode) as ParticipantRosterEntry["executionMode"]),
           groupKey: String(row.group_key),
+          ...(row.original_login_identity ? {originalLoginIdentity:true as const} : {}),
           ...(row.group_label === null || row.group_label === undefined
             ? {}
             : { groupLabel: String(row.group_label) }),
@@ -1652,6 +1662,22 @@ const sqliteMigrations: SqliteMigration[] = [
       group_label TEXT NOT NULL, created_at TEXT NOT NULL, last_modified_at TEXT NOT NULL,
       PRIMARY KEY (tenant_id, workspace_id, group_key)
     );`
+  },
+  {
+    version: 68,
+    name: "original_login_bindings",
+    sql: `CREATE TABLE IF NOT EXISTS original_login_bindings (
+      tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, login_key TEXT NOT NULL,
+      group_key TEXT NOT NULL, group_snapshot_key TEXT NOT NULL,
+      created_at TEXT NOT NULL, last_authenticated_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, workspace_id, login_key),
+      FOREIGN KEY (tenant_id, workspace_id, group_snapshot_key)
+        REFERENCES original_participant_groups(tenant_id, workspace_id, group_key) ON DELETE CASCADE
+    );
+    ALTER TABLE participant_sessions ADD COLUMN original_login_key TEXT;
+    ALTER TABLE participant_roster_entries ADD COLUMN original_login_identity INTEGER;
+    CREATE INDEX IF NOT EXISTS participant_sessions_original_login
+      ON participant_sessions(tenant_id, workspace_id, original_login_key);`
   }
 ];
 
@@ -2679,6 +2705,7 @@ export const createSqliteFirstSliceStorage = (
           deletedTestLogCount: deleteScoped("participant_test_logs")
         };
         deleteScoped("operational_login_migration_candidates");
+        deleteScoped("original_login_bindings");
         deleteScoped("original_participant_groups");
         counts.deletedWorkspaceCount = Number(
           database
@@ -3208,7 +3235,7 @@ export const createSqliteFirstSliceStorage = (
     async getParticipantSessionById(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
            FROM participant_sessions
            WHERE participant_session_id = ?`
         )
@@ -3242,7 +3269,7 @@ export const createSqliteFirstSliceStorage = (
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
            FROM participant_sessions
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -3268,12 +3295,43 @@ export const createSqliteFirstSliceStorage = (
     async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
       return database.prepare("SELECT * FROM original_participant_groups WHERE tenant_id = ? AND workspace_id = ? ORDER BY group_key").all(tenantId, workspaceId).map(mapOriginalParticipantGroup);
     },
+    async bindOriginalLoginGroup(input) {
+      const validated=prepareOriginalLoginBinding(input); database.exec("BEGIN IMMEDIATE");
+      try {
+        const parent=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(input.tenantId,input.workspaceId);
+        const group=database.prepare("SELECT group_key FROM original_participant_groups WHERE tenant_id=? AND workspace_id=? AND group_key=?").get(input.tenantId,input.workspaceId,input.groupSnapshotKey);
+        if (!parent || !group) { database.exec("ROLLBACK"); return null; }
+        const bindings=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=?").all(input.tenantId,input.workspaceId).map(mapOriginalLoginBinding);
+        const binding=prepareOriginalLoginBinding(input,bindings.find(row=>originalParticipantGroupKeysEqual(row.loginKey,validated.loginKey)));
+        database.prepare(`INSERT INTO original_login_bindings (tenant_id,workspace_id,login_key,group_key,group_snapshot_key,created_at,last_authenticated_at)
+          VALUES (?,?,?,?,?,?,?) ON CONFLICT (tenant_id,workspace_id,login_key) DO UPDATE SET
+          group_key=excluded.group_key,group_snapshot_key=excluded.group_snapshot_key,last_authenticated_at=excluded.last_authenticated_at`)
+          .run(binding.tenantId,binding.workspaceId,binding.loginKey,binding.groupKey,binding.groupSnapshotKey,binding.createdAt,binding.lastAuthenticatedAt);
+        database.prepare("UPDATE participant_sessions SET group_key=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=?")
+          .run(binding.groupKey,binding.tenantId,binding.workspaceId,binding.loginKey);
+        database.exec("COMMIT"); return binding;
+      } catch (error) { return rollbackAfterFailure(database,error); }
+    },
+    async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
+      return database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? ORDER BY login_key").all(tenantId,workspaceId).map(mapOriginalLoginBinding);
+    },
     async saveParticipantSession(participantSession) {
-      database
+      const previous=mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id=?").get(participantSession.participantSessionId));
+      const originalLoginKey=previous?.originalLoginKey ?? participantSession.originalLoginKey, native=originalLoginKey!==undefined;
+      if (native) database.exec("BEGIN IMMEDIATE");
+      try {
+        if (native) {
+          if (previous?.originalLoginKey && (previous.tenantId!==participantSession.tenantId || previous.workspaceId!==participantSession.workspaceId || previous.originalLoginKey!==(participantSession.originalLoginKey ?? originalLoginKey) || previous.loginKey!==participantSession.loginKey)) throw new TypeError('Native person cannot change its login identity.');
+          const parent=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(participantSession.tenantId,participantSession.workspaceId);
+          const binding=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(participantSession.tenantId,participantSession.workspaceId,originalLoginKey!);
+          if (!parent || !binding || participantSession.loginKey !== binding.login_key) throw new TypeError('Native person requires its current scoped login binding.');
+          participantSession={...participantSession,originalLoginKey,groupKey:String(binding.group_key)};
+        }
+        database
         .prepare(
           `INSERT INTO participant_sessions (
-            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(participant_session_id) DO UPDATE SET
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
@@ -3284,7 +3342,8 @@ export const createSqliteFirstSliceStorage = (
             execution_mode = excluded.execution_mode,
             status = excluded.status,
             valid_until = excluded.valid_until,
-            created_at = excluded.created_at`
+            created_at = excluded.created_at,
+            original_login_key = excluded.original_login_key`
         )
         .run(
           participantSession.participantSessionId,
@@ -3297,13 +3356,16 @@ export const createSqliteFirstSliceStorage = (
           participantSession.executionMode ?? null,
           participantSession.status,
           participantSession.validUntil ?? null,
-          participantSession.createdAt
+          participantSession.createdAt,
+          participantSession.originalLoginKey ?? null
         );
+        if (native) database.exec("COMMIT");
+      } catch (error) { if (native) return rollbackAfterFailure(database,error); throw error; }
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
            FROM participant_roster_entries
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -3377,8 +3439,8 @@ export const createSqliteFirstSliceStorage = (
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
-            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
             participant_roster_entry_id = excluded.participant_roster_entry_id,
             execution_mode = excluded.execution_mode,
@@ -3396,7 +3458,8 @@ export const createSqliteFirstSliceStorage = (
             custom_texts_json = excluded.custom_texts_json,
             view_settings_json = excluded.view_settings_json,
             asset_assignments_json = excluded.asset_assignments_json,
-            imported_at = excluded.imported_at`
+            imported_at = excluded.imported_at,
+            original_login_identity = excluded.original_login_identity`
         )
         .run(
           participantRosterEntry.participantRosterEntryId,
@@ -3424,7 +3487,8 @@ export const createSqliteFirstSliceStorage = (
           JSON.stringify(participantRosterEntry.customTexts ?? {}),
           JSON.stringify(participantRosterEntry.viewSettings ?? {}),
           JSON.stringify(participantRosterEntry.assetAssignments ?? {}),
-          participantRosterEntry.importedAt
+          participantRosterEntry.importedAt,
+          participantRosterEntry.originalLoginIdentity ? 1 : null
         );
       });
     },
