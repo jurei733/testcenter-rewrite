@@ -486,7 +486,7 @@ try{
  check('restoring a code assignment reopens the original person Test after intervening assignments',{testId:restoredTest,originalTestId:initialLifecycleTest,testSessions:(await sessions()).filter(row=>row.loginName===lifecycleName)});
  const zeroName='owned-native-zero-code',zeroFile='native-zero-code.xml';
  const zeroRoster=code=>groupRoster('ORACLE.ZERO-CODE','Owned zero code',zeroName,code);
- await uploadGroups(zeroRoster('0'),zeroFile);const zeroLogin=await groupLogin(zeroName);
+ await uploadGroups(zeroRoster('0 AbC'),zeroFile);const zeroLogin=await groupLogin(zeroName);
  const zeroPerson=(await request('PUT','/session/person',{token:zeroLogin.token,body:{code:'0'}})).value,zeroTest=await openGroupTest(zeroPerson);await stateful(zeroPerson,zeroTest);
  await uploadGroups(zeroRoster(''),zeroFile);const noCodePerson=await groupLogin(zeroName);
  const noCodeTestReply=await request('PUT','/test',{token:noCodePerson.token,body:{bookletName:'ORACLE.BOOK.A'},status:[201,400,403]});
@@ -494,11 +494,29 @@ try{
  const zeroRows=(await sessions()).filter(row=>row.loginName===zeroName);assert.equal(zeroRows.length,1);assert.equal(zeroRows[0].code,'0');assert.equal(zeroRows[0].nameSuffix,'');
  check('native zero-code to no-code transition records empty suffix reuse and subsequent Test access',{firstCode:'0',laterCode:'',testOpenStatus:noCodeTestReply.status,testId:noCodeTest,originalTestId:zeroTest,testSessions:zeroRows});
 
+
+ // A standalone PHP-falsy codes attribute is parsed as uncoded before person creation.
+ const zeroAloneName='owned-native-zero-alone';
+ await uploadGroups(groupRoster('ORACLE.ZERO-ALONE','Owned zero alone',zeroAloneName,'0'),'native-zero-alone.xml');
+ const zeroAlonePerson=await groupLogin(zeroAloneName);assert.ok(!zeroAlonePerson.flags.includes('codeRequired'));
+ const zeroAloneTest=await openGroupTest(zeroAlonePerson);await stateful(zeroAlonePerson,zeroAloneTest);
+ const zeroAloneRows=(await sessions()).filter(row=>row.loginName===zeroAloneName);assert.equal(zeroAloneRows.length,1);assert.equal(zeroAloneRows[0].code,'');assert.equal(zeroAloneRows[0].nameSuffix,'');
+ check('standalone zero codes attribute is PHP-falsy and creates an uncoded native person',{authoredCodes:'0',codeRequired:false,testId:zeroAloneTest,testSessions:zeroAloneRows});
+ for(const [kind,first,second] of [['unicode-case','Ä','ä'],['unicode-composition','é','e\u0301']]){
+  const name='owned-native-'+kind;
+  await uploadGroups(groupRoster('ORACLE.'+kind.toUpperCase(),'Owned suffix collation',name,first+' '+second),'native-'+kind+'.xml');
+  const login=await groupLogin(name);assert.ok(login.flags.includes('codeRequired'));
+  const firstPerson=(await request('PUT','/session/person',{token:login.token,body:{code:first}})).value,firstTest=await openGroupTest(firstPerson);await stateful(firstPerson,firstTest);
+  const secondPerson=(await request('PUT','/session/person',{token:login.token,body:{code:second}})).value,secondTest=await openGroupTest(secondPerson);assert.equal(secondTest,firstTest);
+  const rows=(await sessions()).filter(row=>row.loginName===name);assert.equal(rows.length,1);assert.equal(rows[0].code,first);assert.equal(rows[0].nameSuffix,first);
+  check('native person suffix collation retains first spelling for '+kind+' with both codes authored',{firstRequestedCode:first,secondRequestedCode:second,testId:secondTest,originalTestId:firstTest,testSessions:rows});
+ }
+
  }
  await request('PATCH','/user/'+users.RO.id+'/workspaces',{token,body:{ws:[{id:ownedId,role:''}]}});
  await request('GET',overview,{token:ro,status:404});
  check('revocation is enforced against the existing signed-in token');
- assert.equal(receipt.checks.length,59);
+ assert.equal(receipt.checks.length,62);
  receipt.success=true;
 }finally{
  const directory=process.env.SOURCE_ORACLE_ARTIFACT_DIR;assert.ok(directory);await mkdir(directory,{recursive:true});
