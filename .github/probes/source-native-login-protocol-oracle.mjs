@@ -103,6 +103,7 @@ try{
  await request('DELETE','/session',{token:initialLogin.token,status:205});
  assert.ok((await request('GET','/session',{token:initialLogin.token})).value.token===initialLogin.token,'Login logout is a no-op');
  const nextTest=Number((await request('PUT','/test',{token:next.token,body:{bookletName:'ORACLE.BOOK.A'},status:201})).value);await request('GET','/test/'+nextTest,{token:next.token});
+ await request('PATCH','/test/'+nextTest+'/state',{token:next.token,body:[{key:'CURRENT_UNIT_ID',content:'ORACLE.UNIT',timeStamp:Date.now()}]});
  await request('DELETE','/session',{token:next.token,status:205});await request('GET','/session',{token:next.token,status:403});
  const renewed=await person(initialLogin.token,'replacement');assert.ok(renewed.token!==next.token,'person logout/reentry rotates person token');
  assert.equal(Number((await request('PUT','/test',{token:renewed.token,body:{bookletName:'ORACLE.BOOK.A'},status:201})).value),nextTest);
