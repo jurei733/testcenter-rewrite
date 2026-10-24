@@ -24,6 +24,10 @@ export function withOriginalResultState(previous: TestRun, projected: TestRun,
     before.hasTestState !== undefined && typeof before.hasTestState !== 'boolean')) {
     throw Error('Invalid persisted Original result evidence.');
   }
+  if (before && (before.bookletName !== undefined || before.bookletLabel !== undefined) &&
+      (typeof before.bookletName !== 'string' || !before.bookletName.trim() || typeof before.bookletLabel !== 'string')) {
+    throw Error('Invalid persisted Original Test identity.');
+  }
   for (const field of ['lastOpenedAt','lastTestStateAt','lastTestModifiedAt'] as const) {
     if (before?.[field] !== undefined && before[field] !== null) time(before[field]);
   }

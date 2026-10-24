@@ -55,8 +55,16 @@ main workflow, with the patched manifest/lock and Node **22.23.3** / npm **10.9.
 It reports **zero vulnerabilities**, without installation or npm cache restoration.
 The probe's exact commit/tree and limited scope are retained in the receipt. This
 qualifies the audit patch, not the ongoing failed predecessor or full application
-acceptance. Publication waits for the remaining useful predecessor browser-reference jobs
-to finish.
+acceptance. All useful predecessor jobs finish before PR publication; all five Original
+browser-reference jobs succeed, while the old audit and its two dependent
+aggregate gates correctly fail. The patched head then completes
+[full run 40046280241](https://github.com/jurei733/testcenter-rewrite/actions/runs/40046280241)
+with **89/89 successful Linux jobs** and no skips/cancellations/failures. Actual
+main audit job **120728630579** reports zero findings. Unit/frontend job
+**120728959231** verifies 3,981 checks and full PostgreSQL job **120729505709**
+verifies 2,121. The actual merge tree is exactly the published security tree.
+This is complete hosted qualification at that registry state, not a permanent
+absence-of-vulnerabilities guarantee.
 
 
 ## Audit without installation

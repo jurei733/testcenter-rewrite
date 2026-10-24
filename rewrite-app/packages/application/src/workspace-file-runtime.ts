@@ -52,7 +52,9 @@ export function createWorkspaceFileRuntime(deps: {
     const currentSources = selectCurrentWorkspaceFiles(sources, activityEvents)
       .filter(source => source.status !== 'rejected');
     const byId = new Map(currentSources.map(source => [source.sourcePackageId, source]));
-    const catalog = buildWorkspaceFileCatalog(currentSources.map(deps.project), {requireDependencies: true});
+    const projectedFiles = currentSources.map(deps.project);
+    const projectedById = new Map(projectedFiles.map(source => [source.sourcePackageId,source]));
+    const catalog = buildWorkspaceFileCatalog(projectedFiles, {requireDependencies: true});
     const roots = catalog.items.filter(file => file.fileType === 'Booklet' || file.fileType === 'SysCheck');
     const included = new Map<string, SourcePackage>();
     const diagnostics: ImportJobDiagnostic[] = [];
@@ -82,6 +84,18 @@ export function createWorkspaceFileRuntime(deps: {
     } catch {
       diagnostics.push({severity: 'error', code: 'workspace_file_compilation_failed',
         message: 'The current workspace files could not be compiled.'});
+    }
+    if (compilation?.runtimeSnapshot) {
+      // Source XMLFile keeps Label node text exactly. Canonical presentation may
+      // trim/fallback; retain the physical native value separately for new Tests.
+      const nativeLabels = new Map(catalog.items.filter(file => file.fileType === 'Booklet' &&
+        projectedById.get(file.sourcePackageId)?.sourceText?.trimStart().startsWith('<'))
+        .map(file => [file.metadata.identifier,file.metadata.label]));
+      compilation = {...compilation,runtimeSnapshot:{...compilation.runtimeSnapshot,
+        bookletEntries:compilation.runtimeSnapshot.bookletEntries.map(booklet => {
+          const raw = nativeLabels.get(booklet.bookletKey.replace(/[a-z]/g,letter=>letter.toUpperCase()));
+          return raw === undefined || raw === booklet.displayLabel ? booklet : {...booklet,originalBookletLabel:raw};
+        })}};
     }
     const current: Current = {revision, compilation, diagnostics};
     // Never retain the temporary archive across runtime reads. It is needed
