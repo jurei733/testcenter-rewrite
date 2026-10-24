@@ -211,6 +211,8 @@
     "smoke:ui:postgres": "npm run build && node ./scripts/run-postgres-ui-smoke.mjs",
     "smoke:ui:postgres:built": "node ./scripts/run-postgres-ui-smoke.mjs",
     "smoke:local-demo": "npm run build && node ./scripts/smoke-local-demo.mjs",
+    "test:participant-auth": "npm run build:core && npm run test:participant-auth:built",
+    "test:participant-auth:built": "node --test scripts/original-participant-group.test.mjs scripts/original-login-binding.test.mjs scripts/original-person-identity.test.mjs scripts/participant-run-creation-api.test.mjs scripts/participant-access-credentials.test.mjs scripts/participant-sign-out.test.mjs",
     "test:original-results": "npm run build:core && npm run test:original-results:built",
     "test:original-results:built": "node --test scripts/original-result-archive.test.mjs scripts/original-result-state.test.mjs scripts/original-participant-group.test.mjs scripts/original-login-binding.test.mjs scripts/original-test-identity.test.mjs scripts/original-person-identity.test.mjs scripts/participant-run-creation-api.test.mjs",
     "test:system-check-reports": "npm run build:core && npm run test:system-check-reports:built",

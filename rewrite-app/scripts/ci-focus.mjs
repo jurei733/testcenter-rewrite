@@ -9,7 +9,8 @@ const appRoot = fileURLToPath(new URL('../', import.meta.url));
 const readJson = path => JSON.parse(readFileSync(path, 'utf8'));
 // These service/store suites consume only TypeScript core output. Unknown or
 // mixed selections retain the complete production build by default.
-const coreOnlyScripts = new Set(['test:original-results:built', 'test:system-check-reports:built']);
+const coreOnlyScripts = new Set(['test:unit:built', 'test:participant-auth:built',
+  'test:original-results:built', 'test:system-check-reports:built']);
 
 // Read the actual workflow on every invocation. No second scenario inventory or
 // arbitrary shell command can silently diverge from the complete CI gates.
@@ -26,6 +27,7 @@ export function focusChecks(workflow, scripts) {
   }
   for (const [id, script, build] of [['policy', 'test:ci-policy', false],
     ['typecheck', 'typecheck', false], ['unit', 'test:unit:built', true],
+    ['participant-auth', 'test:participant-auth:built', true],
     ['original-results', 'test:original-results:built', true],
     ['system-check-reports', 'test:system-check-reports:built', true]]) {
     checks.push({ id, check: id, build, headed: false, browser: false,
