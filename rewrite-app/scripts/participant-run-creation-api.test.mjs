@@ -104,6 +104,22 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       }
       assert.equal((await repository.listParticipantSessionsByWorkspace(scope.tenantId,scope.workspaceId)).filter(row=>row.loginKey===input.loginKey).length,1);
     });
+    await t.test('native zero-only XML signs in without a code while mixed XML and canonical zero still require one',async()=>{
+      const document=`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="HTTP.NATIVE.ZERO" label="Native zero"><Login name="http-zero-alone" pw="Owned-zero-secret" mode="run-hot-return"><Booklet codes="0">${bookletKey}</Booklet></Login><Login name="http-zero-mixed" pw="Owned-zero-secret" mode="run-hot-return"><Booklet codes="0 AbC">${bookletKey}</Booklet></Login></Group></Testtakers>`;
+      await request('POST',workspace+'/participant-roster',{rosterText:document},operator,201);
+      const input={tenantKey,workspaceKey,loginKey:'http-zero-alone',password:'Owned-zero-secret'};
+      const alone=await request('POST',routes.participant.signIn,input);
+      assert.equal(alone.participantSession.participantCode??'','');assert.equal(alone.participantSession.originalNameSuffix,'');
+      const mixedInput={...input,loginKey:'http-zero-mixed'};
+      assert.equal((await request('POST',routes.participant.signIn,mixedInput,undefined,409)).error,'participant_code_required');
+      const mixed=await request('POST',routes.participant.signIn,{...mixedInput,participantCode:'0'});
+      assert.equal(mixed.participantSession.participantCode,'0');assert.equal(mixed.participantSession.originalNameSuffix,'');
+      await request('POST',workspace+'/participant-roster',{rosterText:JSON.stringify([{loginKey:'http-zero-canonical',password:'Owned-zero-secret',booklets:[{id:bookletKey,codes:'0'}]}])},operator,201);
+      const canonicalInput={...input,loginKey:'http-zero-canonical'};
+      assert.equal((await request('POST',routes.participant.signIn,canonicalInput,undefined,409)).error,'participant_code_required');
+      const canonical=await request('POST',routes.participant.signIn,{...canonicalInput,participantCode:'0'});
+      assert.equal(canonical.participantSession.participantCode,'0');assert.equal(canonical.participantSession.originalNameSuffix,undefined);
+    });
     await t.test('native HTTP preserves first raw code and durable suffix while canonical code normalization remains separate',async()=>{
       const document=`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="HTTP.NATIVE.CODE" label="Native code"><Login name="http-native-coded" pw="Owned-native-code-secret" mode="run-hot-return"><Booklet codes="AbC">${bookletKey}</Booklet></Login><Login name="http-native-restart" pw="Owned-native-code-secret" mode="run-hot-restart"><Booklet codes="AbC">${bookletKey}</Booklet></Login></Group></Testtakers>`;
       await request('POST',workspace+'/participant-roster',{rosterText:document},operator,201);

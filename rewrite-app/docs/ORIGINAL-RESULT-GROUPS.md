@@ -1,5 +1,41 @@
 # Original participant group snapshots
 
+## Standalone zero code attribute and native suffix lookup evidence (2026-10-24)
+
+The [unchanged production Source62 run](https://github.com/jurei733/testcenter-rewrite/actions/runs/40052775596)
+retains all previous 53 HTTP controls and adds native mode cycling, logout,
+current assignments through an existing Login token, standalone/mixed zero and
+Unicode suffix observations. Its complete [raw evidence and provenance](../test-fixtures/original-testcenter/source-workspace-results/native-person-lifecycle/manifest.json)
+independently verify 13 public members, 13,236 ZIP bytes and SHA256
+`4ec626a3ed7a405ea2f0672c540e2363de53db58c7de36ae121380a376b2b117`.
+Source is unchanged, TestMode is false, real XSD/upload/authentication routes
+are used and owned containers/volumes retire. The preceding probe completed
+57 controls, then exposed its incorrect assumption that standalone `codes="0"`
+requires a Login-token/person-code phase. That failure remains recorded.
+
+Source's XML parser checks PHP truthiness of the entire trimmed code attribute:
+standalone `0` is uncoded; mixed `0 AbC` still assigns both codes. The Rewrite
+now follows this distinction for Testtakers XML, including decoded numeric XML
+references and surrounding ASCII whitespace. Canonical JSON and legacy
+Participant XML retain their zero-code contract. Actual validated native import
+and protected HTTP controls cover all four stores. The existing normal and
+protected browser login gates additionally enter the native zero-only account
+through password/PoW into its real Player without a code page.
+
+Source62 also proves that the existing Test survives a mixed-code `0` to uncoded
+transition with stored code `0`, suffix `""` and HTTP201 reopening. When both
+Unicode codes are authored, `Ä/ä` and composed/decomposed `é` retain one first
+person/Test and first stored spelling. Code authorization still folds only
+ASCII; durable suffix lookup uses Source's German case/composition comparison.
+A controlled validated-XML Rewrite comparison creates two people in all three
+cases. Those suffix lookup/atomicity gaps remain open; fixture integrity alone
+does not implement them. The next person resolver must use the native suffix
+and scoped Login identity, with durable concurrency protection, rather than
+the current normalized-code/release/mode/status filters.
+
+This parser correction needs no migration (SQLite69/PostgreSQL63). It does not
+close native two-step auth, Results/Tests pages or the eight broad visual rows.
+
 ## First raw native person code and durable suffix (2026-10-24)
 
 The [unchanged production Source53 receipt](../test-fixtures/original-testcenter/source-workspace-results/native-person-labels/manifest.json)
@@ -10,8 +46,8 @@ the issued person bearer rotates. Native authorization follows Source's ASCII
 case folding without trimming; canonical JSON/CSV code handling keeps its
 existing behavior. Always-new native people store an independently generated
 eight-character `[a-z0-9_-]` suffix, prefixed by the first code and `/` when
-the PHP-truthy code is present. Source's `"0"` prefix exception is derived from
-the pinned PHP implementation, separately from the 53 HTTP observations.
+the PHP-truthy code is present. Source53 did not exercise the `"0"` prefix
+exception; Source62 above now observes it through a mixed `0 AbC` assignment.
 
 `originalNameSuffix` is immutable native parent metadata, resolved against the
 current scoped Login binding on every store save. Neither client metadata nor

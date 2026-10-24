@@ -37,6 +37,7 @@ const headful = ["1", "true", "yes", "on"].includes(
   String(process.env.UI_SMOKE_HEADFUL ?? "").toLowerCase()
 );
 const artifactDirectory = process.env.UI_SMOKE_ARTIFACT_DIR?.trim();
+const failureArtifactDirectory = process.env.UI_SMOKE_FAILURE_ARTIFACT_DIR?.trim() || artifactDirectory;
 const frontendRoot = process.env.UI_SMOKE_FRONTEND_ROOT?.trim();
 const attachmentQrCameraFile = process.env.UI_SMOKE_ATTACHMENT_QR_CAMERA_FILE?.trim();
 const verifyAttachmentVisibility = process.env.UI_SMOKE_VERIFY_ATTACHMENT_VISIBILITY === "true";
@@ -445,6 +446,17 @@ try {
     ["clipboard-read", "clipboard-write", "camera"],
     { origin: baseUrl }
   );
+  await context.addInitScript(() => {
+    if (window !== window.top) return;
+    const events = []; window.__ownedNavigationEvents = events;
+    for (const type of ["pointerdown", "pointerup", "click"]) window.addEventListener(type, event => {
+      const target = event.target instanceof Element ? event.target.closest("[data-view-nav]") : null;
+      if (!target) return;
+      events.push({ type, view: target.getAttribute("data-view-nav"), trusted: event.isTrusted,
+        at: performance.now(), focused: document.hasFocus(), visibility: document.visibilityState });
+      if (events.length > 64) events.shift();
+    }, true);
+  });
   page = await context.newPage();
   const tenantKey = `ui-tenant-${Date.now()}`;
   const workspaceKey = `ui-workspace-${Date.now()}`;
@@ -26368,7 +26380,25 @@ try {
     }
     if (page && !page.isClosed()) {
       try {
-        const failureDirectory = artifactDirectory ?? await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
+        const failureDirectory = failureArtifactDirectory ?? await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
+        await mkdir(failureDirectory, { recursive: true });
+        let navigation;
+        try {
+          navigation = await page.locator("html").evaluate(() => ({
+            path: location.pathname, focused: document.hasFocus(), visibility: document.visibilityState,
+            activeElement: { id: document.activeElement?.id, tag: document.activeElement?.tagName },
+            events: window.__ownedNavigationEvents ?? [],
+            links: [...document.querySelectorAll("[data-view-nav]")].map(element => {
+              const box = element.getBoundingClientRect(), style = getComputedStyle(element);
+              return { view: element.getAttribute("data-view-nav"), href: element.getAttribute("href")?.split("?")[0],
+                x: box.x, y: box.y, width: box.width, height: box.height,
+                display: style.display, visibility: style.visibility, pointerEvents: style.pointerEvents };
+            })
+          }), undefined, { timeout: 2_000 });
+        } catch (captureError) { navigation = { unavailable: String(captureError).split("\nCall log:")[0] }; }
+        await writeFile(resolve(failureDirectory, "failure.json"), JSON.stringify({
+          error: String(error?.message ?? error).split("\nCall log:")[0], navigation
+        }, null, 2) + "\n");
         await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true });
         process.stderr.write(`UI smoke failure screenshot: ${failureDirectory}/failure.png\n`);
       } catch (captureError) {

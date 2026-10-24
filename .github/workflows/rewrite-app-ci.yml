@@ -773,7 +773,21 @@ jobs:
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-material-label: ${{ strategy.job-index }}
-      - run: npm run smoke:ui:postgres:built
+      - name: Run protected PostgreSQL UI
+        shell: bash
+        env:
+          UI_SMOKE_FAILURE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-postgres-ui-failure
+        run: npm run smoke:ui:postgres:built 2>&1 | tee "$RUNNER_TEMP/rewrite-postgres-ui.log"
+      - name: Retain failed PostgreSQL UI diagnostics
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: postgres-ui-diagnostics-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-postgres-ui.log
+            ${{ runner.temp }}/rewrite-postgres-ui-failure/
+          if-no-files-found: warn
+          retention-days: 7
 
   deployability:
     needs: [build, fast-feedback]

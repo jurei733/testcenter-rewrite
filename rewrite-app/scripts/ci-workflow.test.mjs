@@ -477,6 +477,18 @@ test("participant diagnostics are retained without uploading their SQLite scratc
   assert.equal(evidence.with.path.trim(), "${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.json\n${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.png");
   assert.ok(scripts["test:frontend-state"].split(/\s+/).includes("scripts/inactive-runtime-snapshot-gate.test.mjs"));
 });
+test("the full PostgreSQL UI retains failure-only navigation evidence and its exact failing log", () => {
+  const job = workflow.jobs["verify-postgres-ui"];
+  const execute = job.steps.find(step => step.name === "Run protected PostgreSQL UI");
+  assert.equal(execute.shell, "bash", "The tee pipeline must retain bash pipefail");
+  assert.equal(execute.env.UI_SMOKE_FAILURE_ARTIFACT_DIR, "${{ runner.temp }}/rewrite-postgres-ui-failure");
+  assert.equal(execute.env.UI_SMOKE_ARTIFACT_DIR, undefined, "Do not add successful screenshot captures to the full UI journey");
+  assert.equal(execute.run, 'npm run smoke:ui:postgres:built 2>&1 | tee "$RUNNER_TEMP/rewrite-postgres-ui.log"');
+  const evidence = job.steps.find(step => step.name === "Retain failed PostgreSQL UI diagnostics");
+  assert.equal(evidence.if, "failure() || cancelled()");
+  assert.equal(evidence.with["retention-days"], 7);
+  assert.equal(evidence.with.path.trim(), "${{ runner.temp }}/rewrite-postgres-ui.log\n${{ runner.temp }}/rewrite-postgres-ui-failure/");
+});
 test("the required loading leaf has independent fatal phase and total deadlines", () => {
   const source = read('./smoke-participant-console-loading.mjs');
   assert.equal(scripts['smoke:ui:participant-console-loading:built'], 'node ./scripts/smoke-participant-console-loading.mjs');

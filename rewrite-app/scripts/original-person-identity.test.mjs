@@ -20,6 +20,20 @@ assert.equal(createHash('sha256').update(bytes).digest('hex'),manifest.files['re
 const source=JSON.parse(bytes);assert.equal(source.success,true);assert.equal(source.testMode,false);assert.equal(source.checks.length,53);
 const casing=source.checks.find(row=>row.name.startsWith('native code casing records'));
 const restarts=[false,true].map(coded=>source.checks.find(row=>row.name==='native always-new person persists '+(coded?'code-prefixed':'plain')+' eight-character suffix'));
+const lifecycleEvidence=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-person-lifecycle/',import.meta.url);
+const lifecycleManifest=JSON.parse(await readFile(new URL('manifest.json',lifecycleEvidence),'utf8'));
+assert.equal(lifecycleManifest.sourceCommit,'eedae41840cbe90e5547c0211da818bdf620f5aa');assert.equal(lifecycleManifest.runId,40052775596);
+assert.equal(lifecycleManifest.probeCommit,'9192fe560283a3b94c7ebc442d62c12fc7a602f6');
+assert.equal(lifecycleManifest.artifact.sha256,'4ec626a3ed7a405ea2f0672c540e2363de53db58c7de36ae121380a376b2b117');
+assert.equal(Object.keys(lifecycleManifest.files).length,13);
+for(const [name,sha] of Object.entries(lifecycleManifest.files)){
+ assert.match(name,/^[a-z0-9][a-z0-9.-]*$/);assert.equal(createHash('sha256').update(await readFile(new URL(name,lifecycleEvidence))).digest('hex'),sha,name);
+}
+const lifecycle=JSON.parse(await readFile(new URL('receipt.json',lifecycleEvidence),'utf8'));
+assert.equal(lifecycle.success,true);assert.equal(lifecycle.testMode,false);assert.equal(lifecycle.checks.length,62);
+const zeroAloneSource=lifecycle.checks.find(row=>row.name==='standalone zero codes attribute is PHP-falsy and creates an uncoded native person');
+const zeroMixedSource=lifecycle.checks.find(row=>row.name==='native zero-code to no-code transition records empty suffix reuse and subsequent Test access');
+assert.equal(zeroAloneSource.codeRequired,false);assert.equal(zeroMixedSource.testOpenStatus,201);
 const kinds=['memory','file','sqlite'];
 if(process.env.FIRST_SLICE_STORE==='postgres'){assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);kinds.push('postgres');}
 for(const kind of kinds)test(`${kind}: native first code spelling and person suffix are durable server-owned identity`,async t=>{
@@ -32,7 +46,7 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
   await open();const tenant=await services.platform.createTenant({tenantKey:'owned-'+randomUUID(),displayName:'Owned native people'});
   const workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'owned',displayName:'Owned native people'}),scope={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey},release=randomUUID(),now=new Date().toISOString();
   await repository.saveContentRelease({tenantId:tenant.tenantId,workspaceId:workspace.workspaceId,contentReleaseId:release,importJobId:release,releaseLabel:'Owned fixed release',status:'active',createdAt:now,activatedAt:now,runtimeSnapshot:{bookletEntries:[{bookletKey:'owned',displayLabel:'Owned',policy:compileBookletRuntimePolicy({}),testletEntries:[],unitEntries:[]}]}});
-  const entries=[['coded','run-hot-return',casing.assignedCode],['plain','run-hot-return',''],['restart-plain','run-hot-restart',''],['restart-coded','run-hot-restart',casing.assignedCode],['unicode','run-hot-return','Ä'],['zero','run-hot-return','0']];
+  const entries=[['coded','run-hot-return',casing.assignedCode],['plain','run-hot-return',''],['restart-plain','run-hot-restart',''],['restart-coded','run-hot-restart',casing.assignedCode],['unicode','run-hot-return','Ä'],['zero','run-hot-return','0 AbC'],['zero-alone','run-hot-return','0']];
   const document=group=>`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="${group}" label="Owned people">${entries.map(([name,mode,code])=>`<Login name="${name}" pw="Owned-person-secret" mode="${mode}"><Booklet${code?' codes="'+code+'"':''}>owned</Booklet></Login>`).join('')}</Group></Testtakers>`;
   const upload=group=>services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:document(group)});
   const login=(loginKey,participantCode,extra={})=>services.participantRuntime.signIn({...scope,loginKey,password:'Owned-person-secret',...(participantCode===undefined?{}:{participantCode}),...extra});
@@ -51,9 +65,11 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
    for(const [name,code]of [['coded',' abc '],['coded','\tabc'],['unicode','ä']])await assert.rejects(login(name,code),e=>e.errorCode==='participant_code_invalid');
    const exact=await login('unicode','Ä');assert.equal(exact.participantCode,'Ä');assert.equal(exact.originalNameSuffix,'Ä');
   });
-  await t.test('non-coded native people retain an observed empty suffix; numeric zero follows Source suffix truthiness',async()=>{
+  await t.test('a standalone native zero codes attribute is uncoded; zero in a mixed list keeps its raw code',async()=>{
+   const zeroAlone=await login('zero-alone');assert.equal(zeroAlone.participantCode??'',zeroAloneSource.testSessions[0].code);assert.equal(zeroAlone.originalNameSuffix,zeroAloneSource.testSessions[0].nameSuffix);
+   assert.equal((await login('zero-alone','0')).participantSessionId,zeroAlone.participantSessionId);
    const plain=await login('plain');assert.equal(plain.originalNameSuffix,'');assert.equal((await login('plain')).participantSessionId,plain.participantSessionId);
-   const zero=await login('zero','0');assert.equal(zero.participantCode,'0');assert.equal(zero.originalNameSuffix,'');
+   const zero=await login('zero','0');assert.equal(zero.participantCode,zeroMixedSource.testSessions[0].code);assert.equal(zero.originalNameSuffix,zeroMixedSource.testSessions[0].nameSuffix);
   });
   await t.test('always-new people persist two independent Source-shaped plain/code-prefixed suffixes',async()=>{
    for(const [index,row]of restarts.entries()){

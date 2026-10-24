@@ -385,6 +385,20 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("treats only a standalone Original XML zero codes attribute as uncoded", () => {
+    const parseCodes = (codes: string) => parseParticipantRosterText(
+      `<?xml version="1.0"?><!-- owned --><Testtakers><Group id="owned"><Login name="zero"><Booklet codes="${codes}">OWNED</Booklet></Login></Group></Testtakers>`
+    )[0]!.bookletAssignments![0]!.accessCodes;
+    for (const codes of ["0", " 0 ", "&#48;", "&#x30;", "&#9;0&#10;"]) {
+      assert.equal(parseCodes(codes), undefined);
+    }
+    assert.deepEqual(parseCodes("0 AbC"), ["0", "AbC"]);
+    assert.deepEqual(parseCodes("AbC 0"), ["AbC", "0"]);
+    assert.deepEqual(parseCodes("00"), ["00"]);
+    assert.deepEqual(parseParticipantRosterText([{ loginKey: "canonical", booklets: [{ id: "OWNED", codes: "0" }] }])[0]!.bookletAssignments![0]!.accessCodes, ["0"]);
+    assert.deepEqual(parseParticipantRosterText('<Participants><Participant loginKey="legacy"><Booklet codes="0">OWNED</Booklet></Participant></Participants>')[0]!.bookletAssignments![0]!.accessCodes, ["0"]);
+  });
+
   it("parses participant Testcenter Login entries and excludes operational modes", () => {
     assert.deepEqual(
       parseParticipantRosterText(

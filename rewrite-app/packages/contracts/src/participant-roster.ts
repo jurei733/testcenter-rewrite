@@ -556,7 +556,8 @@ const mergeBookletAssignments = (
 };
 
 const readXmlBookletAssignments = (
-  content: string
+  content: string,
+  originalTesttakers = false
 ): NonNullable<ParsedParticipantRosterEntry["bookletAssignments"]> => {
   const assignments = Array.from(
     content.matchAll(
@@ -573,9 +574,13 @@ const readXmlBookletAssignments = (
     const statePreset = parseBookletStatePreset(
       readXmlAttribute(attributes, "state", "states")
     );
+    const rawCodes = readXmlAttribute(attributes, "codes") ?? "";
+    // XMLFileTesttakers checks PHP truthiness of the complete trimmed attribute.
+    // Only a standalone "0" is uncoded; a mixed "0 abc" still assigns both codes.
+    const originalZero = originalTesttakers && rawCodes.replace(/^[ \t\r\n\v\0]+|[ \t\r\n\v\0]+$/g, "") === "0";
     const accessCodes = [
       ...new Set(
-        (readXmlAttribute(attributes, "codes") ?? "")
+        (originalZero ? "" : rawCodes)
           .split(/\s+/)
           .map(code => code.trim())
           .filter(Boolean)
@@ -1548,6 +1553,7 @@ const parseParticipantRosterXmlText = (
   const entries: ParsedParticipantRosterEntry[] = [];
   const customTexts = parseXmlRosterCustomTexts(rosterText);
   rosterText = prepareXmlRosterStructure(rosterText);
+  const originalTesttakers = /^\s*<(?:[A-Za-z_][\w.-]*:)?Testtakers\b/i.test(rosterText);
   const groupContextRanges = collectXmlRosterContextRanges(
     rosterText,
     "group|groupRef|group-ref|class|classRef|class-ref",
@@ -1771,7 +1777,7 @@ const parseParticipantRosterXmlText = (
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
       ]),
       ...(() => {
-        const bookletAssignments = readXmlBookletAssignments(content);
+        const bookletAssignments = readXmlBookletAssignments(content, originalTesttakers);
         const bookletStatePresets = readXmlBookletStatePresets(content);
         return {
           ...(bookletAssignments.length > 0 ? { bookletAssignments } : {}),
@@ -1915,7 +1921,7 @@ const parseParticipantRosterXmlText = (
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
       ]),
       ...(() => {
-        const bookletAssignments = readXmlBookletAssignments(content);
+        const bookletAssignments = readXmlBookletAssignments(content, originalTesttakers);
         const bookletStatePresets = readXmlBookletStatePresets(content);
         return {
           ...(bookletAssignments.length > 0 ? { bookletAssignments } : {}),
