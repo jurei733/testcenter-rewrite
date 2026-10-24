@@ -6,6 +6,8 @@ import {
   resolveOriginalPerson,
   assertOriginalPersonUnique,
   projectOriginalPersonRuns,
+  projectOriginalLoginMode,
+  withOriginalTestRunMode,
   projectOriginalPersonSessions,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
@@ -804,6 +806,9 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Array.from(state.applicationAssets.values()));
+      const modes=projectOriginalLoginMode(participantRosterEntry,Array.from(state.participantSessions.values()),Array.from(state.testRuns.values()));
+      for(const person of modes.participantSessions)state.participantSessions.set(person.participantSessionId,person);
+      for(const run of modes.testRuns)state.testRuns.set(run.testRunId,run);
       state.participantRosterEntries.set(
         participantRosterEntry.participantRosterEntryId,
         participantRosterEntry
@@ -892,7 +897,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return { testRun: prepared.testRun, created: prepared.created };
     },
     async saveTestRun(testRun) {
-      state.testRuns.set(testRun.testRunId, testRun);
+      state.testRuns.set(testRun.testRunId, withOriginalTestRunMode(testRun,state.participantSessions.get(testRun.participantSessionId)));
     },
     async activateParticipantController(input) {
       const result = prepareParticipantControllerActivation(input,

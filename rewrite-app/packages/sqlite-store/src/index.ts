@@ -1,6 +1,7 @@
 import { mkdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { defaultParticipantExecutionMode } from "@testcenter-rewrite-app/domain";
 
 import {
   originalParticipantGroupKeysEqual,
@@ -10,6 +11,8 @@ import {
   resolveOriginalPerson,
   assertOriginalPersonUnique,
   projectOriginalPersonRuns,
+  projectOriginalLoginMode,
+  withOriginalTestRunMode,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -3467,6 +3470,7 @@ export const createSqliteFirstSliceStorage = (
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       return withAssetWrite(()=>{
         validateApplicationAssetReferences(participantRosterEntry.assetAssignments,assetNames());
+        if(participantRosterEntry.originalLoginIdentity&&!database.prepare('SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(participantRosterEntry.tenantId,participantRosterEntry.workspaceId))throw new Error('Native roster workspace no longer exists.');
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
@@ -3521,6 +3525,15 @@ export const createSqliteFirstSliceStorage = (
           participantRosterEntry.importedAt,
           participantRosterEntry.originalLoginIdentity ? 1 : null
         );
+      if(participantRosterEntry.originalLoginIdentity){
+        const entry=participantRosterEntry;
+        const people=database.prepare('SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?').all(entry.tenantId,entry.workspaceId,entry.loginKey).map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
+        // Authorization metadata does not require decoding private responses or Test state.
+        const runs=database.prepare('SELECT test_run_id,participant_session_id,tenant_id,workspace_id,execution_mode FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)').all(entry.tenantId,entry.workspaceId,entry.loginKey).map(row=>({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),executionMode:row.execution_mode==null?undefined:row.execution_mode as TestRun['executionMode']}));
+        const modes=projectOriginalLoginMode(entry,people,runs),mode=entry.executionMode??defaultParticipantExecutionMode;
+        if(modes.participantSessions.some((person,index)=>person!==people[index]))database.prepare('UPDATE participant_sessions SET execution_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND execution_mode IS NOT ?').run(mode,entry.tenantId,entry.workspaceId,entry.loginKey,mode);
+        if(modes.testRuns.some((run,index)=>run!==runs[index]))database.prepare('UPDATE test_runs SET execution_mode=? WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT ?').run(mode,entry.tenantId,entry.workspaceId,entry.loginKey,mode);
+      }
       });
     },
     async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
@@ -3653,7 +3666,10 @@ export const createSqliteFirstSliceStorage = (
       }
     },
     async saveTestRun(testRun) {
-      persistTestRun(database, testRun);
+      return withAssetWrite(()=>{
+        const parent=mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(testRun.participantSessionId));
+        persistTestRun(database, withOriginalTestRunMode(testRun,parent));
+      });
     },
     async activateParticipantController(input) {
       database.exec("BEGIN IMMEDIATE");

@@ -1,4 +1,5 @@
 import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
+import {withOriginalTestRunMode} from './original-person-identity.js';
 import { prepareParticipantRunMutation, type ParticipantRunMutationContext,
   type ParticipantRunMutationEffect } from "./participant-run-mutation.js";
 
@@ -43,6 +44,7 @@ export const prepareParticipantAssignmentRunCreation = (
   runs: TestRun[],
   initialize?: ParticipantAssignmentRunInitializer
 ): { testRun: TestRun; created: boolean; effect: ParticipantAssignmentRunCreationEffect | null } => {
+  candidate=withOriginalTestRunMode(candidate,session);
   const existing = selectParticipantAssignmentRun(candidate, session, runs);
   if (existing) return { testRun: structuredClone(existing), created: false, effect: null };
   const prepared = prepareParticipantRunMutation(candidate, {

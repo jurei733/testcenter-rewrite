@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import test from 'node:test';
 import {DatabaseSync} from 'node:sqlite';
-import {Pool} from 'pg';
+import {Pool,types as pgTypes} from 'pg';
 import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
 import {compileBookletRuntimePolicy} from '@testcenter-rewrite-app/contracts';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
@@ -49,7 +49,7 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
   const entries=[['coded','run-hot-return',casing.assignedCode],['plain','run-hot-return',''],['restart-plain','run-hot-restart',''],['restart-coded','run-hot-restart',casing.assignedCode],['unicode','run-hot-return','Ä'],['zero','run-hot-return','0 AbC'],['zero-alone','run-hot-return','0']];
   const suffixRows=lifecycle.checks.filter(row=>row.name.startsWith('native person suffix collation retains first spelling for '));
   assert.equal(suffixRows.length,2);
-  entries.push(...suffixRows.map((row,index)=>['suffix-'+index,'run-hot-return',row.firstRequestedCode+' '+row.secondRequestedCode]),['suffix-concurrent','run-hot-return','AbC'],['suffix-mode','run-hot-return','AbC'],['suffix-cycle','run-hot-return','AbC']);
+  entries.push(...suffixRows.map((row,index)=>['suffix-'+index,'run-hot-return',row.firstRequestedCode+' '+row.secondRequestedCode]),['suffix-concurrent','run-hot-return','AbC'],['suffix-mode','run-hot-return','AbC'],['suffix-cycle','run-hot-return','AbC'],['suffix-live-fresh','run-hot-return','AbC']);
   const document=(group,selected=entries)=>`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="${group}" label="Owned people">${selected.map(([name,mode,code])=>`<Login name="${name}" pw="Owned-person-secret" mode="${mode}"><Booklet${code?' codes="'+code+'"':''}>owned</Booklet></Login>`).join('')}</Group></Testtakers>`;
   const upload=(group,names)=>services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:document(group,names?entries.filter(entry=>names.includes(entry[0])):entries)});
   const login=(loginKey,participantCode,extra={})=>services.participantRuntime.signIn({...scope,loginKey,password:'Owned-person-secret',...(participantCode===undefined?{}:{participantCode}),...extra});
@@ -120,15 +120,64 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
     assert.deepEqual(await repository.listParticipantSessionsByWorkspace(tenant.tenantId,workspace.workspaceId),snapshot);
    }finally{await peerStorage?.shutdown();}
   });
-  await t.test('native mode reentry keeps its person, first metadata and answers while projecting current Login mode',async()=>{
+  await t.test('native import immediately changes existing bearer and Test mode without reentry or saved-state edits',async()=>{
    const person=await login('suffix-mode','abc'),created=await services.participantRuntime.launch({participantSessionId:person.participantSessionId,bookletKey:'owned'});
-   const before=await repository.getTestRunById(created.testRunId),parentBefore=await get(person.participantSessionId),entry=entries.find(entry=>entry[0]==='suffix-mode');entry[1]='run-review';await upload('ORACLE.PERSON',['suffix-mode']);
+   const before=await repository.getTestRunById(created.testRunId),parentBefore=await get(person.participantSessionId),entry=entries.find(entry=>entry[0]==='suffix-mode');
+   const bearer=await services.participantAccess.issueCredential({participantSessionId:person.participantSessionId});
+   const bindingBefore=await repository.listOriginalLoginBindingsByWorkspace(tenant.tenantId,workspace.workspaceId),peerBefore=await get(first.participantSessionId);
+   entry[1]='run-review';await upload('ORACLE.PERSON',['suffix-mode']);
    try{
+    const authorized=await services.participantAccess.authorize({participantSessionId:person.participantSessionId,sessionToken:bearer});assert.equal(authorized.executionMode,'run-review');
+    const runtime=await services.participantRuntime.getRuntimeState({participantSessionId:person.participantSessionId});
+    assert.equal(runtime.executionMode.mode,'run-review');assert.equal(runtime.latestTestRun.testRunId,created.testRunId);assert.equal(runtime.latestTestRun.executionMode,'run-review');
+    assert.deepEqual(await repository.listOriginalLoginBindingsByWorkspace(tenant.tenantId,workspace.workspaceId),bindingBefore);
+    assert.deepEqual(await get(first.participantSessionId),peerBefore);
+    const afterImport=await repository.getTestRunById(created.testRunId);assert.deepEqual({...afterImport,executionMode:before.executionMode},before);
+    await repository.saveTestRun(before);assert.equal((await repository.getTestRunById(created.testRunId)).executionMode,'run-review','A stale ordinary Test save cannot restore the preceding Login mode');
     const review=await login('suffix-mode','ABC');assert.equal(review.participantSessionId,person.participantSessionId);assert.equal(review.executionMode,'run-review');
     assert.deepEqual({...review,executionMode:parentBefore.executionMode},parentBefore);
     const after=await repository.getTestRunById(created.testRunId);assert.equal(after.executionMode,'run-review');assert.deepEqual({...after,executionMode:before.executionMode},before);
     await repository.saveParticipantSession(parentBefore);assert.equal((await get(person.participantSessionId)).executionMode,'run-review','A stale ordinary parent save cannot restore the preceding Login mode');
-   }finally{entry[1]='run-hot-return';await upload('ORACLE.PERSON',['suffix-mode']);await login('suffix-mode','abc');}
+   }finally{entry[1]='run-hot-return';await upload('ORACLE.PERSON',['suffix-mode']);}
+   assert.equal((await services.participantRuntime.getRuntimeState({participantSessionId:person.participantSessionId})).executionMode.mode,'run-hot-return');
+   assert.deepEqual(await repository.getTestRunById(created.testRunId),before);
+  });
+  if(kind==='sqlite'||kind==='postgres')await t.test('native SQL mode publication does not decode private response payloads',async()=>{
+   const person=await login('suffix-mode','abc'),stored=(await repository.listTestRunsByParticipantSessionId(person.participantSessionId))[0],entry=entries.find(entry=>entry[0]==='suffix-mode');
+   const marker='owned-mode-private-'+randomUUID(),payload=JSON.stringify({opaque:marker}),original=JSON.stringify(stored.unitResponses??{});
+   control=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
+   const write=payload=>kind==='sqlite'?control.prepare('UPDATE test_runs SET unit_responses_json=? WHERE test_run_id=?').run(payload,stored.testRunId):control.query('UPDATE test_runs SET unit_responses_json=$1::jsonb WHERE test_run_id=$2',[payload,stored.testRunId]);
+   const raw=async()=>kind==='sqlite'?control.prepare('SELECT execution_mode,unit_responses_json AS payload FROM test_runs WHERE test_run_id=?').get(stored.testRunId):(await control.query('SELECT execution_mode,unit_responses_json::text AS payload FROM test_runs WHERE test_run_id=$1',[stored.testRunId])).rows[0];
+   const parse=JSON.parse,pgParse=pgTypes.getTypeParser(3802,'text');
+   await write(payload);const before=await raw();
+   const rejectPrivate=read=>value=>{if(typeof value==='string'&&value.includes(marker))throw Error('Private responses must not be decoded for a Login mode change');return read(value);};
+   try{
+    if(kind==='sqlite')JSON.parse=rejectPrivate(parse);else pgTypes.setTypeParser(3802,'text',rejectPrivate(pgParse));
+    entry[1]='run-review';await upload('ORACLE.PERSON',['suffix-mode']);
+    const after=await raw();assert.equal(after.execution_mode,'run-review');assert.equal(after.payload,before.payload);
+   }finally{
+    JSON.parse=parse;pgTypes.setTypeParser(3802,'text',pgParse);
+    entry[1]='run-hot-return';await upload('ORACLE.PERSON',['suffix-mode']);await write(original);
+    if(kind==='sqlite')control.close();else await control.end();control=null;
+   }
+  });
+  await t.test('fresh reservations and delayed ordinary saves use the current native parent mode while legacy Runs keep their contract',async()=>{
+   const person=await login('suffix-live-fresh','abc'),template=await repository.getTestRunById(run.testRunId),entry=entries.find(entry=>entry[0]==='suffix-live-fresh');
+   const canonical={...person,participantSessionId:randomUUID()};delete canonical.originalLoginKey;delete canonical.originalNameSuffix;await repository.saveParticipantSession(canonical);
+   const canonicalRun={...template,testRunId:randomUUID(),participantSessionId:canonical.participantSessionId,executionMode:'run-hot-return'};await repository.saveTestRun(canonicalRun);
+   const stale={...template,testRunId:randomUUID(),participantSessionId:person.participantSessionId,executionMode:'run-hot-return'};
+   entry[1]='run-review';await upload('ORACLE.PERSON',['suffix-live-fresh']);
+   try{
+    const created=await repository.getOrCreateTestRunForAssignment(stale,context=>{
+     assert.equal(context.testRun.executionMode,'run-review');assert.equal(context.participantSession.executionMode,'run-review');
+     return {testRun:context.testRun,testLogs:[],activityEvents:[]};
+    });
+    assert.equal(created.created,true);assert.equal(created.testRun.executionMode,'run-review');
+    await repository.saveTestRun(stale);assert.equal((await repository.getTestRunById(stale.testRunId)).executionMode,'run-review');
+    assert.equal((await repository.getParticipantSessionById(canonical.participantSessionId)).executionMode,'run-hot-return');
+    assert.equal((await repository.getTestRunById(canonicalRun.testRunId)).executionMode,'run-hot-return');
+    await repository.saveTestRun({...canonicalRun,executionMode:'run-demo'});assert.equal((await repository.getTestRunById(canonicalRun.testRunId)).executionMode,'run-demo');
+   }finally{entry[1]='run-hot-return';await upload('ORACLE.PERSON',['suffix-live-fresh']);}
   });
   await t.test('a fresh always-new suffix collision allocates another person instead of aliasing or overwriting its winner',async()=>{
    const winner=await login('restart-coded','abc'),before=await get(winner.participantSessionId);
@@ -156,15 +205,15 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
     await repository.saveParticipantSession(restarted);assert.equal((await get(restarted.participantSessionId)).executionMode,sourceCycle.firstMode);
    }finally{entry[1]='run-hot-return';await upload('ORACLE.PERSON',['suffix-cycle']);await login('suffix-cycle','abc');}
   });
-  if(kind==='file'||kind==='sqlite'||kind==='postgres')await t.test('late native mode publication failure rolls back both parent and all Test metadata',async()=>{
+  if(kind==='file'||kind==='sqlite'||kind==='postgres')await t.test('late native roster mode publication failure rolls back roster, parents and all Test metadata',async()=>{
    const person=await login('suffix-cycle','abc'),before=await repository.listParticipantSessionsByWorkspace(tenant.tenantId,workspace.workspaceId),cohort=before.filter(p=>p.loginKey==='suffix-cycle'),entry=entries.find(entry=>entry[0]==='suffix-cycle');
    const readRuns=async()=> (await Promise.all(cohort.map(p=>repository.listTestRunsByParticipantSessionId(p.participantSessionId)))).flat().sort((a,b)=>a.testRunId.localeCompare(b.testRunId)),runsBefore=await readRuns();
-   entry[1]='run-hot-restart';await upload('ORACLE.PERSON',['suffix-cycle']);
+   const rosterBefore=await repository.listParticipantRosterEntriesByWorkspace(tenant.tenantId,workspace.workspaceId);
+   entry[1]='run-hot-restart';
    let restore;
    if(kind==='file'){
-    const bind=repository.bindOriginalLoginGroup,backup=file+'.mode-backup';let blocked=false;
-    repository.bindOriginalLoginGroup=async input=>{const result=await bind(input);await rename(file,backup);blocked=true;await mkdir(file);return result;};
-    restore=async()=>{repository.bindOriginalLoginGroup=bind;if(blocked){await rm(file,{recursive:true,force:true});await rename(backup,file);}};
+    const backup=file+'.mode-backup';await rename(file,backup);await mkdir(file);
+    restore=async()=>{await rm(file,{recursive:true,force:true});await rename(backup,file);};
    }else{
     control=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
     const execute=sql=>kind==='sqlite'?control.exec(sql):control.query(sql);
@@ -172,11 +221,12 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
     restore=async()=>{await execute(kind==='sqlite'?'DROP TRIGGER owned_mode_fail':'DROP TRIGGER owned_mode_fail ON test_runs; DROP FUNCTION owned_mode_fail()');if(kind==='sqlite')control.close();else await control.end();control=null;};
    }
    try{
-    await assert.rejects(login('suffix-cycle','ABC'),kind==='file'?undefined:/owned mode failure/);
+    await assert.rejects(upload('ORACLE.PERSON',['suffix-cycle']),kind==='file'?undefined:/owned mode failure/);
     assert.deepEqual(await repository.listParticipantSessionsByWorkspace(tenant.tenantId,workspace.workspaceId),before);assert.deepEqual(await readRuns(),runsBefore);
+    assert.deepEqual(await repository.listParticipantRosterEntriesByWorkspace(tenant.tenantId,workspace.workspaceId),rosterBefore);
    }finally{await restore();}
    try{
-    const recovered=await login('suffix-cycle','ABC');assert.notEqual(recovered.participantSessionId,person.participantSessionId);assert.equal(recovered.executionMode,'run-hot-restart');
+    await upload('ORACLE.PERSON',['suffix-cycle']);const recovered=await login('suffix-cycle','ABC');assert.notEqual(recovered.participantSessionId,person.participantSessionId);assert.equal(recovered.executionMode,'run-hot-restart');
     assert.deepEqual((await readRuns()).map(run=>({...run,executionMode:'run-hot-return'})),runsBefore);
     for(const member of cohort)assert.equal((await get(member.participantSessionId)).executionMode,'run-hot-restart');
    }finally{entry[1]='run-hot-return';await upload('ORACLE.PERSON',['suffix-cycle']);await login('suffix-cycle','abc');}
@@ -211,6 +261,24 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
     const result=await outcome;if(result.error)throw result.error;
     assert.equal(result.value.participantSession.participantSessionId,first.participantSessionId);assert.equal(result.value.created,false);
    }finally{if(active)await lock.query('ROLLBACK');lock.release();if(outcome)await outcome;}
+  });
+  if(kind==='postgres')await t.test('native roster mode publication waits for its real parent lock without blocking runtime foreign-key activity',async()=>{
+   const lock=await pool.connect(),entry=entries.find(entry=>entry[0]==='coded');let active=false,outcome;
+   try{
+    await lock.query('BEGIN');active=true;await lock.query(`SET LOCAL search_path TO "${schema}"`);
+    await lock.query('SELECT participant_session_id FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE',[first.participantSessionId]);
+    const pid=(await lock.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    entry[1]='run-review';outcome=upload('ORACLE.PERSON',['coded']).then(value=>({value}),error=>({error}));
+    const deadline=Date.now()+5000;let waiting=false;
+    while(Date.now()<deadline){waiting=(await pool.query('SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))) AS blocked',[pid])).rows[0].blocked;if(waiting)break;await new Promise(done=>setTimeout(done,20));}
+    assert.equal(waiting,true,'Mode import must reach the actual locked native parent');
+    await lock.query('INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES ($1,$2,$3,$4,NULL,$5,$6,$7,$8,$9)',[randomUUID(),tenant.tenantId,workspace.workspaceId,'owned_native_mode_fk_witness','participant_session',first.participantSessionId,new Date().toISOString(),'Owned mode FK concurrency witness','{}']);
+    await lock.query('COMMIT');active=false;const result=await outcome;if(result.error)throw result.error;
+    assert.equal((await get(first.participantSessionId)).executionMode,'run-review');assert.equal((await repository.getTestRunById(run.testRunId)).executionMode,'run-review');
+   }finally{
+    if(active)await lock.query('ROLLBACK');lock.release();if(outcome)await outcome;
+    entry[1]='run-hot-return';await upload('ORACLE.PERSON',['coded']);
+   }
   });
   await t.test('group movement and stale parent saves retain first code/suffix, including omitted pointer metadata',async()=>{
    await upload('ORACLE.MOVED');const moved=await login('coded','ABC');assert.equal(moved.participantSessionId,first.participantSessionId);assert.equal(moved.groupKey,'ORACLE.MOVED');
