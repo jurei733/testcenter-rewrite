@@ -354,6 +354,33 @@ test("extended dispatch avoids the measured long tail without adding slots or dr
   assert.ok(duration(current) <= duration(recorded.previousOrder) - 300,
     "Keep at least five minutes of the recorded four-slot queue improvement; this is not an actual CI timing guarantee");
 });
+test('broad verification dispatches recorded long jobs first without changing coverage or runner limits', () => {
+  const recorded = JSON.parse(read('./fixtures/ci-verification-timings.json'));
+  const strategy = workflow.jobs['verify-memory-sqlite'].strategy;
+  const current = strategy.matrix.include;
+  for (const previous of recorded.previousMatrix) {
+    assert.deepEqual(current.find(item => item.check === previous.check), previous, 'Preserve every prior command, option and browser requirement');
+  }
+  assert.equal(strategy['fail-fast'], false);
+  assert.equal(strategy['max-parallel'], undefined, 'Do not increase or restrict existing runner capacity');
+  const weights = recorded.secondsByCheck;
+  assert.deepEqual(Object.keys(weights).sort(), recorded.previousMatrix.map(item => item.check).sort());
+  assert.ok(Object.values(weights).every(value => Number.isInteger(value) && value > 0));
+  const longestFirst = [...recorded.previousMatrix].sort((a, b) => weights[b.check] - weights[a.check] || a.check.localeCompare(b.check));
+  // Future additional suites need no invented timing or rewritten historical receipt.
+  const measuredCurrent = current.filter(item => Object.hasOwn(weights, item.check));
+  assert.deepEqual(measuredCurrent, longestFirst);
+  const duration = (order, count) => {
+    const slots = Array(count).fill(0);
+    for (const item of order) slots[slots.indexOf(Math.min(...slots))] += weights[item.check];
+    return Math.max(...slots);
+  };
+  // A deterministic scheduling model using observed job times, not a claim
+  // about GitHub's shared runner availability or actual end-to-end speedup.
+  for (const count of [15, 16]) {
+    assert.ok(duration(measuredCurrent, count) <= duration(recorded.previousMatrix, count) - 300);
+  }
+});
 test("a green early checkpoint cannot certify missing, cancelled or failed extended qualification", () => {
   const gate = workflow.jobs.acceptance;
   const results = Object.fromEntries(gate.needs.map(name=>[name,{result:"success"}]));
@@ -437,6 +464,17 @@ test("PR code runs once per update while main, merge queue and manual runs remai
   for (const event of ["push", "pull_request"]) assert.ok(workflow.on[event].paths.includes(".github/actions/**"));
   assert.equal(workflow.concurrency["cancel-in-progress"], true);
 });
+test('changing either production workflow alone still triggers complete acceptance', () => {
+  for (const event of ['push', 'pull_request']) {
+    const trigger = workflow.on[event];
+    assert.equal(trigger['paths-ignore'], undefined);
+    for (const path of ['.github/workflows/rewrite-app-ci.yml', '.github/workflows/rewrite-service-focus.yml']) {
+      assert.ok(trigger.paths.includes(path), `${event} must check a change only to ${path}`);
+    }
+    assert.ok(trigger.paths.includes('rewrite-app/**'));
+    assert.ok(trigger.paths.includes('.github/actions/**'));
+  }
+});
 test('same-run build and visual consumers retain the qualified OS and an OS-specific browser cache', () => {
   assert.deepEqual([...new Set(Object.values(workflow.jobs).map(job => job['runs-on']))], ['ubuntu-24.04']);
   const cache = action.runs.steps.find(step => step.uses?.startsWith('actions/cache@'));
@@ -479,7 +517,7 @@ test("administration reference requires real browser paint and layout negative c
 test("isolated console shards retain each of the eight prior checks without a long serial prefix", () => {
   const names=["ui-controller-timer","ui-console-debug","ui-participant-console","ui-participant-command-completion","ui-participant-native-routes"];
   const shards=matrix.filter(item=>names.includes(item.check));
-  assert.deepEqual(shards.map(item=>item.check),names);
+  assert.deepEqual(shards.map(item=>item.check).sort(),[...names].sort());
   const prior=baseline.commands.find(item=>item.check==="ui-participant-console").leaves;
   const actual=shards.flatMap(item=>expand(item.command).split("&&").map(value=>value.trim()));
   assert.equal(actual.length,8);assert.equal(new Set(actual).size,8);

@@ -1,5 +1,66 @@
 # CI iteration and complete acceptance
 
+## Latest full baseline, measured service feedback and queue ordering (2026-10-24)
+
+[Full run 40067020592](https://github.com/jurei733/testcenter-rewrite/actions/runs/40067020592)
+completes successfully with **89/89 jobs**, no failed, skipped or cancelled jobs.
+Published head `072b075c6fa6b58647268a19e8e209dc9978818d` and actual checkout
+merge `9145fd1fb124177d43d46b9ab59f575413c14dd5` have the same verified tree
+`d6f6d36af68320ed2dff248508539d6074c32f1b`. Actual logs confirm **4,078
+unit/frontend** and **2,224 PostgreSQL** checks, with no failures/skips, and
+zero complete-lock audit vulnerabilities. Full PostgreSQL UI and all remaining
+browser, Original-reference and deployability gates pass. The historical starter
+failure does not recur; its root cause remains unproven. The run spans
+05:38:09–06:08:55 UTC (30 min 46 s); early Fast feedback finishes at 05:43:02 UTC.
+
+The independently successful [focused run 40067107146](https://github.com/jurei733/testcenter-rewrite/actions/runs/40067107146)
+uses the exact same application tree with only an isolated qualification wrapper
+added, head `337034f4c820d2dd71e63bb24bfcf96b47fded8c`. It exercises the actual
+reusable production service workflow, without advancing or cancelling full CI:
+
+| Complete PostgreSQL service suite | Checks passed | Whole job | Fresh core | Selected tests |
+| --- | ---: | ---: | ---: | ---: |
+| Participant authentication | 219 | 78 s | 13.03 s | 22.96 s |
+| Original results | 294 | 69 s | 8.83 s | 18.83 s |
+| Systemcheck reports | 9 | 59 s | 13.15 s | 4.06 s |
+
+Every focused job also passes **273 Linux policy checks**, without skips, and
+the full locked-graph audit with zero vulnerabilities. Job IDs are
+`120792563750`, `120792563794` and `120792563560`, respectively. These are
+observations of focused feedback; no whole-pipeline speedup is inferred from
+their smaller scope. Manual dispatch still requires the workflow on the default
+branch; no merge or deployment is performed here.
+
+The next pipeline change submits the 40 broad verification shards in descending
+observed duration. Its immutable timing fixture records the preceding successful
+[89-job run 40064366620](https://github.com/jurei733/testcenter-rewrite/actions/runs/40064366620),
+head `a6daa1d25ff9904e4f0fdfa20847988a32528c94`, and the complete previous matrix.
+No command, browser requirement, assertion, deadline, dependency, runner limit
+or acceptance prerequisite is removed. The five console shards retain all eight
+checks; their membership control now permits the deliberate dispatch reorder.
+Future extra suites can be added without inventing timings or rewriting this
+historical receipt.
+
+| Independent list-scheduling model | Previous order | Long jobs first | Model reduction |
+| --- | ---: | ---: | ---: |
+| 15 available slots | 25 min 54 s | 17 min | 8 min 54 s |
+| 16 available slots | 23 min | 15 min 57 s | 7 min 3 s |
+
+This model includes the recorded whole-job setup times but does not simulate
+GitHub's shared queue, other workflow jobs or variable runtime. It is not an
+observed hosted speedup. The reordered tree still requires its own full hosted
+acceptance. Regression controls require every recorded command/option, descending
+measured order, unchanged runner limits and the model's five-minute improvement.
+The control fails against the previous order before the correction.
+
+The same follow-up closes a trigger gap: changes only to
+`.github/workflows/rewrite-service-focus.yml` now trigger full CI on main pushes
+and PR updates, just like the main workflow and shared action. A negative
+control fails against the old path filters. Both workflows pass Actionlint;
+the final local policy run passes **273**, with one explicit Linux-only GNU
+timeout control skipped on macOS and no failures. The read-only token,
+immutable actions, credential-free checkout and fatal audit/test failures remain.
+
 ## Complete exact-Login baseline and current native modes (2026-10-24)
 
 [Run 40064366620](https://github.com/jurei733/testcenter-rewrite/actions/runs/40064366620)
