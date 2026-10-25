@@ -376,7 +376,7 @@ try {
   check('native numeric Test GET enforces person ownership and opens an unassigned Test only once with current XML and canonical preset state',{testId:presetId,firstStart:firstOpen.firstStart,secondStart:again.firstStart,mode:firstOpen.mode,laststate:firstOpen.laststate,presetBookletStates:firstOpen.presetBookletStates,xmlSha256:createHash('sha256').update(firstOpen.xml).digest('hex')});
 
   const gone='ORACLE.GONE.BOOK';
-  await upload('gone-booklet.xml',xml('Booklet','testcenter-booklet-xml','18.0',`<Metadata><Id>${gone}</Id><Label>Owned removed physical Booklet</Label></Metadata><Units><Unit id="ORACLE.POW.UNIT"/></Units>`));
+  await upload('gone-booklet.xml',xml('Booklet','testcenter-booklet-xml','18.0',`<Metadata><Id>${gone}</Id><Label>Owned removed physical Booklet</Label></Metadata><Units><Unit id="ORACLE.POW.UNIT" label="Owned removed Booklet Unit"/></Units>`));
   const goneId=Number((await request('PUT','/test',{token:partToken,body:{bookletName:gone},status:201})).value);
   const deletion=(await request('DELETE',`/workspace/${workspace}/files`,{token:admin.token,body:{f:['Booklet/gone-booklet.xml']},status:207})).value;
   assert.ok(deletion.deleted.includes('Booklet/gone-booklet.xml'));
