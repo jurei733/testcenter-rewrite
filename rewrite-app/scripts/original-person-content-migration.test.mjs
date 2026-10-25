@@ -52,6 +52,7 @@ for (const kind of kinds) test(`${kind}: release-independent native person migra
       ? 'CREATE TRIGGER owned_person_trigger AFTER UPDATE OF status ON participant_sessions BEGIN INSERT INTO owned_person_audit VALUES (NEW.participant_session_id); END'
       : `CREATE FUNCTION owned_person_trigger() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN INSERT INTO owned_person_audit VALUES (NEW.participant_session_id); RETURN NEW; END $$;
          CREATE TRIGGER owned_person_trigger AFTER UPDATE OF status ON participant_sessions FOR EACH ROW EXECUTE FUNCTION owned_person_trigger()`);
+    await exec('ALTER TABLE test_runs DROP COLUMN response_part_types_json');
     if (kind === 'sqlite') {
       // Reconstruct the old NOT NULL metadata only in this owned fixture.
       // Production uses a transactional table rebuild, never catalog editing.

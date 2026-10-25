@@ -41,7 +41,7 @@ import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "
 import { projectSupersededParticipantTermination } from "./participant-terminal-continuation.js";
 import { retainedLegacyTimerPreparation, withLegacyTimerPreparation, legacyTimerInterruptionBalance } from "./participant-legacy-timer.js";
 import { validParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
-import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
+import { ParticipantResponseTypeError, withOrderedParticipantResponse } from "./participant-response-persistence.js";
 import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
   ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
 export { prepareParticipantRunMutation } from "./participant-run-mutation.js";
@@ -20953,6 +20953,7 @@ const resetNonSavingTestRunForEntry = (input: {
     currentUnitKey: null,
     unitResponses: {},
     ...(input.testRun.unitResponseFieldTimestamps ? { unitResponseFieldTimestamps: {} } : {}),
+    ...(input.testRun.unitResponsePartTypes ? { unitResponsePartTypes: {} } : {}),
     sharedParameters: [],
     ...(input.testRun.sharedParameterTimestamps ? { sharedParameterTimestamps: {} } : {}),
     unlockedTestletKeys: [],
@@ -25253,6 +25254,7 @@ export const createFirstSliceServices = (
   const orderedParticipantResponse = (input: Parameters<typeof withOrderedParticipantResponse>[0]): TestRun => {
     try { return withOrderedParticipantResponse(input); }
     catch (error) {
+      if (error instanceof ParticipantResponseTypeError) throw new FirstSliceError(400, "participant_response_type_invalid", error.message);
       if (error instanceof RangeError) throw new FirstSliceError(400, "participant_response_timestamps_invalid", error.message);
       throw error;
     }

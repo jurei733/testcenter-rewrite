@@ -77,7 +77,7 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
       const before = await repository.getTestRunById(f.id);
       const currentVersion = kind === 'sqlite' ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
       const version = kind === 'sqlite' ? 63 : 57;
-      await execute(`DROP TABLE original_session_tokens; DROP INDEX participant_access_credentials_token_hash; DROP TABLE original_login_bindings; DROP TABLE original_participant_groups; DROP INDEX participant_sessions_original_login; ALTER TABLE participant_sessions DROP COLUMN original_name_suffix; ALTER TABLE participant_sessions DROP COLUMN original_login_key; ALTER TABLE participant_roster_entries DROP COLUMN original_login_identity; ALTER TABLE test_runs DROP COLUMN original_result_state_json; ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
+      await execute(`ALTER TABLE test_runs DROP COLUMN response_part_types_json; DROP TABLE original_session_tokens; DROP INDEX participant_access_credentials_token_hash; DROP TABLE original_login_bindings; DROP TABLE original_participant_groups; DROP INDEX participant_sessions_original_login; ALTER TABLE participant_sessions DROP COLUMN original_name_suffix; ALTER TABLE participant_sessions DROP COLUMN original_login_key; ALTER TABLE participant_roster_entries DROP COLUMN original_login_identity; ALTER TABLE test_runs DROP COLUMN original_result_state_json; ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
         ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json; DELETE FROM schema_migrations WHERE version>=${version}`);
       const migration = () => kind === 'sqlite' ? migrateSqliteFirstSliceStorage(file) : migratePostgresFirstSliceStorage(url.toString());
       const value = async sql => kind === 'sqlite' ? control.prepare(sql).get().value : (await control.query(sql)).rows[0].value;
@@ -359,16 +359,17 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
       assert.equal(saved.logs.filter(log => log.logKey === 'RESPONSE_SAVED').length, 1);
     });
     if (kind === 'file') await t.test('failed File publication rolls back receipt and clocks in cache and after restart', async () => {
-      const f = await fixture(), input = request(f, { responseOnly: true }), before = await snapshot(f, input.deliveryId), backup = file + '.owned-backup';
+      const f = await fixture(), input = request(f, { responseOnly: true, unitResponse: packet({ unitStateDataType: 'transactional/Ω', dataParts: { a: 'Transactional A' } }, { unitState: { unitStateDataType: 20 }, dataParts: { a: 20 } }) }), before = await snapshot(f, input.deliveryId), backup = file + '.owned-backup';
       await rename(file, backup); await mkdir(file);
       try { await assert.rejects(f.services.participantRuntime.saveProgress(input)); assert.deepEqual(await snapshot(f, input.deliveryId), before); }
       finally { await rm(file, { recursive: true }); await rename(backup, file); }
       const restarted = await create(); assert.equal(await receipt(restarted, f, input.deliveryId), null);
       assert.deepEqual(await restarted.getTestRunById(f.id), before.run);
       await f.services.participantRuntime.saveProgress(input); assert.ok(await receipt(await create(), f, input.deliveryId));
+      assert.deepEqual((await (await create()).getTestRunById(f.id)).unitResponsePartTypes.unit, { a: 'transactional/Ω' });
     });
     if (control) for (const target of ['run', 'log', 'audit']) await t.test(`${target} failure after receipt insertion rolls back receipt, answers, clocks and artifacts`, async () => {
-      const f = await fixture(), input = request(f, { responseOnly: true, unitResponse: packet({ dataParts: { a: 'Transactional A' } }, { dataParts: { a: 20 } }) }), before = await snapshot(f, input.deliveryId);
+      const f = await fixture(), input = request(f, { responseOnly: true, unitResponse: packet({ unitStateDataType: 'transactional/Ω', dataParts: { a: 'Transactional A' } }, { unitState: { unitStateDataType: 20 }, dataParts: { a: 20 } }) }), before = await snapshot(f, input.deliveryId);
       const table = target === 'run' ? 'test_runs' : target === 'log' ? 'participant_test_logs' : 'workspace_activity_events';
       const field = target === 'audit' ? 'subject_id' : 'test_run_id';
       const install = kind === 'sqlite' ? `CREATE TRIGGER owned_delivery_failure BEFORE INSERT ON ${table} WHEN NEW.${field}='${f.id}' BEGIN SELECT RAISE(ABORT,'owned delivery failure'); END` :
@@ -379,6 +380,7 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
       finally { await execute(remove); }
       assert.equal(await receipt(await create(), f, input.deliveryId), null);
       await f.services.participantRuntime.saveProgress(input); assert.ok(await receipt(await create(), f, input.deliveryId));
+      assert.deepEqual((await (await create()).getTestRunById(f.id)).unitResponsePartTypes.unit, { a: 'transactional/Ω' });
     });
     if (kind === 'postgres') await t.test('a duplicate waits for the first uncommitted receipt and then observes one acceptance', async () => {
       const f = await fixture(), input = request(f), replica = await create();

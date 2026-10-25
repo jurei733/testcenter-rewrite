@@ -8,9 +8,12 @@ enhanced comments, PHP nested JSON escaping and exact empty-body behavior. The
 unchanged production Source28 run adds seven Unit/part/report controls to all 21
 preceding native auth/cascade groups, with 159 genuine HTTP observations.
 It does not connect the four native downloads or claim native repository/HTTP/UI
-parity. Stored person suffixes, first Unit identity/state, per-part response types
-and clocks, current physical XML labels and native permission mapping still need
-their complete projection. The canonical ZIP and broad ledger remain unchanged.
+parity. Accepted per-part response types now persist in the actual participant
+Run transaction across all four stores (SQLite 72 / PostgreSQL 66), with no legacy
+backfill; [data history and browser-coalescing boundary](ORIGINAL-REPORTS.md) are
+explicit. Stored person suffixes, first native Unit identity/state, per-part report
+projection, current physical XML labels and native permission mapping still need
+their complete connection. The canonical ZIP and broad ledger remain unchanged.
 
 ## Hosted cascade feedback and complete-acceptance boundary (2026-10-25)
 

@@ -1,5 +1,50 @@
 # Native workspace report output
 
+
+## Durable accepted part types (2026-10-25)
+
+The existing participant Run write transaction now records the incoming packet's
+response type separately for each **accepted** data part in
+`TestRun.unitResponsePartTypes`. Equal/stale fields retain their earlier type;
+a new part may have a clock older than other parts. An omitted type becomes
+`unknown`. A newer global `unitStateDataType` cannot rewrite earlier part types.
+This is actual service/store behavior, independent of the report renderer.
+Source's `unit_data.response_type varchar(50)` limit is enforced before copying
+an accepted type across parts. Fifty Unicode code points remain valid; longer,
+NUL-containing or malformed Unicode types fail with a static HTTP 400
+`participant_response_type_invalid` error, without changing the Run. The versioned
+Rewrite error mapping is not a claim about numeric Source HTTP error bytes.
+
+SQLite migration **72** and PostgreSQL migration **66** add a nullable private
+`response_part_types_json` column. Existing rows stay without type history: the
+latest packet type, Run update time and response value encoding are not evidence
+for old part types. Memory/File include the same field in their Run commit.
+Accepted opaque replacement retires only that Unit's metadata; a stale opaque
+write preserves it. Non-saving starter reentry clears types with answers and
+clocks. The eight-field group inventory remains free of this private sidecar.
+All prior migration-failure controls remain; old-schema fixtures also remove the
+new column before replaying migrations. Late File/SQLite/PostgreSQL write-failure
+controls now compute real type metadata and verify rollback and durable recovery.
+
+The mandatory `participant-response-part-types.test.mjs` uses real schema-validated
+native credential XML, Login/person creation, an owned release fixture and actual
+participant progress transactions across all four stores. Its four-part values,
+clocks and types are taken directly from the unchanged production Source28
+receipt. This is not a new production Source upload/browser Oracle. Existing
+IB Player browser checks additionally require types for real `variables`/`scores`
+parts before and after reload in both interfaces.
+
+The browser coalescing contract remains a separate boundary. Pinned Source
+`frontend/src/app/test-controller/util/test-state.util.ts` (`sortDataParts`, blob
+`a1d2bdb1a962986cccac7532ca0d53c9e9f866f0`) chooses the **first** type for all
+parts of a buffered unit; the Unit host supplies an empty type for an omitted
+notification type. This differs from independent production HTTP writes, whose
+omitted type defaults to `unknown`. Exact buffer grouping/flush-boundary behavior
+still needs paired browser qualification and implementation; no per-notification
+type-hint extension is shipped here. Native numeric Unit writer/first identity,
+raw laststate, repository report projection, current physical labels and the four
+report HTTP/UI actions remain open. The broad ledger remains 27 done /22 partial.
+
 ## Status and evidence boundary
 
 The dedicated `original-workspace-report-wire.ts` component renders Source-shaped

@@ -1205,6 +1205,8 @@ export type TestRun = {
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
   unitResponseFieldTimestamps?: Record<string, ParticipantResponseFieldTimestamps>;
+  /** Server-owned response type captured when each data part was accepted; legacy parts remain unknown. */
+  unitResponsePartTypes?: Record<string, Record<string, string>>;
   /** Original test-wide Verona 6 Player-to-Player communication state. */
   sharedParameters?: Array<{ key: string; value: string }>;
   sharedParameterTimestamps?: Record<string, number>;
