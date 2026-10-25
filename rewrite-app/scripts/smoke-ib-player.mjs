@@ -393,6 +393,7 @@ try {
   }, ibRuntimeReadyTimeoutMs);
   const stateDeadline = Date.now() + 10_000;
   let savedUnitResponse = "";
+  let savedPartTypes;
   let capturedInteractions = false;
   while (!capturedInteractions && Date.now() < stateDeadline) {
     await delay(250);
@@ -403,6 +404,7 @@ try {
     const currentState = await currentStateResponse.json();
     savedUnitResponse =
       currentState.currentRunState.testRun.unitResponses[unitKey] ?? "";
+    savedPartTypes = currentState.currentRunState.testRun.unitResponsePartTypes?.[unitKey];
     // The Player reports data parts separately. An initial envelope or the
     // checkbox save can arrive before the text interaction's score part.
     const parts = savedUnitResponse
@@ -423,6 +425,8 @@ try {
   );
   const savedUnitState = JSON.parse(savedUnitResponse).unitState;
   assert.equal(savedUnitState.unitStateDataType, "iqb-standard@1.4");
+  for (const part of ['variables', 'scores']) assert.equal(savedPartTypes?.[part], 'iqb-standard@1.4',
+    'The actual Player save must persist each accepted part type in the same Run transaction.');
   const savedVariables = JSON.parse(savedUnitState.dataParts.variables);
   assert.equal(savedVariables.find(variable => variable.id === "VarA")?.value, 0);
   const savedScores = JSON.parse(savedUnitState.dataParts.scores);
@@ -504,6 +508,8 @@ try {
   const restoredEnvelope = JSON.parse(restoredState.currentRunState.testRun.unitResponses[unitKey]);
   assert.equal(restoredState.currentRunState.testRun.testRunId, reEntryRun.testRunId);
   assert.equal(restoredEnvelope.unitState.unitStateDataType, savedUnitState.unitStateDataType);
+  for (const part of ['variables', 'scores']) assert.equal(restoredState.currentRunState.testRun.unitResponsePartTypes?.[unitKey]?.[part], savedPartTypes[part],
+    'Reloaded native Player state must retain accepted per-part types.');
   assert.equal(restoredEnvelope.unitState.dataParts.variables, savedUnitState.dataParts.variables);
   assert.deepEqual(restoredEnvelope.dataPartValueTypes, reEntryResponseEnvelope.dataPartValueTypes);
   assert.ok(restoredInteractions(restoredEnvelope) >= savedInteractionCount,

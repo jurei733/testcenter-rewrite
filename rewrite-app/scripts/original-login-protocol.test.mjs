@@ -381,7 +381,7 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
       const version = kind === 'sqlite' ? 70 : 64;
       const migrate = () => kind === 'sqlite' ? migrateSqliteFirstSliceStorage(file) : migratePostgresFirstSliceStorage(url.toString());
       try {
-        await execute(`DROP TABLE original_session_tokens; DROP INDEX participant_access_credentials_token_hash; DELETE FROM schema_migrations WHERE version>=${version}`);
+        await execute(`ALTER TABLE test_runs DROP COLUMN response_part_types_json; DROP TABLE original_session_tokens; DROP INDEX participant_access_credentials_token_hash; DELETE FROM schema_migrations WHERE version>=${version}`);
         await execute(kind === 'sqlite'
           ? `CREATE TRIGGER owned_token_migration_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned token migration failure'); END`
           : `CREATE FUNCTION owned_token_migration_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned token migration failure'; END $$; CREATE TRIGGER owned_token_migration_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_token_migration_failure()`);

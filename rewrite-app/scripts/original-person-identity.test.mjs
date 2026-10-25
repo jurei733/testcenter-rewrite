@@ -335,7 +335,7 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
     const data=JSON.parse(await readFile(file,'utf8'));for(const parent of Object.values(data.participantSessions))delete parent.originalNameSuffix;await writeFile(file,JSON.stringify(data));
    }else{
     control=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
-    const sql='DROP TABLE original_session_tokens; DROP INDEX participant_access_credentials_token_hash; ALTER TABLE participant_sessions DROP COLUMN original_name_suffix; DELETE FROM schema_migrations WHERE version>='+(kind==='sqlite'?69:63);
+    const sql='ALTER TABLE test_runs DROP COLUMN response_part_types_json; DROP TABLE original_session_tokens; DROP INDEX participant_access_credentials_token_hash; ALTER TABLE participant_sessions DROP COLUMN original_name_suffix; DELETE FROM schema_migrations WHERE version>='+(kind==='sqlite'?69:63);
     if(kind==='sqlite'){control.exec(sql);control.close();}else{await control.query(sql);await control.end();}control=null;
    }
    await open();const legacy=await get(first.participantSessionId),{originalNameSuffix,...known}=before;assert.deepEqual(legacy,known);

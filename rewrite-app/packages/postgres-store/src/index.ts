@@ -620,6 +620,9 @@ const mapTestRun = (row: Row | undefined): TestRun | null =>
           const fields = JSON.parse(String(row.response_field_timestamps_json ?? "{}")) as NonNullable<TestRun["unitResponseFieldTimestamps"]>;
           return Object.keys(fields).length ? { unitResponseFieldTimestamps: fields } : {};
         })(),
+        ...(row.response_part_types_json == null ? {} : {
+          unitResponsePartTypes: JSON.parse(String(row.response_part_types_json)) as NonNullable<TestRun["unitResponsePartTypes"]>
+        }),
         ...(() => {
           const fields = JSON.parse(String(row.shared_parameter_timestamps_json ?? "{}")) as NonNullable<TestRun["sharedParameterTimestamps"]>;
           return Object.keys(fields).length ? { sharedParameterTimestamps: fields } : {};
@@ -1670,6 +1673,11 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
       ALTER TABLE participant_sessions DROP CONSTRAINT IF EXISTS participant_sessions_original_content;
       ALTER TABLE participant_sessions ADD CONSTRAINT participant_sessions_original_content
         CHECK (content_release_id IS NOT NULL OR (original_login_key IS NOT NULL AND length(original_login_key)>0));`
+  },
+  {
+    version: 66,
+    name: "participant_response_part_types",
+    sql: `ALTER TABLE test_runs ADD COLUMN response_part_types_json TEXT;`
   }
 ];
 
@@ -1773,8 +1781,8 @@ export const checkPostgresFirstSliceReadiness = async (
 const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun, updateExisting = true): Promise<boolean> => {
   const result = await connection.query(
     `INSERT INTO test_runs (
-      test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
+      test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
     ${updateExisting ? `ON CONFLICT(test_run_id) DO UPDATE SET
       participant_session_id = EXCLUDED.participant_session_id,
       tenant_id = EXCLUDED.tenant_id,
@@ -1805,7 +1813,8 @@ const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun,
         controller_entry_json = EXCLUDED.controller_entry_json,
         state_revision = EXCLUDED.state_revision,
         controller_dispatches_json = EXCLUDED.controller_dispatches_json,
-        original_result_state_json = EXCLUDED.original_result_state_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`,
+        original_result_state_json = EXCLUDED.original_result_state_json,
+        response_part_types_json = EXCLUDED.response_part_types_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`,
     [
       testRun.testRunId,
       testRun.participantSessionId,
@@ -1837,7 +1846,8 @@ const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun,
       testRun.controllerEntry === undefined ? null : JSON.stringify(testRun.controllerEntry),
       testRun.stateRevision ?? null,
       testRun.controllerDispatches === undefined ? null : JSON.stringify(testRun.controllerDispatches),
-      testRun.originalResultState === undefined ? null : JSON.stringify(testRun.originalResultState)
+      testRun.originalResultState === undefined ? null : JSON.stringify(testRun.originalResultState),
+      testRun.unitResponsePartTypes === undefined ? null : JSON.stringify(testRun.unitResponsePartTypes)
     ]
   );
   return result.rowCount === 1;
