@@ -1,5 +1,53 @@
 # CI iteration and complete acceptance
 
+## Complete guarded Session acceptance and native result reads (2026-10-25)
+
+[Full CI 40189158651](https://github.com/jurei733/testcenter-rewrite/actions/runs/40189158651)
+is terminal **success, 89/89 jobs**, without failures/skips/cancellations. Head
+`bc5301893e16b42434f1e74e59705e39e2004647`, actual merge
+`87f8b971f5ebb428df91df8f864c147974b85206` and verified application tree
+`660471677674e6525e6d7fa3eebae47794343df4` qualify the native participant Session
+boundary, guarded work, complete protected UI prefix and corrected compound Xvfb
+execution. Actual Linux logs confirm **4,183 unit/frontend**, **2,366 PostgreSQL**
+checks and zero audit vulnerabilities. The full console-loading/context-compat
+leaf succeeds, including terminal route drain and all five context markers.
+PostgreSQL UI, Original/reference and deployability gates pass as well.
+
+Observed job span is **30:01**, 11:30:36–12:00:37 UTC, and Fast feedback completes
+at 11:35:38 UTC. The preceding green baseline was 28:59. These queue-dependent
+measurements do not establish a causal whole-CI speedup. The independently
+qualified service feedback remains 60–99 seconds, with its separate tested scope.
+Full acceptance remains mandatory.
+
+The next native group-result read uses one scoped inventory snapshot: one SQL
+statement for SQLite/PostgreSQL and one synchronous projection of committed state
+for Memory/File. Response values, timers, passwords, bearer/token material and private review text
+are absent from that repository DTO. Real decoder fences actively reject complete
+Run reads while permitting the new read. Actual protected SQL HTTP verifies RO
+workspace access, anonymous/invalid/foreign-workspace denial, native array shape,
+no-store headers and exact group filtering. The suite joins full unit/PostgreSQL
+and original-results focused acceptance; no previous gate is removed.
+
+The read matches pinned Source's saved-Unit statistics, first group labels,
+current binary Login bindings, persistent opening history and max(group/Test)
+Unix-second clock. Indexed lookups and scalar aggregates handle a 140,001-person /
+140,001-Login fixture without quadratic scans or argument-stack overflow. This
+is an owned correctness/scale fixture, not a production-load timing guarantee.
+See [contract, actual Source evidence and remaining UI/wire scope](ORIGINAL-RESULT-GROUPS.md).
+The next application tree requires its own independent hosted qualification.
+
+Local qualification of this follow-up passes **4,218 complete unit/frontend**
+checks (121 + 325 + 1,722 + 2,050) and **2,413 complete PostgreSQL** checks,
+without failures/skips. The final SQL placement is isolated under each adapter;
+after that equivalent relocation and removal of an unused metadata-list port,
+**138/138 all-store result/archive/Session controls**, core/web typechecking,
+production build and CI policy pass again. Policy has 276 passes and one explicit
+GNU-timeout-only macOS skip; complete-lock audit reports zero vulnerabilities.
+Actionlint and diff checks pass. Existing CSS/CommonJS build warnings remain.
+The owned database is removed after checking its owner, zero other connections
+and no remaining test schemas; the initially stopped cluster returns to stopped.
+New exact-head Linux qualification remains separate from the green baseline.
+
 ## Compound browser commands stay inside one display (2026-10-25)
 
 Native Session [full run 40188347937](https://github.com/jurei733/testcenter-rewrite/actions/runs/40188347937)

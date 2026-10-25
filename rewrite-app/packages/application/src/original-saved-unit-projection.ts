@@ -6,14 +6,15 @@ export const originalReviewUnitEventTypes = ['review_created', 'review_updated',
  * The durable review journal keeps that identity after the comment is deleted.
  * Arbitrary Unit-scoped logs do not establish a saved Unit. */
 export function selectOriginalSavedUnitKeys(input: {
-  testRuns: TestRun[];
-  reviews: WorkspaceReview[];
-  activityEvents: WorkspaceActivityEvent[];
+  testRuns: Array<Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId'> & {unitResponses?: TestRun['unitResponses']}>;
+  persistedUnitKeys?: ReadonlyMap<string, readonly string[]>;
+  reviews: Array<Pick<WorkspaceReview, 'tenantId' | 'workspaceId' | 'testRunId' | 'participantSessionId' | 'unitKey'>>;
+  activityEvents: Array<Pick<WorkspaceActivityEvent, 'tenantId' | 'workspaceId' | 'eventType' | 'subjectType' | 'subjectId' | 'occurredAt' | 'details'>>;
 }): Map<string, Set<string>> {
   const runs = new Map(input.testRuns.map(run => [run.testRunId, run]));
-  const units = new Map(input.testRuns.map(run => [run.testRunId, new Set(Object.keys(run.unitResponses ?? {}))]));
+  const units = new Map(input.testRuns.map(run => [run.testRunId, new Set(input.persistedUnitKeys?.get(run.testRunId) ?? Object.keys(run.unitResponses ?? {}))]));
   const reviewEvents: ReadonlySet<string> = new Set(originalReviewUnitEventTypes);
-  const add = (run: TestRun | undefined, evidence: {tenantId: string; workspaceId: string},
+  const add = (run: typeof input.testRuns[number] | undefined, evidence: {tenantId: string; workspaceId: string},
     participantSessionId: unknown, unitKey: unknown): void => {
     if (run && evidence.tenantId === run.tenantId && evidence.workspaceId === run.workspaceId &&
       participantSessionId === run.participantSessionId && typeof unitKey === 'string' && unitKey.trim()) {

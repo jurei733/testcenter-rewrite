@@ -1,5 +1,60 @@
 # Original participant group snapshots
 
+## Source-shaped group-result read inventory (2026-10-25)
+
+The new protected versioned read
+`GET /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-groups`
+returns Source's exact eight-field array: groupName, groupLabel, bookletsStarted,
+numUnitsMin, numUnitsMax, numUnitsTotal, numUnitsAvg and Unix-second lastChange.
+It uses proven native people, their binary Login bindings and frozen credential-stage
+group snapshots. Current roster imports cannot rewrite the first label; a later
+case-equivalent Login changes raw group spelling, while a move to a new group moves
+its retained Tests and applies that group's clock. Group filters use the qualified
+German case/composition comparison without trimming; omitted/empty filters mean all.
+
+Opening history decides inclusion independently of current Run status. A truly
+opened zero-Unit Test counts; a pre-created unopened Test does not. Distinct saved
+Units include state-only and review-only Units, including a subsequently deleted
+review's durable initialization journal. Arbitrary Unit logs do not create Units.
+Unit response/review updates and generic Run activity do not advance Source's Test
+clock. lastChange is max(group snapshot modification, Test modification), rounded
+to Unix seconds. Missing clocks, ownership/bindings/snapshots or duplicate native
+Test identities fail explicitly rather than inventing history. Canonical extension
+sessions are not mislabeled as native Source records; their existing report stays
+available separately.
+
+All four adapters capture one owned inventory. SQLite/PostgreSQL use one SQL
+statement snapshot and transport only identities, saved Unit keys, clocks and the
+three qualifying review-journal identity fields. Memory/File copy the same thin
+projection synchronously from one committed state. No response/timer payload,
+password, bearer/token material or private review text enters the snapshot DTO. Actual SQL decoder
+negative controls prove full Run reads would deserialize private responses, while
+the native inventory succeeds. A real Login move plus Unit write overtaking a
+captured read cannot alter its result. Binary Login and exact snapshot indexes
+avoid per-Test rescans; scalar count/min/max/sum avoid spreading large inventories
+through JavaScript's argument stack.
+
+Source27, frozen-group Source32 and native-person Source62 manifests and receipt
+hashes remain mandatory. The owned tests use actual strict native credential
+parsing against an explicitly seeded runtime-release fixture; they do not claim a
+new production Source/XSD-upload Oracle. Existing production Source receipts supply
+the 1/2/3/1.5 statistics, first-label, raw-case and clock semantics. Real protected
+SQLite/PostgreSQL HTTP checks the Source-shaped array, filtering, caching and the
+versioned workspace authorization boundary.
+
+Full local unit/frontend passes 4,218 and complete PostgreSQL passes 2,413 checks.
+The final adapter layout independently repeats all 138 result/archive/Session
+controls, policy, typechecking and production build; no old assertions or required
+CI gate is removed. Complete-lock audit has zero vulnerabilities. Independent
+hosted qualification must still accept the new application tree.
+
+The literal numeric Source workspace route, native admin authorization mapping,
+result table/UI adoption, selected-Test administration and the four native report
+wire downloads remain open. The versioned read retains the Rewrite's existing
+workspace role policy; it is not proof of Source admin permission equivalence.
+This foundation closes no broad row: **27 done / 22 partial**, all eight broad
+visual rows open, approximately **4–8 engineering weeks** remaining.
+
 ## Native participant Session HTTP follow-up (2026-10-25)
 
 The [participant Session boundary](ORIGINAL-SESSION.md) implements literal Source
