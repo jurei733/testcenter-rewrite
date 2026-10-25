@@ -1,0 +1,18 @@
+name: Focused native authentication core qualification
+
+on:
+  push:
+    branches: [codex/service-focus-native-auth-core-20261025]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [participant-auth, original-results, system-check-reports]
+    uses: ./.github/workflows/rewrite-service-focus.yml
+    with:
+      check: ${{ matrix.check }}
