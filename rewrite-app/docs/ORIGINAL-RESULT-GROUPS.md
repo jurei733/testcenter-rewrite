@@ -1,5 +1,16 @@
 # Original participant group snapshots
 
+## Native participant Session HTTP follow-up (2026-10-25)
+
+The [participant Session boundary](ORIGINAL-SESSION.md) implements literal Source
+paths, AccessSets and guarded ALTCHA transport. It reads current physical labels
+without creating Tests, preserves exact raw code buckets/order and first stored
+person suffixes, and distinguishes current immediate group labels from frozen
+credential-stage person-read labels. All four stores expose scoped Test opening
+metadata without decoding responses/timers. The native admin/operational and
+numeric Test transports, production UI adoption, complete result pages and paired
+visual proof remain outstanding. This follow-up does not close a broad parity row.
+
 ## Current native code grants and protected Source ALTCHA contract (2026-10-25)
 
 The native runtime no longer interprets an absent current code bucket as a grant

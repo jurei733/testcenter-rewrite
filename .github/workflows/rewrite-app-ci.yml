@@ -329,7 +329,7 @@ jobs:
             command: npm run smoke:ui:original-admin-login:built
           - check: proof-of-work
             group: entry
-            command: npm run smoke:ui:proof-of-work:built
+            command: npm run smoke:ui:proof-of-work:built && npm run smoke:ui:original-session:built
           - check: system-check
             group: system-check
             command: npm run smoke:ui:system-check:built

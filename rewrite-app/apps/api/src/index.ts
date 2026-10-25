@@ -1,3 +1,5 @@
+import {OriginalSessionProof} from './original-session-proof.js';
+import {handleOriginalSessionHttp, originalSessionRoutes} from './original-session-http.js';
 import { participantCommandExecutionRoute, type ExecuteParticipantRunCommandRequest } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import type { GetWorkspaceFileCatalogResponse } from '@testcenter-rewrite-app/contracts';
 import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
@@ -816,6 +818,10 @@ const createApiRuntime = async () => {
     currentSecret: proofOfWorkCurrentSecret,
     previousSecret: proofOfWorkPreviousSecret
   });
+  const originalSessionProof = new OriginalSessionProof(repository, {
+    enabledScopes: proofOfWorkEnabledScopes, maxNumber: proofOfWorkMaxNumber, ttlMs: proofOfWorkTtlMs,
+    currentSecret: proofOfWorkCurrentSecret, previousSecret: proofOfWorkPreviousSecret, maxJsonBodyBytes
+  });
   const services = createFirstSliceServices({
     repository,
     adminLoginMaxFailures,
@@ -993,6 +999,7 @@ const createApiRuntime = async () => {
     repository,
     requestLifecycle,
     proofOfWork,
+    originalSessionProof,
     services,
     metrics: createRuntimeMetrics(),
     recentOperationalEvents: [] as RuntimeOperationalEvent[],
@@ -3310,6 +3317,8 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /system-check";
   }
 
+  if (originalSessionRoutes.get(pathname)?.includes(method)) return `${method} ${pathname}`;
+
   if (method === "GET" && pathname === "/healthz") {
     return "GET /healthz";
   }
@@ -4953,6 +4962,13 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         return;
       }
+
+      if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,
+        readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),
+        send: (status, value) => {
+          if (status === 205) { response.writeHead(205, securityHeaders); response.end(); }
+          else sendJson(response, status, value);
+        }})) return;
 
       if (
         request.method === "POST" &&

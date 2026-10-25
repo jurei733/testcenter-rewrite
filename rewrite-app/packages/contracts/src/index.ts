@@ -1,3 +1,5 @@
+export {originalSessionPaths} from './original-session.js';
+export type {OriginalAccessSet, OriginalTestAccess, OriginalWorkChallenge, OriginalWorkSolution} from './original-session.js';
 import type {WorkspaceFileAvailability} from "@testcenter-rewrite-app/domain";
 import type {
   WorkspaceFileCatalog,

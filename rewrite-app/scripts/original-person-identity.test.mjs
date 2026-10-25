@@ -152,7 +152,8 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
    await write(payload);const before=await raw();
    const rejectPrivate=read=>value=>{if(typeof value==='string'&&value.includes(marker))throw Error('Private responses must not be decoded for a Login mode change');return read(value);};
    try{
-    if(kind==='sqlite')JSON.parse=rejectPrivate(parse);else pgTypes.setTypeParser(3802,'text',rejectPrivate(pgParse));
+    JSON.parse=rejectPrivate(parse);if(kind==='postgres')pgTypes.setTypeParser(3802,'text',rejectPrivate(pgParse));
+    await assert.rejects(repository.getTestRunById(stored.testRunId),/Private responses must not be decoded for a Login mode change/);
     entry[1]='run-review';await upload('ORACLE.PERSON',['suffix-mode']);
     const after=await raw();assert.equal(after.execution_mode,'run-review');assert.equal(after.payload,before.payload);
    }finally{

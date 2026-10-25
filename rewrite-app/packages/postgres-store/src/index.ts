@@ -1,3 +1,4 @@
+import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { defaultParticipantExecutionMode } from "@testcenter-rewrite-app/domain";
 
@@ -3495,6 +3496,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [testRunId],
         mapTestRun
       );
+    },
+    async listOriginalSessionTestFlags(participantSessionId) {
+      const rows = (await pool.query(`SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,booklet_key,
+        booklet_assignment_key,locked,original_result_state_json::text AS original_result_state_json FROM test_runs WHERE participant_session_id=$1`, [participantSessionId])).rows;
+      return rows.map(row => projectOriginalSessionTest({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),
+        tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id),bookletKey:String(row.booklet_key),
+        ...(row.booklet_assignment_key == null ? {} : {bookletAssignmentKey:String(row.booklet_assignment_key)}),
+        locked:row.locked === true,
+        ...(row.original_result_state_json == null ? {} : {originalResultState:JSON.parse(String(row.original_result_state_json)) as TestRun['originalResultState']})}));
     },
     async listTestRunsByParticipantSessionId(participantSessionId) {
       return many(
