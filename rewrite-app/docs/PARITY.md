@@ -1,5 +1,21 @@
 # Testcenter parity checklist
 
+### Current native code buckets and protected transport reference (2026-10-25)
+
+The preceding release-free/native-browser correction is now qualified by actual
+full Linux CI **40180975239, 89/89 successful jobs**, including 4,133 unit/frontend,
+2,301 PostgreSQL checks and all 21 native-route/tab markers. An additional unchanged
+production Source ALTCHA Oracle passes 16 groups / 32 HTTP observations with
+Login/person protection enabled; its public artifacts and exact provenance are
+retained and integrity-checked. Native transport must retain Rewrite's expiry,
+one-use and scope/input binding despite Source's observed replay semantics.
+The current runtime correction removes all-release fallback for missing native
+code grants while retaining already owned Tests and Source62 zero-code continuity.
+See [scope, Source evidence and outstanding HTTP work](ORIGINAL-RESULT-GROUPS.md).
+This does not close a broad row: **27 done / 22 partial**, all eight visual rows
+remain open. Remaining effort stays approximately **4–8 engineering weeks**.
+
+
 ### Native people before content and first-Test atomic binding (2026-10-25)
 
 Internal native Login/person auth now creates coded and uncoded people without

@@ -1,5 +1,63 @@
 # Original participant group snapshots
 
+## Current native code grants and protected Source ALTCHA contract (2026-10-25)
+
+The native runtime no longer interprets an absent current code bucket as a grant
+to every release Booklet. A retained person remains readable after code import,
+but its current starter assignments are empty. Uncoded Booklets accompany a
+valid native code bucket; they do not manufacture one after that code disappears.
+A retained Login token also rejects a formerly assigned nonempty code after its
+roster becomes uncoded. The canonical RPC's historical ignored-code behavior for
+an uncoded Login remains separate from the true native person phase.
+
+Previously owned native Tests can still reopen by their exact assignment, with
+immutable parent/release scope, preserving answers, timers and identity. Source62's
+zero-to-no-code person/Test continuity remains required. Reopening a known Test
+does not repopulate the current assignment list or authorize a new unrelated
+release Booklet. Missing native assignments no longer trigger the canonical
+no-roster fallback. Actual red controls first reproduced both faults across
+Memory/File/SQLite; final checks include the original zero/suffix cases and
+PostgreSQL. This is a runtime/read-model correction, not complete native HTTP.
+
+Final local qualification passes **4,139 unit/frontend checks** (121 + 325 +
+1,643 + 2,050), the complete **2,309 PostgreSQL checks**, and **304/304 focused
+authentication cases** over all four stores. No failures/skips/cancellations.
+Production build, core/web typechecking and the real Booklet variant/selection
+browser journey pass in both interfaces, retaining exact Run IDs, answers,
+reloads, navigation and non-saving-mode resets. The full-lock audit reports zero
+vulnerabilities. CI policy passes 275 with one explicit GNU-timeout-only macOS
+skip; Actionlint and diff checks pass. The owned PostgreSQL database is removed
+after owner/zero-connection/schema checks and its initially stopped cluster is
+stopped again. A new hosted application run must qualify this follow-up separately
+from the preceding successful 89-job baseline.
+
+Unmodified production [Source ALTCHA run 40181968246](https://github.com/jurei733/testcenter-rewrite/actions/runs/40181968246)
+passes **16 groups / 32 HTTP observations**, with native Login and person
+protection enabled. Its four-member public artifact is independently downloaded
+and SHA-256 verified; all eight referenced Source files match the unchanged
+pinned checkout. Durable public receipts, hashes and exact probe provenance are
+in `test-fixtures/original-testcenter/source-workspace-results/native-pow-protocol/`.
+The mandatory authentication suite verifies the fixture's integrity, protected
+scope, challenge wire fields and denied invalid-work/token cases.
+
+The observed challenge has `algorithm`, `challenge`, `maxNumber`, `salt` and
+`signature`, with SHA-256 and maxNumber 1,000,000. Source salt parameters include
+credential inputs; no expiry parameter is present. Invalid work/signatures,
+missing/wrong bearer types and altered salts are rejected. Source accepts a
+repeated Login solution with the same Login token, accepts repeated person work
+with bearer rotation and accepts that person work under a second authorized
+Login, resolving that peer. These are measured Source semantics, not assumptions
+about Replay prevention. Public evidence replaces every response token and full
+salt/challenge/signature value, never records request credentials/headers, and
+retains per-response wire hashes.
+
+Rewrite's existing expiry, one-use claims, credential/scope binding and key
+rotation remain requirements for its new native transport. Native session DTOs,
+AccessSet Test claims, guarded challenge handling and browser adoption are still
+open; Source evidence does not prove any of them implemented. The formal ledger
+remains **27 done / 22 partial; all eight broad visual rows open**.
+
+
 ## Native person creation before content exists (2026-10-25)
 
 The internal native `originalAuthentication` person phase now follows Source's
