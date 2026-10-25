@@ -637,7 +637,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         ) ||
         contentReleases.some(contentRelease => contentRelease.status === "active") ||
         Array.from(state.participantSessions.values()).some(participantSession =>
-          contentReleaseIds.has(participantSession.contentReleaseId)
+          participantSession.contentReleaseId !== null && contentReleaseIds.has(participantSession.contentReleaseId)
         ) ||
         Array.from(state.testRuns.values()).some(testRun =>
           contentReleaseIds.has(testRun.contentReleaseId)
@@ -912,7 +912,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async getOrCreateTestRunForAssignment(candidate, initialize) {
       const prepared = prepareParticipantAssignmentRunCreation(candidate,
         state.participantSessions.get(candidate.participantSessionId) ?? null,
-        Array.from(state.testRuns.values()), initialize);
+        Array.from(state.testRuns.values()), initialize, state.contentReleases.get(candidate.contentReleaseId));
       if (prepared.effect) {
         const effect = prepared.effect;
         if (effect.testLogs.some(log => state.participantTestLogs.has(log.participantTestLogId)) ||

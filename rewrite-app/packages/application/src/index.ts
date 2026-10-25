@@ -6403,7 +6403,7 @@ const buildSourcePackageDeletionReadiness = (input: {
       })),
     ...input.participantSessions
       .filter(participantSession =>
-        contentReleaseIds.has(participantSession.contentReleaseId)
+        participantSession.contentReleaseId !== null && contentReleaseIds.has(participantSession.contentReleaseId)
       )
       .map(participantSession => ({
         dependencyType: "participant_session" as const,
@@ -8023,7 +8023,7 @@ const formatParticipantSessionsCsv = (input: {
         ),
         item.participantSession.status,
         item.participantSession.createdAt,
-        item.participantSession.contentReleaseId,
+        item.participantSession.contentReleaseId ?? "",
         item.contentRelease?.releaseLabel ?? "",
         item.latestTestRun?.testRunId ?? "",
         item.latestTestRun?.bookletKey ?? "",
@@ -22862,7 +22862,7 @@ const buildStudyMonitorUnitProgress = (input: {
   for (const testRun of input.testRuns.map(normalizeTestRun)) {
     const participantSession = sessionsById.get(testRun.participantSessionId);
     const contentRelease = participantSession
-      ? contentReleasesById.get(participantSession.contentReleaseId)
+      ? (participantSession.contentReleaseId === null ? undefined : contentReleasesById.get(participantSession.contentReleaseId))
       : null;
     const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
       bookletEntry => bookletEntry.bookletKey === testRun.bookletKey
@@ -23041,7 +23041,7 @@ const buildStudyMonitorBookletProgress = (input: {
     const contentRelease =
       contentReleasesById.get(testRun.contentReleaseId) ??
       (participantSession
-        ? contentReleasesById.get(participantSession.contentReleaseId)
+        ? (participantSession.contentReleaseId === null ? undefined : contentReleasesById.get(participantSession.contentReleaseId))
         : undefined);
     const progress = ensureProgress(testRun.bookletKey, contentRelease);
     const previousParticipantSessionCount = progress.participantSessionIds.size;
@@ -23511,7 +23511,7 @@ const buildStudyMonitorParticipantMatrix = (input: {
       latestRunsBySessionId.get(participantSession.participantSessionId) ?? null;
     const contentRelease =
       (latestRun ? contentReleasesById.get(latestRun.contentReleaseId) : null) ??
-      contentReleasesById.get(participantSession.contentReleaseId) ??
+      (participantSession.contentReleaseId === null ? undefined : contentReleasesById.get(participantSession.contentReleaseId)) ??
       null;
     const booklet = findBooklet(
       latestRun?.bookletKey ?? rosterEntry?.bookletKey,
@@ -23880,7 +23880,7 @@ const buildStudyMonitorBookletDetail = (input: {
         const contentRelease =
           contentReleasesById.get(testRun.contentReleaseId) ??
           (participantSession
-            ? contentReleasesById.get(participantSession.contentReleaseId)
+            ? (participantSession.contentReleaseId === null ? undefined : contentReleasesById.get(participantSession.contentReleaseId))
             : undefined);
         return contentRelease?.runtimeSnapshot.bookletEntries.find(
           bookletEntry => bookletEntry.bookletKey === bookletKey
@@ -24001,7 +24001,7 @@ const buildStudyMonitorUnitDetail = (input: {
       const contentRelease =
         contentReleasesById.get(testRun.contentReleaseId) ??
         (participantSession
-          ? contentReleasesById.get(participantSession.contentReleaseId)
+          ? (participantSession.contentReleaseId === null ? undefined : contentReleasesById.get(participantSession.contentReleaseId))
           : undefined);
       const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
         bookletEntry => bookletEntry.bookletKey === testRun.bookletKey
@@ -26696,6 +26696,14 @@ export const createFirstSliceServices = (
     };
   };
 
+  const requireParticipantContentRelease = async (person: ParticipantSession): Promise<ContentRelease> => {
+    if (person.contentReleaseId !== null) return requireRuntimeContentRelease(repository, person.contentReleaseId);
+    if (person.originalLoginKey === undefined) throw new FirstSliceError(409, 'participant_content_unbound', 'Canonical participant content is missing.');
+    const active = await getActiveWorkspaceRelease(repository, person.tenantId, person.workspaceId);
+    if (!active) throw new FirstSliceError(409, 'workspace_has_no_active_content_release', 'No active content is available for a Test.');
+    return requireRuntimeContentRelease(repository, active.contentReleaseId);
+  };
+
   const launchParticipantRun = async (
     input: Parameters<FirstSliceServices["participantRuntime"]["launch"]>[0],
     deferExistingActivation = false
@@ -26719,10 +26727,7 @@ export const createFirstSliceServices = (
         throw error;
       }
     };
-    const contentRelease = await requireRuntimeContentRelease(
-      repository,
-      participantSession.contentReleaseId
-    );
+    const contentRelease = await requireParticipantContentRelease(participantSession);
 
     const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
       input.bookletKey
@@ -26832,7 +26837,7 @@ export const createFirstSliceServices = (
       participantSessionId: participantSession.participantSessionId,
       tenantId: participantSession.tenantId,
       workspaceId: participantSession.workspaceId,
-      contentReleaseId: participantSession.contentReleaseId,
+      contentReleaseId: contentRelease.contentReleaseId,
       bookletKey: selectedBooklet.bookletKey,
       executionMode: executionMode.mode,
       bookletAssignmentKey:
@@ -27488,13 +27493,13 @@ export const createFirstSliceServices = (
       );
     }
 
-    const activeRelease = await getActiveWorkspaceRelease(
+    const activeRelease = nativePrincipal ? null : await getActiveWorkspaceRelease(
       repository,
       workspace.tenantId,
       workspace.workspaceId
     );
 
-    if (!activeRelease) {
+    if (!activeRelease && !nativePrincipal) {
       throw new FirstSliceError(
         409,
         "workspace_has_no_active_content_release",
@@ -27591,7 +27596,7 @@ export const createFirstSliceServices = (
               normalizeParticipantCode(participantSession.participantCode) ===
                 normalizeParticipantCode(effectiveParticipantCode) &&
               participantSession.contentReleaseId ===
-                activeRelease.contentReleaseId &&
+                activeRelease?.contentReleaseId &&
               normalizeParticipantExecutionMode(
                 participantSession.executionMode
               ) === executionMode.mode &&
@@ -27631,7 +27636,7 @@ export const createFirstSliceServices = (
       participantSessionId: idGenerator(),
       tenantId: workspace.tenantId,
       workspaceId: workspace.workspaceId,
-      contentReleaseId: activeRelease.contentReleaseId,
+      contentReleaseId: activeRelease?.contentReleaseId ?? null,
       loginKey: nativeBinding?.loginKey ?? loginKey,
       ...(nativeBinding ? {originalLoginKey:nativeBinding.loginKey,
         originalNameSuffix:createOriginalPersonNameSuffix(effectiveParticipantCode,executionMode.alwaysNewSession)} : {}),
@@ -30667,7 +30672,7 @@ export const createFirstSliceServices = (
                   participantSession.loginKey
                 ) ?? null,
               latestTestRun: sessionRuns[0] ?? null,
-              contentRelease: contentReleaseSummariesById.get(
+              contentRelease: participantSession.contentReleaseId === null ? null : contentReleaseSummariesById.get(
                 participantSession.contentReleaseId
               ) ?? null
             };
@@ -30803,7 +30808,7 @@ export const createFirstSliceServices = (
           workspaceReviews,
           participantRosterEntries
         ] = await Promise.all([
-          repository.getContentReleaseById(participantSession.contentReleaseId),
+          participantSession.contentReleaseId === null ? Promise.resolve(null) : repository.getContentReleaseById(participantSession.contentReleaseId),
           repository.listTestRunsByParticipantSessionId(
             participantSession.participantSessionId
           ),
@@ -32379,10 +32384,7 @@ export const createFirstSliceServices = (
           participantSession.workspaceId,
           participantSession.loginKey
         );
-        const contentRelease = await requireRuntimeContentRelease(
-          repository,
-          participantSession.contentReleaseId
-        );
+        const contentRelease = await requireParticipantContentRelease(participantSession);
         const testRuns = (
           await repository.listTestRunsByParticipantSessionId(
             participantSession.participantSessionId
@@ -33487,10 +33489,7 @@ export const createFirstSliceServices = (
             "Participant resource path is invalid."
           );
         }
-        const contentRelease = await requireRuntimeContentRelease(
-          repository,
-          participantSession.contentReleaseId
-        );
+        const contentRelease = await requireParticipantContentRelease(participantSession);
         if (contentRelease.runtimeSnapshot.workspaceFilePublication) {
           const [sources, events] = await Promise.all([
             repository.listSourcePackagesByWorkspace(participantSession.tenantId,participantSession.workspaceId),

@@ -28,6 +28,7 @@ export function projectOriginalLoginMode<Person extends NativeModePerson,Run ext
 /** A delayed Test save cannot restore an obsolete native Login mode. */
 export function withOriginalTestRunMode(run:TestRun,person:ParticipantSession|null|undefined):TestRun {
   if(person?.originalLoginKey===undefined)return run;
+  if(person.contentReleaseId===null)throw new OriginalPersonIdentityConflictError('An unbound native person requires atomic first Test creation.');
   if(person.participantSessionId!==run.participantSessionId||person.tenantId!==run.tenantId||person.workspaceId!==run.workspaceId)throw new OriginalPersonIdentityConflictError('Native person has an inconsistent Test scope.');
   return run.executionMode===person.executionMode?run:{...run,executionMode:person.executionMode};
 }
@@ -117,6 +118,7 @@ export function prepareOriginalParticipantSession(candidate:ParticipantSession,
   previous:ParticipantSession|undefined|null,binding:OriginalLoginBinding|undefined|null):ParticipantSession {
   const key=previous?.originalLoginKey??candidate.originalLoginKey;
   if(key===undefined){
+    if(typeof candidate.contentReleaseId!=='string'||!candidate.contentReleaseId.trim())throw new TypeError('Canonical participant sessions require a content release.');
     if(candidate.originalNameSuffix!==undefined)throw new TypeError('A native person suffix requires a native login identity.');
     return {...candidate};
   }
@@ -146,7 +148,7 @@ export function prepareOriginalParticipantSession(candidate:ParticipantSession,
       throw new TypeError('Invalid native person suffix.');
     }
   }
-  const result={...candidate,...(previous?.originalLoginKey===undefined?{}:{executionMode:previous.executionMode}),
+  const result={...candidate,...(previous?.originalLoginKey===undefined?{}:{executionMode:previous.executionMode,contentReleaseId:previous.contentReleaseId}),
     originalLoginKey:key,groupKey:binding.groupKey,participantCode:code};
   if(suffix===undefined)delete result.originalNameSuffix;else result.originalNameSuffix=suffix;
   return result;

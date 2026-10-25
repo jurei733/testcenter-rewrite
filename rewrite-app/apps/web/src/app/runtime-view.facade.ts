@@ -914,7 +914,7 @@ export class RuntimeViewFacade {
               label: "Release",
               value:
                 item.contentRelease?.releaseLabel ??
-                item.participantSession.contentReleaseId
+                item.participantSession.contentReleaseId ?? '—'
             },
             {
               label: "Created",

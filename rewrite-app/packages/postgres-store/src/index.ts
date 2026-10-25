@@ -410,7 +410,7 @@ const mapParticipantSession = (row: Row | undefined): ParticipantSession | null 
         participantSessionId: String(row.participant_session_id),
         tenantId: String(row.tenant_id),
         workspaceId: String(row.workspace_id),
-        contentReleaseId: String(row.content_release_id),
+        contentReleaseId: row.content_release_id === null ? null : String(row.content_release_id),
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
         ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
@@ -1657,6 +1657,14 @@ const migrations: PostgresMigration[] = [
     REFERENCES original_participant_groups(tenant_id, workspace_id, group_key) ON DELETE CASCADE
 );
 CREATE INDEX participant_access_credentials_token_hash ON participant_access_credentials(token_hash);`
+  },
+  {
+    version: 65,
+    name: "native_person_without_content_release",
+    sql: `ALTER TABLE participant_sessions ALTER COLUMN content_release_id DROP NOT NULL;
+      ALTER TABLE participant_sessions DROP CONSTRAINT IF EXISTS participant_sessions_original_content;
+      ALTER TABLE participant_sessions ADD CONSTRAINT participant_sessions_original_content
+        CHECK (content_release_id IS NOT NULL OR (original_login_key IS NOT NULL AND length(original_login_key)>0));`
   }
 ];
 
@@ -3521,6 +3529,12 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        // Native roster publication and first-content capture use the same
+        // workspace-before-parent order. Canonical standalone reservations keep
+        // their existing contract, without adding a workspace FK requirement.
+        await client.query(`SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2
+          AND EXISTS (SELECT 1 FROM participant_sessions WHERE participant_session_id=$3 AND original_login_key IS NOT NULL)
+          FOR NO KEY UPDATE`,[candidate.tenantId,candidate.workspaceId,candidate.participantSessionId]);
         // Lock the existing parent, even when no child Run exists yet. All
         // reservation reads/writes use this client, never a second pool slot.
         const session = mapParticipantSession((await client.query(
@@ -3531,7 +3545,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           `SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id = $1 OR test_run_id = $2`,
           [candidate.participantSessionId, candidate.testRunId]
         )).rows.map(mapTestRun).filter((run): run is TestRun => run !== null);
-        const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize);
+        const initialReleaseRow = session?.contentReleaseId === null ? (await client.query('SELECT content_release_id,tenant_id,workspace_id,status FROM content_releases WHERE content_release_id=$1 AND tenant_id=$2 AND workspace_id=$3 FOR SHARE',[candidate.contentReleaseId,session.tenantId,session.workspaceId])).rows[0] : undefined;
+        const initialRelease = initialReleaseRow ? {contentReleaseId:String(initialReleaseRow.content_release_id),tenantId:String(initialReleaseRow.tenant_id),workspaceId:String(initialReleaseRow.workspace_id),status:initialReleaseRow.status as ContentRelease['status']} : null;
+        const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize, initialRelease);
         if (!prepared.created) {
           await client.query("COMMIT");
           return { testRun: prepared.testRun, created: false };
@@ -3549,8 +3565,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`, [event.activityEventId, event.tenantId, event.workspaceId,
             event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details)]);
-        if (effect.participantSession) await client.query("UPDATE participant_sessions SET status = $1 WHERE participant_session_id = $2",
-          [effect.participantSession.status, candidate.participantSessionId]);
+        if (effect.participantSession) await client.query("UPDATE participant_sessions SET status = $1, content_release_id = $2 WHERE participant_session_id = $3",
+          [effect.participantSession.status, effect.participantSession.contentReleaseId, candidate.participantSessionId]);
         const stored = mapTestRun((await client.query(
           `SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1`, [candidate.testRunId]
         )).rows[0]);

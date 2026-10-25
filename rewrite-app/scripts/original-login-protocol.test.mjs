@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash, randomUUID} from 'node:crypto';
-import {mkdtemp, readFile, writeFile, rm} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, rename, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import test from 'node:test';
@@ -64,8 +64,10 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
     const login = (name = names[0], supplied = password) => services.originalAuthentication.login({name, password: supplied});
     const person = (token, requested = code) => services.originalAuthentication.person({loginToken: token, code: requested});
     const read = token => services.originalAuthentication.read({token});
-    let first, entered, run, lastPerson, firstBinding;
+    let first, entered, run, lastPerson, firstBinding, beforeContent;
     await upload();
+    const timedLogin = (await repository.listParticipantRosterEntriesByWorkspace(ids.tenantId, ids.workspaceId)).find(entry => entry.loginKey === names[0]);
+    await repository.saveParticipantRosterEntry({...timedLogin, validForMinutes: 60}, await repository.getParticipantRosterPasswordHash(ids.tenantId, ids.workspaceId, names[0]));
     if (kind === 'file') await t.test('a pre-capability File manifest retains its roster and workspace when the private collection is absent', async () => {
       const roster = await repository.listParticipantRosterEntriesByWorkspace(ids.tenantId, ids.workspaceId);
       await close();
@@ -86,9 +88,102 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
       firstBinding = (await repository.listOriginalLoginBindingsByWorkspace(ids.tenantId, ids.workspaceId)).find(row => row.loginKey === names[0]);
       assert.ok(firstBinding);
     });
+    await t.test('coded and uncoded native people authenticate without any release and retain valid independent credentials', async () => {
+      beforeContent = await person(first.token, 'sHaReD');
+      assert.equal(beforeContent.kind, 'person'); assert.equal(beforeContent.participantSession.contentReleaseId, null);
+      assert.equal(Date.parse(beforeContent.participantSession.validUntil) - Date.parse(beforeContent.participantSession.createdAt), 60 * 60 * 1000);
+      const plain = await login('plain', 'Owned-native-secret'); assert.equal(plain.kind, 'person'); assert.equal(plain.participantSession.contentReleaseId, null);
+      const id = beforeContent.participantSession.participantSessionId;
+      assert.equal((await read(beforeContent.token)).participantSession.contentReleaseId, null);
+      assert.equal((await services.participantAccess.authorize({participantSessionId: id, sessionToken: beforeContent.token})).contentReleaseId, null);
+      await assert.rejects(services.participantRuntime.launch({participantSessionId: id, bookletKey: 'owned'}), error => error.errorCode === 'workspace_has_no_active_content_release');
+      await assert.rejects(services.participantRuntime.signIn({...scope, loginKey: names[0], password}), error => error.errorCode === 'workspace_has_no_active_content_release');
+      assert.equal((await repository.getParticipantSessionById(id)).contentReleaseId, null);
+      assert.deepEqual(await repository.listTestRunsByParticipantSessionId(id), []);
+      await repository.saveParticipantSession({...beforeContent.participantSession, contentReleaseId: 'untrusted-anchor'});
+      assert.equal((await repository.getParticipantSessionById(id)).contentReleaseId, null, 'Ordinary saves cannot bind a native person');
+      await assert.rejects(repository.saveParticipantSession({...beforeContent.participantSession, participantSessionId: randomUUID(), originalLoginKey: undefined, originalNameSuffix: undefined}), /Canonical.*release/);
+    });
     const release = randomUUID(), now = new Date().toISOString();
     await repository.saveContentRelease({...ids, contentReleaseId: release, importJobId: release, releaseLabel: 'Owned native login', status: 'active', createdAt: now, activatedAt: now,
       runtimeSnapshot: {bookletEntries: [{bookletKey: 'owned', displayLabel: 'Owned', policy: compileBookletRuntimePolicy({}), testletEntries: [], unitEntries: []}]}});
+    await t.test('first-Test binding rejects missing, inactive and foreign content and rolls back an initializer failure', async () => {
+      const parent = beforeContent.participantSession, id = parent.participantSessionId;
+      const credential = await repository.getParticipantAccessCredential(id);
+      const foreign = await services.platform.createWorkspace({tenantKey: tenant.tenantKey, workspaceKey: 'foreign-content', displayName: 'Owned foreign content'});
+      const inactive = randomUUID(), foreignRelease = randomUUID();
+      const saved = await repository.getContentReleaseById(release);
+      await repository.saveContentRelease({...saved, contentReleaseId: inactive, status: 'staged'});
+      await repository.saveContentRelease({...saved, contentReleaseId: foreignRelease, workspaceId: foreign.workspaceId});
+      const candidate = contentReleaseId => ({testRunId: randomUUID(), participantSessionId: id, ...ids, contentReleaseId,
+        bookletKey: 'owned', executionMode: parent.executionMode, status: 'running', currentUnitKey: null,
+        unitResponses: {}, testletTimers: {}, createdAt: now, updatedAt: now, completedAt: null});
+      let initialized = false;
+      for (const content of [randomUUID(), inactive, foreignRelease]) {
+        await assert.rejects(repository.getOrCreateTestRunForAssignment(candidate(content), () => { initialized = true; throw Error('must not initialize'); }), /first scoped Test|scope/);
+      }
+      assert.equal(initialized, false);
+      await assert.rejects(repository.getOrCreateTestRunForAssignment(candidate(release), () => { throw Error('owned initial content fault'); }), /owned initial content fault/);
+      assert.equal((await repository.getParticipantSessionById(id)).contentReleaseId, null);
+      assert.deepEqual(await repository.listTestRunsByParticipantSessionId(id), []);
+      assert.deepEqual(await repository.getParticipantAccessCredential(id), credential);
+    });
+    if (kind !== 'memory') await t.test('late durable first-Test failure preserves the unbound person, credentials and every initial artifact', async () => {
+      const id = beforeContent.participantSession.participantSessionId;
+      const snapshot = async () => ({parent: await repository.getParticipantSessionById(id), credential: await repository.getParticipantAccessCredential(id),
+        runs: await repository.listTestRunsByParticipantSessionId(id), logs: await repository.listParticipantTestLogsByWorkspace(ids.tenantId, ids.workspaceId),
+        events: await repository.listWorkspaceActivityEventsByWorkspace(ids.tenantId, ids.workspaceId)});
+      const before = await snapshot();
+      let control;
+      try {
+        if (kind === 'file') { await rename(file, file + '.before-first-test'); await mkdir(file); }
+        else {
+          control = kind === 'sqlite' ? new DatabaseSync(file) : new Pool({connectionString: url.toString()});
+          const sql = kind === 'sqlite'
+            ? `CREATE TRIGGER owned_first_content_failure BEFORE UPDATE ON participant_sessions WHEN NEW.participant_session_id='${id}' AND NEW.content_release_id IS NOT NULL BEGIN SELECT RAISE(ABORT,'owned first content failure'); END`
+            : `CREATE FUNCTION owned_first_content_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned first content failure'; END $$;
+               CREATE TRIGGER owned_first_content_failure BEFORE UPDATE ON participant_sessions FOR EACH ROW WHEN (NEW.participant_session_id='${id}' AND NEW.content_release_id IS NOT NULL) EXECUTE FUNCTION owned_first_content_failure()`;
+          if (kind === 'sqlite') control.exec(sql); else await control.query(sql);
+        }
+        await assert.rejects(services.participantRuntime.launch({participantSessionId: id, bookletKey: 'owned'}),
+          kind === 'file' ? undefined : /owned first content failure/);
+        assert.deepEqual(await snapshot(), before, 'Test, logs and audit written before the final parent update must roll back too');
+      } finally {
+        if (kind === 'file') { await rm(file, {recursive: true, force: true}); await rename(file + '.before-first-test', file); }
+        else if (control) {
+          if (kind === 'sqlite') { control.exec('DROP TRIGGER owned_first_content_failure'); control.close(); }
+          else { try { await control.query('DROP TRIGGER owned_first_content_failure ON participant_sessions; DROP FUNCTION owned_first_content_failure()'); } finally { await control.end(); } }
+        }
+      }
+      await close(); await open(); assert.deepEqual(await snapshot(), before);
+    });
+    if (kind === 'postgres') await t.test('first native content capture waits on its actual parent without blocking runtime foreign-key activity', async () => {
+      const plain = await login('plain', 'Owned-native-secret'), parent = plain.participantSession;
+      assert.equal(parent.contentReleaseId, null);
+      const credential = await repository.getParticipantAccessCredential(parent.participantSessionId);
+      const lock = await pool.connect(); let active = false, outcome;
+      try {
+        await lock.query('BEGIN'); active = true; await lock.query(`SET LOCAL search_path TO "${schema}"`);
+        await lock.query('SELECT participant_session_id FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE', [parent.participantSessionId]);
+        const pid = (await lock.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        outcome = services.participantRuntime.launch({participantSessionId: parent.participantSessionId, bookletKey: 'owned'}).then(value => ({value}), error => ({error}));
+        const deadline = Date.now() + 5000; let waiting = false;
+        while (Date.now() < deadline) {
+          waiting = (await pool.query('SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))) AS blocked', [pid])).rows[0].blocked;
+          if (waiting) break; await new Promise(done => setTimeout(done, 20));
+        }
+        assert.equal(waiting, true, 'Observe the real first-Test parent lock before the FK write');
+        await lock.query('INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES ($1,$2,$3,$4,NULL,$5,$6,$7,$8,$9)',
+          [randomUUID(), ids.tenantId, ids.workspaceId, 'owned_first_content_fk_witness', 'participant_session', parent.participantSessionId, now, 'Owned first content FK witness', '{}']);
+        await lock.query('COMMIT'); active = false;
+        const result = await outcome; if (result.error) throw result.error;
+        assert.equal(result.value.contentReleaseId, release);
+        const stored = await repository.getParticipantSessionById(parent.participantSessionId);
+        assert.equal(stored.contentReleaseId, release); assert.equal(stored.createdAt, parent.createdAt); assert.equal(stored.validUntil, parent.validUntil);
+        assert.deepEqual(await repository.getParticipantAccessCredential(parent.participantSessionId), credential);
+        assert.equal((await repository.listTestRunsByParticipantSessionId(parent.participantSessionId)).length, 1);
+      } finally { if (active) await lock.query('ROLLBACK'); lock.release(); if (outcome) await outcome; }
+    });
     await t.test('stable first-factor tokens survive concurrent credential entry and durable reopening', async () => {
       const replies = await Promise.all(Array.from({length: 6}, () => login()));
       assert.ok(replies.every(row => row.kind === 'login' && row.token === first.token && row.groupToken === first.groupToken));
@@ -122,7 +217,18 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
       assert.equal(again.participantSession.participantCode, 'sHaReD'); assert.equal(again.requestedCode, 'SHARED');
       assert.equal((await read(again.token)).requestedCode, 'sHaReD');
       await assert.rejects(read(entered.token), fails(401)); entered = again;
-      run = await services.participantRuntime.launch({participantSessionId: entered.participantSession.participantSessionId, bookletKey: 'owned'});
+      const parentBeforeTest = entered.participantSession;
+      assert.equal(parentBeforeTest.contentReleaseId, null);
+      const credentialBeforeTest = await repository.getParticipantAccessCredential(parentBeforeTest.participantSessionId);
+      const starts = await Promise.all(Array.from({length: 3}, () => services.participantRuntime.launch({participantSessionId: parentBeforeTest.participantSessionId, bookletKey: 'owned'})));
+      run = starts[0]; assert.ok(starts.every(value => value.testRunId === run.testRunId));
+      const bound = await repository.getParticipantSessionById(parentBeforeTest.participantSessionId);
+      assert.equal(bound.contentReleaseId, release);
+      for (const field of ['participantSessionId','tenantId','workspaceId','originalLoginKey','originalNameSuffix','loginKey','groupKey','participantCode','createdAt','validUntil']) assert.deepEqual(bound[field], parentBeforeTest[field], field);
+      assert.deepEqual(await repository.getParticipantAccessCredential(bound.participantSessionId), credentialBeforeTest);
+      await repository.saveParticipantSession({...bound, contentReleaseId: null});
+      await repository.saveParticipantSession({...bound, contentReleaseId: 'foreign-forged-anchor'});
+      assert.equal((await repository.getParticipantSessionById(bound.participantSessionId)).contentReleaseId, release);
       lastPerson = entered;
     });
     await t.test('Login/group/person capabilities are distinct and group metadata is never promoted into a person bearer', async () => {

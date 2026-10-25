@@ -1,5 +1,59 @@
 # CI iteration and complete acceptance
 
+## Native route readiness, retained evidence and release-free authentication (2026-10-25)
+
+The authentication-core [full run 40174750198](https://github.com/jurei733/testcenter-rewrite/actions/runs/40174750198)
+is terminal **failure**: 87 successful jobs, one failed browser leaf and the
+failed final acceptance aggregate, with no skipped/cancelled jobs. Published head
+`0a41d7ac78da70069311673681625fdb295bd362` and actual merge
+`f3f9d7e332df5b53ab3acaca253e7855ce814d24` share exact tree
+`38e1db3727a02ef3895703cab5befa57a4b00c93`. The first native-route smoke times
+out at its 30-second `page.reload(networkidle)` wait, before the native-tabs
+script runs. The expected failure uploads find no files because that prefix
+used a private temporary directory. Its historical blocking request and any
+application root cause are therefore **not established**.
+
+The route prefix now uses the existing independently exercised native readiness
+helper: DOM readiness plus all five required `window.tc` methods. Reload keeps
+old-document retries unavailable until document commit before releasing the
+route interception. Original exact Run, answer, clock, owner, journal and
+idempotency assertions remain; no deadline or product assertion is relaxed.
+A real browser fixture rejects a missing method and accepts ready methods while
+a held background transport makes network-idle time out. Both complete production
+route and native-tab journeys pass locally, including lost receipts, SPA
+destruction/reentry, copied-tab ownership and browser crashes.
+
+The first prefix honors `UI_SMOKE_ARTIFACT_DIR` and writes the workflow's exact
+root `failure.json`/`failure.png` paths. Its public JSON contains bounded checks
+and same-origin pending-request paths/methods only. It excludes request queries,
+headers/bodies, document text and error payloads. Real filesystem controls prove
+the configured upload paths, redaction, private-store retention and JSON survival
+after screenshot failure. The workflow keeps its narrow explicit upload list.
+
+Independent [focused Linux run 40174841334](https://github.com/jurei733/testcenter-rewrite/actions/runs/40174841334)
+passes all three reusable service jobs. Its wrapper adds only one workflow to the
+same published application tree (head `ce9591d14a52b3c78422f32e82ade1fa9cd496e5`).
+Actual participant-auth / original-results / system-check results are **278 / 353 /
+9 tests**, whole jobs **79 / 87 / 63 seconds**, fresh core **11.15 / 12.79 / 13.16
+seconds**, selected tests **32.30 / 32.20 / 4.09 seconds**. Each also passes **275
+Linux policy checks** without skips and a complete-lock audit with zero
+vulnerabilities. Focused success does not override the failed full acceptance.
+The earlier dispatch change still has no measured whole-CI speedup.
+
+The current follow-up also qualifies [native person creation without content](ORIGINAL-RESULT-GROUPS.md).
+Its local full unit/frontend suite passes **4,133** checks (121 + 325 + 1,637 +
+2,050), full PostgreSQL passes **2,301**, and independent all-store auth
+and migration controls pass **77/77**. Production build, core/web typechecking,
+Actionlint and diff checks pass; full-lock audit reports zero vulnerabilities.
+CI policy passes **275**, with one explicit GNU-timeout-only macOS skip. Two old
+SQLite settings/role fixtures now include their historical content-release column.
+An overstrict workspace-existence check found by canonical PostgreSQL reservation
+controls was removed; only native parents take the new workspace lock, preserving
+the standalone canonical contract. Those failed attempts are not passing receipts;
+complete final suites are rerun after the corrections. New exact-head hosted
+acceptance remains separate. Native HTTP/PoW and broad visual proof remain open.
+
+
 ## Native authentication core and completed pipeline follow-up (2026-10-25)
 
 The dispatch/trigger follow-up completes [CI 40069256223](https://github.com/jurei733/testcenter-rewrite/actions/runs/40069256223)

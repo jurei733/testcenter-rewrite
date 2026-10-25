@@ -1,3 +1,4 @@
+import {migrateNativePersonContentRelease} from './native-person-release-migration.js';
 import { mkdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -68,7 +69,8 @@ import type {
 type SqliteMigration = {
   version: number;
   name: string;
-  sql: string;
+  sql: string | ((database: DatabaseSync) => void);
+  rebuildNativePerson?: true;
 };
 
 type WorkspaceRow = Workspace & {
@@ -428,7 +430,7 @@ const mapParticipantSession = (
         participantSessionId: String(row.participant_session_id),
         tenantId: String(row.tenant_id),
         workspaceId: String(row.workspace_id),
-        contentReleaseId: String(row.content_release_id),
+        contentReleaseId: row.content_release_id === null ? null : String(row.content_release_id),
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
         ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
@@ -1723,6 +1725,12 @@ const sqliteMigrations: SqliteMigration[] = [
     REFERENCES original_participant_groups(tenant_id, workspace_id, group_key) ON DELETE CASCADE
 );
 CREATE INDEX participant_access_credentials_token_hash ON participant_access_credentials(token_hash);`
+  },
+  {
+    version: 71,
+    name: "native_person_without_content_release",
+    sql: migrateNativePersonContentRelease,
+    rebuildNativePerson: true
   }
 ];
 
@@ -1776,19 +1784,29 @@ const applyMigrations = (database: DatabaseSync): void => {
   );
 
   for (const migration of pendingMigrations) {
-    database.exec("BEGIN");
-
+    const legacy = Number(database.prepare('PRAGMA legacy_alter_table').get()?.legacy_alter_table ?? 0);
+    if (migration.rebuildNativePerson) database.exec('PRAGMA foreign_keys=OFF; PRAGMA legacy_alter_table=ON;');
+    let failed = false, failure: unknown;
     try {
-      database.exec(migration.sql);
-      database
-        .prepare(
-          `INSERT INTO schema_migrations (version, name, applied_at)
-           VALUES (?, ?, ?)`
-        )
-        .run(migration.version, migration.name, new Date().toISOString());
-      database.exec("COMMIT");
-    } catch (error) {
-      rollbackAfterFailure(database, error);
+      database.exec(migration.rebuildNativePerson ? 'BEGIN IMMEDIATE' : 'BEGIN');
+      try {
+        if (typeof migration.sql === 'string') database.exec(migration.sql); else migration.sql(database);
+        if (migration.rebuildNativePerson && database.prepare('PRAGMA foreign_key_check').all().length) {
+          throw new Error('Native person migration violates a foreign-key relationship.');
+        }
+        database.prepare('INSERT INTO schema_migrations (version,name,applied_at) VALUES (?,?,?)')
+          .run(migration.version,migration.name,new Date().toISOString());
+        database.exec('COMMIT');
+      } catch (error) { rollbackAfterFailure(database,error); }
+    } catch (error) { failed = true; failure = error; throw error; }
+    finally {
+      if (migration.rebuildNativePerson) {
+        try { database.exec(`PRAGMA legacy_alter_table=${legacy}; PRAGMA foreign_keys=ON;`); }
+        catch (restoreError) {
+          if (failed) throw new AggregateError([failure, restoreError], 'SQLite migration failed and its foreign-key settings could not be restored.', {cause: failure});
+          throw restoreError;
+        }
+      }
     }
   }
 };
@@ -3697,7 +3715,9 @@ export const createSqliteFirstSliceStorage = (
           "SELECT * FROM test_runs WHERE participant_session_id = ? OR test_run_id = ?"
         ).all(candidate.participantSessionId, candidate.testRunId) as Record<string, unknown>[])
           .map(mapTestRun).filter((run): run is TestRun => run !== null);
-        const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize);
+        const initialReleaseRow = session?.contentReleaseId === null ? database.prepare('SELECT content_release_id,tenant_id,workspace_id,status FROM content_releases WHERE content_release_id=? AND tenant_id=? AND workspace_id=?').get(candidate.contentReleaseId,session.tenantId,session.workspaceId) : undefined;
+        const initialRelease = initialReleaseRow ? {contentReleaseId:String(initialReleaseRow.content_release_id),tenantId:String(initialReleaseRow.tenant_id),workspaceId:String(initialReleaseRow.workspace_id),status:initialReleaseRow.status as ContentRelease['status']} : null;
+        const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize, initialRelease);
         if (!prepared.created) {
           database.exec("COMMIT");
           return { testRun: prepared.testRun, created: false };
@@ -3715,8 +3735,8 @@ export const createSqliteFirstSliceStorage = (
           (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(event.activityEventId, event.tenantId, event.workspaceId,
             event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details));
-        if (effect.participantSession) database.prepare("UPDATE participant_sessions SET status = ? WHERE participant_session_id = ?")
-          .run(effect.participantSession.status, candidate.participantSessionId);
+        if (effect.participantSession) database.prepare("UPDATE participant_sessions SET status = ?, content_release_id = ? WHERE participant_session_id = ?")
+          .run(effect.participantSession.status, effect.participantSession.contentReleaseId, candidate.participantSessionId);
         const stored = mapTestRun(database.prepare(
           "SELECT * FROM test_runs WHERE test_run_id = ?"
         ).get(candidate.testRunId) as Record<string, unknown> | undefined);
