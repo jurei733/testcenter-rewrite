@@ -1,5 +1,33 @@
 # CI iteration and complete acceptance
 
+## Complete timer feedback without the broad queue (2026-10-25)
+
+`rewrite-timer-focus.yml` exposes a manual/reusable **non-acceptance** workflow.
+It reads the fixed `verify/ui-controller-timer` selection from the actual acceptance
+inventory, compiles the complete production app once, then runs all nine Original
+and 22 Rewrite scenarios in order. A failed build or entry stops execution and
+preserves its status; there are no retries or optional product checks. Browser
+mode matches the full timer leaf. No arbitrary check or shell input is accepted.
+
+The single fresh Ubuntu job retains locked installation, the complete-lock audit,
+all CI policy controls and Linux archive qualification. It uses the same v3 native
+APT/material producer as complete CI, including authenticated packages and actual
+Chromium material verification, directly on its own runner. No cross-run build,
+package artifact or privileged cache is reused. The locked Chromium download cache
+is the same as in complete CI. Separate receipt uploads run even on success;
+failure/cancellation logs remain bounded to the owned timer directories. SQLite
+stores and package archives are excluded. Actions are pinned and checkout has no
+persisted credentials; the token is read-only.
+
+The workflow has a 25-minute outer job limit; each timer entry retains its existing
+eight-minute total and one-minute phase limits. Its separate concurrency group
+cannot cancel a live full acceptance run. Full acceptance remains mandatory,
+including on changes only to this focused workflow. The four new policy controls
+include execution of the actual CLI with failing build/first-entry/second-entry
+children and verify that failures propagate without retry or later dispatch.
+Hosted runtime and timing must be qualified independently; no speedup is inferred
+from the smaller job inventory.
+
 ## Bounded controller-timer diagnosis and accepted cascade feedback (2026-10-25)
 
 The two actual timer entries now run under independent owned-process supervision:
