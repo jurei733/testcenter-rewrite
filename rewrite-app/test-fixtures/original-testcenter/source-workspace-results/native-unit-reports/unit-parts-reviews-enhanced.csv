@@ -1,0 +1,16 @@
+﻿"groupname";"loginname";"code";"bookletname";"unitname";"priority";"category_";"category_1";"category_02";"category_10";"category_9223372036854775807";"category_9223372036854775808";"category_9223372036854775809";"reviewtime";"page";"pagelabel";"originalUnitId";"userAgent";"reviewer";"entry";"unitlabel";"bookletlabel"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";"FALSE";"FALSE";"TRUE";"TRUE";"FALSE";"FALSE";"FALSE";"2026-10-25 16:48:21";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle";"Owned report reviewer";"Owned report review Ω
+""; 10 02";"  Alias current Ω  ";"  Current Booklet Ω
+  "
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";"TRUE";"TRUE";"FALSE";"FALSE";"FALSE";"FALSE";"FALSE";"2026-10-25 16:48:21";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle";"Owned report reviewer";"Owned report review Ω
+""; 2  1";"  Alias current Ω  ";"  Current Booklet Ω
+  "
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";"FALSE";"FALSE";"FALSE";"FALSE";"FALSE";"FALSE";"TRUE";"2026-10-25 16:48:21";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle";"Owned report reviewer";"Owned report review Ω
+""; 9223372036854775809";"  Alias current Ω  ";"  Current Booklet Ω
+  "
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";"FALSE";"FALSE";"FALSE";"FALSE";"FALSE";"TRUE";"FALSE";"2026-10-25 16:48:21";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle";"Owned report reviewer";"Owned report review Ω
+""; 9223372036854775808";"  Alias current Ω  ";"  Current Booklet Ω
+  "
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";"FALSE";"FALSE";"FALSE";"FALSE";"TRUE";"FALSE";"FALSE";"2026-10-25 16:48:21";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle";"Owned report reviewer";"Owned report review Ω
+""; 9223372036854775807";"  Alias current Ω  ";"  Current Booklet Ω
+  "

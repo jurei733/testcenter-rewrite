@@ -1,0 +1,249 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "transport": "unchanged production Apache HTTP; actual ALTCHA; no SQL seeds",
+  "testMode": false,
+  "checks": [
+    {
+      "name": "actual production Apache requires both native Login and person challenges"
+    },
+    {
+      "name": "owned XSD-validated fixture enters only through protected admin HTTP"
+    },
+    {
+      "name": "configured Login protection refuses direct password authentication"
+    },
+    {
+      "name": "actual native Login challenge is solved without replacing the production verifier",
+      "challenge": {
+        "keys": [
+          "algorithm",
+          "challenge",
+          "maxNumber",
+          "salt",
+          "signature"
+        ],
+        "algorithm": "SHA-256",
+        "maxnumber": 1000000,
+        "saltParameterNames": [
+          "loginType",
+          "name",
+          "password"
+        ],
+        "hasExpiryParameter": false
+      }
+    },
+    {
+      "name": "invalid signature and wrong work cannot authenticate through the native solution route"
+    },
+    {
+      "name": "a valid Login solution returns the coded Login AccessSet rather than a person"
+    },
+    {
+      "name": "Login-solution replay behavior is measured without assuming one-use semantics",
+      "status": 200,
+      "sameLoginToken": true
+    },
+    {
+      "name": "native person challenges require a Login bearer before issuing work"
+    },
+    {
+      "name": "configured person protection refuses direct code entry while Login metadata remains readable"
+    },
+    {
+      "name": "actual native person challenge retains its observed signed parameter shape",
+      "challenge": {
+        "keys": [
+          "algorithm",
+          "challenge",
+          "maxNumber",
+          "salt",
+          "signature"
+        ],
+        "algorithm": "SHA-256",
+        "maxnumber": 1000000,
+        "saltParameterNames": [
+          "code"
+        ],
+        "hasExpiryParameter": false
+      }
+    },
+    {
+      "name": "a person solution still requires the correct Login bearer and valid work"
+    },
+    {
+      "name": "a valid person solution returns exact raw code display and assigned Test claims without opening a Test"
+    },
+    {
+      "name": "person-solution replay and bearer rotation are observed separately",
+      "status": 200,
+      "rotatedPersonToken": true
+    },
+    {
+      "name": "person-solution binding to a different authorized Login is measured explicitly",
+      "status": 200,
+      "peerIdentity": "owned-native-pow-peer"
+    },
+    {
+      "name": "a signed person challenge cannot be used with modified salt parameters"
+    },
+    {
+      "name": "proof-based person entry and Login logout preserve the original first-factor capability"
+    },
+    {
+      "name": "native groups contain actual opened Tests, Unit state, answers, reviews and logs before deletion"
+    },
+    {
+      "name": "deleting an obsolete group snapshot preserves the Login, person and Test already rebound elsewhere"
+    },
+    {
+      "name": "read-only, anonymous and participant deletion is denied; an unknown group is a successful no-op"
+    },
+    {
+      "name": "case-equivalent whole-group deletion returns an empty HTTP200 and revokes every selected Login and person while preserving other groups and authored files"
+    },
+    {
+      "name": "new native authentication recreates fresh Login, group and person capabilities without reviving deleted Tests or old bearers"
+    },
+    {
+      "name": "native response requires an initialized Unit; state creates an owned alias independently of Booklet membership and records its first original ID and person suffix"
+    },
+    {
+      "name": "response parts retain independent client clocks and response types across partial writes, equal/stale rejection and the omitted-type default",
+      "parts": [
+        {
+          "id": "part-a",
+          "content": "  Exact part Ω/β\n\"; \\ kept  ",
+          "ts": 1792929600010,
+          "responseType": "first/Ω"
+        },
+        {
+          "id": "part-c",
+          "content": "new c",
+          "ts": 1792929600010,
+          "responseType": "third/γ"
+        },
+        {
+          "id": "part-default",
+          "content": "default type",
+          "ts": 1792929600040,
+          "responseType": "unknown"
+        },
+        {
+          "id": "part-z",
+          "content": "new z",
+          "ts": 1792929600020,
+          "responseType": "second/β"
+        }
+      ]
+    },
+    {
+      "name": "Unit field clocks and response clocks stay independent while the original Unit ID remains the first stored value",
+      "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+      "originalUnitId": "FIRST.PERSISTED.ID"
+    },
+    {
+      "name": "real PHP review categories retain numeric first spelling, strict selected membership, empty tokens and distinct overflowing integer strings",
+      "categoryNames": [
+        "category_",
+        "category_1",
+        "category_02",
+        "category_10",
+        "category_9223372036854775807",
+        "category_9223372036854775808",
+        "category_9223372036854775809"
+      ]
+    },
+    {
+      "name": "enhanced report labels resolve the current physical Booklet alias and raw XML labels without rewriting stored Unit identity",
+      "bookletlabel": "  Current Booklet Ω\n  ",
+      "unitlabel": "  Alias current Ω  "
+    },
+    {
+      "name": "all four native report variants retain original JSON and CSV bytes; unknown groups return zero bytes in both formats",
+      "reports": [
+        {
+          "file": "unit-parts-responses.json",
+          "bytes": 725,
+          "sha256": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-responses.csv",
+          "bytes": 768,
+          "sha256": "4cd713b969ca86fb9680fe25cd3013fbfded9b679233873d7f86331f46ba1df9",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-logs.json",
+          "bytes": 1542,
+          "sha256": "f5f140b330a5cd33ec34b3e87924d52dc189f60bb5d7cda733588d562c4a40f4",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-logs.csv",
+          "bytes": 1045,
+          "sha256": "cb21f0d3a73a3a8b7780fffe0334cc4d2ee9a6bf64603a181a91d1df4f3cec09",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-reviews-legacy.json",
+          "bytes": 2710,
+          "sha256": "81d98f31c964f7a9738ffbd1f2abfc54036e8fbc69b35968a4af59a7561419c2",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-reviews-legacy.csv",
+          "bytes": 1428,
+          "sha256": "d36f1afdd3059cfd5a40e6c33e56c54799772ff9ee4bf9a51b34b429e28dd9b4",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-reviews-enhanced.json",
+          "bytes": 3310,
+          "sha256": "83974ff2c84d3ed0a6763223a149f5e47fed0488d34069aa919ab15910051952",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-reviews-enhanced.csv",
+          "bytes": 2041,
+          "sha256": "7ba9147812cbe4f42bb8c0f2ad9880feac0b90c3f8a29e6e0a194bbe734bf429",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native result downloads permit the owned read-only administrator and reject anonymous or participant capabilities"
+    }
+  ],
+  "sourceFiles": {
+    "backend/routes.php": "8ecafc8e25edaf2cd0453c180a23be8a8d0568f048000eb033d7772af1b3a213",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/middleware/RequireToken.class.php": "f2d19714051837e46c07adec45bc1c52205cc9a282b37441a248bf9916f3c35a",
+    "backend/src/helper/SystemConfig.class.php": "2f97c265453d34d1d7be465afd2b58ac2422f60fbdcf7e970352b60bc23e957d",
+    "backend/src/helper/Token.class.php": "d57516492d6f68fecfb070d3a9fd81edb245bd7c365c389c419504bcbaa87cf9",
+    "backend/src/data-collection/AccessSet.class.php": "e76d5c03c642a8d178c583766ffc66b27355c3606bb34add287e55ccb6cdca6c",
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/controller/WorkspaceController.class.php": "f9cb336fc05ad115d1ebfca923d48eb397ed94cd065ccbdd83c359849233a6b4",
+    "backend/composer.lock": "47c7dda51f6d27fbbc93aaedc99d364b9eeb299d80f92d68226b0218a436b708",
+    "scripts/database/full.sql": "9ac4b941ba40d75a563cbe4fb9d55075f27e46894902eb50100eb7263594ed08",
+    "backend/src/helper/CSV.class.php": "77d3e0cfca1a99e37efccb49480b68d1737ea63ead252f25d18662ebe997bb84",
+    "backend/src/helper/ReviewCSVFormatter.php": "5db29ee7680ffa8ddf01febe71a95c0d5fc580091a4f5111ba819cc37123df2e",
+    "backend/src/helper/TimeStamp.class.php": "eba4eb49ca3dbe8aa99733a55b40b9259823edb05e0f67267e946c8bcac87a7d",
+    "backend/src/workspace/Report.php": "f81129e75bfb3550205d3668fb2de1821967f20994c604cc0d41b380a13e543f",
+    "backend/src/workspace/ResponseReportOutput.php": "0c88a1742d3e321cccb4c62c6fc34ca1627faa9b9e2763227310dc2dd1187466",
+    "backend/src/workspace/LogReportOutput.php": "cfcb2fd3418195fdac8bc6b7dcfeafeb53da36745c7fa1f37194e9fbf9da8b86",
+    "backend/src/workspace/ReviewReportOutput.php": "d1f39523e236b0f2265da3a1892775f1bd5977fdc50da4c2091afab48282ba59",
+    "backend/src/data-collection/ReportFormat.php": "3fb41e925c59daf7800a132187fb324f31a20562fbadd5932e464d90ea180f94",
+    "backend/src/files/XMLFileBooklet.class.php": "95cefab11030f5aa237941311874f46b4def068bcdd009638dfaec01b151bfa1"
+  },
+  "version": {
+    "version": "19.0.0"
+  },
+  "protectedScopes": [
+    "login",
+    "person"
+  ],
+  "success": true
+}

@@ -2,9 +2,11 @@
 
 ## Native report serialization and remaining data history (2026-10-25)
 
-The separate [native report output component](ORIGINAL-REPORTS.md) matches twenty
-retained Original CSV bodies across five production evidence families, including
-legacy/enhanced comments, PHP nested JSON escaping and exact empty-body behavior.
+The separate [native report output component](ORIGINAL-REPORTS.md) matches 24
+retained Original CSV bodies and four raw HTTP JSON bodies, including legacy/
+enhanced comments, PHP nested JSON escaping and exact empty-body behavior. The
+unchanged production Source28 run adds seven Unit/part/report controls to all 21
+preceding native auth/cascade groups, with 159 genuine HTTP observations.
 It does not connect the four native downloads or claim native repository/HTTP/UI
 parity. Stored person suffixes, first Unit identity/state, per-part response types
 and clocks, current physical XML labels and native permission mapping still need

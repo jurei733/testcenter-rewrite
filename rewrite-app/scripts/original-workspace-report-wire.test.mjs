@@ -7,6 +7,78 @@ import {encodeOriginalReportJson, formatOriginalResponseReport, formatOriginalLo
   from '../packages/application/dist/packages/application/src/original-workspace-report-wire.js';
 
 const evidence=new URL('../test-fixtures/original-testcenter/source-workspace-results/',import.meta.url);
+test('Source28 actual production Unit and report history retains its complete guarded provenance and eight raw bodies',async t => {
+  const root=new URL('native-unit-reports/',evidence);
+  const read=name=>readFile(new URL(name,root));
+  const manifest=JSON.parse(await read('manifest.json')),receipt=JSON.parse(await read('receipt.json'));
+  const old=JSON.parse(await readFile(new URL('native-group-deletion/receipt.json',evidence)));
+  await t.test('immutable actual Source, public artifact, probe and every preceding control',async () => {
+    assert.equal(manifest.sourceCommit,'eedae41840cbe90e5547c0211da818bdf620f5aa');
+    assert.equal(manifest.probeCommit,'5010312460a7dfb0b569028099a03b8d10e29e0c');
+    assert.equal(manifest.probeTree,'056eab5f7a8649c7b010e31201a4dc4324c0da5f');
+    assert.equal(manifest.runId,40208546516);assert.equal(manifest.jobId,121214629849);
+    assert.equal(manifest.artifactId,12604982552);assert.equal(manifest.artifactZipBytes,17980);
+    assert.equal(manifest.artifactZipSha256,'e18bf955637a77773f22a6d8fb353fbe8a3f7f003f8d35f32526c758706ee719');
+    assert.equal(manifest.files['probe.mjs'],'bdd9a980527370aefd1e512f6beab128c7962e689da77e6cc93189ebaab3ab75');
+    assert.equal(Object.keys(manifest.files).length,15);
+    for(const [name,sha]of Object.entries(manifest.files)) {
+      assert.match(name,/^[a-z][a-z0-9.-]*$/);assert.equal(createHash('sha256').update(await read(name)).digest('hex'),sha,name);
+    }
+    assert.equal(receipt.success,true);assert.equal(receipt.testMode,false);assert.equal(receipt.checks.length,28);
+    assert.equal(receipt.sourceCommit,manifest.sourceCommit);assert.deepEqual(receipt.sourceFiles,manifest.sourceFiles);
+    assert.equal(Object.keys(receipt.sourceFiles).length,21);
+    assert.deepEqual(receipt.checks.slice(0,21).map(row=>row.name),old.checks.map(row=>row.name));
+    for(const [path,sha]of Object.entries(old.sourceFiles))assert.equal(receipt.sourceFiles[path],sha,path);
+    assert.equal(JSON.parse(await read('php-runtime.json')).php,'8.3.36');
+  });
+  await t.test('native history is actual HTTP data and public receipts omit registered capabilities',async () => {
+    const observations=JSON.parse(await read('http-observations.json'));
+    assert.equal(observations.length,159);assert.deepEqual(receipt.protectedScopes,['login','person']);
+    const typed=receipt.checks.find(row=>row.name.startsWith('response parts retain independent'));
+    assert.deepEqual(typed.parts.map(part=>[part.id,part.ts,part.responseType]),[
+      ['part-a',1792929600010,'first/Ω'],['part-c',1792929600010,'third/γ'],
+      ['part-default',1792929600040,'unknown'],['part-z',1792929600020,'second/β']]);
+    const state=receipt.checks.find(row=>row.name.startsWith('Unit field clocks'));
+    assert.equal(state.originalUnitId,'FIRST.PERSISTED.ID');
+    assert.deepEqual(JSON.parse(state.laststate),{PRESENTATION_PROGRESS:'complete',RESPONSE_PROGRESS:'none','CUSTOM_Ω':'  Exact Ä/β\n";  '});
+    assert.ok(observations.some(row=>row.method==='PUT'&&row.path.endsWith('/unit/OWNED.UNIT.ALIAS/response')&&row.status===404));
+    const empty=observations.filter(row=>row.method==='GET'&&row.path.includes('/report/')&&row.path.includes('dataIds=ORACLE.UNKNOWN'));
+    assert.equal(empty.length,8);assert.ok(empty.every(row=>row.status===200&&row.value===null&&row.wireSha256==='e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'));
+    const inspect=value=>{
+      if(!value||typeof value!=='object')return;
+      for(const [key,item]of Object.entries(value)) {
+        if(/^(token|groupToken|salt|challenge|signature)$/i.test(key)&&typeof item==='string')assert.match(item,/^\[redacted-owned-/);
+        else inspect(item);
+      }
+    };
+    inspect(receipt);inspect(observations);
+    const probe=(await read('probe.mjs')).toString(),workflow=(await read('workflow.yml')).toString(),compose=(await read('compose.yml')).toString();
+    assert.ok(probe.includes("privateValue(adminPassword, 'password')"));
+    assert.ok(probe.includes("Raw public reports must omit every registered private value"));
+    assert.ok(workflow.includes('ref: eedae41840cbe90e5547c0211da818bdf620f5aa'));
+    assert.ok(workflow.includes('git -C original-reference diff --exit-code'));
+    assert.ok(!/sed -i|git -C original-reference (?:apply|checkout)|docker exec.*psql/.test(workflow+probe));
+    assert.ok(compose.includes("BRUTE_FORCE_PROTECTION: 'login person'"));assert.ok(compose.includes("ALLOW_TEST_MODE: 'false'"));
+  });
+  const enhanced=JSON.parse(await read('unit-parts-reviews-enhanced.json'));
+  const prefix='Owned report review Ω\n"; ';
+  // Preserve the exact authored categories from this HTTP fixture, including
+  // internal spaces and numeric spellings lost by transformed boolean columns.
+  const reviews=enhanced.map(row=>{
+    assert.ok(row.entry.startsWith(prefix));
+    return {...row,categories:row.entry.slice(prefix.length)};
+  });
+  const labels=new Map(enhanced.map(row=>[JSON.stringify([row.bookletname,row.unitname]),
+    {unitlabel:row.unitlabel,bookletlabel:row.bookletlabel}]));
+  for(const name of ['responses','logs','reviews-legacy','reviews-enhanced'])await t.test(name+' raw CSV and raw JSON bytes',async () => {
+    const rawJson=await read('unit-parts-'+name+'.json'),rows=JSON.parse(rawJson);
+    const render=format=>name==='responses'?formatOriginalResponseReport(rows,format):name==='logs'?formatOriginalLogReport(rows,format):
+      formatOriginalReviewReport({rows:reviews,format,useNewVersion:name==='reviews-enhanced',labels:(booklet,unit)=>labels.get(JSON.stringify([booklet,unit]))});
+    assert.deepEqual(Buffer.from(render('json'),'utf8'),rawJson,'Use actual original HTTP JSON bytes, including PHP escaping/key order');
+    assert.deepEqual(Buffer.from(render('csv'),'utf8'),await read('unit-parts-'+name+'.csv'));
+  });
+});
+
 for (const family of ['', 'group-labels', 'lock-clock', 'native-person-lifecycle', 'native-person-labels']) {
   test(`${family || 'Source27'}: native report renderer retains all four actual Source CSV bodies and JSON values`,async t => {
     const root=new URL(family ? family+'/' : './',evidence);
