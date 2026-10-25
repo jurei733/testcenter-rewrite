@@ -219,9 +219,9 @@ try {
   assert.equal(removed.value, null);
   assert.ok(!(await resultRows()).some(row => row.groupName === 'ORACLE.DELETE.MAIN'));
   for (const session of [main, mainPeer]) {
-    await request('GET', '/session', {token: session.login.token, status: 401});
-    await request('GET', '/session', {token: session.person.token, status: 401});
-    await request('GET', `/test/${session.id}`, {token: session.person.token, status: 401});
+    await request('GET', '/session', {token: session.login.token, status: 403});
+    await request('GET', '/session', {token: session.person.token, status: 403});
+    await request('GET', `/test/${session.id}`, {token: session.person.token, status: 403});
   }
   for (const session of [kept, moved]) {
     await request('GET', '/session', {token: session.login.token});
@@ -240,7 +240,7 @@ try {
   assert.notEqual(recreated.person.groupToken, main.person.groupToken);
   assert.ok(recreated.person.claims.test.every(claim => claim.flags.running === false));
   await request('GET', `/test/${main.id}`, {token: recreated.person.token, status: [403, 404]});
-  for (const token of [main.login.token, main.person.token, mainPeer.login.token, mainPeer.person.token]) await request('GET', '/session', {token, status: 401});
+  for (const token of [main.login.token, main.person.token, mainPeer.login.token, mainPeer.person.token]) await request('GET', '/session', {token, status: 403});
   check('new native authentication recreates fresh Login, group and person capabilities without reviving deleted Tests or old bearers');
 
   receipt.success = true;
