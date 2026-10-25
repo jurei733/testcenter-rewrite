@@ -41,7 +41,7 @@ const request = async (method, path, {token, body, status = 200, accept = 'appli
   let value = null;
   if (bytes.length) { try { value = JSON.parse(bytes.toString('utf8')); } catch { value = bytes.toString('utf8'); } }
   register(value);
-  responses.push({method, path, status: response.status, wireSha256: createHash('sha256').update(bytes).digest('hex'), value});
+  responses.push({method, path, status: response.status, wireSha256: createHash('sha256').update(bytes).digest('hex'), contentType: response.headers.get('content-type'), value});
   assert.ok((Array.isArray(status) ? status : [status]).includes(response.status), `${method} ${path}: unexpected HTTP ${response.status}`);
   return {status: response.status, value, bytes, contentType: response.headers.get('content-type')};
 };
@@ -345,8 +345,8 @@ try {
   const beforeUnopened=await resultRows(),claimsBefore=(await request('GET','/session',{token:partToken})).value;
   assert.ok(!claimsBefore.claims.test.some(item=>item.id===unassigned));
   await request('PUT','/test',{body:{bookletName:unassigned},status:401});
-  const loginDenied=await request('PUT','/test',{token:recreated.login.token,body:{bookletName:unassigned},status:[401,403]});
-  const adminDenied=await request('PUT','/test',{token:admin.token,body:{bookletName:unassigned},status:[401,403]});
+  const loginDenied=await request('PUT','/test',{token:recreated.login.token,body:{bookletName:unassigned},status:403});
+  const adminDenied=await request('PUT','/test',{token:admin.token,body:{bookletName:unassigned},status:403});
   const rawTest=await request('PUT','/test',{token:partToken,body:{bookletName:unassigned},status:201}),unassignedId=Number(rawTest.value);
   assert.ok(Number.isSafeInteger(unassignedId)&&unassignedId>0);assert.match(rawTest.bytes.toString('utf8'),/^[1-9][0-9]*$/);
   assert.deepEqual(await resultRows(),beforeUnopened);
@@ -370,7 +370,7 @@ try {
 
   await request('GET',`/test/${presetId}`,{token:kept.person.token,status:403});
   const firstOpen=(await request('GET',`/test/${presetId}`,{token:partToken})).value;
-  assert.equal(firstOpen.firstStart,true);assert.equal(firstOpen.mode,'run-hot-return');assert.deepEqual(firstOpen.laststate,[]);assert.equal(firstOpen.workspaceId,workspace);
+  assert.equal(firstOpen.firstStart,true);assert.equal(firstOpen.mode,'run-review');assert.deepEqual(firstOpen.laststate,[]);assert.equal(firstOpen.workspaceId,workspace);
   assert.deepEqual(firstOpen.presetBookletStates,{b:'last',a:'first'});assert.ok(typeof firstOpen.xml==='string'&&firstOpen.xml.includes(nextLabel));
   const again=(await request('GET',`/test/${presetId}`,{token:partToken})).value;assert.equal(again.firstStart,false);
   check('native numeric Test GET enforces person ownership and opens an unassigned Test only once with current XML and canonical preset state',{testId:presetId,firstStart:firstOpen.firstStart,secondStart:again.firstStart,mode:firstOpen.mode,laststate:firstOpen.laststate,presetBookletStates:firstOpen.presetBookletStates,xmlSha256:createHash('sha256').update(firstOpen.xml).digest('hex')});
