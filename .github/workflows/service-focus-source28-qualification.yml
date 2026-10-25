@@ -1,0 +1,18 @@
+name: Source28 native report reference service qualification
+
+on:
+  push:
+    branches: [codex/service-focus-source28-20261025]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-results:
+    uses: ./.github/workflows/rewrite-service-focus.yml
+    with:
+      check: original-results
