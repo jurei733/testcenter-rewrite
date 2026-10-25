@@ -181,7 +181,7 @@ try {
     await request('GET', `/test/${id}`, {token});
     await request('PATCH', `/test/${id}/unit/ORACLE.POW.UNIT/state`, {token, body: {newState: [{key: 'PRESENTATION_PROGRESS', content: 'some', timeStamp: 1792929600000}], originalUnitId: 'ORACLE.POW.UNIT'}});
     await request('PUT', `/test/${id}/unit/ORACLE.POW.UNIT/response`, {token, body: {timeStamp: 1792929600000, dataParts: {owned: JSON.stringify({owned: loginName})}, responseType: 'owned'}, status: 201});
-    await request('PUT', `/test/${id}/unit/ORACLE.POW.UNIT/review`, {token, body: {entry: 'Owned cascade review ' + loginName, reviewer: 'Owned reviewer', originalUnitId: 'ORACLE.POW.UNIT'}, status: 201});
+    await request('PUT', `/test/${id}/unit/ORACLE.POW.UNIT/review`, {token, body: {priority: 2, categories: 'owned', entry: 'Owned cascade review ' + loginName, reviewer: 'Owned reviewer', originalUnitId: 'ORACLE.POW.UNIT'}, status: 201});
     await request('PUT', `/test/${id}/log`, {token, body: [{key: 'OWNED', content: loginName, timeStamp: 1792929600000}], status: 201});
     return {...session, id};
   };
