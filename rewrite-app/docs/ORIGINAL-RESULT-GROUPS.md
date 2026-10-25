@@ -1,5 +1,64 @@
 # Original participant group snapshots
 
+## Native group-deletion reference and remaining write work (2026-10-25)
+
+[Unchanged production Source run 40196464182](https://github.com/jurei733/testcenter-rewrite/actions/runs/40196464182)
+passes **21 control groups / 118 HTTP observations**, including all 16 preceding
+native ALTCHA controls. Pinned Source remains
+`eedae41840cbe90e5547c0211da818bdf620f5aa`; protected Login/person puzzles are
+solved genuinely, TestMode is off and all lifecycle fixtures enter through actual
+XSD-validated admin uploads and production HTTP, without SQL seeds or Source patches.
+Probe head `4779500c23135a3d8c6c38698c1f5d89b0abb5c0`, tree
+`7facf36f4e53ffeba08ee07a52594492582183fc`. The public 9,343-byte artifact
+12600596227 has SHA-256
+`bd020f5ccbba36a61094cdcfa1a4bb5428dcc59979c9411567ba79b312502ab5`.
+Its four public members, exact probe/Compose/workflow copies and eleven production
+Source file hashes are retained under
+`test-fixtures/original-testcenter/source-workspace-results/native-group-deletion/`.
+Four mandatory reference controls join the existing original-results suite, so
+unit, PostgreSQL and focused results gates all verify the same frozen reference.
+Response capabilities and signed puzzle fields are redacted; request bodies and
+bearer headers are never retained.
+
+Source `DELETE /workspace/{id}/responses` removes selected group snapshots and
+all still-associated Login/person sessions and Tests, with saved Unit state,
+answers, reviews and logs. Case-equivalent selection succeeds with an empty
+HTTP200. Obsolete snapshots preserve a Login/person/Test already moved elsewhere;
+other groups and authored files remain unchanged. Unknown groups return HTTP200
+without effects. Read-only and participant bearers receive HTTP403; a missing
+bearer receives HTTP401. Deleted bearers receive HTTP403. Reauthentication creates
+fresh Login, person and group capabilities, adopts the new first label and leaves
+old Tests and old bearer aliases inaccessible.
+
+Two failed probe attempts remain recorded in the manifest. The first omitted the
+required string review categories and reached Source's strict-typing HTTP500;
+the second incorrectly expected HTTP401 for invalidated bearers. The fixture now
+supplies the real review shape and asserts the actual HTTP403 contract. Production
+Source was never modified and all previous assertions remain.
+
+**This is reference coverage, not a Rewrite deletion implementation.** The existing
+canonical `deleteWorkspaceGroupResults` deletes Tests and result artifacts while
+retaining people, bindings, group snapshots and capabilities. It cannot safely be
+wired to the native page's group-delete action. A distinct atomic native operation
+must remove the selected current snapshot hierarchy and capabilities, preserve
+moved/canonical/foreign data, and fence delayed writes and auth reentry on all four
+stores. Late rollback, independent-connection races and protected RW/RO HTTP checks
+remain required before native UI adoption. This closes no broad parity row.
+
+## Hosted acceptance of the result-read foundation (2026-10-25)
+
+[Full CI 40193724586](https://github.com/jurei733/testcenter-rewrite/actions/runs/40193724586)
+accepts the final native group inventory with **89/89 successful jobs**, including
+4,218 unit/frontend and 2,413 PostgreSQL checks. Application head
+`2027fb9bae2707fdc366c51411e7502129248e61`, tree
+`449f063094c5119fc295fcd50d3013fc793a976c` and actual merge
+`7955844b44889617bccbf817c6f6cb60709587c6` are verified. Independent focused
+service feedback passes in 53–88 seconds with the complete policy/audit gates.
+The full observed span is 31:38; a whole-CI speedup is not established.
+These receipts supersede the earlier pending-hosted-qualification notes below.
+The native result page, whole-group session cascade and native downloads remain
+open; this read foundation does not close a broad parity row.
+
 ## Source-shaped group-result read inventory (2026-10-25)
 
 The new protected versioned read

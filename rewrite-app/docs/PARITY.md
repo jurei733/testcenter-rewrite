@@ -1,5 +1,18 @@
 # Testcenter parity checklist
 
+### Hosted native result-read acceptance (2026-10-25)
+
+[Full CI 40193724586](https://github.com/jurei733/testcenter-rewrite/actions/runs/40193724586)
+is terminal success, **89/89 jobs**, with 4,218 unit/frontend and 2,413 PostgreSQL
+checks. The final inventory adapter layout now has independent hosted acceptance.
+Focused service jobs pass in 53–88 seconds; full acceptance's observed span is
+31:38. No causal whole-CI speedup is claimed. See [exact receipts](CI.md).
+
+The native result table/actions, whole-group session cascade, four native report
+wire downloads, numeric workspace/admin transport and broad visuals remain open.
+Formal ledger unchanged: **27 done / 22 partial**, all eight visual rows open;
+estimated remaining work stays **4–8 engineering weeks**.
+
 ### Qualified Session pipeline and native result inventory (2026-10-25)
 
 Full CI **40189158651 passes all 89 jobs**, including 4,183 unit/frontend and

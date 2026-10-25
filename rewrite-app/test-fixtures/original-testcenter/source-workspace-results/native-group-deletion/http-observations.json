@@ -1,0 +1,2059 @@
+[
+  {
+    "method": "GET",
+    "path": "/version",
+    "status": 200,
+    "wireSha256": "276de21c2e994b71dd74fece42fa92b5763fd6f56141ee5b10c26db1e3b2948f",
+    "value": {
+      "version": "19.0.0"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/system/config",
+    "status": 200,
+    "wireSha256": "740e5c22eda8e5b255b357e097eca655799c2a3e5ef14a250227ff136aaffa26",
+    "value": {
+      "version": "19.0.0",
+      "customTexts": {},
+      "appConfig": {},
+      "baseUrl": "http://127.0.0.1:32768",
+      "bruteForceProtection": [
+        "login",
+        "person"
+      ],
+      "veronaPlayerApiVersionMin": 2,
+      "veronaPlayerApiVersionMax": 6,
+      "iqbStandardResponseTypeMin": 1,
+      "iqbStandardResponseTypeMax": 1,
+      "xmlSchemaVersions": {
+        "Booklet": {
+          "repo": "testcenter-booklet-xml",
+          "min": 18,
+          "max": 18
+        },
+        "Testtakers": {
+          "repo": "testcenter-testtaker-xml",
+          "min": 17,
+          "max": 18
+        },
+        "Unit": {
+          "repo": "unit-xml",
+          "min": 17,
+          "max": 17
+        },
+        "SysCheck": {
+          "repo": "testcenter-syscheck-xml",
+          "min": 18,
+          "max": 18
+        }
+      },
+      "fileServiceUri": "",
+      "broadcastingServiceUri": "",
+      "supportedBrowsers": [
+        "chrome 154",
+        "chrome 153",
+        "edge 154",
+        "edge 153",
+        "firefox 157",
+        "firefox 156",
+        "firefox 140",
+        "ios_saf 27.0",
+        "ios_saf 26.6",
+        "safari 27",
+        "safari 26.6"
+      ],
+      "passwordMinLength": 8,
+      "passwordPattern": ".*"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/admin",
+    "status": 200,
+    "wireSha256": "4b3b255e408e9bdba1c6bd85801f7f9695c193b360452eeb6a2a498381f66724",
+    "value": {
+      "token": "[redacted-owned-token-3]",
+      "displayName": "super",
+      "loginName": "super",
+      "groupLabel": null,
+      "id": 1,
+      "pwSetByAdmin": false,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "workspaceAdmin": [],
+        "superAdmin": []
+      },
+      "groupToken": null,
+      "viewSettings": [],
+      "access": {
+        "workspaceAdmin": [],
+        "superAdmin": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/workspace",
+    "status": 201,
+    "wireSha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "value": 1
+  },
+  {
+    "method": "PATCH",
+    "path": "/user/1/workspaces",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "2fd365a68f1d6eaecc7033ac03b95f2e54daa71edf5a98102991658e008dd3a5",
+    "value": {
+      "player.html": {
+        "info": [
+          "Verona-Version: 6.0"
+        ],
+        "warning": [
+          "Non-Standard-Filename: `owned-pow-player-6.0.html` expected.",
+          "Resource is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "c951058edcd4486b1e803bfc8610db0aff19f2e40ba5b4dd6117364e8857df7e",
+    "value": {
+      "unit.xml": {
+        "warning": [
+          "Unit is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "d69b2bc0364f160a19b50bed6a5d84414c9fb5529f3293912e54c7325cf0527f",
+    "value": {
+      "booklet.xml": {
+        "warning": [
+          "Booklet is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "26cef50780ef207f98d3b60075a0b7e6851ed3d06ebe79910cf379cea4e6e121",
+    "value": {
+      "people.xml": []
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 400,
+    "wireSha256": "de9fc11a4d628d3cefe8e7811056ec194ae39484f818b64bc01dad4a3ba46bef",
+    "value": "Brute Force protection active. Challenge for this password must be solved to create a session"
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "74e65711fd14a5d1c17a42aee2f84cfd386eb5d64af0cf4ab1a636c441ed79c9",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-4]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-5]",
+      "signature": "[redacted-owned-signature-6]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "26eae62543063ec03ffd45e3ac5a67b80238a48ee078128f4ff0baf405f6d417",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "26eae62543063ec03ffd45e3ac5a67b80238a48ee078128f4ff0baf405f6d417",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 403,
+    "wireSha256": "bcb9f821598ffca22b33a76ccf3e5f9b2f7005a8bf521eff2b12d4b860358436",
+    "value": "Token `[redacted-owned-token-3]` of type `admin` has wrong type - `login` required."
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 400,
+    "wireSha256": "c906140d9d712f038557f6c8dac3d79a5cf5806e4f34c091dd99337490c8730d",
+    "value": "Brute Force protection active. Challenge for this code must be solved to create a session"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "26eae62543063ec03ffd45e3ac5a67b80238a48ee078128f4ff0baf405f6d417",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "8c2082e50a2694d58cc55d5744e02a48dfd3d67b538cf11f9c1012ade60ecf35",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-9]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-10]",
+      "signature": "[redacted-owned-signature-11]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "bcb9f821598ffca22b33a76ccf3e5f9b2f7005a8bf521eff2b12d4b860358436",
+    "value": "Token `[redacted-owned-token-3]` of type `admin` has wrong type - `login` required."
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "e2227b2328eefeef42d6820e2c16b866dc32ea755bf559c86159e6d68fe99fb3",
+    "value": {
+      "token": "[redacted-owned-token-12]",
+      "displayName": "Owned proof group/owned-native-pow/sHaReD",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "4d79a9f51e983974de0bf09b22ccc0f42b561317452c25f29d382895c08927c5",
+    "value": {
+      "token": "[redacted-owned-token-13]",
+      "displayName": "Owned proof group/owned-native-pow/sHaReD",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "0685583f8b10513340b54a8adc05d1706673de63c74566a3202214dca4f0fc11",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-14]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-15]",
+      "signature": "[redacted-owned-signature-16]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "6f8c7aa88b48135988cf4d64c70b5c0e0912468d5d8d7fff82ebd80a553db2af",
+    "value": {
+      "token": "[redacted-owned-token-17]",
+      "displayName": "Owned proof group/owned-native-pow-peer",
+      "loginName": "owned-native-pow-peer",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "9ffe98ec451accee8fbbba03f7a7ef8a6ae0cbaa7dd57eaefca8c40653a263cc",
+    "value": {
+      "token": "[redacted-owned-token-18]",
+      "displayName": "Owned proof group/owned-native-pow-peer/sHaReD",
+      "loginName": "owned-native-pow-peer",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "26eae62543063ec03ffd45e3ac5a67b80238a48ee078128f4ff0baf405f6d417",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/session",
+    "status": 205,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "26eae62543063ec03ffd45e3ac5a67b80238a48ee078128f4ff0baf405f6d417",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "b67e68b165ca685aaff64a948354cc2b059712c86585dc5be262d23ed01ac44a",
+    "value": {
+      "delete-people.xml": []
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "655da8e4980f63cd1e5c63b5d7291ef3cf351973894a127a55e75e96e74fde3f",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-20]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-21]",
+      "signature": "[redacted-owned-signature-22]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "c5f47a0c6cc6b7668545aa70b4add6c271cb8fa51af5f3bef72a455bbd61bc6d",
+    "value": {
+      "token": "[redacted-owned-token-23]",
+      "displayName": "First deletion label/owned-delete-main",
+      "loginName": "owned-delete-main",
+      "groupLabel": "First deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-24]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "86f66f1c8637a04ee87936304cc67fb3df3457751e77aa4215716b1728faf0a6",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-25]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-26]",
+      "signature": "[redacted-owned-signature-27]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "705209f0ce3083a991d450c3b35cbea2314058cbcd21c18c1556c18e89d667ec",
+    "value": {
+      "token": "[redacted-owned-token-28]",
+      "displayName": "First deletion label/owned-delete-main/Shared",
+      "loginName": "owned-delete-main",
+      "groupLabel": "First deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-24]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "value": 1
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/1/unit/ORACLE.POW.UNIT/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/1/unit/ORACLE.POW.UNIT/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/1/unit/ORACLE.POW.UNIT/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/1/log",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "35da6c3b116f3b9dbf28a9f050a3d1b2cffd6ea2e0a8ecedeff2725cdd7d437d",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-29]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-30]",
+      "signature": "[redacted-owned-signature-31]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "3ddbd1931999966eea3419ddd8b4ccded0a09814dddcebfb09a1fc7290d69c3a",
+    "value": {
+      "token": "[redacted-owned-token-32]",
+      "displayName": "First deletion label/owned-delete-peer",
+      "loginName": "owned-delete-peer",
+      "groupLabel": "First deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-24]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "58b3ca59d316cdee5b21e61c3f315c1a7ccd2321a08eb921fbddb8a8dd0dd77f",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-33]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-34]",
+      "signature": "[redacted-owned-signature-35]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "d5d60960a9d1cd5f54c6736d5c93c42098138d72fee86edeb3fcd60c66b9636a",
+    "value": {
+      "token": "[redacted-owned-token-36]",
+      "displayName": "First deletion label/owned-delete-peer/Shared",
+      "loginName": "owned-delete-peer",
+      "groupLabel": "First deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-24]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+    "value": 2
+  },
+  {
+    "method": "GET",
+    "path": "/test/2",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/2/unit/ORACLE.POW.UNIT/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/2/unit/ORACLE.POW.UNIT/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/2/unit/ORACLE.POW.UNIT/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/2/log",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "396eabd49b022d3f1609ada2bdb506765fd7277c8f3652b8b35277962b784686",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-37]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-38]",
+      "signature": "[redacted-owned-signature-39]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "48b2c1f6b89d5d2fd39c195185af586487439d24f7d2ab8202291d6c73cf94e7",
+    "value": {
+      "token": "[redacted-owned-token-40]",
+      "displayName": "Retained label/owned-delete-keep",
+      "loginName": "owned-delete-keep",
+      "groupLabel": "Retained label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-41]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "ef30c57ad629581506a0a5c756ba6ec5d73aa24cc0678b1f2f486808755cb7fb",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-42]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-43]",
+      "signature": "[redacted-owned-signature-44]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "0fef976dba61044843d481bd7164a0368630cd72bb203cb091f3c993d3c9ee67",
+    "value": {
+      "token": "[redacted-owned-token-45]",
+      "displayName": "Retained label/owned-delete-keep/Shared",
+      "loginName": "owned-delete-keep",
+      "groupLabel": "Retained label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-41]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+    "value": 3
+  },
+  {
+    "method": "GET",
+    "path": "/test/3",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/3/unit/ORACLE.POW.UNIT/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/3/unit/ORACLE.POW.UNIT/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/3/unit/ORACLE.POW.UNIT/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/3/log",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "e8ab8fb72fcd4bbfb4a67794b4d204c6d5f3fb95606fe91e093f7d1ffe437420",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-46]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-47]",
+      "signature": "[redacted-owned-signature-48]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "687a9845fa390296aba883b7e7949a60ab8c406b3317d4615bf8126fca68e199",
+    "value": {
+      "token": "[redacted-owned-token-49]",
+      "displayName": "Former label/owned-delete-moved",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Former label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-50]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "504dec3ee5a1db7f55cd9961fd7a7e347f102efa523bc40917d09c8a54e6614f",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-51]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-52]",
+      "signature": "[redacted-owned-signature-53]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "7c1405dd7d8e56787ca23a15145eedb3a2f0f2f9b6ae04ea3b336d3774dc36a7",
+    "value": {
+      "token": "[redacted-owned-token-54]",
+      "displayName": "Former label/owned-delete-moved/Shared",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Former label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-50]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+    "value": 4
+  },
+  {
+    "method": "GET",
+    "path": "/test/4",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/4/unit/ORACLE.POW.UNIT/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/4/unit/ORACLE.POW.UNIT/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/4/unit/ORACLE.POW.UNIT/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/4/log",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "443cf40e008310087db211c0b0e8369e9e3c52a23a78b1d97fccb1e1d842e48e",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.FORMER",
+        "groupLabel": "Former label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933982
+      },
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933981
+      },
+      {
+        "groupName": "ORACLE.DELETE.MAIN",
+        "groupLabel": "First deletion label",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933979
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "dcffb6a8cf6d7e410192f066221355b0d95f7e3e52478f5ae36233f6851007f9",
+    "value": {
+      "delete-people.xml": {
+        "warning": [
+          "File of name `delete-people.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "31d97b80e450e3aebabf077b75cc88ae33c370306e0adafc89ca59aa363d45f2",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-55]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-56]",
+      "signature": "[redacted-owned-signature-57]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "72a06d1500a9ab2a8f136fd0c05dc05268ad2d465cdb23d7c28debd34c4e7b3e",
+    "value": {
+      "token": "[redacted-owned-token-49]",
+      "displayName": "Moved label/owned-delete-moved",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Moved label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-58]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "41b83fc394aa9f262c4ea067408a81631222ba06a187b836a6e67a2f6c93c482",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933981
+      },
+      {
+        "groupName": "ORACLE.DELETE.MAIN",
+        "groupLabel": "First deletion label",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933979
+      },
+      {
+        "groupName": "ORACLE.DELETE.NEXT",
+        "groupLabel": "Moved label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933983
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "3417e0e086752cd5fda4358ae7e1db60d243541fd63710d836db6bdc19e92941",
+    "value": {
+      "token": "[redacted-owned-token-54]",
+      "displayName": "Moved label/owned-delete-moved/Shared",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Moved label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-58]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/4",
+    "status": 200,
+    "wireSha256": "49196b8831c5615eb5dc59c4322c4ceea92e25c042c44416b27389d7954511a9",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/user",
+    "status": 201,
+    "wireSha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+    "value": 2
+  },
+  {
+    "method": "PATCH",
+    "path": "/user/2/workspaces",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/session/admin",
+    "status": 200,
+    "wireSha256": "1785053d3614dea23011a1f311a0ba16ec8ede8d08a9547fe1aef5715855126b",
+    "value": {
+      "token": "[redacted-owned-token-60]",
+      "displayName": "owned-delete-reader",
+      "loginName": "owned-delete-reader",
+      "groupLabel": null,
+      "id": 2,
+      "pwSetByAdmin": true,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "workspaceAdmin": [
+          {
+            "id": "1",
+            "type": "workspaceAdmin",
+            "label": "Owned native proof of work",
+            "flags": {
+              "mode": "RO"
+            }
+          }
+        ]
+      },
+      "groupToken": null,
+      "viewSettings": [],
+      "access": {
+        "workspaceAdmin": [
+          "1"
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "41b83fc394aa9f262c4ea067408a81631222ba06a187b836a6e67a2f6c93c482",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933981
+      },
+      {
+        "groupName": "ORACLE.DELETE.MAIN",
+        "groupLabel": "First deletion label",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933979
+      },
+      {
+        "groupName": "ORACLE.DELETE.NEXT",
+        "groupLabel": "Moved label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933983
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 403,
+    "wireSha256": "cd961d209ce7e239c02dace6984953d06e0db7d311688c1af00c100292ed61dc",
+    "value": "Access Denied: Role `RW` on workspace `ws_1`, needed. Only `RO` provided."
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 403,
+    "wireSha256": "92a81cd1f524afaed478125e65f9c31f4d40ad132ba8a7c57bab5fd63935e74a",
+    "value": "Token `[redacted-owned-token-28]` of type `person` has wrong type - `admin` required."
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "41b83fc394aa9f262c4ea067408a81631222ba06a187b836a6e67a2f6c93c482",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933981
+      },
+      {
+        "groupName": "ORACLE.DELETE.MAIN",
+        "groupLabel": "First deletion label",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933979
+      },
+      {
+        "groupName": "ORACLE.DELETE.NEXT",
+        "groupLabel": "Moved label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933983
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/files",
+    "status": 200,
+    "wireSha256": "6fffffcc6c19004fb972cf93dc43aa44cc77e96bc6a7df0c95508c9fac63aa7f",
+    "value": {
+      "Booklet": [
+        {
+          "name": "booklet.xml",
+          "size": 300,
+          "modificationTime": 1792933976,
+          "type": "Booklet",
+          "id": "ORACLE.POW.BOOK",
+          "report": {
+            "warning": []
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned proof booklet",
+            "description": ""
+          }
+        }
+      ],
+      "Testtakers": [
+        {
+          "name": "delete-people.xml",
+          "size": 1118,
+          "modificationTime": 1792933982,
+          "type": "Testtakers",
+          "id": "DELETE-PEOPLE.XML",
+          "report": {
+            "warning": [
+              "File of name `delete-people.xml` did already exist and was overwritten."
+            ]
+          },
+          "dependencies": [],
+          "info": {
+            "label": "",
+            "description": "",
+            "testtakers": 5
+          }
+        },
+        {
+          "name": "people.xml",
+          "size": 518,
+          "modificationTime": 1792933976,
+          "type": "Testtakers",
+          "id": "PEOPLE.XML",
+          "report": [],
+          "dependencies": [],
+          "info": {
+            "label": "",
+            "description": "",
+            "testtakers": 2
+          }
+        }
+      ],
+      "Resource": [
+        {
+          "name": "player.html",
+          "size": 431,
+          "modificationTime": 1792933976,
+          "type": "Resource",
+          "id": "OWNED-POW-PLAYER-6.0",
+          "report": {
+            "info": [
+              "Verona-Version: 6.0"
+            ],
+            "warning": [
+              "Non-Standard-Filename: `owned-pow-player-6.0.html` expected."
+            ]
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned proof player",
+            "description": "Owned production HTTP fixture",
+            "veronaModuleType": "player",
+            "veronaVersion": "6.0",
+            "version": "6.0.4"
+          }
+        }
+      ],
+      "Unit": [
+        {
+          "name": "unit.xml",
+          "size": 282,
+          "modificationTime": 1792933976,
+          "type": "Unit",
+          "id": "ORACLE.POW.UNIT",
+          "report": {
+            "warning": []
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned unit",
+            "description": ""
+          }
+        }
+      ]
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "740f597ba4775a7462a02eec1c8a3e89eded7e381e84919793c0e488501cb5aa",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933981
+      },
+      {
+        "groupName": "ORACLE.DELETE.NEXT",
+        "groupLabel": "Moved label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792933983
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "9af4006012e3e35887b96c2c1919d2ea29332f602f97396145859898e1bdaa9a",
+    "value": "Invalid token: `[redacted-owned-token-23]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "1fe4588e7073e3ba657bda3dace4cab4d33729e299c622f7d34a8dc6e2b15976",
+    "value": "Invalid token: `[redacted-owned-token-28]`"
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "1fe4588e7073e3ba657bda3dace4cab4d33729e299c622f7d34a8dc6e2b15976",
+    "value": "Invalid token: `[redacted-owned-token-28]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "d16c4f54efc0a22b1822fe61a1741f8eac62d1365d2f0c09fefe211255183af5",
+    "value": "Invalid token: `[redacted-owned-token-32]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "02562ca6370a5b48bf791408558c2e823b538c22cd199f4321bc12fc13cd2f1f",
+    "value": "Invalid token: `[redacted-owned-token-36]`"
+  },
+  {
+    "method": "GET",
+    "path": "/test/2",
+    "status": 403,
+    "wireSha256": "02562ca6370a5b48bf791408558c2e823b538c22cd199f4321bc12fc13cd2f1f",
+    "value": "Invalid token: `[redacted-owned-token-36]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "48b2c1f6b89d5d2fd39c195185af586487439d24f7d2ab8202291d6c73cf94e7",
+    "value": {
+      "token": "[redacted-owned-token-40]",
+      "displayName": "Retained label/owned-delete-keep",
+      "loginName": "owned-delete-keep",
+      "groupLabel": "Retained label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-41]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "d3bfbe65f5f56108d2bfd5c022efbe29ef9283373efed829d44ac32f0b5913fa",
+    "value": {
+      "token": "[redacted-owned-token-45]",
+      "displayName": "Retained label/owned-delete-keep/Shared",
+      "loginName": "owned-delete-keep",
+      "groupLabel": "Retained label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-41]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/3",
+    "status": 200,
+    "wireSha256": "49196b8831c5615eb5dc59c4322c4ceea92e25c042c44416b27389d7954511a9",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/3/unit/ORACLE.POW.UNIT/reviews",
+    "status": 200,
+    "wireSha256": "faa33a2780c78bba47a60b0bd61e54a74d199ac5552b959d367ff24659f81951",
+    "value": [
+      {
+        "id": 3,
+        "unit_name": "ORACLE.POW.UNIT",
+        "test_id": 3,
+        "person_id": 5,
+        "reviewtime": "2026-10-25 13:13:01+00",
+        "priority": 2,
+        "categories": "owned",
+        "entry": "Owned cascade review owned-delete-keep",
+        "reviewer": "Owned reviewer",
+        "page": null,
+        "pagelabel": null,
+        "userAgent": "",
+        "originalUnitId": "ORACLE.POW.UNIT"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "72a06d1500a9ab2a8f136fd0c05dc05268ad2d465cdb23d7c28debd34c4e7b3e",
+    "value": {
+      "token": "[redacted-owned-token-49]",
+      "displayName": "Moved label/owned-delete-moved",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Moved label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-58]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "3417e0e086752cd5fda4358ae7e1db60d243541fd63710d836db6bdc19e92941",
+    "value": {
+      "token": "[redacted-owned-token-54]",
+      "displayName": "Moved label/owned-delete-moved/Shared",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Moved label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-58]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/4",
+    "status": 200,
+    "wireSha256": "49196b8831c5615eb5dc59c4322c4ceea92e25c042c44416b27389d7954511a9",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/4/unit/ORACLE.POW.UNIT/reviews",
+    "status": 200,
+    "wireSha256": "028f7c4fb42e71451ca0016f135a948b7dd243f8f95d6127f9b34b96f5984874",
+    "value": [
+      {
+        "id": 4,
+        "unit_name": "ORACLE.POW.UNIT",
+        "test_id": 4,
+        "person_id": 6,
+        "reviewtime": "2026-10-25 13:13:02+00",
+        "priority": 2,
+        "categories": "owned",
+        "entry": "Owned cascade review owned-delete-moved",
+        "reviewer": "Owned reviewer",
+        "page": null,
+        "pagelabel": null,
+        "userAgent": "",
+        "originalUnitId": "ORACLE.POW.UNIT"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/files",
+    "status": 200,
+    "wireSha256": "6fffffcc6c19004fb972cf93dc43aa44cc77e96bc6a7df0c95508c9fac63aa7f",
+    "value": {
+      "Booklet": [
+        {
+          "name": "booklet.xml",
+          "size": 300,
+          "modificationTime": 1792933976,
+          "type": "Booklet",
+          "id": "ORACLE.POW.BOOK",
+          "report": {
+            "warning": []
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned proof booklet",
+            "description": ""
+          }
+        }
+      ],
+      "Testtakers": [
+        {
+          "name": "delete-people.xml",
+          "size": 1118,
+          "modificationTime": 1792933982,
+          "type": "Testtakers",
+          "id": "DELETE-PEOPLE.XML",
+          "report": {
+            "warning": [
+              "File of name `delete-people.xml` did already exist and was overwritten."
+            ]
+          },
+          "dependencies": [],
+          "info": {
+            "label": "",
+            "description": "",
+            "testtakers": 5
+          }
+        },
+        {
+          "name": "people.xml",
+          "size": 518,
+          "modificationTime": 1792933976,
+          "type": "Testtakers",
+          "id": "PEOPLE.XML",
+          "report": [],
+          "dependencies": [],
+          "info": {
+            "label": "",
+            "description": "",
+            "testtakers": 2
+          }
+        }
+      ],
+      "Resource": [
+        {
+          "name": "player.html",
+          "size": 431,
+          "modificationTime": 1792933976,
+          "type": "Resource",
+          "id": "OWNED-POW-PLAYER-6.0",
+          "report": {
+            "info": [
+              "Verona-Version: 6.0"
+            ],
+            "warning": [
+              "Non-Standard-Filename: `owned-pow-player-6.0.html` expected."
+            ]
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned proof player",
+            "description": "Owned production HTTP fixture",
+            "veronaModuleType": "player",
+            "veronaVersion": "6.0",
+            "version": "6.0.4"
+          }
+        }
+      ],
+      "Unit": [
+        {
+          "name": "unit.xml",
+          "size": 282,
+          "modificationTime": 1792933976,
+          "type": "Unit",
+          "id": "ORACLE.POW.UNIT",
+          "report": {
+            "warning": []
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned unit",
+            "description": ""
+          }
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "dcffb6a8cf6d7e410192f066221355b0d95f7e3e52478f5ae36233f6851007f9",
+    "value": {
+      "delete-people.xml": {
+        "warning": [
+          "File of name `delete-people.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "831ee7b15887761357c57c4831fdee47b539ba2029cdbdd7606e3cbea5435d29",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-61]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-62]",
+      "signature": "[redacted-owned-signature-63]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "f935351b92d2b5f0900120b110c0fcbcc6bcedaae0c7685eae1efa6c1e0149ea",
+    "value": {
+      "token": "[redacted-owned-token-64]",
+      "displayName": "Recreated deletion label/owned-delete-main",
+      "loginName": "owned-delete-main",
+      "groupLabel": "Recreated deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-65]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "9f373cc8f3260f7653a49aba6128b8c5056a568e6dedadea8bd6527b227df6f9",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-66]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-67]",
+      "signature": "[redacted-owned-signature-68]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "a683394dc42294e810f9dd0046fa8e730f297cc87bbd07e0c12ba708456fb479",
+    "value": {
+      "token": "[redacted-owned-token-69]",
+      "displayName": "Recreated deletion label/owned-delete-main/Shared",
+      "loginName": "owned-delete-main",
+      "groupLabel": "Recreated deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-65]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "dc6c1d7588120a08c758964a51ba972ca2d511e98e579d966f6f1ad007461754",
+    "value": "Access to test 1 is not provided."
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "9af4006012e3e35887b96c2c1919d2ea29332f602f97396145859898e1bdaa9a",
+    "value": "Invalid token: `[redacted-owned-token-23]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "1fe4588e7073e3ba657bda3dace4cab4d33729e299c622f7d34a8dc6e2b15976",
+    "value": "Invalid token: `[redacted-owned-token-28]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "d16c4f54efc0a22b1822fe61a1741f8eac62d1365d2f0c09fefe211255183af5",
+    "value": "Invalid token: `[redacted-owned-token-32]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "02562ca6370a5b48bf791408558c2e823b538c22cd199f4321bc12fc13cd2f1f",
+    "value": "Invalid token: `[redacted-owned-token-36]`"
+  }
+]
