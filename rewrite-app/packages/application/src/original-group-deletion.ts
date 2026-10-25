@@ -1,3 +1,4 @@
+import type {OriginalTestNumberRecord} from './original-test-number.js';
 import type {AttachmentFile, OriginalLoginBinding, OriginalParticipantGroup, ParticipantSession, TestRun, WorkspaceActivityEvent, WorkspaceReview, ParticipantTestLog, ParticipantRunCommand, ParticipantProgressDelivery} from '@testcenter-rewrite-app/domain';
 import type {OriginalSessionToken} from './original-session-token.js';
 import {FirstSliceError} from './first-slice-error.js';
@@ -47,6 +48,7 @@ const remove = <Row>(collection: Collection<Row>, predicate: (row: Row, key: str
 export type OriginalGroupDeletionCollections = {
   originalParticipantGroups: Collection<OriginalParticipantGroup>; originalLoginBindings: Collection<OriginalLoginBinding>;
   originalSessionTokens: Collection<OriginalSessionToken>; participantSessions: Collection<ParticipantSession>;
+  originalTestNumbers?: Collection<OriginalTestNumberRecord>;
   participantAccessCredentials: Collection<{participantSessionId: string}>; testRuns: Collection<TestRun>;
   workspaceReviews: Collection<WorkspaceReview>; participantTestLogs: Collection<ParticipantTestLog>;
   participantRunCommands: Collection<ParticipantRunCommand>; participantProgressDeliveries: Collection<ParticipantProgressDelivery>;
@@ -71,6 +73,7 @@ export function deleteOriginalGroupsFromCollections(state: OriginalGroupDeletion
     typeof row.details.testRunId === 'string' && runs.has(row.details.testRunId) ||
     typeof row.details.reviewId === 'string' && reviews.has(row.details.reviewId)));
   remove(state.participantRunCommands, descendant); remove(state.participantProgressDeliveries, descendant);
+  if (state.originalTestNumbers) remove(state.originalTestNumbers, descendant);
   remove(state.participantPresence, row => runs.has(row.testRunId));
   remove(state.participantAccessCredentials, row => people.has(row.participantSessionId));
   const deletedTestCount = remove(state.testRuns, row => scoped(row) && runs.has(row.testRunId));

@@ -1,0 +1,33 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "probeCommit": "9009dcb83d05c356e26cb5816ed0e25b396ea8bc",
+  "probeTree": "2fb282e669f11cc3d70ff50c74984264aeba7b2a",
+  "runId": 40241983022,
+  "jobId": 121315541350,
+  "checks": 33,
+  "httpObservations": 188,
+  "preservedPriorGroups": 28,
+  "preservedPriorAssertionLines": 53,
+  "sourceFileHashes": 26,
+  "artifactId": 12615974851,
+  "artifactBytes": 20880,
+  "artifactSha256": "06ec057af193651d014f690f59bf1538882fce947dea18125790fe07c519c658",
+  "sourceProbeSha256": "30380b98c37dfad0f9dbb80961c12feaa08e5cd92cf029f2f50c8492ce742de0",
+  "files": {
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
+    "unit-parts-reviews-legacy.json": "dfab63be8ff4545a774d7774fb70c9b3195991126d4e1376539ce010ef898157",
+    "image-id.txt": "690fc820681f3068ffbd49cf377a49e881196f229bd85fc6cebe794edd0c341a",
+    "source-probe.workflow.yml": "8ec9002117ac60c211d2bf0aa7ba76acaec2223fe9312cc46daf5619a5cfcd37",
+    "unit-parts-reviews-enhanced.csv": "75d44ef8a410fc8608b483a2abc317d68d4aef581fa2f6bbece41d95df2c00ab",
+    "unit-parts-logs.json": "f5f140b330a5cd33ec34b3e87924d52dc189f60bb5d7cda733588d562c4a40f4",
+    "unit-parts-responses.json": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+    "unit-parts-responses.csv": "4cd713b969ca86fb9680fe25cd3013fbfded9b679233873d7f86331f46ba1df9",
+    "http-observations.json": "9750003a8c4d7dd924924ddff165082bbaa659ea94d017076789efb7436beeb9",
+    "unit-parts-reviews-legacy.csv": "e429eb85995f76a87acee58919b6484c5e0d12a279f242fee911757102a26da2",
+    "unit-parts-logs.csv": "cb21f0d3a73a3a8b7780fffe0334cc4d2ee9a6bf64603a181a91d1df4f3cec09",
+    "unit-parts-reviews-enhanced.json": "be55a179f314fb6f2123dd9d3df7ec0b1922983be7a050f2b3c0908704c1bc13",
+    "source-probe.mjs": "30380b98c37dfad0f9dbb80961c12feaa08e5cd92cf029f2f50c8492ce742de0",
+    "source-probe.compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    "receipt.json": "98f5d852ef9526ed801fdba683da0d5c35742459eff72c4ee7dda18ce42adc93"
+  }
+}

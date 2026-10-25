@@ -4,7 +4,7 @@ The participant boundary implements the Original paths `PUT /session/login`,
 `PUT /session/person`, `GET|PUT|DELETE /session`, `POST /session/challenge` and
 `POST /session/person/challenge`. It uses `AuthToken` and the Original participant
 AccessSet shape. Canonical RPC authentication remains available. Native admin and
-operational AccessSets, `/session/admin`, native numeric Test transport and
+operational AccessSets, `/session/admin`, native numeric Test reads/Unit writes and
 production UI adoption are still outstanding. This boundary does not establish
 paired visual parity.
 
@@ -41,7 +41,57 @@ and both relevant focused service suites.
 
 `npm run smoke:ui:original-session:built` uses an owned SQLite API, real admin
 uploads and Chromium WebCrypto to solve work and verify typed Login/person
-rotation, raw codes, replay denial, reload and empty 205 logout. This is a real
-browser protocol check, not evidence of production UI adoption. It runs after
+rotation, raw codes, replay denial, reload and empty 205 logout. It also creates an unopened native Test and signs in through the actual protected
+Original-style UI: single-Booklet auto-entry opens that same Test and starts its
+controller after a genuine Verona 6.0 fixture handshake. Native Session HTTP
+adoption by production UI remains open. It runs after
 the existing protected UI smoke in the mandatory quick proof-of-work CI cell;
 the earlier smoke and all complete acceptance gates remain required.
+
+
+## Unopened native Test creation (2026-10-26)
+
+`PUT /test` accepts a genuine Original person `AuthToken`. Login, group and admin
+capabilities cannot create a Test. Authentication precedes JSON parsing; the
+operator boundary does not substitute for the participant capability. Success is
+HTTP 201 with raw decimal bytes and `text/html; charset=UTF-8`, under
+`private, no-store`. The decimal identity is separate from private Run UUIDs and
+remains lossless through the signed 64-bit range.
+
+[Unchanged production Source33](https://github.com/jurei733/testcenter-rewrite/actions/runs/40241983022)
+qualifies 33 groups and 188 HTTP observations on pinned Original `eedae41840cbe90e5547c0211da818bdf620f5aa`,
+with production Apache/PHP, actual ALTCHA and admin XSD uploads, TestMode off and
+no SQL Test seeds or Source patches. The 16-file evidence fixture retains all
+28 prior groups/53 assertion lines and checks its pinned hashes in mandatory CI.
+
+The raw requested name is compared first using the qualified German comparison.
+An owned raw-name hit returns its stable number even after physical-file deletion.
+A raw miss requires the current physical Booklet, then applies Source's ASCII
+whitespace/preset normalization, including duplicate values in first-key order.
+Unassigned physical Booklets are allowed. Repeated/case-equivalent requests reuse
+one Test; normalized reservation attempts may consume number gaps. The first raw
+physical label and first name remain unchanged after replacement; a locked Test
+returns 423 with its first label. Numeric gaps are not a public contiguous count.
+
+Creation commits an unopened Run, number and first content binding atomically.
+It creates no controller entry, current Unit, timer, response, TestLog or group
+result row. Review-mode creation is allowed. Existing assignment claims remain
+unchanged and report running=false. Subsequent canonical controller entry handles
+the created Run under the same parent/Run writer fence, initializing its controller,
+timer and initial artifacts once, including simultaneous entry requests.
+
+SQLite migration 73 and PostgreSQL migration 67 add scoped unique number mappings,
+a durable global decimal counter and cascading Run/person foreign keys. Memory
+and File use equivalent scoped collections; File publishes its cache only after
+its durable write. Existing Run writes cannot overwrite the separate identity.
+Native group and generic Run deletion remove mappings while retaining the counter.
+Legacy migrations create empty mappings and never guess historical numeric IDs.
+
+Mandatory `scripts/original-test-creation.test.mjs` runs in complete unit,
+PostgreSQL and focused Original-results gates. It covers actual legacy upgrade
+and late DDL rollback, late File/SQL creation rollback, durable retries, role/scope
+denials, raw HTTP, independent PostgreSQL writers, concurrent controller entry
+and mapping cleanup. Native `GET /test/:number`, numeric workspace/resource
+transport, native Unit writes and report HTTP/UI projection remain open. Missing
+file error text still uses the Rewrite workspace identity. This slice does not
+establish complete native transport or paired visual parity.

@@ -1,6 +1,36 @@
 # CI iteration and complete acceptance
 
 
+## Native creation enters existing fast and complete gates (2026-10-26)
+
+The accepted predecessor [full run 40240110529](https://github.com/jurei733/testcenter-rewrite/actions/runs/40240110529)
+is terminal success, **89/89** jobs on head `1e520949c212964f70641e5b799125f6e081c290`,
+tree `402c85c3a4bd08c21c6b6e2eea2e103dfdabe48a`. Actual merge
+`ff0fa64e1bad542d592bb78edaa71b4e1ae20cdc` has the independently verified same tree.
+Its actual leaves pass 4,316 unit/frontend checks, 2,525 PostgreSQL checks and all
+57 exit scenarios. The actual job span is **30:05**. This accepts that predecessor,
+not the subsequent native-creation implementation.
+
+The new native Test-creation suite is mandatory in the existing complete unit,
+PostgreSQL and `original-results` service inventories. A policy control prevents
+its removal from any of the three paths. The existing quick proof-of-work cell
+also retains every prior protected-browser check and now exercises native creation
+followed by actual protected UI entry of the same Test. No new broad job matrix
+or repeated production build is needed for these additions.
+
+Local qualification of the actual implementation includes a fresh production
+build, complete unit/frontend **4,352** and PostgreSQL **2,573** passing controls,
+without failures/skips/cancellations. Subsequent test-only additions pass **56**
+targeted controls across all four stores, including upgrade/DDL failure, independent
+PostgreSQL writers, concurrent first controller entry and number cascade cleanup.
+The real Chromium native-session smoke passes all eight markers, including
+Source-format raw Test creation and actual protected Original-style UI entry.
+Policy passes 281 controls with its explicit GNU-timeout-only macOS skip; diff
+checks and Actionlint pass. Hosted qualification and complete acceptance for this
+new implementation remain required. Prior 96-second service / 143-second Player
+feedback measurements apply to their exact earlier scoped trees, not this candidate.
+
+
 ## Durable response-type feedback and complete acceptance (2026-10-25)
 
 [Full run 40237514022](https://github.com/jurei733/testcenter-rewrite/actions/runs/40237514022)

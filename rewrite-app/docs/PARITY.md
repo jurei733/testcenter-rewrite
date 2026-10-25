@@ -1,5 +1,20 @@
 # Testcenter parity checklist
 
+### Native unopened Test creation candidate (2026-10-26)
+
+Literal person-authenticated `PUT /test` now creates stable decimal identities and
+unopened Tests atomically on all four stores, with production Source33 evidence.
+Current physical unassigned Booklets, raw lookup before normalization, first labels,
+locked requests, durable retries and rollback are covered. Canonical controller
+entry opens the same Test exactly once; real protected UI entry is verified.
+The new suite is mandatory in complete unit/PostgreSQL and fast Original-results
+CI. [Scope and limitations](ORIGINAL-SESSION.md); [validation](CI.md).
+
+Native numeric Test reads/Unit writes, workspace/resource transport, reports and
+broad visuals remain open. Hosted qualification/full acceptance of this candidate
+are pending. Ledger stays **27 done / 22 partial**, all eight broad visual rows
+open; estimate remains **4-8 engineering weeks**.
+
 ### Hosted cascade feedback and bounded timer follow-up (2026-10-25)
 
 The native cascade passes [all three focused Linux jobs](https://github.com/jurei733/testcenter-rewrite/actions/runs/40200874804),
