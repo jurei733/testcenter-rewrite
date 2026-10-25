@@ -49,6 +49,8 @@ test('native TestName keeps Source whitespace, duplicate-key and first-key-order
   assert.equal(parseOriginalTestName(' \t'+names.presetInput+'\n ').name,names.presetCanonical);
   const parsed=parseOriginalTestName(' BOOK #2:first;1:other;2:last;__proto__:safe;x:a:b');
   assert.equal(parsed.name,'BOOK#2:last;1:other;__proto__:safe;x:a:b');assert.ok(Object.hasOwn(parsed.states,'__proto__'));assert.equal(parsed.states.__proto__,'safe');
+  assert.deepEqual(parseOriginalTestName(' BOOK #0 '),{name:'BOOK',fileId:'BOOK',states:{}});
+  assert.equal(parseOriginalTestName('BOOK#00').name,'BOOK#00:');
   assert.equal(parseOriginalTestName('BOOK#').name,'BOOK');assert.equal(parseOriginalTestName('BOOK\u00a0').fileId,'BOOK\u00a0');
 });
 
@@ -125,7 +127,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       await assert.rejects(services.originalTest.create({token:main.login.token,bookletName:native.bookletName}),denied(403));
     });
     await t.test('repeated, case-equivalent and normalized attempts reuse the same number and preserve first metadata after restart',async()=>{
-      for(const key of [native.bookletName,native.bookletName.toLowerCase(),' \t'+native.bookletName+' \n'])assert.equal(await request(main,key),number);
+      for(const key of [native.bookletName,native.bookletName.toLowerCase(),' \t'+native.bookletName+' \n',native.bookletName+'#0'])assert.equal(await request(main,key),number);
       const preset=await request(main,names.presetInput);assert.ok(BigInt(preset)>BigInt(number));assert.equal(await request(main,names.presetCanonical),preset);
       const before=await owned(main.person);await reopen();assert.equal(await request(main,native.bookletName),number);assert.deepEqual(await owned(main.person),before);
     });
@@ -206,6 +208,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         const result=await call('PUT',httpPerson.person.token,JSON.stringify({bookletName:key,ignored:'owned'}),201);
         assert.equal(result.text,expected);assert.match(result.text,/^[1-9][0-9]*$/);assert.equal(result.headers.get('content-type'),'text/html; charset=UTF-8');
         assert.equal((await call('PUT',httpPerson.person.token,JSON.stringify({bookletName:key.toLowerCase()}),201)).text,expected);
+        assert.equal((await call('PUT',httpPerson.person.token,JSON.stringify({bookletName:key+'#0'}),201)).text,expected);
         const wrong=await call('POST',httpPerson.person.token,'{}',405);assert.equal(wrong.headers.get('allow'),'PUT');
         await call('GET',httpPerson.person.token,undefined,405);await call('DELETE',adminToken,undefined,405);
         await call('PUT',httpPerson.person.token,JSON.stringify({bookletName:'OWNED.MISSING'}),404);

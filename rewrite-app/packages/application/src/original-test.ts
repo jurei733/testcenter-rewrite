@@ -9,7 +9,8 @@ export function parseOriginalTestName(input: string): {name: string; fileId: str
   const source = input.replace(/[ \t\n\r\v\f]/g, ''), separator = source.indexOf('#');
   const fileId = separator < 0 ? source : source.slice(0, separator), parameters = separator < 0 ? '' : source.slice(separator + 1);
   const states = new Map<string, string>();
-  if (parameters) for (const tuple of parameters.split(';')) {
+  // PHP treats the literal string "0" as an empty parameter section.
+  if (parameters && parameters !== '0') for (const tuple of parameters.split(';')) {
     const split = tuple.indexOf(':');
     states.set(split < 0 ? tuple : tuple.slice(0, split), split < 0 ? '' : tuple.slice(split + 1));
   }
