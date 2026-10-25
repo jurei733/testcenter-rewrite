@@ -13,7 +13,7 @@ import {createServerRequestFailureGate} from './server-request-failure-gate.mjs'
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || '.');
 await access(join(root, 'dist/apps/web/browser/index.html'));
 const scratch = await mkdtemp(join(tmpdir(), 'owned-native-session-browser-'));
-const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR) : scratch;
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, 'native-session') : join(scratch, 'public');
 await mkdir(artifacts, {recursive: true});
 const gate = createServerRequestFailureGate(), checks = [];
 const module = pathToFileURL(resolve('apps/api/dist/apps/api/src/index.js')).href;
@@ -29,9 +29,11 @@ const server = spawn(process.execPath, ['--input-type=module', '-e', `
   FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER: '12', FIRST_SLICE_PROOF_OF_WORK_TTL_MS: '60000'}, stdio: ['ignore', 'pipe', 'pipe', 'ipc']});
 gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(resolve => server.once('close', resolve));
-let browser, page;
+let browser, page, phase = 'initializing';
+const setPhase = value => {phase = value; console.log('original_session_browser_phase=' + value);};
 const mark = value => {checks.push(value); console.log('original_session_browser=' + value + ':passed');};
 try {
+  setPhase('owned-api-startup');
   const port = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(Error('Owned API startup timed out')), 20_000);
     server.once('message', ({port}) => {clearTimeout(timer); resolve(port);});
@@ -43,6 +45,7 @@ try {
     const response = await fetch(base + path, {method: 'POST', headers: {'content-type': 'application/json', ...(token ? {authorization: 'Bearer ' + token} : {})}, body: JSON.stringify(body)});
     assert.equal(response.status, expected, 'Owned admin fixture request failed'); return response.json();
   };
+  setPhase('owned-admin-fixture');
   const operatorPassword = 'Owned-native-browser-admin-2026!';
   await operatorApi('/api/v1/admin/auth/bootstrap', {username: 'owned-native-browser', password: operatorPassword}, undefined, 201);
   const operator = (await operatorApi('/api/v1/admin/auth/sign-in', {username: 'owned-native-browser', password: operatorPassword})).sessionToken;
@@ -50,19 +53,26 @@ try {
   await operatorApi('/api/v1/platform/tenants', {tenantKey, displayName: 'Owned native browser'}, operator, 201);
   await operatorApi('/api/v1/tenants/' + tenantKey + '/workspaces', {workspaceKey, displayName: 'Owned native browser'}, operator, 201);
   const workspace = '/api/v1/tenants/' + tenantKey + '/workspaces/' + workspaceKey;
-  const upload = (fileName, sourceDocument, mediaType = 'application/xml') => operatorApi(workspace + '/files', {fileName, sourceDocument, mediaType}, operator, 201);
+  const upload = (fileName, sourceDocument, mediaType = 'application/xml') => {
+    setPhase('owned-fixture-upload-' + fileName);
+    return operatorApi(workspace + '/files', {fileName, sourceDocument, mediaType}, operator, 201);
+  };
   const metadata = {id: 'owned-native-browser-player', version: '6.0.4', specVersion: '6.0', metadataVersion: '2.0', type: 'player',
     name: [{lang: 'de', value: 'Owned native browser Player'}], description: [{lang: 'de', value: 'Owned fixture'}]};
   await upload('player.html', '<html><script type="application/ld+json">' + JSON.stringify(metadata) + '</script><main>Owned fixture</main></html>', 'text/html');
   await upload('unit.xml', '<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/unit-xml/17.6"><Metadata><Id>OWNED.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="owned-native-browser-player@6.0.4">Owned definition</Definition></Unit>');
   await upload('booklet.xml', '<Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0"><Metadata><Id>OWNED.BROWSER</Id><Label>Owned native Booklet</Label></Metadata><Units><Unit id="OWNED.UNIT" label="Owned unit"/></Units></Booklet>');
+  setPhase('owned-roster-fixture');
   const password = 'Owned-native-browser-private-2026!';
   await operatorApi(workspace + '/participant-roster', {rosterText: '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="OWNED.NATIVE.BROWSER" label="Owned native browser">' +
     ['native-browser', 'native-peer'].map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login>`).join('') + '</Group></Testtakers>'}, operator, 201);
+  setPhase('browser-launch');
   browser = await chromium.launch({headless: process.env.CI === 'true' && process.env.UI_SMOKE_HEADFUL !== 'true'});
   page = await browser.newPage({viewport: {width: 1280, height: 720}, locale: 'de-DE'});
+  setPhase('owned-document-load');
   await page.goto(base + '/app/participant?ui=original', {waitUntil: 'domcontentloaded'});
   const request = async (method, path, body, token, status = 200) => {
+    setPhase('native-http:' + method + ' ' + path);
     const result = await page.evaluate(async ({method, path, body, token}) => {
       const response = await fetch(path, {method, headers: {...(body === undefined ? {} : {'content-type': 'application/json'}), ...(token ? {AuthToken: token} : {})},
         ...(body === undefined ? {} : {body: JSON.stringify(body)})});
@@ -70,15 +80,18 @@ try {
     }, {method, path, body, token});
     assert.equal(result.status, status, 'Unexpected native session HTTP status'); assert.equal(result.cache, 'private, no-store'); return result;
   };
-  const solve = challenge => page.evaluate(async challenge => {
-    const encoder = new TextEncoder();
-    for (let number = 0; number <= challenge.maxNumber; number++) {
-      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(challenge.salt + number));
-      const hex = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
-      if (hex === challenge.challenge) return {algorithm: challenge.algorithm, challenge: challenge.challenge, salt: challenge.salt, signature: challenge.signature, number};
-    }
-    throw Error('The actual native challenge was not solvable');
-  }, challenge);
+  const solve = challenge => {
+    setPhase('browser-work-solution');
+    return page.evaluate(async challenge => {
+      const encoder = new TextEncoder();
+      for (let number = 0; number <= challenge.maxNumber; number++) {
+        const digest = await crypto.subtle.digest('SHA-256', encoder.encode(challenge.salt + number));
+        const hex = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+        if (hex === challenge.challenge) return {algorithm: challenge.algorithm, challenge: challenge.challenge, salt: challenge.salt, signature: challenge.signature, number};
+      }
+      throw Error('The actual native challenge was not solvable');
+    }, challenge);
+  };
   await request('PUT', '/session/login', {name: 'native-browser', password}, undefined, 400);
   await request('GET', '/session', undefined, undefined, 401);
   mark('configured-protection-refuses-direct-secrets');
@@ -111,6 +124,7 @@ try {
   const former = person.token; person = (await request('PUT', '/session', repeat, login.token)).value;
   assert.ok(person.displayName.endsWith('/SHARED')); await request('GET', '/session', undefined, former, 401);
   mark('cross-login-work-cannot-burn-owner-ticket-and-reentry-rotates-only-the-person');
+  setPhase('document-reload');
   await page.reload({waitUntil: 'domcontentloaded'});
   const reread = (await request('GET', '/session', undefined, person.token)).value;
   assert.ok(reread.displayName.endsWith('/sHaReD')); assert.deepEqual(reread.access.test, ['OWNED.BROWSER']);
@@ -121,8 +135,14 @@ try {
   mark('reload-preserves-first-person-spelling-and-empty-205-logout-keeps-login-capability');
 } catch (error) {
   await page?.screenshot({path: join(artifacts, 'failure.png'), fullPage: true}).catch(() => {});
-  await writeFile(join(artifacts, 'failure.json'), JSON.stringify({errorName: error.name, checks}, null, 2));
-  process.exitCode = 1; console.error('original_session_browser=failed; category=' + error.name);
+  // Retain a useful bounded failure location without serializing Playwright's
+  // exception, which can contain evaluated arguments, credentials or HTML.
+  const errorName = error instanceof assert.AssertionError ? 'AssertionError' : error instanceof TypeError ? 'TypeError' : 'Error';
+  const failureKind = phase === 'browser-launch' && /Missing X server|without having a XServer|DISPLAY environment variable/.test(String(error.message))
+    ? 'headed-browser-display-unavailable' : 'unclassified';
+  const failure = {errorName, phase, failureKind, checks};
+  await writeFile(join(artifacts, 'failure.json'), JSON.stringify(failure, null, 2));
+  process.exitCode = 1; console.error('original_session_browser=failed; category=' + errorName + '; phase=' + phase + '; kind=' + failureKind);
 } finally {
   await page?.close(); await browser?.close(); server.kill('SIGTERM');
   await closed; gate.assertHealthy();

@@ -287,17 +287,46 @@ test("Quick logs retain an upstream test failure instead of reporting tee succes
   // GitHub's explicit bash shell is bash --noprofile --norc -e -o pipefail.
   // Reproduce a failing test piped through the exact logging command without
   // invoking the full browser suite or depending on its eventual runtime.
-  const command = step.run.replace("${{ matrix.command }}", "(echo owned-failure; exit 37)")
-    .replace("xvfb-run --auto-servernum ", "")
+  const command = step.run.replace("xvfb-run --auto-servernum ", "")
     .replace('"$RUNNER_TEMP/rewrite-ui-quick.log"', "/dev/null");
-  const result = spawnSync("bash", ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", command], { encoding: "utf8" });
+  const result = spawnSync("bash", ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", command], { encoding: "utf8", env: {...process.env, CI_BROWSER_COMMAND: "echo owned-failure; exit 37"} });
   assert.equal(result.status, 37); assert.match(result.stdout, /owned-failure/);
-  const implicit = spawnSync("bash", ["-e", "-c", command], { encoding: "utf8" });
+  const implicit = spawnSync("bash", ["-e", "-c", command], { encoding: "utf8", env: {...process.env, CI_BROWSER_COMMAND: "echo owned-failure; exit 37"} });
   assert.equal(implicit.status, 0, "The old implicit shell must reproduce the false green");
   const legacy = 'bash --noprofile --norc -e -o pipefail -c "exit 37" 2>&1 | tee /dev/null';
   assert.equal(spawnSync("bash", ["-e", "-c", legacy]).status, 0,
     "An inner pipefail bash cannot fix the historical outer logger pipeline");
   assert.equal(spawnSync("bash", ["-e", "-o", "pipefail", "-c", legacy]).status, 37);
+});
+test('compound browser gates share one display and preserve either command failure through the actual logger', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'owned-ci-display-'));
+  const bin = join(scratch, 'bin'); mkdirSync(bin);
+  const xvfb = join(bin, 'xvfb-run'), browser = join(bin, 'owned-browser-command');
+  writeFileSync(xvfb, '#!/bin/bash\n[ "$1" = --auto-servernum ] || exit 91\nshift\nexport DISPLAY=:owned-display\nexport OWNED_DISPLAY_OWNER=$$\nexec "$@"\n');
+  writeFileSync(browser, '#!/bin/bash\n[ "$DISPLAY" = :owned-display ] && [ -n "$OWNED_DISPLAY_OWNER" ] || exit 92\nprintf "%s %s %s\\n" "$1" "$DISPLAY" "$OWNED_DISPLAY_OWNER"\nif [ "$OWNED_FAIL_STAGE" = "$1" ]; then exit 37; fi\n');
+  chmodSync(xvfb, 0o755); chmodSync(browser, 0o755);
+  const env = {...process.env, PATH: bin + ':' + process.env.PATH, DISPLAY: '', OWNED_DISPLAY_OWNER: '',
+    RUNNER_TEMP: scratch, CI_BROWSER_COMMAND: 'owned-browser-command first && owned-browser-command second'};
+  const execute = (command, failed = '', selected = env.CI_BROWSER_COMMAND) => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', command],
+    {env: {...env, OWNED_FAIL_STAGE: failed, CI_BROWSER_COMMAND: selected}, encoding: 'utf8'});
+  try {
+    // The historical shell really runs its successor outside xvfb; reproduce
+    // that failure rather than only asserting a workflow string.
+    const old = execute('xvfb-run --auto-servernum owned-browser-command first && owned-browser-command second 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"');
+    assert.equal(old.status, 92); assert.equal(old.stdout.trim().split('\n').length, 1);
+    for (const name of ['quick', 'quick-extended']) {
+      const command = workflow.jobs[name].steps.find(step => step.name === 'Run Quick browser gates').run;
+      const success = execute(command); assert.equal(success.status, 0, success.stderr);
+      const lines = success.stdout.trim().split('\n').map(line => line.split(' '));
+      assert.deepEqual(lines.map(line => line[0]), ['first', 'second']);
+      assert.deepEqual(lines[0].slice(1), lines[1].slice(1), 'Both commands require the same display owner');
+      assert.equal(readFileSync(join(scratch, 'rewrite-ui-quick.log'), 'utf8'), success.stdout);
+      const first = execute(command, 'first'); assert.equal(first.status, 37); assert.equal(first.stdout.trim().split('\n').length, 1);
+      const second = execute(command, 'second'); assert.equal(second.status, 37); assert.equal(second.stdout.trim().split('\n').length, 2);
+      const piped = execute(command, 'first', 'owned-browser-command first | cat && owned-browser-command second');
+      assert.equal(piped.status, 37);
+    }
+  } finally { rmSync(scratch, {recursive: true, force: true}); }
 });
 test("all 28 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
   const quick = workflow.jobs.quick;
@@ -320,7 +349,8 @@ test("all 28 browser scenarios run once across fast and extended shards, with co
   }
   for (const tier of [quick, extended]) {
     const execution = tier.steps.find(step => step.run?.includes("| tee"));
-    assert.equal(execution.run, 'xvfb-run --auto-servernum ${{ matrix.command }} 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"');
+    assert.equal(execution.env.CI_BROWSER_COMMAND, '${{ matrix.command }}');
+    assert.equal(execution.run, 'xvfb-run --auto-servernum bash --noprofile --norc -e -o pipefail -c "$CI_BROWSER_COMMAND" 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"');
     assert.equal(execution.shell, "bash");
     assert.equal(tier.env.UI_SMOKE_HEADFUL, "true", "Source visual measurements use a visible Chromium renderer");
     const log = tier.steps.find(step => step.name === "Retain failed Quick browser log");

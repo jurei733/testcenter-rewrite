@@ -1,5 +1,49 @@
 # CI iteration and complete acceptance
 
+## Compound browser commands stay inside one display (2026-10-25)
+
+Native Session [full run 40188347937](https://github.com/jurei733/testcenter-rewrite/actions/runs/40188347937)
+is terminal **failure: 21 successful, three failed and five skipped jobs**. The
+quick proof-of-work leaf fails after the preceding protected UI smoke succeeds;
+Fast feedback and the final aggregate consequently fail, and dependent broad
+qualification groups do not run. Head `873d2e547c27c4fa4fb9c8396f46386b478488ab`
+and actual merge `9f757a0b9a0394dd7d6729951a26b0930b0c7f90` share application
+tree `59ac7c6075069f4150b0fe95c1606a992e156bb6`. Its retained 690-byte artifact
+12597297384 has SHA-256
+`4eaa8e3361a9c33a7628ea0c2a6cfc8119a167bcf54c1137b9fcb3c351dd03e1`.
+It contains no completed native browser marker and only a generic Error category;
+the original Playwright exception was deliberately not retained.
+
+The workflow previously substituted `first && second` after `xvfb-run` directly.
+Shell parsing therefore ran the successor outside Xvfb, with only that successor
+piped through the logger. Both quick tiers now pass their entire matrix command
+through an environment variable to an explicit inner Bash under Xvfb. Both inner
+and outer shells retain `-e -o pipefail`. No command inventory, assertion, deadline,
+job gate or headed-renderer requirement is removed.
+
+An executable shell control reproduces the old successor's missing display,
+then verifies both commands share the same display owner under each actual tier's
+new logger command. First-command failures prevent the successor, second-command
+failures propagate through tee, and an inner failing pipeline also fails the job.
+The original outer-logger false-green negative control remains. All **276 local
+policy cases pass**, with one explicit GNU-timeout-only macOS skip. Actionlint and
+diff checks pass; all six native browser/WebCrypto markers pass locally.
+
+Native browser diagnostics now retain bounded phase/category fields in their own
+public subdirectory. They classify the known headed-browser display error without
+serializing exception messages, evaluated arguments, tokens, credentials or HTML.
+Private SQLite fixtures remain outside that public directory. Actual corrected
+Linux browser qualification is still required; the old generic artifact alone
+does not recover its missing exception.
+
+The exact application also passes independent [focused run 40188428421](https://github.com/jurei733/testcenter-rewrite/actions/runs/40188428421),
+**3/3 jobs**: auth **361 tests / 87 s**, results **436 / 99 s**, Systemcheck
+**9 / 60 s**, each with **277 Linux policy checks**, no skips and zero complete-lock
+audit vulnerabilities. Fresh core times are 12.48 / 13.68 / 13.08 seconds; selected
+tests 34.18 / 36.87 / 4.16 seconds. Wrapper
+`2ed5f30bcc8db8475f85340132f0574c15edd96d` adds only one isolated workflow.
+Focused success does not override failed full acceptance or prove visual parity.
+
 ## Native Session boundary and bounded console cleanup (2026-10-25)
 
 The published native-assignment [full run 40183685738](https://github.com/jurei733/testcenter-rewrite/actions/runs/40183685738)
