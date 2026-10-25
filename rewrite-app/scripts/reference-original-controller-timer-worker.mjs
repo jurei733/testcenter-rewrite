@@ -1,3 +1,5 @@
+import {isSupervisedSmokeChild, reportSmokePhase} from './supervised-smoke.mjs';
+import {superviseTimerSmoke} from './timer-smoke-supervision.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile,mkdtemp,writeFile} from 'node:fs/promises';
@@ -7,6 +9,10 @@ import {join} from 'node:path';
 import {build} from 'esbuild';
 import {chromium} from 'playwright';
 
+if (!isSupervisedSmokeChild(import.meta.url)) {
+  process.exitCode = await superviseTimerSmoke(import.meta.url, 'original-timer-reference');
+} else {
+reportSmokePhase('bootstrap-owned-original-timer-reference');
 const fixture=JSON.parse(await readFile(new URL('./fixtures/original-controller-timer-lifetime.json',import.meta.url),'utf8'));
 assert.equal(fixture.originalCommit,'ee2ab9ab64bd91209ef8534bbe6005838024e46d');
 const sources=['interfaces','timer','ticker','service','controller','guard','unitHost'].map(key=>fixture.sources[key].extracted).join('\n');
@@ -16,7 +22,8 @@ ${sources}
 globalThis.originalTimer={TestControllerService,TestControllerComponent,UnitActivateGuard,UnithostComponent,BehaviorSubject,Subject};`;
 const compiled=await build({stdin:{contents:script,resolveDir:process.cwd(),loader:'ts'},bundle:true,format:'iife',platform:'browser',write:false});
 const bundle=compiled.outputFiles[0].text;
-const artifacts=await mkdtemp(join(tmpdir(),'testcenter-original-timer-worker-'));
+const artifactRoot=process.env.UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT||tmpdir();
+const artifacts=await mkdtemp(join(artifactRoot,'testcenter-original-timer-worker-'));
 console.log('owned_artifacts='+artifacts);
 const errors=[],checks=[];
 const server=createServer((request,response)=>{
@@ -24,10 +31,13 @@ const server=createServer((request,response)=>{
  response.end(request.url==='/bundle.js'?bundle:'<!doctype html><meta charset="utf-8"><script src="/bundle.js"></script>');
 });
 await new Promise(done=>server.listen(0,'127.0.0.1',done));
-let browser;
+let browser, activeKeyword = null;
+const closePage = async (page, keyword) => {reportSmokePhase(`original:${keyword}:page-close`);await page.close();};
 try{
+ reportSmokePhase('original:chromium-launch');
  browser=await chromium.launch({headless:process.env.UI_SMOKE_HEADFUL!=='true'});
  for(const keyword of ['pause','terminate','terminate-error','zero-pause-enforced','zero-pause-preview','expired-enforced','expired-preview','goto-reentry','goto-zero-reentry']){
+  activeKeyword=keyword;reportSmokePhase('original:'+keyword+':scenario');
   const page=await browser.newPage();page.on('pageerror',error=>errors.push(error.message));
   await page.goto('http://127.0.0.1:'+server.address().port);
   await page.evaluate(keyword=>{
@@ -93,7 +103,7 @@ try{
     assert.equal(after.lifecycle.filter(e=>e==='created').length,2);assert.equal(after.lifecycle.filter(e=>e==='terminated').length,2);assert.equal(after.lifecycle.filter(e=>e==='url-revoked').length,2);
     checks.push({keyword,before,held,after});
    }
-   console.log('original_controller_timer_worker='+keyword+':passed');await page.close();continue;
+   console.log('original_controller_timer_worker='+keyword+':passed');await closePage(page,keyword);continue;
   }
   await page.waitForFunction(keyword=>globalThis.ownedTimer.events.some(e=>e.type==='STEP'&&e.seconds===(keyword==='goto-zero-reentry'?0:3)),keyword);
   if(keyword.startsWith('goto-')){
@@ -104,7 +114,7 @@ try{
    await page.waitForFunction(()=>Date.now()>globalThis.ownedTimer.events[0].time+6500);
    const after=await page.evaluate(async()=>{const f=globalThis.ownedTimer;const held={balance:f.service.timers.timed*60,buffers:f.buffers.length,navigation:f.navigation.length,ended:f.events.some(e=>e.type==='ENDED'),lifecycle:[...f.lifecycle]};f.release();await f.pending;f.subscription.unsubscribe();return held;});
    assert.equal(after.balance,balance);assert.equal(after.buffers,1);assert.equal(after.navigation,1);assert.equal(after.ended,false);assert.equal(after.lifecycle.filter(e=>e==='created').length,2);assert.equal(after.lifecycle.filter(e=>e==='terminated').length,2);
-   checks.push({keyword,before,after});console.log('original_controller_timer_worker='+keyword+':passed');await page.close();continue;
+   checks.push({keyword,before,after});console.log('original_controller_timer_worker='+keyword+':passed');await closePage(page,keyword);continue;
   }
   const before=await page.evaluate(keyword=>{
    const f=globalThis.ownedTimer;if(keyword==='terminate-error')f.service.state$.next('ERROR');
@@ -132,10 +142,16 @@ try{
   // before the outer expiry timer emits ENDED and persists that balance again.
   assert.deepEqual(after.held.writes,keyword==='terminate-error'?[['TESTLETS_TIMELEFT',{timed:0.1}],['TESTLETS_TIMELEFT',{timed:0}],['TESTLETS_TIMELEFT',{timed:0}]]:[['TESTLETS_TIMELEFT',{timed:0.1}]]);
   checks.push({keyword,before,after});console.log('original_controller_timer_worker='+keyword+':passed');
-  await page.close();
+  await closePage(page,keyword);
  }
  assert.deepEqual(errors,[]);
  await writeFile(join(artifacts,'worker-reference.json'),JSON.stringify({originalCommit:fixture.originalCommit,fixtureSha256:createHash('sha256').update(JSON.stringify(fixture)).digest('hex'),checks,errors},null,2)+'\n');
+}catch(error){
+ await writeFile(join(artifacts,'failure.json'),JSON.stringify({scenario:activeKeyword,error:{name:error.name,message:String(error.message).slice(0,4000)},completedCases:checks.map(row=>row.keyword)},null,2)+'\n');
+ throw error;
 }finally{
- await browser?.close();await new Promise(done=>server.close(done));console.log('owned_server=shutdown');
+ reportSmokePhase('original:browser-close');await browser?.close();
+ reportSmokePhase('original:server-close');await new Promise(done=>server.close(done));console.log('owned_server=shutdown');
+}
+
 }

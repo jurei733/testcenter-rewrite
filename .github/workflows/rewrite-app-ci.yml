@@ -680,13 +680,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - name: Retain failed controller timer diagnostics
-        if: failure() && matrix.check == 'ui-controller-timer'
+        if: (failure() || cancelled()) && matrix.check == 'ui-controller-timer'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: controller-timer-diagnostics-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/controller-timer-diagnostics/**/failure.json
             ${{ runner.temp }}/controller-timer-diagnostics/**/api.log
+            ${{ runner.temp }}/controller-timer-diagnostics/**/supervision.json
+            ${{ runner.temp }}/controller-timer-diagnostics/**/worker-reference.json
           if-no-files-found: warn
           retention-days: 7
 
