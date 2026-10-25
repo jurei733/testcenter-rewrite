@@ -257,3 +257,17 @@ uses these fixtures to gate successful imports,
 compiled runtime policies, restriction semantics, and a compatibility profile
 for the original schemas. It does not yet claim complete XSD coverage or every
 Testcenter constraint.
+
+
+The `source-workspace-results/native-pow-protocol/` public fixture comes from
+unchanged production Apache at pinned Source `eedae41840cbe90e5547c0211da818bdf620f5aa`,
+with native Login/person brute-force protection enabled: run **40181968246**,
+**16 groups / 32 HTTP observations**. It exercises actual SHA-256 ALTCHA work,
+invalid solutions, typed bearers, code display and Test claims, salt tampering,
+Login/person replay, cross-Login person work and Login logout. Its manifest pins
+the exact isolated probe files, artifact ZIP, four members and eight Source
+hashes. Requests are never recorded; tokens and complete salt/challenge/signature
+values are aliased before publication. The mandatory authentication suite checks
+integrity and the public protected contract. This reference does not establish
+native Rewrite HTTP/PoW or visual parity; existing Rewrite TTL, one-use and scope
+binding remain required.

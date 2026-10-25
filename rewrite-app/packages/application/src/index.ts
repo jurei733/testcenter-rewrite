@@ -6007,12 +6007,20 @@ const getParticipantCodeBookletAssignments = (
 ): NonNullable<ParticipantRosterEntry["bookletAssignments"]> => {
   const assignments = getParticipantRosterBookletAssignments(entry);
   if (!assignments.some(assignment => (assignment.accessCodes?.length ?? 0) > 0)) {
-    return assignments;
+    // Source's uncoded bucket is keyed by the empty code. A retained native
+    // person with a formerly assigned code does not acquire that bucket.
+    return entry?.originalLoginIdentity && String(participantCode ?? '') !== '' ? [] : assignments;
   }
-  const normalizedCode = normalizeParticipantCode(participantCode);
+  const normalizedCode = entry?.originalLoginIdentity
+    ? String(participantCode ?? '').replace(/[A-Z]/g, letter => letter.toLowerCase())
+    : normalizeParticipantCode(participantCode);
   if (!normalizedCode) {
     return [];
   }
+  // Uncoded Booklets accompany an existing native code bucket; they cannot
+  // manufacture one after the person's original code has been removed.
+  if (entry?.originalLoginIdentity && !assignments.some(assignment =>
+    assignment.accessCodes?.some(code => code.replace(/[A-Z]/g, letter => letter.toLowerCase()) === normalizedCode))) return [];
   return assignments.filter(
     assignment =>
       !assignment.accessCodes?.length ||
@@ -6066,7 +6074,7 @@ const buildParticipantRuntimeBooklets = (input: {
     ])
   );
   const runtimeAssignments =
-    assignedBooklets.length > 0
+    assignedBooklets.length > 0 || input.participantRosterEntry?.originalLoginIdentity
       ? assignedBooklets
       : input.contentRelease.runtimeSnapshot.bookletEntries.map(booklet => ({
           assignmentKey: booklet.bookletKey,
@@ -26772,7 +26780,13 @@ export const createFirstSliceServices = (
       : runtimeBooklets.find(booklet => booklet.bookletKey ===
           testRuns.find(run => run.status !== "completed")?.bookletAssignmentKey) ??
         runtimeBooklets.find(booklet => booklet.status === "available");
-    if (requestedBookletKey && assignedBookletKeys.length > 0 && !selectedRuntimeBooklet) {
+    // Source can reopen an already owned Test after its code bucket changes.
+    // This does not grant a new Test or repopulate the current assignment list.
+    const retainedNativeRun = participantSession.originalLoginKey !== undefined && requestedBookletKey && !selectedRuntimeBooklet
+      ? testRuns.find(run => (run.bookletAssignmentKey ?? run.bookletKey) === requestedBookletKey &&
+        run.tenantId === participantSession.tenantId && run.workspaceId === participantSession.workspaceId &&
+        run.contentReleaseId === contentRelease.contentReleaseId) : undefined;
+    if (requestedBookletKey && (assignedBookletKeys.length > 0 || rosterEntry?.originalLoginIdentity) && !selectedRuntimeBooklet && !retainedNativeRun) {
       throw new FirstSliceError(
         403,
         "booklet_not_assigned",
@@ -26780,7 +26794,7 @@ export const createFirstSliceServices = (
       );
     }
     const effectiveBookletKey =
-      selectedRuntimeBooklet?.sourceBookletKey || requestedBookletKey || "";
+      selectedRuntimeBooklet?.sourceBookletKey || retainedNativeRun?.bookletKey || requestedBookletKey || "";
     const bookletSource = requestedBookletKey
       ? "request"
       : assignedBookletKeys.length > 0
@@ -26816,7 +26830,7 @@ export const createFirstSliceServices = (
       );
     }
 
-    const existingRun = testRuns.find(run =>
+    const existingRun = retainedNativeRun ?? testRuns.find(run =>
       (run.bookletAssignmentKey ?? run.bookletKey) ===
         (selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey));
     if (existingRun) {
@@ -27550,7 +27564,7 @@ export const createFirstSliceServices = (
               : normalizeParticipantCode(code) === normalizeParticipantCode(participantCode)
           )
       : undefined;
-    if (codeRequired && matchedParticipantCode === undefined) {
+    if ((codeRequired && matchedParticipantCode === undefined) || (nativePrincipal && !codeRequired && participantCode !== '')) {
       throw new FirstSliceError(
         400,
         "participant_code_invalid",

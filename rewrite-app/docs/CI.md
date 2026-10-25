@@ -1,5 +1,57 @@
 # CI iteration and complete acceptance
 
+## Complete release-free baseline and protected Source proof (2026-10-25)
+
+[Full CI 40180975239](https://github.com/jurei733/testcenter-rewrite/actions/runs/40180975239)
+is terminal **success, 89/89 jobs**, without failures, skips or cancellations.
+Head `195cf6142ea8199c51745f03889563fe50a2e732` and merge
+`ddf0bde583f36c761df41ab586585a0c7f5d20ce` have verified exact application tree
+`78a1914d6387b2de8e01578eb148227843e63712`. Actual Linux logs confirm **4,133
+unit/frontend** and **2,301 PostgreSQL** checks. The complete native-route and
+native-tabs leaf passes all **21 product/readiness markers**, including the
+formerly failing first-prefix reload. Full PostgreSQL UI, Original/reference,
+startup/shutdown and deployability gates pass. The audit job succeeds.
+
+Observed job span: **28 min 59 s**, 09:31:12–10:00:11 UTC; Fast feedback finishes
+09:35:19 UTC. This is shorter than the preceding green dispatch baseline's
+31:17, but one queue-dependent observation does not establish a causal speedup.
+The independent exact-application [focused run 40181089376](https://github.com/jurei733/testcenter-rewrite/actions/runs/40181089376)
+passes all three reusable jobs: authentication **296 tests / 81 s**, results
+**371 / 83 s**, Systemcheck **9 / 60 s**. Fresh-core times are **13.23 / 9.59 /
+13.32 s**, selected-test times **31.97 / 31.12 / 3.96 s**. Every job also passes
+**277 Linux policy checks**, no skips, and the full-lock audit with zero
+vulnerabilities. The isolated wrapper adds only one workflow to the same
+application tree; complete acceptance remains separate.
+
+New unchanged-production [Source ALTCHA qualification 40181968246](https://github.com/jurei733/testcenter-rewrite/actions/runs/40181968246)
+passes **16 groups / 32 HTTP observations** with Login/person protection active,
+real XSD fixture uploads and the actual verifier. Artifact **12593679219**, 4,711
+bytes, has ZIP SHA-256 `6dfc32dfcd191360675a1ef2758532e22ac09bb218e6ecb6402e736803d851ba`.
+All four members and eight Source file hashes are checked. Probe head
+`ffa67c0c015a041f8103de723f5a1ead8b8f11a9` has tree
+`77789338c74f839d327e96dbe12cff8951f92dfd`, adding only its three isolated probe
+files to the published application tree. Original production code stays unchanged;
+owned containers and volumes are retired. Public evidence excludes credentials,
+bearer headers and complete challenge values. See [contract and limits](ORIGINAL-RESULT-GROUPS.md).
+
+The current native assignment follow-up requires its own qualified application
+tree. It rejects stale-code fallback without losing Source-backed owned-Test or
+zero-code reentry. An initially overstrict attempt fails the existing Source62
+controls; those assertions remain unchanged, and the corrected implementation
+retains their behavior. A narrow green auth result is not full acceptance.
+Native HTTP/PoW implementation and broad visual parity remain open.
+
+Final local qualification of the native code-grant correction passes **4,139
+unit/frontend**, **2,309 full PostgreSQL**, and **304 focused all-store auth**
+checks, without failures/skips/cancellations. Fresh production build, typechecking,
+both-interface Booklet variant/selection/browser journeys, Actionlint and diff
+checks pass. The full-lock audit reports zero vulnerabilities. Policy passes 275,
+with one explicit GNU-timeout-only local skip. The owned PostgreSQL database has
+zero other connections and zero remaining test schemas before removal; its
+initially stopped cluster returns to stopped. New exact-head hosted acceptance
+still has to run independently of the green preceding baseline.
+
+
 ## Native route readiness, retained evidence and release-free authentication (2026-10-25)
 
 The authentication-core [full run 40174750198](https://github.com/jurei733/testcenter-rewrite/actions/runs/40174750198)

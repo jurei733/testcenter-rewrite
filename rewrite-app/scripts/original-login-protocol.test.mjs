@@ -35,6 +35,38 @@ const kinds = ['memory', 'file', 'sqlite'];
 if (process.env.FIRST_SLICE_STORE === 'postgres') { assert.ok(process.env.FIRST_SLICE_POSTGRES_URL); kinds.push('postgres'); }
 const fails = (status, code) => error => error.statusCode === status && (!code || error.errorCode === code);
 
+// The next native transport must consume the real protected Source contract,
+// while retaining Rewrite's stronger TTL/input binding/one-use requirements.
+const powEvidence = new URL('../test-fixtures/original-testcenter/source-workspace-results/native-pow-protocol/', import.meta.url);
+const powManifest = JSON.parse(await readFile(new URL('manifest.json', powEvidence), 'utf8'));
+assert.equal(powManifest.sourceCommit, manifest.sourceCommit); assert.equal(powManifest.runId, 40181968246);
+assert.equal(powManifest.testMode, false); assert.equal(powManifest.checks, 16); assert.equal(powManifest.httpObservations, 32);
+for (const [file, hash] of Object.entries(powManifest.files)) {
+  assert.match(file, /^[a-z0-9][a-z0-9.-]*$/);
+  assert.equal(createHash('sha256').update(await readFile(new URL(file, powEvidence))).digest('hex'), hash);
+}
+const protectedSource = JSON.parse(await readFile(new URL('receipt.json', powEvidence), 'utf8'));
+assert.equal(protectedSource.success, true); assert.equal(protectedSource.testMode, false);
+assert.deepEqual(protectedSource.protectedScopes, ['login', 'person']);
+const protectedObservations = JSON.parse(await readFile(new URL('http-observations.json', powEvidence), 'utf8'));
+assert.equal(protectedSource.checks.length, 16); assert.equal(protectedObservations.length, 32);
+for (const [path, parameters] of [['/session/challenge', ['loginType', 'name', 'password']], ['/session/person/challenge', ['code']]]) {
+  const challenge = protectedObservations.find(row => row.method === 'POST' && row.path === path && row.status === 200)?.value;
+  assert.deepEqual(Object.keys(challenge).sort(), ['algorithm', 'challenge', 'maxNumber', 'salt', 'signature']);
+  assert.equal(challenge.algorithm, 'SHA-256'); assert.equal(challenge.maxNumber, 1_000_000);
+  assert.match(challenge.salt, /^\[redacted-owned-salt-/);
+  const measured = protectedSource.checks.find(row => JSON.stringify(row.challenge?.saltParameterNames) === JSON.stringify(parameters));
+  assert.ok(measured); assert.equal(measured.challenge.hasExpiryParameter, false);
+}
+for (const name of ['configured Login protection refuses direct password authentication',
+  'invalid signature and wrong work cannot authenticate through the native solution route',
+  'native person challenges require a Login bearer before issuing work',
+  'configured person protection refuses direct code entry while Login metadata remains readable',
+  'a person solution still requires the correct Login bearer and valid work',
+  'a signed person challenge cannot be used with modified salt parameters']) {
+  assert.ok(protectedSource.checks.some(row => row.name === name));
+}
+
 for (const kind of kinds) test(`${kind}: real native Login and person phases use durable private capabilities`, async t => {
   const directory = await mkdtemp(join(tmpdir(), 'owned-native-login-'));
   const file = join(directory, kind === 'file' ? 'state.json' : 'state.sqlite');
@@ -59,7 +91,7 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
     const scope = {tenantKey: tenant.tenantKey, workspaceKey: workspace.workspaceKey};
     const ids = {tenantId: tenant.tenantId, workspaceId: workspace.workspaceId};
     let selected = [...names], password = 'Owned-native-secret', code = 'Shared', group = 'ORACLE.NATIVE.LOGIN';
-    const document = () => `<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="${group}" label="Owned native login Ω">${selected.map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="${code}">owned</Booklet></Login>`).join('')}<Login name="plain" pw="Owned-native-secret" mode="run-hot-return"><Booklet>owned</Booklet></Login><Login name="zero" pw="Owned-native-secret" mode="run-hot-return"><Booklet codes="0">owned</Booklet></Login><Login name="empty" pw="" mode="run-hot-return"><Booklet>owned</Booklet></Login></Group></Testtakers>`;
+    const document = () => `<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="${group}" label="Owned native login Ω">${selected.map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="${code}">owned</Booklet><Booklet>common</Booklet></Login>`).join('')}<Login name="plain" pw="Owned-native-secret" mode="run-hot-return"><Booklet>owned</Booklet></Login><Login name="zero" pw="Owned-native-secret" mode="run-hot-return"><Booklet codes="0">owned</Booklet></Login><Login name="empty" pw="" mode="run-hot-return"><Booklet>owned</Booklet></Login></Group></Testtakers>`;
     const upload = () => services.workspaceAdminRead.importParticipantRoster({...scope, rosterText: document()});
     const login = (name = names[0], supplied = password) => services.originalAuthentication.login({name, password: supplied});
     const person = (token, requested = code) => services.originalAuthentication.person({loginToken: token, code: requested});
@@ -106,7 +138,7 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
     });
     const release = randomUUID(), now = new Date().toISOString();
     await repository.saveContentRelease({...ids, contentReleaseId: release, importJobId: release, releaseLabel: 'Owned native login', status: 'active', createdAt: now, activatedAt: now,
-      runtimeSnapshot: {bookletEntries: [{bookletKey: 'owned', displayLabel: 'Owned', policy: compileBookletRuntimePolicy({}), testletEntries: [], unitEntries: []}]}});
+      runtimeSnapshot: {bookletEntries: ['owned', 'common', 'unassigned'].map(bookletKey => ({bookletKey, displayLabel: bookletKey, policy: compileBookletRuntimePolicy({}), testletEntries: [], unitEntries: []}))}});
     await t.test('first-Test binding rejects missing, inactive and foreign content and rolls back an initializer failure', async () => {
       const parent = beforeContent.participantSession, id = parent.participantSessionId;
       const credential = await repository.getParticipantAccessCredential(id);
@@ -222,6 +254,7 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
       const credentialBeforeTest = await repository.getParticipantAccessCredential(parentBeforeTest.participantSessionId);
       const starts = await Promise.all(Array.from({length: 3}, () => services.participantRuntime.launch({participantSessionId: parentBeforeTest.participantSessionId, bookletKey: 'owned'})));
       run = starts[0]; assert.ok(starts.every(value => value.testRunId === run.testRunId));
+      assert.deepEqual((await services.participantRuntime.getRuntimeState({participantSessionId: parentBeforeTest.participantSessionId})).booklets.map(row => row.bookletKey), ['owned', 'common'], 'Uncoded Booklets still accompany a valid native code bucket');
       const bound = await repository.getParticipantSessionById(parentBeforeTest.participantSessionId);
       assert.equal(bound.contentReleaseId, release);
       for (const field of ['participantSessionId','tenantId','workspaceId','originalLoginKey','originalNameSuffix','loginKey','groupKey','participantCode','createdAt','validUntil']) assert.deepEqual(bound[field], parentBeforeTest[field], field);
@@ -254,6 +287,21 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
       lastPerson = await person(first.token, 'replacement'); assert.equal(lastPerson.kind, 'person');
       assert.equal((await login()).token, first.token); assert.equal((await read(first.token)).token, first.token);
       assert.equal((await read(entered.token)).participantSession.participantSessionId, entered.participantSession.participantSessionId);
+    });
+    await t.test('a retained old-code person keeps its owned Test without falling back to every release Booklet', async () => {
+      const id = entered.participantSession.participantSessionId;
+      const before = await repository.getTestRunById(run.testRunId);
+      assert.equal((await read(entered.token)).participantSession.participantSessionId, id, 'Person identity remains valid after a code import');
+      const state = await services.participantRuntime.getRuntimeState({participantSessionId: id});
+      assert.deepEqual(state.booklets, [], 'Source getTestsOfPerson selects only the retained code bucket, never every workspace Booklet');
+      await assert.rejects(services.participantRuntime.launch({participantSessionId: id, bookletKey: 'unassigned'}), error => error.statusCode === 403 && error.errorCode === 'booklet_not_assigned');
+      assert.deepEqual(await repository.getTestRunById(run.testRunId), before);
+      const reopened = await services.participantRuntime.launch({participantSessionId: id, bookletKey: 'owned'});
+      assert.equal(reopened.testRunId, before.testRunId, 'Source reopens an existing owned Test independently of its current assignment list');
+      assert.deepEqual(reopened.unitResponses, before.unitResponses);
+      assert.deepEqual(reopened.unitResponseFieldTimestamps, before.unitResponseFieldTimestamps);
+      assert.deepEqual(reopened.testletTimers, before.testletTimers);
+      assert.equal((await repository.listTestRunsByParticipantSessionId(id)).length, 1);
     });
     await t.test('Login logout is a no-op; person logout revokes only that bearer and retains people and Tests', async () => {
       await services.originalAuthentication.logout({token: first.token}); assert.equal((await read(first.token)).token, first.token);
@@ -289,6 +337,16 @@ for (const kind of kinds) test(`${kind}: real native Login and person phases use
       for (const name of ['plain', 'zero']) { const state = await login(name, 'Owned-native-secret'); assert.equal(state.kind, 'person'); assert.equal(state.participantSession.participantCode, null); }
       await assert.rejects(login('empty', 'not-empty'), error => error.errorCode === 'participant_password_invalid');
       const empty = await login('empty', ''); assert.equal(empty.kind, 'person');
+    });
+    await t.test('a retained Login token uses only the empty code after its native assignments become uncoded', async () => {
+      const previous = code; code = ''; await upload();
+      try {
+        await assert.rejects(person(first.token, previous), error => error.errorCode === 'participant_code_invalid');
+        const plain = await person(first.token, '');
+        assert.equal(plain.kind, 'person'); assert.equal(plain.participantSession.participantCode, null);
+        assert.equal(plain.participantSession.originalNameSuffix, '');
+        assert.deepEqual(await repository.listTestRunsByParticipantSessionId(plain.participantSession.participantSessionId), []);
+      } finally { code = previous; await upload(); }
     });
     await t.test('private capability writers retain the first value and reject cross-subject collisions without leakage', async () => {
       const candidate = {...ids, kind: 'login', subjectKey: names[0], token: 'a'.repeat(24), createdAt: new Date().toISOString()};
