@@ -36,6 +36,24 @@ storage, query and error sentinels stay out of JSON. These controls are mandator
 in native browser qualification. This improves diagnosis and fixture precision;
 it does not establish that the historical UI failure was a lost click or is fixed.
 
+
+The diagnostic-only application candidate `5ebfdf38d1f20c911ddcf1a1254e7a79e1ea2aa0`
+has tree `bd6f4a3540fc35cff0a968ac64b042eaf2eba153`. All **57** local cases pass
+from a fresh production build (505,420 ms for the 57-case entry), with 16 browser
+controls passing and one explicit Linux-only skip on macOS. The mandatory local
+policy suite has 280 passes and its explicit GNU-timeout-only macOS skip.
+[Isolated Linux run 40236405909](https://github.com/jurei733/testcenter-rewrite/actions/runs/40236405909)
+is terminal success: **57/57** headed production cases, **17/17** browser controls,
+**281/281** policy controls, **4/4** native archive controls and zero complete-lock
+audit vulnerabilities. Wrapper head `4b3679244b981131a933ba2a2616f07d1ed97d13`,
+tree `1586718cf864b7b24eb04924cc22b8c872c65ecd`, adds only one fixed qualification
+workflow to that application tree; the blob/parent/tree/ref were independently
+verified. Its single job took **11 min 10 s**, including fresh runtime, audit,
+policy, authenticated browser material, controls and build; the actual 57-case
+entry took 534,510 ms. This scopes feedback without reducing acceptance coverage.
+It does **not** establish the earlier failure's cause or make the failed full run
+successful. A new full acceptance is required after integration.
+
 ## Complete timer feedback without the broad queue (2026-10-25)
 
 `rewrite-timer-focus.yml` exposes a manual/reusable **non-acceptance** workflow.
