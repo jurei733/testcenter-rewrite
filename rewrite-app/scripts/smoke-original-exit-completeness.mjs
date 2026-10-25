@@ -14,6 +14,7 @@ import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo
 import { completenessCases, completenessPlayer, legacyCompletenessCase, closeIconMetrics } from "./exit-completeness-fixture.mjs";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 import { waitForMaterialDialog } from "./material-dialog-ready.mjs";
+import { createExitCompletenessDiagnostics } from "./exit-completeness-diagnostics.mjs";
 
 const reference = await loadOriginalVisualReference("original-exit-completeness");
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
@@ -77,14 +78,21 @@ try {
       const key=`${theme}-${screen}-header-${leave}-${progress}`,context=await browser.newContext({viewport:{width,height},locale:"de-DE"}),page=await context.newPage();
       await page.bringToFront();
       page.on("pageerror",error=>errors.push({key,error:String(error)}));
+      const diagnostic=createExitCompletenessDiagnostics({page,key,artifactRoot:process.env.UI_SMOKE_ARTIFACT_DIR||join(artifacts,"public-failure")});
+      await diagnostic.install();
+      try {
       const workspaceKey=`complete-exit-${leave}`;
+      diagnostic.mark("navigation");
       await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`,{waitUntil:"networkidle"});
+      diagnostic.mark("sign-in");
       await page.locator("#originalLoginName").fill(`${theme.toLowerCase()}-${screen}-${progress}`);
       const signedIn=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/v1/participant/auth/sign-in" && r.request().method()==="POST");
       await page.getByRole("button",{name:"Weiter",exact:true}).click();
       assert.equal((await signedIn).status(),200);const identity=await (await signedIn).json(),token=identity.sessionToken;
+      diagnostic.mark("player-ready");
       const frame=page.frameLocator("iframe");await frame.locator("#exitPresentation").waitFor();
       const currentPath=`/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/current-state`;
+      diagnostic.mark("save-incomplete");
       await frame.locator("#demoPlayerAnswer").fill(`Own ${key}\n Ω exact whitespace  `);
       await frame.locator("#exitPresentation").selectOption(values.presentation);await frame.locator("#exitResponse").selectOption(values.response);
       let current;
@@ -98,6 +106,7 @@ try {
       assert.equal(parsed?.unitState.presentationProgress,values.presentation);assert.equal(parsed.unitState.responseProgress,values.response);
       const runId=current.testRun.testRunId,returnPath=`/api/v1/participant/test-runs/${runId}/return-to-starter`;
       states[key]={packet,runId};
+      diagnostic.mark("assert-denied");
       const denied=await api(returnPath,{confirmTestletTimeLeave:true,confirmTestletLeaveLock:true},token,"POST",409);
       assert.equal(denied.error,"booklet_starter_return_denied");assert.deepEqual(denied.details.deniedReasons,values.reasons);
       if(theme==="Primar"&&screen==="desktop"&&progress==="both") {
@@ -106,9 +115,11 @@ try {
         await api(returnPath,{confirmTestletTimeLeave:true},foreign.sessionToken,"POST",401);
       }
       const mutations=[];page.on("request",request=>{if(new URL(request.url()).pathname===returnPath)mutations.push(request.postDataJSON());});
+      diagnostic.mark("denial-open");
       const logo=page.locator("#participantApplicationLogoButton");await logo.click();
       await page.locator('[data-cy="deny-navigation-message"]').waitFor();
       await waitForMaterialDialog(page);
+      diagnostic.mark("denial-visuals");
       await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).every(a=>!a.pending&&a.playState!=="running"));
       await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:join(artifacts,`${key}-information.png`),fullPage:true});
       const dialog=await page.locator("mat-dialog-container").evaluate(dialog=>{
@@ -134,15 +145,18 @@ try {
       assert.equal(closeHash,reference.closeButtonPixelSha256[`${theme}-${screen}-${progress}`]);states[key].closeButtonPixelSha256=closeHash;
       assert.equal(await page.locator('[data-cy="dialog-confirm"]').count(),0);assert.deepEqual(mutations,[]);
       const close=page.locator('[data-cy="close-deny-navigation-message"]');
+      diagnostic.mark("escape-and-focus");
       await page.keyboard.press("Shift+Tab");assert.equal(await close.evaluate(n=>n===document.activeElement),true);
       await page.keyboard.press("Escape");await page.locator("mat-dialog-container").waitFor({state:"detached"});
       assert.equal(await logo.evaluate(n=>n===document.activeElement),true);
-      await logo.click();await waitForMaterialDialog(page);await close.click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
+      diagnostic.mark("denial-reopen");
+      await logo.click();await waitForMaterialDialog(page);diagnostic.mark("denial-close");await close.click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
       assert.deepEqual(mutations,[]);
       const retained=(await api(currentPath,undefined,token)).currentRunState;
       assert.equal(retained.testRun.testRunId,runId);assert.equal(retained.testRun.status,"running");assert.equal(retained.testRun.unitResponses["unit-intro"],packet);
       assert.deepEqual(retained.testRun.lockedUnitKeys,current.testRun.lockedUnitKeys);assert.deepEqual(retained.testRun.lockedTestletKeys,current.testRun.lockedTestletKeys);
       if(current.activeTestletTimer){assert.equal(retained.activeTestletTimer.status,"running");assert.equal(retained.activeTestletTimer.expiresAt,current.activeTestletTimer.expiresAt);}
+      diagnostic.mark("save-complete");
       await frame.locator("#exitPresentation").selectOption("complete");await frame.locator("#exitResponse").selectOption("complete");
       for(let attempt=0;attempt<100;attempt++) {
         current=(await api(currentPath,undefined,token)).currentRunState;
@@ -151,20 +165,30 @@ try {
         await delay(100);
       }
       const completedPacket=current.testRun.unitResponses["unit-intro"];
+      const completed=parseVeronaUnitResponse(completedPacket);
+      assert.equal(completed?.unitState.presentationProgress,"complete");assert.equal(completed.unitState.responseProgress,"complete");
+      diagnostic.mark("complete-logo");
       await logo.click();
       if(leave==="forbidden") {
         await page.locator('[data-cy^="toast-text-"]').filter({hasText:"Es darf erst weiter geblättert werden, wenn die Zeit abgelaufen ist."}).waitFor();
         assert.equal(await page.locator("mat-dialog-container").count(),0);
         assert.deepEqual((await api(returnPath,{confirmTestletTimeLeave:true},token,"POST",409)).details.deniedReasons,["testlet_time_leave_forbidden"]);
       } else {
+        diagnostic.mark("complete-dialog");
         await waitForMaterialDialog(page);
+        diagnostic.mark("return-starter");
         await page.locator("#participantConfirmationContinueButton").click();
         await page.locator("#originalParticipantStarter mat-card").first().waitFor();assert.equal(mutations.length,1);
         const runtime=await api(`/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/runtime-state`,undefined,token);
         assert.equal(runtime.runtimeState.latestTestRun.testRunId,runId);assert.equal(runtime.runtimeState.latestTestRun.status,"paused");
         assert.equal(runtime.runtimeState.latestTestRun.unitResponses["unit-intro"],completedPacket);
       }
+      diagnostic.mark("context-close");
       await context.close();console.log(`original_exit_completeness=${key}:passed`);
+      } catch(error) {
+        await diagnostic.capture(error).catch(()=>console.log("exit_completeness_diagnostics=unavailable"));
+        throw error;
+      }
     }
   }
   assert.deepEqual(errors,[]);failureGate.assertHealthy();

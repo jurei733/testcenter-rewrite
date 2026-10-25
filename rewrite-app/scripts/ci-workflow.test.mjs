@@ -553,7 +553,7 @@ test("administration reference requires real browser paint and layout negative c
   assert.equal(control.if, "matrix.family == 'administration' || matrix.family == 'directory'");
   assert.equal(control.run, "xvfb-run --auto-servernum npm run test:browser-capture:built");
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
-  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs scripts/ci-browser-material-capture.test.mjs");
+  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs scripts/exit-completeness-diagnostics.test.mjs scripts/ci-browser-material-capture.test.mjs");
 });
 test("isolated console shards retain each of the eight prior checks without a long serial prefix", () => {
   const names=["ui-controller-timer","ui-console-debug","ui-participant-console","ui-participant-command-completion","ui-participant-native-routes"];
@@ -636,6 +636,7 @@ test('settings wait for current finite effects and keep actual Chromium cancella
  assert.ok(source.includes('await waitForFiniteDocumentAnimations(page)'));
  assert.ok(!source.includes('.map(a=>a.finished)'));
  assert.ok(scripts['test:browser-capture:built'].split(/\s+/).includes('scripts/finite-animation-ready.test.mjs'));
+ assert.ok(scripts['test:browser-capture:built'].split(/\s+/).includes('scripts/exit-completeness-diagnostics.test.mjs'));
  assert.ok(workflow.jobs['browser-system-qualification'].steps.some(step=>step.run==='xvfb-run --auto-servernum npm run test:browser-capture:built'));
 });
 test('the Original sample retains scoped input/message/save evidence without widening credential or store uploads',()=>{

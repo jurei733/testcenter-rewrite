@@ -288,7 +288,7 @@
     "test:application-assets": "npm run build:core && npm run test:application-assets:built",
     "test:application-assets:built": "node --test scripts/application-settings-mutation.test.mjs scripts/application-asset-cascade.test.mjs scripts/application-asset-cascade-api.test.mjs scripts/original-settings-controller.test.mjs",
     "reference:ui:original-administration-settings:built": "node scripts/reference-original-administration-settings.mjs",
-    "test:browser-capture:built": "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs scripts/ci-browser-material-capture.test.mjs",
+    "test:browser-capture:built": "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs scripts/exit-completeness-diagnostics.test.mjs scripts/ci-browser-material-capture.test.mjs",
     "typecheck:core": "tsc -b --pretty packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api",
     "typecheck:web": "ngc -p apps/web/tsconfig.app.json --noEmit",
     "typecheck:ci": "npm run typecheck:core && ng build rewrite-app-web --configuration development --output-path dist/typecheck-development",

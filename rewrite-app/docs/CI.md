@@ -1,5 +1,41 @@
 # CI iteration and complete acceptance
 
+## Owned completeness failure evidence (2026-10-25)
+
+[Full run 40209993795](https://github.com/jurei733/testcenter-rewrite/actions/runs/40209993795)
+is terminal **failure: 87 successful jobs, one failed exit-completeness browser
+leaf and the failed acceptance aggregate**, without skips/cancellations. Actual
+unit/frontend (4,293) and PostgreSQL (2,495) leaves pass. Head
+`4d800e83d844ea2bdedb502984418f4cbe298dcd`, tree
+`e7d09d60873eb12577e701ece38aae2b2a6e9ee2`, actual verified merge
+`66f1f132b6527edf4a3fa1dc4f561c0dbacc0c32` identify the failed acceptance.
+
+The completeness smoke reports 48 successful cases, ending with Erwachsenen
+desktop / forbidden / both. In the next mobile case, its final complete-state
+confirmation does not reach the Material-open selector before the existing
+30-second locator deadline. The 848-byte artifact 12606230910 has SHA-256
+`52dbae6a5836eee316967e830a58bf7c6524bac180bb764aec2e54456904f098` and contains
+only the quick console log. No failed UI document or image survived. The actual
+cause is unestablished; it is not attributed to the preceding report renderer.
+
+The owned smoke now records fixed per-case phases and native pointerdown/up/click
+events, including trusted input and element identity/connectivity, without
+redispatching clicks. On failure it writes a bounded JSON document summary and
+viewport screenshot under the existing public artifact root. Raw HTML, form
+values, request headers/bodies, storage, URL/query values, environment and
+exception messages/stacks stay outside JSON receipts. The SQLite fixture remains
+in its separate private temporary directory. Snapshot/screenshot operations have
+their own five-second diagnostic limits; original failures still propagate.
+
+Every prior product assertion, exact reference/pixel measurement, operation
+deadline and all 57 scenarios remain. An additional positive assertion requires
+both saved progress fields to be complete before the final logo action. Two real
+Chromium controls prove a stable native click works, a deliberately replaced
+target can lose a native click and the observer distinguishes it; private input,
+storage, query and error sentinels stay out of JSON. These controls are mandatory
+in native browser qualification. This improves diagnosis and fixture precision;
+it does not establish that the historical UI failure was a lost click or is fixed.
+
 ## Complete timer feedback without the broad queue (2026-10-25)
 
 `rewrite-timer-focus.yml` exposes a manual/reusable **non-acceptance** workflow.
