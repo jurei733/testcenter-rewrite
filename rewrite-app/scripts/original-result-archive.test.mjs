@@ -95,7 +95,16 @@ for (const kind of kinds) test(`${kind}: Original archive distinguishes omitted 
     for (const group of ['alpha', 'beta']) await seed(workspace, group);
     await seed(foreign, 'private-foreign');
     const scope = { tenantKey: tenant.tenantKey, workspaceKey: 'owned' };
-    const report = async groupKeys => readArchive(await services().workspaceAdminRead.exportOriginalResultArchive({ ...scope, ...(groupKeys === undefined ? {} : { groupKeys }) }));
+    const legacyMalformedEvents = [];
+    const report = async groupKeys => {
+      // New writes reject invalid ownership. Still prove the reader is safe
+      // when a legacy/corrupt snapshot supplies that same malformed evidence.
+      const readRepository = new Proxy(repository, {get(target, key) {
+        if (key === 'listWorkspaceActivityEventsByWorkspace') return async (...args) => [...await target[key](...args), ...legacyMalformedEvents.filter(row => args[2] === undefined || args[2].includes(row.eventType))];
+        const value = Reflect.get(target, key); return typeof value === 'function' ? value.bind(target) : value;
+      }});
+      return readArchive(await createFirstSliceServices({repository: readRepository, now: () => timestamp}).workspaceAdminRead.exportOriginalResultArchive({...scope, ...(groupKeys === undefined ? {} : {groupKeys})}));
+    };
 
     await t.test('omission equals the union of all group reports in every CSV and JSON member', async () => {
       const all = await report(), selected = await report(['alpha', 'beta']);
@@ -173,9 +182,13 @@ for (const kind of kinds) test(`${kind}: Original archive distinguishes omitted 
       for(const overrides of [{tenantId:foreign.tenantId,workspaceId:foreign.workspaceId},
         {subjectId:randomUUID()},{details:{participantSessionId:randomUUID(),unitKey:'foreign-session',reviewId:randomUUID()}},
         {eventType:'source_package_created'},{subjectType:'participant_session'}]){
-        await repository.saveWorkspaceActivityEvent({activityEventId:randomUUID(),tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,
+        const event = {activityEventId:randomUUID(),tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,
           eventType:'review_created',actorId:null,subjectType:'test_run',subjectId:run.testRunId,occurredAt:timestamp,
-          summary:'Owned invalid projection control',details:{participantSessionId:session.participantSessionId,unitKey:'foreign-unit',reviewId:randomUUID()},...overrides});
+          summary:'Owned invalid projection control',details:{participantSessionId:session.participantSessionId,unitKey:'foreign-unit',reviewId:randomUUID()},...overrides};
+        if ('workspaceId' in overrides || 'subjectId' in overrides) {
+          await assert.rejects(repository.saveWorkspaceActivityEvent(event), error => error.errorCode === 'result_parent_scope_changed');
+          legacyMalformedEvents.push(event);
+        } else await repository.saveWorkspaceActivityEvent(event);
       }
       await services().workspaceReview.createReview({...scope,participantSessionId:session.participantSessionId,testRunId:run.testRunId,
         reviewerId:'owned',category:'quality',comment:'Booklet-level comment does not initialize a Unit.'});

@@ -2705,6 +2705,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", detailedResponsesPattern],
   ["GET", groupResultsPattern],
   ["GET", originalGroupResultsPattern],
+  ["DELETE", originalGroupResultsPattern],
   ["DELETE", groupResultsPattern],
   ["GET", reviewListPattern],
   ["POST", reviewListPattern],
@@ -3683,6 +3684,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.listGroupResults
     ],
     ["GET", originalGroupResultsPattern, productionApiRoutes.workspace.listOriginalGroupResults],
+    ["DELETE", originalGroupResultsPattern, productionApiRoutes.workspace.deleteOriginalGroupResults],
     [
       "DELETE",
       groupResultsPattern,
@@ -7598,6 +7600,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const raw = url.searchParams.get('groups');
         const items = await services.originalGroupResults.list({tenantKey, workspaceKey, groups: raw ? raw.split(',') : []});
         sendJson<OriginalGroupResult[]>(response, 200, items); return;
+      }
+
+      if (request.method === "DELETE" && originalGroups?.groups) {
+        const tenantKey = decodeRouteGroup(originalGroups.groups.tenantKey), workspaceKey = decodeRouteGroup(originalGroups.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {sendError(response, 400, 'invalid_workspace_scope', 'tenantKey and workspaceKey are required.'); return;}
+        const body = await readRequestJsonBody<unknown>();
+        const groups = body && typeof body === 'object' && !Array.isArray(body) && 'groups' in body ? body.groups : undefined;
+        if (!Array.isArray(groups) || !groups.every(group => typeof group === 'string')) {sendError(response, 400, 'original_result_groups_invalid', 'Group names must be strings.'); return;}
+        await services.originalGroupResults.delete({tenantKey, workspaceKey, groups});
+        response.setHeader('cache-control', 'private, no-store'); response.statusCode = 200; response.end(); return;
       }
 
       if (request.method === "GET" && groupResultsMatch?.groups) {

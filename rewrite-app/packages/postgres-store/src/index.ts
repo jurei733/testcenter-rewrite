@@ -1,3 +1,6 @@
+import {guardResultArtifactParent, guardResultArtifactBatch, withResultArtifactParent} from './result-artifact-parent.js';
+import {assertResultArtifactParent, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
+import {deleteOriginalGroupResults} from './original-group-deletion.js';
 import {readOriginalGroupResultInventory} from './original-result-inventory.js';
 import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
@@ -1877,11 +1880,13 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      // These callbacks never change workspace keys. Preserve writer exclusion
+      // while allowing a Run mutation to insert its workspace-referenced event.
       const workspace = await client.query(
         `SELECT workspace_id
          FROM workspaces
          WHERE tenant_id = $1 AND workspace_id = $2
-         FOR UPDATE`,
+         FOR NO KEY UPDATE`,
         [tenantId, workspaceId]
       );
       if (workspace.rowCount !== 1) {
@@ -2184,8 +2189,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
     },
     async saveAttachmentFile(attachmentFile) {
-      await pool.query(
-        `INSERT INTO attachment_files (
+      await withResultArtifactParent(pool, attachmentResultParent(attachmentFile), async client => {
+        await client.query(
+          `INSERT INTO attachment_files (
           attachment_file_id, attachment_id, tenant_id, workspace_id,
           file_name, media_type, data_base64, created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -2197,17 +2203,18 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           media_type = EXCLUDED.media_type,
           data_base64 = EXCLUDED.data_base64,
           created_at = EXCLUDED.created_at`,
-        [
-          attachmentFile.attachmentFileId,
-          attachmentFile.attachmentId,
-          attachmentFile.tenantId,
-          attachmentFile.workspaceId,
-          attachmentFile.fileName,
-          attachmentFile.mediaType,
-          attachmentFile.dataBase64,
-          attachmentFile.createdAt
-        ]
-      );
+          [
+            attachmentFile.attachmentFileId,
+            attachmentFile.attachmentId,
+            attachmentFile.tenantId,
+            attachmentFile.workspaceId,
+            attachmentFile.fileName,
+            attachmentFile.mediaType,
+            attachmentFile.dataBase64,
+            attachmentFile.createdAt
+          ]
+        );
+      });
     },
     async deleteAttachmentFile(attachmentFileId) {
       const result = await pool.query(
@@ -2664,8 +2671,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       await withWorkspaceMutationLock(
         activityEvent.tenantId,
         activityEvent.workspaceId,
-        client =>
-          client.query(
+        async client => {
+          await guardResultArtifactParent(client, activityResultParent(activityEvent));
+          return client.query(
             `INSERT INTO workspace_activity_events (
               activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -2691,7 +2699,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
               activityEvent.summary,
               JSON.stringify(activityEvent.details)
             ]
-          )
+          );
+        }
       );
     },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
@@ -3270,6 +3279,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         await client.query("COMMIT");return result;
       }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
     },
+    async updateParticipantSessionValidity(input) {
+      await pool.query('UPDATE participant_sessions SET valid_until=$1 WHERE participant_session_id=$2 AND tenant_id=$3 AND workspace_id=$4', [input.validUntil, input.participantSessionId, input.tenantId, input.workspaceId]);
+    },
     async saveParticipantSession(participantSession) {
       let previous = mapParticipantSession((await pool.query("SELECT * FROM participant_sessions WHERE participant_session_id=$1",[participantSession.participantSessionId])).rows[0]);
       if (previous?.originalLoginKey === undefined && participantSession.originalLoginKey === undefined) participantSession=prepareOriginalParticipantSession(participantSession,previous,null);
@@ -3498,6 +3510,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapTestRun
       );
     },
+    async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(pool, input);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(pool, tenantId, workspaceId);
     },
@@ -3599,6 +3612,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       try{
         await client.query('BEGIN');
         const parent=mapParticipantSession((await client.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE',[testRun.participantSessionId])).rows[0]);
+        assertResultArtifactParent({tenantId:testRun.tenantId,workspaceId:testRun.workspaceId,participantSessionId:testRun.participantSessionId}, parent);
         await persistTestRun(client,withOriginalTestRunMode(testRun,parent));await client.query('COMMIT');
       }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
     },
@@ -3807,6 +3821,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        await guardResultArtifactBatch(client, testLogs);
         for (const testLog of testLogs) {
           await client.query(
             `INSERT INTO participant_test_logs (
@@ -3925,8 +3940,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
     },
     async saveWorkspaceReview(review) {
-      await pool.query(
-        `INSERT INTO workspace_reviews (
+      await withResultArtifactParent(pool, review, async client => {
+        await client.query(
+          `INSERT INTO workspace_reviews (
           review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, page, page_label, user_agent, reviewer_id, category, priority, comment_text, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         ON CONFLICT(review_id) DO UPDATE SET
@@ -3945,25 +3961,26 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           comment_text = EXCLUDED.comment_text,
           created_at = EXCLUDED.created_at,
           updated_at = EXCLUDED.updated_at`,
-        [
-          review.reviewId,
-          review.tenantId,
-          review.workspaceId,
-          review.participantSessionId,
-          review.testRunId,
-          review.unitKey,
-          review.originalUnitId,
-          review.page,
-          review.pageLabel,
-          review.userAgent,
-          review.reviewerId,
-          review.category,
-          review.priority,
-          review.comment,
-          review.createdAt,
-          review.updatedAt
-        ]
-      );
+          [
+            review.reviewId,
+            review.tenantId,
+            review.workspaceId,
+            review.participantSessionId,
+            review.testRunId,
+            review.unitKey,
+            review.originalUnitId,
+            review.page,
+            review.pageLabel,
+            review.userAgent,
+            review.reviewerId,
+            review.category,
+            review.priority,
+            review.comment,
+            review.createdAt,
+            review.updatedAt
+          ]
+        );
+      });
     },
     async deleteWorkspaceReview(reviewId) {
       const result = await pool.query(

@@ -401,6 +401,7 @@ test("SQLite preserves whole-test locks and monitor pauses through every run loo
     completedAt: null
   };
 
+  await repository.saveParticipantSession({tenantId:testRun.tenantId,workspaceId:testRun.workspaceId,participantSessionId:testRun.participantSessionId,contentReleaseId:testRun.contentReleaseId,loginKey:'owned-lock',groupKey:'owned-lock',status:'launched',createdAt:testRun.createdAt});
   await repository.saveTestRun(testRun);
 
   assert.equal((await repository.getTestRunById(testRun.testRunId))?.locked, true);

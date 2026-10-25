@@ -1,5 +1,71 @@
 # Original participant group snapshots
 
+## Atomic native group/session deletion (2026-10-25)
+
+The protected versioned route now also supports
+`DELETE /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-groups`
+with `{"groups":["ORACLE.DELETE.MAIN"]}`. It requires workspace read-write access
+and returns Source's empty HTTP200 with private/no-store caching. Read-only,
+foreign-workspace, anonymous and invalid-admin requests are denied before mutation.
+Malformed group selections return HTTP400; empty/unknown groups succeed without
+changing data. Names remain untrimmed, with the qualified German case/composition
+comparison. There is no invented 100-group cap. Sorted membership handles large
+selections without comparing every stored group against every requested name.
+
+A distinct native repository transaction selects exact frozen snapshots and their
+current binary Login bindings. It removes still-linked native people, private
+Login/group/person capabilities, Tests and their answers/timers, reviews, logs,
+result journals, command/delivery/presence records and associated Rewrite attachment
+records. People without a Test are included. An obsolete snapshot cannot own a
+Login/person/Test already moved elsewhere. Canonical extensions with the same raw
+group name, a real foreign native group and its Test/capabilities, retained groups,
+authored rosters and content releases remain unchanged. The canonical results-only
+deletion keeps its existing behavior and remains separate.
+
+Memory executes one synchronous collection mutation; File publishes isolated
+collection maps only after its durable manifest commits. SQLite uses BEGIN IMMEDIATE;
+PostgreSQL takes the workspace NO KEY UPDATE lock, then ordered people and Run locks.
+SQL transports identity columns only, never response or attachment contents.
+Attachment ownership uses the existing encoded Run/Unit/variable identity. Source21
+qualifies the native session/result hierarchy; physical Rewrite attachment cleanup
+is additional owned-store evidence, not an unmeasured Source media-file claim.
+
+Result writes now verify their actual current scoped person/Run under the same
+transaction as persistence. A late Run, review, log, activity journal, attachment
+or credential write cannot recreate a deleted parent. Imported validity changes
+use UPDATE-only semantics instead of upserting a captured person after deletion.
+Non-key workspace mutations retain writer exclusion while allowing an in-flight
+Run's workspace FK reference, avoiding the opposing parent/workspace lock order.
+Batch log writers acquire all people before Runs in database order. The existing
+SQLite rollback helper is shared without changing its primary/secondary error rules.
+No schema migration or dependency change is required.
+
+The mandatory deletion suite checks genuine native XML authentication against an
+explicitly seeded owned runtime release, saved private answers, positive command/
+delivery/presence records, review journals, credential-only groups and unopened
+people. File and SQL failures injected at the final durable boundary roll back the
+whole hierarchy and capabilities; reopen verifies that result. Active SQL decoder
+negative controls reject complete private Run reads while deletion succeeds.
+Seven independent PostgreSQL writer operations demonstrably wait on actual database
+locks, then fail safely or update zero rows after commit. Real in-flight review/log
+services and real protected SQLite/PostgreSQL HTTP exercise the public boundary.
+Fresh authentication creates new Login/group/person capabilities without reviving
+old bearers, people or Tests. A 50,001-group selection fixture exercises qualified
+collation and large selection correctness, not production-load timing guarantees.
+
+Final local qualification passes **4,250 complete unit/frontend**, **2,456 complete
+PostgreSQL**, and **217/217 result/archive/Session/command controls**, with no failures,
+skips or cancellations. Policy passes 276 checks plus one explicit GNU-timeout-only
+macOS skip; complete-lock audit reports zero vulnerabilities. Earlier malformed
+fixtures now supply real parents; reader controls still inject the same malformed
+legacy history through their read boundary. No previous assertion is removed.
+
+The literal numeric Source workspace path and native admin permission mapping,
+production result-table/delete-dialog adoption, selected-Test administration,
+four native report wire downloads and paired visuals remain open. The versioned
+route retains Rewrite's existing admin roles. No broad row closes: **27 done /
+22 partial**, all eight visual rows open; remaining estimate **4–8 engineering weeks**.
+
 ## Native group-deletion reference and remaining write work (2026-10-25)
 
 [Unchanged production Source run 40196464182](https://github.com/jurei733/testcenter-rewrite/actions/runs/40196464182)

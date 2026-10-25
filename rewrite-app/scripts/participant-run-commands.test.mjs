@@ -211,6 +211,7 @@ test("legacy file snapshots receive an empty command collection without dropping
     const run = { tenantId: "owned", workspaceId: "owned", participantSessionId: "owned", testRunId: "owned",
       contentReleaseId: "owned", bookletKey: "owned", status: "running", currentUnitKey: "unit", unitResponses: { unit: "Exact legacy answer" },
       testletTimers: {}, createdAt: issuedAt, updatedAt: issuedAt, completedAt: null };
+    await original.saveParticipantSession({tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,contentReleaseId:run.contentReleaseId,loginKey:'owned',groupKey:'owned',status:'launched',createdAt:issuedAt});
     await original.saveTestRun(run);
     const document = JSON.parse(await readFile(file, "utf8"));
     delete document.participantRunCommands;
@@ -253,6 +254,7 @@ test("SQLite serializes command identities across two actual Node processes", as
   `;
   const timeout = setTimeout(() => { for (const worker of workers) worker.kill("SIGTERM"); }, 15_000);
   try {
+    await repository.saveParticipantSession({tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId,contentReleaseId:'owned',loginKey:'owned',groupKey:'owned',status:'launched',createdAt:issuedAt});
     await repository.saveTestRun({ ...scope, contentReleaseId: "owned", bookletKey: "owned", status: "running",
       currentUnitKey: "unit", unitResponses: {}, testletTimers: {}, createdAt: issuedAt, updatedAt: issuedAt, completedAt: null });
     const jobs = ["first", "second"].map(name => {
@@ -311,6 +313,7 @@ if (kinds.includes("postgres")) {
         contentReleaseId: "owned", bookletKey: "owned", status: "running", currentUnitKey: "unit",
         unitResponses: { unit: "Exact PostgreSQL answer before migration" }, testletTimers: {},
         createdAt: issuedAt, updatedAt: issuedAt, completedAt: null };
+      await storage.repository.saveParticipantSession({tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,contentReleaseId:run.contentReleaseId,loginKey:'owned',groupKey:'owned',status:'launched',createdAt:issuedAt});
       await storage.repository.saveTestRun(run);
       const before = await storage.repository.getTestRunById(run.testRunId);
       await storage.shutdown();

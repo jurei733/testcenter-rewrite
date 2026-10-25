@@ -1,5 +1,28 @@
 # CI iteration and complete acceptance
 
+## Native deletion coverage retains full and focused gates (2026-10-25)
+
+The [atomic native group/session cascade](ORIGINAL-RESULT-GROUPS.md) adds its complete
+suite to existing unit, PostgreSQL and focused Original-results gates. All old
+checks remain. The final local application passes **4,250 unit/frontend**, **2,456
+PostgreSQL**, and **217 targeted** controls. This includes actual protected HTTP,
+late durable rollback, no private-result decoding, a large selection and seven
+independent PostgreSQL writer operations observed waiting on database locks.
+Policy has 276 passes and one explicit macOS GNU-timeout skip; the complete-lock
+audit has zero vulnerabilities. Core/web typechecking, the complete production
+build, Actionlint and diff checks pass. Existing CSS/CommonJS warnings remain.
+The owned test database is removed after owner, zero-client and zero-schema
+checks; the initially stopped cluster is stopped again. Hosted qualification
+of this change is separate.
+
+The preceding reference-only full run
+[40196969583](https://github.com/jurei733/testcenter-rewrite/actions/runs/40196969583)
+has 87 successful jobs and an unusually long-running controller-timer browser
+leaf at the last observation. It is still live, not a completed acceptance result.
+The new application is qualified on an isolated branch while that run remains
+intact. No timer assertion, required gate or deadline has been removed, and no
+unproven timer fix or whole-CI speedup is claimed.
+
 ## Production Source deletion reference joins existing service feedback (2026-10-25)
 
 The [native group-deletion reference](ORIGINAL-RESULT-GROUPS.md) adds four frozen

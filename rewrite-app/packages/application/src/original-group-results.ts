@@ -2,6 +2,7 @@ import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/origin
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalLoginBinding, OriginalParticipantGroup, ParticipantSession, TestRun, WorkspaceActivityEvent, WorkspaceReview} from '@testcenter-rewrite-app/domain';
 import {FirstSliceError} from './first-slice-error.js';
+import {prepareOriginalGroupSelection} from './original-group-deletion.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {originalReviewUnitEventTypes, selectOriginalSavedUnitKeys} from './original-saved-unit-projection.js';
 
@@ -100,6 +101,7 @@ export function projectOriginalGroupResults(input: Scope & OriginalGroupResultIn
 
 export type OriginalGroupResultsPort = {
   list(input: {tenantKey: string; workspaceKey: string; groups?: string[]}): Promise<OriginalGroupResult[]>;
+  delete(input: {tenantKey: string; workspaceKey: string; groups: string[]}): Promise<void>;
 };
 export function createOriginalGroupResultsPort(repository: FirstSliceRepository,
   workspace: (tenantKey: string, workspaceKey: string) => Promise<Scope>): OriginalGroupResultsPort {
@@ -110,5 +112,10 @@ export function createOriginalGroupResultsPort(repository: FirstSliceRepository,
     const scope = await workspace(tenantKey, workspaceKey);
     const inventory = await repository.getOriginalGroupResultInventory(scope.tenantId, scope.workspaceId);
     return projectOriginalGroupResults({...scope, ...inventory, selectedGroups});
+  }, async delete(input) {
+    // Validate and copy the caller-owned selection before resolving workspace.
+    const groups = prepareOriginalGroupSelection(input.groups);
+    const scope = await workspace(input.tenantKey, input.workspaceKey);
+    if (!await repository.deleteOriginalGroupResults({...scope, groups})) throw new FirstSliceError(404, 'workspace_not_found', 'Workspace not found.');
   }};
 }

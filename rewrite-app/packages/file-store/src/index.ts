@@ -1,3 +1,5 @@
+import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
+import {prepareOriginalGroupDeletionInput, deleteOriginalGroupsFromCollections} from '@testcenter-rewrite-app/application';
 import {projectOriginalGroupResultInventory} from '@testcenter-rewrite-app/application';
 import {projectOriginalResultTest} from '@testcenter-rewrite-app/application';
 import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
@@ -969,6 +971,7 @@ const createFileRepository = (
     },
     async saveAttachmentFile(attachmentFile) {
       await mutate(state => {
+        guardResultArtifactCollections(state, attachmentResultParent(attachmentFile));
         state.attachmentFiles[attachmentFile.attachmentFileId] = attachmentFile;
       });
     },
@@ -1261,6 +1264,7 @@ const createFileRepository = (
     },
     async saveWorkspaceActivityEvent(activityEvent) {
       await mutate(state => {
+        guardResultArtifactCollections(state, activityResultParent(activityEvent));
         state.workspaceActivityEvents[activityEvent.activityEventId] = activityEvent;
       });
     },
@@ -1512,11 +1516,13 @@ const createFileRepository = (
     },
     async saveParticipantAccessCredential(credential) {
       await mutate(state => {
+        guardResultArtifactCollections(state, credential);
         state.participantAccessCredentials[credential.participantSessionId] = { ...credential };
       });
     },
     async revokeParticipantAccessCredential(input) {
       return mutate(state => {
+        guardResultArtifactCollections(state, input);
         const current = state.participantAccessCredentials[input.participantSessionId];
         if ((current?.tokenHash ?? null) !== input.expectedTokenHash) return false;
         state.participantAccessCredentials[input.participantSessionId] = {
@@ -1610,6 +1616,12 @@ const createFileRepository = (
         const next={...state,participantSessions:Object.fromEntries(people.map(person=>[person.participantSessionId,person])),
           testRuns:Object.fromEntries(runs.map(run=>[run.testRunId,run]))};
         await persistState(next);cachePromise=Promise.resolve(next);return structuredClone(result);
+      });
+    },
+    async updateParticipantSessionValidity(input) {
+      await mutate(state => {
+        const person = state.participantSessions[input.participantSessionId];
+        if (person && person.tenantId === input.tenantId && person.workspaceId === input.workspaceId) state.participantSessions[input.participantSessionId] = {...person, validUntil: input.validUntil};
       });
     },
     async saveParticipantSession(participantSession) {
@@ -1732,6 +1744,13 @@ const createFileRepository = (
       const state = await getState();
       return state.testRuns[testRunId] ?? null;
     },
+    async deleteOriginalGroupResults(raw) {
+      const input = prepareOriginalGroupDeletionInput(raw);
+      return mutate(state => {
+        if (!Object.values(state.workspacesByScope).some(row => row.tenantId === input.tenantId && row.workspaceId === input.workspaceId)) return null;
+        return deleteOriginalGroupsFromCollections(state, input);
+      });
+    },
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       const state = await getState();
       const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
@@ -1792,6 +1811,7 @@ const createFileRepository = (
     },
     async saveTestRun(testRun) {
       await mutate(state => {
+        guardResultArtifactCollections(state, {tenantId: testRun.tenantId, workspaceId: testRun.workspaceId, participantSessionId: testRun.participantSessionId});
         state.testRuns[testRun.testRunId] = withOriginalTestRunMode(testRun,state.participantSessions[testRun.participantSessionId]);
       });
     },
@@ -1917,6 +1937,7 @@ const createFileRepository = (
     },
     async saveParticipantTestLogs(testLogs) {
       await mutate(state => {
+        for (const log of testLogs) guardResultArtifactCollections(state, log);
         for (const testLog of testLogs) {
           if (testLog.participantTestLogId.startsWith("delivery:") && Object.hasOwn(state.participantTestLogs, testLog.participantTestLogId)) continue;
           state.participantTestLogs[testLog.participantTestLogId] = testLog;
@@ -1970,6 +1991,7 @@ const createFileRepository = (
     },
     async saveWorkspaceReview(review) {
       await mutate(state => {
+        guardResultArtifactCollections(state, review);
         state.workspaceReviews[review.reviewId] = review;
       });
     },

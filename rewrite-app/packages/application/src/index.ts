@@ -1,3 +1,6 @@
+export {assertResultArtifactParent, guardResultArtifactCollections, activityResultParent, attachmentResultParent, resultParentUnavailable, type ResultArtifactParent} from './result-artifact-parent.js';
+export {prepareOriginalGroupDeletionInput, selectOriginalGroupDeletionKeys, deleteOriginalGroupsFromCollections, attachmentTestRunId} from './original-group-deletion.js';
+export type {OriginalGroupDeletionInput, OriginalGroupDeletionResult} from './original-group-deletion.js';
 export {projectOriginalGroupResultInventory} from './original-group-results.js';
 export type {OriginalGroupResultInventory} from './original-group-results.js';
 export {projectOriginalResultTest} from './original-group-results.js';
@@ -1524,6 +1527,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
     workspaceId: string
   ): Promise<ParticipantSession[]>;
   saveParticipantSession(participantSession: ParticipantSession): Promise<void>;
+  /** Refresh imported validity without recreating a concurrently deleted person. */
+  updateParticipantSessionValidity(input: {participantSessionId: string; tenantId: string; workspaceId: string; validUntil: string | null}): Promise<void>;
   /** Atomic native Login/suffix lookup and creation; validate runs before any durable effect. */
   resolveOriginalParticipantSession(candidate: ParticipantSession, validate?: (person: Readonly<ParticipantSession>) => void): Promise<import('./original-person-identity.js').OriginalPersonResolution | null>;
   /** First validated credential login wins; returns null if the workspace was deleted. */
@@ -1576,6 +1581,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   listOriginalSessionTestFlags(participantSessionId: string): Promise<import('./original-session.js').OriginalSessionTest[]>;
   /** One committed inventory snapshot; never returns response/timer values or private review text. */
   getOriginalGroupResultInventory(tenantId: string, workspaceId: string): Promise<import('./original-group-results.js').OriginalGroupResultInventory>;
+  /** Atomically delete native group snapshots, current session descendants and capabilities. */
+  deleteOriginalGroupResults(input: import('./original-group-deletion.js').OriginalGroupDeletionInput): Promise<import('./original-group-deletion.js').OriginalGroupDeletionResult | null>;
   listTestRunsByParticipantSessionId(
     participantSessionId: string
   ): Promise<TestRun[]>;
@@ -25590,10 +25597,8 @@ export const createFirstSliceServices = (
         ) ?? participantSession.createdAt
       );
       if (validUntil !== participantSession.validUntil) {
-        await repository.saveParticipantSession({
-          ...participantSession,
-          validUntil
-        });
+        await repository.updateParticipantSessionValidity({participantSessionId: participantSession.participantSessionId,
+          tenantId: participantSession.tenantId, workspaceId: participantSession.workspaceId, validUntil});
       }
     }
 
