@@ -57,6 +57,10 @@
     "./system-check-custom-texts": {
       "types": "./dist/packages/contracts/src/system-check-custom-texts.d.ts",
       "default": "./dist/packages/contracts/src/system-check-custom-texts.js"
+    },
+    "./original-session": {
+      "types": "./dist/packages/contracts/src/original-session.d.ts",
+      "default": "./dist/packages/contracts/src/original-session.js"
     }
   },
   "dependencies": {

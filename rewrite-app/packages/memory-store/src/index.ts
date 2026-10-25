@@ -1,3 +1,4 @@
+import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
@@ -889,6 +890,9 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async getTestRunById(testRunId) {
       return state.testRuns.get(testRunId) ?? null;
+    },
+    async listOriginalSessionTestFlags(participantSessionId) {
+      return Array.from(state.testRuns.values()).filter(run => run.participantSessionId === participantSessionId).map(projectOriginalSessionTest);
     },
     async listTestRunsByParticipantSessionId(participantSessionId) {
       return Array.from(state.testRuns.values()).filter(

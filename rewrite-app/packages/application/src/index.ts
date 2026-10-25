@@ -1,3 +1,8 @@
+export {projectOriginalSessionTest} from './original-session.js';
+export type {OriginalSessionTest} from './original-session.js';
+import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
+import {createOriginalSessionPort} from './original-session.js';
+export type {OriginalSessionPort, OriginalAccessSet} from './original-session.js';
 import {createOriginalPersonNameSuffix,OriginalPersonIdentityConflictError} from './original-person-identity.js';
 export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix,resolveOriginalPerson,assertOriginalPersonUnique,projectOriginalPersonSessions,projectOriginalPersonRuns,projectOriginalLoginMode,withOriginalTestRunMode,OriginalPersonIdentityConflictError} from './original-person-identity.js';
 import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
@@ -1244,6 +1249,7 @@ export type FirstSlicePorts = {
   participantAccess: ParticipantAccessPort;
   /** Trusted native authentication core; HTTP must separately enforce configured proof of work. */
   originalAuthentication: import('./original-authentication.js').OriginalAuthenticationPort;
+  originalSession: import('./original-session.js').OriginalSessionPort;
   monitorRead: MonitorReadPort;
   monitorControl: MonitorControlPort;
   systemCheck: SystemCheckPort;
@@ -1560,6 +1566,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
     loginKey: string
   ): Promise<void>;
   getTestRunById(testRunId: string): Promise<TestRun | null>;
+  /** Session claims read only scope/identity/lock/opening metadata, never answer or timer payloads. */
+  listOriginalSessionTestFlags(participantSessionId: string): Promise<import('./original-session.js').OriginalSessionTest[]>;
   listTestRunsByParticipantSessionId(
     participantSessionId: string
   ): Promise<TestRun[]>;
@@ -6006,21 +6014,10 @@ const getParticipantCodeBookletAssignments = (
   participantCode: string | null | undefined
 ): NonNullable<ParticipantRosterEntry["bookletAssignments"]> => {
   const assignments = getParticipantRosterBookletAssignments(entry);
-  if (!assignments.some(assignment => (assignment.accessCodes?.length ?? 0) > 0)) {
-    // Source's uncoded bucket is keyed by the empty code. A retained native
-    // person with a formerly assigned code does not acquire that bucket.
-    return entry?.originalLoginIdentity && String(participantCode ?? '') !== '' ? [] : assignments;
-  }
-  const normalizedCode = entry?.originalLoginIdentity
-    ? String(participantCode ?? '').replace(/[A-Z]/g, letter => letter.toLowerCase())
-    : normalizeParticipantCode(participantCode);
-  if (!normalizedCode) {
-    return [];
-  }
-  // Uncoded Booklets accompany an existing native code bucket; they cannot
-  // manufacture one after the person's original code has been removed.
-  if (entry?.originalLoginIdentity && !assignments.some(assignment =>
-    assignment.accessCodes?.some(code => code.replace(/[A-Z]/g, letter => letter.toLowerCase()) === normalizedCode))) return [];
+  if (entry?.originalLoginIdentity) return selectOriginalParticipantAssignments(assignments, participantCode);
+  if (!assignments.some(assignment => (assignment.accessCodes?.length ?? 0) > 0)) return assignments;
+  const normalizedCode = normalizeParticipantCode(participantCode);
+  if (!normalizedCode) return [];
   return assignments.filter(
     assignment =>
       !assignment.accessCodes?.length ||
@@ -32354,6 +32351,16 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantAccess,
     originalAuthentication,
+    originalSession: createOriginalSessionPort({auth: originalAuthentication, repository,
+      assignments: (entry, code) => selectOriginalParticipantAssignments(getParticipantRosterBookletAssignments(entry), code),
+      async bookletLabels(scope) {
+        const [sources, events] = await Promise.all([repository.listSourcePackagesByWorkspace(scope.tenantId, scope.workspaceId),
+          repository.listWorkspaceActivityEventsByWorkspace(scope.tenantId, scope.workspaceId)]);
+        const catalog = buildWorkspaceFileCatalog(selectCurrentWorkspaceFiles(sources, events)
+          .filter(source => source.status !== 'rejected').map(projectWorkspaceFile));
+        return new Map(catalog.items.filter(file => file.fileType === 'Booklet').map(file => [file.metadata.identifier, file.metadata.label]));
+      }
+    }),
     participantRuntime: {
       async updateConnection(input) {
         const participantSessionId = normalizeParticipantSessionId(input.participantSessionId);

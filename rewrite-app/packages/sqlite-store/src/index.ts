@@ -1,3 +1,4 @@
+import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import {migrateNativePersonContentRelease} from './native-person-release-migration.js';
 import { mkdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
@@ -3672,6 +3673,15 @@ export const createSqliteFirstSliceStorage = (
         )
         .get(testRunId) as Record<string, unknown> | undefined;
       return mapTestRun(row);
+    },
+    async listOriginalSessionTestFlags(participantSessionId) {
+      const rows = database.prepare(`SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,booklet_key,
+        booklet_assignment_key,locked,original_result_state_json FROM test_runs WHERE participant_session_id=?`).all(participantSessionId) as Record<string, unknown>[];
+      return rows.map(row => projectOriginalSessionTest({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),
+        tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id),bookletKey:String(row.booklet_key),
+        ...(row.booklet_assignment_key == null ? {} : {bookletAssignmentKey:String(row.booklet_assignment_key)}),
+        locked:Number(row.locked) === 1,
+        ...(row.original_result_state_json == null ? {} : {originalResultState:JSON.parse(String(row.original_result_state_json)) as TestRun['originalResultState']})}));
     },
     async listTestRunsByParticipantSessionId(participantSessionId) {
       const rows = database

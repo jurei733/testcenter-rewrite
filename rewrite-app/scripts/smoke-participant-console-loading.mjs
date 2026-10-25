@@ -1,3 +1,4 @@
+import {createOwnedSmokeRoutes, qualifyOwnedSmokeRouteDrain} from './owned-smoke-routes.mjs';
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
@@ -97,6 +98,8 @@ try {
   reportSmokePhase('chromium-launch');
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
   await qualifySmokeRouteFailureSettlement(browser, base);
+  await qualifyOwnedSmokeRouteDrain(browser, base);
+  reportConsolePhase('participant_console_loading=scoped-route-drain-retains-unrelated-handlers-and-rejects-real-failures:passed');
   reportConsolePhase("participant_console_loading=cancelled-fetch-route-settles-and-unexpected-fetch-still-fails:passed");
   // Resume is a real controller transition even if the server Run is already
   // running: before the initial view arrives the controller itself is LOADING.
@@ -211,6 +214,15 @@ try {
     await remotePage.frameLocator("iframe").locator("#demoPlayerAnswer").fill("3");
     await poll(async()=>{const run=await loadingRepository.getTestRunById(runId);try{return JSON.parse(parseVeronaUnitResponse(run.unitResponses[run.currentUnitKey]).unitState.dataParts.answer)[0].value==='3';}catch{return false;}},"Trusted remote-case answer was not stored");
     let before=await loadingRepository.getTestRunById(runId);const applications=[],acks=[];let pausedHeld=false;
+    const completionProof={testRunId:runId,requests:[],responses:[],logs:[]};
+    loadingObservations.push({remoteCompletionProof:completionProof});
+    remotePage.on('request',request=>{
+      if(request.method()!=='POST'||!new URL(request.url()).pathname.endsWith('/command-completions'))return;
+      const packet=request.postDataJSON();completionProof.requests.push({kind:packet.command?.kind,commandId:packet.command?.commandId,timeStamp:packet.timeStamp});
+    });
+    remotePage.on('response',response=>{
+      if(response.request().method()==='POST'&&new URL(response.url()).pathname.endsWith('/command-completions'))completionProof.responses.push({status:response.status()});
+    });
     remotePage.on("request",request=>{if(request.method()==="PATCH"&&new URL(request.url()).pathname.includes("/commands/"))acks.push({path:new URL(request.url()).pathname,body:request.postDataJSON()});});
     const captureApplication=async route=>{const response=await route.fetch();assert.equal(response.status(),200);applications.push(await response.json());await route.fulfill({response});};
     const waitForRemoteReceipt=command=>poll(()=>Promise.resolve(
@@ -245,6 +257,7 @@ try {
     assert.ok(acks.some(ack=>ack.path.includes(pause.commandId)));assert.ok(acks.some(ack=>ack.path.includes(resume.commandId)));
     await poll(async()=>{
       const saved=(await loadingRepository.listParticipantTestLogsByWorkspace(after.tenantId,after.workspaceId)).filter(log=>log.testRunId===runId);
+      completionProof.logs=saved.filter(log=>['command executed','CONTROLLER'].includes(log.logKey)).map(log=>({key:log.logKey,content:log.logContent,timeStamp:log.timestamp}));
       return ['pause','resume'].every(keyword=>saved.filter(log=>log.logKey==='command executed'&&log.logContent===keyword).length===1);
     },'The two fulfilled remote command completions were not persisted exactly once');
     const logs=(await loadingRepository.listParticipantTestLogsByWorkspace(after.tenantId,after.workspaceId)).filter(log=>log.testRunId===runId);
@@ -652,6 +665,7 @@ try {
       const runtimeCapture=createInactiveRuntimeSnapshotGate(before.participantSessionId,heldRuntime.promise);
       let viewHeld=false,viewReleased=false,routeError;
       const heldAcks=[],issued=[];
+      const ownedRoutes=createOwnedSmokeRoutes(remotePage,{observe:pending=>reportSmokeObservation(`terminal-independent-${origin}:pending-owned-routes:${JSON.stringify(pending)}`)});
       const routeFailure=async(route,error)=>{
         const outcome=await settleFailedSmokeRoute(route,error);
         if(outcome.cancelled)loadingObservations.push({cancelledTerminalView:outcome.cancelled});
@@ -659,30 +673,33 @@ try {
       };
       try {
         reportSmokeObservation(`terminal-independent-${origin}:install-held-routes`);
-        await remotePage.route('**/application',captureApplication);
-        await remotePage.route(url=>url.pathname===runtimePath,async route=>{
+        await ownedRoutes.route('**/application',async(route,stage)=>{
+          stage('fetch');const response=await route.fetch();assert.equal(response.status(),200);
+          stage('read-receipt');applications.push(await response.json());stage('fulfill');await route.fulfill({response});
+        },'application');
+        await ownedRoutes.route(url=>url.pathname===runtimePath,async(route,stage)=>{
           try {
-            const response=await route.fetch();await runtimeCapture.observe(response);
-            await route.fulfill({response});
+            stage('fetch');const response=await route.fetch();stage('held-runtime');await runtimeCapture.observe(response);
+            stage('fulfill');await route.fulfill({response});
           } catch(error) {await routeFailure(route,error);}
-        });
-        await remotePage.route('**/current-state?*',async route=>{
+        },'runtime');
+        await ownedRoutes.route('**/current-state?*',async(route,stage)=>{
           try {
-            const response=await route.fetch(),data=await response.json();
-            if(!viewReleased&&data.currentRunState.testRun.status==='running'){viewHeld=true;await heldView.promise;}
-            await route.fulfill({response});
+            stage('fetch');const response=await route.fetch();stage('read-view');const data=await response.json();
+            if(!viewReleased&&data.currentRunState.testRun.status==='running'){viewHeld=true;stage('held-view');await heldView.promise;}
+            stage('fulfill');await route.fulfill({response});
           } catch(error) {await routeFailure(route,error);}
-        });
+        },'unit-view');
         if(origin==='remote') {
-          await remotePage.route('**/commands/*/acknowledgement',async route=>{
+          await ownedRoutes.route('**/commands/*/acknowledgement',async(route,stage)=>{
             if(route.request().method()!=='PATCH')return route.continue();
             try {
-              const response=await route.fetch(),command=(await response.json()).command;
+              stage('fetch');const response=await route.fetch();stage('read-acknowledgement');const command=(await response.json()).command;
               assert.ok(command.acknowledgedAt);heldAcks.push(command);
-              await (command.commandType==='complete'?completeAck.promise:resumeAck.promise);
-              await route.fulfill({response});
+              stage('held-acknowledgement');await (command.commandType==='complete'?completeAck.promise:resumeAck.promise);
+              stage('fulfill');await route.fulfill({response});
             } catch(error) {await routeFailure(route,error);}
-          });
+          },'acknowledgement');
           for(const commandType of ['complete','resume'])issued.push((await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType},operator)).command);
           await poll(()=>{if(routeError)throw routeError;return Promise.resolve(heldAcks.length===2);},'Both remote commands were not accepted before termination');
           assert.deepEqual(heldAcks.map(command=>command.commandId),issued.map(command=>command.commandId));
@@ -707,7 +724,7 @@ try {
         await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),`${origin} Resume did not reopen reception before its Unit view`);
         // The held ACK routes are only needed for the two preaccepted receipts.
         reportSmokeObservation(`terminal-independent-${origin}:retire-held-ack-route`);
-        await remotePage.unroute('**/commands/*/acknowledgement');
+        await ownedRoutes.remove('**/commands/*/acknowledgement');
         reportSmokeObservation(`terminal-independent-${origin}:apply-following-pause`);
         const following=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator)).command;issued.push(following);
         await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),`${origin} reopened reception did not apply a fresh Pause while views were held`);
@@ -717,7 +734,7 @@ try {
         await poll(()=>Promise.resolve(runtimeCapture.reads>=2),`${origin} stale Starter runtime was not reread after Resume/Pause`);
         viewReleased=true;heldView.resolve();
         reportSmokeObservation(`terminal-independent-${origin}:drain-released-routes`);
-        await remotePage.unrouteAll({behavior:'wait'});
+        await ownedRoutes.drain();
         if(routeError)throw routeError;
         assert.equal(await remotePage.locator('#originalParticipantStarter mat-card').count(),0);
         assert.match(await remotePane.innerText(),/STATUS:\s*PAUSED/);
@@ -742,7 +759,7 @@ try {
       } finally {
         heldRuntime.resolve();viewReleased=true;heldView.resolve();completeAck.resolve();resumeAck.resolve();
         reportSmokeObservation(`terminal-independent-${origin}:route-cleanup-begin`);
-        await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});
+        await ownedRoutes.drain().catch(()=>{});
         reportSmokeObservation(`terminal-independent-${origin}:route-cleanup-complete`);
       }
     }

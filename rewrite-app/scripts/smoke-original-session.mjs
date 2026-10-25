@@ -1,0 +1,131 @@
+import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
+import {spawn} from 'node:child_process';
+import {access, mkdtemp, mkdir, writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join, resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {chromium} from 'playwright';
+import {createServerRequestFailureGate} from './server-request-failure-gate.mjs';
+
+// Real browser WebCrypto + Source's five-field native client protocol. This
+// qualifies the transport, not production UI adoption or paired-page visuals.
+const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || '.');
+await access(join(root, 'dist/apps/web/browser/index.html'));
+const scratch = await mkdtemp(join(tmpdir(), 'owned-native-session-browser-'));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR) : scratch;
+await mkdir(artifacts, {recursive: true});
+const gate = createServerRequestFailureGate(), checks = [];
+const module = pathToFileURL(resolve('apps/api/dist/apps/api/src/index.js')).href;
+const server = spawn(process.execPath, ['--input-type=module', '-e', `
+ import {createProductionApiServer} from ${JSON.stringify(module)};
+ const server=await createProductionApiServer();
+ server.listen(0,'127.0.0.1',()=>process.send({port:server.address().port}));
+ process.once('SIGTERM',()=>server.close(()=>process.exit(0)));
+`], {cwd: root, env: {...process.env, FIRST_SLICE_STORE: 'sqlite', FIRST_SLICE_SQLITE_FILE: join(scratch, 'owned.sqlite'),
+  FIRST_SLICE_BOOTSTRAP_DEMO: 'false', FIRST_SLICE_OPERATOR_AUTH_REQUIRED: 'true', REQUIRE_LOGIN_PASSWORD: 'false',
+  FIRST_SLICE_XML_SCHEMA_PROFILE: 'original-19', FIRST_SLICE_PROOF_OF_WORK_SCOPES: 'participant,second_code',
+  FIRST_SLICE_PROOF_OF_WORK_SECRET: randomBytes(32).toString('hex'), FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET: '',
+  FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER: '12', FIRST_SLICE_PROOF_OF_WORK_TTL_MS: '60000'}, stdio: ['ignore', 'pipe', 'pipe', 'ipc']});
+gate.observeStream(server.stdout); gate.observeStream(server.stderr);
+const closed = new Promise(resolve => server.once('close', resolve));
+let browser, page;
+const mark = value => {checks.push(value); console.log('original_session_browser=' + value + ':passed');};
+try {
+  const port = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(Error('Owned API startup timed out')), 20_000);
+    server.once('message', ({port}) => {clearTimeout(timer); resolve(port);});
+    server.once('error', error => {clearTimeout(timer); reject(error);});
+    server.once('exit', () => {clearTimeout(timer); reject(Error('Owned API exited before startup'));});
+  });
+  const base = 'http://127.0.0.1:' + port;
+  const operatorApi = async (path, body, token, expected = 200) => {
+    const response = await fetch(base + path, {method: 'POST', headers: {'content-type': 'application/json', ...(token ? {authorization: 'Bearer ' + token} : {})}, body: JSON.stringify(body)});
+    assert.equal(response.status, expected, 'Owned admin fixture request failed'); return response.json();
+  };
+  const operatorPassword = 'Owned-native-browser-admin-2026!';
+  await operatorApi('/api/v1/admin/auth/bootstrap', {username: 'owned-native-browser', password: operatorPassword}, undefined, 201);
+  const operator = (await operatorApi('/api/v1/admin/auth/sign-in', {username: 'owned-native-browser', password: operatorPassword})).sessionToken;
+  const tenantKey = 'owned-native-browser', workspaceKey = 'owned';
+  await operatorApi('/api/v1/platform/tenants', {tenantKey, displayName: 'Owned native browser'}, operator, 201);
+  await operatorApi('/api/v1/tenants/' + tenantKey + '/workspaces', {workspaceKey, displayName: 'Owned native browser'}, operator, 201);
+  const workspace = '/api/v1/tenants/' + tenantKey + '/workspaces/' + workspaceKey;
+  const upload = (fileName, sourceDocument, mediaType = 'application/xml') => operatorApi(workspace + '/files', {fileName, sourceDocument, mediaType}, operator, 201);
+  const metadata = {id: 'owned-native-browser-player', version: '6.0.4', specVersion: '6.0', metadataVersion: '2.0', type: 'player',
+    name: [{lang: 'de', value: 'Owned native browser Player'}], description: [{lang: 'de', value: 'Owned fixture'}]};
+  await upload('player.html', '<html><script type="application/ld+json">' + JSON.stringify(metadata) + '</script><main>Owned fixture</main></html>', 'text/html');
+  await upload('unit.xml', '<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/unit-xml/17.6"><Metadata><Id>OWNED.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="owned-native-browser-player@6.0.4">Owned definition</Definition></Unit>');
+  await upload('booklet.xml', '<Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0"><Metadata><Id>OWNED.BROWSER</Id><Label>Owned native Booklet</Label></Metadata><Units><Unit id="OWNED.UNIT" label="Owned unit"/></Units></Booklet>');
+  const password = 'Owned-native-browser-private-2026!';
+  await operatorApi(workspace + '/participant-roster', {rosterText: '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="OWNED.NATIVE.BROWSER" label="Owned native browser">' +
+    ['native-browser', 'native-peer'].map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login>`).join('') + '</Group></Testtakers>'}, operator, 201);
+  browser = await chromium.launch({headless: process.env.CI === 'true' && process.env.UI_SMOKE_HEADFUL !== 'true'});
+  page = await browser.newPage({viewport: {width: 1280, height: 720}, locale: 'de-DE'});
+  await page.goto(base + '/app/participant?ui=original', {waitUntil: 'domcontentloaded'});
+  const request = async (method, path, body, token, status = 200) => {
+    const result = await page.evaluate(async ({method, path, body, token}) => {
+      const response = await fetch(path, {method, headers: {...(body === undefined ? {} : {'content-type': 'application/json'}), ...(token ? {AuthToken: token} : {})},
+        ...(body === undefined ? {} : {body: JSON.stringify(body)})});
+      const text = await response.text(); return {status: response.status, cache: response.headers.get('cache-control'), value: text ? JSON.parse(text) : null, empty: text.length === 0};
+    }, {method, path, body, token});
+    assert.equal(result.status, status, 'Unexpected native session HTTP status'); assert.equal(result.cache, 'private, no-store'); return result;
+  };
+  const solve = challenge => page.evaluate(async challenge => {
+    const encoder = new TextEncoder();
+    for (let number = 0; number <= challenge.maxNumber; number++) {
+      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(challenge.salt + number));
+      const hex = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+      if (hex === challenge.challenge) return {algorithm: challenge.algorithm, challenge: challenge.challenge, salt: challenge.salt, signature: challenge.signature, number};
+    }
+    throw Error('The actual native challenge was not solvable');
+  }, challenge);
+  await request('PUT', '/session/login', {name: 'native-browser', password}, undefined, 400);
+  await request('GET', '/session', undefined, undefined, 401);
+  mark('configured-protection-refuses-direct-secrets');
+  const loginChallenge = (await request('POST', '/session/challenge', {loginType: 'login', name: 'native-browser', password})).value;
+  assert.equal(JSON.stringify(loginChallenge).includes(password), false);
+  const loginSolution = await solve(loginChallenge);
+  assert.deepEqual(Object.keys(loginSolution).sort(), ['algorithm', 'challenge', 'number', 'salt', 'signature']);
+  const login = (await request('PUT', '/session', loginSolution)).value;
+  assert.deepEqual(login.flags, ['codeRequired']); assert.deepEqual(login.claims, {}); assert.deepEqual(login.access, {});
+  await request('PUT', '/session', loginSolution, undefined, 409);
+  mark('browser-webcrypto-solves-source-five-field-login-and-replay-is-refused');
+  const invalidCodeChallenge = (await request('POST', '/session/person/challenge', {code: ' Shared'}, login.token)).value;
+  await request('PUT', '/session', await solve(invalidCodeChallenge), login.token, 400);
+  mark('native-raw-code-is-not-trimmed-by-challenge-processing');
+  const challenge = (await request('POST', '/session/person/challenge', {code: 'sHaReD'}, login.token)).value;
+  assert.equal(JSON.stringify(challenge).includes('sHaReD'), false);
+  const solution = await solve(challenge);
+  await request('PUT', '/session', solution, undefined, 401);
+  let person = (await request('PUT', '/session', solution, login.token)).value;
+  assert.equal(person.displayName, 'Owned native browser/native-browser/sHaReD');
+  assert.deepEqual(person.access.test, ['OWNED.BROWSER']); assert.deepEqual(person.claims.test[0].flags, {locked: false, running: false});
+  assert.equal(person.claims.test[0].label, 'Owned native Booklet');
+  await request('PUT', '/session', solution, login.token, 409);
+  await request('POST', '/session/person/challenge', {code: 'Shared'}, person.token, 403);
+  mark('native-person-accessset-retains-typed-bearers-current-label-and-unopened-test-flags');
+  const peerWork = (await request('POST', '/session/challenge', {loginType: 'login', name: 'native-peer', password})).value;
+  const peer = (await request('PUT', '/session', await solve(peerWork))).value;
+  const repeat = await solve((await request('POST', '/session/person/challenge', {code: 'SHARED'}, login.token)).value);
+  await request('PUT', '/session', repeat, peer.token, 400);
+  const former = person.token; person = (await request('PUT', '/session', repeat, login.token)).value;
+  assert.ok(person.displayName.endsWith('/SHARED')); await request('GET', '/session', undefined, former, 401);
+  mark('cross-login-work-cannot-burn-owner-ticket-and-reentry-rotates-only-the-person');
+  await page.reload({waitUntil: 'domcontentloaded'});
+  const reread = (await request('GET', '/session', undefined, person.token)).value;
+  assert.ok(reread.displayName.endsWith('/sHaReD')); assert.deepEqual(reread.access.test, ['OWNED.BROWSER']);
+  assert.equal((await request('DELETE', '/session', undefined, login.token, 205)).empty, true);
+  assert.equal((await request('GET', '/session', undefined, login.token)).value.token, login.token);
+  assert.equal((await request('DELETE', '/session', undefined, person.token, 205)).empty, true);
+  await request('GET', '/session', undefined, person.token, 401);
+  mark('reload-preserves-first-person-spelling-and-empty-205-logout-keeps-login-capability');
+} catch (error) {
+  await page?.screenshot({path: join(artifacts, 'failure.png'), fullPage: true}).catch(() => {});
+  await writeFile(join(artifacts, 'failure.json'), JSON.stringify({errorName: error.name, checks}, null, 2));
+  process.exitCode = 1; console.error('original_session_browser=failed; category=' + error.name);
+} finally {
+  await page?.close(); await browser?.close(); server.kill('SIGTERM');
+  await closed; gate.assertHealthy();
+  await writeFile(join(artifacts, 'native-session-protocol.json'), JSON.stringify({checks}, null, 2));
+  console.log('owned_api=shutdown');
+}

@@ -1,3 +1,4 @@
+import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import { fileStoreTemporaryIdentity, hasFileStoreReaders, isDeadFileStoreTemporary, registerFileStoreAccess, withFileStoreAccess } from "./access.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -1728,6 +1729,10 @@ const createFileRepository = (
     async getTestRunById(testRunId) {
       const state = await getState();
       return state.testRuns[testRunId] ?? null;
+    },
+    async listOriginalSessionTestFlags(participantSessionId) {
+      const state = await getState();
+      return Object.values(state.testRuns).filter(run => run.participantSessionId === participantSessionId).map(projectOriginalSessionTest);
     },
     async listTestRunsByParticipantSessionId(participantSessionId) {
       const state = await getState();

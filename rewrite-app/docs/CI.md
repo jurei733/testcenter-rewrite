@@ -1,5 +1,57 @@
 # CI iteration and complete acceptance
 
+## Native Session boundary and bounded console cleanup (2026-10-25)
+
+The published native-assignment [full run 40183685738](https://github.com/jurei733/testcenter-rewrite/actions/runs/40183685738)
+is terminal **failure: 87 successful jobs, one failed participant-console leaf and
+the failed acceptance aggregate**, with no skips/cancellations. Head
+`eb4bc435b5a1a93cab674ed6c3ddbb525623b138` and actual merge
+`da6cd39959c32e9b46f3a9b0c0d34850636c013f` have identical application tree
+`e6ff901be9d43603e8c664ec0c9c3538f2d09a10`. The retained supervisor identifies
+`terminal-independent-native:drain-released-routes` during a global route wait.
+Artifact 12595387239 is 1,179,460 bytes with ZIP SHA-256
+`feb7e44c6f1f6d1a458b4382d10b4211f41a6c0c8fa2b837b703ff36f78718e2`.
+The historical blocking request and application/SDK cause remain unestablished.
+
+The terminal scenario now removes exactly its four owned handlers and bounds
+callback drain, retaining every product assertion and deadline. An independent
+Chromium fixture proves unrelated handlers survive, held callbacks must actually
+settle and unexpected callback failures still fail the smoke. This corrects test
+lifecycle ownership without accepting a timeout as success.
+
+The same published application tree passes independent [focused run 40183765371](https://github.com/jurei733/testcenter-rewrite/actions/runs/40183765371),
+**3/3 successful jobs**: auth **304 tests / 90 s**, results **379 / 91 s**,
+Systemcheck **9 / 58 s**. Every job passes 277 Linux policy checks, no skips, and
+complete-lock audit with zero vulnerabilities. Fresh core times are 9.77 / 12.86 /
+9.77 s and test times 34.99 / 34.41 / 3.13 s. Its isolated wrapper adds one workflow
+only. Focused success does not override the failed complete acceptance.
+
+The new [native participant Session boundary](ORIGINAL-SESSION.md) adds mandatory
+contract/security/HTTP checks to full unit, PostgreSQL and relevant focused
+service suites. Its real Chromium/WebCrypto protocol journey joins the existing
+quick proof-of-work cell. No broad visual row closes and production UI adoption
+remains open. New hosted acceptance must qualify this follow-up independently.
+
+Final local qualification passes **4,183 unit/frontend** (121 + 325 + 1,687 +
+2,050), **2,366 complete PostgreSQL** checks, and **141 all-store native
+Session/person controls**, without failures/skips. Typechecking, production build,
+Actionlint and diff checks pass. Full-lock audit reports zero vulnerabilities;
+policy passes 275 with one explicit GNU-timeout-only macOS skip. The existing
+protected UI smoke and all six native Session/WebCrypto markers pass as a pair.
+The complete console-loading/context-compat pair passes, including the formerly
+hanging terminal route drain and all five context compatibility markers.
+
+An earlier local console attempt failed before the repaired drain: the remote
+Pause completion log was absent while Resume was present. That attempt remains
+failed evidence; its root cause is not established. The smoke now retains bounded
+command IDs, completion response statuses and controller/completion log metadata
+for that boundary, without relaxing exact-once assertions. The diagnostic rerun
+passes the full pair. A passing rerun does not prove that intermittent issue fixed.
+Owned PostgreSQL has zero other connections and no remaining test schemas before
+removal; the initially stopped cluster is stopped again. New exact-head hosted
+acceptance remains required.
+
+
 ## Complete release-free baseline and protected Source proof (2026-10-25)
 
 [Full CI 40180975239](https://github.com/jurei733/testcenter-rewrite/actions/runs/40180975239)

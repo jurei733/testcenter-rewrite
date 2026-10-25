@@ -1,5 +1,21 @@
 # Testcenter parity checklist
 
+### Native participant HTTP and retained failed acceptance (2026-10-25)
+
+The [native Session boundary](ORIGINAL-SESSION.md) now implements participant
+AccessSets and five Source-compatible paths with encrypted, expiring, one-use,
+Login-bound proof of work. Current physical labels, case-colliding code buckets,
+first stored suffixes and credential-stage group labels have explicit controls.
+Metadata-only Test reads preserve private answer/timer payloads. The real browser
+protocol test is not production UI adoption. Native admin/operational transport,
+numeric Test transport, complete results and broad paired visuals remain open.
+
+Full CI 40183685738 ends with 87 successful jobs, a participant-console route-drain
+failure and failed aggregate. Owned callback cleanup now has independent browser
+controls; new hosted acceptance is still required. The unchanged formal ledger
+is **27 done / 22 partial**, all eight visual rows open. Remaining effort stays
+approximately **4–8 engineering weeks**.
+
 ### Current native code buckets and protected transport reference (2026-10-25)
 
 The preceding release-free/native-browser correction is now qualified by actual
