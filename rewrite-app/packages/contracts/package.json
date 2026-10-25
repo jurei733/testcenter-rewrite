@@ -61,6 +61,10 @@
     "./original-session": {
       "types": "./dist/packages/contracts/src/original-session.d.ts",
       "default": "./dist/packages/contracts/src/original-session.js"
+    },
+    "./original-group-results": {
+      "types": "./dist/packages/contracts/src/original-group-results.d.ts",
+      "default": "./dist/packages/contracts/src/original-group-results.js"
     }
   },
   "dependencies": {

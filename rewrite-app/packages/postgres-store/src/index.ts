@@ -1,3 +1,4 @@
+import {readOriginalGroupResultInventory} from './original-result-inventory.js';
 import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { defaultParticipantExecutionMode } from "@testcenter-rewrite-app/domain";
@@ -3496,6 +3497,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [testRunId],
         mapTestRun
       );
+    },
+    async getOriginalGroupResultInventory(tenantId, workspaceId) {
+      return readOriginalGroupResultInventory(pool, tenantId, workspaceId);
     },
     async listOriginalSessionTestFlags(participantSessionId) {
       const rows = (await pool.query(`SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,booklet_key,

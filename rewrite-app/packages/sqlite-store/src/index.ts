@@ -1,3 +1,4 @@
+import {readOriginalGroupResultInventory} from './original-result-inventory.js';
 import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import {migrateNativePersonContentRelease} from './native-person-release-migration.js';
 import { mkdirSync, statSync } from "node:fs";
@@ -3673,6 +3674,9 @@ export const createSqliteFirstSliceStorage = (
         )
         .get(testRunId) as Record<string, unknown> | undefined;
       return mapTestRun(row);
+    },
+    async getOriginalGroupResultInventory(tenantId, workspaceId) {
+      return readOriginalGroupResultInventory(database, tenantId, workspaceId);
     },
     async listOriginalSessionTestFlags(participantSessionId) {
       const rows = database.prepare(`SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,booklet_key,

@@ -1,3 +1,4 @@
+import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
 import {OriginalSessionProof} from './original-session-proof.js';
 import {handleOriginalSessionHttp, originalSessionRoutes} from './original-session-http.js';
 import { participantCommandExecutionRoute, type ExecuteParticipantRunCommandRequest } from "@testcenter-rewrite-app/contracts/participant-run-command";
@@ -2469,6 +2470,7 @@ const detailedResponsesPattern = createRoutePattern(
 const groupResultsPattern = createRoutePattern(
   productionApiRoutes.workspace.listGroupResults
 );
+const originalGroupResultsPattern = createRoutePattern(productionApiRoutes.workspace.listOriginalGroupResults);
 const reviewListPattern = createRoutePattern(
   productionApiRoutes.workspace.listReviews
 );
@@ -2702,6 +2704,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", openRunsCsvExportPattern],
   ["GET", detailedResponsesPattern],
   ["GET", groupResultsPattern],
+  ["GET", originalGroupResultsPattern],
   ["DELETE", groupResultsPattern],
   ["GET", reviewListPattern],
   ["POST", reviewListPattern],
@@ -3679,6 +3682,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       groupResultsPattern,
       productionApiRoutes.workspace.listGroupResults
     ],
+    ["GET", originalGroupResultsPattern, productionApiRoutes.workspace.listOriginalGroupResults],
     [
       "DELETE",
       groupResultsPattern,
@@ -7584,6 +7588,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         sendJson<ListDetailedResponsesResponse>(response, 200, { items });
         return;
+      }
+
+      const originalGroups = originalGroupResultsPattern.exec(pathname);
+      if (request.method === "GET" && originalGroups?.groups) {
+        const tenantKey = decodeRouteGroup(originalGroups.groups.tenantKey), workspaceKey = decodeRouteGroup(originalGroups.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {sendError(response, 400, 'invalid_workspace_scope', 'tenantKey and workspaceKey are required.'); return;}
+        response.setHeader('cache-control', 'private, no-store');
+        const raw = url.searchParams.get('groups');
+        const items = await services.originalGroupResults.list({tenantKey, workspaceKey, groups: raw ? raw.split(',') : []});
+        sendJson<OriginalGroupResult[]>(response, 200, items); return;
       }
 
       if (request.method === "GET" && groupResultsMatch?.groups) {

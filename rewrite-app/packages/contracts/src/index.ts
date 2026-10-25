@@ -1,3 +1,4 @@
+export type {OriginalGroupResult} from './original-group-results.js';
 export {originalSessionPaths} from './original-session.js';
 export type {OriginalAccessSet, OriginalTestAccess, OriginalWorkChallenge, OriginalWorkSolution} from './original-session.js';
 import type {WorkspaceFileAvailability} from "@testcenter-rewrite-app/domain";
@@ -255,6 +256,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/responses/detailed",
     listGroupResults:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups",
+    listOriginalGroupResults:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-groups",
     listReviews:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews",
     createReview:

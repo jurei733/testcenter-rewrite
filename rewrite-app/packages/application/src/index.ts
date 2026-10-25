@@ -1,3 +1,8 @@
+export {projectOriginalGroupResultInventory} from './original-group-results.js';
+export type {OriginalGroupResultInventory} from './original-group-results.js';
+export {projectOriginalResultTest} from './original-group-results.js';
+export type {OriginalResultTest} from './original-group-results.js';
+import {createOriginalGroupResultsPort} from './original-group-results.js';
 export {projectOriginalSessionTest} from './original-session.js';
 export type {OriginalSessionTest} from './original-session.js';
 import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
@@ -1250,6 +1255,7 @@ export type FirstSlicePorts = {
   /** Trusted native authentication core; HTTP must separately enforce configured proof of work. */
   originalAuthentication: import('./original-authentication.js').OriginalAuthenticationPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
+  originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
   monitorRead: MonitorReadPort;
   monitorControl: MonitorControlPort;
   systemCheck: SystemCheckPort;
@@ -1568,6 +1574,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   getTestRunById(testRunId: string): Promise<TestRun | null>;
   /** Session claims read only scope/identity/lock/opening metadata, never answer or timer payloads. */
   listOriginalSessionTestFlags(participantSessionId: string): Promise<import('./original-session.js').OriginalSessionTest[]>;
+  /** One committed inventory snapshot; never returns response/timer values or private review text. */
+  getOriginalGroupResultInventory(tenantId: string, workspaceId: string): Promise<import('./original-group-results.js').OriginalGroupResultInventory>;
   listTestRunsByParticipantSessionId(
     participantSessionId: string
   ): Promise<TestRun[]>;
@@ -32351,6 +32359,7 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantAccess,
     originalAuthentication,
+    originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository,
       assignments: (entry, code) => selectOriginalParticipantAssignments(getParticipantRosterBookletAssignments(entry), code),
       async bookletLabels(scope) {

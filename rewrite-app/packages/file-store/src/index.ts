@@ -1,3 +1,5 @@
+import {projectOriginalGroupResultInventory} from '@testcenter-rewrite-app/application';
+import {projectOriginalResultTest} from '@testcenter-rewrite-app/application';
 import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import { fileStoreTemporaryIdentity, hasFileStoreReaders, isDeadFileStoreTemporary, registerFileStoreAccess, withFileStoreAccess } from "./access.js";
 import { createHash, randomUUID } from "node:crypto";
@@ -1729,6 +1731,18 @@ const createFileRepository = (
     async getTestRunById(testRunId) {
       const state = await getState();
       return state.testRuns[testRunId] ?? null;
+    },
+    async getOriginalGroupResultInventory(tenantId, workspaceId) {
+      const state = await getState();
+      const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
+      return projectOriginalGroupResultInventory({
+        people: Object.values(state.participantSessions).filter(scoped),
+        bindings: Object.values(state.originalLoginBindings).filter(scoped),
+        groups: Object.values(state.originalParticipantGroups).filter(scoped),
+        runs: Object.values(state.testRuns).filter(scoped).map(run => projectOriginalResultTest(run)),
+        reviews: Object.values(state.workspaceReviews).filter(scoped),
+        events: Object.values(state.workspaceActivityEvents).filter(scoped)
+      });
     },
     async listOriginalSessionTestFlags(participantSessionId) {
       const state = await getState();

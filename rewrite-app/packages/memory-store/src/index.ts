@@ -1,3 +1,5 @@
+import {projectOriginalGroupResultInventory} from '@testcenter-rewrite-app/application';
+import {projectOriginalResultTest} from '@testcenter-rewrite-app/application';
 import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import {
   originalParticipantGroupKeysEqual,
@@ -890,6 +892,17 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async getTestRunById(testRunId) {
       return state.testRuns.get(testRunId) ?? null;
+    },
+    async getOriginalGroupResultInventory(tenantId, workspaceId) {
+      const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
+      return projectOriginalGroupResultInventory({
+        people: Array.from(state.participantSessions.values()).filter(scoped),
+        bindings: Array.from(state.originalLoginBindings.values()).filter(scoped),
+        groups: Array.from(state.originalParticipantGroups.values()).filter(scoped),
+        runs: Array.from(state.testRuns.values()).filter(scoped).map(run => projectOriginalResultTest(run)),
+        reviews: Array.from(state.workspaceReviews.values()).filter(scoped),
+        events: Array.from(state.workspaceActivityEvents.values()).filter(scoped)
+      });
     },
     async listOriginalSessionTestFlags(participantSessionId) {
       return Array.from(state.testRuns.values()).filter(run => run.participantSessionId === participantSessionId).map(projectOriginalSessionTest);

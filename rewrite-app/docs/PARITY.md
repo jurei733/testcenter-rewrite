@@ -1,5 +1,21 @@
 # Testcenter parity checklist
 
+### Qualified Session pipeline and native result inventory (2026-10-25)
+
+Full CI **40189158651 passes all 89 jobs**, including 4,183 unit/frontend and
+2,366 PostgreSQL checks, complete console/context browser flows, protected native
+Session work and Original/reference/deployability gates. No failures/skips/cancellations.
+The measured complete job span is 30:01; focused service feedback remains the
+separately measured 60–99-second iteration path, without a causal full-CI speedup claim.
+
+The next [native group-result read](ORIGINAL-RESULT-GROUPS.md) uses frozen group
+labels, current Login bindings, opened-Test history, distinct saved Units and
+separate group/Test clocks. One owned snapshot per adapter excludes private response
+and timer payloads; SQL HTTP and decoder controls exercise the real boundary.
+The literal native workspace/admin wire, result UI, selected-Test administration,
+report wire and broad paired visuals remain open. Formal ledger unchanged:
+**27 done / 22 partial; all eight visual rows open**, approximately **4–8 weeks**.
+
 ### Native participant HTTP and retained failed acceptance (2026-10-25)
 
 The [native Session boundary](ORIGINAL-SESSION.md) now implements participant

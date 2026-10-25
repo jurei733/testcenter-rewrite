@@ -1,0 +1,18 @@
+import {projectOriginalGroupResultInventory, projectOriginalResultTest, type OriginalGroupResultInventory} from '@testcenter-rewrite-app/application';
+import type {Pool} from 'pg';
+
+export async function readOriginalGroupResultInventory(pool: Pool, tenantId: string, workspaceId: string): Promise<OriginalGroupResultInventory> {
+  // One SQL statement gives every subquery the same database snapshot.
+  // Only Unit identities and result clocks cross the adapter boundary.
+  const row = (await pool.query(`WITH scope(tenant_id,workspace_id) AS (VALUES ($1::text,$2::text))
+    SELECT json_build_object(
+      'people',COALESCE((SELECT json_agg(json_build_object('tenantId',t.tenant_id,'workspaceId',t.workspace_id,'participantSessionId',t.participant_session_id,'contentReleaseId',t.content_release_id,'originalLoginKey',t.original_login_key,'groupKey',t.group_key)) FROM participant_sessions t JOIN scope s ON t.tenant_id=s.tenant_id AND t.workspace_id=s.workspace_id),'[]'::json),
+      'bindings',COALESCE((SELECT json_agg(json_build_object('tenantId',t.tenant_id,'workspaceId',t.workspace_id,'loginKey',t.login_key,'groupKey',t.group_key,'groupSnapshotKey',t.group_snapshot_key)) FROM original_login_bindings t JOIN scope s ON t.tenant_id=s.tenant_id AND t.workspace_id=s.workspace_id),'[]'::json),
+      'groups',COALESCE((SELECT json_agg(json_build_object('tenantId',t.tenant_id,'workspaceId',t.workspace_id,'groupKey',t.group_key,'groupLabel',t.group_label,'lastModifiedAt',t.last_modified_at)) FROM original_participant_groups t JOIN scope s ON t.tenant_id=s.tenant_id AND t.workspace_id=s.workspace_id),'[]'::json),
+      'runs',COALESCE((SELECT json_agg(json_build_object('tenantId',t.tenant_id,'workspaceId',t.workspace_id,'participantSessionId',t.participant_session_id,'testRunId',t.test_run_id,'contentReleaseId',t.content_release_id,'originalResultState',t.original_result_state_json::json,'savedUnitKeys',COALESCE((SELECT json_agg(key) FROM json_object_keys(t.unit_responses_json::json) AS saved_keys(key)),'[]'::json))) FROM test_runs t JOIN scope s ON t.tenant_id=s.tenant_id AND t.workspace_id=s.workspace_id),'[]'::json),
+      'reviews',COALESCE((SELECT json_agg(json_build_object('tenantId',t.tenant_id,'workspaceId',t.workspace_id,'participantSessionId',t.participant_session_id,'testRunId',t.test_run_id,'unitKey',t.unit_key)) FROM workspace_reviews t JOIN scope s ON t.tenant_id=s.tenant_id AND t.workspace_id=s.workspace_id),'[]'::json),
+      'events',COALESCE((SELECT json_agg(json_build_object('tenantId',t.tenant_id,'workspaceId',t.workspace_id,'eventType',t.event_type,'subjectType',t.subject_type,'subjectId',t.subject_id,'occurredAt',t.occurred_at,'details',json_build_object('reviewId',(t.details_json::json->'reviewId'),'participantSessionId',(t.details_json::json->'participantSessionId'),'unitKey',(t.details_json::json->'unitKey')))) FROM workspace_activity_events t JOIN scope s ON t.tenant_id=s.tenant_id AND t.workspace_id=s.workspace_id WHERE t.event_type IN ('review_created','review_updated','review_deleted')),'[]'::json))::text AS inventory`, [tenantId, workspaceId])).rows[0] as {inventory:string};
+  const raw = JSON.parse(row.inventory) as Omit<OriginalGroupResultInventory, 'runs'> & {
+    runs: Array<Parameters<typeof projectOriginalResultTest>[0] & {savedUnitKeys:string[]}>};
+  return projectOriginalGroupResultInventory({...raw, runs: raw.runs.map(run => projectOriginalResultTest(run, run.savedUnitKeys))});
+}
