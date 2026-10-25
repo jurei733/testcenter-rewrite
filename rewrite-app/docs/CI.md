@@ -1,5 +1,43 @@
 # CI iteration and complete acceptance
 
+## Production Source deletion reference joins existing service feedback (2026-10-25)
+
+The [native group-deletion reference](ORIGINAL-RESULT-GROUPS.md) adds four frozen
+production-evidence controls to the existing mandatory Original result suite.
+They verify artifact/source/probe integrity, genuine guarded production setup,
+whole-group capability revocation, moved identity preservation, denied writes,
+fresh recreation and public-receipt redaction. All 16 previous ALTCHA controls
+remain in the isolated Source run. No unit, PostgreSQL, policy, audit or full
+acceptance gate is removed; the focused results path receives the same controls.
+The new reference is not proof of a Rewrite deletion implementation or UI parity.
+Local verification passes **109/109** result/archive/Session controls with the new
+reference; CI policy passes 276 checks with one explicit GNU-timeout-only macOS
+skip. The captured Source workflow passes Actionlint and the diff is clean.
+The previously qualified 4,218/2,413 full suites belong to the application tree
+recorded below; no fresh complete-suite count is inferred for this reference-only
+follow-up.
+
+## Complete native result-read acceptance (2026-10-25)
+
+[Full CI 40193724586](https://github.com/jurei733/testcenter-rewrite/actions/runs/40193724586)
+is terminal **success, 89/89 jobs**, without failed, skipped or cancelled jobs.
+Head `2027fb9bae2707fdc366c51411e7502129248e61`, actual PR merge
+`7955844b44889617bccbf817c6f6cb60709587c6` and verified application tree
+`449f063094c5119fc295fcd50d3013fc793a976c` qualify the final adapter layout.
+Actual hosted logs pass **4,218 unit/frontend**, **2,413 PostgreSQL** and **277
+Linux CI-policy** checks, with zero audit vulnerabilities. The protected native
+Session browser journey, complete console/context journey, Original/reference,
+PostgreSQL UI and deployability gates all pass.
+
+Observed job span is **31:38**, 12:34:44–13:06:22 UTC; Fast feedback completes
+at 12:39:15 UTC. Together with the preceding 30:01 and 28:59 runs, this does not
+establish a whole-CI speedup. For iteration, [focused run 40193801269](https://github.com/jurei733/testcenter-rewrite/actions/runs/40193801269)
+passes all three service jobs on the same application tree plus one isolated
+wrapper: participant-auth **361 checks / 83 seconds**, original-results **483 /
+88 seconds**, system-check-reports **9 / 53 seconds**. Every focused job retains
+278 Linux policy checks and the complete-lock security audit. Focused success
+is separate from full acceptance; neither removes the other gate.
+
 ## Complete guarded Session acceptance and native result reads (2026-10-25)
 
 [Full CI 40189158651](https://github.com/jurei733/testcenter-rewrite/actions/runs/40189158651)

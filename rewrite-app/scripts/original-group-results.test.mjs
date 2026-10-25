@@ -1,3 +1,4 @@
+import './source-native-group-deletion-evidence.mjs';
 import assert from 'node:assert/strict';
 import {createHash, randomUUID} from 'node:crypto';
 import {mkdtemp, readFile, rm} from 'node:fs/promises';
