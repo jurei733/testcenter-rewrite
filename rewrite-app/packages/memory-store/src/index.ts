@@ -1,3 +1,5 @@
+import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
+import {prepareOriginalGroupDeletionInput, deleteOriginalGroupsFromCollections} from '@testcenter-rewrite-app/application';
 import {projectOriginalGroupResultInventory} from '@testcenter-rewrite-app/application';
 import {projectOriginalResultTest} from '@testcenter-rewrite-app/application';
 import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
@@ -274,6 +276,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return state.attachmentFiles.get(attachmentFileId) ?? null;
     },
     async saveAttachmentFile(attachmentFile) {
+      guardResultArtifactCollections(state, attachmentResultParent(attachmentFile));
       state.attachmentFiles.set(attachmentFile.attachmentFileId, attachmentFile);
     },
     async deleteAttachmentFile(attachmentFileId) {
@@ -496,6 +499,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       );
     },
     async saveWorkspaceActivityEvent(activityEvent) {
+      guardResultArtifactCollections(state, activityResultParent(activityEvent));
       state.workspaceActivityEvents.set(
         activityEvent.activityEventId,
         activityEvent
@@ -719,9 +723,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return credential ? { ...credential } : null;
     },
     async saveParticipantAccessCredential(credential) {
+      guardResultArtifactCollections(state, credential);
       state.participantAccessCredentials.set(credential.participantSessionId, { ...credential });
     },
     async revokeParticipantAccessCredential(input) {
+      guardResultArtifactCollections(state, input);
       const current = state.participantAccessCredentials.get(input.participantSessionId);
       if ((current?.tokenHash ?? null) !== input.expectedTokenHash) return false;
       state.participantAccessCredentials.set(input.participantSessionId, {
@@ -792,6 +798,10 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       for(const person of people)state.participantSessions.set(person.participantSessionId,person);
       for(const run of runs)state.testRuns.set(run.testRunId,run);
       return structuredClone(result);
+    },
+    async updateParticipantSessionValidity(input) {
+      const person = state.participantSessions.get(input.participantSessionId);
+      if (person && person.tenantId === input.tenantId && person.workspaceId === input.workspaceId) state.participantSessions.set(input.participantSessionId, {...person, validUntil: input.validUntil});
     },
     async saveParticipantSession(participantSession) {
       const previous = state.participantSessions.get(participantSession.participantSessionId);
@@ -893,6 +903,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async getTestRunById(testRunId) {
       return state.testRuns.get(testRunId) ?? null;
     },
+    async deleteOriginalGroupResults(raw) {
+      const input = prepareOriginalGroupDeletionInput(raw);
+      if (![...state.workspacesByScope.values()].some(row => row.tenantId === input.tenantId && row.workspaceId === input.workspaceId)) return null;
+      return deleteOriginalGroupsFromCollections(state, input);
+    },
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
       return projectOriginalGroupResultInventory({
@@ -944,6 +959,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return { testRun: prepared.testRun, created: prepared.created };
     },
     async saveTestRun(testRun) {
+      guardResultArtifactCollections(state, {tenantId: testRun.tenantId, workspaceId: testRun.workspaceId, participantSessionId: testRun.participantSessionId});
       state.testRuns.set(testRun.testRunId, withOriginalTestRunMode(testRun,state.participantSessions.get(testRun.participantSessionId)));
     },
     async activateParticipantController(input) {
@@ -1059,6 +1075,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       );
     },
     async saveParticipantTestLogs(testLogs) {
+      for (const log of testLogs) guardResultArtifactCollections(state, log);
       for (const testLog of testLogs) {
         // A stable delivery identity keeps its first persisted content and receipt time.
         if (testLog.participantTestLogId.startsWith("delivery:") && state.participantTestLogs.has(testLog.participantTestLogId)) continue;
@@ -1104,6 +1121,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       );
     },
     async saveWorkspaceReview(review) {
+      guardResultArtifactCollections(state, review);
       state.workspaceReviews.set(review.reviewId, review);
     },
     async deleteWorkspaceReview(reviewId) {

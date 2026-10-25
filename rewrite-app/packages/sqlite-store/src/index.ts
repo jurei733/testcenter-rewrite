@@ -1,3 +1,7 @@
+import {rollbackAfterFailure} from './transaction-rollback.js';
+import {guardResultArtifactParent, withResultArtifactParent} from './result-artifact-parent.js';
+import {activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
+import {deleteOriginalGroupResults} from './original-group-deletion.js';
 import {readOriginalGroupResultInventory} from './original-result-inventory.js';
 import {projectOriginalSessionTest} from '@testcenter-rewrite-app/application';
 import {migrateNativePersonContentRelease} from './native-person-release-migration.js';
@@ -1759,23 +1763,6 @@ const getCurrentSchemaVersion = (database: DatabaseSync): number => {
   return row ? Number(row.version) : 0;
 };
 
-function rollbackAfterFailure(database: DatabaseSync, error: unknown): never {
-  try {
-    database.exec("ROLLBACK");
-  } catch (rollbackError) {
-    // SQLite can already have rolled back the entire transaction after FULL,
-    // IOERR or a ROLLBACK conflict. Retain the primary failure for diagnostics
-    // and retry instead of replacing it with "no transaction is active".
-    if (!(rollbackError instanceof Error &&
-      rollbackError.message === "cannot rollback - no transaction is active")) {
-      const message = (failure: unknown) => failure instanceof Error ? failure.message : String(failure);
-      throw new AggregateError([error, rollbackError],
-        `SQLite transaction failed (${message(error)}); rollback failed (${message(rollbackError)}).`,
-        { cause: error });
-    }
-  }
-  throw error;
-}
 
 const applyMigrations = (database: DatabaseSync): void => {
   database.exec("PRAGMA foreign_keys = ON;");
@@ -2290,9 +2277,10 @@ export const createSqliteFirstSliceStorage = (
       return mapAttachmentFile(row);
     },
     async saveAttachmentFile(attachmentFile) {
-      database
-        .prepare(
-          `INSERT INTO attachment_files (
+      withResultArtifactParent(database, attachmentResultParent(attachmentFile), () => {
+        database
+          .prepare(
+            `INSERT INTO attachment_files (
             attachment_file_id, attachment_id, tenant_id, workspace_id,
             file_name, media_type, data_base64, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -2304,17 +2292,18 @@ export const createSqliteFirstSliceStorage = (
             media_type = excluded.media_type,
             data_base64 = excluded.data_base64,
             created_at = excluded.created_at`
-        )
-        .run(
-          attachmentFile.attachmentFileId,
-          attachmentFile.attachmentId,
-          attachmentFile.tenantId,
-          attachmentFile.workspaceId,
-          attachmentFile.fileName,
-          attachmentFile.mediaType,
-          attachmentFile.dataBase64,
-          attachmentFile.createdAt
-        );
+          )
+          .run(
+            attachmentFile.attachmentFileId,
+            attachmentFile.attachmentId,
+            attachmentFile.tenantId,
+            attachmentFile.workspaceId,
+            attachmentFile.fileName,
+            attachmentFile.mediaType,
+            attachmentFile.dataBase64,
+            attachmentFile.createdAt
+          );
+      });
     },
     async deleteAttachmentFile(attachmentFileId) {
       return (
@@ -2821,9 +2810,10 @@ export const createSqliteFirstSliceStorage = (
         .filter(Boolean) as WorkspaceActivityEvent[];
     },
     async saveWorkspaceActivityEvent(activityEvent) {
-      database
-        .prepare(
-          `INSERT INTO workspace_activity_events (
+      withResultArtifactParent(database, activityResultParent(activityEvent), () => {
+        database
+          .prepare(
+            `INSERT INTO workspace_activity_events (
             activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(activity_event_id) DO UPDATE SET
@@ -2836,19 +2826,20 @@ export const createSqliteFirstSliceStorage = (
             occurred_at = excluded.occurred_at,
             summary = excluded.summary,
             details_json = excluded.details_json`
-        )
-        .run(
-          activityEvent.activityEventId,
-          activityEvent.tenantId,
-          activityEvent.workspaceId,
-          activityEvent.eventType,
-          activityEvent.actorId,
-          activityEvent.subjectType,
-          activityEvent.subjectId,
-          activityEvent.occurredAt,
-          activityEvent.summary,
-          JSON.stringify(activityEvent.details)
-        );
+          )
+          .run(
+            activityEvent.activityEventId,
+            activityEvent.tenantId,
+            activityEvent.workspaceId,
+            activityEvent.eventType,
+            activityEvent.actorId,
+            activityEvent.subjectType,
+            activityEvent.subjectId,
+            activityEvent.occurredAt,
+            activityEvent.summary,
+            JSON.stringify(activityEvent.details)
+          );
+      });
     },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
       if (activityEventIds.length === 0) {
@@ -3426,6 +3417,9 @@ export const createSqliteFirstSliceStorage = (
         database.exec("COMMIT");return result;
       }catch(error){return rollbackAfterFailure(database,error);}
     },
+    async updateParticipantSessionValidity(input) {
+      database.prepare('UPDATE participant_sessions SET valid_until=? WHERE participant_session_id=? AND tenant_id=? AND workspace_id=?').run(input.validUntil, input.participantSessionId, input.tenantId, input.workspaceId);
+    },
     async saveParticipantSession(participantSession) {
       let previous=mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id=?").get(participantSession.participantSessionId));
       if (previous?.originalLoginKey === undefined && participantSession.originalLoginKey === undefined) participantSession=prepareOriginalParticipantSession(participantSession,previous,null);
@@ -3675,6 +3669,7 @@ export const createSqliteFirstSliceStorage = (
         .get(testRunId) as Record<string, unknown> | undefined;
       return mapTestRun(row);
     },
+    async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(database, input);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(database, tenantId, workspaceId);
     },
@@ -3763,6 +3758,7 @@ export const createSqliteFirstSliceStorage = (
     },
     async saveTestRun(testRun) {
       return withAssetWrite(()=>{
+        guardResultArtifactParent(database, {tenantId:testRun.tenantId,workspaceId:testRun.workspaceId,participantSessionId:testRun.participantSessionId});
         const parent=mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(testRun.participantSessionId));
         persistTestRun(database, withOriginalTestRunMode(testRun,parent));
       });
@@ -4003,8 +3999,9 @@ export const createSqliteFirstSliceStorage = (
           original_timestamp = excluded.original_timestamp
         WHERE substr(participant_test_logs.participant_test_log_id, 1, 9) <> 'delivery:'`
       );
-      database.exec("BEGIN");
+      database.exec("BEGIN IMMEDIATE");
       try {
+        for (const log of testLogs) guardResultArtifactParent(database, log);
         for (const testLog of testLogs) {
           statement.run(
             testLog.participantTestLogId,
@@ -4105,9 +4102,10 @@ export const createSqliteFirstSliceStorage = (
       return rows.map(row => mapWorkspaceReview(row)).filter(Boolean) as WorkspaceReview[];
     },
     async saveWorkspaceReview(review) {
-      database
-        .prepare(
-          `INSERT INTO workspace_reviews (
+      withResultArtifactParent(database, review, () => {
+        database
+          .prepare(
+            `INSERT INTO workspace_reviews (
             review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, page, page_label, user_agent, reviewer_id, category, priority, comment_text, created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(review_id) DO UPDATE SET
@@ -4126,25 +4124,26 @@ export const createSqliteFirstSliceStorage = (
             comment_text = excluded.comment_text,
             created_at = excluded.created_at,
             updated_at = excluded.updated_at`
-        )
-        .run(
-          review.reviewId,
-          review.tenantId,
-          review.workspaceId,
-          review.participantSessionId,
-          review.testRunId,
-          review.unitKey,
-          review.originalUnitId,
-          review.page,
-          review.pageLabel,
-          review.userAgent,
-          review.reviewerId,
-          review.category,
-          review.priority,
-          review.comment,
-          review.createdAt,
-          review.updatedAt
-        );
+          )
+          .run(
+            review.reviewId,
+            review.tenantId,
+            review.workspaceId,
+            review.participantSessionId,
+            review.testRunId,
+            review.unitKey,
+            review.originalUnitId,
+            review.page,
+            review.pageLabel,
+            review.userAgent,
+            review.reviewerId,
+            review.category,
+            review.priority,
+            review.comment,
+            review.createdAt,
+            review.updatedAt
+          );
+      });
     },
     async deleteWorkspaceReview(reviewId) {
       const result = database

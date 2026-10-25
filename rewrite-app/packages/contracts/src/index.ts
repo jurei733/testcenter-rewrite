@@ -258,6 +258,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups",
     listOriginalGroupResults:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-groups",
+    deleteOriginalGroupResults:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-groups",
     listReviews:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews",
     createReview:

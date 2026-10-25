@@ -4,8 +4,10 @@ import type { OriginalParticipantGroup } from "@testcenter-rewrite-app/domain";
 // Compare within a locked workspace instead of inventing a lowercase Unicode key.
 const groupCollator = new Intl.Collator("de-DE-u-ks-level2", { usage: "sort", sensitivity: "accent" });
 
+export const compareOriginalParticipantGroupKeys = (left: string, right: string): number => groupCollator.compare(left, right);
+
 export const originalParticipantGroupKeysEqual = (left: string, right: string): boolean =>
-  groupCollator.compare(left, right) === 0;
+  compareOriginalParticipantGroupKeys(left, right) === 0;
 
 export const prepareOriginalParticipantGroup = (input: {
   tenantId: string;

@@ -1,5 +1,21 @@
 # Testcenter parity checklist
 
+### Native group/session deletion foundation (2026-10-25)
+
+The protected versioned Original group route now deletes the current native
+snapshot hierarchy and private capabilities atomically on all four stores.
+Moved people/Tests, real foreign native data, canonical extensions and authored
+content survive. Late result writes are fenced; fresh native authentication
+cannot revive old tokens or Tests. Real SQL HTTP, final durable rollback, private
+response decoder controls and independent PostgreSQL lock waits are covered.
+See [exact scope and evidence](ORIGINAL-RESULT-GROUPS.md). Local qualification:
+4,250 unit/frontend, 2,456 PostgreSQL and 217 targeted controls, without failures/skips.
+
+Literal numeric Source workspace/admin transport, production table/dialog adoption,
+selected-Test operations, four native reports and broad visuals remain open.
+Formal ledger remains **27 done / 22 partial**, all eight visual rows open;
+remaining estimate stays **4–8 engineering weeks**. Hosted acceptance is pending.
+
 ### Hosted native result-read acceptance (2026-10-25)
 
 [Full CI 40193724586](https://github.com/jurei733/testcenter-rewrite/actions/runs/40193724586)

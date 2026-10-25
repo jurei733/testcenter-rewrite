@@ -17,11 +17,22 @@ const log = (id: string, content: string): ParticipantTestLog => ({
   timestamp: 1, recordedAt: "2026-10-10T00:00:00.000Z"
 });
 
+// Durable batch failures operate on an actual owned parent hierarchy.
+const seedLogParent = async (repository: ReturnType<typeof createSqliteFirstSliceRepository>) => {
+  const row = log('seed', 'seed');
+  await repository.saveParticipantSession({tenantId:row.tenantId,workspaceId:row.workspaceId,participantSessionId:row.participantSessionId,
+    contentReleaseId:'own-release',loginKey:'own-login',groupKey:'own-group',status:'launched',createdAt:row.recordedAt});
+  await repository.saveTestRun({tenantId:row.tenantId,workspaceId:row.workspaceId,participantSessionId:row.participantSessionId,
+    contentReleaseId:'own-release',testRunId:row.testRunId,bookletKey:'own-booklet',status:'running',currentUnitKey:null,
+    unitResponses:{},testletTimers:{},createdAt:row.recordedAt,updatedAt:row.recordedAt,completedAt:null});
+};
+
 for (const conflict of ["ABORT", "ROLLBACK"] as const) {
   test(`SQLite preserves the original ${conflict} error and atomically retries a test-log batch`, async () => {
     const directory = await mkdtemp(join(tmpdir(), "sqlite-log-failure-"));
     const databasePath = join(directory, "own.sqlite");
     const repository = createSqliteFirstSliceRepository(databasePath);
+  await seedLogParent(repository);
     const control = new DatabaseSync(databasePath);
     try {
       await repository.saveParticipantTestLogs([log("existing", "before")]);
@@ -49,6 +60,7 @@ test("SQLite preserves SQLITE_FULL, rolls back the whole test-log batch and reco
   const directory = await mkdtemp(join(tmpdir(), "sqlite-bounded-capacity-"));
   const databasePath = join(directory, "own.sqlite");
   const repository = createSqliteFirstSliceRepository(databasePath);
+  await seedLogParent(repository);
   const control = new DatabaseSync(databasePath);
   let limitedDatabase: DatabaseSync | undefined;
   const originalExec = DatabaseSync.prototype.exec;
@@ -58,7 +70,7 @@ test("SQLite preserves SQLITE_FULL, rolls back the whole test-log batch and reco
     // Limit only this real repository connection, without filling the host disk
     // or adding a test-only storage option to the production API.
     const hook = t.mock.method(DatabaseSync.prototype, "exec", function (this: DatabaseSync, sql: string) {
-      if (sql === "BEGIN" && !limitedDatabase) {
+      if (sql === "BEGIN IMMEDIATE" && !limitedDatabase) {
         limitedDatabase = this;
         originalExec.call(this, `PRAGMA max_page_count = ${pages + 16}`);
       }
@@ -107,6 +119,7 @@ test("SQLite keeps both failures when rollback itself fails unexpectedly", async
   const directory = await mkdtemp(join(tmpdir(), "sqlite-rollback-failure-"));
   const databasePath = join(directory, "own.sqlite");
   const repository = createSqliteFirstSliceRepository(databasePath);
+  await seedLogParent(repository);
   const control = new DatabaseSync(databasePath);
   const originalExec = DatabaseSync.prototype.exec;
   const rollbackError = new Error("own rollback I/O failure");
@@ -141,6 +154,7 @@ test("SQLite rolls back a test-log batch after a busy COMMIT and accepts a later
   const directory = await mkdtemp(join(tmpdir(), "sqlite-commit-failure-"));
   const databasePath = join(directory, "own.sqlite");
   const repository = createSqliteFirstSliceRepository(databasePath);
+  await seedLogParent(repository);
   const worker = new Worker(`
     const { DatabaseSync } = require('node:sqlite');
     const { parentPort, workerData } = require('node:worker_threads');
@@ -175,6 +189,7 @@ test("SQLite migration automatic rollback preserves its cause and leaves schema 
       contentReleaseId: "own", bookletKey: "own", status: "running" as const, currentUnitKey: "unit",
       unitResponses: { unit: "Exact answer before migration" }, testletTimers: {},
       createdAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-10T00:00:00.000Z", completedAt: null };
+    await repository.saveParticipantSession({tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,contentReleaseId:run.contentReleaseId,loginKey:'own',groupKey:'own',status:'launched',createdAt:run.createdAt});
     await repository.saveTestRun(run);
     const storedRun = await repository.getTestRunById(run.testRunId);
     control.exec(`DELETE FROM schema_migrations WHERE version >= 58;
