@@ -1,0 +1,26 @@
+name: Native assignment authorization qualification
+
+on:
+  push:
+    branches: [codex/service-focus-native-assignments-20261025]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  participant-auth:
+    uses: ./.github/workflows/rewrite-service-focus.yml
+    with:
+      check: participant-auth
+  original-results:
+    uses: ./.github/workflows/rewrite-service-focus.yml
+    with:
+      check: original-results
+  system-check-reports:
+    uses: ./.github/workflows/rewrite-service-focus.yml
+    with:
+      check: system-check-reports
