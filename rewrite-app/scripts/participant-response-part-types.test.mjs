@@ -11,8 +11,8 @@ import {compileBookletRuntimePolicy, parseVeronaUnitResponse} from '@testcenter-
 import {serializeCapturedVeronaUnitResponse as packet} from '@testcenter-rewrite-app/contracts/participant-response-capture';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
-import {createSqliteFirstSliceStorage, migrateSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
-import {createPostgresFirstSliceStorage, migratePostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
+import {createSqliteFirstSliceStorage, migrateSqliteFirstSliceStorage, SQLITE_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/sqlite-store';
+import {createPostgresFirstSliceStorage, migratePostgresFirstSliceStorage, POSTGRES_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/postgres-store';
 import {ParticipantResponseTypeError, withOrderedParticipantResponse} from '../packages/application/dist/packages/application/src/participant-response-persistence.js';
 import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
 
@@ -190,7 +190,7 @@ for (const kind of kinds) test(`${kind}: native authenticated progress retains p
       const exec = sql => kind === 'sqlite' ? control.exec(sql) : control.query(sql);
       const rows = async sql => kind === 'sqlite' ? control.prepare(sql).all().map(row => ({...row})) : (await control.query(sql)).rows;
       const version = kind === 'sqlite' ? 72 : 66;
-      await exec(`ALTER TABLE test_runs DROP COLUMN response_part_types_json; DELETE FROM schema_migrations WHERE version>=${version}`);
+      await exec(`DROP TABLE original_test_numbers; DROP TABLE original_test_number_counter; ALTER TABLE test_runs DROP COLUMN response_part_types_json; DELETE FROM schema_migrations WHERE version>=${version}`);
       const expected = await rows('SELECT test_run_id,unit_responses_json FROM test_runs ORDER BY test_run_id');
       await exec(kind === 'sqlite' ? `CREATE TRIGGER owned_type_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned type migration failure'); END`
         : `CREATE FUNCTION owned_type_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned type migration failure'; END $$; CREATE TRIGGER owned_type_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_type_failure()`);
@@ -203,7 +203,7 @@ for (const kind of kinds) test(`${kind}: native authenticated progress retains p
       } finally {
         await exec(kind === 'sqlite' ? 'DROP TRIGGER owned_type_failure' : 'DROP TRIGGER owned_type_failure ON schema_migrations; DROP FUNCTION owned_type_failure()');
       }
-      assert.equal((await migrate()).currentSchemaVersion, version);
+      assert.equal((await migrate()).currentSchemaVersion, kind === 'sqlite' ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION);
       if (kind === 'sqlite') control.close(); else await control.end(); control = undefined;
       await open(); assert.deepEqual(await read(), before); assert.equal((await read()).unitResponsePartTypes, undefined);
     });

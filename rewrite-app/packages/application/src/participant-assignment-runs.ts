@@ -1,3 +1,4 @@
+import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import type { ContentRelease, ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 import {withOriginalTestRunMode} from './original-person-identity.js';
 import { prepareParticipantRunMutation, type ParticipantRunMutationContext,
@@ -42,7 +43,10 @@ export const selectParticipantAssignmentRun = (
   const ownsAssignment = (run: TestRun): boolean =>
     run.participantSessionId === candidate.participantSessionId &&
     run.tenantId === candidate.tenantId && run.workspaceId === candidate.workspaceId &&
-    run.contentReleaseId === candidate.contentReleaseId && assignmentKey(run) === assignmentKey(candidate);
+    run.contentReleaseId === candidate.contentReleaseId && (session.originalLoginKey !== undefined &&
+      run.originalResultState?.bookletName !== undefined && candidate.originalResultState?.bookletName !== undefined
+      ? originalParticipantGroupKeysEqual(run.originalResultState.bookletName, candidate.originalResultState.bookletName)
+      : assignmentKey(run) === assignmentKey(candidate));
   if (runs.some(run => run.testRunId === candidate.testRunId && !ownsAssignment(run))) {
     throw new Error("Run ID already exists outside the participant assignment reservation.");
   }

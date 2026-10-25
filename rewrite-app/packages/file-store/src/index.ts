@@ -1,3 +1,4 @@
+import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
 import {prepareOriginalGroupDeletionInput, deleteOriginalGroupsFromCollections} from '@testcenter-rewrite-app/application';
 import {projectOriginalGroupResultInventory} from '@testcenter-rewrite-app/application';
@@ -120,6 +121,8 @@ type PersistedFirstSliceState = {
   participantRosterPasswordHashes: Record<string, string>;
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
+  originalTestNumbers: Record<string, OriginalTestNumberRecord>;
+  originalTestNumberCounter: string;
   participantRunCommands: Record<string, ParticipantRunCommand>;
   participantProgressDeliveries: Record<string, ParticipantProgressDelivery>;
   participantTestLogs: Record<string, ParticipantTestLog>;
@@ -177,6 +180,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantRosterPasswordHashes: {},
   participantLoginAttempts: {},
   testRuns: {},
+  originalTestNumbers: {},
+  originalTestNumberCounter: "0",
   participantRunCommands: {},
   participantProgressDeliveries: {},
   participantTestLogs: {},
@@ -805,18 +810,17 @@ const createFileRepository = (
   };
 
   const mutateParticipantRunApplication = <Result extends { applied: boolean } | null>(
-    updater: (state: PersistedFirstSliceState) => Result
+    updater: (state: PersistedFirstSliceState) => Result, includeOriginalNumbers = false
   ): Promise<Result> => {
     return enqueueMutation(async () => {
       const current = await getState();
-      const next = { ...current, participantRunCommands: { ...current.participantRunCommands },
-        participantProgressDeliveries: { ...current.participantProgressDeliveries },
+      const next = { ...current, ...(includeOriginalNumbers ? {originalTestNumbers: {...current.originalTestNumbers}} : {}),
+        participantRunCommands: { ...current.participantRunCommands }, participantProgressDeliveries: { ...current.participantProgressDeliveries },
         testRuns: { ...current.testRuns }, participantSessions: { ...current.participantSessions },
         participantTestLogs: { ...current.participantTestLogs }, workspaceActivityEvents: { ...current.workspaceActivityEvents } };
       const result = updater(next);
       if (!result?.applied) return result;
-      await persistState(next);
-      cachePromise = Promise.resolve(next);
+      await persistState(next); cachePromise = Promise.resolve(next);
       return result;
     });
   };
@@ -1740,6 +1744,20 @@ const createFileRepository = (
       }
       return result;
     },
+    async getOrCreateOriginalTestNumber(input) {
+      return enqueueMutation(async () => {
+        const current = await getState();
+        guardResultArtifactCollections(current, input);
+        const prepared = prepareOriginalTestNumber(input, current.testRuns[input.testRunId] ?? null,
+          current.participantSessions[input.participantSessionId] ?? null,
+          current.originalTestNumbers && Object.hasOwn(current.originalTestNumbers, input.testRunId) ? current.originalTestNumbers[input.testRunId] : undefined,
+          current.originalTestNumberCounter ?? "0");
+        if (!prepared.changed) return prepared.record.testNumber;
+        const next = {...current, originalTestNumbers: {...current.originalTestNumbers, [input.testRunId]: prepared.record}, originalTestNumberCounter: prepared.counter};
+        await persistState(next); cachePromise = Promise.resolve(next);
+        return prepared.record.testNumber;
+      });
+    },
     async getTestRunById(testRunId) {
       const state = await getState();
       return state.testRuns[testRunId] ?? null;
@@ -1789,25 +1807,28 @@ const createFileRepository = (
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
     },
-    async getOrCreateTestRunForAssignment(candidate, initialize) {
+    async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
+      if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}
       const result = await mutateParticipantRunApplication(state => {
-        const prepared = prepareParticipantAssignmentRunCreation(candidate,
-          state.participantSessions[candidate.participantSessionId] ?? null,
+        const prepared = prepareParticipantAssignmentRunCreation(candidate, state.participantSessions[candidate.participantSessionId] ?? null,
           Object.values(state.testRuns), initialize, state.contentReleases[candidate.contentReleaseId]);
+        const numbered = allocateOriginalNumber ? prepareOriginalTestNumber({...prepared.testRun, consumeSequence: true}, prepared.testRun,
+          prepared.effect?.participantSession ?? state.participantSessions[candidate.participantSessionId] ?? null,
+          Object.hasOwn(state.originalTestNumbers, prepared.testRun.testRunId) ? state.originalTestNumbers[prepared.testRun.testRunId] : undefined,
+          state.originalTestNumberCounter ?? "0") : undefined;
         if (prepared.effect) {
           const effect = prepared.effect;
-          if (effect.testLogs.some(log => state.participantTestLogs[log.participantTestLogId]) ||
-            effect.activityEvents.some(event => state.workspaceActivityEvents[event.activityEventId])) {
-            throw new Error("Initial participant artifacts cannot overwrite existing identities.");
-          }
+          if (effect.testLogs.some(log => state.participantTestLogs[log.participantTestLogId]) || effect.activityEvents.some(event => state.workspaceActivityEvents[event.activityEventId])) throw new Error("Initial participant artifacts cannot overwrite existing identities.");
           state.testRuns[candidate.testRunId] = effect.testRun;
           for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
           for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
           if (effect.participantSession) state.participantSessions[candidate.participantSessionId] = effect.participantSession;
         }
-        return { testRun: prepared.testRun, created: prepared.created, applied: prepared.created };
-      });
-      return { testRun: result.testRun, created: result.created };
+        if (numbered?.changed) {state.originalTestNumbers[prepared.testRun.testRunId] = numbered.record; state.originalTestNumberCounter = numbered.counter;}
+        return {testRun: prepared.testRun, created: prepared.created, applied: prepared.created || numbered?.changed === true,
+          ...(numbered ? {originalTestNumber: numbered.record.testNumber} : {})};
+      }, allocateOriginalNumber === true);
+      return {testRun: result.testRun, created: result.created, ...(result.originalTestNumber ? {originalTestNumber: result.originalTestNumber} : {})};
     },
     async saveTestRun(testRun) {
       await mutate(state => {
@@ -1908,6 +1929,7 @@ const createFileRepository = (
           }
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
+            if (state.originalTestNumbers) delete state.originalTestNumbers[testRunId];
             deletedCount += 1;
           }
         }

@@ -1,3 +1,4 @@
+import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {participantExecutionModeDefinitions, defaultParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
 import type {ParticipantBookletAssignment, ParticipantRosterEntry, TestRun} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
@@ -76,7 +77,7 @@ export function createOriginalSessionPort(input: {
         if (label === undefined) throw new FirstSliceError(409, 'original_booklet_unavailable', 'An assigned Booklet is unavailable.');
         const owned = runs.filter(run => run.participantSessionId === person!.participantSessionId && run.tenantId === person!.tenantId &&
           run.workspaceId === person!.workspaceId && run.contentReleaseId === person!.contentReleaseId &&
-          (run.bookletAssignmentKey ?? run.bookletKey) === assignment.assignmentKey);
+          originalParticipantGroupKeysEqual(run.bookletAssignmentKey ?? run.bookletKey, assignment.assignmentKey));
         if (owned.length > 1) throw new FirstSliceError(409, 'original_test_history_ambiguous', 'The Original Test identity is ambiguous.');
         const run = owned[0];
         if (run && run.lastOpenedAt === undefined) throw new FirstSliceError(409, 'original_test_history_unknown', 'The Original Test opening state is unavailable.');

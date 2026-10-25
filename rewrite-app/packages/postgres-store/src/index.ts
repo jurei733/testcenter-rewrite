@@ -1,3 +1,5 @@
+import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
+import {allocateOriginalTestNumber} from './original-test-number.js';
 import {guardResultArtifactParent, guardResultArtifactBatch, withResultArtifactParent} from './result-artifact-parent.js';
 import {assertResultArtifactParent, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
 import {deleteOriginalGroupResults} from './original-group-deletion.js';
@@ -1678,6 +1680,18 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
     version: 66,
     name: "participant_response_part_types",
     sql: `ALTER TABLE test_runs ADD COLUMN response_part_types_json TEXT;`
+  },
+  {
+    version: 67,
+    name: "original_native_test_numbers",
+    sql: `CREATE TABLE original_test_number_counter (singleton INTEGER PRIMARY KEY CHECK(singleton=1), last_number TEXT NOT NULL);
+      INSERT INTO original_test_number_counter(singleton,last_number) VALUES(1,'0');
+      CREATE TABLE original_test_numbers (
+        test_number TEXT PRIMARY KEY, test_run_id TEXT NOT NULL UNIQUE,
+        participant_session_id TEXT NOT NULL, tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, content_release_id TEXT NOT NULL,
+        FOREIGN KEY(test_run_id) REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        FOREIGN KEY(participant_session_id) REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE
+      );`
   }
 ];
 
@@ -3511,6 +3525,13 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       }
       return loginAttempt;
     },
+    async getOrCreateOriginalTestNumber(input) {
+      return withResultArtifactParent(pool, input, async client => {
+        const run = mapTestRun((await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE test_run_id=$1`,[input.testRunId])).rows[0]);
+        const person = mapParticipantSession((await client.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1',[input.participantSessionId])).rows[0]);
+        return allocateOriginalTestNumber(client, input, run, person);
+      });
+    },
     async getTestRunById(testRunId) {
       return one(
         `SELECT ${testRunProjection}
@@ -3562,7 +3583,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapTestRun
       );
     },
-    async getOrCreateTestRunForAssignment(candidate, initialize) {
+    async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
+      if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -3586,8 +3608,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         const initialRelease = initialReleaseRow ? {contentReleaseId:String(initialReleaseRow.content_release_id),tenantId:String(initialReleaseRow.tenant_id),workspaceId:String(initialReleaseRow.workspace_id),status:initialReleaseRow.status as ContentRelease['status']} : null;
         const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize, initialRelease);
         if (!prepared.created) {
+          const originalTestNumber = allocateOriginalNumber ? await allocateOriginalTestNumber(client, {...prepared.testRun, consumeSequence: true}, prepared.testRun, session) : undefined;
           await client.query("COMMIT");
-          return { testRun: prepared.testRun, created: false };
+          return { testRun: prepared.testRun, created: false, ...(originalTestNumber ? {originalTestNumber} : {}) };
         }
         if (!await persistTestRun(client, prepared.testRun, false)) {
           throw new Error("Run ID already exists outside the participant assignment reservation.");
@@ -3608,8 +3631,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           `SELECT ${testRunProjection} FROM test_runs WHERE test_run_id = $1`, [candidate.testRunId]
         )).rows[0]);
         if (!stored) throw new Error("Participant assignment reservation was not persisted.");
+        const originalTestNumber = allocateOriginalNumber ? await allocateOriginalTestNumber(client, {...stored, consumeSequence: true}, stored, effect.participantSession ?? session) : undefined;
         await client.query("COMMIT");
-        return { testRun: stored, created: true };
+        return { testRun: stored, created: true, ...(originalTestNumber ? {originalTestNumber} : {}) };
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

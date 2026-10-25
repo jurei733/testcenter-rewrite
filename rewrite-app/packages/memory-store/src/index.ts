@@ -1,3 +1,4 @@
+import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
 import {prepareOriginalGroupDeletionInput, deleteOriginalGroupsFromCollections} from '@testcenter-rewrite-app/application';
 import {projectOriginalGroupResultInventory} from '@testcenter-rewrite-app/application';
@@ -102,6 +103,8 @@ type InMemoryFirstSliceState = {
   participantRosterPasswordHashes: Map<string, string>;
   participantLoginAttempts: Map<string, ParticipantLoginAttempt>;
   testRuns: Map<string, TestRun>;
+  originalTestNumbers: Map<string, OriginalTestNumberRecord>;
+  originalTestNumberCounter: string;
   participantRunCommands: Map<string, ParticipantRunCommand>;
   participantProgressDeliveries: Map<string, ParticipantProgressDelivery>;
   participantTestLogs: Map<string, ParticipantTestLog>;
@@ -137,6 +140,8 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   participantRosterPasswordHashes: new Map(),
   participantLoginAttempts: new Map(),
   testRuns: new Map(),
+  originalTestNumbers: new Map(),
+  originalTestNumberCounter: "0",
   participantRunCommands: new Map(),
   participantProgressDeliveries: new Map(),
   participantTestLogs: new Map(),
@@ -900,6 +905,13 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       state.participantLoginAttempts.set(attemptKey, next);
       return next;
     },
+    async getOrCreateOriginalTestNumber(input) {
+      guardResultArtifactCollections(state, input);
+      const prepared = prepareOriginalTestNumber(input, state.testRuns.get(input.testRunId) ?? null,
+        state.participantSessions.get(input.participantSessionId) ?? null, state.originalTestNumbers.get(input.testRunId), state.originalTestNumberCounter);
+      if (prepared.changed) {state.originalTestNumbers.set(input.testRunId, prepared.record); state.originalTestNumberCounter = prepared.counter;}
+      return prepared.record.testNumber;
+    },
     async getTestRunById(testRunId) {
       return state.testRuns.get(testRunId) ?? null;
     },
@@ -941,10 +953,14 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
     },
-    async getOrCreateTestRunForAssignment(candidate, initialize) {
+    async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
+      if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}
       const prepared = prepareParticipantAssignmentRunCreation(candidate,
         state.participantSessions.get(candidate.participantSessionId) ?? null,
         Array.from(state.testRuns.values()), initialize, state.contentReleases.get(candidate.contentReleaseId));
+      const numbered = allocateOriginalNumber ? prepareOriginalTestNumber({...prepared.testRun, consumeSequence: true}, prepared.testRun,
+        prepared.effect?.participantSession ?? state.participantSessions.get(candidate.participantSessionId) ?? null,
+        state.originalTestNumbers.get(prepared.testRun.testRunId), state.originalTestNumberCounter) : undefined;
       if (prepared.effect) {
         const effect = prepared.effect;
         if (effect.testLogs.some(log => state.participantTestLogs.has(log.participantTestLogId)) ||
@@ -956,7 +972,8 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         for (const event of effect.activityEvents) state.workspaceActivityEvents.set(event.activityEventId, event);
         if (effect.participantSession) state.participantSessions.set(candidate.participantSessionId, effect.participantSession);
       }
-      return { testRun: prepared.testRun, created: prepared.created };
+      if (numbered?.changed) {state.originalTestNumbers.set(prepared.testRun.testRunId, numbered.record); state.originalTestNumberCounter = numbered.counter;}
+      return { testRun: prepared.testRun, created: prepared.created, ...(numbered ? {originalTestNumber: numbered.record.testNumber} : {}) };
     },
     async saveTestRun(testRun) {
       guardResultArtifactCollections(state, {tenantId: testRun.tenantId, workspaceId: testRun.workspaceId, participantSessionId: testRun.participantSessionId});
@@ -1049,6 +1066,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         for (const [key, receipt] of state.participantProgressDeliveries) {
           if (receipt.testRunId === testRunId) state.participantProgressDeliveries.delete(key);
         }
+        state.originalTestNumbers.delete(testRunId);
         if (state.testRuns.delete(testRunId)) {
           deletedCount += 1;
         }

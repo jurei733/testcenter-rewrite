@@ -1,3 +1,4 @@
+import {handleOriginalTestHttp, originalTestCreationPath} from './original-test-http.js';
 import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
 import {OriginalSessionProof} from './original-session-proof.js';
 import {handleOriginalSessionHttp, originalSessionRoutes} from './original-session-http.js';
@@ -3321,6 +3322,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /system-check";
   }
 
+  if (pathname === originalTestCreationPath) return `${method} ${originalTestCreationPath}`;
   if (originalSessionRoutes.get(pathname)?.includes(method)) return `${method} ${pathname}`;
 
   if (method === "GET" && pathname === "/healthz") {
@@ -4968,6 +4970,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         return;
       }
+
+      if (await handleOriginalTestHttp({request, pathname, services,
+        readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),
+        send: (status, value) => sendJson(response, status, value),
+        raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); response.end(text);}
+      })) return;
 
       if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,
         readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),

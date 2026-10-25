@@ -1,3 +1,5 @@
+import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
+import {allocateOriginalTestNumber} from './original-test-number.js';
 import {rollbackAfterFailure} from './transaction-rollback.js';
 import {guardResultArtifactParent, withResultArtifactParent} from './result-artifact-parent.js';
 import {activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
@@ -1745,6 +1747,18 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
     version: 72,
     name: "participant_response_part_types",
     sql: `ALTER TABLE test_runs ADD COLUMN response_part_types_json TEXT;`
+  },
+  {
+    version: 73,
+    name: "original_native_test_numbers",
+    sql: `CREATE TABLE original_test_number_counter (singleton INTEGER PRIMARY KEY CHECK(singleton=1), last_number TEXT NOT NULL);
+      INSERT INTO original_test_number_counter(singleton,last_number) VALUES(1,'0');
+      CREATE TABLE original_test_numbers (
+        test_number TEXT PRIMARY KEY, test_run_id TEXT NOT NULL UNIQUE,
+        participant_session_id TEXT NOT NULL, tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, content_release_id TEXT NOT NULL,
+        FOREIGN KEY(test_run_id) REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        FOREIGN KEY(participant_session_id) REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE
+      );`
   }
 ];
 
@@ -3669,6 +3683,13 @@ export const createSqliteFirstSliceStorage = (
       }
       return result;
     },
+    async getOrCreateOriginalTestNumber(input) {
+      return withResultArtifactParent(database, input, () => {
+        const run = mapTestRun(database.prepare('SELECT * FROM test_runs WHERE test_run_id=?').get(input.testRunId) as Record<string, unknown> | undefined);
+        const person = mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(input.participantSessionId) as Record<string, unknown> | undefined);
+        return allocateOriginalTestNumber(database, input, run, person);
+      });
+    },
     async getTestRunById(testRunId) {
       const row = database
         .prepare(
@@ -3724,7 +3745,8 @@ export const createSqliteFirstSliceStorage = (
         .all(tenantId, workspaceId) as Record<string, unknown>[];
       return rows.map(row => mapTestRun(row)).filter(Boolean) as TestRun[];
     },
-    async getOrCreateTestRunForAssignment(candidate, initialize) {
+    async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
+      if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}
       database.exec("BEGIN IMMEDIATE");
       try {
         const session = mapParticipantSession(database.prepare(
@@ -3738,8 +3760,9 @@ export const createSqliteFirstSliceStorage = (
         const initialRelease = initialReleaseRow ? {contentReleaseId:String(initialReleaseRow.content_release_id),tenantId:String(initialReleaseRow.tenant_id),workspaceId:String(initialReleaseRow.workspace_id),status:initialReleaseRow.status as ContentRelease['status']} : null;
         const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize, initialRelease);
         if (!prepared.created) {
+          const originalTestNumber = allocateOriginalNumber ? allocateOriginalTestNumber(database, {...prepared.testRun, consumeSequence: true}, prepared.testRun, session) : undefined;
           database.exec("COMMIT");
-          return { testRun: prepared.testRun, created: false };
+          return { testRun: prepared.testRun, created: false, ...(originalTestNumber ? {originalTestNumber} : {}) };
         }
         if (!persistTestRun(database, prepared.testRun, false)) {
           throw new Error("Run ID already exists outside the participant assignment reservation.");
@@ -3760,8 +3783,9 @@ export const createSqliteFirstSliceStorage = (
           "SELECT * FROM test_runs WHERE test_run_id = ?"
         ).get(candidate.testRunId) as Record<string, unknown> | undefined);
         if (!stored) throw new Error("Participant assignment reservation was not persisted.");
+        const originalTestNumber = allocateOriginalNumber ? allocateOriginalTestNumber(database, {...stored, consumeSequence: true}, stored, effect.participantSession ?? session) : undefined;
         database.exec("COMMIT");
-        return { testRun: stored, created: true };
+        return { testRun: stored, created: true, ...(originalTestNumber ? {originalTestNumber} : {}) };
       } catch (error) {
         rollbackAfterFailure(database, error);
       }

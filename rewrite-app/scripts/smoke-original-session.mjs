@@ -59,7 +59,7 @@ try {
   };
   const metadata = {id: 'owned-native-browser-player', version: '6.0.4', specVersion: '6.0', metadataVersion: '2.0', type: 'player',
     name: [{lang: 'de', value: 'Owned native browser Player'}], description: [{lang: 'de', value: 'Owned fixture'}]};
-  await upload('player.html', '<html><script type="application/ld+json">' + JSON.stringify(metadata) + '</script><main>Owned fixture</main></html>', 'text/html');
+  await upload('player.html', '<html><script type="application/ld+json">' + JSON.stringify(metadata) + '</script><main>Owned fixture</main><script>addEventListener("message",event=>{if(event.data?.type==="vopStartCommand")document.querySelector("main").dataset.started="true";});parent.postMessage({type:"vopReadyNotification",metadata:{specVersion:"6.0"}},"*");</script></html>', 'text/html');
   await upload('unit.xml', '<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/unit-xml/17.6"><Metadata><Id>OWNED.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="owned-native-browser-player@6.0.4">Owned definition</Definition></Unit>');
   await upload('booklet.xml', '<Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0"><Metadata><Id>OWNED.BROWSER</Id><Label>Owned native Booklet</Label></Metadata><Units><Unit id="OWNED.UNIT" label="Owned unit"/></Units></Booklet>');
   setPhase('owned-roster-fixture');
@@ -76,7 +76,7 @@ try {
     const result = await page.evaluate(async ({method, path, body, token}) => {
       const response = await fetch(path, {method, headers: {...(body === undefined ? {} : {'content-type': 'application/json'}), ...(token ? {AuthToken: token} : {})},
         ...(body === undefined ? {} : {body: JSON.stringify(body)})});
-      const text = await response.text(); return {status: response.status, cache: response.headers.get('cache-control'), value: text ? JSON.parse(text) : null, empty: text.length === 0};
+      const text = await response.text(); return {status: response.status, cache: response.headers.get('cache-control'), value: text ? JSON.parse(text) : null, empty: text.length === 0, rawText: text, contentType: response.headers.get('content-type')};
     }, {method, path, body, token});
     assert.equal(result.status, status, 'Unexpected native session HTTP status'); assert.equal(result.cache, 'private, no-store'); return result;
   };
@@ -117,6 +117,12 @@ try {
   await request('PUT', '/session', solution, login.token, 409);
   await request('POST', '/session/person/challenge', {code: 'Shared'}, person.token, 403);
   mark('native-person-accessset-retains-typed-bearers-current-label-and-unopened-test-flags');
+  await request('PUT', '/test', {bookletName: 'owned.browser'}, login.token, 403);
+  const createdTest = await request('PUT', '/test', {bookletName: 'owned.browser'}, person.token, 201);
+  assert.match(createdTest.rawText, /^[1-9][0-9]*$/); assert.equal(createdTest.contentType, 'text/html; charset=UTF-8');
+  assert.equal((await request('PUT', '/test', {bookletName: 'OWNED.BROWSER'}, person.token, 201)).rawText, createdTest.rawText);
+  assert.deepEqual((await request('GET', '/session', undefined, person.token)).value.claims.test[0].flags, {locked: false, running: false});
+  mark('browser-native-test-put-returns-stable-raw-number-without-opening-the-test');
   const peerWork = (await request('POST', '/session/challenge', {loginType: 'login', name: 'native-peer', password})).value;
   const peer = (await request('PUT', '/session', await solve(peerWork))).value;
   const repeat = await solve((await request('POST', '/session/person/challenge', {code: 'SHARED'}, login.token)).value);
@@ -133,6 +139,29 @@ try {
   assert.equal((await request('DELETE', '/session', undefined, person.token, 205)).empty, true);
   await request('GET', '/session', undefined, person.token, 401);
   mark('reload-preserves-first-person-spelling-and-empty-205-logout-keeps-login-capability');
+  setPhase('actual-ui-entry-for-native-created-test');
+  await page.goto(base + '/app/participant?ui=original&tenantKey=' + tenantKey + '&workspaceKey=' + workspaceKey, {waitUntil: 'domcontentloaded'});
+  await page.locator('#originalLoginName').fill('native-browser');
+  await page.getByRole('button', {name: 'Weiter', exact: true}).click();
+  setPhase('actual-ui-password');
+  await page.locator('#originalLoginPassword').fill(password);
+  await page.getByRole('button', {name: 'Anmelden', exact: true}).click();
+  setPhase('actual-ui-second-code');
+  await page.locator('#participantCode').fill('Shared');
+  const authenticated = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/participant/auth/sign-in' && response.ok());
+  await page.locator('#participantRouteSignInButton').click();
+  const identity = await (await authenticated).json();
+  setPhase('actual-ui-single-booklet-auto-entry');
+  await page.frameLocator('iframe').locator('main[data-started="true"]').waitFor();
+  setPhase('actual-ui-native-created-controller-readback');
+  const currentResponse = await fetch(base + '/api/v1/participant/sessions/' + identity.participantSession.participantSessionId + '/current-state', {headers: {authorization: 'Bearer ' + identity.sessionToken}});
+  assert.equal(currentResponse.status, 200);
+  const current = (await currentResponse.json()).currentRunState.testRun;
+  assert.equal(current.status, 'running'); assert.equal(current.currentUnitKey, 'OWNED.UNIT'); assert.equal(current.controllerEntry.active, true);
+  assert.equal(current.originalResultState.bookletName, 'owned.browser'); assert.ok(current.originalResultState.lastOpenedAt);
+  assert.equal((await request('PUT', '/test', {bookletName: 'OWNED.BROWSER'}, identity.sessionToken, 201)).rawText, createdTest.rawText);
+  assert.equal((await request('GET', '/session', undefined, identity.sessionToken)).value.claims.test[0].flags.running, true);
+  mark('actual-protected-original-ui-enters-the-same-native-created-test-and-starts-its-controller');
 } catch (error) {
   await page?.screenshot({path: join(artifacts, 'failure.png'), fullPage: true}).catch(() => {});
   // Retain a useful bounded failure location without serializing Playwright's

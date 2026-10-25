@@ -1,3 +1,9 @@
+import {createOriginalTestPort} from './original-test.js';
+export {parseOriginalTestName} from './original-test.js';
+export type {OriginalTestPort} from './original-test.js';
+import {originalParticipantGroupKeysEqual as sameOriginalTestName} from './original-participant-group.js';
+export {prepareOriginalTestNumber, assertOriginalTestCreationCandidate} from './original-test-number.js';
+export type {OriginalTestNumberScope, OriginalTestNumberRecord, OriginalTestNumberInput} from './original-test-number.js';
 export {assertResultArtifactParent, guardResultArtifactCollections, activityResultParent, attachmentResultParent, resultParentUnavailable, type ResultArtifactParent} from './result-artifact-parent.js';
 export {prepareOriginalGroupDeletionInput, selectOriginalGroupDeletionKeys, deleteOriginalGroupsFromCollections, attachmentTestRunId} from './original-group-deletion.js';
 export type {OriginalGroupDeletionInput, OriginalGroupDeletionResult} from './original-group-deletion.js';
@@ -1257,6 +1263,7 @@ export type FirstSlicePorts = {
   participantAccess: ParticipantAccessPort;
   /** Trusted native authentication core; HTTP must separately enforce configured proof of work. */
   originalAuthentication: import('./original-authentication.js').OriginalAuthenticationPort;
+  originalTest: import('./original-test.js').OriginalTestPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
   monitorRead: MonitorReadPort;
@@ -1590,6 +1597,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
     participantSessionId: string
   ): Promise<TestRun | null>;
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
+  /** Allocate/reuse an Original decimal Test number inside the current parent's write boundary. */
+  getOrCreateOriginalTestNumber(input: import('./original-test-number.js').OriginalTestNumberInput): Promise<string>;
   saveTestRun(testRun: TestRun): Promise<void>;
   /** Read current parent/Run and commit the pure projection, logs and activity in one write boundary. */
   mutateParticipantRun(input: ParticipantRunMutationInput,
@@ -1608,8 +1617,9 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   /** Reserve/reuse one exact assignment; initialize a fresh Run and all its artifacts in that same write. */
   getOrCreateTestRunForAssignment(
     candidate: TestRun,
-    initialize?: ParticipantAssignmentRunInitializer
-  ): Promise<{ testRun: TestRun; created: boolean }>;
+    initialize?: ParticipantAssignmentRunInitializer,
+    allocateOriginalNumber?: true
+  ): Promise<{ testRun: TestRun; created: boolean; originalTestNumber?: string }>;
   /** Activate the current parent under the same lock as Run eligibility; preserve its other fields. */
   activateParticipantController(input: ParticipantControllerActivationInput): Promise<ParticipantControllerActivationResult | null>;
   deleteTestRunsByIds(testRunIds: string[]): Promise<number>;
@@ -6101,13 +6111,15 @@ const buildParticipantRuntimeBooklets = (input: {
     }
     const bookletRuns = input.testRuns.filter(
       testRun =>
-        (testRun.bookletAssignmentKey ?? testRun.bookletKey) ===
-        assignment.assignmentKey
+        (input.participantRosterEntry?.originalLoginIdentity
+          ? sameOriginalTestName(testRun.originalResultState?.bookletName ?? testRun.bookletAssignmentKey ?? testRun.bookletKey, assignment.assignmentKey)
+          : (testRun.bookletAssignmentKey ?? testRun.bookletKey) === assignment.assignmentKey)
     );
     const hasLockedRun = bookletRuns.some(
       testRun => testRun.status !== "completed" && testRun.locked === true
     );
-    const hasOpenRun = bookletRuns.some(testRun => testRun.status !== "completed");
+    const hasOpenRun = bookletRuns.some(testRun => testRun.status !== "completed" &&
+      !(input.participantRosterEntry?.originalLoginIdentity && testRun.status === "created" && testRun.originalResultState?.lastOpenedAt === null));
     const hasCompletedRun = bookletRuns.some(
       testRun => testRun.status === "completed"
     );
@@ -26843,9 +26855,10 @@ export const createFirstSliceServices = (
     }
 
     const existingRun = retainedNativeRun ?? testRuns.find(run =>
-      (run.bookletAssignmentKey ?? run.bookletKey) ===
-        (selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey));
-    if (existingRun) {
+      (participantSession.originalLoginKey !== undefined
+        ? sameOriginalTestName(run.originalResultState?.bookletName ?? run.bookletAssignmentKey ?? run.bookletKey, selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey)
+        : (run.bookletAssignmentKey ?? run.bookletKey) === (selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey)));
+    if (existingRun && !(participantSession.originalLoginKey !== undefined && existingRun.status === "created")) {
       requireParticipantTestRunUnlocked(existingRun);
       if (existingRun.status === "completed") {
         throw new FirstSliceError(409, "booklet_already_completed",
@@ -26905,9 +26918,7 @@ export const createFirstSliceServices = (
         ? null
         : firstUnit?.unitKey ?? null
     };
-    let reservation: Awaited<ReturnType<FirstSliceRepository["getOrCreateTestRunForAssignment"]>>;
-    try {
-      reservation = await repository.getOrCreateTestRunForAssignment(testRun, context => {
+    const initializeEntry = (context: ParticipantRunMutationContext) => {
         const currentParent = context.participantSession;
         if (currentParent.participantCode !== participantSession.participantCode ||
           resolveParticipantExecutionMode(currentParent.executionMode ?? rosterEntry?.executionMode).mode !== executionMode.mode) {
@@ -26917,10 +26928,13 @@ export const createFirstSliceServices = (
         // Read eligibility and start the timer only after acquiring the parent's
         // reservation lock. A losing candidate never initializes any artifacts.
         const activatedAt = now();
-        const activation = prepareParticipantControllerActivation({ ...context.testRun, activatedAt }, currentParent, context.testRun);
+        requireParticipantTestRunUnlocked(context.testRun);
+        const enteringRun = context.testRun.status === "created" ? withEvaluatedBookletStates(selectedBooklet,
+          {...context.testRun, status: "running", currentUnitKey: context.testRun.currentUnitKey ?? testRun.currentUnitKey}) : context.testRun;
+        const activation = prepareParticipantControllerActivation({ ...enteringRun, activatedAt }, currentParent, enteringRun);
         if (!activation) throw new FirstSliceError(409, "participant_controller_scope_changed",
           "The controller's parent scope changed during entry.");
-        const activated = activateCurrentTestletTimer(contentRelease, normalizeTestRun(context.testRun), activatedAt);
+        const activated = activateCurrentTestletTimer(contentRelease, normalizeTestRun(enteringRun), activatedAt);
         const freshRun = { ...activated.testRun, updatedAt: activatedAt };
         const entries: ParticipantTestLogEntryInput[] = [];
         const activityEvents: WorkspaceActivityEvent[] = [];
@@ -26949,7 +26963,17 @@ export const createFirstSliceServices = (
           activityEvents, controllerEntryActive: true, originalResultOpenedAt: activatedAt,
           ...(entries.length ? {originalResultTestStateAt: activatedAt} : {}),
           ...(activation.activated ? { participantSession: activation.participantSession } : {}) };
-      });
+    };
+    let reservation: Awaited<ReturnType<FirstSliceRepository["getOrCreateTestRunForAssignment"]>>;
+    let enteredNativeCreated = false;
+    try {
+      reservation = await repository.getOrCreateTestRunForAssignment(testRun, initializeEntry);
+      if (!reservation.created && reservation.testRun.status === "created" && participantSession.originalLoginKey !== undefined) {
+        const entry = await repository.mutateParticipantRun(reservation.testRun, context =>
+          context.testRun.status === "created" ? initializeEntry(context) : null);
+        if (!entry) throw new FirstSliceError(409, "participant_controller_scope_changed", "The controller's parent scope changed during entry.");
+        reservation = {...reservation, testRun: entry.testRun}; enteredNativeCreated = entry.applied;
+      }
     } catch (error) {
       if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
       throw error;
@@ -26960,7 +26984,7 @@ export const createFirstSliceServices = (
       throw new FirstSliceError(409, "booklet_already_completed",
         `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
     }
-    return !reservation.created && !deferExistingActivation ? activateSession(effectiveTestRun) : effectiveTestRun;
+    return !reservation.created && !enteredNativeCreated && !deferExistingActivation ? activateSession(effectiveTestRun) : effectiveTestRun;
   };
 
 
@@ -32366,6 +32390,15 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantAccess,
     originalAuthentication,
+    originalTest: createOriginalTestPort({auth: originalAuthentication, repository, now, id: idGenerator,
+      async currentBooklet(person, fileId) {
+        const current = await workspaceFiles.read(person);
+        const booklet = current.compilation?.runtimeSnapshot?.bookletEntries.find(entry => sameOriginalTestName(entry.bookletKey, fileId));
+        if (!booklet) throw new FirstSliceError(404, 'original_booklet_unavailable', `No Booklet with id \`${fileId}\` found on workspace \`${person.workspaceId}\`!`);
+        const release = await requireParticipantContentRelease(person);
+        return {booklet, contentReleaseId: release.contentReleaseId};
+      }
+    }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository,
       assignments: (entry, code) => selectOriginalParticipantAssignments(getParticipantRosterBookletAssignments(entry), code),
