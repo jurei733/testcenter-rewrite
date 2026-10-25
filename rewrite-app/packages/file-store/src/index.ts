@@ -18,6 +18,11 @@ import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
+  prepareOriginalSessionToken,
+  selectOriginalSessionToken,
+  originalSessionTokenKey,
+  hashOriginalSessionToken,
+  type OriginalSessionToken,
   prepareOriginalParticipantSession,
   resolveOriginalPerson,
   assertOriginalPersonUnique,
@@ -99,6 +104,7 @@ type PersistedFirstSliceState = {
   contentReleases: Record<string, ContentRelease>;
   originalParticipantGroups: Record<string, OriginalParticipantGroup>;
   originalLoginBindings: Record<string, OriginalLoginBinding>;
+  originalSessionTokens: Record<string, OriginalSessionToken>;
   participantSessions: Record<string, ParticipantSession>;
   participantAccessCredentials: Record<string, ParticipantAccessCredential>;
   participantRosterEntries: Record<string, ParticipantRosterEntry>;
@@ -158,6 +164,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   contentReleases: {},
   originalParticipantGroups: {},
   originalLoginBindings: {},
+  originalSessionTokens: {},
   participantSessions: {},
   participantAccessCredentials: {},
   participantRosterEntries: {},
@@ -1170,6 +1177,7 @@ const createFileRepository = (
         deleteMatching(state.participantRunCommands, workspaceMatches);
       deleteMatching(state.participantProgressDeliveries, workspaceMatches);
         deleteMatching(state.originalLoginBindings, workspaceMatches);
+        deleteMatching(state.originalSessionTokens, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
           if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
@@ -1521,6 +1529,35 @@ const createFileRepository = (
           participantSession.tenantId === tenantId &&
           participantSession.workspaceId === workspaceId
       );
+    },
+    async getOrCreateOriginalSessionToken(input) {
+      const candidate = prepareOriginalSessionToken(input);
+      return enqueueMutation(async () => {
+        const state = await getState();
+        if (!Object.values(state.workspacesByScope).some(workspace => workspace.tenantId === candidate.tenantId && workspace.workspaceId === candidate.workspaceId)) return null;
+        const subjects = candidate.kind === 'login' ? Object.values(state.originalLoginBindings) : Object.values(state.originalParticipantGroups);
+        if (!subjects.some(subject => subject.tenantId === candidate.tenantId && subject.workspaceId === candidate.workspaceId &&
+          ('loginKey' in subject ? subject.loginKey : subject.groupKey) === candidate.subjectKey)) return null;
+        const selected = selectOriginalSessionToken(candidate, Object.values(state.originalSessionTokens));
+        if (state.originalSessionTokens[originalSessionTokenKey(selected)]) return structuredClone(selected);
+        const next = {...state, originalSessionTokens: {...state.originalSessionTokens, [originalSessionTokenKey(selected)]: selected}};
+        await persistState(next); cachePromise = Promise.resolve(next);
+        return structuredClone(selected);
+      });
+    },
+    async findOriginalSessionTokenByHash(tokenHash) {
+      if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+      const state = await getState();
+      const matches = Object.values(state.originalSessionTokens).filter(token => hashOriginalSessionToken(token.token) === tokenHash);
+      return matches.length === 1 ? structuredClone(matches[0]) : null;
+    },
+    async findParticipantSessionByAccessTokenHash(tokenHash) {
+      if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+      const state = await getState();
+      const matches = Object.values(state.participantAccessCredentials).filter(credential => credential.tokenHash === tokenHash);
+      if (matches.length !== 1) return null;
+      const person = state.participantSessions[matches[0]!.participantSessionId];
+      return person ? structuredClone(person) : null;
     },
     async getOrCreateOriginalParticipantGroup(input) {
       return enqueueMutation(async () => {

@@ -219,11 +219,13 @@ test('Original result export iteration retains the complete archive suite in uni
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
  assert.equal(scripts['test:original-results'],'npm run build:core && npm run test:original-results:built');
- assert.equal(scripts['test:original-results:built'],'node --test '+suite+' scripts/original-result-state.test.mjs scripts/original-participant-group.test.mjs scripts/original-login-binding.test.mjs scripts/original-test-identity.test.mjs scripts/original-person-identity.test.mjs scripts/participant-run-creation-api.test.mjs');
+ assert.equal(scripts['test:original-results:built'],'node --test '+suite+' scripts/original-result-state.test.mjs scripts/original-participant-group.test.mjs scripts/original-login-binding.test.mjs scripts/original-test-identity.test.mjs scripts/original-person-identity.test.mjs scripts/original-login-protocol.test.mjs scripts/participant-run-creation-api.test.mjs');
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes('scripts/original-result-state.test.mjs'));
  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify('scripts/original-result-state.test.mjs')));
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes('scripts/original-person-identity.test.mjs'));
  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify('scripts/original-person-identity.test.mjs')));
+ assert.ok(scripts['test:unit:built'].split(/\s+/).includes('scripts/original-login-protocol.test.mjs'));
+ assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify('scripts/original-login-protocol.test.mjs')));
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes('scripts/original-test-identity.test.mjs'));
  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify('scripts/original-test-identity.test.mjs')));
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes('scripts/original-login-binding.test.mjs'));

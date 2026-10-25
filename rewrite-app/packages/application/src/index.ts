@@ -3,6 +3,11 @@ export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix,resolve
 import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
 export { originalParticipantGroupKeysEqual, prepareOriginalParticipantGroup } from "./original-participant-group.js";
 export {prepareOriginalLoginBinding, type OriginalLoginBindingInput} from './original-login-binding.js';
+export {prepareOriginalSessionToken, selectOriginalSessionToken, originalSessionTokenKey, hashOriginalSessionToken,
+  createOriginalSessionToken, OriginalSessionTokenCollisionError} from './original-session-token.js';
+export type {OriginalSessionToken, OriginalSessionTokenRepository} from './original-session-token.js';
+import {createOriginalAuthentication} from './original-authentication.js';
+export type {OriginalAuthenticationPort, OriginalAuthenticationState} from './original-authentication.js';
 import type {WorkspaceFilePublicationInput} from "./workspace-file-publication.js";
 export {createWorkspaceFilePublicationRevision,prepareWorkspaceFilePublication} from "./workspace-file-publication.js";
 export {createContentReleaseActivationRevision,prepareContentReleaseActivation} from "./content-release-activation.js";
@@ -1237,6 +1242,8 @@ export type FirstSlicePorts = {
   workspaceReview: WorkspaceReviewPort;
   participantRuntime: ParticipantRuntimePort;
   participantAccess: ParticipantAccessPort;
+  /** Trusted native authentication core; HTTP must separately enforce configured proof of work. */
+  originalAuthentication: import('./original-authentication.js').OriginalAuthenticationPort;
   monitorRead: MonitorReadPort;
   monitorControl: MonitorControlPort;
   systemCheck: SystemCheckPort;
@@ -1370,7 +1377,7 @@ export type FirstSliceServices = FirstSlicePorts & {
   }): Promise<CreateImportJobResult>;
 };
 
-export type FirstSliceRepository = ParticipantAccessRepository & {
+export type FirstSliceRepository = ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
@@ -25062,6 +25069,10 @@ export const createFirstSliceServices = (
       participantSession.workspaceId,
       participantSession.loginKey
     );
+    if (participantSession.originalLoginKey !== undefined &&
+      (rosterEntry?.originalLoginIdentity !== true || rosterEntry.loginKey !== participantSession.originalLoginKey)) {
+      throw new FirstSliceError(410, 'original_login_gone', 'The Original login is no longer available.');
+    }
     assertParticipantAccessWindow(
       rosterEntry,
       now(),
@@ -27352,6 +27363,368 @@ export const createFirstSliceServices = (
         : {})
     };
   };
+
+  const authenticateParticipantCredentials = async (
+    workspace: Workspace, rosterEntry: ParticipantRosterEntry | null, loginKey: string,
+    input: {password?: string; groupKey?: string}, nativeFirstFactor = false
+  ) => {
+    const signInTimestamp = now();
+    // Original accepts the XML attribute but stores an empty label as NULL.
+    // Its Login construction then fails before checking the password. Keep
+    // that invalid stored metadata visible; never invent a group-key label.
+    if (rosterEntry?.groupLabel === "") {
+      assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+      throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
+    }
+    if (requireLoginPassword || rosterEntry?.passwordRequired || nativeFirstFactor) {
+      const loginAttempt = await repository.getParticipantLoginAttempt(
+        workspace.tenantId,
+        workspace.workspaceId,
+        loginKey
+      );
+      const loginAttemptExpiresAtMs = Date.parse(
+        loginAttempt?.expiresAt ?? ""
+      );
+      const signInTimestampMs = Date.parse(signInTimestamp);
+      if (
+        loginAttempt &&
+        loginAttempt.failedAttempts >= participantLoginMaxFailures &&
+        Number.isFinite(loginAttemptExpiresAtMs) &&
+        loginAttemptExpiresAtMs > signInTimestampMs
+      ) {
+        throw new FirstSliceError(
+          429,
+          "participant_login_rate_limited",
+          "Too many failed participant login attempts. Try again later.",
+          {
+            retryAfterSeconds: Math.max(
+              1,
+              Math.ceil((loginAttemptExpiresAtMs - signInTimestampMs) / 1_000)
+            ),
+            maxFailures: participantLoginMaxFailures
+          }
+        );
+      }
+      const passwordHash = await repository.getParticipantRosterPasswordHash(
+        workspace.tenantId,
+        workspace.workspaceId,
+        loginKey
+      );
+      if (
+        typeof input.password !== "string" ||
+        (passwordHash ? !verifyPassword(input.password, passwordHash) :
+          !(nativeFirstFactor && !requireLoginPassword && !rosterEntry?.passwordRequired && input.password === ""))
+      ) {
+        const failedAt = now();
+        await repository.recordParticipantLoginFailure({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          loginKey,
+          attemptedAt: failedAt,
+          expiresAt: new Date(
+            Date.parse(failedAt) + participantLoginFailureWindowMs
+          ).toISOString()
+        });
+        throw new FirstSliceError(
+          401,
+          "participant_password_invalid",
+          `Password for participant '${loginKey}' is required or invalid.`
+        );
+      }
+    }
+    // Source creates login_session_groups after credential/absolute-window
+    // validation, before the separate person-code step (which may fail).
+    assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+    const requestedGroupKey = String(input.groupKey ?? "").trim();
+    const groupKey = rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
+    const originalGroup = await repository.getOrCreateOriginalParticipantGroup({
+      tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+      groupKey, groupLabel: rosterEntry?.groupLabel ?? groupKey, createdAt: signInTimestamp
+    });
+    if (!originalGroup) {
+      throw new FirstSliceError(404, "workspace_not_found", "Participant workspace was not found.");
+    }
+    const nativeBinding = rosterEntry?.originalLoginIdentity
+      ? await repository.bindOriginalLoginGroup({tenantId:workspace.tenantId,
+          workspaceId:workspace.workspaceId,loginKey:rosterEntry.loginKey,groupKey,
+          groupSnapshotKey:originalGroup.groupKey,authenticatedAt:signInTimestamp})
+      : null;
+    if (rosterEntry?.originalLoginIdentity && !nativeBinding) {
+      throw new FirstSliceError(409, "participant_login_scope_changed", "The login group changed during authentication.");
+    }
+    return {signInTimestamp, requestedGroupKey, groupKey, nativeBinding};
+  };
+
+  const signInParticipant = async (
+    input: Parameters<ParticipantRuntimePort['signIn']>[0],
+    nativePrincipal?: import('./original-authentication.js').OriginalAuthenticationPrincipal
+  ): Promise<ParticipantSession> => {
+    const tenantKey = normalizeOptionalParticipantTenantKey(input.tenantKey);
+    const requestedWorkspaceKey = String(input.workspaceKey ?? "").trim();
+    const loginKey = nativePrincipal?.rosterEntry.loginKey ?? normalizeParticipantLoginKey(input.loginKey);
+    const workspace = nativePrincipal?.workspace ?? (requestedWorkspaceKey
+      ? tenantKey
+        ? await repository.getWorkspaceByScope(
+            tenantKey,
+            normalizeParticipantWorkspaceKey(requestedWorkspaceKey)
+          )
+        : await resolveUniqueWorkspaceByWorkspaceKey(
+            repository,
+            normalizeParticipantWorkspaceKey(requestedWorkspaceKey)
+          )
+      : await resolveUniqueWorkspaceByParticipantLoginKey(
+          repository,
+          loginKey,
+          tenantKey
+        ));
+
+    if (!workspace) {
+      throw new FirstSliceError(
+        404,
+        "workspace_not_found",
+        tenantKey
+          ? `Workspace '${requestedWorkspaceKey}' was not found in tenant '${tenantKey}'.`
+          : `Workspace '${requestedWorkspaceKey}' was not found.`
+      );
+    }
+
+    const activeRelease = await getActiveWorkspaceRelease(
+      repository,
+      workspace.tenantId,
+      workspace.workspaceId
+    );
+
+    if (!activeRelease) {
+      throw new FirstSliceError(
+        409,
+        "workspace_has_no_active_content_release",
+        `Workspace '${workspace.workspaceKey}' has no active content release.`
+      );
+    }
+
+    const participantRosterEntries =
+      await repository.listParticipantRosterEntriesByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      );
+    const rosterEntry = nativePrincipal?.rosterEntry ??
+      participantRosterEntries.find(entry => entry.loginKey === loginKey) ?? null;
+    if (participantRosterEntries.length > 0 && !rosterEntry) {
+      throw new FirstSliceError(
+        401,
+        "participant_login_invalid",
+        "Participant login is invalid."
+      );
+    }
+    const {signInTimestamp, requestedGroupKey, groupKey, nativeBinding} = nativePrincipal
+      ? {signInTimestamp: now(), requestedGroupKey: '', groupKey: nativePrincipal.binding.groupKey, nativeBinding: nativePrincipal.binding}
+      : await authenticateParticipantCredentials(workspace, rosterEntry, loginKey, input);
+    if (nativePrincipal) assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+    const matchesLogin = (session: ParticipantSession): boolean => nativeBinding
+      ? session.originalLoginKey === nativeBinding.loginKey
+      : session.loginKey === loginKey && session.originalLoginKey === undefined;
+    const participantCode = nativeBinding ? String(input.participantCode ?? "") : String(input.participantCode ?? "").trim();
+    const codeRequired = participantRosterRequiresCode(rosterEntry);
+    if (codeRequired && !participantCode) {
+      throw new FirstSliceError(
+        409,
+        "participant_code_required",
+        `Participant '${loginKey}' must enter the assigned participant code.`,
+        {
+          customTexts: rosterEntry?.customTexts ?? {},
+          viewSettings: rosterEntry?.viewSettings ?? {}
+        }
+      );
+    }
+    const matchedParticipantCode = codeRequired
+      ? getParticipantRosterBookletAssignments(rosterEntry)
+          .flatMap(assignment => assignment.accessCodes ?? [])
+          .find(code =>
+            nativeBinding
+              ? code.replace(/[A-Z]/g,letter=>letter.toLowerCase()) === participantCode.replace(/[A-Z]/g,letter=>letter.toLowerCase())
+              : normalizeParticipantCode(code) === normalizeParticipantCode(participantCode)
+          )
+      : undefined;
+    if (codeRequired && matchedParticipantCode === undefined) {
+      throw new FirstSliceError(
+        400,
+        "participant_code_invalid",
+        "The participant code is invalid.",
+        {
+          customTexts: rosterEntry?.customTexts ?? {},
+          viewSettings: rosterEntry?.viewSettings ?? {}
+        }
+      );
+    }
+    const effectiveParticipantCode = matchedParticipantCode === undefined ? null : nativeBinding ? participantCode : matchedParticipantCode;
+    const executionMode = resolveParticipantExecutionMode(
+      rosterEntry?.executionMode
+    );
+
+    const workspaceParticipantSessions = nativeBinding ? [] :
+      await repository.listParticipantSessionsByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      );
+    const loginSessions = workspaceParticipantSessions
+      .filter(
+        participantSession =>
+          matchesLogin(participantSession) &&
+          normalizeParticipantCode(participantSession.participantCode) ===
+            normalizeParticipantCode(effectiveParticipantCode)
+      )
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    const accessStartedAt = nativeBinding ? signInTimestamp : loginSessions[0]?.createdAt ?? signInTimestamp;
+    const validUntil = resolveParticipantSessionValidUntil(
+      rosterEntry,
+      accessStartedAt
+    );
+    assertParticipantAccessWindow(rosterEntry, signInTimestamp, validUntil);
+
+    const reusableSession = executionMode.alwaysNewSession || nativeBinding
+      ? undefined
+      : workspaceParticipantSessions
+          .filter(
+            participantSession =>
+              matchesLogin(participantSession) &&
+              participantSession.groupKey === groupKey &&
+              normalizeParticipantCode(participantSession.participantCode) ===
+                normalizeParticipantCode(effectiveParticipantCode) &&
+              participantSession.contentReleaseId ===
+                activeRelease.contentReleaseId &&
+              normalizeParticipantExecutionMode(
+                participantSession.executionMode
+              ) === executionMode.mode &&
+              participantSession.status !== "closed"
+          )
+          .sort((left, right) =>
+            right.createdAt.localeCompare(left.createdAt)
+          )[0];
+
+    if (reusableSession) {
+      await recordWorkspaceActivity({
+        tenantId: reusableSession.tenantId,
+        workspaceId: reusableSession.workspaceId,
+        eventType: "participant_signed_in",
+        subjectType: "participant_session",
+        subjectId: reusableSession.participantSessionId,
+        summary: `Participant '${reusableSession.loginKey}' re-entered an existing session.`,
+        details: {
+          loginKey: reusableSession.loginKey,
+          groupKey: reusableSession.groupKey,
+          contentReleaseId: reusableSession.contentReleaseId,
+          participantCodeRequired: codeRequired,
+          executionMode: executionMode.mode,
+          rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
+          reused: true
+        }
+      });
+      if (!nativePrincipal) await repository.resetParticipantLoginAttempts(
+        workspace.tenantId,
+        workspace.workspaceId,
+        loginKey
+      );
+      return reusableSession;
+    }
+
+    let participantSession: ParticipantSession = {
+      participantSessionId: idGenerator(),
+      tenantId: workspace.tenantId,
+      workspaceId: workspace.workspaceId,
+      contentReleaseId: activeRelease.contentReleaseId,
+      loginKey: nativeBinding?.loginKey ?? loginKey,
+      ...(nativeBinding ? {originalLoginKey:nativeBinding.loginKey,
+        originalNameSuffix:createOriginalPersonNameSuffix(effectiveParticipantCode,executionMode.alwaysNewSession)} : {}),
+      groupKey,
+      participantCode: effectiveParticipantCode,
+      executionMode: executionMode.mode,
+      status: "signed_in",
+      validUntil,
+      createdAt: signInTimestamp
+    };
+    let nativeReused=false;
+    if(nativeBinding){
+      try{
+        const resolved=await repository.resolveOriginalParticipantSession(participantSession,
+          person=>assertParticipantAccessWindow(rosterEntry,signInTimestamp,person.validUntil));
+        if(!resolved)throw new FirstSliceError(409,"participant_login_scope_changed","The native person workspace changed during authentication.");
+        participantSession=resolved.participantSession;nativeReused=!resolved.created;
+      }catch(error){
+        if(error instanceof OriginalPersonIdentityConflictError)throw new FirstSliceError(409,"original_person_identity_conflict",error.message);
+        throw error;
+      }
+    }else await repository.saveParticipantSession(participantSession);
+    await recordWorkspaceActivity({
+      tenantId: workspace.tenantId,
+      workspaceId: workspace.workspaceId,
+      eventType: "participant_signed_in",
+      subjectType: "participant_session",
+      subjectId: participantSession.participantSessionId,
+      summary: nativeReused?`Participant '${participantSession.loginKey}' re-entered an existing session.`:`Participant '${participantSession.loginKey}' signed in.`,
+      details: {
+        loginKey: participantSession.loginKey,
+        groupKey: participantSession.groupKey,
+        contentReleaseId: participantSession.contentReleaseId,
+        participantCodeRequired: codeRequired,
+        executionMode: executionMode.mode,
+        rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
+        ...(nativeReused?{reused:true}:{})
+      }
+    });
+    if (!nativePrincipal) await repository.resetParticipantLoginAttempts(
+      workspace.tenantId,
+      workspace.workspaceId,
+      loginKey
+    );
+    return participantSession;
+  };
+
+  const participantAccess = createParticipantAccessService({
+    repository, getAccessibleSession: requireAccessibleParticipantSession,
+    invalidAccess: () => new FirstSliceError(401, 'participant_session_invalid', 'Participant access is invalid or has expired.'),
+    now, allowLegacySessionIds: true
+  });
+  const originalAuthentication = createOriginalAuthentication({
+    repository, access: participantAccess, now,
+    error: (status, code, message) => new FirstSliceError(status, code, message),
+    requiresCode: participantRosterRequiresCode,
+    async authenticate(name, password) {
+      if (typeof name !== 'string' || !name || typeof password !== 'string') {
+        throw new FirstSliceError(400, 'original_login_invalid', 'An Original login name and password are required.');
+      }
+      const candidates: Array<{workspace: Workspace; rosterEntry: ParticipantRosterEntry}> = [];
+      for (const tenant of await repository.listTenants()) {
+        if (tenant.status !== 'active') continue;
+        for (const workspace of await repository.listWorkspacesByTenantId(tenant.tenantId)) {
+          if (workspace.status !== 'active') continue;
+          const rosterEntry = (await repository.listParticipantRosterEntriesByWorkspace(workspace.tenantId, workspace.workspaceId))
+            .find(entry => entry.originalLoginIdentity === true && entry.loginKey === name);
+          if (rosterEntry) candidates.push({workspace, rosterEntry});
+        }
+      }
+      if (candidates.length !== 1) throw new FirstSliceError(401, 'original_login_invalid', 'The Original login is invalid or ambiguous.');
+      const {workspace, rosterEntry} = candidates[0]!;
+      const authenticated = await authenticateParticipantCredentials(workspace, rosterEntry, name, {password}, true);
+      if (!authenticated.nativeBinding) throw new FirstSliceError(409, 'original_login_scope_changed', 'The Original login scope changed during authentication.');
+      // First-factor success resets attempts even when no code is entered afterwards.
+      await repository.resetParticipantLoginAttempts(workspace.tenantId, workspace.workspaceId, name);
+      return {workspace, rosterEntry, binding: authenticated.nativeBinding};
+    },
+    async resolve(scope) {
+      const tenant = (await repository.listTenants()).find(item => item.tenantId === scope.tenantId && item.status === 'active');
+      const workspace = tenant ? (await repository.listWorkspacesByTenantId(tenant.tenantId))
+        .find(item => item.workspaceId === scope.workspaceId && item.status === 'active') : undefined;
+      const rosterEntry = workspace ? (await repository.listParticipantRosterEntriesByWorkspace(scope.tenantId, scope.workspaceId))
+        .find(entry => entry.originalLoginIdentity === true && entry.loginKey === scope.subjectKey) : undefined;
+      const binding = workspace ? (await repository.listOriginalLoginBindingsByWorkspace(scope.tenantId, scope.workspaceId))
+        .find(item => item.loginKey === scope.subjectKey) : undefined;
+      if (!workspace || !rosterEntry || !binding) throw new FirstSliceError(410, 'original_login_gone', 'The Original login is no longer available.');
+      assertParticipantAccessWindow(rosterEntry, now());
+      if (rosterEntry.groupLabel === '') throw new FirstSliceError(500, 'original_group_label_invalid', 'The imported Original group label is empty.');
+      return {workspace, rosterEntry, binding};
+    },
+    enter: (principal, code) => signInParticipant({loginKey: principal.rosterEntry.loginKey, participantCode: code}, principal)
+  });
 
   return {
     applicationSettings: {
@@ -31960,17 +32333,8 @@ export const createFirstSliceServices = (
       }
     },
     createImportJobWithRelease,
-    participantAccess: createParticipantAccessService({
-      repository,
-      getAccessibleSession: requireAccessibleParticipantSession,
-      invalidAccess: () => new FirstSliceError(
-        401,
-        "participant_session_invalid",
-        "Participant access is invalid or has expired."
-      ),
-      now,
-      allowLegacySessionIds: true
-    }),
+    participantAccess,
+    originalAuthentication,
     participantRuntime: {
       async updateConnection(input) {
         const participantSessionId = normalizeParticipantSessionId(input.participantSessionId);
@@ -31993,307 +32357,7 @@ export const createFirstSliceServices = (
           await repository.updateParticipantPresence({ ...presence, action: "expire", timestamp });
         }
       },
-      async signIn(input) {
-        const tenantKey = normalizeOptionalParticipantTenantKey(input.tenantKey);
-        const requestedWorkspaceKey = String(input.workspaceKey ?? "").trim();
-        const loginKey = normalizeParticipantLoginKey(input.loginKey);
-        const workspace = requestedWorkspaceKey
-          ? tenantKey
-            ? await repository.getWorkspaceByScope(
-                tenantKey,
-                normalizeParticipantWorkspaceKey(requestedWorkspaceKey)
-              )
-            : await resolveUniqueWorkspaceByWorkspaceKey(
-                repository,
-                normalizeParticipantWorkspaceKey(requestedWorkspaceKey)
-              )
-          : await resolveUniqueWorkspaceByParticipantLoginKey(
-              repository,
-              loginKey,
-              tenantKey
-            );
-
-        if (!workspace) {
-          throw new FirstSliceError(
-            404,
-            "workspace_not_found",
-            tenantKey
-              ? `Workspace '${requestedWorkspaceKey}' was not found in tenant '${tenantKey}'.`
-              : `Workspace '${requestedWorkspaceKey}' was not found.`
-          );
-        }
-
-        const activeRelease = await getActiveWorkspaceRelease(
-          repository,
-          workspace.tenantId,
-          workspace.workspaceId
-        );
-
-        if (!activeRelease) {
-          throw new FirstSliceError(
-            409,
-            "workspace_has_no_active_content_release",
-            `Workspace '${workspace.workspaceKey}' has no active content release.`
-          );
-        }
-
-        const participantRosterEntries =
-          await repository.listParticipantRosterEntriesByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          );
-        const rosterEntry =
-          participantRosterEntries.find(entry => entry.loginKey === loginKey) ??
-          null;
-        if (participantRosterEntries.length > 0 && !rosterEntry) {
-          throw new FirstSliceError(
-            401,
-            "participant_login_invalid",
-            "Participant login is invalid."
-          );
-        }
-        const signInTimestamp = now();
-        // Original accepts the XML attribute but stores an empty label as NULL.
-        // Its Login construction then fails before checking the password. Keep
-        // that invalid stored metadata visible; never invent a group-key label.
-        if (rosterEntry?.groupLabel === "") {
-          assertParticipantAccessWindow(rosterEntry, signInTimestamp);
-          throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
-        }
-        if (requireLoginPassword || rosterEntry?.passwordRequired) {
-          const loginAttempt = await repository.getParticipantLoginAttempt(
-            workspace.tenantId,
-            workspace.workspaceId,
-            loginKey
-          );
-          const loginAttemptExpiresAtMs = Date.parse(
-            loginAttempt?.expiresAt ?? ""
-          );
-          const signInTimestampMs = Date.parse(signInTimestamp);
-          if (
-            loginAttempt &&
-            loginAttempt.failedAttempts >= participantLoginMaxFailures &&
-            Number.isFinite(loginAttemptExpiresAtMs) &&
-            loginAttemptExpiresAtMs > signInTimestampMs
-          ) {
-            throw new FirstSliceError(
-              429,
-              "participant_login_rate_limited",
-              "Too many failed participant login attempts. Try again later.",
-              {
-                retryAfterSeconds: Math.max(
-                  1,
-                  Math.ceil((loginAttemptExpiresAtMs - signInTimestampMs) / 1_000)
-                ),
-                maxFailures: participantLoginMaxFailures
-              }
-            );
-          }
-          const passwordHash = await repository.getParticipantRosterPasswordHash(
-            workspace.tenantId,
-            workspace.workspaceId,
-            loginKey
-          );
-          if (
-            !passwordHash ||
-            typeof input.password !== "string" ||
-            !verifyPassword(input.password, passwordHash)
-          ) {
-            const failedAt = now();
-            await repository.recordParticipantLoginFailure({
-              tenantId: workspace.tenantId,
-              workspaceId: workspace.workspaceId,
-              loginKey,
-              attemptedAt: failedAt,
-              expiresAt: new Date(
-                Date.parse(failedAt) + participantLoginFailureWindowMs
-              ).toISOString()
-            });
-            throw new FirstSliceError(
-              401,
-              "participant_password_invalid",
-              `Password for participant '${loginKey}' is required or invalid.`
-            );
-          }
-        }
-        // Source creates login_session_groups after credential/absolute-window
-        // validation, before the separate person-code step (which may fail).
-        assertParticipantAccessWindow(rosterEntry, signInTimestamp);
-        const requestedGroupKey = String(input.groupKey ?? "").trim();
-        const groupKey = rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
-        const originalGroup = await repository.getOrCreateOriginalParticipantGroup({
-          tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
-          groupKey, groupLabel: rosterEntry?.groupLabel ?? groupKey, createdAt: signInTimestamp
-        });
-        if (!originalGroup) {
-          throw new FirstSliceError(404, "workspace_not_found", "Participant workspace was not found.");
-        }
-        const nativeBinding = rosterEntry?.originalLoginIdentity
-          ? await repository.bindOriginalLoginGroup({tenantId:workspace.tenantId,
-              workspaceId:workspace.workspaceId,loginKey:rosterEntry.loginKey,groupKey,
-              groupSnapshotKey:originalGroup.groupKey,authenticatedAt:signInTimestamp})
-          : null;
-        if (rosterEntry?.originalLoginIdentity && !nativeBinding) {
-          throw new FirstSliceError(409, "participant_login_scope_changed", "The login group changed during authentication.");
-        }
-        const matchesLogin = (session: ParticipantSession): boolean => nativeBinding
-          ? session.originalLoginKey === nativeBinding.loginKey
-          : session.loginKey === loginKey && session.originalLoginKey === undefined;
-        const participantCode = nativeBinding ? String(input.participantCode ?? "") : String(input.participantCode ?? "").trim();
-        const codeRequired = participantRosterRequiresCode(rosterEntry);
-        if (codeRequired && !participantCode) {
-          throw new FirstSliceError(
-            409,
-            "participant_code_required",
-            `Participant '${loginKey}' must enter the assigned participant code.`,
-            {
-              customTexts: rosterEntry?.customTexts ?? {},
-              viewSettings: rosterEntry?.viewSettings ?? {}
-            }
-          );
-        }
-        const matchedParticipantCode = codeRequired
-          ? getParticipantRosterBookletAssignments(rosterEntry)
-              .flatMap(assignment => assignment.accessCodes ?? [])
-              .find(code =>
-                nativeBinding
-                  ? code.replace(/[A-Z]/g,letter=>letter.toLowerCase()) === participantCode.replace(/[A-Z]/g,letter=>letter.toLowerCase())
-                  : normalizeParticipantCode(code) === normalizeParticipantCode(participantCode)
-              )
-          : undefined;
-        if (codeRequired && matchedParticipantCode === undefined) {
-          throw new FirstSliceError(
-            400,
-            "participant_code_invalid",
-            "The participant code is invalid.",
-            {
-              customTexts: rosterEntry?.customTexts ?? {},
-              viewSettings: rosterEntry?.viewSettings ?? {}
-            }
-          );
-        }
-        const effectiveParticipantCode = matchedParticipantCode === undefined ? null : nativeBinding ? participantCode : matchedParticipantCode;
-        const executionMode = resolveParticipantExecutionMode(
-          rosterEntry?.executionMode
-        );
-
-        const workspaceParticipantSessions = nativeBinding ? [] :
-          await repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          );
-        const loginSessions = workspaceParticipantSessions
-          .filter(
-            participantSession =>
-              matchesLogin(participantSession) &&
-              normalizeParticipantCode(participantSession.participantCode) ===
-                normalizeParticipantCode(effectiveParticipantCode)
-          )
-          .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-        const accessStartedAt = nativeBinding ? signInTimestamp : loginSessions[0]?.createdAt ?? signInTimestamp;
-        const validUntil = resolveParticipantSessionValidUntil(
-          rosterEntry,
-          accessStartedAt
-        );
-        assertParticipantAccessWindow(rosterEntry, signInTimestamp, validUntil);
-
-        const reusableSession = executionMode.alwaysNewSession || nativeBinding
-          ? undefined
-          : workspaceParticipantSessions
-              .filter(
-                participantSession =>
-                  matchesLogin(participantSession) &&
-                  participantSession.groupKey === groupKey &&
-                  normalizeParticipantCode(participantSession.participantCode) ===
-                    normalizeParticipantCode(effectiveParticipantCode) &&
-                  participantSession.contentReleaseId ===
-                    activeRelease.contentReleaseId &&
-                  normalizeParticipantExecutionMode(
-                    participantSession.executionMode
-                  ) === executionMode.mode &&
-                  participantSession.status !== "closed"
-              )
-              .sort((left, right) =>
-                right.createdAt.localeCompare(left.createdAt)
-              )[0];
-
-        if (reusableSession) {
-          await recordWorkspaceActivity({
-            tenantId: reusableSession.tenantId,
-            workspaceId: reusableSession.workspaceId,
-            eventType: "participant_signed_in",
-            subjectType: "participant_session",
-            subjectId: reusableSession.participantSessionId,
-            summary: `Participant '${reusableSession.loginKey}' re-entered an existing session.`,
-            details: {
-              loginKey: reusableSession.loginKey,
-              groupKey: reusableSession.groupKey,
-              contentReleaseId: reusableSession.contentReleaseId,
-              participantCodeRequired: codeRequired,
-              executionMode: executionMode.mode,
-              rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
-              reused: true
-            }
-          });
-          await repository.resetParticipantLoginAttempts(
-            workspace.tenantId,
-            workspace.workspaceId,
-            loginKey
-          );
-          return reusableSession;
-        }
-
-        let participantSession: ParticipantSession = {
-          participantSessionId: idGenerator(),
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          contentReleaseId: activeRelease.contentReleaseId,
-          loginKey: nativeBinding?.loginKey ?? loginKey,
-          ...(nativeBinding ? {originalLoginKey:nativeBinding.loginKey,
-            originalNameSuffix:createOriginalPersonNameSuffix(effectiveParticipantCode,executionMode.alwaysNewSession)} : {}),
-          groupKey,
-          participantCode: effectiveParticipantCode,
-          executionMode: executionMode.mode,
-          status: "signed_in",
-          validUntil,
-          createdAt: signInTimestamp
-        };
-        let nativeReused=false;
-        if(nativeBinding){
-          try{
-            const resolved=await repository.resolveOriginalParticipantSession(participantSession,
-              person=>assertParticipantAccessWindow(rosterEntry,signInTimestamp,person.validUntil));
-            if(!resolved)throw new FirstSliceError(409,"participant_login_scope_changed","The native person workspace changed during authentication.");
-            participantSession=resolved.participantSession;nativeReused=!resolved.created;
-          }catch(error){
-            if(error instanceof OriginalPersonIdentityConflictError)throw new FirstSliceError(409,"original_person_identity_conflict",error.message);
-            throw error;
-          }
-        }else await repository.saveParticipantSession(participantSession);
-        await recordWorkspaceActivity({
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "participant_signed_in",
-          subjectType: "participant_session",
-          subjectId: participantSession.participantSessionId,
-          summary: nativeReused?`Participant '${participantSession.loginKey}' re-entered an existing session.`:`Participant '${participantSession.loginKey}' signed in.`,
-          details: {
-            loginKey: participantSession.loginKey,
-            groupKey: participantSession.groupKey,
-            contentReleaseId: participantSession.contentReleaseId,
-            participantCodeRequired: codeRequired,
-            executionMode: executionMode.mode,
-            rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
-            ...(nativeReused?{reused:true}:{})
-          }
-        });
-        await repository.resetParticipantLoginAttempts(
-          workspace.tenantId,
-          workspace.workspaceId,
-          loginKey
-        );
-        return participantSession;
-      },
+      signIn: input => signInParticipant(input),
       async getRuntimeState(input) {
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId

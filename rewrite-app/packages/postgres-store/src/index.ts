@@ -5,6 +5,10 @@ import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
+  prepareOriginalSessionToken,
+  hashOriginalSessionToken,
+  OriginalSessionTokenCollisionError,
+  type OriginalSessionToken,
   prepareOriginalParticipantSession,
   resolveOriginalPerson,
   assertOriginalPersonUnique,
@@ -66,6 +70,11 @@ type PostgresMigration = {
   name: string;
   sql: string;
 };
+
+const mapOriginalSessionToken = (row: Record<string, unknown>): OriginalSessionToken => ({
+  tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id), kind: row.kind as 'login' | 'group',
+  subjectKey: String(row.subject_key), token: String(row.token_value), createdAt: String(row.created_at)
+});
 
 const mapOriginalParticipantGroup = (row: Record<string, unknown>): OriginalParticipantGroup => ({
   tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id),
@@ -1625,6 +1634,29 @@ const migrations: PostgresMigration[] = [
     version: 63,
     name: "original_person_name_suffix",
     sql: `ALTER TABLE participant_sessions ADD COLUMN original_name_suffix TEXT;`
+  },
+  {
+    version: 64,
+    name: "original_session_tokens",
+    sql: `CREATE TABLE original_session_tokens (
+  tenant_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  subject_key TEXT NOT NULL,
+  login_key TEXT,
+  group_key TEXT,
+  token_value TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, workspace_id, kind, subject_key),
+  CHECK ((kind = 'login' AND login_key IS NOT NULL AND login_key = subject_key AND group_key IS NULL)
+    OR (kind = 'group' AND group_key IS NOT NULL AND group_key = subject_key AND login_key IS NULL)),
+  FOREIGN KEY (tenant_id, workspace_id, login_key)
+    REFERENCES original_login_bindings(tenant_id, workspace_id, login_key) ON DELETE CASCADE,
+  FOREIGN KEY (tenant_id, workspace_id, group_key)
+    REFERENCES original_participant_groups(tenant_id, workspace_id, group_key) ON DELETE CASCADE
+);
+CREATE INDEX participant_access_credentials_token_hash ON participant_access_credentials(token_hash);`
   }
 ];
 
@@ -3130,6 +3162,43 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [tenantId, workspaceId],
         mapParticipantSession
       );
+    },
+    async getOrCreateOriginalSessionToken(input) {
+      const candidate = prepareOriginalSessionToken(input), client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const workspace = await client.query('SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE',[candidate.tenantId,candidate.workspaceId]);
+        if (!workspace.rowCount) { await client.query('ROLLBACK'); return null; }
+        const subject = candidate.kind === 'login' ? 'original_login_bindings' : 'original_participant_groups';
+        const column = candidate.kind === 'login' ? 'login_key' : 'group_key';
+        if (!(await client.query(`SELECT 1 FROM ${subject} WHERE tenant_id=$1 AND workspace_id=$2 AND ${column}=$3`,
+          [candidate.tenantId,candidate.workspaceId,candidate.subjectKey])).rowCount) { await client.query('ROLLBACK'); return null; }
+        const previous = (await client.query('SELECT * FROM original_session_tokens WHERE tenant_id=$1 AND workspace_id=$2 AND kind=$3 AND subject_key=$4',
+          [candidate.tenantId,candidate.workspaceId,candidate.kind,candidate.subjectKey])).rows[0];
+        if (previous) { await client.query('COMMIT'); return mapOriginalSessionToken(previous); }
+        await client.query(`INSERT INTO original_session_tokens (tenant_id,workspace_id,kind,subject_key,login_key,group_key,token_value,token_hash,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[candidate.tenantId,candidate.workspaceId,candidate.kind,candidate.subjectKey,
+            candidate.kind==='login'?candidate.subjectKey:null,candidate.kind==='group'?candidate.subjectKey:null,candidate.token,hashOriginalSessionToken(candidate.token),candidate.createdAt]);
+        await client.query('COMMIT'); return candidate;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505' &&
+          'constraint' in error && error.constraint === 'original_session_tokens_token_hash_key') {
+          throw new OriginalSessionTokenCollisionError('Original session token collision.');
+        }
+        throw error;
+      } finally { client.release(); }
+    },
+    async findOriginalSessionTokenByHash(tokenHash) {
+      if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+      const row = (await pool.query('SELECT * FROM original_session_tokens WHERE token_hash=$1',[tokenHash])).rows[0];
+      return row ? mapOriginalSessionToken(row) : null;
+    },
+    async findParticipantSessionByAccessTokenHash(tokenHash) {
+      if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+      const rows = (await pool.query('SELECT participant_session_id FROM participant_access_credentials WHERE token_hash=$1 LIMIT 2',[tokenHash])).rows;
+      if (rows.length !== 1) return null;
+      return mapParticipantSession((await pool.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1',[rows[0].participant_session_id])).rows[0]);
     },
     async getOrCreateOriginalParticipantGroup(input) {
       const candidate = prepareOriginalParticipantGroup(input);
