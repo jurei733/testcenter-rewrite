@@ -716,7 +716,7 @@ test("SQLite adds current defaults to legacy application settings", async () => 
       INSERT INTO schema_migrations (version, name, applied_at)
       VALUES (39, 'add_attachment_files', '2026-08-08T20:00:00.000Z');
       CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
-      CREATE TABLE participant_sessions (participant_session_id TEXT PRIMARY KEY, tenant_id TEXT, workspace_id TEXT);
+      CREATE TABLE participant_sessions (participant_session_id TEXT PRIMARY KEY, tenant_id TEXT, workspace_id TEXT, content_release_id TEXT NOT NULL);
       CREATE TABLE participant_roster_entries (
         participant_roster_entry_id TEXT PRIMARY KEY
       );
@@ -806,7 +806,7 @@ test("SQLite upgrades legacy admin roles to read-write access", async () => {
       INSERT INTO schema_migrations (version, name, applied_at)
       VALUES (36, 'add_test_run_lock', '2026-08-03T00:00:00.000Z');
       CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
-      CREATE TABLE participant_sessions (participant_session_id TEXT PRIMARY KEY, tenant_id TEXT, workspace_id TEXT);
+      CREATE TABLE participant_sessions (participant_session_id TEXT PRIMARY KEY, tenant_id TEXT, workspace_id TEXT, content_release_id TEXT NOT NULL);
       CREATE TABLE participant_roster_entries (
         participant_roster_entry_id TEXT PRIMARY KEY
       );

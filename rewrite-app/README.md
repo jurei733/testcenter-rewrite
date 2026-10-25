@@ -652,7 +652,7 @@ set `FIRST_SLICE_STORE=postgres` and `FIRST_SLICE_POSTGRES_URL` to include its
 cases. The separate **Rewrite focused services (not acceptance)** Actions
 workflow supplies PostgreSQL and also runs the complete lock audit and CI policy.
 It becomes manually dispatchable once present on the default branch. Actual
-Linux service jobs currently take 59–78 seconds; see [CI measurements](docs/CI.md).
+Linux service jobs currently take 63–87 seconds; see [CI measurements](docs/CI.md).
 Focused feedback does not replace complete acceptance.
 
 For a quicker pre-push signal that builds once, reuses built artifacts, includes the SQLite runtime preflight, and stops the browser flow after the content import/activation read model, run:

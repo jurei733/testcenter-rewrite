@@ -1,4 +1,4 @@
-import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
+import type { ContentRelease, ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 import {withOriginalTestRunMode} from './original-person-identity.js';
 import { prepareParticipantRunMutation, type ParticipantRunMutationContext,
   type ParticipantRunMutationEffect } from "./participant-run-mutation.js";
@@ -11,6 +11,22 @@ export type ParticipantAssignmentRunInitializer = (
 
 const assignmentKey = (run: TestRun): string =>
   run.bookletAssignmentKey?.trim() || run.bookletKey.trim();
+
+export type ParticipantInitialContentRelease = Pick<ContentRelease, 'contentReleaseId' | 'tenantId' | 'workspaceId' | 'status'>;
+
+/** Bind only a genuinely unbound native person, under the same writer as its
+ * first Test and initial artifacts. Existing/canonical parent scopes stay strict. */
+export function bindOriginalPersonContentForFirstTest(candidate: TestRun, session: ParticipantSession | null,
+  runs: TestRun[], release?: ParticipantInitialContentRelease | null): ParticipantSession | null {
+  if (session?.contentReleaseId !== null) return session;
+  if (session.originalLoginKey === undefined || session.originalNameSuffix === undefined || session.status !== 'signed_in' ||
+    runs.some(run => run.participantSessionId === session.participantSessionId) || !release || release.status !== 'active' ||
+    release.contentReleaseId !== candidate.contentReleaseId || release.tenantId !== session.tenantId || release.workspaceId !== session.workspaceId ||
+    candidate.participantSessionId !== session.participantSessionId || candidate.tenantId !== session.tenantId || candidate.workspaceId !== session.workspaceId) {
+    throw new Error('A native person can bind content only with its first scoped Test from an active release.');
+  }
+  return {...session, contentReleaseId: release.contentReleaseId};
+}
 
 /** Pure reservation decision, executed inside each store's atomic boundary. */
 export const selectParticipantAssignmentRun = (
@@ -42,8 +58,11 @@ export const prepareParticipantAssignmentRunCreation = (
   candidate: TestRun,
   session: ParticipantSession | null,
   runs: TestRun[],
-  initialize?: ParticipantAssignmentRunInitializer
+  initialize?: ParticipantAssignmentRunInitializer,
+  initialRelease?: ParticipantInitialContentRelease | null
 ): { testRun: TestRun; created: boolean; effect: ParticipantAssignmentRunCreationEffect | null } => {
+  const previousSession = session;
+  session = bindOriginalPersonContentForFirstTest(candidate, session, runs, initialRelease);
   candidate=withOriginalTestRunMode(candidate,session);
   const existing = selectParticipantAssignmentRun(candidate, session, runs);
   if (existing) return { testRun: structuredClone(existing), created: false, effect: null };
@@ -60,5 +79,6 @@ export const prepareParticipantAssignmentRunCreation = (
     effect.activityEvents.some(event => event.subjectType !== "test_run" || event.subjectId !== candidate.testRunId)) {
     throw new Error("A participant assignment initializer requires scoped, unique initial artifacts without commands or deliveries.");
   }
+  if (previousSession?.contentReleaseId === null) effect.participantSession = effect.participantSession ?? session!;
   return { testRun: structuredClone(effect.testRun), created: true, effect };
 };

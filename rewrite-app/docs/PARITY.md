@@ -1,5 +1,22 @@
 # Testcenter parity checklist
 
+### Native people before content and first-Test atomic binding (2026-10-25)
+
+Internal native Login/person auth now creates coded and uncoded people without
+an active content release, as Source does. The first actual Test atomically
+captures a real active release together with its initial artifacts; original
+person expiry, identity and credentials stay fixed. Nullable native parents,
+strict canonical/Run scopes, stale saves, late durable rollback and SQLite/PG
+upgrades are covered. See [scope and evidence](ORIGINAL-RESULT-GROUPS.md).
+The first native browser CI prefix now waits for actual bindings after reload
+and retains sanitized uploadable diagnostics; both complete browser journeys
+pass locally. Previous hosted full acceptance failed that reload wait, so the
+follow-up requires a new independent CI result. Native HTTP/AccessSet/ALTCHA,
+result pages and all eight broad visual rows remain open. Formal ledger:
+**27 done / 22 partial**; estimated remaining parity work remains **4–8 engineering
+weeks**, subject to integration and visual findings.
+
+
 ### Native first person code and suffix foundation (2026-10-24)
 
 Validated native XML sign-in now preserves the first requested raw code (`abc`

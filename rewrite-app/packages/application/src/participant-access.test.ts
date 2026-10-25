@@ -10,6 +10,7 @@ const session: ParticipantSession = {
   participantSessionId: "session-a", tenantId: "tenant", workspaceId: "workspace",
   contentReleaseId: "release", loginKey: "login", groupKey: "group", status: "launched", createdAt: stamp
 };
+assert.ok(typeof session.contentReleaseId === 'string');
 const run: TestRun = {
   testRunId: "run-a", participantSessionId: session.participantSessionId,
   tenantId: session.tenantId, workspaceId: session.workspaceId, contentReleaseId: session.contentReleaseId,

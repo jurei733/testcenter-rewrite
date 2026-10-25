@@ -1139,6 +1139,7 @@ test("participant access credentials rotate and revoke without changing sessions
     loginKey: "credential-login", groupKey: "credential-group", executionMode: "run-hot-return",
     status: "launched", participantCode: null, validUntil: null, createdAt: stamp
   };
+  assert.ok(typeof session.contentReleaseId === 'string');
   const run: TestRun = {
     testRunId: randomUUID(), participantSessionId: session.participantSessionId, tenantId, workspaceId,
     contentReleaseId: session.contentReleaseId, bookletKey: "credential-booklet", status: "running",

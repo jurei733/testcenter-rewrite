@@ -1,8 +1,7 @@
 import { observeParticipantCommandCompletions, assertNativeCommandCompletion } from "./participant-command-completion-smoke-observer.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { access, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
@@ -11,12 +10,14 @@ import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite
 import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
+import {waitForParticipantNativeTabReady, verifyNativeTabReadiness} from './participant-native-tab-readiness.mjs';
+import {nativeRouteArtifactDirectory, writeNativeRouteFailure} from './participant-native-route-evidence.mjs';
 
 // Actual production bundles, authenticated SQLite API and trusted Verona input.
 // Source formatter/parser/config contracts are verified separately against pinned excerpts.
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root, "dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(), "testcenter-native-route-"));
+const artifacts = await nativeRouteArtifactDirectory();
 console.log(`owned_artifacts=${artifacts}`);
 const file = join(artifacts, "owned.sqlite"), gate = createServerRequestFailureGate();
 const module = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
@@ -31,7 +32,8 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
 gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
 const errors = [], checks = [], nativeRequests = [], observations = [], releases = [];
-let browser, page;
+let browser, page, origin = '';
+const pending = new Map();
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) { if (await predicate()) return; await delay(50); }
@@ -45,6 +47,7 @@ try {
     server.once("exit", () => { clearTimeout(timer); reject(Error("Owned API exited before startup")); });
   });
   const base = `http://127.0.0.1:${port}`;
+  origin = base;
   const api = async (path, body, token) => {
     const response = await fetch(base + path, { method: body === undefined ? "GET" : "POST",
       headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) },
@@ -64,9 +67,11 @@ try {
   await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="route-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
   page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
+  page.on('request', request => pending.set(request, 'native-route'));
+  for (const event of ['requestfinished', 'requestfailed']) page.on(event, request => pending.delete(request));
   page.on("pageerror", error => errors.push(String(error)));
   page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/native-commands")) nativeRequests.push(request.postDataJSON()); });
-  await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
+  await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "domcontentloaded" });
   // Real RouterLinks establish a preceding route for actual browser Back/Forward.
   await page.locator("#applicationPrivacyNoticeLink").click();
   await page.getByRole("link", { name: "Back to participant entry", exact: true }).click();
@@ -77,11 +82,12 @@ try {
   const read = async runId => (await api(currentPath + (runId ? `?testRunId=${runId}` : ""), undefined, identity.sessionToken)).currentRunState.testRun;
   const repository = createSqliteFirstSliceRepository(file);
   const native = (keyword, args = []) => page.evaluate(({ keyword, args }) => window.tc[keyword](args), { keyword, args });
-  const methods = () => page.waitForFunction(() => ["debug", "pause", "resume", "terminate", "goto"].every(key => typeof window.tc?.[key] === "function"));
+  const methods = () => waitForParticipantNativeTabReady(page);
   const player = () => page.frameLocator("iframe").locator("#demoPlayerAnswer");
   const journal = () => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith("testcenter-rewrite:participant-native-command:v1:")).map(key => JSON.parse(localStorage.getItem(key))));
   const emptyJournal = () => poll(async () => (await journal()).length === 0, "The native journal was not drained");
   const mark = name => { checks.push(name); console.log(`participant_native_route=${name}:passed`); };
+  await verifyNativeTabReadiness(browser, base, mark);
   const start = async key => { await page.locator(`#originalParticipantStarter mat-card[data-booklet-key="${key}"] button`).click(); await player().waitFor(); await methods(); };
   await start("first"); const first = await read();
   await player().fill("First trusted Ω");
@@ -93,7 +99,10 @@ try {
   await native("goto", ["2"]); await poll(async () => (await journal()).some(entry => entry.prepared), "Prepared intent was not persisted");
   const queued = (await journal())[0], owner = queued.owner;
   assert.equal(queued.scope.testRunId, first.testRunId); assert.ok(!JSON.stringify(queued).includes(identity.sessionToken));
-  await page.unroute("**/native-commands", unavailable); await page.reload({ waitUntil: "networkidle" });
+  // Old-document retries stay unavailable until the new document commits.
+  // Then require native bindings and the original exact Run/journal assertions,
+  // rather than completion of unrelated background transports.
+  await page.reload({ waitUntil: 'commit' }); await page.unroute("**/native-commands", unavailable);
   await methods(); await poll(async () => (await read(first.testRunId)).currentUnitKey === "first-2", "Reload did not deliver the captured goto");
   await emptyJournal();
   const delivered = nativeRequests.filter(request => request.deliveryId === queued.id);
@@ -112,9 +121,9 @@ try {
   await page.route("**/native-commands", lostResponse);
   await native("pause"); await poll(() => Promise.resolve(lost), "The owned lost receipt was not produced");
   const committed = (await journal())[0]; assert.ok(committed?.prepared); assert.equal((await read(first.testRunId)).status, "paused");
-  await page.unroute("**/native-commands", lostResponse);
   const replay = page.waitForResponse(response => new URL(response.url()).pathname.endsWith("/native-commands") && response.request().postDataJSON().deliveryId === committed.id);
-  await page.reload({ waitUntil: "networkidle" }); const replayed = (await (await replay).json()).application;
+  await page.reload({ waitUntil: 'commit' }); await page.unroute("**/native-commands", lostResponse);
+  await methods(); const replayed = (await (await replay).json()).application;
   assert.equal(replayed.applied, false); assert.equal(replayed.deliveryId, committed.id); await emptyJournal();
   await assertNativeCommandCompletion({ repository, run: first, request: committed.request, packets: completionPackets, poll });
   assert.deepEqual(answers(await read(first.testRunId)), saved);
@@ -227,9 +236,9 @@ try {
   mark("committed-old-effect-stays-on-its-run-and-late-reply-cannot-project-on-replacement");
   assert.deepEqual(errors, []);
 } catch (error) {
-  await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => {});
-  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, nativeRequests,
-    body: await page?.locator("body").innerText().catch(() => "") }, null, 2)); throw error;
+  try { await writeNativeRouteFailure({directory: artifacts, page, error, checks, pending, origin}); }
+  catch (evidenceError) { throw new AggregateError([error, evidenceError], 'Native route failed and evidence could not be retained.', {cause: error}); }
+  throw error;
 } finally {
   for (const release of releases) release(); await page?.unrouteAll({ behavior: "wait" });
   await writeFile(join(artifacts, "native-route.json"), JSON.stringify({ checks, errors, nativeRequests, observations }, null, 2));

@@ -1128,7 +1128,8 @@ export type ParticipantSession = {
   participantSessionId: string;
   tenantId: string;
   workspaceId: string;
-  contentReleaseId: string;
+  /** Native people need no content until their first Test is created. Canonical sessions always bind at sign-in. */
+  contentReleaseId: string | null;
   loginKey: string;
   groupKey: string;
   /** First captured native login identity; absent for canonical/unknown legacy sessions. */

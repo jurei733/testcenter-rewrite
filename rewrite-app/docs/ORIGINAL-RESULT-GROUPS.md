@@ -1,5 +1,45 @@
 # Original participant group snapshots
 
+## Native person creation before content exists (2026-10-25)
+
+The internal native `originalAuthentication` person phase now follows Source's
+separation between a person and a Test: both coded and uncoded people can be
+created, authorized, read, rotated and logged out before any content release
+exists. A fresh native person has `contentReleaseId: null`; no placeholder release
+or inferred historical ownership is created. Its relative access window starts
+at person creation and is retained when its first Test opens. Canonical sign-in
+still requires active content and ordinary canonical parents require a release.
+
+Opening the first Test resolves a real active release in the same tenant and
+workspace. The reservation writer binds that release together with the Test,
+initial logs/audit and parent activation. Missing, inactive or foreign content,
+initializer faults, late SQL parent-update faults and failed File publication
+leave the complete person, credentials and artifacts unchanged. Concurrent starts
+reuse one Test. Generic parent saves cannot pre-bind, forge or rewind the stored
+release; generic Run saves cannot bypass the first-Test reservation. Once bound,
+the existing strict parent/Run release boundaries remain enforced. Existing
+release IDs and unknown historical suffixes remain untouched.
+
+SQLite71 rebuilds only the person table under the owned migration transaction,
+retaining child credentials, revocation tombstones, views, indexes and triggers;
+it never edits the schema catalog or copies Test payloads. Foreign-key checks
+are restored and checked. PostgreSQL65 relaxes the column with a constraint
+requiring an explicit native identity for null content. Deliberate late metadata
+failures prove retryable rollback and exact old people/Test/credential retention
+on both engines. PostgreSQL uses the native workspace-before-parent lock order;
+a real blocked-parent/FK activity test proves the first capture can complete
+without a lock cycle. Standalone canonical reservation semantics stay intact.
+
+Local qualification: **4,133 unit/frontend checks**, **2,301 complete
+PostgreSQL checks** and **77/77 independent authentication/migration controls**
+across all four adapters, without failures, skips or cancellations. Full core/web
+typechecking and production build pass. The required unit, full PostgreSQL and
+both relevant focused service inventories include the new migration suite.
+Native HTTP DTOs/AccessSet/status mapping, ALTCHA/PoW and browser adoption remain
+open. This closes the release-independent internal person prerequisite, without
+closing a broad ledger row: **27 done / 22 partial**, all eight visual rows open.
+
+
 ## Durable native first factor and password-free person phase (2026-10-25)
 
 `services.originalAuthentication` now implements the real internal two-stage
@@ -73,8 +113,7 @@ definitions, unchanged Tests and real migration failures are exercised.
 
 The full native HTTP `/session/login`, `/session/person`, GET/DELETE `/session`,
 exact AccessSet/Test claims, native error/status mapping, ALTCHA/PoW and browser
-adoption remain open. The person initializer still requires an active canonical
-release; native release-independent person creation remains to be completed.
+adoption remain open. Release-independent person creation is qualified in the follow-up above.
 Native whole-file removal/replacement, global import conflict policy and
 operational monitor/Systemcheck Logins are also separate unfinished work. No
 unguarded HTTP route is added while configured proof-of-work must still be

@@ -1416,7 +1416,7 @@ const createFileRepository = (
           ) ||
           contentReleases.some(contentRelease => contentRelease.status === "active") ||
           Object.values(state.participantSessions).some(participantSession =>
-            contentReleaseIds.has(participantSession.contentReleaseId)
+            participantSession.contentReleaseId !== null && contentReleaseIds.has(participantSession.contentReleaseId)
           ) ||
           Object.values(state.testRuns).some(testRun =>
             contentReleaseIds.has(testRun.contentReleaseId)
@@ -1755,7 +1755,7 @@ const createFileRepository = (
       const result = await mutateParticipantRunApplication(state => {
         const prepared = prepareParticipantAssignmentRunCreation(candidate,
           state.participantSessions[candidate.participantSessionId] ?? null,
-          Object.values(state.testRuns), initialize);
+          Object.values(state.testRuns), initialize, state.contentReleases[candidate.contentReleaseId]);
         if (prepared.effect) {
           const effect = prepared.effect;
           if (effect.testLogs.some(log => state.participantTestLogs[log.participantTestLogId]) ||
