@@ -1,0 +1,16 @@
+name: Isolated complete timer qualification
+
+on:
+  push:
+    branches: [codex/timer-focus-linux-20261025]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  complete-timer:
+    uses: ./.github/workflows/rewrite-timer-focus.yml
