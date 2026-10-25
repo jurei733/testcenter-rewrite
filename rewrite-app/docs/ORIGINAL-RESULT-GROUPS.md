@@ -1,5 +1,15 @@
 # Original participant group snapshots
 
+## Native report serialization and remaining data history (2026-10-25)
+
+The separate [native report output component](ORIGINAL-REPORTS.md) matches twenty
+retained Original CSV bodies across five production evidence families, including
+legacy/enhanced comments, PHP nested JSON escaping and exact empty-body behavior.
+It does not connect the four native downloads or claim native repository/HTTP/UI
+parity. Stored person suffixes, first Unit identity/state, per-part response types
+and clocks, current physical XML labels and native permission mapping still need
+their complete projection. The canonical ZIP and broad ledger remain unchanged.
+
 ## Hosted cascade feedback and complete-acceptance boundary (2026-10-25)
 
 [Focused Linux run 40200874804](https://github.com/jurei733/testcenter-rewrite/actions/runs/40200874804)
