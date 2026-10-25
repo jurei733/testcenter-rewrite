@@ -1,5 +1,87 @@
 # Original participant group snapshots
 
+## Durable native first factor and password-free person phase (2026-10-25)
+
+`services.originalAuthentication` now implements the real internal two-stage
+authentication boundary for validated native participant Logins. This is a
+trusted application port, not a Source wire DTO or newly exposed HTTP route.
+It is based on unchanged production [Source21 evidence](../test-fixtures/original-testcenter/source-workspace-results/native-login-protocol/manifest.json),
+including the stable Login-token/current-assignment/password-edit observations.
+
+- `login({name,password})` resolves exact authored names across active scopes,
+  rejects ambiguity, checks the password/window/rate limit, then binds the
+  credential-stage group. Coded Logins return a stable private Login capability
+  and group capability without creating a person or requiring an active release.
+  Successful first-factor entry resets failures before a later code is entered.
+  Uncoded and standalone PHP-falsy `codes="0"` Logins directly enter a person.
+- `person({loginToken,code})` loads the current native definition and existing
+  binding. It never replays or caches a password, never performs credential-stage
+  rebinding and never resets password failures. Current replacement assignments
+  work with a retained Login token after password reimport. Native ASCII-only
+  code authorization, untrimmed input, first saved suffix/code spelling and
+  per-Login identity remain. The internal result keeps the immediate requested
+  code separate from the stored person spelling for future AccessSet formatting.
+- `read` distinguishes Login/person/group capabilities. Login logout validates
+  its current scope and leaves its token intact. Person entry rotates only that
+  person's bearer; logout uses the existing compare-and-revoke boundary and
+  preserves people/Tests. Login/group tokens cannot authorize participant/Test
+  operations. Existing canonical RPC issuance still uses its 43-character token;
+  only explicitly native person issuance selects Source's random 24-character
+  alphabet. Person tokens remain digest-only in durable credential storage.
+- A missing exact native definition returns **410** for retained Login/person
+  authentication. Restoring the same unexpired native definition makes its
+  retained valid tokens readable again. The shared protected participant-access
+  path now enforces this too: a same-spelling canonical roster row cannot revive
+  a native person. Tests exercise this boundary through real persisted native
+  removal/replacement and restoration; they do not pretend the existing canonical
+  roster upsert API implements native whole-file replacement/deletion.
+- Imported group moves do not rebind a Login during `read` or the person phase.
+  A later successful credential login updates its binding and linked people,
+  selects the new group's token and retains the same Login capability. Frozen
+  group metadata, exact-name peers and existing Test data stay independent.
+
+Memory and File retain private capability records separately from roster,
+participant and Test/export models. SQL adds **SQLite70 / PostgreSQL64**:
+`original_session_tokens` is keyed by exact tenant/workspace/kind/subject, has a
+unique SHA-256 lookup index and exclusive Login/group foreign-key constraints.
+Its private recoverable Login/group values permit stable reissuance after a
+restart, as Source does; they are never added to public roster/export rows.
+Participant digest lookup has its own index and fails closed on ambiguity.
+Workspace/subject checks and first-value retention run under the existing
+Memory/File writer, SQLite transaction or PostgreSQL workspace lock. Collisions
+cannot overwrite another subject. Workspace deletion retires private records;
+SQL subject deletion cascades through the private FK child.
+
+No ownership/token history is inferred or backfilled. Older File manifests
+default the absent collection without losing persisted fields. Actual failed
+SQLite/PostgreSQL migrations roll back both new structures and preserve exact
+legacy people, Tests and participant credentials. Historical upgrade fixtures
+retire the new child/index before recreating the original old schema; their
+rollback and unknown-history assertions remain.
+
+Local qualification passes **4,122 complete unit/frontend checks**, the full
+**2,283 PostgreSQL checks**, and independent **59/59 authentication
+controls over all four stores**, including two SQL connections and two clients
+of the registered File writer. A competing File writer is still rejected.
+The final placement keeps identical migration SQL inside each infrastructure
+adapter and repeats all protocol/migration controls. Writers capture validated
+private input before yielding, so a queued caller cannot change its capability
+scope/token. Credential reads/rebinding/failure resets are forbidden by
+an active test proxy during the person step. The six actual Source name peers,
+password/assignment edits, durable reopening, logout/rotation, restored native
+definitions, unchanged Tests and real migration failures are exercised.
+
+The full native HTTP `/session/login`, `/session/person`, GET/DELETE `/session`,
+exact AccessSet/Test claims, native error/status mapping, ALTCHA/PoW and browser
+adoption remain open. The person initializer still requires an active canonical
+release; native release-independent person creation remains to be completed.
+Native whole-file removal/replacement, global import conflict policy and
+operational monitor/Systemcheck Logins are also separate unfinished work. No
+unguarded HTTP route is added while configured proof-of-work must still be
+enforced at the transport boundary. This core increment does not close the
+native-protocol or broad visual ledger rows; **27 done / 22 partial**, all eight
+broad visual rows open, remains the formal assessment.
+
 ## Current native mode without reentry (2026-10-24)
 
 The observed Source21 live-mode gap below now has matching Rewrite controls.

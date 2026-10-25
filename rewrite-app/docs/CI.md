@@ -1,5 +1,64 @@
 # CI iteration and complete acceptance
 
+## Native authentication core and completed pipeline follow-up (2026-10-25)
+
+The dispatch/trigger follow-up completes [CI 40069256223](https://github.com/jurei733/testcenter-rewrite/actions/runs/40069256223)
+with **89/89 successful jobs**, no failures/skips/cancellations. Head
+`512756886778f18132b07a12372d28f41ba36ebd` and actual merge
+`0a21dcf4826a7ef9e59103311b556254b8cf06d8` share verified tree
+`bd6b0fc6bd3dabeca19d2d9a3609e2eb4413c50e`. Actual logs show **4,078
+unit/frontend**, **2,224 PostgreSQL** checks and zero complete-lock audit
+vulnerabilities. Linux policy passes **274/274**, without skips. Full PostgreSQL
+UI and every mandatory Original/browser/deployability group pass.
+
+Its observed span is **31 min 17 s**, 06:12:07–06:43:24 UTC on October 24,
+compared with the preceding run's **30 min 46 s**. Fast feedback arrives at
+06:17:12 UTC. The modeled 7–9-minute dispatch reduction is therefore **not an
+observed full-CI speedup**. Shared queue availability and individual job runtimes
+are not controlled by that model. Focused service feedback remains the separately
+measured 59–78-second iteration path; complete acceptance remains required.
+
+The next change implements a genuine internal native Login/person authentication
+port, described in [the native lifecycle scope](ORIGINAL-RESULT-GROUPS.md). Its
+new `original-login-protocol.test.mjs` remains mandatory in complete unit and
+PostgreSQL acceptance and both relevant focused service suites. Actual Source21
+receipts are integrity-checked; the second phase runs with password reads,
+credential rebinding and failure-counter resets actively forbidden. Stable
+Login/group capabilities survive reopening and password imports, while native
+person bearers retain digest-only storage and compare-and-revoke logout.
+
+The final local unit/frontend run passes **4,122 checks** (121 + 325 + 1,626 +
+2,050), with no failures/skips. Complete PostgreSQL acceptance passes **2,283**
+checks. The final adapter layout independently passes **59/59 authentication
+controls over all four stores**, including two SQL connections, the registered
+File writer, an older File manifest and deliberately failed SQLite70/PostgreSQL64
+migrations. Migration SQL stays inside the infrastructure adapters, as required
+by the repository Design Rules; the identical 936-byte text has SHA-256
+`ed44f77699645e4a97e7503014f85bd16e25113e5bf49038f44b6d944e4e4d1a`.
+The final layout repeats the protocol/migration checks after that byte-identical
+placement. Input-capture controls also prove a caller cannot alter a queued
+private capability's validated scope or token after submission.
+
+Final core/web typechecking, **273 local policy passes** with one explicit
+GNU-timeout-only macOS skip, Actionlint and diff checks pass. Historical schema
+fixtures now retire the new private FK child/index before recreating their older
+schema; all original rollback/data assertions remain. One old SQLite migration
+fixture initially failed for that dependency and is corrected, rather than
+removing its coverage. File's intentional one-writer exclusion remains enforced; concurrent clients
+share its registered writer while SQL clients use separate connections. No
+production assertion is weakened.
+
+The first PostgreSQL attempt has no terminal TAP summary and is not a passing
+run. At resumption its process handles and processes are absent, the cluster is
+stopped, and startup recovery reports an interrupted database system; the
+interruption's cause is not established. Those states are revalidated before restarting.
+The interrupted owned database is removed only after its owner and zero
+connections are verified. The successful replacement database has zero other
+connections and zero remaining test schemas before removal; its initially
+stopped cluster returns to stopped. New exact-head hosted acceptance still
+needs to qualify the authentication follow-up independently of the green
+pipeline baseline. No native HTTP/AccessSet/ALTCHA or visual parity is inferred.
+
 ## Latest full baseline, measured service feedback and queue ordering (2026-10-24)
 
 [Full run 40067020592](https://github.com/jurei733/testcenter-rewrite/actions/runs/40067020592)

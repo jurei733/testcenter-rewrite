@@ -2,6 +2,11 @@ import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
+  prepareOriginalSessionToken,
+  selectOriginalSessionToken,
+  originalSessionTokenKey,
+  hashOriginalSessionToken,
+  type OriginalSessionToken,
   prepareOriginalParticipantSession,
   resolveOriginalPerson,
   assertOriginalPersonUnique,
@@ -81,6 +86,7 @@ type InMemoryFirstSliceState = {
   contentReleases: Map<string, ContentRelease>;
   originalParticipantGroups: Map<string, OriginalParticipantGroup>;
   originalLoginBindings: Map<string, OriginalLoginBinding>;
+  originalSessionTokens: Map<string, OriginalSessionToken>;
   participantSessions: Map<string, ParticipantSession>;
   participantAccessCredentials: Map<string, ParticipantAccessCredential>;
   participantRosterEntries: Map<string, ParticipantRosterEntry>;
@@ -118,6 +124,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   contentReleases: new Map(),
   originalParticipantGroups: new Map(),
   originalLoginBindings: new Map(),
+  originalSessionTokens: new Map(),
   participantSessions: new Map(),
   participantAccessCredentials: new Map(),
   participantRosterEntries: new Map(),
@@ -416,6 +423,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       deleteMatching(state.participantRunCommands, workspaceMatches);
       deleteMatching(state.participantProgressDeliveries, workspaceMatches);
       deleteMatching(state.originalLoginBindings, workspaceMatches);
+      deleteMatching(state.originalSessionTokens, workspaceMatches);
       deleteMatching(state.originalParticipantGroups, workspaceMatches);
       for (const run of state.testRuns.values()) {
         if (workspaceMatches(run)) state.participantPresence.delete(run.testRunId);
@@ -724,6 +732,28 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
           participantSession.tenantId === tenantId &&
           participantSession.workspaceId === workspaceId
       );
+    },
+    async getOrCreateOriginalSessionToken(input) {
+      const candidate = prepareOriginalSessionToken(input);
+      if (!Array.from(state.workspacesByScope.values()).some(workspace => workspace.tenantId === candidate.tenantId && workspace.workspaceId === candidate.workspaceId)) return null;
+      const subjects = candidate.kind === 'login' ? Array.from(state.originalLoginBindings.values()) : Array.from(state.originalParticipantGroups.values());
+      if (!subjects.some(subject => subject.tenantId === candidate.tenantId && subject.workspaceId === candidate.workspaceId &&
+        ('loginKey' in subject ? subject.loginKey : subject.groupKey) === candidate.subjectKey)) return null;
+      const selected = selectOriginalSessionToken(candidate, Array.from(state.originalSessionTokens.values()));
+      state.originalSessionTokens.set(originalSessionTokenKey(selected), selected);
+      return structuredClone(selected);
+    },
+    async findOriginalSessionTokenByHash(tokenHash) {
+      if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+      const matches = Array.from(state.originalSessionTokens.values()).filter(token => hashOriginalSessionToken(token.token) === tokenHash);
+      return matches.length === 1 ? structuredClone(matches[0]) : null;
+    },
+    async findParticipantSessionByAccessTokenHash(tokenHash) {
+      if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+      const matches = Array.from(state.participantAccessCredentials.values()).filter(credential => credential.tokenHash === tokenHash);
+      if (matches.length !== 1) return null;
+      const person = state.participantSessions.get(matches[0]!.participantSessionId);
+      return person ? structuredClone(person) : null;
     },
     async getOrCreateOriginalParticipantGroup(input) {
       const candidate = prepareOriginalParticipantGroup(input);

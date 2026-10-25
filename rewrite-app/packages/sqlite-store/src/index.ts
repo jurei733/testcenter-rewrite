@@ -7,6 +7,10 @@ import {
   originalParticipantGroupKeysEqual,
   prepareOriginalParticipantGroup,
   prepareOriginalLoginBinding,
+  prepareOriginalSessionToken,
+  hashOriginalSessionToken,
+  OriginalSessionTokenCollisionError,
+  type OriginalSessionToken,
   prepareOriginalParticipantSession,
   resolveOriginalPerson,
   assertOriginalPersonUnique,
@@ -70,6 +74,11 @@ type SqliteMigration = {
 type WorkspaceRow = Workspace & {
   tenant_key: string;
 };
+
+const mapOriginalSessionToken = (row: Record<string, unknown>): OriginalSessionToken => ({
+  tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id), kind: row.kind as 'login' | 'group',
+  subjectKey: String(row.subject_key), token: String(row.token_value), createdAt: String(row.created_at)
+});
 
 const mapOriginalParticipantGroup = (row: Record<string, unknown>): OriginalParticipantGroup => ({
   tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id),
@@ -1691,6 +1700,29 @@ const sqliteMigrations: SqliteMigration[] = [
     version: 69,
     name: "original_person_name_suffix",
     sql: `ALTER TABLE participant_sessions ADD COLUMN original_name_suffix TEXT;`
+  },
+  {
+    version: 70,
+    name: "original_session_tokens",
+    sql: `CREATE TABLE original_session_tokens (
+  tenant_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  subject_key TEXT NOT NULL,
+  login_key TEXT,
+  group_key TEXT,
+  token_value TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, workspace_id, kind, subject_key),
+  CHECK ((kind = 'login' AND login_key IS NOT NULL AND login_key = subject_key AND group_key IS NULL)
+    OR (kind = 'group' AND group_key IS NOT NULL AND group_key = subject_key AND login_key IS NULL)),
+  FOREIGN KEY (tenant_id, workspace_id, login_key)
+    REFERENCES original_login_bindings(tenant_id, workspace_id, login_key) ON DELETE CASCADE,
+  FOREIGN KEY (tenant_id, workspace_id, group_key)
+    REFERENCES original_participant_groups(tenant_id, workspace_id, group_key) ON DELETE CASCADE
+);
+CREATE INDEX participant_access_credentials_token_hash ON participant_access_credentials(token_hash);`
   }
 ];
 
@@ -3290,6 +3322,36 @@ export const createSqliteFirstSliceStorage = (
       return rows
         .map(row => mapParticipantSession(row))
         .filter(Boolean) as ParticipantSession[];
+    },
+    async getOrCreateOriginalSessionToken(input) {
+      const candidate = prepareOriginalSessionToken(input);
+      return withAssetWrite(() => {
+        if (!database.prepare('SELECT 1 FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(candidate.tenantId, candidate.workspaceId)) return null;
+        const subject = candidate.kind === 'login' ? 'original_login_bindings' : 'original_participant_groups';
+        const column = candidate.kind === 'login' ? 'login_key' : 'group_key';
+        if (!database.prepare(`SELECT 1 FROM ${subject} WHERE tenant_id=? AND workspace_id=? AND ${column}=?`)
+          .get(candidate.tenantId, candidate.workspaceId, candidate.subjectKey)) return null;
+        const previous = database.prepare('SELECT * FROM original_session_tokens WHERE tenant_id=? AND workspace_id=? AND kind=? AND subject_key=?')
+          .get(candidate.tenantId, candidate.workspaceId, candidate.kind, candidate.subjectKey);
+        if (previous) return mapOriginalSessionToken(previous);
+        const hash = hashOriginalSessionToken(candidate.token);
+        if (database.prepare('SELECT 1 FROM original_session_tokens WHERE token_hash=?').get(hash)) throw new OriginalSessionTokenCollisionError('Original session token collision.');
+        database.prepare(`INSERT INTO original_session_tokens (tenant_id,workspace_id,kind,subject_key,login_key,group_key,token_value,token_hash,created_at)
+          VALUES (?,?,?,?,?,?,?,?,?)`).run(candidate.tenantId,candidate.workspaceId,candidate.kind,candidate.subjectKey,
+            candidate.kind==='login'?candidate.subjectKey:null,candidate.kind==='group'?candidate.subjectKey:null,candidate.token,hash,candidate.createdAt);
+        return candidate;
+      });
+    },
+    async findOriginalSessionTokenByHash(tokenHash) {
+      if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+      const row = database.prepare('SELECT * FROM original_session_tokens WHERE token_hash=?').get(tokenHash);
+      return row ? mapOriginalSessionToken(row) : null;
+    },
+    async findParticipantSessionByAccessTokenHash(tokenHash) {
+      if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+      const rows = database.prepare('SELECT participant_session_id FROM participant_access_credentials WHERE token_hash=? LIMIT 2').all(tokenHash);
+      if (rows.length !== 1) return null;
+      return mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(String(rows[0]!.participant_session_id)));
     },
     async getOrCreateOriginalParticipantGroup(input) {
       const candidate = prepareOriginalParticipantGroup(input);
