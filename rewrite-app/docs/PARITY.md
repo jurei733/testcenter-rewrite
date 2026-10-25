@@ -1,5 +1,20 @@
 # Testcenter parity checklist
 
+### Hosted cascade feedback and bounded timer follow-up (2026-10-25)
+
+The native cascade passes [all three focused Linux jobs](https://github.com/jurei733/testcenter-rewrite/actions/runs/40200874804),
+including 526 result and 361 auth controls with the complete policy/security gates.
+The preceding full run 40196969583 is terminal cancelled: its timer browser leaf
+stops reporting after 16 Rewrite cases, while 87 other jobs succeed. Its aggregate
+fails. The follow-up keeps all scenarios/assertions and adds owned process deadlines
+and phase receipts; local nine Original / 22 Rewrite timer controls and all 4,254
+unit/frontend checks pass. The hosted cause is not claimed fixed. [Full evidence](CI.md).
+
+Functional numeric Source/admin transport, production result-table/dialog adoption,
+selected-Test operations, four native reports and broad paired visuals remain open.
+Ledger remains **27 done / 22 partial**, all eight visual rows open, approximately
+**4–8 engineering weeks** remaining. Full acceptance is still required.
+
 ### Native group/session deletion foundation (2026-10-25)
 
 The protected versioned Original group route now deletes the current native

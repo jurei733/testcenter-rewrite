@@ -1,5 +1,23 @@
 # Original participant group snapshots
 
+## Hosted cascade feedback and complete-acceptance boundary (2026-10-25)
+
+[Focused Linux run 40200874804](https://github.com/jurei733/testcenter-rewrite/actions/runs/40200874804)
+accepts the exact native cascade application tree with three successful jobs:
+526 Original-results controls in 67 s, 361 auth controls in 93 s and nine Systemcheck
+controls in 55 s. Every job retains 278 policy checks, no skips and a zero-vulnerability
+complete-lock audit. Application head `c716350b1d31843a4e982d6162ed2c5c216e2edb`,
+tree `25e9561e7a9c2889b47aebffaa73950f4e0cf646`; the isolated wrapper adds only one
+independently verified workflow file.
+
+The preceding reference-only full run 40196969583 is terminal cancelled after its
+timer browser leaf stops reporting progress; 87 other jobs succeed and acceptance
+fails. Local complete timer controls pass. Both actual timer entries now have owned
+process supervision, phase evidence and failure/cancellation retention, preserving
+all nine Original and 22 Rewrite cases and their exact product assertions. The
+intermittent hosted cause remains unproven; see [exact evidence and limits](CI.md).
+Complete follow-up acceptance remains required. No broad parity row closes.
+
 ## Atomic native group/session deletion (2026-10-25)
 
 The protected versioned route now also supports

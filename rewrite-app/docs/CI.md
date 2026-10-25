@@ -1,5 +1,54 @@
 # CI iteration and complete acceptance
 
+## Bounded controller-timer diagnosis and accepted cascade feedback (2026-10-25)
+
+The two actual timer entries now run under independent owned-process supervision:
+**60 seconds per phase and eight minutes total per entry**. Scenario, browser/context
+cleanup, callback settlement and owned API shutdown have explicit phase records.
+Route-entry/exit and wait breadcrumbs are observations; they never extend a deadline.
+The supervisor terminates only its spawned process group and verified descendants,
+and records entry/phase/process identities without environment or request contents.
+Failure and cancellation retention now includes supervision and Original worker
+receipts alongside the existing bounded failure JSON/API log, excluding SQLite data.
+
+This follows [full run 40196969583](https://github.com/jurei733/testcenter-rewrite/actions/runs/40196969583),
+head `1877876110772ae711e5ab88262ba2b3382dcf31`, tree
+`cbe17c96cfed2e4d3b2868a29298272e8ddc7753`, verified merge
+`18d52398cf4982824c11c320468d081eb0028123`. It is terminal **cancelled**:
+87 successful jobs, one cancelled timer leaf and one failed acceptance aggregate.
+The timer job starts 13:23:16 UTC and cancellation is logged at 14:23:29 UTC,
+against its configured 60-minute limit. All nine Original worker controls pass;
+16 Rewrite scenario markers pass, ending with native Pause / applied legacy /
+stale state / lost legacy reply at 13:28:04 UTC. The logs cannot distinguish that
+scenario's cleanup from the next scenario's body. The complete 76-artifact inventory
+contains no controller-timer diagnostics. Actual Linux unit/frontend (4,222) and
+PostgreSQL (2,417) leaves pass, but this is not full acceptance.
+
+Unchanged local controls pass all nine Original and 22 Rewrite scenarios; a separate
+phase-only repeat also passes all 22, including every cleanup boundary. The hosted
+hang is not reproduced or claimed fixed. The follow-up supplies bounded failure
+and decisive phase evidence; it retains global route cleanup semantics, every
+scenario, every product assertion and all existing operation deadlines. Exact
+product assertion lines remain identical to the preceding harnesses.
+
+Local qualification of the supervised entries passes nine Original controls
+(58.96 s) and all 22 Rewrite scenarios (236.54 s), with successful owned shutdown.
+Eighteen supervisor/deadline controls include a real non-settling child that fails
+and retires correctly, plus public-evidence privacy checks. Complete unit/frontend
+passes **4,254 checks** without failures/skips/cancellations. Policy passes 276 plus
+one explicit GNU-timeout-only macOS skip; Actionlint passes. The backend implementation
+is unchanged from its already qualified **2,456 PostgreSQL** controls.
+
+[Isolated native cascade feedback 40200874804](https://github.com/jurei733/testcenter-rewrite/actions/runs/40200874804)
+is terminal **success, 3/3 jobs** on application
+`c716350b1d31843a4e982d6162ed2c5c216e2edb`, tree
+`25e9561e7a9c2889b47aebffaa73950f4e0cf646`, plus one verified wrapper.
+Actual Linux results pass **526 checks / 67 seconds**, auth **361 / 93 seconds**,
+Systemcheck **9 / 55 seconds**. Each retains 278 policy controls, no skips and a
+zero-vulnerability complete-lock audit. Fresh core builds take 8.06 / 13.63 / 13.34 s;
+selected suites take 27.64 / 35.25 / 4.05 s. These are measured focused feedback,
+with independent complete acceptance still required for the follow-up.
+
 ## Native deletion coverage retains full and focused gates (2026-10-25)
 
 The [atomic native group/session cascade](ORIGINAL-RESULT-GROUPS.md) adds its complete

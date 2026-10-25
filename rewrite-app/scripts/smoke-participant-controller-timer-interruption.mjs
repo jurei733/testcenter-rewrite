@@ -1,3 +1,5 @@
+import {isSupervisedSmokeChild, reportSmokePhase, reportSmokeObservation} from './supervised-smoke.mjs';
+import {superviseTimerSmoke} from './timer-smoke-supervision.mjs';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {access,mkdir,mkdtemp,writeFile} from 'node:fs/promises';
@@ -14,6 +16,10 @@ import {createServerRequestFailureGate} from './server-request-failure-gate.mjs'
 import {createSmokeRouteFailureGate,describeSmokeRouteFailure} from './smoke-route-failure-gate.mjs';
 import {fetchHeldSmokeRoute} from './fetch-held-smoke-route.mjs';
 
+if (!isSupervisedSmokeChild(import.meta.url)) {
+  process.exitCode = await superviseTimerSmoke(import.meta.url, 'participant-controller-timer');
+} else {
+reportSmokePhase('bootstrap-owned-participant-controller-timer');
 const root=resolve(process.env.UI_SMOKE_FRONTEND_ROOT||'.');
 await access(join(root,'dist/apps/web/browser/index.html'));
 const artifactRoot=process.env.UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT?.trim()||tmpdir();
@@ -35,11 +41,13 @@ const errors=[],checks=[],releases=[];
 let browser;
 let activeRouteFailures;
 const poll=async(predicate,message)=>{
+ reportSmokeObservation('wait:'+message);
  const deadline=Date.now()+20_000;
  while(Date.now()<deadline){activeRouteFailures?.assertHealthy();const matched=await predicate();activeRouteFailures?.assertHealthy();if(matched)return;await delay(50);}
  throw Error(message);
 };
 try{
+ reportSmokePhase('rewrite:owned-api-startup');
  const port=await new Promise((done,reject)=>{
   const timeout=setTimeout(()=>reject(Error('Owned timer API startup timed out')),20_000);
   server.once('message',({port})=>{clearTimeout(timeout);done(port);});server.once('error',reject);server.once('exit',()=>reject(Error('Owned timer API exited before startup')));
@@ -50,6 +58,7 @@ try{
   const response=await fetch(base+path,{method,headers:{...(token?{authorization:'Bearer '+token}:{}),...(body===undefined?{}:{'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)})});
   assert.ok(response.ok,`${method} ${path}: ${response.status} ${await response.clone().text()}`);return response.json();
  };
+ reportSmokePhase('rewrite:owned-content-setup');
  const operator=(await api('/api/v1/admin/auth/sign-in',{username:'demo-admin',password:'demo-admin-password'})).sessionToken;
  const workspaceKey='owned-controller-timer',workspace='/api/v1/tenants/demo-tenant/workspaces/'+workspaceKey;
  await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey,displayName:'Owned controller timer'},operator);
@@ -77,12 +86,17 @@ try{
    process.env.UI_SMOKE_TIMER_LEGACY_ONLY==='true'?scenario.legacy:process.env.UI_SMOKE_TIMER_CODE_ONLY==='true'?scenario.code:process.env.UI_SMOKE_TIMER_ZERO_ONLY!=='true'||scenario.zero);
  await api(workspace+'/participant-roster',{rosterText:'<Testtakers><Group id="owned">'+scenarios.map((scenario,i)=>`<Login mode="run-hot-return" name="timer-${i}"><Booklet>${scenario.code?'code-entry':'first'}</Booklet><Booklet>second</Booklet></Login>`).join('')+'</Group></Testtakers>'},operator);
  const repository=createSqliteFirstSliceRepository(file);
+ reportSmokePhase('rewrite:chromium-launch');
  browser=await chromium.launch({headless:process.env.UI_SMOKE_HEADFUL!=='true'});
  for(const [index,scenario] of scenarios.entries()){
+  reportSmokePhase(`rewrite:case-${index}:scenario`);
   const context=await browser.newContext({viewport:{width:1280,height:800},locale:'de-DE'}),page=await context.newPage();
   page.on('pageerror',error=>errors.push(error.message));
   const routeFailures=createSmokeRouteFailureGate();activeRouteFailures=routeFailures;
-  const intercept=(pattern,handler)=>page.route(pattern,routeFailures.wrap(pattern,handler));
+  const intercept=(pattern,handler)=>page.route(pattern,routeFailures.wrap(pattern,async(...args)=>{
+   reportSmokeObservation(`case-${index}:route-enter:${pattern}`);
+   try{return await handler(...args);}finally{reportSmokeObservation(`case-${index}:route-exit:${pattern}`);}
+  }));
   let releaseFreshState,releaseApply,releaseAnswer,releaseApplication,releaseAck,releaseLegacy,holdLegacyRoute,caseFailure,disposing=false,heldAnswer=false,heldApplication=false,heldAck=false,heldLegacy=false,loseReply=Boolean(scenario.lostTimerReply);
   const answerGate=new Promise(done=>{releaseAnswer=done;}),applicationGate=new Promise(done=>{releaseApplication=done;}),ackGate=new Promise(done=>{releaseAck=done;}),legacyGate=new Promise(done=>{releaseLegacy=done;});releases.push(releaseAnswer,releaseApplication,releaseAck,releaseLegacy);
   const applyGate=new Promise(done=>{releaseApply=done;}),freshStateGate=new Promise(done=>{releaseFreshState=done;});releases.push(releaseApply,releaseFreshState);
@@ -232,8 +246,11 @@ try{
   }catch(error){caseFailure=error;await writeFile(join(artifacts,'failure.json'),JSON.stringify({scenario,error:String(error),failure:describeSmokeRouteFailure(error),timerPackets,legacyPacket,legacyApplications,heldAnswer,heldApplication,heldLegacy,errors},null,2)+'\n');throw error;
   }finally{
    disposing=true;routeFailures.beginCleanup();releaseFreshState();releaseApply();releaseAnswer();releaseApplication();releaseAck();releaseLegacy();
+   reportSmokePhase(`rewrite:case-${index}:unroute-all`);
    await routeFailures.wrap('unrouteAll cleanup',()=>page.unrouteAll({behavior:caseFailure?'ignoreErrors':'wait'}))();
+   reportSmokePhase(`rewrite:case-${index}:context-close`);
    await routeFailures.wrap('context cleanup',()=>context.close())();activeRouteFailures=undefined;
+   reportSmokePhase(`rewrite:case-${index}:callback-settle`);
    await routeFailures.settle();
    const failure=routeFailures.failure(caseFailure);
    if(failure){await writeFile(join(artifacts,'failure.json'),JSON.stringify({scenario,error:String(caseFailure??failure),failure:describeSmokeRouteFailure(failure),timerPackets,legacyPacket,legacyApplications,heldAnswer,heldApplication,heldLegacy,errors},null,2)+'\n');throw failure;}
@@ -242,5 +259,9 @@ try{
  for(const check of checks.filter(check=>check.scenario.legacy))assert.equal(check.legacyApplications.filter(reply=>reply.application.applied).length,1,'The repeated legacy wire packet must have exactly one state effect');
  assert.deepEqual(errors,[]);gate.assertHealthy();await writeFile(join(artifacts,'timer-interruptions.json'),JSON.stringify({checks,errors},null,2)+'\n');
 }finally{
- for(const release of releases)release();await browser?.close();server.kill('SIGTERM');await closed;await new Promise(done=>apiLog.end(done));gate.assertHealthy();console.log('owned_api=shutdown');
+ for(const release of releases)release();reportSmokePhase('rewrite:browser-close');await browser?.close();
+ reportSmokePhase('rewrite:owned-api-close');server.kill('SIGTERM');await closed;
+ reportSmokePhase('rewrite:api-log-close');await new Promise(done=>apiLog.end(done));gate.assertHealthy();console.log('owned_api=shutdown');
+}
+
 }

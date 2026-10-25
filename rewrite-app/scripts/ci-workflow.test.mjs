@@ -563,7 +563,7 @@ test("isolated console shards retain each of the eight prior checks without a lo
   for(const item of shards){assert.equal(item.playwright,true);assert.ok(item.command.split("&&").length<=2);}
   assert.ok(workflow.jobs.acceptance.needs.includes("verify-memory-sqlite"));
   const timer=workflow.jobs["verify-memory-sqlite"].steps.find(step=>step.name==="Retain failed controller timer diagnostics");
-  assert.equal(timer.if,"failure() && matrix.check == 'ui-controller-timer'");
+  assert.equal(timer.if,"(failure() || cancelled()) && matrix.check == 'ui-controller-timer'");
   const debug=workflow.jobs["verify-memory-sqlite"].steps.find(step=>step.name==="Retain failed console debug evidence");
   assert.equal(debug.if,"failure() && matrix.check == 'ui-console-debug'");
   assert.equal(debug.with.path.trim(),"${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.json\n${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.png");
