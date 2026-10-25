@@ -45,6 +45,21 @@ type-hint extension is shipped here. Native numeric Unit writer/first identity,
 raw laststate, repository report projection, current physical labels and the four
 report HTTP/UI actions remain open. The broad ledger remains 27 done /22 partial.
 
+## Part-type qualification
+
+The exact part-type application `73b36c7e9ca6247a69be283c14baea21fedc45ae`
+(tree `9047d091c3248fce26d98f10e98a16dd4a5fd4e6`) passes a fresh complete local
+production build, 4,316 unit/frontend and 2,525 PostgreSQL checks, 109 focused
+ordering/rollback controls and real IB save/reload in both Rewrite interfaces.
+[Linux qualification 40239144647](https://github.com/jurei733/testcenter-rewrite/actions/runs/40239144647)
+passes the complete 595-check Original-results service suite on fresh PostgreSQL 16
+in 96 s and both actual IB Player interface entries with native material in 143 s.
+Full policy/audit/native checks remain; both audits have zero findings and neither
+job skips. This qualification proves the stored service path and its actual
+Player usage. Numeric Source Unit HTTP, report projection, first Unit identity,
+raw state and exact Source browser buffering remain open. Complete acceptance
+for the integrated part-type follow-up is still required.
+
 ## Status and evidence boundary
 
 The dedicated `original-workspace-report-wire.ts` component renders Source-shaped

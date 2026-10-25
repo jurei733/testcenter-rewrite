@@ -1,5 +1,43 @@
 # CI iteration and complete acceptance
 
+
+## Durable response-type feedback and complete acceptance (2026-10-25)
+
+[Full run 40237514022](https://github.com/jurei733/testcenter-rewrite/actions/runs/40237514022)
+is terminal **success: 89/89 jobs**, without skips/cancellations, on diagnostic
+head `206ef29e7927adf06829972f79741d99209a0f7b`, tree
+`3432cf460e11f88f776afd6b205ccd8ac00f76ef`; actual merge
+`3b881f5f87a9042fdad062e44af11ab279b9498e` has the independently verified same tree.
+Actual complete unit/frontend and PostgreSQL leaves pass **4,293 /2,495** checks;
+the full exit-completeness leaf passes all **57** cases. The 89-job span is
+**29:29**, from 21:52:24 to 22:21:53 UTC. This accepts that exact application tree;
+it does not establish the preceding intermittent failure's cause or a causal
+whole-pipeline performance gain.
+
+The subsequent durable part-type application `73b36c7e9ca6247a69be283c14baea21fedc45ae`,
+tree `9047d091c3248fce26d98f10e98a16dd4a5fd4e6`, has a fresh complete local
+production build, **4,316** unit/frontend checks, **2,525** real PostgreSQL checks,
+**109** targeted ordering/rollback controls and real IB Player save/reload checks
+in both interfaces. Mandatory policy passes 280 with its explicit GNU-timeout-only
+macOS skip; all other local controls have no failures/skips/cancellations. The
+owned test database was removed after verifying owner, zero other clients, no
+remaining owned schemas/public relations; its owned PostgreSQL cluster is stopped.
+
+[Isolated Linux run 40239144647](https://github.com/jurei733/testcenter-rewrite/actions/runs/40239144647)
+is terminal success. The existing reusable `original-results` service path accepts
+**595** checks on fresh PostgreSQL 16 in **96 s**, including installation, audit,
+282 policy controls and fresh core compilation (13,344 ms; service entry 43,785 ms).
+A separate native-material job passes both actual IB Player interfaces, 281
+policy, 17 browser and four archive controls in **143 s**; fresh production build
+33,041 ms and the two-interface Player entry 24,147 ms. Both audits report zero
+vulnerabilities; neither job skips, retries or weakens acceptance. Wrapper head
+`8b26bc4485c7706b302fbc0c2c3dc34b699cff2f`, tree
+`077be5d55c0ff0ae3e785d18172986b2babc3dc8`, adds only one fixed qualification file
+to that exact application tree. Blob/tree/parent/ref checks verify the boundary.
+This is scoped service/Player feedback; the part-type follow-up still requires
+its own complete acceptance after integration. Native report HTTP/UI connection
+and exact Source browser buffer/flush grouping remain separate open work.
+
 ## Owned completeness failure evidence (2026-10-25)
 
 [Full run 40209993795](https://github.com/jurei733/testcenter-rewrite/actions/runs/40209993795)
