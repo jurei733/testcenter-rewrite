@@ -7,12 +7,13 @@ import type { ParticipantRuntimeBooklet } from "@testcenter-rewrite-app/domain";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { OriginalToastService } from "./original-toast.service";
+import { OriginalParticipantNoticeComponent } from "./original-participant-notice.component";
 
 // Layout adapted from IQB Testcenter; see assets/ORIGINAL-UI-LICENSE.txt.
 @Component({
   selector: "app-original-participant-starter",
   standalone: true,
-  imports: [NgFor, NgIf, MatButton, MatCard, MatCardActions, MatCardHeader],
+  imports: [NgFor, NgIf, MatButton, MatCard, MatCardActions, MatCardHeader, OriginalParticipantNoticeComponent],
   templateUrl: "./original-participant-starter.component.html",
   styleUrls: ["./original-participant-starter.component.css", "./original-login-theme.scss"]
 })

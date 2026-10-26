@@ -353,7 +353,7 @@ export class ParticipantViewFacade {
   get noAssignedBookletsLabel(): string {
     // The Original starter also accepts this authored key outside the
     // versioned participant default catalog.
-    return this.participantCustomTexts.login_noBookletsAvailable?.trim() ||
+    return this.participantCustomTexts.login_noBookletsAvailable ||
       "Für diese Anmeldung wurde kein Test gefunden.";
   }
 
