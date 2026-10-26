@@ -239,7 +239,7 @@ entries, 46 Source provenance controls, CI policy and the complete dependency
 audit pass. The native capture controls retain the explicit macOS exclusion of
 the Ubuntu browser-material diagnostic; that case must run on Linux.
 
-The latest complete-candidate attempt reached 113 zero-difference viewport pairs,
+A development attempt reached 113 zero-difference viewport pairs,
 110 zero-difference independent Source repeats and all nine paint fault controls,
 then correctly failed an unstable macOS Erwachsene/600px password viewport. It is
 **not** a passing 120-case matrix. On that failure its saved first and last images
@@ -247,5 +247,38 @@ both match Source, while intermediate frame hashes alternate. The bounded failur
 packet now retains all twelve actual sampled PNGs, not only their hashes and the
 first/last image. No failed matrix is retried automatically or exempted. Every
 capture additionally requires an actually foregrounded document and preserves
-its focus state. Isolated Linux qualification and the remaining macOS diagnosis
-must be reported by their actual terminal outcomes before wider acceptance.
+its focus state. The following complete outcomes apply to the implementation
+with that foreground invariant and bounded intermediate-frame diagnostics.
+
+
+On the exact application tree `e838fe4c3556b81ab6a3ffb8c126a157bc3160d1`
+(commit `243101d58849b3908d8ec743d69145e6a45a400f`), both the complete local macOS
+matrix and [native Linux qualification 40270079942](https://github.com/jurei733/testcenter-rewrite/actions/runs/40270079942)
+pass **120 Source/Rewrite viewport pairs, 120 independent Source repeats and all
+nine real paint fault controls** at zero pixel tolerance. The Linux wrapper
+`d3fe5a805c9f58ae5617f5f1f023591ddbb43a7b` adds exactly one fixed workflow to that
+application; its parent, tree and single-file scope were independently verified.
+Its actual single-job span is **14:05**. This is scoped qualification, not a
+replacement for the complete acceptance workflow or evidence of a causal
+whole-pipeline speedup.
+
+Actual Linux logs retain **282 CI-policy, 46 Source-provenance and all 19 native
+browser controls**, with no failures, skips or cancellations. All three existing
+normal/protected participant-login entries pass, including **38 real browser
+proof-of-work challenges** in the protected participant scope. The full Rewrite
+locked-graph audit reports zero vulnerabilities. All eight entry-family tasks
+succeed, preserving the seven previous entry tasks; the complete workflow still
+retains all twenty previous tasks across its five families.
+
+Artifact **12628232481** has **40,148,442 bytes**, SHA-256
+`de1fe0ad47c08c624f996a1e9de97212bb65612677980f1795ab51664efe1c13`.
+Its 1,806 members were checked for duplicate or unsafe paths; the complete JSON
+matrix, required state keys, all **360 visible PNGs and 1,080 clearing PNG hashes**
+were independently verified. Clearing frames are white, actual root/interaction
+styles are restored and all declared requests stay within the owned fixtures.
+The complete macOS matrix also preserves native document focus, input selection,
+hover and scroll geometry. The original implementation's earlier failed
+development captures remain diagnostics, not accepted goldens.
+
+Complete acceptance for any subsequently integrated head remains a separate
+mandatory run. No broad visual parity row is closed by this entry matrix.
