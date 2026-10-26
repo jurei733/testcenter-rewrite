@@ -2122,6 +2122,18 @@ export type WorkspaceGroupResultSummary = {
   lastChangeAt: string;
 };
 
+/** Source Unit storage, separate from canonical controller projections. */
+export type OriginalNativeUnit = Pick<TestRun,
+  'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId'> & {
+  unitName: string;
+  originalUnitId: string;
+  /** A canonical write touched this Unit without native clock provenance. */
+  unknownHistory?: true;
+  state: Record<string, string>;
+  stateClocks: Record<string, number>;
+  parts: Array<{id: string; content: string | null; ts: number; responseType: string}>;
+};
+
 export type WorkspaceReview = {
   reviewId: string;
   tenantId: string;

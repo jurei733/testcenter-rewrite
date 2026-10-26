@@ -1,3 +1,4 @@
+import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
@@ -1772,6 +1773,13 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
       CREATE TABLE original_workspace_numbers(workspace_number TEXT PRIMARY KEY,workspace_id TEXT NOT NULL UNIQUE,tenant_id TEXT NOT NULL,
         FOREIGN KEY(workspace_id) REFERENCES workspaces(workspace_id) ON DELETE CASCADE);`
   }
+  ,{
+    version: 75,
+    name: "original_native_units",
+    sql: `CREATE TABLE original_native_units(test_run_id TEXT NOT NULL,participant_session_id TEXT NOT NULL,tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_release_id TEXT NOT NULL,unit_name TEXT NOT NULL,unit_json TEXT NOT NULL,
+      PRIMARY KEY(test_run_id,unit_name),FOREIGN KEY(test_run_id) REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+      FOREIGN KEY(participant_session_id) REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE);`
+  }
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -1921,6 +1929,7 @@ const checkSqliteDatabaseReadiness = (database: DatabaseSync): void => {
 };
 
 const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting = true): boolean => {
+  if(updateExisting)invalidateOriginalNativeUnits(database,testRun);
   const result = database
     .prepare(
       `INSERT INTO test_runs (
@@ -3726,6 +3735,8 @@ export const createSqliteFirstSliceStorage = (
       return mapTestRun(row);
     },
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(database, input);},
+    async getOriginalUnit(input){return readOriginalNativeUnit(database,input);},
+    async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(database,input,transform);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(database, tenantId, workspaceId);
     },

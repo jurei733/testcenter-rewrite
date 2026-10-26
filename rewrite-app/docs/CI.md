@@ -1,5 +1,43 @@
 # CI iteration and complete acceptance
 
+## Native Unit candidate and realistic SQLite contention feedback (2026-10-26)
+
+The accepted predecessor [40256061895](https://github.com/jurei733/testcenter-rewrite/actions/runs/40256061895)
+is terminal **89/89 success** on head `4cecdd2af7ee71906cfa1117a450312abe252122`,
+tree `5a4d7ef0ef75b42d9fc64774c5b91e5cf16965a2`; actual PR merge
+`4e50ba0fb538b6c8b0c39ff4f256880c140f9c04` has the independently verified same
+tree. Actual leaves pass 4,390 unit/frontend, 2,626 PostgreSQL and all57 exit
+scenarios, without failures/skips/cancellations. Its job span is **30:11**,
+01:49:12–02:19:23 UTC. The prior isolated service and protected-browser feedback
+on that tree takes104s/242s; these are scoped measurements, not proof of a causal
+complete-pipeline speedup.
+
+Native Unit GET/state/response/log extends the existing creation suite and
+protected Session browser entry. The complete unit/PostgreSQL and reusable
+`original-results` gates consume the same cases; no broad matrix or duplicate
+frontend build is added. Source41 retains every Source37 control and qualifies
+the changed transport against unchanged production Apache/PHP/PostgreSQL.
+New Unit rows keep packet writes separate from large canonical Test payloads.
+
+An initial broad local PostgreSQL regression run has2641/2643 passes: an external
+SQLite worker's COMMIT reports BUSY, failing that case and its enclosing parent.
+The same SQLite suite passes in isolation. A controlled actual-reader case now
+reproduces zero-timeout COMMIT failure and proves the production bounded wait
+policy commits after reader release. The external fixture uses that existing
+repository policy and requires an explicit committed receipt, while preserving
+the original blocked-mutation assertion and both independent answers. Production
+SQLite policy remains5s. This addresses the fixture's zero-timeout behavior;
+the final candidate passes fresh local regression; Linux qualification remains required.
+
+Final local validation: fresh production build, **4,404 unit/frontend** checks
+(160+325+1,865+2,054), **2,646 real PostgreSQL** checks, **303** targeted native
+and mutation controls across all four stores and all **11 Chromium markers**.
+The final complete runs have zero failures/skips/cancellations. Policy passes281
+with its one explicit GNU-timeout-only macOS skip; complete-lock audit zero,
+Actionlint and diff checks pass. Hosted qualification and the next complete
+acceptance run remain separate requirements. The prior accepted trees are not
+evidence for this subsequent Unit implementation.
+
 ## Native Test read/state feedback in the existing inventory (2026-10-26)
 
 The accepted predecessor [40249520035](https://github.com/jurei733/testcenter-rewrite/actions/runs/40249520035)
@@ -18,7 +56,7 @@ PostgreSQL and `original-results`, so `npm run ci:focus -- original-results` use
 one fresh core build for short service feedback. No broad job or repeated Angular
 build was added. The protected Chromium Session smoke retains all eight original
 markers and adds two native read/state/resource markers. Production UI adoption
-and broad paired visuals remain open. Complete candidate acceptance is pending.
+and broad paired visuals remain open. The Test-read tree is accepted by full40256061895 above; subsequent Unit qualification remains separate.
 
 Local qualification passes a fresh production build, **4,390 unit/frontend**
 checks (160+325+1,851+2,054), **2,626 real PostgreSQL** checks, **101** targeted
@@ -28,8 +66,8 @@ hardening; they have zero failures/skips/cancellations. Policy passes 281 with
 its one explicit GNU-timeout-only macOS skip; the complete locked audit reports
 zero vulnerabilities, and Actionlint/diff checks pass. The final browser retains
 every earlier marker and uses the same production frontend build with fresh core
-output. Hosted Linux qualification and complete candidate acceptance remain
-separate requirements. The prior 96-second service result is scoped to its own
+output. Its hosted Linux and full acceptance are recorded above. The prior
+96-second service result is scoped to its own
 earlier tree and does not establish this candidate's timing.
 
 

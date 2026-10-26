@@ -12,10 +12,30 @@ import { createFirstSliceServices } from '@testcenter-rewrite-app/application';
 import { compileBookletRuntimePolicy } from '@testcenter-rewrite-app/contracts';
 import { createInMemoryFirstSliceRepository } from '@testcenter-rewrite-app/memory-store';
 import { createFileFirstSliceRepository } from '@testcenter-rewrite-app/file-store';
-import { createSqliteFirstSliceRepository } from '@testcenter-rewrite-app/sqlite-store';
+import { createSqliteFirstSliceRepository,SQLITE_BUSY_TIMEOUT_MS } from '@testcenter-rewrite-app/sqlite-store';
 import { createPostgresFirstSliceStorage } from '@testcenter-rewrite-app/postgres-store';
 
 const timestamp = '2026-10-11T00:00:00.000Z';
+// The external writer uses the same bounded lock policy as a real repository.
+// A zero-timeout COMMIT can fail during a perfectly valid short-lived reader.
+function startSqliteAnswerWriter(file,id,responses,{busyTimeout=SQLITE_BUSY_TIMEOUT_MS,commitDelay=300}={}){
+  const worker=new Worker(`const{parentPort,workerData}=require('node:worker_threads');const{DatabaseSync}=require('node:sqlite');
+    const db=new DatabaseSync(workerData.file);db.exec('PRAGMA busy_timeout='+workerData.busyTimeout);db.exec('BEGIN IMMEDIATE');
+    db.prepare('UPDATE test_runs SET unit_responses_json=? WHERE test_run_id=?').run(JSON.stringify(workerData.responses),workerData.id);parentPort.postMessage('locked');
+    parentPort.once('message',()=>setTimeout(()=>{parentPort.postMessage('committing');let result;
+      try{db.exec('COMMIT');result={committed:true};}catch(error){result={committed:false,sqliteCode:error.errcode};db.exec('ROLLBACK');}
+      db.close();parentPort.postMessage(result);parentPort.close();},workerData.commitDelay));`,{eval:true,workerData:{file,id,responses,busyTimeout,commitDelay}});
+  const pending=new Map();
+  const deferred=key=>new Promise((resolve,reject)=>pending.set(key,{resolve,reject}));
+  const ready=deferred('ready'),committing=deferred('committing'),result=deferred('result'),finished=deferred('finished');
+  worker.on('message',message=>{const key=message==='locked'?'ready':message==='committing'?'committing':'result';pending.get(key)?.resolve(message);pending.delete(key);});
+  worker.once('error',error=>{for(const item of pending.values())item.reject(error);pending.clear();});
+  worker.once('exit',code=>{const done=pending.get('finished');if(code===0)done?.resolve();else done?.reject(Error('Owned SQLite writer failed'));pending.delete('finished');for(const item of pending.values())item.reject(Error('Owned SQLite writer exited before its receipt'));pending.clear();});
+  // Some receipts arrive while the main thread is synchronously waiting for
+  // SQLite. Keep failures observed until their assertions can run.
+  for(const promise of [ready,committing,result,finished])promise.catch(()=>{});
+  return{worker,ready,committing,result,finished};
+}
 const kinds = ['memory', 'file', 'sqlite'];
 if (process.env.FIRST_SLICE_STORE === 'postgres') { assert.ok(process.env.FIRST_SLICE_POSTGRES_URL); kinds.push('postgres'); }
 
@@ -443,15 +463,27 @@ for (const kind of kinds) test(`${kind}: participant runtime transitions, progre
         assert.deepEqual((await snapshot(f)).run.unitResponses, { unit: 'Waiting mutation answer', second: 'Held SQL writer answer' });
       } finally { if (!committed) await writer.query('ROLLBACK'); writer.release(); await pending; }
     });
+    if(kind==='sqlite')await t.test('external SQLite commit needs a bounded wait under a real reader; zero timeout fails while production policy commits',async()=>{
+      for(const busyTimeout of [0,SQLITE_BUSY_TIMEOUT_MS]){
+        const f=await fixture(),writer=startSqliteAnswerWriter(file,f.id,{...f.run.unitResponses,second:'Held-reader writer answer'},{busyTimeout,commitDelay:0});let reader;
+        try{
+          assert.equal(await writer.ready,'locked');reader=new DatabaseSync(file);reader.exec('BEGIN');reader.prepare('SELECT unit_responses_json FROM test_runs WHERE test_run_id=?').get(f.id);
+          writer.worker.postMessage('commit');await writer.committing;
+          if(busyTimeout===0){const receipt=await writer.result;assert.equal(receipt.committed,false);assert.equal(receipt.sqliteCode,5);}
+          else{let settled=false;writer.result.then(()=>{settled=true;});await delay(60);assert.equal(settled,false,'The actual writer must be waiting for the held reader.');}
+          reader.exec('COMMIT');reader.close();reader=undefined;
+          const receipt=await writer.result;await writer.finished;assert.equal(receipt.committed,busyTimeout!==0);
+          assert.equal((await snapshot(f)).run.unitResponses.second,busyTimeout===0?undefined:'Held-reader writer answer');
+        }finally{reader?.close();await writer.worker.terminate();await Promise.allSettled([writer.result,writer.finished]);}
+      }
+    });
     if (kind === 'sqlite') await t.test('an independent SQLite worker commits an answer before the blocked mutation reads its Run', async () => {
       const f = await fixture();
-      const worker = new Worker(`const {parentPort,workerData}=require('node:worker_threads');const {DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(workerData.file);db.exec('BEGIN IMMEDIATE');db.prepare('UPDATE test_runs SET unit_responses_json=? WHERE test_run_id=?').run(JSON.stringify(workerData.responses),workerData.id);parentPort.postMessage('locked');parentPort.once('message',()=>setTimeout(()=>{db.exec('COMMIT');db.close();parentPort.close();},300));`, { eval: true, workerData: { file, id: f.id, responses: { ...f.run.unitResponses, second: 'SQLite worker answer' } } });
-      const ready = new Promise((resolve, reject) => { worker.once('message', resolve); worker.once('error', reject); });
-      const finished = new Promise((resolve, reject) => { worker.once('exit', code => code === 0 ? resolve() : reject(Error('Owned SQLite writer failed'))); worker.once('error', reject); });
-      try { assert.equal(await ready, 'locked'); worker.postMessage('mutate');
+      const writer=startSqliteAnswerWriter(file,f.id,{...f.run.unitResponses,second:'SQLite worker answer'});
+      try { assert.equal(await writer.ready, 'locked'); writer.worker.postMessage('mutate');
         await repository.mutateParticipantRun(f.run, context => ({ testRun: { ...context.testRun, unitResponses: { ...context.testRun.unitResponses, unit: 'SQLite mutation answer' } }, testLogs: [], activityEvents: [] }));
-        await finished; assert.deepEqual((await snapshot(f)).run.unitResponses, { unit: 'SQLite mutation answer', second: 'SQLite worker answer' });
-      } finally { await worker.terminate(); }
+        assert.equal((await writer.result).committed,true);await writer.finished; assert.deepEqual((await snapshot(f)).run.unitResponses, { unit: 'SQLite mutation answer', second: 'SQLite worker answer' });
+      } finally { await writer.worker.terminate();await Promise.allSettled([writer.result,writer.finished]); }
     });
   } finally {
     for (const storage of storages) await storage.shutdown();

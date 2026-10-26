@@ -4,8 +4,9 @@ The participant boundary implements the Original paths `PUT /session/login`,
 `PUT /session/person`, `GET|PUT|DELETE /session`, `POST /session/challenge` and
 `POST /session/person/challenge`. It uses `AuthToken` and the Original participant
 AccessSet shape. Canonical RPC authentication remains available. Native admin and
-operational AccessSets, `/session/admin`, native numeric Unit reads/writes and
-production UI adoption are still outstanding. This boundary does not establish
+operational AccessSets, `/session/admin`, numeric administration and
+production native-transport adoption are still outstanding. Unit transport is
+implemented in the candidate described below. This does not establish
 paired visual parity.
 
 The Source21 Login receipt and Source16 protected ALTCHA receipt are checked
@@ -93,7 +94,7 @@ PostgreSQL and focused Original-results gates. It covers actual legacy upgrade
 and late DDL rollback, late File/SQL creation rollback, durable retries, role/scope
 denials, raw HTTP, independent PostgreSQL writers, concurrent controller entry
 and mapping cleanup. The following slice adds Test reads/state/resource transport.
-Native Unit writes and report HTTP/UI projection remain open. This does not
+The native Unit candidate below extends these paths; report HTTP/UI remains open. This does not
 establish complete native transport or paired visual parity.
 
 ## Native Test reads, saved state and group resources (2026-10-26)
@@ -139,5 +140,59 @@ Mandatory existing gates cover real migration/open/state rollback, binary HTTP,
 restarts, foreign decoder fences and independent concurrent PostgreSQL writers.
 The existing Chromium Session smoke keeps all eight previous markers and adds
 native Test read/state and group-resource markers. Production frontend adoption,
-native Unit transport, ZIP resource dependency edge cases, numeric administration,
+mixed native Unit adoption, ZIP resource dependency edge cases, numeric administration,
 report HTTP/UI and paired broad visuals remain separate open work.
+
+## Native Unit transport candidate (2026-10-26)
+
+[Unchanged production Source41](https://github.com/jurei733/testcenter-rewrite/actions/runs/40256816222)
+passes 41 groups and 231 HTTP observations, with all 37 previous groups and
+74 assertion lines retained. Its 16-file fixture pins 34 Original source hashes,
+the exact probe, production Apache/PHP receipt and eight raw report files.
+Actual ALTCHA/admin uploads create every fixture; TestMode stays off, with no SQL
+Test seeds or Source patches.
+
+`GET /test/:number/unit/:physicalId[/alias/:alias]` returns the five Source fields:
+state, dataParts, unitResponseType, definition and definitionType. Definition and
+normalized Player identity come from current physical workspace files. An absent
+saved Unit returns empty objects and an empty response type. Reading does not
+create a Unit, open a Test, start a controller or modify Test clocks. PHP-falsy
+alias `0` falls back to the physical Unit name. Test ownership is checked from
+indexed metadata; SQL Unit access does not decode unrelated canonical responses,
+with positive owned and foreign decoder controls.
+
+`PATCH /test/:number/unit/:name/state` accepts both the legacy array and the
+`{newState, originalUnitId}` body. Unlike Test state, Unit field clocks persist
+across packets; equal/stale/zero updates do not replace an accepted value. Every
+submitted entry is logged. The first stored Unit name and original ID survive
+case-equivalent writes. Units outside current Booklet assignments are allowed.
+State, clocks and logs publish atomically.
+
+`PUT /test/:number/unit/:name/response` requires an initialized Unit and merges
+each data part with its own strictly increasing clock and durable response type.
+A new part can have clock zero; an omitted type defaults to `unknown`. A stale
+part cannot change its content/type or suppress a new sibling part. The legacy
+GET exposes one response type from its final stored part, matching the qualified
+Source case; Source's SQL query itself has no general ordering guarantee.
+`PUT /test/:number/unit/:name/log` accepts legacy arrays and `{logEntries}`.
+Log-only writes create no Unit. Unit GET/state/response remain independent of
+Test locks and execution-mode response-saving policy, as Source41 demonstrates.
+JSON reads and empty HTML write responses use private/no-store caching.
+
+SQLite75/PG69 persist a scoped Unit row separately from the canonical Run. Unit
+packets avoid decoding/replacing the complete Test payload. Parent/Run locks
+serialize first creation and German case-equivalent aliases with deletion and
+canonical writes. File cache publication follows durable commit. Result-group
+inventory reads only Unit identities, includes actual saved native Units and
+does not decode their private JSON. Generic Run, group and workspace deletion
+retire Unit rows; old schemas receive no fabricated Unit clocks.
+
+Canonical legacy data without native field-clock provenance returns explicit409.
+A later canonical response change marks an existing native row's history unknown,
+preserving its first identity; stale native values are not returned as current.
+Valid Unit fields/part strings, Unicode, original SQL string lengths and bounded
+payloads are validated before publication. Full mixed-transport adoption and
+native result/report projection remain open, together with Test-log HTTP,
+numeric administration, ZIP dependency edges and the eight broad visual rows.
+This candidate extends existing mandatory service/unit/PostgreSQL and protected
+browser inventories; full candidate qualification remains required.

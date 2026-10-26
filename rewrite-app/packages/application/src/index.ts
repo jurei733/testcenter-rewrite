@@ -1,3 +1,9 @@
+import {createOriginalUnitPort} from './original-unit.js';
+export {formatOriginalUnitReadJson} from './original-unit.js';
+export type {OriginalUnitPort,OriginalUnitRead} from './original-unit.js';
+export {readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from './original-unit-collections.js';
+export {originalUnitHistoryUnavailable,assertOriginalUnitParent,assertOriginalUnitInput,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitRecordKey,selectOriginalUnitName,prepareOriginalUnitMutation,patchOriginalUnitState,patchOriginalUnitParts} from './original-unit-record.js';
+export type {OriginalUnitScope,OriginalUnitInput,OriginalUnitEffect,OriginalUnitTransform} from './original-unit-record.js';
 export {preserveOriginalTestState} from './original-test-state.js';
 export {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 import {createOriginalTestFiles} from './original-test-files.js';
@@ -1271,6 +1277,7 @@ export type FirstSlicePorts = {
   /** Trusted native authentication core; HTTP must separately enforce configured proof of work. */
   originalAuthentication: import('./original-authentication.js').OriginalAuthenticationPort;
   originalTest: import('./original-test.js').OriginalTestPort;
+  originalUnit:import('./original-unit.js').OriginalUnitPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
   monitorRead: MonitorReadPort;
@@ -1594,6 +1601,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   /** Session claims read only scope/identity/lock/opening metadata, never answer or timer payloads. */
   listOriginalSessionTestFlags(participantSessionId: string): Promise<import('./original-session.js').OriginalSessionTest[]>;
   /** One committed inventory snapshot; never returns response/timer values or private review text. */
+  getOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
+  mutateOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput, transform: import('./original-unit-record.js').OriginalUnitTransform): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   getOriginalGroupResultInventory(tenantId: string, workspaceId: string): Promise<import('./original-group-results.js').OriginalGroupResultInventory>;
   /** Atomically delete native group snapshots, current session descendants and capabilities. */
   deleteOriginalGroupResults(input: import('./original-group-deletion.js').OriginalGroupDeletionInput): Promise<import('./original-group-deletion.js').OriginalGroupDeletionResult | null>;
@@ -32401,6 +32410,7 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantAccess,
     originalAuthentication,
+    originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
     originalTest: createOriginalTestPort({auth: originalAuthentication, repository, now, id: idGenerator,
       readBooklet:(scope,fileId)=>originalTestFiles.booklet(scope,fileId),
       readResource:(scope,path)=>originalTestFiles.resource(scope,path),

@@ -1,0 +1,32 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "probeCommit": "363e8575fd5925d4d286fc7afafcff1f3a18f028",
+  "probeTree": "424c6e3f741a81b736b59f5b0fd14cf7e7525b16",
+  "runId": 40256816222,
+  "jobId": 121360339813,
+  "artifactId": 12622892043,
+  "artifactSha256": "dc66250945cbdc0f6fd9cf257d93adf2eab8f40c4f0f014b8b28a28cd5b06baa",
+  "sourceProbeSha256": "15e5d96a78e84aa47b20051765b525f3a5face7dad2af2ff16c533d927bdc11d",
+  "preservedPriorGroups": 37,
+  "preservedPriorAssertionLines": 74,
+  "checks": 41,
+  "httpObservations": 231,
+  "sourceFileHashes": 34,
+  "files": {
+    "http-observations.json": "93c75917fc1b81eeebca664770b1fad49846b05bf23c1b8ecc8b1e566f04e2e4",
+    "image-id.txt": "f801e2dfc3cdb7f1b6db15123acb8dc9f27f848fe5970efc8929bf9644f79e71",
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
+    "receipt.json": "b3e488f1922e5e866b8ee35c79b0a875938d814df88587121d716eea48ec26dc",
+    "source-probe.compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    "source-probe.mjs": "15e5d96a78e84aa47b20051765b525f3a5face7dad2af2ff16c533d927bdc11d",
+    "source-probe.workflow.yml": "9aa4bc85c536fda3a2521cf8268090108fde0c735293abaf97d9704cca68d1a0",
+    "unit-parts-logs.csv": "cb21f0d3a73a3a8b7780fffe0334cc4d2ee9a6bf64603a181a91d1df4f3cec09",
+    "unit-parts-logs.json": "f5f140b330a5cd33ec34b3e87924d52dc189f60bb5d7cda733588d562c4a40f4",
+    "unit-parts-responses.csv": "4cd713b969ca86fb9680fe25cd3013fbfded9b679233873d7f86331f46ba1df9",
+    "unit-parts-responses.json": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+    "unit-parts-reviews-enhanced.csv": "29d865cd8a860f1d0cf77a215e0d3a96192b75e84e0428d2ed354bfc81e45626",
+    "unit-parts-reviews-enhanced.json": "6081a2cd24ab9bba4c372bd31f1acc5b9b8896d9fdfcd329520bf584945d1684",
+    "unit-parts-reviews-legacy.csv": "4d5dc7a3c40fa67e5cbb83d9c7cdee0f6cc267babf5621efd6ca537b138399a7",
+    "unit-parts-reviews-legacy.json": "102f8130d62d85c64bb6e7ade7bad29d20b89f60ab09ce3cfa75d9048fcae152"
+  }
+}

@@ -15,11 +15,12 @@ export type OriginalResultTest = Pick<TestRun, 'testRunId' | 'participantSession
   savedUnitKeys: string[]; bookletName?: string; lastOpenedAt?: string | null; lastTestModifiedAt?: string | null;
 };
 export function projectOriginalResultTest(run: Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId' | 'originalResultState'> & {unitResponses?: TestRun['unitResponses']},
-  savedUnitKeys: readonly string[] = Object.keys(run.unitResponses ?? {})): OriginalResultTest {
+  savedUnitKeys: readonly string[] = Object.keys(run.unitResponses ?? {}),nativeUnitKeys:readonly string[]=[]): OriginalResultTest {
   if (!Array.isArray(savedUnitKeys) || savedUnitKeys.some(key => typeof key !== 'string')) throw unavailable();
-  const state = run.originalResultState;
+  const state = run.originalResultState,units=[...savedUnitKeys];
+  for(const key of nativeUnitKeys)if(!units.some(existing=>originalParticipantGroupKeysEqual(existing,key)))units.push(key);
   return {testRunId: run.testRunId, participantSessionId: run.participantSessionId, tenantId: run.tenantId, workspaceId: run.workspaceId,
-    contentReleaseId: run.contentReleaseId, savedUnitKeys: [...savedUnitKeys],
+    contentReleaseId: run.contentReleaseId, savedUnitKeys: units,
     ...(state?.bookletName === undefined ? {} : {bookletName: state.bookletName}),
     ...(state?.lastOpenedAt === undefined ? {} : {lastOpenedAt: state.lastOpenedAt}),
     ...(state?.lastTestModifiedAt === undefined ? {} : {lastTestModifiedAt: state.lastTestModifiedAt})};
