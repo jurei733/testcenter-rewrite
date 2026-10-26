@@ -175,3 +175,77 @@ The exit gate retains trusted pointer/keyboard events, bounded request/response/
 The IB gate observes the real parent-to-Player Start message in the exact restored opaque frame, and compares its complete unit state and raw data parts with the actual re-entry API response. It retains trusted-input, foreign-session, covered-target, real Document/Script reload, interface and operator-credential separation checks. Authored variables and raw value types remain exact; interaction scores and progress must survive subsequent runtime notifications. This is a stronger restoration witness than comparing two live database reads after the real Player has legitimately advanced its execution-time scores. Requests started by the previous document cannot supply the re-entry witness, and response bodies are consumed immediately. Both Rewrite and Original browser flows pass locally.
 
 Source capture images and indexes are retained for 30 days for review; shared build binaries remain one-day same-run inputs, and failed Quick diagnostics remain seven days. The qualified profile is checked into Git with producing artifact digests and immutable Source/browser provenance.
+
+
+## Complete participant entry viewport comparisons
+
+The five capture families retain all twenty previous Source tasks. The entry
+family adds `entry-viewports` as the twenty-first task. The new task requires 120 complete
+Source/Rewrite viewport pairs and 120 independent Source repeats: Primar,
+Sekundar and Erwachsene at 1280×720, 390×844, 599×844 and 600×844, each with fresh
+entry, logo keyboard focus, name keyboard focus, password, password-submit hover,
+caps-lock warning, password visibility, visibility-control hover, back navigation
+and invalid credentials. Non-hover states use an actual neutral pointer position
+after layout; separate explicit hover states preserve the hovered control. The unchanged
+Source frontend receives explicitly owned UI DTOs. The candidate signs in through
+its real protected API. This establishes no Source backend authorization proof.
+Every pair compares all RGBA pixels at zero tolerance, and nine actual candidate
+paint defects (footer, welcome panel and submit control in each theme) must be
+detected and disappear exactly after removing their owned styles. Capture must
+preserve actual focus, selection, input length, layout and scroll positions.
+Each native form transition also verifies that the previous form was detached,
+matching the unchanged Source's separate name/password forms.
+
+Scoped Original participant CSS removes the Rewrite's global one-pixel hover
+translation. Actual paired captures found the password submit and visibility
+control moving while the Original controls retained their authored position.
+The legacy name/password and real proof-of-work browser gates remain required.
+
+Native repaint invalidates the descendant paint before **each** of the three
+consecutive qualifying frames. Opacity-only capture reproduced stale fractional
+card edges, including two alternating actual edge rasters, despite identical DOM
+geometry. The clearing frame temporarily hides descendant paint under a fully
+transparent root; the actual focus and hover targets remain explicitly visible under
+that transparent root. This preserves native interaction without calling `focus()`
+or replaying mouse/input events. All changed style attributes are restored exactly, a complete white
+clearing image is required, and authored geometry remains exact. A visibility
+change without preserving the actual focused element was rejected because it
+dispatched blur. Root filtering was also insufficient to invalidate the stale
+card edge. Neither rejected method supplies acceptance evidence.
+
+The native browser controls retain perpetual-paint and layout-change failures,
+exact one-pixel detection, independent Source diagnostic contexts and failure
+cleanup. Additional controls cover explicitly visible descendants, existing root
+styles, real link/input focus, selection, blur and independent hover event history for
+every native frame. Entry capture also waits for real transient Material ripples
+to disappear and finite effects to finish; it does not suppress them.
+The image preparation code never receives an expected image or pixel comparison.
+The optional sampling-only diagnostics keep their independent preparation and
+cannot replace a failing complete viewport comparison.
+
+This addition strengthens two narrow entry flows. All eight broad visual parity
+rows remain open, including starter, second-code variants, custom assets/text,
+errors and the other application surfaces. Source and candidate images remain
+same-run artifacts; no prior-run image or enlarged pixel tolerance is accepted.
+
+
+Candidate validation remains separate from complete acceptance. The preceding
+published application `b02d3d07329591a356938429045ebeae35f48bf4` passed
+[all 89 jobs](https://github.com/jurei733/testcenter-rewrite/actions/runs/40263983164),
+with 4,404 unit/frontend tests, 2,646 PostgreSQL tests and all 57 exit scenarios;
+its actual job span was 30:30. That result excludes this follow-on capture work.
+Local production build, all three existing normal/protected participant-login
+entries, 46 Source provenance controls, CI policy and the complete dependency
+audit pass. The native capture controls retain the explicit macOS exclusion of
+the Ubuntu browser-material diagnostic; that case must run on Linux.
+
+The latest complete-candidate attempt reached 113 zero-difference viewport pairs,
+110 zero-difference independent Source repeats and all nine paint fault controls,
+then correctly failed an unstable macOS Erwachsene/600px password viewport. It is
+**not** a passing 120-case matrix. On that failure its saved first and last images
+both match Source, while intermediate frame hashes alternate. The bounded failure
+packet now retains all twelve actual sampled PNGs, not only their hashes and the
+first/last image. No failed matrix is retried automatically or exempted. Every
+capture additionally requires an actually foregrounded document and preserves
+its focus state. Isolated Linux qualification and the remaining macOS diagnosis
+must be reported by their actual terminal outcomes before wider acceptance.

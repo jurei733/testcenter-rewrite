@@ -140,7 +140,8 @@ export const originalReferenceTasks = {
     task("insecure-admin", "reference-original-participant-login-focus.mjs", { ORIGINAL_LOGIN_REFERENCE_INSECURE: "true", ORIGINAL_LOGIN_REFERENCE_ENTRY: "admin" }, "focus.json"),
     task("header-login", "reference-original-participant-login-focus.mjs", { ORIGINAL_LOGIN_REFERENCE_HEADER: "true" }, "focus.json"),
     task("header-admin", "reference-original-participant-login-focus.mjs", { ORIGINAL_LOGIN_REFERENCE_HEADER: "true", ORIGINAL_LOGIN_REFERENCE_ENTRY: "admin" }, "focus.json"),
-    task("header-starter", "reference-original-participant-login-focus.mjs", { ORIGINAL_LOGIN_REFERENCE_HEADER: "true", ORIGINAL_LOGIN_REFERENCE_STARTER: "true" }, "focus.json")
+    task("header-starter", "reference-original-participant-login-focus.mjs", { ORIGINAL_LOGIN_REFERENCE_HEADER: "true", ORIGINAL_LOGIN_REFERENCE_STARTER: "true" }, "focus.json"),
+    task('entry-viewports', 'reference-original-participant-entry-viewports.mjs', {}, 'entry-viewports.json')
   ],
   dialogs: [
     task("exit", "reference-original-player-exit.mjs"),

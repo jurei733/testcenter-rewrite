@@ -17,6 +17,9 @@ mat-form-field { display: block; }
    icon registry/remote resources into the shared initial bundle. */
 .login-submit .mat-icon { overflow: hidden; fill: currentColor; }
 button.mat-mdc-icon-button { font-family: revert; font-weight: revert; line-height: normal; }
+/* Original buttons keep their authored position while hovered, including
+   the shared name/password submit and password visibility control. */
+button:hover { transform: none; }
 :host ::ng-deep .mdc-floating-label { gap: normal; }
 .password-headline { display: flex; align-items: center; gap: 24px; }
 .password-headline > button { color: var(--secondary); border: 1px solid var(--secondary); border-radius: 12px; }
