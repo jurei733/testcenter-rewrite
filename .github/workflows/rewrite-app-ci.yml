@@ -504,26 +504,36 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - check: ui-delete-group-results
-            command: npm run smoke:ui:delete-group-results:built
-            playwright: true
-          - check: ui-unit-detail-review
-            command: npm run smoke:ui:unit-detail-review:built
+          # Longest observed jobs first; exact timings in rewrite-app/scripts/fixtures/ci-shard-timings.json.
+          - check: ui-full
+            command: npm run smoke:ui:built
             playwright: true
           - check: ui-activation-blocking-runtime
             command: npm run smoke:ui:activation-blocking-runtime:built && npm run smoke:ui:participant-save-retry:built
             playwright: true
+          - check: ui-delete-group-results
+            command: npm run smoke:ui:delete-group-results:built
+            playwright: true
+          - check: ui-monitor-detail-review
+            command: npm run smoke:ui:monitor-detail-review:built
+            playwright: true
           - check: ui-participant-detail-review
             command: npm run smoke:ui:participant-detail-review:built
+            playwright: true
+          - check: ui-monitor-review
+            command: npm run smoke:ui:monitor-review:built
+            playwright: true
+          - check: ui-unit-detail-review
+            command: npm run smoke:ui:unit-detail-review:built
+            playwright: true
+          - check: ui-monitor-finish-all
+            command: npm run smoke:ui:monitor-finish-all:built
             playwright: true
           - check: ui-monitor-bulk
             command: npm run smoke:ui:monitor-bulk:built
             playwright: true
-          - check: ui-monitor-auto-next
-            command: npm run smoke:ui:monitor-auto-next:built
-            playwright: true
-          - check: ui-monitor-review
-            command: npm run smoke:ui:monitor-review:built
+          - check: ui-ops
+            command: npm run smoke:ui:operator-auth:built
             playwright: true
           - check: ui-open-run-sync
             command: npm run smoke:ui:open-run-sync:built
@@ -531,33 +541,24 @@ jobs:
           - check: ui-run-detail-review
             command: npm run smoke:ui:run-detail-review:built
             playwright: true
-          - check: ui-monitor-detail-review
-            command: npm run smoke:ui:monitor-detail-review:built
-            playwright: true
-          - check: ui-monitor-finish-all
-            command: npm run smoke:ui:monitor-finish-all:built
-            playwright: true
-          - check: ui-ops
-            command: npm run smoke:ui:operator-auth:built
+          - check: ui-monitor-auto-next
+            command: npm run smoke:ui:monitor-auto-next:built
             playwright: true
           - check: ui-review-readiness
             command: npm run smoke:ui:review-readiness:built
             playwright: true
-          - check: ui-full
-            command: npm run smoke:ui:built
-            playwright: true
           - check: ui-controller-timer
             command: npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built
             playwright: true
-          - check: integration-file
-            command: npm run test:integration:file:built
-            playwright: false
           - check: ui-participant-console
             command: npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built
             playwright: true
           - check: ui-participant-native-routes
             command: npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
             playwright: true
+          - check: integration-file
+            command: npm run test:integration:file:built
+            playwright: false
           - check: ui-admin-delete
             command: npm run smoke:ui:admin-delete:built
             playwright: true
@@ -567,47 +568,47 @@ jobs:
           - check: ui-original-review
             command: npm run smoke:ui:original-review:built
             playwright: true
-          - check: ui-admin-workspace-access
-            command: npm run smoke:ui:admin-workspace-access:built
-            playwright: true
           - check: ui-original-workspace-files
             command: npm run smoke:ui:original-workspace-files:built
-            playwright: true
-          - check: ui-participant-monitor-live
-            command: npm run smoke:ui:participant-monitor-live:built
             playwright: true
           - check: ui-verona-development
             command: npm run smoke:ui:verona-development:built
             playwright: true
-          - check: integration-sqlite
-            command: npm run test:integration:sqlite:built
-            playwright: false
+          - check: ui-deletion-confirmation
+            command: npm run smoke:ui:deletion-confirmation:built
+            playwright: true
+          - check: ui-admin-workspace-access
+            command: npm run smoke:ui:admin-workspace-access:built
+            playwright: true
           - check: ui-workspace-delete
             command: npm run smoke:ui:workspace-delete:built
             playwright: true
-          - check: integration-memory
-            command: npm run test:integration:memory:built
-            playwright: false
           - check: ui-workspace-rename
             command: npm run smoke:ui:workspace-rename:built
-            playwright: true
-          - check: ui-adaptive-runtime
-            command: npm run smoke:ui:adaptive-runtime:built
-            playwright: true
-          - check: ui-deletion-confirmation
-            command: npm run smoke:ui:deletion-confirmation:built
             playwright: true
           - check: ui-console-debug
             command: npm run smoke:ui:participant-debug:built
             playwright: true
-          - check: ui-original-xml-schema
-            command: npm run smoke:ui:original-xml-schema:built
+          - check: integration-sqlite
+            command: npm run test:integration:sqlite:built
+            playwright: false
+          - check: integration-memory
+            command: npm run test:integration:memory:built
+            playwright: false
+          - check: ui-participant-monitor-live
+            command: npm run smoke:ui:participant-monitor-live:built
+            playwright: true
+          - check: ui-adaptive-runtime
+            command: npm run smoke:ui:adaptive-runtime:built
+            playwright: true
+          - check: local-demo
+            command: npm run smoke:local-demo:built
             playwright: true
           - check: ui-participant-command-completion
             command: npm run smoke:ui:participant-command-completion:built
             playwright: true
-          - check: local-demo
-            command: npm run smoke:local-demo:built
+          - check: ui-original-xml-schema
+            command: npm run smoke:ui:original-xml-schema:built
             playwright: true
           - check: compatibility
             command: npm run test:compatibility:built

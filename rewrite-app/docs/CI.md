@@ -3243,3 +3243,10 @@ The follow-up review-hover expansion adds the hovered review download button to 
 
 
 The exact four-state Retina counterexample was rerun against fresh production after the scoped hover fix: all four Source/Rewrite views and all four independent Source repeats are now exact, with zero page errors and unknown Source requests. Evidence: `starter-interaction-fixed-20261026/starter-viewports.json` (76,465 bytes, SHA-256 `7eea43ad1ebc92706b89d0cfbda7aa996d940e987ad20e30e7e0fdcc352535b8`). This is a targeted causal check, separate from complete default-profile acceptance.
+
+
+### Refresh broad scheduling from completed job timings (qualification pending)
+
+The prior accepted complete run 40275946436 passed all 89 jobs in 30:08. Its longest broad UI job, `ui-full`, took 17:22 but started at 05:58:03 UTC, 8:01 after the Fast feedback gate completed (05:50:02). The broad matrix had placed it fourteenth. The updated order puts observed long jobs first using the separate complete receipt `scripts/fixtures/ci-shard-timings.json`; all 40 exact command/options/browser records, dependency gates, runner limits, fail-fast policy and acceptance requirements are preserved. No suite or input is shortened. The original historical timing receipt remains untouched, and its existing 15/16-slot scheduling model must still retain at least 300 seconds of improvement over its original baseline (the refreshed order models 515/414 seconds).
+
+This is a queue-order optimization based on actual recent job durations. The simplified model for the latest 15/16-slot matrix alone predicts the same makespan; the observed delay also involves shared runner availability and other job families. No new whole-pipeline speedup is claimed. Validate the complete Starter/review implementation first, then run every integrated gate with the refreshed schedule. Preserve useful live qualifications to terminal completion. The prior complete baseline excludes the newly added Starter views, so any observed whole-run difference must disclose that changed workload and cannot establish isolated scheduling causality. A scoped run does not establish complete acceptance.
