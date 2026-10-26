@@ -84,7 +84,8 @@ SQLite migration 73 and PostgreSQL migration 67 add scoped unique number mapping
 a durable global decimal counter and cascading Run/person foreign keys. Memory
 and File use equivalent scoped collections; File publishes its cache only after
 its durable write. Existing Run writes cannot overwrite the separate identity.
-Native group and generic Run deletion remove mappings while retaining the counter.
+Native group, generic Run and whole-workspace deletion remove mappings while
+retaining the counter.
 Legacy migrations create empty mappings and never guess historical numeric IDs.
 
 Mandatory `scripts/original-test-creation.test.mjs` runs in complete unit,
