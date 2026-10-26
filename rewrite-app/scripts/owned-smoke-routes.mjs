@@ -45,22 +45,31 @@ export function createOwnedSmokeRoutes(page, {timeout = 20_000, observe = () => 
 
 export async function qualifyOwnedSmokeRouteDrain(browser, base) {
   const page = await browser.newPage(), scope = createOwnedSmokeRoutes(page, {timeout: 5000});
-  let entered, release;
+  let entered, release, unrelatedEntered, releaseUnrelated, unrelatedSettled=false;
   const entry = new Promise(resolve => {entered = resolve;}), gate = new Promise(resolve => {release = resolve;});
+  const unrelatedEntry=new Promise(resolve=>{unrelatedEntered=resolve;}),unrelatedGate=new Promise(resolve=>{releaseUnrelated=resolve;});
   try {
     await page.goto(base + '/app/', {waitUntil: 'domcontentloaded'});
     await page.route('**/__owned_unrelated_route', route => route.fulfill({body: 'unrelated retained'}));
+    await page.route('**/__owned_unrelated_held_route',async route=>{
+      unrelatedEntered();await unrelatedGate;await route.fulfill({body:'unrelated held completed'});unrelatedSettled=true;
+    });
     await scope.route('**/__owned_scoped_route', async (route, stage) => {
       stage('held'); entered(); await gate; stage('fulfill'); await route.fulfill({body: 'owned completed'});
     }, 'owned-fixture');
-    await page.evaluate(() => {window.ownedScopedReply = fetch('/__owned_scoped_route').then(response => response.text());});
-    await raceWithSmokeDeadline(entry, 5000, () => {throw Error('Owned scoped route did not enter');});
+    await page.evaluate(() => {
+      window.ownedScopedReply=fetch('/__owned_scoped_route').then(response=>response.text());
+      window.ownedUnrelatedReply=fetch('/__owned_unrelated_held_route').then(response=>response.text());
+    });
+    await raceWithSmokeDeadline(Promise.all([entry,unrelatedEntry]),5000,()=>{throw Error('Owned or unrelated held route did not enter');});
     assert.deepEqual(scope.snapshot(), [{label: 'owned-fixture', stage: 'held'}]);
     await scope.remove();
     assert.equal(await page.evaluate(() => fetch('/__owned_unrelated_route').then(response => response.text())), 'unrelated retained');
     assert.equal(scope.snapshot().length, 1, 'Unregistering must not cancel or pretend to finish the held callback');
     release(); await scope.drain();
     assert.equal(await page.evaluate(() => window.ownedScopedReply), 'owned completed'); assert.deepEqual(scope.snapshot(), []);
+    assert.equal(unrelatedSettled,false,'An owned drain must finish while the unrelated callback remains genuinely held.');
+    releaseUnrelated();assert.equal(await page.evaluate(()=>window.ownedUnrelatedReply),'unrelated held completed');
     await scope.route('**/__owned_failed_scoped_route', async () => {throw Error('Owned unexpected route failure');}, 'owned-failure');
     const failed = page.waitForEvent('requestfailed', {predicate: request => new URL(request.url()).pathname === '/__owned_failed_scoped_route'});
     await page.evaluate(() => {void fetch('/__owned_failed_scoped_route').catch(() => {});});
@@ -68,5 +77,5 @@ export async function qualifyOwnedSmokeRouteDrain(browser, base) {
     // and aborts the browser request rather than losing a rejected async handler.
     await raceWithSmokeDeadline(failed, 5000, () => {throw Error('Owned failed callback did not abort its request');});
     await assert.rejects(scope.drain(), error => error instanceof AggregateError && error.errors[0].message === 'Owned unexpected route failure');
-  } finally {release(); await scope.drain().catch(() => {}); await page.close();}
+  } finally {release();releaseUnrelated();await scope.drain().catch(() => {});await page.close();}
 }

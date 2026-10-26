@@ -3165,3 +3165,46 @@ the immutable shared archive.
 The complete Memory HTTP suite also passes 172/172 against the reused schema
 cache. Remote Linux/PostgreSQL/Docker qualification and actual improved timing
 remain pending until the new published workflow completes.
+
+
+## Console fixture route ownership
+
+The participant-console cell keeps both original browser entries. Its loading
+fixture uses a separate owned route scope for each forced terminal-continuation
+scenario. It releases the existing answer/runtime/state-effect/acknowledgement
+gates and drains only that scenario's actual callbacks before resetting the Run.
+The existing 20-second owned-route bound and 60/480-second supervisor bounds are
+unchanged. Fixed scenario/operation phases and callback-stage observations locate
+an actual pending request without extending a deadline or recording private
+request fields. No controller production code or existing assertion is changed.
+
+The concrete failure was job **121408913853** in
+[complete CI 40272316050](https://github.com/jurei733/testcenter-rewrite/actions/runs/40272316050):
+the child stopped at the global `unrouteAll({behavior:'wait'})` on the forced
+terminal scenario's cleanup line. Its supervision artifact **12629131636** has
+873,647 bytes, SHA-256
+`4f484bb010dc76006d182a6bd006e7b3fb87de6ec56b65ff3b4185e8c403ca85`.
+That stack proves the global wait was blocked; it does not identify every
+historical Playwright callback responsible for that wait.
+
+The route-ownership control now keeps an unrelated callback genuinely held while
+an admitted owned callback completes and the owned scope drains. The unrelated
+handler remains installed and its own response completes only after explicit
+release. The separate unexpected-callback control must still abort its browser
+request and make `drain()` fail. This prevents a cleanup fix from silently
+ignoring actual fixture errors or canceling unrelated requests.
+
+The complete local `npm run ci:focus -- ui-participant-console` entry performs a
+fresh production build and retains both browser leaves. Its actual local phase
+timings are **22,899ms build /111,628ms loading /13,307ms context compatibility**,
+with all **43 loading checks, two embedded route controls and five context checks**
+passing. The 24 relevant deadline/failure/drain/snapshot static controls also pass
+without skips. Native Linux qualification and complete acceptance for the
+follow-on head require their own actual terminal results. No retry of the
+unchanged failed commit is substituted for this changed implementation.
+
+A one-time AST comparison against the failing parent also verifies that all
+**192 assertion calls, 107 polling assertions and eleven check registrations**
+in the loading fixture remain identical and in the same order. The change is
+route ownership, bounded settlement and fixed operation evidence, not reduced
+controller coverage.
