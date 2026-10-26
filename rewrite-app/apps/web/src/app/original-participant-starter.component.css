@@ -19,6 +19,7 @@ button.test-done { background-color: transparent; color: var(--mat-sys-primary);
 .sentinel { width: 100%; height: 1px; }
 .button-box { margin-top: auto; align-self: end; display: flex; gap: 9px; padding: 20px; }
 .button-box .mat-tonal-button { border: 1px solid var(--mat-sys-outline-variant); }
+.button-box button:hover { transform: none; }
 /* Source uses an unstyled native button, not the Rewrite's pill button. */
 .scroll-button { all: revert; position: sticky; bottom: 24px; right: 24px; align-self: end; display: flex; flex-direction: column; align-items: center; }
 .scroll-button:hover { transform: none; }

@@ -142,34 +142,42 @@ try {
           active:[document.activeElement.tagName,document.activeElement.id],hover:[...document.querySelectorAll(':hover')].map(element=>[element.tagName,element.id]),
           layout:[...document.querySelectorAll('.intro,.cards,mat-card,.sentinel,.button-box,.scroll-button')].map(element=>({
             box:element.getBoundingClientRect().toJSON(),scroll:[element.scrollLeft,element.scrollTop]}))}));
-        const phase='initial';console.log('starter_viewport_capture='+key+'/'+kind+'/'+phase);
-        await page.bringToFront();await page.waitForFunction(()=>document.hasFocus());await page.mouse.move(0,0);
-        await page.evaluate(()=>document.fonts.ready);
-        await page.waitForFunction(()=>[...document.images].every(image=>image.complete&&image.naturalWidth>0));
-        await page.waitForFunction(()=>!document.querySelector('.mat-ripple-element:not(.mat-radio-persistent-ripple)')&&
-          document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity)
-            .every(animation=>!animation.pending&&(animation.playState==='finished'||animation.playState==='idle')));
-        await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
-        const result=await captureStableViewport(page,measure,join(artifacts,key+'-'+phase+'-'+kind+'.png'));
-        diagnostics.push({key,phase,kind,geometry:result.geometry,paint:result.paintDiagnostics});
-        if(kind==='source')captures[phase]=result.bytes;
-        else if(kind==='rewrite')comparisons[key+'-'+phase]=await compareScreenshots(page,captures[phase],result.bytes);
-        else referenceReproducibility[key+'-'+phase]=await compareScreenshots(page,captures[phase],result.bytes);
-        if(kind==='rewrite'&&state==='fresh'&&screen==='desktop') {
-          for(const[fault,selector,css]of[
-            ['card-border','#originalParticipantStarter mat-card:first-child','border-color:#ef0011!important'],
-            ['intro-position','#originalParticipantStarter .intro','transform:translateY(1px)!important']
-          ]) {
-            assert.equal(await page.locator(selector).count(),1);
-            const style=await page.addStyleTag({content:selector+'{'+css+'}'});let mutation;
-            try{
-              const changed=await captureStableViewport(page,measure,join(artifacts,key+'-fault-'+fault+'.png'));
-              mutation=await compareScreenshots(page,result.bytes,changed.bytes);
-              assert.ok(mutation.differingPixels>0,'An actual '+fault+' defect must fail the complete comparison.');
-            }finally{await style.evaluate(element=>element.remove());}
-            const restored=await captureStableViewport(page,measure,join(artifacts,key+'-restored-'+fault+'.png'));
-            const recovery=await compareScreenshots(page,result.bytes,restored.bytes);
-            assert.equal(recovery.differingPixels,0);faultControls.push({key,fault,mutation,recovery});
+        for(const phase of state==='review'?['initial','review-hover']:['initial']) {
+          if(phase==='review-hover') {
+            await review.hover();
+            assert.equal(await review.evaluate(element=>getComputedStyle(element).transform),'none',
+              'The native review button remains in position while hovered.');
+          }
+          console.log('starter_viewport_capture='+key+'/'+kind+'/'+phase);
+          await page.bringToFront();await page.waitForFunction(()=>document.hasFocus());
+          if(phase==='initial')await page.mouse.move(0,0);
+          await page.evaluate(()=>document.fonts.ready);
+          await page.waitForFunction(()=>[...document.images].every(image=>image.complete&&image.naturalWidth>0));
+          await page.waitForFunction(()=>!document.querySelector('.mat-ripple-element:not(.mat-radio-persistent-ripple)')&&
+            document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity)
+              .every(animation=>!animation.pending&&(animation.playState==='finished'||animation.playState==='idle')));
+          await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+          const result=await captureStableViewport(page,measure,join(artifacts,key+'-'+phase+'-'+kind+'.png'));
+          diagnostics.push({key,phase,kind,geometry:result.geometry,paint:result.paintDiagnostics});
+          if(kind==='source')captures[phase]=result.bytes;
+          else if(kind==='rewrite')comparisons[key+'-'+phase]=await compareScreenshots(page,captures[phase],result.bytes);
+          else referenceReproducibility[key+'-'+phase]=await compareScreenshots(page,captures[phase],result.bytes);
+          if(kind==='rewrite'&&state==='fresh'&&screen==='desktop') {
+            for(const[fault,selector,css]of[
+              ['card-border','#originalParticipantStarter mat-card:first-child','border-color:#ef0011!important'],
+              ['intro-position','#originalParticipantStarter .intro','transform:translateY(1px)!important']
+            ]) {
+              assert.equal(await page.locator(selector).count(),1);
+              const style=await page.addStyleTag({content:selector+'{'+css+'}'});let mutation;
+              try{
+                const changed=await captureStableViewport(page,measure,join(artifacts,key+'-fault-'+fault+'.png'));
+                mutation=await compareScreenshots(page,result.bytes,changed.bytes);
+                assert.ok(mutation.differingPixels>0,'An actual '+fault+' defect must fail the complete comparison.');
+              }finally{await style.evaluate(element=>element.remove());}
+              const restored=await captureStableViewport(page,measure,join(artifacts,key+'-restored-'+fault+'.png'));
+              const recovery=await compareScreenshots(page,result.bytes,restored.bytes);
+              assert.equal(recovery.differingPixels,0);faultControls.push({key,fault,mutation,recovery});
+            }
           }
         }
         await context.close();
@@ -177,7 +185,7 @@ try {
       console.log('paired_starter='+key+':captured');
     }
   }
-  assert.equal(Object.keys(comparisons).length,48);assert.equal(Object.keys(referenceReproducibility).length,48);
+  assert.equal(Object.keys(comparisons).length,60);assert.equal(Object.keys(referenceReproducibility).length,60);
   assert.equal(faultControls.length,6);
   assert.equal(sourceWrites.length,96);assert.equal(candidateWrites.length,48);
   assert.ok(candidateWrites.every(request=>request.path==='/api/v1/participant/auth/sign-in'&&request.method==='POST'));
