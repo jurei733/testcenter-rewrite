@@ -3,9 +3,14 @@ import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {FirstSliceError} from './first-slice-error.js';
+import {parseOriginalTestStatePatch,applyOriginalTestStatePatch,assertOriginalTestState,originalPhpMap} from './original-test-state.js';
+import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {hashOriginalSessionToken} from './original-session-token.js';
+import type {OriginalBookletFiles} from './original-test-files.js';
+import {defaultParticipantExecutionMode,type ParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
 
 /** PHP TestName preserves first key position while duplicate values replace it. */
-export function parseOriginalTestName(input: string): {name: string; fileId: string; states: Record<string, string>} {
+function orderedName(input:string):{name:string;fileId:string;states:Map<string,string>}{
   const source = input.replace(/[ \t\n\r\v\f]/g, ''), separator = source.indexOf('#');
   const fileId = separator < 0 ? source : source.slice(0, separator), parameters = separator < 0 ? '' : source.slice(separator + 1);
   const states = new Map<string, string>();
@@ -14,20 +19,65 @@ export function parseOriginalTestName(input: string): {name: string; fileId: str
     const split = tuple.indexOf(':');
     states.set(split < 0 ? tuple : tuple.slice(0, split), split < 0 ? '' : tuple.slice(split + 1));
   }
-  return {fileId, name: fileId + (states.size ? '#' + [...states].map(([key, value]) => `${key}:${value}`).join(';') : ''), states: Object.fromEntries(states)};
+  return {fileId, name: fileId + (states.size ? '#' + [...states].map(([key, value]) => `${key}:${value}`).join(';') : ''), states};
+}
+export function parseOriginalTestName(input:string):{name:string;fileId:string;states:Record<string,string>}{const parsed=orderedName(input);return{...parsed,states:Object.fromEntries(parsed.states)};}
+export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>};
+export function formatOriginalTestReadJson(value:OriginalTestRead):string{
+ const resources=Object.entries(value.resources);
+ const resourceJson=originalPhpMap(resources);
+ if(!/^[1-9][0-9]{0,18}$/.test(value.workspaceId)||BigInt(value.workspaceId)>9223372036854775807n)throw Error('Invalid native workspace number.');
+ return '{"mode":'+encodeOriginalReportJson(value.mode)+',"laststate":'+originalPhpMap(Object.entries(value.laststate))+',"xml":'+encodeOriginalReportJson(value.xml)+',"resources":'+resourceJson+',"firstStart":'+String(value.firstStart)+',"workspaceId":'+value.workspaceId+',"presetBookletStates":'+originalPhpMap([...value.presetBookletStates])+'}';
 }
 export type OriginalTestPort = {
   requirePerson(input: {token: string}): Promise<void>;
   create(input: {token: string; bookletName: string}): Promise<string>;
+  read(input:{token:string;testNumber:string}):Promise<OriginalTestRead>;
+  patchState(input:{token:string;testNumber:string;patch:unknown}):Promise<void>;
+  resource(input:{groupToken:string;workspaceNumber:string;path:string}):Promise<{bytes:Uint8Array;contentType:string}>;
 };
 const unavailable = () => new FirstSliceError(409, 'original_test_history_unknown', 'The Original Test identity is unavailable.');
 
 /** Creation does not enter a controller, open a Test, save state or start timers. */
 export function createOriginalTestPort(input: {
   auth: OriginalAuthenticationPort; repository: FirstSliceRepository; now: () => string; id: () => string;
+  readBooklet:(person:ParticipantSession,fileId:string)=>Promise<OriginalBookletFiles>;
+  readResource:(scope:{tenantId:string;workspaceId:string},path:string)=>Promise<{bytes:Uint8Array;contentType:string}>;
   currentBooklet: (person: ParticipantSession, fileId: string) => Promise<{contentReleaseId: string; booklet: ContentReleaseBookletEntry}>;
 }): OriginalTestPort {
-  return {async requirePerson({token}) {
+  const personFor=async(token:string)=>{const state=await input.auth.read({token});if(state.kind!=='person')throw new FirstSliceError(403,'original_token_type_forbidden','The supplied token cannot perform that operation.');return state.participantSession;};
+  const number=(raw:string)=>{if(typeof raw!=='string'||!/^0*[1-9][0-9]*$/.test(raw)||raw.length>256||BigInt(raw)>9223372036854775807n)throw new FirstSliceError(400,'original_test_number_invalid','No valid test-Id: '+raw);return BigInt(raw).toString();};
+  const forbidden=(raw:string)=>new FirstSliceError(403,'original_test_forbidden',`Access to test ${raw} is not provided.`);
+  const owned=async(token:string,raw:string)=>{const person=await personFor(token),testNumber=number(raw),mapping=await input.repository.findOriginalTestNumber({...person,testNumber});if(!mapping)throw forbidden(raw);const run=await input.repository.getTestRunById(mapping.testRunId);if(!run||(['testRunId','participantSessionId','tenantId','workspaceId','contentReleaseId'] as const).some(key=>run[key]!==mapping[key]))throw forbidden(raw);return{person,run,testNumber};};
+  const unlocked=(run:TestRun,testNumber:string)=>{if(run.locked)throw new FirstSliceError(423,'original_test_locked',`Test #${testNumber} \`${run.originalResultState?.bookletLabel??''}\` is locked.`);};
+  const savedState=(run:TestRun)=>{if(run.originalTestState!==undefined){assertOriginalTestState(run.originalTestState);return structuredClone(run.originalTestState);}if(run.originalResultState?.hasTestState===false)return{};throw new FirstSliceError(409,'original_test_state_unknown','The historical saved Test state is unavailable.');};
+  return {
+    async read({token,testNumber:raw}){
+      const{person,run,testNumber}=await owned(token,raw);unlocked(run,testNumber);
+      const identity=run.originalResultState;if(typeof identity?.bookletName!=='string'||identity.lastOpenedAt===undefined)throw unavailable();savedState(run);
+      const entry=(await input.repository.listParticipantRosterEntriesByWorkspace(person.tenantId,person.workspaceId)).find(row=>row.originalLoginIdentity===true&&row.loginKey===person.originalLoginKey);if(!entry)throw new FirstSliceError(410,'original_login_gone','The Original login is no longer available.');
+      const workspaceId=await input.repository.getOrCreateOriginalWorkspaceNumber(person),fileId=orderedName(identity.bookletName).fileId;
+      let files:OriginalBookletFiles;try{files=await input.readBooklet(person,fileId);}catch(error){if(error instanceof FirstSliceError&&error.statusCode===404)throw new FirstSliceError(404,'original_booklet_unavailable',`No Booklet with id \`${fileId}\` found on workspace \`${workspaceId}\`!`);throw error;}
+      const result=await input.repository.mutateParticipantRun(run,context=>{unlocked(context.testRun,testNumber);savedState(context.testRun);
+        if(context.testRun.originalResultState?.lastOpenedAt===undefined)throw unavailable();if(context.testRun.originalResultState.lastOpenedAt!==null)return null;
+        const timestamp=input.now();return{testRun:{...context.testRun,updatedAt:timestamp},testLogs:[],activityEvents:[],originalResultOpenedAt:timestamp};});
+      if(!result)throw forbidden(raw);
+      return{...files,workspaceId,mode:entry.executionMode??defaultParticipantExecutionMode,laststate:savedState(result.testRun),firstStart:result.applied,presetBookletStates:orderedName(identity.bookletName).states};
+    },
+    async patchState({token,testNumber:raw,patch}){
+      const{run}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch);
+      const result=await input.repository.mutateParticipantRun(run,context=>{const values=applyOriginalTestStatePatch(savedState(context.testRun),entries),timestamp=input.now();
+        const testLogs=entries.map(entry=>({participantTestLogId:input.id(),tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,testRunId:run.testRunId,unitKey:null,originalUnitId:null,logKey:entry.key,logContent:encodeOriginalReportJson(entry.content),timestamp:entry.timeStamp,recordedAt:timestamp,...(entry.timeStamp===0?{originalTimestamp:0 as const}:{})}));
+        return{testRun:{...context.testRun,updatedAt:timestamp},originalTestState:values,originalResultModifiedAt:timestamp,testLogs,activityEvents:[]};});
+      if(!result)throw forbidden(raw);
+    },
+    async resource({groupToken,workspaceNumber,path}){
+      if(typeof groupToken!=='string'||!groupToken)throw new FirstSliceError(401,'original_group_token_missing','No Token given');
+      const group=groupToken.length<=256?await input.repository.findOriginalSessionTokenByHash(hashOriginalSessionToken(groupToken)):null;
+      let canonical:string;try{canonical=number(workspaceNumber);}catch{throw new FirstSliceError(403,'original_group_token_invalid','Group-Token not valid');}
+      if(group?.kind!=='group'||!await input.repository.matchesOriginalWorkspaceNumber({...group,workspaceNumber:canonical}))throw new FirstSliceError(403,'original_group_token_invalid','Group-Token not valid');
+      return input.readResource(group,path);
+    },async requirePerson({token}) {
     if ((await input.auth.read({token})).kind !== 'person') throw new FirstSliceError(403, 'original_token_type_forbidden', 'The supplied token cannot perform that operation.');
   }, async create(request) {
     const state = await input.auth.read({token: request.token});
@@ -59,7 +109,7 @@ export function createOriginalTestPort(input: {
     const candidate: TestRun = {testRunId: input.id(), participantSessionId: person.participantSessionId,
       tenantId: person.tenantId, workspaceId: person.workspaceId, contentReleaseId: current.contentReleaseId,
       bookletKey: current.booklet.bookletKey, bookletAssignmentKey: name.name, presetBookletStates: name.states,
-      executionMode: person.executionMode, status: 'created', locked: false, currentUnitKey: null, unitResponses: {},
+      executionMode: person.executionMode, status: 'created', locked: false, currentUnitKey: null, unitResponses: {}, originalTestState:{},
       originalResultState: {bookletName: name.name, bookletLabel: current.booklet.originalBookletLabel ?? current.booklet.displayLabel,
         lastOpenedAt: null, lastTestStateAt: null, lastTestModifiedAt: timestamp, hasTestState: false},
       createdAt: timestamp, updatedAt: timestamp, completedAt: null};

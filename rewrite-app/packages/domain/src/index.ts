@@ -1194,6 +1194,8 @@ export type TestRun = {
   controllerEntry?: { active: boolean; revision: number };
   /** Server-owned Original result inclusion and test-wide timestamp evidence. */
   originalResultState?: OriginalTestResultState;
+  /** Exact native saved Test state; undefined means historical state is unknown. */
+  originalTestState?: Record<string, unknown>;
   /** Optional for legacy rows; orders committed projections of this Run. */
   stateRevision?: number;
   /** Server-owned high-water marks for state effects from each controller document. */
@@ -1476,6 +1478,8 @@ export type ParticipantRunCommandEffect = {
   originalResultOpenedAt?: string;
   originalResultTestStateAt?: string;
   originalResultModifiedAt?: string;
+  /** Trusted native state write, independent of frontend saveResponses mode. */
+  originalTestState?: Record<string, unknown>;
   testLogs: ParticipantTestLog[];
   activityEvents: WorkspaceActivityEvent[];
   participantSession?: ParticipantSession;

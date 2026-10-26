@@ -1,5 +1,37 @@
 # CI iteration and complete acceptance
 
+## Native Test read/state feedback in the existing inventory (2026-10-26)
+
+The accepted predecessor [40249520035](https://github.com/jurei733/testcenter-rewrite/actions/runs/40249520035)
+is terminal success, **89/89** jobs, on head
+`52a2ef4f055073b300cbf041c8b1606c502a9da3`, tree
+`e2116b26afc999b14d009cc20eaeb1dbd70d1170`. Actual PR merge
+`78c4b2172439a9d91b57842e98e39c6651cc1c0f` has the independently verified same
+tree. Actual leaves pass **4,360 unit/frontend**, **2,585 PostgreSQL** and all
+**57 exit-completeness** scenarios without failures/skips/cancellations. Its job
+span is **30:47**, 00:28:21–00:59:08 UTC. This accepts the workspace cleanup tree,
+not the subsequent native-read candidate.
+
+Native Test GET/PATCH and group Resource coverage extends the existing mandatory
+`original-test-creation.test.mjs` inventory. The same suite runs in complete unit,
+PostgreSQL and `original-results`, so `npm run ci:focus -- original-results` uses
+one fresh core build for short service feedback. No broad job or repeated Angular
+build was added. The protected Chromium Session smoke retains all eight original
+markers and adds two native read/state/resource markers. Production UI adoption
+and broad paired visuals remain open. Complete candidate acceptance is pending.
+
+Local qualification passes a fresh production build, **4,390 unit/frontend**
+checks (160+325+1,851+2,054), **2,626 real PostgreSQL** checks, **101** targeted
+native controls across all four stores and all **10 Chromium Session markers**.
+The complete unit/PostgreSQL runs were repeated after final URL-redaction
+hardening; they have zero failures/skips/cancellations. Policy passes 281 with
+its one explicit GNU-timeout-only macOS skip; the complete locked audit reports
+zero vulnerabilities, and Actionlint/diff checks pass. The final browser retains
+every earlier marker and uses the same production frontend build with fresh core
+output. Hosted Linux qualification and complete candidate acceptance remain
+separate requirements. The prior 96-second service result is scoped to its own
+earlier tree and does not establish this candidate's timing.
+
 
 ## Native creation enters existing fast and complete gates (2026-10-26)
 

@@ -1,3 +1,10 @@
+export {preserveOriginalTestState} from './original-test-state.js';
+export {encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {createOriginalTestFiles} from './original-test-files.js';
+export {formatOriginalTestReadJson,type OriginalTestRead} from './original-test.js';
+export {selectOwnedOriginalTestNumber} from './original-test-number.js';
+export {prepareOriginalWorkspaceNumber,type OriginalWorkspaceNumberScope,type OriginalWorkspaceNumberRecord} from './original-workspace-number.js';
+export {assertOriginalTestState,parseOriginalTestStatePatch,applyOriginalTestStatePatch,originalPhpMap} from './original-test-state.js';
 import {createOriginalTestPort} from './original-test.js';
 export {parseOriginalTestName} from './original-test.js';
 export type {OriginalTestPort} from './original-test.js';
@@ -1598,6 +1605,9 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   ): Promise<TestRun | null>;
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   /** Allocate/reuse an Original decimal Test number inside the current parent's write boundary. */
+  getOrCreateOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope): Promise<string>;
+  matchesOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope & {workspaceNumber:string}): Promise<boolean>;
+  findOriginalTestNumber(input: {testNumber:string;tenantId:string;workspaceId:string;participantSessionId:string}): Promise<import('./original-test-number.js').OriginalTestNumberRecord|null>;
   getOrCreateOriginalTestNumber(input: import('./original-test-number.js').OriginalTestNumberInput): Promise<string>;
   saveTestRun(testRun: TestRun): Promise<void>;
   /** Read current parent/Run and commit the pure projection, logs and activity in one write boundary. */
@@ -6742,8 +6752,8 @@ const buildOpenMonitorRunTestState = (
   testRun: TestRun,
   latestTestStates: Map<string, LatestMonitorTestState>
 ): Record<string, string> => ({
-  ...(latestTestStates.get(testRun.testRunId)?.values ?? {}),
-  ...(testRun.locked
+  ...(testRun.originalTestState===undefined?latestTestStates.get(testRun.testRunId)?.values??{}:Object.fromEntries(Object.entries(testRun.originalTestState).map(([key,value])=>[key,typeof value==='string'?value:JSON.stringify(value)]))),
+  ...(testRun.originalTestState!==undefined?{status:testRun.locked?'locked':testRun.originalResultState?.lastOpenedAt?'running':'pending'}:testRun.locked
     ? { status: "locked" }
     : testRun.status === "created"
       ? { status: "pending" }
@@ -27153,6 +27163,7 @@ export const createFirstSliceServices = (
       sourceText:decoded ? readPersistedSourceText(source,decoded) : null,
       resourceIdentifier:/\.html$/i.test(source.fileName) ? readStandaloneVeronaPlayerResourceId(source) : null};
   };
+  const originalTestFiles=createOriginalTestFiles({repository,project:projectWorkspaceFile,decode:decodePersistedSourceDocument});
   const validateWorkspaceFile = (source: SourcePackage) => {
     const decoded = decodePersistedSourceDocument(source);
     if (source.sourceDocument === null || !decoded) throw new FirstSliceError(400,
@@ -32391,6 +32402,8 @@ export const createFirstSliceServices = (
     participantAccess,
     originalAuthentication,
     originalTest: createOriginalTestPort({auth: originalAuthentication, repository, now, id: idGenerator,
+      readBooklet:(scope,fileId)=>originalTestFiles.booklet(scope,fileId),
+      readResource:(scope,path)=>originalTestFiles.resource(scope,path),
       async currentBooklet(person, fileId) {
         const current = await workspaceFiles.read(person);
         const booklet = current.compilation?.runtimeSnapshot?.bookletEntries.find(entry => sameOriginalTestName(entry.bookletKey, fileId));

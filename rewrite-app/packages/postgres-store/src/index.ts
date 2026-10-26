@@ -1,3 +1,5 @@
+import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
 import {allocateOriginalTestNumber} from './original-test-number.js';
 import {guardResultArtifactParent, guardResultArtifactBatch, withResultArtifactParent} from './result-artifact-parent.js';
@@ -586,6 +588,7 @@ const mapTestRun = (row: Row | undefined): TestRun | null =>
   row
     ? {
         ...(row.controller_entry_json == null ? {} : { controllerEntry: typeof row.controller_entry_json === "string" ? JSON.parse(row.controller_entry_json) : row.controller_entry_json as TestRun["controllerEntry"] }),
+        ...(row.original_test_state_json == null ? {} : {originalTestState:JSON.parse(String(row.original_test_state_json)) as NonNullable<TestRun['originalTestState']>}),
         ...(row.original_result_state_json == null ? {} : { originalResultState: (typeof row.original_result_state_json === "string" ? JSON.parse(row.original_result_state_json) : row.original_result_state_json) as TestRun["originalResultState"] }),
         ...(row.state_revision == null ? {} : { stateRevision: Number(row.state_revision) }),
         ...(row.controller_dispatches_json == null ? {} : { controllerDispatches: (typeof row.controller_dispatches_json === "string" ? JSON.parse(row.controller_dispatches_json) : row.controller_dispatches_json) as TestRun["controllerDispatches"] }),
@@ -1693,6 +1696,15 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
         FOREIGN KEY(participant_session_id) REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE
       );`
   }
+  ,{
+    version: 68,
+    name: "original_native_test_read",
+    sql: `ALTER TABLE test_runs ADD COLUMN original_test_state_json TEXT;
+      CREATE TABLE original_workspace_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+      INSERT INTO original_workspace_number_counter(singleton,last_number) VALUES(1,'0');
+      CREATE TABLE original_workspace_numbers(workspace_number TEXT PRIMARY KEY,workspace_id TEXT NOT NULL UNIQUE,tenant_id TEXT NOT NULL,
+        FOREIGN KEY(workspace_id) REFERENCES workspaces(workspace_id) ON DELETE CASCADE);`
+  }
 ];
 
 export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
@@ -1795,8 +1807,8 @@ export const checkPostgresFirstSliceReadiness = async (
 const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun, updateExisting = true): Promise<boolean> => {
   const result = await connection.query(
     `INSERT INTO test_runs (
-      test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+      test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json, original_test_state_json
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
     ${updateExisting ? `ON CONFLICT(test_run_id) DO UPDATE SET
       participant_session_id = EXCLUDED.participant_session_id,
       tenant_id = EXCLUDED.tenant_id,
@@ -1828,7 +1840,8 @@ const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun,
         state_revision = EXCLUDED.state_revision,
         controller_dispatches_json = EXCLUDED.controller_dispatches_json,
         original_result_state_json = EXCLUDED.original_result_state_json,
-        response_part_types_json = EXCLUDED.response_part_types_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`,
+        response_part_types_json = EXCLUDED.response_part_types_json,
+        original_test_state_json = EXCLUDED.original_test_state_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`,
     [
       testRun.testRunId,
       testRun.participantSessionId,
@@ -1861,7 +1874,8 @@ const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun,
       testRun.stateRevision ?? null,
       testRun.controllerDispatches === undefined ? null : JSON.stringify(testRun.controllerDispatches),
       testRun.originalResultState === undefined ? null : JSON.stringify(testRun.originalResultState),
-      testRun.unitResponsePartTypes === undefined ? null : JSON.stringify(testRun.unitResponsePartTypes)
+      testRun.unitResponsePartTypes === undefined ? null : JSON.stringify(testRun.unitResponsePartTypes),
+      testRun.originalTestState === undefined ? null : JSON.stringify(testRun.originalTestState)
     ]
   );
   return result.rowCount === 1;
@@ -2563,7 +2577,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
     },
     async saveWorkspace(scope) {
-      await pool.query(
+      await withAssetWrite(async client=>{
+      await client.query(
         `INSERT INTO workspaces (
           workspace_id, tenant_id, tenant_key, workspace_key, display_name, status, created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -2584,6 +2599,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           scope.workspace.createdAt
         ]
       );
+      await allocateOriginalWorkspaceNumber(client,scope.workspace,scope.workspace);
+      });
     },
     async deleteWorkspaceAggregate(input) {
       const client = await pool.connect();
@@ -3525,6 +3542,13 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       }
       return loginAttempt;
     },
+    async getOrCreateOriginalWorkspaceNumber(input){return withWorkspaceMutationLock(input.tenantId,input.workspaceId,async client=>{
+      const row=mapWorkspace((await client.query('SELECT * FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2',[input.tenantId,input.workspaceId])).rows[0]);return allocateOriginalWorkspaceNumber(client,input,row);
+    });},
+    async matchesOriginalWorkspaceNumber(input){return (await pool.query('SELECT 1 FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_id=$1 AND n.tenant_id=$2 AND n.workspace_number=$3 AND w.status=$4 AND v.status=$5',[input.workspaceId,input.tenantId,input.workspaceNumber,'active','active'])).rowCount===1;},
+    async findOriginalTestNumber(input){const row=(await pool.query(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id
+      JOIN participant_sessions p ON p.participant_session_id=m.participant_session_id AND p.tenant_id=m.tenant_id AND p.workspace_id=m.workspace_id AND p.content_release_id=m.content_release_id
+      WHERE m.test_number=$1 AND m.tenant_id=$2 AND m.workspace_id=$3 AND m.participant_session_id=$4 AND p.original_login_key IS NOT NULL AND p.original_name_suffix IS NOT NULL`,[input.testNumber,input.tenantId,input.workspaceId,input.participantSessionId])).rows[0];return row?{testNumber:String(row.test_number),testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id)}:null;},
     async getOrCreateOriginalTestNumber(input) {
       return withResultArtifactParent(pool, input, async client => {
         const run = mapTestRun((await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE test_run_id=$1`,[input.testRunId])).rows[0]);
@@ -3647,7 +3671,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         await client.query('BEGIN');
         const parent=mapParticipantSession((await client.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE',[testRun.participantSessionId])).rows[0]);
         assertResultArtifactParent({tenantId:testRun.tenantId,workspaceId:testRun.workspaceId,participantSessionId:testRun.participantSessionId}, parent);
-        await persistTestRun(client,withOriginalTestRunMode(testRun,parent));await client.query('COMMIT');
+        const before=(await client.query('SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,original_test_state_json,original_result_state_json::text AS original_result_state_json,state_revision FROM test_runs WHERE test_run_id=$1 FOR UPDATE',[testRun.testRunId])).rows[0];const previous=before?{testRunId:String(before.test_run_id),participantSessionId:String(before.participant_session_id),tenantId:String(before.tenant_id),workspaceId:String(before.workspace_id),contentReleaseId:String(before.content_release_id),...(before.original_test_state_json==null?{}:{originalTestState:JSON.parse(String(before.original_test_state_json))}),...(before.original_result_state_json==null?{}:{originalResultState:JSON.parse(String(before.original_result_state_json))}),...(before.state_revision==null?{}:{stateRevision:Number(before.state_revision)})}:null;
+        await persistTestRun(client,preserveOriginalTestState(withOriginalTestRunMode(testRun,parent),previous));await client.query('COMMIT');
       }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
     },
     async activateParticipantController(input) {
@@ -3751,7 +3776,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           await persistTestRun(client, effect.testRun);
           for (const log of effect.testLogs) await client.query(`INSERT INTO participant_test_logs
             (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id, participant_session_id = EXCLUDED.participant_session_id, test_run_id = EXCLUDED.test_run_id, unit_key = EXCLUDED.unit_key, original_unit_id = EXCLUDED.original_unit_id, log_key = EXCLUDED.log_key, log_content = EXCLUDED.log_content, timestamp = EXCLUDED.timestamp, recorded_at = EXCLUDED.recorded_at, original_timestamp = EXCLUDED.original_timestamp`, [log.participantTestLogId, log.tenantId,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)${effect.originalTestState!==undefined?'':` ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id, participant_session_id = EXCLUDED.participant_session_id, test_run_id = EXCLUDED.test_run_id, unit_key = EXCLUDED.unit_key, original_unit_id = EXCLUDED.original_unit_id, log_key = EXCLUDED.log_key, log_content = EXCLUDED.log_content, timestamp = EXCLUDED.timestamp, recorded_at = EXCLUDED.recorded_at, original_timestamp = EXCLUDED.original_timestamp`}`, [log.participantTestLogId, log.tenantId,
               log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
               log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
           for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events

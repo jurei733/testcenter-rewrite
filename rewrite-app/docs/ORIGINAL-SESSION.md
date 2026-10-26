@@ -4,7 +4,7 @@ The participant boundary implements the Original paths `PUT /session/login`,
 `PUT /session/person`, `GET|PUT|DELETE /session`, `POST /session/challenge` and
 `POST /session/person/challenge`. It uses `AuthToken` and the Original participant
 AccessSet shape. Canonical RPC authentication remains available. Native admin and
-operational AccessSets, `/session/admin`, native numeric Test reads/Unit writes and
+operational AccessSets, `/session/admin`, native numeric Unit reads/writes and
 production UI adoption are still outstanding. This boundary does not establish
 paired visual parity.
 
@@ -92,7 +92,52 @@ Mandatory `scripts/original-test-creation.test.mjs` runs in complete unit,
 PostgreSQL and focused Original-results gates. It covers actual legacy upgrade
 and late DDL rollback, late File/SQL creation rollback, durable retries, role/scope
 denials, raw HTTP, independent PostgreSQL writers, concurrent controller entry
-and mapping cleanup. Native `GET /test/:number`, numeric workspace/resource
-transport, native Unit writes and report HTTP/UI projection remain open. Missing
-file error text still uses the Rewrite workspace identity. This slice does not
+and mapping cleanup. The following slice adds Test reads/state/resource transport.
+Native Unit writes and report HTTP/UI projection remain open. This does not
 establish complete native transport or paired visual parity.
+
+## Native Test reads, saved state and group resources (2026-10-26)
+
+[Unchanged production Source37](https://github.com/jurei733/testcenter-rewrite/actions/runs/40249046818)
+qualifies 37 groups and 207 actual HTTP observations, retaining all 33 previous
+groups and 65 assertion lines. Its 16-file fixture pins the probe, production
+image/PHP receipt and 31 Original source hashes. TestMode remains off; actual
+ALTCHA and admin uploads create the fixtures without SQL Test seeds or patches.
+
+`GET /test/:number` requires the owning person and returns Source's seven fields:
+mode, laststate, xml, resources, firstStart, workspaceId, presetBookletStates.
+It opens once under the parent/Run writer fence, without entering a Unit,
+starting a controller/timer or writing logs/state. Current physical Booklet XML
+and Unit resource dependencies are used; first stored Test identity stays fixed.
+Workspace numbers use a separate durable decimal mapping and lossless int64
+wire formatting. A SQL foreign-number lookup rejects before decoding private
+Test state, with an owned decoder-failure control. Unknown historical saved state
+returns 409 instead of inventing a history. Locked reads return 423.
+
+`PATCH /test/:number/state` preserves typed scalar/array values and PHP's encoded
+object strings. Clocks reset for each packet: the greatest positive timestamp
+wins within one packet, equal timestamps keep the first entry, and a lower clock
+in a later packet can replace a previous value. Every input entry is logged,
+including ignored duplicates/zero clocks. Null content fails before publication.
+Native state remains writable in review mode. State, server clock and logs commit
+together; generic stale snapshots cannot replace independently saved native state.
+Native log identity collisions fail atomically. Existing progress-delivery retry
+semantics keep their separate stable-ID upsert behavior.
+
+`GET /file/:groupToken/ws_:workspaceNumber/:path` accepts the current group
+capability for Resource files only. It preserves current physical bytes, including
+binary data, and Source MIME, `private` cache and `X-Source: backend` headers.
+Person/Login tokens, foreign or inactive scopes, non-Resource paths and traversal
+are rejected. Logs/metrics replace capability-bearing paths with fixed labels,
+including encoded invalid route spellings. Replaced files invalidate the bounded
+catalog cache; direct resource reads avoid rebuilding the XML catalog.
+
+SQLite 74/PostgreSQL 68 add nullable saved native state and workspace mappings.
+Legacy upgrades create empty mappings/state provenance. New workspace allocation
+is atomic with creation; deletion retires mappings while keeping counters.
+Mandatory existing gates cover real migration/open/state rollback, binary HTTP,
+restarts, foreign decoder fences and independent concurrent PostgreSQL writers.
+The existing Chromium Session smoke keeps all eight previous markers and adds
+native Test read/state and group-resource markers. Production frontend adoption,
+native Unit transport, ZIP resource dependency edge cases, numeric administration,
+report HTTP/UI and paired broad visuals remain separate open work.

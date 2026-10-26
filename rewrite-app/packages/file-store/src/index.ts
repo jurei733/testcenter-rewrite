@@ -1,3 +1,5 @@
+import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
 import {prepareOriginalGroupDeletionInput, deleteOriginalGroupsFromCollections} from '@testcenter-rewrite-app/application';
@@ -123,6 +125,9 @@ type PersistedFirstSliceState = {
   testRuns: Record<string, TestRun>;
   originalTestNumbers: Record<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
+  originalTestRunsByNumber: Record<string,string>;
+  originalWorkspaceNumbers: Record<string,OriginalWorkspaceNumberRecord>;
+  originalWorkspaceNumberCounter: string;
   participantRunCommands: Record<string, ParticipantRunCommand>;
   participantProgressDeliveries: Record<string, ParticipantProgressDelivery>;
   participantTestLogs: Record<string, ParticipantTestLog>;
@@ -182,6 +187,9 @@ const createInitialState = (): PersistedFirstSliceState => ({
   testRuns: {},
   originalTestNumbers: {},
   originalTestNumberCounter: "0",
+  originalTestRunsByNumber: {},
+  originalWorkspaceNumbers: {},
+  originalWorkspaceNumberCounter: "0",
   participantRunCommands: {},
   participantProgressDeliveries: {},
   participantTestLogs: {},
@@ -744,6 +752,8 @@ const createFileRepository = (
     };
     cachePromise ??= read().then(loaded => {
       externalizedCollections = loaded.externalizedCollections;
+      {const entries=Object.values(loaded.state.originalTestNumbers??{});const index=Object.fromEntries(entries.map(row=>[row.testNumber,row.testRunId]));if(Object.keys(index).length!==entries.length)throw Error('Duplicate native Test number.');loaded.state.originalTestRunsByNumber=index;}
+
       return loaded.state;
     });
     return cachePromise;
@@ -814,7 +824,7 @@ const createFileRepository = (
   ): Promise<Result> => {
     return enqueueMutation(async () => {
       const current = await getState();
-      const next = { ...current, ...(includeOriginalNumbers ? {originalTestNumbers: {...current.originalTestNumbers}} : {}),
+      const next = { ...current, ...(includeOriginalNumbers ? {originalTestNumbers: {...current.originalTestNumbers},originalTestRunsByNumber:{...current.originalTestRunsByNumber}} : {}),
         participantRunCommands: { ...current.participantRunCommands }, participantProgressDeliveries: { ...current.participantProgressDeliveries },
         testRuns: { ...current.testRuns }, participantSessions: { ...current.participantSessions },
         participantTestLogs: { ...current.participantTestLogs }, workspaceActivityEvents: { ...current.workspaceActivityEvents } };
@@ -1156,6 +1166,8 @@ const createFileRepository = (
     },
     async saveWorkspace(scope) {
       await mutate(state => {
+        const number=prepareOriginalWorkspaceNumber(scope.workspace,scope.workspace,state.originalWorkspaceNumbers?.[scope.workspace.workspaceId],state.originalWorkspaceNumberCounter??"0");
+        if(number.changed){state.originalWorkspaceNumbers={...state.originalWorkspaceNumbers,[scope.workspace.workspaceId]:number.record};state.originalWorkspaceNumberCounter=number.counter;}
         state.workspacesByScope[
           workspaceScopeKey(scope.tenantKey, scope.workspaceKey)
         ] = scope.workspace;
@@ -1189,7 +1201,8 @@ const createFileRepository = (
         deleteMatching(state.originalLoginBindings, workspaceMatches);
         deleteMatching(state.originalSessionTokens, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
-        if (state.originalTestNumbers) deleteMatching(state.originalTestNumbers, workspaceMatches);
+        if(state.originalTestNumbers)deleteMatching(state.originalTestNumbers,row=>{if(!workspaceMatches(row))return false;delete state.originalTestRunsByNumber[row.testNumber];return true;});
+        if(state.originalWorkspaceNumbers)deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
           if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
         }
@@ -1745,6 +1758,16 @@ const createFileRepository = (
       }
       return result;
     },
+    async getOrCreateOriginalWorkspaceNumber(input){return enqueueMutation(async()=>{
+      const current=await getState();const workspace=Object.values(current.workspacesByScope).find(row=>row.workspaceId===input.workspaceId)??null;
+      const result=prepareOriginalWorkspaceNumber(input,workspace,current.originalWorkspaceNumbers?.[input.workspaceId],current.originalWorkspaceNumberCounter??"0");
+      if(!result.changed)return result.record.workspaceNumber;
+      const next={...current,originalWorkspaceNumbers:{...current.originalWorkspaceNumbers,[input.workspaceId]:result.record},originalWorkspaceNumberCounter:result.counter};await persistState(next);cachePromise=Promise.resolve(next);return result.record.workspaceNumber;
+    });},
+    async matchesOriginalWorkspaceNumber(input){const current=await getState(),row=current.originalWorkspaceNumbers?.[input.workspaceId];return row?.tenantId===input.tenantId&&row.workspaceNumber===input.workspaceNumber&&Object.values(current.workspacesByScope).some(w=>w.workspaceId===input.workspaceId&&w.tenantId===input.tenantId&&w.status==='active')&&Object.values(current.tenants).some(t=>t.tenantId===input.tenantId&&t.status==='active');},
+    async findOriginalTestNumber(input){const current=await getState(),id=current.originalTestRunsByNumber[input.testNumber],row=id?current.originalTestNumbers?.[id]:undefined;
+      return selectOwnedOriginalTestNumber(input,row,id?current.testRuns[id]??null:null,current.participantSessions[input.participantSessionId]??null);
+    },
     async getOrCreateOriginalTestNumber(input) {
       return enqueueMutation(async () => {
         const current = await getState();
@@ -1754,7 +1777,7 @@ const createFileRepository = (
           current.originalTestNumbers && Object.hasOwn(current.originalTestNumbers, input.testRunId) ? current.originalTestNumbers[input.testRunId] : undefined,
           current.originalTestNumberCounter ?? "0");
         if (!prepared.changed) return prepared.record.testNumber;
-        const next = {...current, originalTestNumbers: {...current.originalTestNumbers, [input.testRunId]: prepared.record}, originalTestNumberCounter: prepared.counter};
+        const next = {...current, originalTestNumbers: {...current.originalTestNumbers, [input.testRunId]: prepared.record}, originalTestRunsByNumber:{...current.originalTestRunsByNumber,[prepared.record.testNumber]:input.testRunId}, originalTestNumberCounter: prepared.counter};
         await persistState(next); cachePromise = Promise.resolve(next);
         return prepared.record.testNumber;
       });
@@ -1825,7 +1848,7 @@ const createFileRepository = (
           for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
           if (effect.participantSession) state.participantSessions[candidate.participantSessionId] = effect.participantSession;
         }
-        if (numbered?.changed) {state.originalTestNumbers[prepared.testRun.testRunId] = numbered.record; state.originalTestNumberCounter = numbered.counter;}
+        if (numbered?.changed) {state.originalTestNumbers[prepared.testRun.testRunId] = numbered.record; state.originalTestRunsByNumber[numbered.record.testNumber]=prepared.testRun.testRunId; state.originalTestNumberCounter = numbered.counter;}
         return {testRun: prepared.testRun, created: prepared.created, applied: prepared.created || numbered?.changed === true,
           ...(numbered ? {originalTestNumber: numbered.record.testNumber} : {})};
       }, allocateOriginalNumber === true);
@@ -1834,7 +1857,7 @@ const createFileRepository = (
     async saveTestRun(testRun) {
       await mutate(state => {
         guardResultArtifactCollections(state, {tenantId: testRun.tenantId, workspaceId: testRun.workspaceId, participantSessionId: testRun.participantSessionId});
-        state.testRuns[testRun.testRunId] = withOriginalTestRunMode(testRun,state.participantSessions[testRun.participantSessionId]);
+        state.testRuns[testRun.testRunId]=preserveOriginalTestState(withOriginalTestRunMode(testRun,state.participantSessions[testRun.participantSessionId]),state.testRuns[testRun.testRunId]??null);
       });
     },
     activateParticipantController: mutateControllerActivation,
@@ -1874,6 +1897,7 @@ const createFileRepository = (
         testRuns: Object.values(state.testRuns).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
       if (prepared?.effect) {
         const effect = prepared.effect;
+        if(effect.originalTestState!==undefined&&(effect.testLogs.some(row=>Object.hasOwn(state.participantTestLogs,row.participantTestLogId))||effect.activityEvents.some(row=>Object.hasOwn(state.workspaceActivityEvents,row.activityEventId))||new Set(effect.testLogs.map(row=>row.participantTestLogId)).size!==effect.testLogs.length||new Set(effect.activityEvents.map(row=>row.activityEventId)).size!==effect.activityEvents.length))throw Error('Run mutation artifact identity already exists.');
         const command = effect.commandInput ? appendParticipantRunCommand(effect.commandInput, effect.testRun, {
           existing: state.participantRunCommands[JSON.stringify([input.testRunId, effect.commandInput.commandId])] ?? null,
           lastSequence: Object.values(state.participantRunCommands).reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)
@@ -1930,6 +1954,7 @@ const createFileRepository = (
           }
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
+            const nativeNumber=state.originalTestNumbers?.[testRunId];if(nativeNumber)delete state.originalTestRunsByNumber[nativeNumber.testNumber];
             if (state.originalTestNumbers) delete state.originalTestNumbers[testRunId];
             deletedCount += 1;
           }
