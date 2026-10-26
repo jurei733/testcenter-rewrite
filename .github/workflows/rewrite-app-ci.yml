@@ -492,8 +492,11 @@ jobs:
         run: |
           node -e 'for (const [name, result] of Object.entries(JSON.parse(process.env.RESULTS))) { if (result.result !== "success") { console.error(name + ": " + result.result); process.exitCode = 1; } }'
 
-  verify-memory-sqlite:
-    needs: [build, fast-feedback, browser-system-dependencies]
+  # Isolated long suites consume the production build and technical/security
+  # gates, but no result of the independent short browser journeys. Complete
+  # acceptance still requires every browser qualification and both matrices.
+  verify-long-ui:
+    needs: [build, typecheck, dependencies, unit, browser-system-dependencies]
     name: verify-memory-sqlite (${{ matrix.check }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -504,7 +507,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Longest observed jobs first; exact timings in rewrite-app/scripts/fixtures/ci-shard-timings.json.
+          # >=700s in the separate terminal89/89 receipt ci-long-ui-timings.json.
           - check: ui-full
             command: npm run smoke:ui:built
             playwright: true
@@ -547,6 +550,59 @@ jobs:
           - check: ui-review-readiness
             command: npm run smoke:ui:review-readiness:built
             playwright: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          build-attempt: ${{ needs.build.outputs.attempt }}
+          playwright: ${{ matrix.playwright && 'true' || 'false' }}
+          browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
+          browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
+          browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-material-label: ${{ strategy.job-index }}
+      - name: Run ${{ matrix.check }}
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
+          UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT: ${{ runner.temp }}/controller-timer-diagnostics
+        run: ${{ matrix.command }}
+      - name: Retain the exact failing browser document
+        if: (failure() || cancelled()) && matrix.playwright
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ui-failure-${{ matrix.check }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/failure.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/failure.png
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Retain Original sample transport diagnostics
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: original-sample-${{ matrix.check }}-diagnostics-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
+  verify-memory-sqlite:
+    needs: [build, fast-feedback, browser-system-dependencies]
+    name: verify-memory-sqlite (${{ matrix.check }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: rewrite-app
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Longest observed jobs first; exact timings in rewrite-app/scripts/fixtures/ci-shard-timings.json.
           - check: ui-controller-timer
             command: npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built
             playwright: true
@@ -891,7 +947,7 @@ jobs:
   acceptance:
     name: CI acceptance
     if: always()
-    needs: [build, browser-system-dependencies, browser-system-qualification, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, quick-extended, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
+    needs: [build, browser-system-dependencies, browser-system-qualification, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, quick-extended, verify-long-ui, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

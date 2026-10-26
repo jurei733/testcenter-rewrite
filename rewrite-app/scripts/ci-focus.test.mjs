@@ -15,7 +15,7 @@ const checks = focusChecks(workflow, scripts);
 const cli = fileURLToPath(new URL('./ci-focus.mjs', import.meta.url));
 
 test('every actual Quick, qualification and memory/SQLite shard has an executable focused plan', () => {
-  const actual = ['quick', 'quick-extended', 'verify-memory-sqlite']
+  const actual = ['quick', 'quick-extended', 'verify-long-ui', 'verify-memory-sqlite']
     .flatMap(job => workflow.jobs[job].strategy.matrix.include);
   assert.equal(checks.length, actual.length + 6);
   for (const item of actual) {
@@ -36,6 +36,17 @@ test('multiple selected shards share one fresh production build and retain every
     'smoke:ui:attachments-live:built', 'smoke:ui:attachments-live:built']);
   assert.deepEqual(calls.at(-1).step.env, { UI_SMOKE_ATTACHMENT_CAMERA_FACING: 'front' });
   assert.deepEqual(calls.at(-2).step.env, {});
+});
+test('moving a long suite retains its public selector, exact command, browser mode and one fresh build', () => {
+  const plan = planFocus(['verify/ui-full','ui-full','integration-file'], checks);
+  assert.deepEqual(plan.checks.map(check => check.id), ['verify/ui-full','verify/integration-file']);
+  assert.equal(plan.checks[0].browser, true); assert.equal(plan.checks[0].headed, false);
+  const calls = [];
+  assert.equal(executeFocus(plan, step => { calls.push(step.script); return 0; }), 0);
+  assert.deepEqual(calls, ['build','smoke:ui:built','test:integration:file:built']);
+  calls.length = 0;
+  assert.equal(executeFocus(plan, step => { calls.push(step.script); return step.script==='smoke:ui:built'?37:0; }), 37);
+  assert.deepEqual(calls, ['build','smoke:ui:built']);
 });
 
 test('a failing production build stops all tests and retains its exact status', () => {

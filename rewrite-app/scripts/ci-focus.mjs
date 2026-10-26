@@ -17,11 +17,11 @@ const coreOnlyScripts = new Set(['test:unit:built', 'test:participant-auth:built
 export function focusChecks(workflow, scripts) {
   const checks = [];
   for (const [job, prefix] of [['quick', 'quick'], ['quick-extended', 'qualification'],
-    ['verify-memory-sqlite', 'verify']]) {
+    ['verify-long-ui', 'verify'], ['verify-memory-sqlite', 'verify']]) {
     for (const item of workflow.jobs[job].strategy.matrix.include) {
       checks.push({ id: `${prefix}/${item.check}`, check: item.check, build: true,
         headed: workflow.jobs[job].env?.UI_SMOKE_HEADFUL === 'true',
-        browser: job !== 'verify-memory-sqlite' || item.playwright === true,
+        browser: !['verify-long-ui', 'verify-memory-sqlite'].includes(job) || item.playwright === true,
         steps: parseFocusCommand(item.command, scripts) });
     }
   }

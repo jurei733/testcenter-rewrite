@@ -61,9 +61,21 @@ async function fixture(source, check, options = {}) {
   try {
     await writeFile(entry, `import {reportSmokePhase,reportSmokeObservation,isSupervisedSmokeChild} from ${JSON.stringify(helper)};\n` +
       `if(!isSupervisedSmokeChild(import.meta.url)) throw Error('Missing exact child entry marker');\n` + source);
-    const result = await runSupervisedSmoke({entry, artifactDirectory: evidence,
-      env: {...process.env, OWNED_TEST_SECRET: 'must-not-be-recorded'},
-      phaseTimeoutMs: 500, totalTimeoutMs: 3000, killGraceMs: 50, ...options});
+    let result;
+    try {
+      result = await runSupervisedSmoke({entry, artifactDirectory: evidence,
+        env: {...process.env, OWNED_TEST_SECRET: 'must-not-be-recorded'},
+        phaseTimeoutMs: 500, totalTimeoutMs: 3000, killGraceMs: 50, ...options});
+    } catch (error) {
+      // Keep bounded cleanup diagnostics in TAP before the owned fixture retires;
+      // the outer AggregateError alone otherwise hides signal/storage failures.
+      const record = await readFile(join(evidence, 'supervision.json'), 'utf8')
+        .then(JSON.parse).catch(() => ({}));
+      const details = {errors: error.errors?.slice(0, 8).map(item => String(item.message).slice(0, 300)),
+        signalFailures: record.signalFailures, processInspectionFailure: record.processInspectionFailure};
+      error.message += '; owned cleanup details=' + JSON.stringify(details);
+      throw error;
+    }
     const raw = await readFile(join(evidence, 'supervision.json'), 'utf8');
     assert.ok(!raw.includes('must-not-be-recorded'));
     await check(result, JSON.parse(raw), directory);
