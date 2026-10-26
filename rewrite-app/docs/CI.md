@@ -3200,7 +3200,7 @@ timings are **22,899ms build /111,628ms loading /13,307ms context compatibility*
 with all **43 loading checks, two embedded route controls and five context checks**
 passing. The 24 relevant deadline/failure/drain/snapshot static controls also pass
 without skips. Native Linux qualification and complete acceptance for the
-follow-on head require their own actual terminal results. No retry of the
+follow-on head are separate gates; the verified scoped outcome follows below. No retry of the
 unchanged failed commit is substituted for this changed implementation.
 
 A one-time AST comparison against the failing parent also verifies that all
@@ -3208,3 +3208,23 @@ A one-time AST comparison against the failing parent also verifies that all
 in the loading fixture remain identical and in the same order. The change is
 route ownership, bounded settlement and fixed operation evidence, not reduced
 controller coverage.
+
+
+[Native Linux console qualification 40275162618](https://github.com/jurei733/testcenter-rewrite/actions/runs/40275162618)
+is terminal success on application `8fb766fb245bdbd6326a133b4e385df07b3781dc`,
+tree `0325e373f6b4f3ecb1253186ace8e488945ca91c`. Wrapper
+`43d8cf9e0e6df99b00583c95558bdad6e9c75a6c` adds exactly one fixed qualification
+workflow; its parent, tree and scope are independently verified. Actual job span
+is **4:32**, including audit zero, **282 CI-policy /24 static /four native archive
+controls**, authenticated native browser material and both complete console
+entries, with no skipped or canceled checks and no automatic retry. Fresh Linux
+phase timings are **51,162ms build /117,879ms loading /14,734ms context compatibility**.
+The forty-three loading checks, both embedded route controls and five context
+checks remain required. This scoped timing does not establish a causal speedup
+of complete CI; the failed parent's remaining 87 jobs passed.
+
+Console artifact **12630385333** has 1,646,038 bytes, SHA-256
+`fac055a3cf4a5b9a323b8c6c486d5af6c02b179cb2b15e89a79c3de5702d19bb`.
+Safe archive paths, the exact complete forty-three-check inventory, successful
+supervision and the actual native/remote no-op cases are independently checked.
+Complete acceptance for the subsequently integrated head remains mandatory.
