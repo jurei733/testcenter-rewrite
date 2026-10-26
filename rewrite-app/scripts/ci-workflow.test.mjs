@@ -411,8 +411,18 @@ test('broad verification dispatches recorded long jobs first without changing co
   const weights = recorded.secondsByCheck;
   assert.deepEqual(Object.keys(weights).sort(), recorded.previousMatrix.map(item => item.check).sort());
   assert.ok(Object.values(weights).every(value => Number.isInteger(value) && value > 0));
-  const longestFirst = [...recorded.previousMatrix].sort((a, b) => weights[b.check] - weights[a.check] || a.check.localeCompare(b.check));
-  // Future additional suites need no invented timing or rewritten historical receipt.
+  const latest = JSON.parse(read('./fixtures/ci-shard-timings.json'));
+  assert.equal(latest.status, 'completed'); assert.equal(latest.conclusion, 'success');
+  const latestWeights = Object.fromEntries(latest.jobs.map(job => {
+    assert.equal(job.seconds, (Date.parse(job.completed) - Date.parse(job.started)) / 1000);
+    assert.ok(Number.isInteger(job.seconds) && job.seconds > 0);
+    return [job.check, job.seconds];
+  }));
+  assert.equal(latest.jobs.length, Object.keys(latestWeights).length);
+  assert.deepEqual(Object.keys(latestWeights).sort(), Object.keys(weights).sort());
+  const longestFirst = [...recorded.previousMatrix].sort((a, b) => latestWeights[b.check] - latestWeights[a.check] || a.check.localeCompare(b.check));
+  // Keep the historical receipt and its improvement controls below. Refresh
+  // dispatch from a separate completed run instead of freezing old durations.
   const measuredCurrent = current.filter(item => Object.hasOwn(weights, item.check));
   assert.deepEqual(measuredCurrent, longestFirst);
   const duration = (order, count) => {
