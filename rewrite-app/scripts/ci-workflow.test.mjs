@@ -551,10 +551,10 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
   assert.equal(evidence.with["retention-days"], 30, "Source images and raw measurements must survive the review window.");
   assert.ok(consumer.steps.some(step => step.run?.startsWith("xvfb-run --auto-servernum node scripts/original-browser-reference.mjs capture")));
 });
-test("administration reference requires real browser paint and layout negative controls", () => {
+test("paired reference families require real browser paint and layout negative controls", () => {
   const consumer = workflow.jobs["original-browser-reference"];
   const control = consumer.steps.find(step => step.name === "Verify native viewport capture");
-  assert.equal(control.if, "matrix.family == 'administration' || matrix.family == 'directory'");
+  assert.equal(control.if, "matrix.family == 'administration' || matrix.family == 'directory' || matrix.family == 'entry'");
   assert.equal(control.run, "xvfb-run --auto-servernum npm run test:browser-capture:built");
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
   assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs scripts/exit-completeness-diagnostics.test.mjs scripts/ci-browser-material-capture.test.mjs");
