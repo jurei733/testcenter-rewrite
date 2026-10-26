@@ -436,6 +436,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       deleteMatching(state.originalLoginBindings, workspaceMatches);
       deleteMatching(state.originalSessionTokens, workspaceMatches);
       deleteMatching(state.originalParticipantGroups, workspaceMatches);
+      deleteMatching(state.originalTestNumbers, workspaceMatches);
       for (const run of state.testRuns.values()) {
         if (workspaceMatches(run)) state.participantPresence.delete(run.testRunId);
       }

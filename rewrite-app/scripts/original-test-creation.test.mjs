@@ -238,5 +238,45 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       await repository.saveParticipantSession(before);await repository.saveTestRun(saved);
       const fresh=await repository.getOrCreateOriginalTestNumber(saved);assert.ok(BigInt(fresh)>BigInt(number));
     });
+    await t.test('workspace deletion retires only its native-number mappings and never reuses them after private parent restoration',async()=>{
+      const sources=await repository.listSourcePackagesByWorkspace(ids.tenantId,ids.workspaceId);
+      const jobs=await repository.listImportJobsByWorkspace(ids.tenantId,ids.workspaceId);
+      const releases=await repository.listContentReleasesByWorkspace(ids.tenantId,ids.workspaceId);
+      const parent=await repository.getParticipantSessionById(run.participantSessionId),saved=await repository.getTestRunById(run.testRunId);
+      const former=await repository.getOrCreateOriginalTestNumber(saved);
+      const foreignWorkspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'foreign-number',displayName:'Owned foreign number'});
+      const foreignScope={tenantKey:tenant.tenantKey,workspaceKey:foreignWorkspace.workspaceKey};
+      const files=['Resource/player.html','Unit/unit.xml','Booklet/assigned.xml'].map(name=>sources.find(source=>source.fileName===name));assert.ok(files.every(Boolean));
+      for(const source of files)await services.contentIntake.uploadWorkspaceFile({...foreignScope,fileName:source.fileName.split('/').at(-1),sourceDocument:source.sourceDocument,mediaType:source.mediaType});
+      await services.workspaceAdminRead.importParticipantRoster({...foreignScope,rosterText:xml('Testtakers',`<Metadata/><Group id="Owned.Foreign" label="Foreign"><Login name="owned-foreign-cascade" pw="${password}" mode="run-hot-return"><Booklet codes="Owned">OWNED.ASSIGNED</Booklet></Login></Group>`)});
+      const foreign=await auth('owned-foreign-cascade'),foreignNumber=await request(foreign,'OWNED.ASSIGNED'),foreignRuns=await owned(foreign.person);
+      const deletion={...scope,...ids,auditEvent:{adminAuditEventId:randomUUID(),eventType:'workspace_deleted',actorAdminUserId:null,subjectAdminUserId:null,occurredAt:stamp,summary:'Owned native number deletion',details:{}}};
+      if(kind==='file'){
+        const backup=file+'.workspace-backup';await rename(file,backup);await mkdir(file);
+        try{
+          await assert.rejects(repository.deleteWorkspaceAggregate(deletion));
+          assert.deepEqual(await repository.getWorkspaceByScope(scope.tenantKey,scope.workspaceKey),workspace);
+          assert.deepEqual(await repository.getTestRunById(saved.testRunId),saved);assert.deepEqual(await repository.getParticipantSessionById(parent.participantSessionId),parent);
+          assert.equal(await repository.getOrCreateOriginalTestNumber(saved),former);assert.equal(await repository.getOrCreateOriginalTestNumber(foreignRuns[0]),foreignNumber);
+        }finally{await rm(file,{recursive:true});await rename(backup,file);}
+        await reopen();assert.deepEqual(await repository.getTestRunById(saved.testRunId),saved);
+        assert.equal(await repository.getOrCreateOriginalTestNumber(saved),former);assert.equal(await request(foreign,'OWNED.ASSIGNED'),foreignNumber);
+      }
+      const result=await repository.deleteWorkspaceAggregate(deletion);
+      assert.equal(result.deletedWorkspaceCount,1);assert.equal(await repository.getWorkspaceByScope(scope.tenantKey,scope.workspaceKey),null);
+      assert.equal(await repository.getTestRunById(saved.testRunId),null);await assert.rejects(repository.getOrCreateOriginalTestNumber(saved));
+      assert.deepEqual(await owned(foreign.person),foreignRuns);assert.equal(await request(foreign,'OWNED.ASSIGNED'),foreignNumber);
+      await close();await open();assert.equal(await request(foreign,'OWNED.ASSIGNED'),foreignNumber);
+      // Reuse private fixture UUIDs only to expose otherwise invisible orphan
+      // mappings. A recreated parent must receive a fresh globally monotonic ID.
+      await repository.saveWorkspace({...scope,workspace});
+      for(const source of sources)await repository.saveSourcePackage(source);
+      for(const job of jobs)await repository.saveImportJob(job);
+      for(const release of releases)await repository.saveContentRelease(release);
+      await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers',`<Metadata/><Group id="Owned.Create" label="Owned create"><Login name="owned-create" pw="${password}" mode="run-hot-return"><Booklet codes="Owned">OWNED.ASSIGNED</Booklet></Login></Group>`)});
+      await services.originalAuthentication.login({name:'owned-create',password});await repository.saveParticipantSession(parent);await repository.saveTestRun(saved);
+      const fresh=await repository.getOrCreateOriginalTestNumber(saved);assert.ok(BigInt(fresh)>BigInt(former));assert.ok(BigInt(fresh)>BigInt(foreignNumber));
+      assert.equal(await request(foreign,'OWNED.ASSIGNED'),foreignNumber);
+    });
   }finally{await close();if(kind==='sqlite')control?.close();else await control?.end();if(admin){if(created)await admin.query(`DROP SCHEMA "${schema}" CASCADE`);await admin.end();}await rm(directory,{recursive:true,force:true});}
 });

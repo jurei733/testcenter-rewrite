@@ -1189,6 +1189,7 @@ const createFileRepository = (
         deleteMatching(state.originalLoginBindings, workspaceMatches);
         deleteMatching(state.originalSessionTokens, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
+        if (state.originalTestNumbers) deleteMatching(state.originalTestNumbers, workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
           if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
         }
