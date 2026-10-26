@@ -63,7 +63,7 @@ test('dependency audit skips installation while preserving the complete locked g
 test('every actual browser consumer waits for the authenticated same-run package producer',()=>{
  const consumers=Object.entries(workflow.jobs).filter(([,job])=>job.steps?.some(step=>
   step.uses==='./.github/actions/rewrite-runtime' && step.with?.playwright && step.with.playwright!=='false'));
- assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','quick','quick-extended','verify-memory-sqlite','verify-postgres-ui'].sort());
+ assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','quick','quick-extended','verify-long-ui','verify-memory-sqlite','verify-postgres-ui'].sort());
  for(const [name,job]of consumers)assert.ok(job.needs.includes('browser-system-dependencies'),name);
  const download=action.runs.steps.find(step=>step.name==='Restore authenticated same-run browser system packages');
  assert.equal(download.if,"inputs.playwright == 'true'");assert.equal(download.with.name,'browser-system-${{ github.sha }}-${{ inputs.browser-system-attempt }}');
@@ -284,7 +284,7 @@ function expand(command, trail = []) {
     return ["build", "build:core"].includes(key) ? "" : expand(scripts[key], [...trail, key]);
   });
 }
-const matrix = workflow.jobs["verify-memory-sqlite"].strategy.matrix.include;
+const matrix = ['verify-long-ui', 'verify-memory-sqlite'].flatMap(id => workflow.jobs[id].strategy.matrix.include);
 const commands = Object.values(workflow.jobs).flatMap(job => [
   ...(job.strategy?.matrix?.include ?? []).map(item => item.command).filter(command => typeof command === "string"),
   ...(job.steps ?? []).map(step => step.run).filter(run => typeof run === "string" && run.includes("npm run"))
@@ -402,7 +402,7 @@ test("extended dispatch avoids the measured long tail without adding slots or dr
 test('broad verification dispatches recorded long jobs first without changing coverage or runner limits', () => {
   const recorded = JSON.parse(read('./fixtures/ci-verification-timings.json'));
   const strategy = workflow.jobs['verify-memory-sqlite'].strategy;
-  const current = strategy.matrix.include;
+  const current = matrix;
   for (const previous of recorded.previousMatrix) {
     assert.deepEqual(current.find(item => item.check === previous.check), previous, 'Preserve every prior command, option and browser requirement');
   }
@@ -436,6 +436,42 @@ test('broad verification dispatches recorded long jobs first without changing co
     assert.ok(duration(measuredCurrent, count) <= duration(recorded.previousMatrix, count) - 300);
   }
 });
+test('the early long tier preserves exact workloads and browser mode behind every technical/security prerequisite', () => {
+  const early = workflow.jobs['verify-long-ui'], later = workflow.jobs['verify-memory-sqlite'];
+  const receipt = JSON.parse(read('./fixtures/ci-long-ui-timings.json'));
+  assert.equal(receipt.status, 'completed'); assert.equal(receipt.conclusion, 'success');
+  assert.equal(receipt.jobs.length, 40); assert.equal(receipt.thresholdSeconds, 700);
+  const measured = receipt.jobs.filter(job => {
+    assert.equal(job.seconds, (Date.parse(job.completed) - Date.parse(job.started)) / 1000);
+    return job.seconds >= receipt.thresholdSeconds;
+  }).map(job => job.check).sort();
+  assert.equal(measured.length, 14);
+  assert.deepEqual(early.strategy.matrix.include.map(item => item.check).sort(), measured);
+  assert.equal(later.strategy.matrix.include.length, 26);
+  assert.equal(matrix.length, new Set(matrix.map(item => item.check)).size);
+  assert.deepEqual(matrix.map(item => item.check).sort(), receipt.jobs.map(item => item.check).sort());
+  assert.deepEqual(early.needs, ['build','typecheck','dependencies','unit','browser-system-dependencies']);
+  assert.equal(early.if, undefined, 'Failed technical prerequisites must skip the early workload.');
+  assert.equal(early.strategy['fail-fast'], false); assert.equal(early.strategy['max-parallel'], undefined);
+  for (const key of ['name','runs-on','timeout-minutes','defaults','env','permissions'])
+    assert.deepEqual(early[key], later[key], key + ' must preserve the prior execution context');
+  const excluded = ['Retain failed console loading evidence','Retain failed console debug evidence',
+    'Retain scoped native tab failure evidence','Retain failed controller timer diagnostics'];
+  assert.deepEqual(early.steps, later.steps.filter(step => !excluded.includes(step.name)));
+  assert.ok(early.strategy.matrix.include.every(item => item.playwright === true));
+  for (const check of ['ui-participant-console','ui-console-debug','ui-participant-native-routes','ui-controller-timer'])
+    assert.ok(later.strategy.matrix.include.some(item => item.check === check),
+      'Keep suites with specialized diagnostics in their existing owner until those artifacts move too.');
+  const ancestors = new Set();
+  const visit = id => { for(const need of [workflow.jobs[id].needs ?? []].flat())
+    if(!ancestors.has(need)){ ancestors.add(need); visit(need); } };
+  visit('verify-long-ui');
+  assert.ok(!ancestors.has('quick') && !ancestors.has('fast-feedback'), 'Long tests consume no short-browser result.');
+  assert.ok(workflow.jobs.acceptance.needs.includes('quick'));
+  assert.ok(workflow.jobs.acceptance.needs.includes('quick-extended'));
+  assert.ok(workflow.jobs.acceptance.needs.includes('verify-long-ui'));
+  assert.ok(workflow.jobs.acceptance.needs.includes('verify-memory-sqlite'));
+});
 test("a green early checkpoint cannot certify missing, cancelled or failed extended qualification", () => {
   const gate = workflow.jobs.acceptance;
   const results = Object.fromEntries(gate.needs.map(name=>[name,{result:"success"}]));
@@ -443,10 +479,11 @@ test("a green early checkpoint cannot certify missing, cancelled or failed exten
     encoding:"utf8",env:{...process.env,RESULTS:JSON.stringify(values)}
   });
   assert.equal(execute(results).status,0);
-  for (const result of ["skipped","cancelled","failure"]) {
-    const outcome=execute({...results,"quick-extended":{result}});
-    assert.equal(outcome.status,1); assert.match(outcome.stderr,new RegExp(`quick-extended: ${result}`));
-  }
+  for (const id of ['quick-extended', 'verify-long-ui', 'verify-memory-sqlite'])
+    for (const result of ["skipped","cancelled","failure"]) {
+      const outcome=execute({...results,[id]:{result}});
+      assert.equal(outcome.status,1); assert.match(outcome.stderr,new RegExp(`${id}: ${result}`));
+    }
 });
 function extendsExplicitTestFiles(previous, current) {
   const files = command => {
@@ -607,7 +644,8 @@ test("participant diagnostics are retained without uploading their SQLite scratc
   assert.ok(scripts["test:frontend-state"].split(/\s+/).includes("scripts/inactive-runtime-snapshot-gate.test.mjs"));
 });
 test('every extended browser leaf retains its existing failure document without uploading successful captures or stores',()=>{
- const job=workflow.jobs['verify-memory-sqlite'];
+ for(const id of ['verify-long-ui','verify-memory-sqlite']) {
+ const job=workflow.jobs[id];
  const execute=job.steps.find(step=>step.name==='Run ${{ matrix.check }}');
  assert.equal(execute.run,'${{ matrix.command }}');
  assert.equal(execute.env.UI_SMOKE_ARTIFACT_DIR,'${{ runner.temp }}/rewrite-ui-artifacts');
@@ -617,6 +655,7 @@ test('every extended browser leaf retains its existing failure document without 
  assert.equal(evidence.with.path.trim(),'${{ runner.temp }}/rewrite-ui-artifacts/failure.json\n${{ runner.temp }}/rewrite-ui-artifacts/failure.png');
  assert.equal(evidence.with['retention-days'],7);assert.equal(evidence.with['if-no-files-found'],'warn');
  assert.equal(evidence.uses,`actions/upload-artifact@${actionVersions['upload-artifact'].sha}`);
+ }
 });
 test("the full PostgreSQL UI retains failure-only navigation evidence and its exact failing log", () => {
   const job = workflow.jobs["verify-postgres-ui"];
@@ -654,10 +693,12 @@ test('settings wait for current finite effects and keep actual Chromium cancella
  assert.ok(workflow.jobs['browser-system-qualification'].steps.some(step=>step.run==='xvfb-run --auto-servernum npm run test:browser-capture:built'));
 });
 test('the Original sample retains scoped input/message/save evidence without widening credential or store uploads',()=>{
-  const step=workflow.jobs['verify-memory-sqlite'].steps.find(step=>step.name==='Retain Original sample transport diagnostics');
+  for(const id of ['verify-long-ui','verify-memory-sqlite']) {
+  const step=workflow.jobs[id].steps.find(step=>step.name==='Retain Original sample transport diagnostics');
   assert.equal(step.if,'failure() || cancelled()');
   assert.equal(step.with.path.trim(),'${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.json\n${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.png');
   assert.equal(step.with['retention-days'],7);
+  }
   assert.ok(scripts['test:browser-capture:built'].split(/\s+/).includes('scripts/stable-viewport-capture.test.mjs'));
   assert.ok(scripts['test:browser-capture:built'].split(/\s+/).includes('scripts/original-sample-diagnostics.test.mjs'));
   const source=read('./smoke-ui.mjs');
@@ -666,11 +707,12 @@ test('the Original sample retains scoped input/message/save evidence without wid
 });
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);
-  for (const id of ["unit", "quick", "quick-extended", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {
+  for (const id of ["unit", "quick", "quick-extended", "verify-long-ui", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {
     const job = workflow.jobs[id];
     if (id === "unit") assert.equal(job.needs, "build");
     else if(id === "quick") assert.deepEqual(job.needs,["build","browser-system-dependencies"]);
     else if(id === "verify-postgres") assert.deepEqual(job.needs,["build","typecheck","dependencies","unit"]);
+    else if(id === "verify-long-ui") assert.deepEqual(job.needs,["build","typecheck","dependencies","unit","browser-system-dependencies"]);
     else if(["quick-extended","verify-memory-sqlite","verify-postgres-ui"].includes(id)) assert.deepEqual(job.needs,["build","fast-feedback","browser-system-dependencies"]);
     else assert.deepEqual(job.needs, ["build", "fast-feedback"]);
     const setup = job.steps.find(step => step.uses === "./.github/actions/rewrite-runtime");

@@ -1,0 +1,295 @@
+{
+  "version": 1,
+  "repository": "jurei733/testcenter-rewrite",
+  "run": 40306142992,
+  "head": "dff3baa4494365bf25cb4670e32a99aaee6608dc",
+  "tree": "c0516827d9cf99532bc89dc1b6c97bd798ff20e9",
+  "status": "completed",
+  "conclusion": "success",
+  "runner": "ubuntu-24.04",
+  "thresholdSeconds": 700,
+  "wholeRunSeconds": 1932,
+  "scope": "Observed completed whole-job timings. Select isolated long UI suites; no runtime guarantee or reduced acceptance.",
+  "jobs": [
+    {
+      "check": "ui-monitor-finish-all",
+      "job": 121517902520,
+      "started": "2026-10-26T10:21:57Z",
+      "completed": "2026-10-26T10:34:27Z",
+      "seconds": 750
+    },
+    {
+      "check": "ui-monitor-detail-review",
+      "job": 121517902543,
+      "started": "2026-10-26T10:21:57Z",
+      "completed": "2026-10-26T10:37:10Z",
+      "seconds": 913
+    },
+    {
+      "check": "ui-monitor-review",
+      "job": 121517902551,
+      "started": "2026-10-26T10:21:58Z",
+      "completed": "2026-10-26T10:37:17Z",
+      "seconds": 919
+    },
+    {
+      "check": "ui-unit-detail-review",
+      "job": 121517902605,
+      "started": "2026-10-26T10:21:58Z",
+      "completed": "2026-10-26T10:37:59Z",
+      "seconds": 961
+    },
+    {
+      "check": "ui-monitor-bulk",
+      "job": 121517902608,
+      "started": "2026-10-26T10:24:31Z",
+      "completed": "2026-10-26T10:38:29Z",
+      "seconds": 838
+    },
+    {
+      "check": "ui-delete-group-results",
+      "job": 121517902650,
+      "started": "2026-10-26T10:25:05Z",
+      "completed": "2026-10-26T10:41:24Z",
+      "seconds": 979
+    },
+    {
+      "check": "ui-activation-blocking-runtime",
+      "job": 121517902675,
+      "started": "2026-10-26T10:24:46Z",
+      "completed": "2026-10-26T10:40:20Z",
+      "seconds": 934
+    },
+    {
+      "check": "integration-file",
+      "job": 121517902683,
+      "started": "2026-10-26T10:21:57Z",
+      "completed": "2026-10-26T10:26:34Z",
+      "seconds": 277
+    },
+    {
+      "check": "ui-participant-detail-review",
+      "job": 121517902693,
+      "started": "2026-10-26T10:27:02Z",
+      "completed": "2026-10-26T10:39:18Z",
+      "seconds": 736
+    },
+    {
+      "check": "ui-full",
+      "job": 121517902724,
+      "started": "2026-10-26T10:27:35Z",
+      "completed": "2026-10-26T10:44:27Z",
+      "seconds": 1012
+    },
+    {
+      "check": "ui-run-detail-review",
+      "job": 121517902727,
+      "started": "2026-10-26T10:27:14Z",
+      "completed": "2026-10-26T10:41:33Z",
+      "seconds": 859
+    },
+    {
+      "check": "ui-verona-development",
+      "job": 121517902740,
+      "started": "2026-10-26T10:25:55Z",
+      "completed": "2026-10-26T10:27:32Z",
+      "seconds": 97
+    },
+    {
+      "check": "ui-participant-console",
+      "job": 121517902750,
+      "started": "2026-10-26T10:21:58Z",
+      "completed": "2026-10-26T10:25:02Z",
+      "seconds": 184
+    },
+    {
+      "check": "ui-open-run-sync",
+      "job": 121517902757,
+      "started": "2026-10-26T10:31:02Z",
+      "completed": "2026-10-26T10:44:58Z",
+      "seconds": 836
+    },
+    {
+      "check": "ui-attachments",
+      "job": 121517902769,
+      "started": "2026-10-26T10:26:37Z",
+      "completed": "2026-10-26T10:29:35Z",
+      "seconds": 178
+    },
+    {
+      "check": "ui-original-review",
+      "job": 121517902793,
+      "started": "2026-10-26T10:27:59Z",
+      "completed": "2026-10-26T10:31:11Z",
+      "seconds": 192
+    },
+    {
+      "check": "ui-original-workspace-files",
+      "job": 121517902798,
+      "started": "2026-10-26T10:24:01Z",
+      "completed": "2026-10-26T10:26:34Z",
+      "seconds": 153
+    },
+    {
+      "check": "ui-participant-native-routes",
+      "job": 121517902816,
+      "started": "2026-10-26T10:26:51Z",
+      "completed": "2026-10-26T10:29:48Z",
+      "seconds": 177
+    },
+    {
+      "check": "ui-original-xml-schema",
+      "job": 121517902820,
+      "started": "2026-10-26T10:26:36Z",
+      "completed": "2026-10-26T10:27:56Z",
+      "seconds": 80
+    },
+    {
+      "check": "ui-workspace-rename",
+      "job": 121517902828,
+      "started": "2026-10-26T10:25:51Z",
+      "completed": "2026-10-26T10:27:12Z",
+      "seconds": 81
+    },
+    {
+      "check": "ui-adaptive-runtime",
+      "job": 121517902835,
+      "started": "2026-10-26T10:23:47Z",
+      "completed": "2026-10-26T10:24:44Z",
+      "seconds": 57
+    },
+    {
+      "check": "ui-ops",
+      "job": 121517902838,
+      "started": "2026-10-26T10:31:29Z",
+      "completed": "2026-10-26T10:48:23Z",
+      "seconds": 1014
+    },
+    {
+      "check": "ui-admin-workspace-access",
+      "job": 121517902842,
+      "started": "2026-10-26T10:23:38Z",
+      "completed": "2026-10-26T10:26:59Z",
+      "seconds": 201
+    },
+    {
+      "check": "ui-workspace-delete",
+      "job": 121517902914,
+      "started": "2026-10-26T10:29:51Z",
+      "completed": "2026-10-26T10:31:33Z",
+      "seconds": 102
+    },
+    {
+      "check": "integration-sqlite",
+      "job": 121517902915,
+      "started": "2026-10-26T10:27:21Z",
+      "completed": "2026-10-26T10:28:57Z",
+      "seconds": 96
+    },
+    {
+      "check": "ui-participant-command-completion",
+      "job": 121517902923,
+      "started": "2026-10-26T10:30:24Z",
+      "completed": "2026-10-26T10:31:26Z",
+      "seconds": 62
+    },
+    {
+      "check": "shutdown",
+      "job": 121517902930,
+      "started": "2026-10-26T10:33:40Z",
+      "completed": "2026-10-26T10:34:04Z",
+      "seconds": 24
+    },
+    {
+      "check": "integration-memory",
+      "job": 121517902942,
+      "started": "2026-10-26T10:32:15Z",
+      "completed": "2026-10-26T10:33:35Z",
+      "seconds": 80
+    },
+    {
+      "check": "ui-participant-monitor-live",
+      "job": 121517902950,
+      "started": "2026-10-26T10:31:58Z",
+      "completed": "2026-10-26T10:33:39Z",
+      "seconds": 101
+    },
+    {
+      "check": "ui-controller-timer",
+      "job": 121517902958,
+      "started": "2026-10-26T10:31:13Z",
+      "completed": "2026-10-26T10:37:20Z",
+      "seconds": 367
+    },
+    {
+      "check": "ui-deletion-confirmation",
+      "job": 121517902973,
+      "started": "2026-10-26T10:32:07Z",
+      "completed": "2026-10-26T10:33:37Z",
+      "seconds": 90
+    },
+    {
+      "check": "ui-review-readiness",
+      "job": 121517902978,
+      "started": "2026-10-26T10:31:34Z",
+      "completed": "2026-10-26T10:44:51Z",
+      "seconds": 797
+    },
+    {
+      "check": "ui-admin-delete",
+      "job": 121517902979,
+      "started": "2026-10-26T10:29:24Z",
+      "completed": "2026-10-26T10:31:50Z",
+      "seconds": 146
+    },
+    {
+      "check": "ui-console-debug",
+      "job": 121517902997,
+      "started": "2026-10-26T10:29:38Z",
+      "completed": "2026-10-26T10:31:00Z",
+      "seconds": 82
+    },
+    {
+      "check": "ui-monitor-auto-next",
+      "job": 121517903011,
+      "started": "2026-10-26T10:33:38Z",
+      "completed": "2026-10-26T10:48:51Z",
+      "seconds": 913
+    },
+    {
+      "check": "startup",
+      "job": 121517903018,
+      "started": "2026-10-26T10:29:00Z",
+      "completed": "2026-10-26T10:29:21Z",
+      "seconds": 21
+    },
+    {
+      "check": "compatibility",
+      "job": 121517903062,
+      "started": "2026-10-26T10:29:24Z",
+      "completed": "2026-10-26T10:30:21Z",
+      "seconds": 57
+    },
+    {
+      "check": "local-demo",
+      "job": 121517903074,
+      "started": "2026-10-26T10:30:53Z",
+      "completed": "2026-10-26T10:32:04Z",
+      "seconds": 71
+    },
+    {
+      "check": "startup-file",
+      "job": 121517903092,
+      "started": "2026-10-26T10:31:35Z",
+      "completed": "2026-10-26T10:31:55Z",
+      "seconds": 20
+    },
+    {
+      "check": "shutdown-file",
+      "job": 121517903521,
+      "started": "2026-10-26T10:31:52Z",
+      "completed": "2026-10-26T10:32:12Z",
+      "seconds": 20
+    }
+  ]
+}
