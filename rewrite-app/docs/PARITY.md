@@ -1,5 +1,23 @@
 # Testcenter parity checklist
 
+### Native Unit read/state/response/log candidate (2026-10-26)
+
+Literal Unit routes now connect to separate scoped Unit rows in all four stores.
+Production Source41 pins five-field reads, persistent Unit clocks, independent
+response parts/types, first identity and Test-lock independence. Actual HTTP,
+durable rollback, migration failure, foreign/private decoder controls and
+independent PostgreSQL writers extend the existing mandatory inventory. The
+protected Chromium Session smoke keeps all ten prior markers and adds Unit
+transport. [Scope and explicit unknown history](ORIGINAL-SESSION.md).
+
+The predecessor [full40256061895](https://github.com/jurei733/testcenter-rewrite/actions/runs/40256061895)
+is terminal **89/89 success**, accepting head `4cecdd2af7ee71906cfa1117a450312abe252122`,
+tree `5a4d7ef0ef75b42d9fc64774c5b91e5cf16965a2`, with 4,390 unit/frontend,
+2,626 PostgreSQL and all57 exit passes. It excludes this subsequent candidate.
+Mixed production frontend/report adoption, numeric administration, remaining
+native endpoints and all eight broad visual rows remain open. Ledger stays
+**27 done / 22 partial**; estimate stays **4–8 engineering weeks**.
+
 ### Native Test read/state/resource candidate (2026-10-26)
 
 Person-owned literal Test GET/PATCH and group-capability Resource delivery now

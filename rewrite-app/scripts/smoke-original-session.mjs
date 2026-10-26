@@ -145,6 +145,17 @@ try {
   },{token:peerPerson.groupToken,workspaceId:opened.workspaceId});
   assert.equal(resource.status,200);assert.equal(resource.cache,'private');assert.equal(resource.type,'text/html;charset=UTF-8');assert.equal(resource.source,'backend');assert.ok(resource.text.includes('<main>Owned fixture</main>'));
   mark('browser-native-group-resource-preserves-current-player-headers-and-bytes');
+  const unitPath='/test/'+peerTest.rawText+'/unit/OWNED.BROWSER.ALIAS',unitRead='/test/'+peerTest.rawText+'/unit/OWNED.UNIT/alias/OWNED.BROWSER.ALIAS';
+  const emptyUnit=(await request('GET',unitRead,undefined,peerPerson.token)).value;
+  assert.deepEqual(Object.keys(emptyUnit),['state','dataParts','unitResponseType','definition','definitionType']);assert.deepEqual(emptyUnit.state,{});assert.deepEqual(emptyUnit.dataParts,{});assert.equal(emptyUnit.definition,'Owned definition');assert.equal(emptyUnit.definitionType,'owned-native-browser-player-6.0');
+  await request('PUT',unitPath+'/response',{timeStamp:5,dataParts:{a:'not initialized'}},peerPerson.token,404);
+  await request('PATCH',unitPath+'/state',{originalUnitId:'FIRST.BROWSER.ID',newState:[{key:'choice',content:'newest',timeStamp:9}]},peerPerson.token);
+  await request('PATCH',unitPath+'/state',[{key:'choice',content:'stale across packets',timeStamp:1}],peerPerson.token);
+  await request('PUT',unitPath+'/response',{timeStamp:5,dataParts:{a:'Exact browser Ω/x'},responseType:'owned/browser'},peerPerson.token,201);
+  await request('PUT',unitPath+'/response',{timeStamp:5,dataParts:{a:'equal rejected',b:'new default type'}},peerPerson.token,201);
+  const unit=(await request('GET',unitRead,undefined,peerPerson.token)).value;assert.deepEqual(unit.state,{choice:'newest'});assert.deepEqual(unit.dataParts,{a:'Exact browser Ω/x',b:'new default type'});assert.equal(unit.unitResponseType,'unknown');
+  await request('PUT',unitPath+'/log',{logEntries:[{key:'browserNativeUnit',content:{owned:true},timeStamp:0}]},peerPerson.token,201);
+  mark('browser-native-unit-restores-five-fields-with-persistent-state-clocks-and-independent-response-parts');
   const repeat = await solve((await request('POST', '/session/person/challenge', {code: 'SHARED'}, login.token)).value);
   await request('PUT', '/session', repeat, peer.token, 400);
   const former = person.token; person = (await request('PUT', '/session', repeat, login.token)).value;

@@ -5,6 +5,8 @@ import {originalParticipantGroupKeysEqual} from './original-participant-group.js
 import {FirstSliceError} from './first-slice-error.js';
 import {originalResourceMediaType} from './original-resource-media-type.js';
 import {createWorkspaceFilePublicationRevision} from './workspace-file-publication.js';
+import {DOMParser,type Element} from '@xmldom/xmldom';
+import {normalizeWorkspacePlayerResourceId} from './workspace-file-catalog.js';
 type Scope={tenantId:string;workspaceId:string};
 export type OriginalBookletFiles={xml:string;resources:Record<string,Record<string,string[]>>};
 export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;project:(source:SourcePackage)=>WorkspaceCatalogInput;decode:(source:SourcePackage)=>{bytes:Uint8Array}|null}){
@@ -20,6 +22,19 @@ export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;pr
   return{physical,catalog};
  };
  return{
+  async unit(scope:Scope,fileId:string):Promise<{definition:string;definitionType:string}>{
+   const{physical,catalog}=await current(scope),matches=catalog.items.filter(file=>file.fileType==='Unit'&&originalParticipantGroupKeysEqual(file.metadata.identifier,fileId));
+   if(matches.length!==1)throw new FirstSliceError(matches.length?409:404,'original_unit_file_unavailable','The current physical Unit is unavailable.');
+   const file=matches[0]!;if(file.unresolvedReferences.length)throw new FirstSliceError(404,'original_unit_file_unavailable','The current physical Unit is unavailable.');
+   const source=physical.find(row=>row.sourcePackageId===file.sourcePackageId)!,xml=deps.project(source).sourceText;
+   if(typeof xml!=='string')throw new FirstSliceError(404,'original_unit_file_unavailable','The current physical Unit is unavailable.');
+   const document=new DOMParser({onError(){}}).parseFromString(xml,'application/xml'),root=document.documentElement;
+   const definitions:Element[]=[];for(let child=root?.firstChild;child;child=child.nextSibling)if(child.nodeType===1&&['Definition','DefinitionRef'].includes((child as Element).tagName))definitions.push(child as Element);
+   const inline=definitions.find(node=>node.tagName==='Definition');let definition='';for(let node=inline?.firstChild;node;node=node.nextSibling)if(node.nodeType===3||node.nodeType===4)definition+=node.nodeValue??'';
+   const player=file.dependencies.find(row=>row.relationship==='usesPlayer'),target=player?catalog.items.find(row=>row.sourcePackageId===player.sourcePackageId):null;
+   const raw=definitions[0]?.getAttribute('player')??'',definitionType=(target?.metadata.identifier??normalizeWorkspacePlayerResourceId(raw)??'').replace(/[A-Z]/g,c=>c.toLowerCase());
+   return{definition,definitionType};
+  },
   async booklet(scope:Scope,fileId:string):Promise<OriginalBookletFiles>{
    const{physical,catalog}=await current(scope);const matches=catalog.items.filter(file=>file.fileType==='Booklet'&&originalParticipantGroupKeysEqual(file.metadata.identifier,fileId));
    if(matches.length!==1)throw new FirstSliceError(matches.length?409:404,'original_booklet_unavailable','The current physical Booklet is unavailable.');

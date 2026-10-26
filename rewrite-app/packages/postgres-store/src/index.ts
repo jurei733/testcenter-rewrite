@@ -1,3 +1,4 @@
+import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
@@ -1705,6 +1706,13 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
       CREATE TABLE original_workspace_numbers(workspace_number TEXT PRIMARY KEY,workspace_id TEXT NOT NULL UNIQUE,tenant_id TEXT NOT NULL,
         FOREIGN KEY(workspace_id) REFERENCES workspaces(workspace_id) ON DELETE CASCADE);`
   }
+  ,{
+    version: 69,
+    name: "original_native_units",
+    sql: `CREATE TABLE original_native_units(test_run_id TEXT NOT NULL,participant_session_id TEXT NOT NULL,tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_release_id TEXT NOT NULL,unit_name TEXT NOT NULL,unit_json TEXT NOT NULL,
+      PRIMARY KEY(test_run_id,unit_name),FOREIGN KEY(test_run_id) REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+      FOREIGN KEY(participant_session_id) REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE);`
+  }
 ];
 
 export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
@@ -1805,6 +1813,7 @@ export const checkPostgresFirstSliceReadiness = async (
 };
 
 const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun, updateExisting = true): Promise<boolean> => {
+  if(updateExisting)await invalidateOriginalNativeUnits(connection,testRun);
   const result = await connection.query(
     `INSERT INTO test_runs (
       test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json, original_test_state_json
@@ -3566,6 +3575,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
     },
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(pool, input);},
+    async getOriginalUnit(input){return readOriginalNativeUnit(pool,input);},
+    async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(pool,input,transform);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(pool, tenantId, workspaceId);
     },

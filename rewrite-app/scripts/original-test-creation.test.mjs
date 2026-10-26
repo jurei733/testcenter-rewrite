@@ -6,7 +6,7 @@ import {join, resolve} from 'node:path';
 import test from 'node:test';
 import {DatabaseSync} from 'node:sqlite';
 import {Pool} from 'pg';
-import {createFirstSliceServices, parseOriginalTestName, prepareOriginalTestNumber,prepareOriginalWorkspaceNumber,parseOriginalTestStatePatch,applyOriginalTestStatePatch,formatOriginalTestReadJson} from '@testcenter-rewrite-app/application';
+import {createFirstSliceServices, parseOriginalTestName, prepareOriginalTestNumber,prepareOriginalWorkspaceNumber,parseOriginalTestStatePatch,applyOriginalTestStatePatch,formatOriginalTestReadJson,formatOriginalUnitReadJson} from '@testcenter-rewrite-app/application';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage, SQLITE_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/sqlite-store';
@@ -28,6 +28,9 @@ const readManifest=JSON.parse(await readFile(new URL('manifest.json',readEvidenc
 const readReceipt=JSON.parse(await readFile(new URL('receipt.json',readEvidence),'utf8'));
 const typedSource=readReceipt.checks.find(row=>row.name.startsWith('native Test state preserves'));
 const batchSource=readReceipt.checks.find(row=>row.name.startsWith('native Test state clocks'));
+const unitEvidence=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-unit-transport/',import.meta.url);
+const unitManifest=JSON.parse(await readFile(new URL('manifest.json',unitEvidence),'utf8'));
+const unitReceipt=JSON.parse(await readFile(new URL('receipt.json',unitEvidence),'utf8'));
 const stamp = '2026-10-26T00:00:00.000Z', password = 'Owned-native-create-secret';
 const schemas = {Unit:'unit-xml/17.6',Booklet:'testcenter-booklet-xml/18.0',Testtakers:'testcenter-testtaker-xml/18.0'};
 const xml = (type, body) => `<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${schemas[type]}">${body}</${type}>`;
@@ -98,6 +101,17 @@ test('native workspace numbers and read JSON remain lossless beyond JS safe inte
  assert.ok(json.includes('"workspaceId":9007199254740992'));assert.ok(json.includes('"presetBookletStates":{"2":"last","1":"first"}'));assert.deepEqual(JSON.parse(json).resources,[]);assert.deepEqual(JSON.parse(json).laststate,[]);
 });
 
+test('Source41 retains all Source37 controls and qualifies native Unit reads and durable independent field clocks',async()=>{
+ assert.equal(unitManifest.sourceCommit,manifest.sourceCommit);assert.equal(unitManifest.runId,40256816222);assert.equal(unitManifest.probeCommit,'363e8575fd5925d4d286fc7afafcff1f3a18f028');
+ assert.equal(unitManifest.artifactSha256,'dc66250945cbdc0f6fd9cf257d93adf2eab8f40c4f0f014b8b28a28cd5b06baa');assert.equal(unitManifest.sourceProbeSha256,'15e5d96a78e84aa47b20051765b525f3a5face7dad2af2ff16c533d927bdc11d');
+ assert.equal(unitReceipt.success,true);assert.equal(unitReceipt.testMode,false);assert.equal(unitReceipt.checks.length,41);assert.equal(Object.keys(unitReceipt.sourceFiles).length,34);
+ for(const[name,digest]of Object.entries(unitManifest.files))assert.equal(createHash('sha256').update(await readFile(new URL(name,unitEvidence))).digest('hex'),digest,name);
+ const old=(await readFile(new URL('source-probe.mjs',readEvidence),'utf8')).split('\n').filter(line=>line.trim().startsWith('assert.'));
+ const current=(await readFile(new URL('source-probe.mjs',unitEvidence),'utf8')).split('\n').filter(line=>line.trim().startsWith('assert.'));let cursor=0;for(const line of old){cursor=current.indexOf(line,cursor);assert.ok(cursor>=0);cursor++;}assert.equal(old.length,74);assert.equal(unitManifest.preservedPriorGroups,37);
+ assert.equal(JSON.parse(await readFile(new URL('http-observations.json',unitEvidence),'utf8')).length,231);
+ assert.deepEqual(unitReceipt.checks.at(-4).empty,{state:{},dataParts:{},unitResponseType:'',definition:'Owned definition',definitionType:'owned-pow-player-6.0'});
+ assert.deepEqual(unitReceipt.checks.at(-3).state,{choice:'newest',second:'legacy array'});assert.equal(unitReceipt.checks.at(-1).lockedGet,200);
+});
 const kinds=['memory','file','sqlite'];if(process.env.FIRST_SLICE_STORE==='postgres'){assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);kinds.push('postgres');}
 for(const kind of kinds)test(`${kind}: real native Test creation is durable, scoped and separate from controller entry`,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'owned-native-create-')),file=join(directory,kind==='file'?'state.json':'state.sqlite');
@@ -117,7 +131,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
     await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-native-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'en',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
     await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.NATIVE.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-native-player@1.2.3">Owned definition</Definition>'));
     await upload('assigned.xml',booklet('OWNED.ASSIGNED','Assigned',true));await upload('unassigned.xml',booklet(native.bookletName,labels.firstLabel));
-    const namesOwned=['owned-create','owned-other','owned-entry','owned-atomic','owned-review','owned-after-delete','owned-legacy','owned-cross-writer'];
+    const namesOwned=['owned-create','owned-other','owned-entry','owned-atomic','owned-review','owned-after-delete','owned-legacy','owned-cross-writer','owned-unit-native','owned-unit-peer'];
     await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="Owned.Create" label="Owned create">'+namesOwned.map(name=>`<Login name="${name}" pw="${password}" mode="${name==='owned-review'?'run-review':'run-hot-return'}"><Booklet codes="Owned">OWNED.ASSIGNED</Booklet></Login>`).join('')+'</Group>')});
     const auth=async name=>{const login=await services.originalAuthentication.login({name,password});return{login,person:await services.originalAuthentication.person({loginToken:login.token,code:'Owned'})};};
     const main=await auth('owned-create'),other=await auth('owned-other');let number,run,nativeWorkspaceNumber;
@@ -125,7 +139,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
     const request=(session,bookletName)=>services.originalTest.create({token:session.person.token,bookletName});
     if(kind==='file')await t.test('an actual legacy File without native-number fields reopens without changing existing people',async()=>{
       const before=await repository.getParticipantSessionById(main.person.participantSession.participantSessionId);await close();
-      const legacy=JSON.parse(await readFile(file,'utf8'));delete legacy.originalTestNumbers;delete legacy.originalTestNumberCounter;
+      const legacy=JSON.parse(await readFile(file,'utf8'));delete legacy.originalTestNumbers;delete legacy.originalTestNumberCounter;delete legacy.originalNativeUnits;
       await writeFile(file,JSON.stringify(legacy));await open();
       assert.deepEqual(await repository.getParticipantSessionById(before.participantSessionId),before);assert.deepEqual(await owned(main.person),[]);
     });
@@ -135,7 +149,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       const connection=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
       const exec=sql=>kind==='sqlite'?connection.exec(sql):connection.query(sql),rows=async sql=>kind==='sqlite'?connection.prepare(sql).all():(await connection.query(sql)).rows;
       try{
-        await exec(`DROP TABLE original_workspace_numbers; DROP TABLE original_workspace_number_counter; ALTER TABLE test_runs DROP COLUMN original_test_state_json; DROP TABLE original_test_numbers; DROP TABLE original_test_number_counter; DELETE FROM schema_migrations WHERE version>=${version}`);
+        await exec(`DROP TABLE IF EXISTS original_native_units; DROP TABLE original_workspace_numbers; DROP TABLE original_workspace_number_counter; ALTER TABLE test_runs DROP COLUMN original_test_state_json; DROP TABLE original_test_numbers; DROP TABLE original_test_number_counter; DELETE FROM schema_migrations WHERE version>=${version}`);
         await exec(kind==='sqlite'?`CREATE TRIGGER owned_number_migration_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned number migration failure'); END`:
           `CREATE FUNCTION owned_number_migration_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned number migration failure'; END $$; CREATE TRIGGER owned_number_migration_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_number_migration_failure()`);
         try{
@@ -155,7 +169,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       const connection=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
       const exec=sql=>kind==='sqlite'?connection.exec(sql):connection.query(sql),rows=async sql=>kind==='sqlite'?connection.prepare(sql).all():(await connection.query(sql)).rows;
       try{
-        await exec(`DROP TABLE original_workspace_numbers; DROP TABLE original_workspace_number_counter; ALTER TABLE test_runs DROP COLUMN original_test_state_json; DELETE FROM schema_migrations WHERE version>=${version}`);
+        await exec(`DROP TABLE IF EXISTS original_native_units; DROP TABLE original_workspace_numbers; DROP TABLE original_workspace_number_counter; ALTER TABLE test_runs DROP COLUMN original_test_state_json; DELETE FROM schema_migrations WHERE version>=${version}`);
         await exec(kind==='sqlite'?`CREATE TRIGGER owned_read_migration_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned read migration failure'); END`:
           `CREATE FUNCTION owned_read_migration_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned read migration failure'; END $$; CREATE TRIGGER owned_read_migration_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_read_migration_failure()`);
         try{
@@ -169,6 +183,20 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         await open();assert.deepEqual(await repository.getParticipantSessionById(before.participantSessionId),before);
         assert.equal(Number((await rows('SELECT count(*) AS count FROM original_workspace_numbers'))[0].count),0);
         assert.equal((await rows('SELECT last_number FROM original_workspace_number_counter WHERE singleton=1'))[0].last_number,'0');
+      }finally{if(kind==='sqlite')connection.close();else await connection.end();}
+    });
+    if(kind==='sqlite'||kind==='postgres')await t.test('native Unit migration rolls back its table atomically and never backfills guessed Unit clocks',async()=>{
+      const version=kind==='sqlite'?75:69,before=await repository.getParticipantSessionById(main.person.participantSession.participantSessionId);await close();
+      const connection=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()}),exec=sql=>kind==='sqlite'?connection.exec(sql):connection.query(sql),rows=async sql=>kind==='sqlite'?connection.prepare(sql).all():(await connection.query(sql)).rows;
+      try{
+        await exec(`DROP TABLE original_native_units; DELETE FROM schema_migrations WHERE version>=${version}`);
+        await exec(kind==='sqlite'?`CREATE TRIGGER owned_unit_migration_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned native Unit migration failure'); END`:
+          `CREATE FUNCTION owned_unit_migration_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned native Unit migration failure'; END $$; CREATE TRIGGER owned_unit_migration_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_unit_migration_failure()`);
+        try{
+          await assert.rejects(async()=>open(),/owned native Unit migration failure/);assert.equal(Number((await rows('SELECT MAX(version) AS version FROM schema_migrations'))[0].version),version-1);
+          const tables=kind==='sqlite'?await rows("SELECT name FROM sqlite_master WHERE type='table' AND name='original_native_units'"):await rows("SELECT table_name AS name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='original_native_units'");assert.deepEqual(tables,[]);
+        }finally{await exec(kind==='sqlite'?'DROP TRIGGER owned_unit_migration_failure':'DROP TRIGGER owned_unit_migration_failure ON schema_migrations; DROP FUNCTION owned_unit_migration_failure()');}
+        await open();assert.deepEqual(await repository.getParticipantSessionById(before.participantSessionId),before);assert.equal(Number((await rows('SELECT count(*) AS count FROM original_native_units'))[0].count),0);
       }finally{if(kind==='sqlite')connection.close();else await connection.end();}
     });
     if(kind==='sqlite'||kind==='postgres')await t.test('workspace creation rolls back its row and native-number counter after a late allocation failure',async()=>{
@@ -237,6 +265,96 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
     if(kind==='file')await t.test('a legacy File with native numbers rebuilds its missing reverse index once on reopen',async()=>{
       await close();const legacy=JSON.parse(await readFile(file,'utf8'));delete legacy.originalTestRunsByNumber;await writeFile(file,JSON.stringify(legacy));await open();
       const owner=await repository.findOriginalTestNumber({...run,testNumber:number});assert.equal(owner.testRunId,run.testRunId);assert.equal((await services.originalTest.read({token:main.person.token,testNumber:number})).firstStart,false);
+    });
+    await t.test('native Unit reads and writes match Source41 without entering a controller or changing Test-level evidence',async()=>{
+      const session=await auth('owned-unit-native'),id=await request(session,native.bookletName),[testRun]=await owned(session.person),before=await repository.getTestRunById(testRun.testRunId);
+      const base={token:session.person.token,testNumber:id},unitName='OWNED.FREE.ALIAS',target={...base,unitName},read=()=>services.originalUnit.read({...base,unitName:'OWNED.NATIVE.UNIT',alias:unitName});
+      const first=JSON.parse(formatOriginalUnitReadJson(await read()));assert.deepEqual(Object.keys(first),['state','dataParts','unitResponseType','definition','definitionType']);assert.deepEqual(first,{state:{},dataParts:{},unitResponseType:'',definition:'Owned definition',definitionType:'owned-native-player-1.2'});
+      assert.equal(await repository.getOriginalUnit({...testRun,unitName}),null);assert.deepEqual(await repository.getTestRunById(testRun.testRunId),before);
+      await assert.rejects(services.originalUnit.read({...base,token:other.person.token,unitName:'OWNED.NATIVE.UNIT'}),denied(403));await assert.rejects(services.originalUnit.read({...base,unitName:'OWNED.MISSING'}),denied(404));
+      await assert.rejects(services.originalUnit.putResponse({...target,body:{timeStamp:9,dataParts:{a:'before state'}}}),denied(404));
+      await services.originalUnit.patchState({...target,body:{originalUnitId:'FIRST.NATIVE.ID',newState:[{key:'choice',content:'newer',timeStamp:9},{key:'zero',content:'ignored',timeStamp:0}]}});
+      await services.originalUnit.patchState({...target,unitName:unitName.toLowerCase(),body:[{key:'choice',content:'stale across packets',timeStamp:1},{key:'second',content:'legacy array',timeStamp:2}]});
+      await services.originalUnit.patchState({...target,body:{originalUnitId:'IGNORED.ID',newState:[{key:'choice',content:'equal rejected',timeStamp:9},{key:'choice',content:'newest',timeStamp:10},{key:'choice',content:'second equal rejected',timeStamp:10}]}});
+      assert.deepEqual((await read()).state,unitReceipt.checks.at(-3).state);
+      for(const body of [{timeStamp:5,dataParts:{a:'Exact Ω/x',z:'old z'},responseType:'type/first'},{timeStamp:6,dataParts:{z:'new z'},responseType:'type/second'},{timeStamp:5,dataParts:{a:'equal rejected',z:'stale rejected',c:'new c'},responseType:'type/third'},{timeStamp:0,dataParts:{zero:'zero first insert'}}])await services.originalUnit.putResponse({...target,body});
+      const saved=await repository.getOriginalUnit({...testRun,unitName});assert.equal(saved.originalUnitId,'FIRST.NATIVE.ID');assert.equal(saved.unitName,unitName);assert.equal(saved.stateClocks.zero,0);assert.equal(saved.stateClocks.choice,10);
+      const parts=JSON.parse(formatOriginalUnitReadJson(await read()));assert.deepEqual(parts.dataParts,unitReceipt.checks.at(-2).dataParts);assert.equal(parts.unitResponseType,'unknown');assert.deepEqual(parts.state,unitReceipt.checks.at(-2).state);
+      assert.deepEqual(saved.parts,[{id:'a',content:'Exact Ω/x',ts:5,responseType:'type/first'},{id:'z',content:'new z',ts:6,responseType:'type/second'},{id:'c',content:'new c',ts:5,responseType:'type/third'},{id:'zero',content:'zero first insert',ts:0,responseType:'unknown'}]);
+      assert.deepEqual(await repository.getTestRunById(testRun.testRunId),before);await reopen();assert.deepEqual(JSON.parse(formatOriginalUnitReadJson(await read())),parts);
+      assert.equal((await services.originalTest.read(base)).firstStart,true);assert.equal((await services.originalGroupResults.list(scope))[0].numUnitsTotal,1);
+      const opened=await repository.getTestRunById(testRun.testRunId);await repository.mutateParticipantRun(testRun,context=>({testRun:{...context.testRun,locked:true},testLogs:[],activityEvents:[]}));
+      await services.originalUnit.patchState({...target,body:{newState:[{key:'lockedWrite',content:'accepted while Test locked',timeStamp:1}]}});await services.originalUnit.putResponse({...target,body:{timeStamp:7,dataParts:{late:'accepted while Test locked'},responseType:'locked/type'}});
+      assert.equal((await read()).state.lockedWrite,'accepted while Test locked');assert.equal(JSON.parse(formatOriginalUnitReadJson(await read())).dataParts.late,'accepted while Test locked');
+      assert.deepEqual((await repository.getTestRunById(testRun.testRunId)).originalResultState.lastTestStateAt,opened.originalResultState.lastTestStateAt);
+      const zero=JSON.parse(formatOriginalUnitReadJson(await services.originalUnit.read({...base,unitName:'OWNED.NATIVE.UNIT',alias:'0'})));assert.deepEqual(zero.state,{});assert.deepEqual(zero.dataParts,{});
+      const count=(await services.originalGroupResults.list(scope))[0].numUnitsTotal;
+      await services.originalUnit.putLog({...base,unitName:'OWNED.LOG.ONLY',body:{logEntries:[{key:'raw',content:{b:'Ω/x',a:1},timeStamp:0}]}});
+      assert.equal(await repository.getOriginalUnit({...testRun,unitName:'OWNED.LOG.ONLY'}),null);assert.equal((await services.originalGroupResults.list(scope))[0].numUnitsTotal,count);
+      const logs=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),ownLogs=logs.filter(row=>row.testRunId===testRun.testRunId);assert.equal(ownLogs.filter(row=>row.logKey==='choice').length,5);assert.ok(ownLogs.some(row=>row.logKey==='choice'&&row.logContent==='stale across packets'));assert.ok(ownLogs.some(row=>row.logKey==='raw'&&row.logContent==='{"b":"\\u03a9\\/x","a":1}'));
+    });
+    await t.test('late native Unit state failure rolls back the row and logs, including durable reopening',async()=>{
+      const session=await auth('owned-unit-peer'),id=await request(session,native.bookletName),[testRun]=await owned(session.person),unitName='OWNED.ATOMIC.ALIAS',target={token:session.person.token,testNumber:id,unitName};
+      await services.originalUnit.patchState({...target,body:{originalUnitId:'ATOMIC.FIRST',newState:[{key:'accepted',content:'before',timeStamp:1}]}});
+      const before=await repository.getOriginalUnit({...testRun,unitName}),logs=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),body={newState:[{key:'ownedLateUnitState',content:'must roll back',timeStamp:2}]};
+      if(kind==='memory'){
+        const failing=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19',idGenerator:()=>logs.find(row=>row.testRunId===testRun.testRunId).participantTestLogId});
+        await assert.rejects(failing.originalUnit.patchState({...target,body}),/collision|identity/i);
+      }else if(kind==='file'){
+        const backup=file+'.native-unit-backup',mutate=repository.mutateOriginalUnit;let projected=false;
+        repository.mutateOriginalUnit=(input,transform)=>mutate(input,previous=>{const effect=transform(previous);if(effect.unit?.state.ownedLateUnitState)projected=true;return effect;});
+        await rename(file,backup);await mkdir(file);
+        try{await assert.rejects(services.originalUnit.patchState({...target,body}));assert.equal(projected,true);
+          await assert.rejects(repository.saveTestRun({...testRun,unitResponses:{...testRun.unitResponses,[unitName]:'uncommitted canonical response'}}));assert.deepEqual(await repository.getOriginalUnit({...testRun,unitName}),before);}
+        finally{repository.mutateOriginalUnit=mutate;await rm(file,{recursive:true});await rename(backup,file);}
+      }else{
+        const connection=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()}),exec=sql=>kind==='sqlite'?connection.exec(sql):connection.query(sql);
+        await exec(kind==='sqlite'?"CREATE TRIGGER owned_unit_log_failure BEFORE INSERT ON participant_test_logs WHEN NEW.log_key='ownedLateUnitState' BEGIN SELECT RAISE(ABORT,'owned native Unit log failure'); END":
+          "CREATE FUNCTION owned_unit_log_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned native Unit log failure'; END $$; CREATE TRIGGER owned_unit_log_failure BEFORE INSERT ON participant_test_logs FOR EACH ROW WHEN (NEW.log_key='ownedLateUnitState') EXECUTE FUNCTION owned_unit_log_failure()");
+        try{await assert.rejects(services.originalUnit.patchState({...target,body}),/owned native Unit log failure/);
+          await exec(kind==='sqlite'?"CREATE TRIGGER owned_unit_canonical_failure BEFORE UPDATE ON test_runs BEGIN SELECT RAISE(ABORT,'owned native Unit canonical failure'); END":
+            "CREATE FUNCTION owned_unit_canonical_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned native Unit canonical failure'; END $$; CREATE TRIGGER owned_unit_canonical_failure BEFORE UPDATE ON test_runs FOR EACH ROW EXECUTE FUNCTION owned_unit_canonical_failure()");
+          try{await assert.rejects(repository.saveTestRun({...testRun,unitResponses:{...testRun.unitResponses,[unitName]:'uncommitted canonical response'}}),/owned native Unit canonical failure/);assert.deepEqual(await repository.getOriginalUnit({...testRun,unitName}),before);}
+          finally{await exec(kind==='sqlite'?'DROP TRIGGER owned_unit_canonical_failure':'DROP TRIGGER owned_unit_canonical_failure ON test_runs; DROP FUNCTION owned_unit_canonical_failure()');}
+        }
+        finally{await exec(kind==='sqlite'?'DROP TRIGGER owned_unit_log_failure':'DROP TRIGGER owned_unit_log_failure ON participant_test_logs; DROP FUNCTION owned_unit_log_failure()');if(kind==='sqlite')connection.close();else await connection.end();}
+      }
+      assert.deepEqual(await repository.getOriginalUnit({...testRun,unitName}),before);assert.deepEqual(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),logs);
+      await reopen();assert.deepEqual(await repository.getOriginalUnit({...testRun,unitName}),before);assert.deepEqual(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),logs);
+      await assert.rejects(services.originalUnit.putResponse({...target,body:{timeStamp:2,dataParts:{safe:'must roll back',invalid:42}}}),denied(400));assert.deepEqual(await repository.getOriginalUnit({...testRun,unitName}),before);
+    });
+    await t.test('canonical history without native clock provenance fails explicitly and cannot overwrite the first native identity',async()=>{
+      const session=await auth('owned-unit-peer'),id=await request(session,native.bookletName),[testRun]=await owned(session.person),unitName='OWNED.UNKNOWN.HISTORY',target={token:session.person.token,testNumber:id,unitName};
+      const changed={...testRun,unitResponses:{...testRun.unitResponses,[unitName]:'Owned canonical legacy response'}};await repository.saveTestRun(changed);
+      const read={...target,unitName:'OWNED.NATIVE.UNIT',alias:unitName};await assert.rejects(services.originalUnit.read(read),denied(409,'original_unit_history_unknown'));
+      await assert.rejects(services.originalUnit.patchState({...target,body:{newState:[{key:'mustNotInvent',content:'unknown',timeStamp:1}]}}),denied(409));
+      const known='OWNED.NATIVE.THEN.CANONICAL';await services.originalUnit.patchState({...target,unitName:known,body:{originalUnitId:'FIRST.PRESERVED',newState:[{key:'native',content:'accepted',timeStamp:9}]}});
+      const latest=await repository.getTestRunById(testRun.testRunId);await repository.saveTestRun({...latest,unitResponses:{...latest.unitResponses,[known]:'A later canonical response without native clocks'}});
+      const raw=await repository.getOriginalUnit({...testRun,unitName:known});assert.equal(raw.unknownHistory,true);assert.equal(raw.originalUnitId,'FIRST.PRESERVED');assert.equal(raw.state.native,'accepted');
+      await assert.rejects(services.originalUnit.read({...read,alias:known}),denied(409));await assert.rejects(services.originalUnit.putResponse({...target,unitName:known,body:{timeStamp:10,dataParts:{new:'cannot fabricate'}}}),denied(409));
+      await reopen();assert.equal((await repository.getOriginalUnit({...testRun,unitName:known})).unknownHistory,true);
+    });
+    if(kind==='sqlite'||kind==='postgres')await t.test('native Unit reads reject foreign numbers before private Unit JSON decoding and result inventory stays metadata-only',async()=>{
+      const session=await auth('owned-unit-native'),[testRun]=await owned(session.person),id=await repository.getOrCreateOriginalTestNumber(testRun),unitName='OWNED.FREE.ALIAS',marker='owned-native-unit-private-'+randomUUID();
+      await services.originalUnit.patchState({token:session.person.token,testNumber:id,unitName,body:{newState:[{key:'privateFence',content:marker,timeStamp:1}]}});
+      const parse=JSON.parse;JSON.parse=function(text,...rest){if(typeof text==='string'&&text.includes(marker))throw Error('Owned native Unit decoder fence');return parse(text,...rest);};
+      try{
+        await assert.rejects(services.originalUnit.read({token:session.person.token,testNumber:id,unitName:'OWNED.NATIVE.UNIT',alias:unitName}),/Owned native Unit decoder fence/);
+        await assert.rejects(services.originalUnit.read({token:main.person.token,testNumber:id,unitName:'OWNED.NATIVE.UNIT',alias:unitName}),denied(403));
+        const inventory=await repository.getOriginalGroupResultInventory(ids.tenantId,ids.workspaceId);assert.ok(inventory.runs.find(row=>row.testRunId===testRun.testRunId).savedUnitKeys.includes(unitName));
+      }finally{JSON.parse=parse;}
+      assert.equal((await services.originalUnit.read({token:session.person.token,testNumber:id,unitName:'OWNED.NATIVE.UNIT',alias:unitName})).state.privateFence,marker);
+    });
+    if(kind==='sqlite'||kind==='postgres')await t.test('native Unit access avoids decoding unrelated canonical responses even for the actual owner',async()=>{
+      const session=await auth('owned-unit-native'),[testRun]=await owned(session.person),id=await repository.getOrCreateOriginalTestNumber(testRun),marker='owned-unrelated-canonical-unit-'+randomUUID(),unitName='OWNED.FREE.ALIAS';
+      await repository.saveTestRun({...testRun,unitResponses:{...testRun.unitResponses,'unrelated-canonical-unit':marker}});
+      const parse=JSON.parse;JSON.parse=function(text,...rest){if(typeof text==='string'&&text.includes(marker))throw Error('Owned unrelated canonical decoder fence');return parse(text,...rest);};
+      try{
+        await assert.rejects(repository.getTestRunById(testRun.testRunId),/Owned unrelated canonical decoder fence/);
+        const output=await services.originalUnit.read({token:session.person.token,testNumber:id,unitName:'OWNED.NATIVE.UNIT',alias:unitName});assert.equal(output.state.choice,'newest');
+        await services.originalUnit.putResponse({token:session.person.token,testNumber:id,unitName,body:{timeStamp:10,dataParts:{metadataOnlyControl:'owned without canonical decoding'}}});
+      }finally{JSON.parse=parse;}
+      assert.equal((await repository.getOriginalUnit({...testRun,unitName})).parts.find(row=>row.id==='metadataOnlyControl').content,'owned without canonical decoding');
     });
     await t.test('native Test state writes preserve exact typed Source semantics, including lower clocks in later packets',async()=>{
       const call=patch=>services.originalTest.patchState({token:main.person.token,testNumber:number,patch});
@@ -336,6 +454,9 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       const review=await auth('owned-review'),id=await request(review,native.bookletName);assert.match(id,/^[1-9][0-9]*$/);
       const [saved]=await owned(review.person);assert.equal(saved.executionMode,'run-review');assert.equal(saved.originalResultState.lastOpenedAt,null);assert.equal(saved.originalResultState.hasTestState,false);
       await services.originalTest.patchState({token:review.person.token,testNumber:id,patch:[{key:'reviewState',content:42,timeStamp:1}]});const nativeRead=await services.originalTest.read({token:review.person.token,testNumber:id});assert.equal(nativeRead.mode,'run-review');assert.deepEqual(nativeRead.laststate,{reviewState:42});assert.equal((await repository.getTestRunById(saved.testRunId)).controllerEntry,undefined);
+      const beforeUnits=await repository.getTestRunById(saved.testRunId),unitName='OWNED.REVIEW.UNIT';await services.originalUnit.patchState({token:review.person.token,testNumber:id,unitName,body:{newState:[{key:'review',content:'native write is allowed',timeStamp:1}]}});
+      await services.originalUnit.putResponse({token:review.person.token,testNumber:id,unitName,body:{timeStamp:1,dataParts:{answer:'retained in native review mode'},responseType:'review/type'}});
+      const result=await services.originalUnit.read({token:review.person.token,testNumber:id,unitName:'OWNED.NATIVE.UNIT',alias:unitName});assert.equal(result.state.review,'native write is allowed');assert.equal(result.dataParts[0][1],'retained in native review mode');assert.deepEqual(await repository.getTestRunById(saved.testRunId),beforeUnits);
     });
     await t.test('a created native Test remains available and starts its real controller and timer only on canonical entry',async()=>{
       const entry=await auth('owned-entry');const id=await request(entry,'owned.assigned');const [before]=await owned(entry.person);
@@ -367,11 +488,19 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         await Promise.all(Array.from({length:16},(_,index)=>(index%2?services:secondary).originalTest.patchState({token:session.person.token,testNumber:values[0],patch:[{key:'writer-'+index,content:index,timeStamp:1}]})));
         const expected=Object.fromEntries(Array.from({length:16},(_,index)=>['writer-'+index,index]));assert.deepEqual((await secondary.originalTest.read({token:session.person.token,testNumber:values[0]})).laststate,expected);
         assert.equal((await second.repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId)).filter(row=>row.testRunId===runs[0].testRunId).length,16);
+        const unitName='OWNED.PG.NATIVE.ALIAS',before=(await repository.getTestRunById(runs[0].testRunId)).originalResultState;
+        await Promise.all(Array.from({length:12},(_,index)=>(index%2?services:secondary).originalUnit.patchState({token:session.person.token,testNumber:values[0],unitName:index%2?unitName:unitName.toLowerCase(),body:{originalUnitId:'FIRST.WRITER.'+index,newState:[{key:'unitWriter-'+index,content:String(index),timeStamp:index+1}]}})));
+        await Promise.all(Array.from({length:12},(_,index)=>(index%2?services:secondary).originalUnit.putResponse({token:session.person.token,testNumber:values[0],unitName,body:{timeStamp:index+1,dataParts:{['part-'+index]:'answer '+index},responseType:'type/'+index}})));
+        const unit=await second.repository.getOriginalUnit({...runs[0],unitName});assert.equal(Object.keys(unit.state).length,12);assert.equal(unit.parts.length,12);assert.match(unit.originalUnitId,/^FIRST.WRITER.\d+$/);
+        for(let index=0;index<12;index++){assert.equal(unit.state['unitWriter-'+index],String(index));assert.deepEqual(unit.parts.find(part=>part.id==='part-'+index),{id:'part-'+index,content:'answer '+index,ts:index+1,responseType:'type/'+index});}
+        assert.deepEqual((await repository.getTestRunById(runs[0].testRunId)).originalResultState,before);
       }finally{await second.shutdown();}
     });
     await t.test('generic Test deletion retires its number mapping without reusing the number for the same private UUID',async()=>{
       const session=await auth('owned-after-delete'),old=await request(session,native.bookletName),[saved]=await owned(session.person);
+      const unitName='OWNED.DELETED.UNIT';await services.originalUnit.patchState({token:session.person.token,testNumber:old,unitName,body:{originalUnitId:'NEVER.REVIVE',newState:[{key:'private',content:'must be retired',timeStamp:1}]}});assert.ok(await repository.getOriginalUnit({...saved,unitName}));
       await repository.deleteTestRunsByIds([saved.testRunId]);assert.equal(await repository.findOriginalTestNumber({...saved,testNumber:old}),null);await repository.saveTestRun({...saved,originalResultState:{...saved.originalResultState,bookletName:'Recreated'}});
+      assert.equal(await repository.getOriginalUnit({...saved,unitName}),null);
       const fresh=await repository.getOrCreateOriginalTestNumber(saved);assert.ok(BigInt(fresh)>BigInt(old));
     });
     if(kind==='sqlite'||kind==='postgres')await t.test('real protected native HTTP returns raw decimal HTML and rejects wrong roles before parsing the body',async()=>{
@@ -408,6 +537,17 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         assert.equal(opened.headers.get('content-type'),'application/json');assert.equal(opened.headers.get('cache-control'),'private, no-store');assert.equal(nativeValue.firstStart,true);assert.deepEqual(nativeValue.laststate,[]);assert.equal(nativeValue.resources['OWNED.NATIVE.UNIT'].usesPlayer[0],'Resource/player.html');
         const stateReply=await nativeRequest('PATCH','/test/'+expected+'/state',httpPerson.person.token,[{key:'httpState',content:{b:'\u03a9/x',a:1},timeStamp:1}]);assert.equal(stateReply.bytes.length,0);
         const reread=JSON.parse((await nativeRequest('GET','/test/'+expected,httpPerson.person.token)).text);assert.equal(reread.firstStart,false);assert.equal(reread.laststate.httpState,typedSource.state.ownedObject);
+        const unitPath='/test/'+expected+'/unit/OWNED.HTTP.ALIAS',unitRead='/test/'+expected+'/unit/OWNED.NATIVE.UNIT/alias/OWNED.HTTP.ALIAS';
+        const emptyUnit=await nativeRequest('GET',unitRead,httpPerson.person.token);assert.equal(emptyUnit.headers.get('content-type'),'application/json');assert.deepEqual(JSON.parse(emptyUnit.text),{state:{},dataParts:{},unitResponseType:'',definition:'Owned definition',definitionType:'owned-native-player-1.2'});
+        const malformed=await fetch(base+unitPath+'/state',{method:'PATCH',headers:{AuthToken:httpPerson.login.token,'content-type':'application/json'},body:'{',signal:AbortSignal.timeout(15000)});assert.equal(malformed.status,403);await malformed.arrayBuffer();
+        await nativeRequest('GET',unitRead,other.person.token,undefined,403);await nativeRequest('PUT',unitPath+'/response',httpPerson.person.token,{timeStamp:5,dataParts:{a:'too early'}},404);
+        const unitState=await nativeRequest('PATCH',unitPath+'/state',httpPerson.person.token,{originalUnitId:'FIRST.HTTP.ID',newState:[{key:'choice',content:'newest',timeStamp:9}]});assert.equal(unitState.bytes.length,0);
+        await nativeRequest('PATCH',unitPath+'/state',httpPerson.person.token,[{key:'choice',content:'older ignored',timeStamp:1}]);
+        const unitResponse=await nativeRequest('PUT',unitPath+'/response',httpPerson.person.token,{timeStamp:5,dataParts:{a:'Exact HTTP Ω/x'},responseType:'owned/http'},201);assert.equal(unitResponse.bytes.length,0);assert.equal(unitResponse.headers.get('content-type'),'text/html; charset=UTF-8');
+        await nativeRequest('PUT',unitPath+'/response',httpPerson.person.token,{timeStamp:5,dataParts:{a:'equal rejected',b:'new default type'}},201);
+        const restoredUnit=JSON.parse((await nativeRequest('GET',unitRead,httpPerson.person.token)).text);assert.deepEqual(restoredUnit.state,{choice:'newest'});assert.deepEqual(restoredUnit.dataParts,{a:'Exact HTTP Ω/x',b:'new default type'});assert.equal(restoredUnit.unitResponseType,'unknown');
+        const logged=await nativeRequest('PUT',unitPath+'/log',httpPerson.person.token,{logEntries:[{key:'httpNativeUnitLog',content:{owned:true},timeStamp:0}]},201);assert.equal(logged.bytes.length,0);
+        assert.deepEqual(JSON.parse((await nativeRequest('GET','/test/'+expected,httpPerson.person.token)).text).laststate,reread.laststate);
         const groupToken=httpPerson.person.groupToken,file='/file/'+groupToken+'/ws_'+nativeValue.workspaceId+'/Resource/player.html';
         const output=[],write=process.stdout.write;process.stdout.write=function(chunk,encoding,callback){output.push(String(chunk));if(typeof encoding==='function')encoding();else if(typeof callback==='function')callback();return true;};
         try{
@@ -464,6 +604,10 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       for(const source of files)await services.contentIntake.uploadWorkspaceFile({...foreignScope,fileName:source.fileName.split('/').at(-1),sourceDocument:source.sourceDocument,mediaType:source.mediaType});
       await services.workspaceAdminRead.importParticipantRoster({...foreignScope,rosterText:xml('Testtakers',`<Metadata/><Group id="Owned.Foreign" label="Foreign"><Login name="owned-foreign-cascade" pw="${password}" mode="run-hot-return"><Booklet codes="Owned">OWNED.ASSIGNED</Booklet></Login></Group>`)});
       const foreign=await auth('owned-foreign-cascade'),foreignNumber=await request(foreign,'OWNED.ASSIGNED'),foreignRuns=await owned(foreign.person);
+      const unitName='OWNED.WORKSPACE.UNIT',owner=await auth('owned-create');assert.equal(owner.person.participantSession.participantSessionId,parent.participantSessionId);
+      await services.originalUnit.patchState({token:owner.person.token,testNumber:former,unitName,body:{originalUnitId:'WORKSPACE.FIRST',newState:[{key:'owned',content:'must retire',timeStamp:1}]}});
+      await services.originalUnit.patchState({token:foreign.person.token,testNumber:foreignNumber,unitName,body:{originalUnitId:'FOREIGN.PRESERVED',newState:[{key:'foreign',content:'must survive',timeStamp:1}]}});
+      const ownedUnit=await repository.getOriginalUnit({...saved,unitName}),foreignUnit=await repository.getOriginalUnit({...foreignRuns[0],unitName});assert.ok(ownedUnit);assert.ok(foreignUnit);
       const deletion={...scope,...ids,auditEvent:{adminAuditEventId:randomUUID(),eventType:'workspace_deleted',actorAdminUserId:null,subjectAdminUserId:null,occurredAt:stamp,summary:'Owned native number deletion',details:{}}};
       if(kind==='file'){
         const backup=file+'.workspace-backup';await rename(file,backup);await mkdir(file);
@@ -472,6 +616,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
           assert.deepEqual(await repository.getWorkspaceByScope(scope.tenantKey,scope.workspaceKey),workspace);
           assert.deepEqual(await repository.getTestRunById(saved.testRunId),saved);assert.deepEqual(await repository.getParticipantSessionById(parent.participantSessionId),parent);
           assert.equal(await repository.getOrCreateOriginalTestNumber(saved),former);assert.equal(await repository.getOrCreateOriginalTestNumber(foreignRuns[0]),foreignNumber);
+          assert.deepEqual(await repository.getOriginalUnit({...saved,unitName}),ownedUnit);assert.deepEqual(await repository.getOriginalUnit({...foreignRuns[0],unitName}),foreignUnit);
         }finally{await rm(file,{recursive:true});await rename(backup,file);}
         await reopen();assert.deepEqual(await repository.getTestRunById(saved.testRunId),saved);
         assert.equal(await repository.getOrCreateOriginalTestNumber(saved),former);assert.equal(await request(foreign,'OWNED.ASSIGNED'),foreignNumber);
@@ -481,6 +626,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       assert.equal(await repository.matchesOriginalWorkspaceNumber({...ids,workspaceNumber:formerWorkspace}),false);
       assert.equal(await repository.getTestRunById(saved.testRunId),null);await assert.rejects(repository.getOrCreateOriginalTestNumber(saved));
       assert.deepEqual(await owned(foreign.person),foreignRuns);assert.equal(await request(foreign,'OWNED.ASSIGNED'),foreignNumber);
+      assert.deepEqual(await repository.getOriginalUnit({...foreignRuns[0],unitName}),foreignUnit);
       await close();await open();assert.equal(await request(foreign,'OWNED.ASSIGNED'),foreignNumber);
       // Reuse private fixture UUIDs only to expose otherwise invisible orphan
       // mappings. A recreated parent must receive a fresh globally monotonic ID.
@@ -490,6 +636,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       for(const release of releases)await repository.saveContentRelease(release);
       await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers',`<Metadata/><Group id="Owned.Create" label="Owned create"><Login name="owned-create" pw="${password}" mode="run-hot-return"><Booklet codes="Owned">OWNED.ASSIGNED</Booklet></Login></Group>`)});
       await services.originalAuthentication.login({name:'owned-create',password});await repository.saveParticipantSession(parent);await repository.saveTestRun(saved);
+      assert.equal(await repository.getOriginalUnit({...saved,unitName}),null);assert.deepEqual(await repository.getOriginalUnit({...foreignRuns[0],unitName}),foreignUnit);
       const fresh=await repository.getOrCreateOriginalTestNumber(saved);assert.ok(BigInt(fresh)>BigInt(former));assert.ok(BigInt(fresh)>BigInt(foreignNumber));
       assert.equal(await request(foreign,'OWNED.ASSIGNED'),foreignNumber);
     });

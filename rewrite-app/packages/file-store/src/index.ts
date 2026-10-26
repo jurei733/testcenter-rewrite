@@ -1,3 +1,5 @@
+import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
+import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
 import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
@@ -123,6 +125,7 @@ type PersistedFirstSliceState = {
   participantRosterPasswordHashes: Record<string, string>;
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
+  originalNativeUnits: Record<string,OriginalNativeUnit>;
   originalTestNumbers: Record<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
   originalTestRunsByNumber: Record<string,string>;
@@ -185,6 +188,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantRosterPasswordHashes: {},
   participantLoginAttempts: {},
   testRuns: {},
+  originalNativeUnits: {},
   originalTestNumbers: {},
   originalTestNumberCounter: "0",
   originalTestRunsByNumber: {},
@@ -825,6 +829,7 @@ const createFileRepository = (
     return enqueueMutation(async () => {
       const current = await getState();
       const next = { ...current, ...(includeOriginalNumbers ? {originalTestNumbers: {...current.originalTestNumbers},originalTestRunsByNumber:{...current.originalTestRunsByNumber}} : {}),
+        originalNativeUnits:{...current.originalNativeUnits},
         participantRunCommands: { ...current.participantRunCommands }, participantProgressDeliveries: { ...current.participantProgressDeliveries },
         testRuns: { ...current.testRuns }, participantSessions: { ...current.participantSessions },
         participantTestLogs: { ...current.participantTestLogs }, workspaceActivityEvents: { ...current.workspaceActivityEvents } };
@@ -845,7 +850,9 @@ const createFileRepository = (
       if (!result || !result.activated && !result.entryChanged) return result;
       const next = { ...current, participantSessions: result.activated ? { ...current.participantSessions,
         [input.participantSessionId]: structuredClone(result.participantSession) } : current.participantSessions,
+        originalNativeUnits:{...current.originalNativeUnits},
         testRuns: result.entryChanged ? { ...current.testRuns, [input.testRunId]: structuredClone(result.testRun) } : current.testRuns };
+      if(result.entryChanged)invalidateOriginalUnitCollection(next,current.testRuns[input.testRunId],result.testRun);
       await persistState(next);
       cachePromise = Promise.resolve(next);
       return result;
@@ -1201,6 +1208,7 @@ const createFileRepository = (
         deleteMatching(state.originalLoginBindings, workspaceMatches);
         deleteMatching(state.originalSessionTokens, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
+        deleteMatching(state.originalNativeUnits,workspaceMatches);
         if(state.originalTestNumbers)deleteMatching(state.originalTestNumbers,row=>{if(!workspaceMatches(row))return false;delete state.originalTestRunsByNumber[row.testNumber];return true;});
         if(state.originalWorkspaceNumbers)deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
@@ -1793,14 +1801,18 @@ const createFileRepository = (
         return deleteOriginalGroupsFromCollections(state, input);
       });
     },
+    async getOriginalUnit(input){return readOriginalUnitCollection(await getState(),input);},
+    async mutateOriginalUnit(input,transform){return mutate(state=>mutateOriginalUnitCollection(state,input,transform));},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       const state = await getState();
       const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
+      const nativeByRun=new Map<string,OriginalNativeUnit[]>();
+      for(const unit of Object.values(state.originalNativeUnits))if(scoped(unit)){const rows=nativeByRun.get(unit.testRunId)??[];rows.push(unit);nativeByRun.set(unit.testRunId,rows);}
       return projectOriginalGroupResultInventory({
         people: Object.values(state.participantSessions).filter(scoped),
         bindings: Object.values(state.originalLoginBindings).filter(scoped),
         groups: Object.values(state.originalParticipantGroups).filter(scoped),
-        runs: Object.values(state.testRuns).filter(scoped).map(run => projectOriginalResultTest(run)),
+        runs: Object.values(state.testRuns).filter(scoped).map(run => projectOriginalResultTest(run,Object.keys(run.unitResponses),(nativeByRun.get(run.testRunId)??[]).filter(unit=>originalUnitParentMatches(run,unit)).map(unit=>unit.unitName))),
         reviews: Object.values(state.workspaceReviews).filter(scoped),
         events: Object.values(state.workspaceActivityEvents).filter(scoped)
       });
@@ -1857,7 +1869,7 @@ const createFileRepository = (
     async saveTestRun(testRun) {
       await mutate(state => {
         guardResultArtifactCollections(state, {tenantId: testRun.tenantId, workspaceId: testRun.workspaceId, participantSessionId: testRun.participantSessionId});
-        state.testRuns[testRun.testRunId]=preserveOriginalTestState(withOriginalTestRunMode(testRun,state.participantSessions[testRun.participantSessionId]),state.testRuns[testRun.testRunId]??null);
+        invalidateOriginalUnitCollection(state,state.testRuns[testRun.testRunId],testRun);state.testRuns[testRun.testRunId]=preserveOriginalTestState(withOriginalTestRunMode(testRun,state.participantSessions[testRun.participantSessionId]),state.testRuns[testRun.testRunId]??null);
       });
     },
     activateParticipantController: mutateControllerActivation,
@@ -1905,6 +1917,7 @@ const createFileRepository = (
         if (effect.commandInput && !command) throw new Error("The Run no longer accepts the projected command.");
         if (command) state.participantRunCommands[JSON.stringify([command.testRunId, command.commandId])] = command;
         if (effect.progressDelivery) state.participantProgressDeliveries[JSON.stringify([input.testRunId, effect.progressDelivery.deliveryId])] = effect.progressDelivery;
+        invalidateOriginalUnitCollection(state,state.testRuns[input.testRunId],effect.testRun);
         state.testRuns[input.testRunId] = effect.testRun;
         for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
         for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
@@ -1932,7 +1945,8 @@ const createFileRepository = (
               effect.activityEvents.some(event => state.workspaceActivityEvents[event.activityEventId])) {
             throw new Error("A participant command effect cannot overwrite an existing artifact identity.");
           }
-          state.testRuns[input.testRunId] = effect.testRun;
+          invalidateOriginalUnitCollection(state,state.testRuns[input.testRunId],effect.testRun);
+        state.testRuns[input.testRunId] = effect.testRun;
           state.participantRunCommands[key] = prepared.result.command;
           for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
           for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
@@ -1952,6 +1966,7 @@ const createFileRepository = (
           for (const [key, receipt] of Object.entries(state.participantProgressDeliveries)) {
             if (receipt.testRunId === testRunId) delete state.participantProgressDeliveries[key];
           }
+          for(const[key,row]of Object.entries(state.originalNativeUnits))if(row.testRunId===testRunId)delete state.originalNativeUnits[key];
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
             const nativeNumber=state.originalTestNumbers?.[testRunId];if(nativeNumber)delete state.originalTestRunsByNumber[nativeNumber.testNumber];

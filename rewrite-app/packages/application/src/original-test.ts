@@ -7,6 +7,7 @@ import {parseOriginalTestStatePatch,applyOriginalTestStatePatch,assertOriginalTe
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 import {hashOriginalSessionToken} from './original-session-token.js';
 import type {OriginalBookletFiles} from './original-test-files.js';
+import {parseOriginalNativeTestNumber,readOriginalPerson,resolveOriginalOwnedTest} from './original-test-access.js';
 import {defaultParticipantExecutionMode,type ParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
 
 /** PHP TestName preserves first key position while duplicate values replace it. */
@@ -45,10 +46,10 @@ export function createOriginalTestPort(input: {
   readResource:(scope:{tenantId:string;workspaceId:string},path:string)=>Promise<{bytes:Uint8Array;contentType:string}>;
   currentBooklet: (person: ParticipantSession, fileId: string) => Promise<{contentReleaseId: string; booklet: ContentReleaseBookletEntry}>;
 }): OriginalTestPort {
-  const personFor=async(token:string)=>{const state=await input.auth.read({token});if(state.kind!=='person')throw new FirstSliceError(403,'original_token_type_forbidden','The supplied token cannot perform that operation.');return state.participantSession;};
-  const number=(raw:string)=>{if(typeof raw!=='string'||!/^0*[1-9][0-9]*$/.test(raw)||raw.length>256||BigInt(raw)>9223372036854775807n)throw new FirstSliceError(400,'original_test_number_invalid','No valid test-Id: '+raw);return BigInt(raw).toString();};
+  const personFor=(token:string)=>readOriginalPerson(input.auth,token);
+  const number=parseOriginalNativeTestNumber;
   const forbidden=(raw:string)=>new FirstSliceError(403,'original_test_forbidden',`Access to test ${raw} is not provided.`);
-  const owned=async(token:string,raw:string)=>{const person=await personFor(token),testNumber=number(raw),mapping=await input.repository.findOriginalTestNumber({...person,testNumber});if(!mapping)throw forbidden(raw);const run=await input.repository.getTestRunById(mapping.testRunId);if(!run||(['testRunId','participantSessionId','tenantId','workspaceId','contentReleaseId'] as const).some(key=>run[key]!==mapping[key]))throw forbidden(raw);return{person,run,testNumber};};
+  const owned=(token:string,raw:string)=>resolveOriginalOwnedTest(input,token,raw);
   const unlocked=(run:TestRun,testNumber:string)=>{if(run.locked)throw new FirstSliceError(423,'original_test_locked',`Test #${testNumber} \`${run.originalResultState?.bookletLabel??''}\` is locked.`);};
   const savedState=(run:TestRun)=>{if(run.originalTestState!==undefined){assertOriginalTestState(run.originalTestState);return structuredClone(run.originalTestState);}if(run.originalResultState?.hasTestState===false)return{};throw new FirstSliceError(409,'original_test_state_unknown','The historical saved Test state is unavailable.');};
   return {
