@@ -1,0 +1,34 @@
+name: Early long UI policy qualification
+
+on:
+  push:
+    branches: [codex/early-long-ui-linux-policy-20261026]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-early-long-policy
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: Complete CI policy and focused CLI controls (not UI acceptance or timing)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Audit the complete locked candidate graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - name: Verify the complete CI inventory, prerequisites and failure propagation
+        run: npm run test:ci-policy
+      - name: Plan exact legacy long and short selectors without building or accepting
+        run: npm run ci:focus -- --plan ui-full integration-file
