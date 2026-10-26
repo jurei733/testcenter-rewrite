@@ -3228,3 +3228,12 @@ Console artifact **12630385333** has 1,646,038 bytes, SHA-256
 Safe archive paths, the exact complete forty-three-check inventory, successful
 supervision and the actual native/remote no-op cases are independently checked.
 Complete acceptance for the subsequently integrated head remains mandatory.
+
+
+### Paired Starter viewport expansion (qualification pending)
+
+The Starter reference family retains its four existing tasks and adds `starter-viewports`: 3 themes × 4 states (fresh, continuing/locked with custom button texts, long labels, review) × 4 viewports (1280×720, 390×844, 599×844, 600×844). Every case opens independent Source, Rewrite and Source-repeat contexts; all 48 complete comparisons and all 48 independent Source repeats must be pixel exact. The candidate signs in through its real protected API and schema-qualified Testtakers 18 fixtures. Source uses unchanged pinned frontend code with owned UI DTOs; this does not establish Source backend authorization. No browser flags, masks, thresholds or optional case selectors are introduced.
+
+Six actual pixel fault controls alter a card border or move the introduction by one pixel, across all three desktop themes. Each must produce a nonzero full-viewport difference and return to exactly zero after restoration. The Starter family now also requires the existing native paint, layout and failure-diagnostic controls before capturing. All prior 21 Source tasks remain mandatory.
+
+The default profile remains headful locked Chromium at DPR 1. The initial macOS run captured the first desktop pair/repeat exactly but the unchanged Original failed its mobile stability check: fractional card shadows changed despite constant layout. All sampled failing frames were retained. A separate full DPR 2 diagnostic had 48 exact pairs and 48 exact Original repeats; this additional profile does not replace or accept the failing default profile. A software-rendering diagnostic had five account-icon pixels different and was not adopted. Default Linux qualification and all broader Starter interaction/scroll flows remain pending; no broad parity row is closed by this addition.
