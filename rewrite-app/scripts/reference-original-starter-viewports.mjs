@@ -143,22 +143,35 @@ try {
           layout:[...document.querySelectorAll('.intro,.cards,mat-card,.sentinel,.button-box,.scroll-button')].map(element=>({
             box:element.getBoundingClientRect().toJSON(),scroll:[element.scrollLeft,element.scrollTop]}))}));
         for(const phase of state==='review'?['initial','review-hover']:['initial']) {
-          if(phase==='review-hover') {
-            await review.hover();
-            assert.equal(await review.evaluate(element=>getComputedStyle(element).transform),'none',
-              'The native review button remains in position while hovered.');
-          }
+          if(phase==='review-hover')await review.scrollIntoViewIfNeeded();
           console.log('starter_viewport_capture='+key+'/'+kind+'/'+phase);
           await page.bringToFront();await page.waitForFunction(()=>document.hasFocus());
           if(phase==='initial')await page.mouse.move(0,0);
           await page.evaluate(()=>document.fonts.ready);
           await page.waitForFunction(()=>[...document.images].every(image=>image.complete&&image.naturalWidth>0));
+          // The Original first observes its sentinel before asynchronous claims
+          // render. Await its actual visibility-driven UI update, not just the
+          // card layout: a stale initial callback can outlive three PNG frames.
+          const sentinelIntersecting=await starter.locator('.sentinel').evaluate(element=>new Promise(done=>{
+            const observer=new IntersectionObserver(([entry])=>{observer.disconnect();done(entry.isIntersecting);});
+            observer.observe(element);
+          }));
+          await page.waitForFunction(({selector,visible})=>
+            !!document.querySelector(selector+' .scroll-button')===visible,
+            {selector:source?'tc-starter':'#originalParticipantStarter',visible:!sentinelIntersecting});
+          if(phase==='review-hover') {
+            await review.hover();
+            assert.equal(await review.evaluate(element=>getComputedStyle(element).transform),'none',
+              'The native review button remains in position while hovered.');
+          }
           await page.waitForFunction(()=>!document.querySelector('.mat-ripple-element:not(.mat-radio-persistent-ripple)')&&
             document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity)
               .every(animation=>!animation.pending&&(animation.playState==='finished'||animation.playState==='idle')));
           await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+          const reviewHovered=phase==='review-hover'&&await review.evaluate(element=>element.matches(':hover'));
+          if(phase==='review-hover')assert.ok(reviewHovered,'Capture the actual hovered review button.');
           const result=await captureStableViewport(page,measure,join(artifacts,key+'-'+phase+'-'+kind+'.png'));
-          diagnostics.push({key,phase,kind,geometry:result.geometry,paint:result.paintDiagnostics});
+          diagnostics.push({key,phase,kind,readiness:{sentinelIntersecting,reviewHovered},geometry:result.geometry,paint:result.paintDiagnostics});
           if(kind==='source')captures[phase]=result.bytes;
           else if(kind==='rewrite')comparisons[key+'-'+phase]=await compareScreenshots(page,captures[phase],result.bytes);
           else referenceReproducibility[key+'-'+phase]=await compareScreenshots(page,captures[phase],result.bytes);
@@ -194,6 +207,7 @@ try {
   assert.deepEqual(Object.entries(comparisons).filter(([,v])=>v.differingPixels),[],'Every complete starter viewport must match Source.');
 }finally{
   await writeFile(join(artifacts,'starter-viewports.json'),JSON.stringify({source:originalBrowserSource,manifest,
+    browserMode:'visible',browserVersion:browser?.version()??null,
     scope:'Unchanged Source frontend on owned UI DTOs; real protected candidate API. Source backend authorization not established.',
     comparisons,referenceReproducibility,diagnostics,faultControls,errors,unknown,sourceWrites,candidateWrites},null,2));
   await browser?.close();apiServer.kill('SIGTERM');
