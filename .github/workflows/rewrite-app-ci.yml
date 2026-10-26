@@ -253,7 +253,7 @@ jobs:
           path: ${{ runner.temp }}/original-browser
           digest-mismatch: error
       - name: Verify native viewport capture
-        if: matrix.family == 'administration' || matrix.family == 'directory' || matrix.family == 'entry'
+        if: matrix.family == 'administration' || matrix.family == 'directory' || matrix.family == 'entry' || matrix.family == 'starter'
         run: xvfb-run --auto-servernum npm run test:browser-capture:built
         env:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/original-captures
