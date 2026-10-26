@@ -1,3 +1,5 @@
+import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
 import {prepareOriginalGroupDeletionInput, deleteOriginalGroupsFromCollections} from '@testcenter-rewrite-app/application';
@@ -105,6 +107,9 @@ type InMemoryFirstSliceState = {
   testRuns: Map<string, TestRun>;
   originalTestNumbers: Map<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
+  originalTestRunsByNumber: Map<string,string>;
+  originalWorkspaceNumbers: Map<string,OriginalWorkspaceNumberRecord>;
+  originalWorkspaceNumberCounter: string;
   participantRunCommands: Map<string, ParticipantRunCommand>;
   participantProgressDeliveries: Map<string, ParticipantProgressDelivery>;
   participantTestLogs: Map<string, ParticipantTestLog>;
@@ -142,6 +147,9 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   testRuns: new Map(),
   originalTestNumbers: new Map(),
   originalTestNumberCounter: "0",
+  originalTestRunsByNumber: new Map(),
+  originalWorkspaceNumbers: new Map(),
+  originalWorkspaceNumberCounter: "0",
   participantRunCommands: new Map(),
   participantProgressDeliveries: new Map(),
   participantTestLogs: new Map(),
@@ -404,6 +412,8 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       );
     },
     async saveWorkspace(scope) {
+      const number=prepareOriginalWorkspaceNumber(scope.workspace,scope.workspace,state.originalWorkspaceNumbers.get(scope.workspace.workspaceId),state.originalWorkspaceNumberCounter);
+      if(number.changed){state.originalWorkspaceNumbers.set(scope.workspace.workspaceId,number.record);state.originalWorkspaceNumberCounter=number.counter;}
       state.workspacesByScope.set(
         workspaceScopeKey(scope.tenantKey, scope.workspaceKey),
         scope.workspace
@@ -436,7 +446,8 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       deleteMatching(state.originalLoginBindings, workspaceMatches);
       deleteMatching(state.originalSessionTokens, workspaceMatches);
       deleteMatching(state.originalParticipantGroups, workspaceMatches);
-      deleteMatching(state.originalTestNumbers, workspaceMatches);
+      deleteMatching(state.originalTestNumbers, row=>{if(!workspaceMatches(row))return false;state.originalTestRunsByNumber.delete(row.testNumber);return true;});
+      deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
       for (const run of state.testRuns.values()) {
         if (workspaceMatches(run)) state.participantPresence.delete(run.testRunId);
       }
@@ -906,11 +917,21 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       state.participantLoginAttempts.set(attemptKey, next);
       return next;
     },
+    async getOrCreateOriginalWorkspaceNumber(input){
+      const workspace=Array.from(state.workspacesByScope.values()).find(row=>row.workspaceId===input.workspaceId)??null;
+      const result=prepareOriginalWorkspaceNumber(input,workspace,state.originalWorkspaceNumbers.get(input.workspaceId),state.originalWorkspaceNumberCounter);
+      if(result.changed){state.originalWorkspaceNumbers.set(input.workspaceId,result.record);state.originalWorkspaceNumberCounter=result.counter;}return result.record.workspaceNumber;
+    },
+    async matchesOriginalWorkspaceNumber(input){const row=state.originalWorkspaceNumbers.get(input.workspaceId);return row?.tenantId===input.tenantId&&row.workspaceNumber===input.workspaceNumber&&Array.from(state.workspacesByScope.values()).some(w=>w.workspaceId===input.workspaceId&&w.tenantId===input.tenantId&&w.status==='active')&&Array.from(state.tenants.values()).some(t=>t.tenantId===input.tenantId&&t.status==='active');},
+    async findOriginalTestNumber(input){
+      const id=state.originalTestRunsByNumber.get(input.testNumber);const row=id?state.originalTestNumbers.get(id):undefined;
+      return selectOwnedOriginalTestNumber(input,row,id?state.testRuns.get(id)??null:null,state.participantSessions.get(input.participantSessionId)??null);
+    },
     async getOrCreateOriginalTestNumber(input) {
       guardResultArtifactCollections(state, input);
       const prepared = prepareOriginalTestNumber(input, state.testRuns.get(input.testRunId) ?? null,
         state.participantSessions.get(input.participantSessionId) ?? null, state.originalTestNumbers.get(input.testRunId), state.originalTestNumberCounter);
-      if (prepared.changed) {state.originalTestNumbers.set(input.testRunId, prepared.record); state.originalTestNumberCounter = prepared.counter;}
+      if (prepared.changed) {state.originalTestNumbers.set(input.testRunId, prepared.record); state.originalTestRunsByNumber.set(prepared.record.testNumber,input.testRunId); state.originalTestNumberCounter = prepared.counter;}
       return prepared.record.testNumber;
     },
     async getTestRunById(testRunId) {
@@ -973,12 +994,12 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         for (const event of effect.activityEvents) state.workspaceActivityEvents.set(event.activityEventId, event);
         if (effect.participantSession) state.participantSessions.set(candidate.participantSessionId, effect.participantSession);
       }
-      if (numbered?.changed) {state.originalTestNumbers.set(prepared.testRun.testRunId, numbered.record); state.originalTestNumberCounter = numbered.counter;}
+      if (numbered?.changed) {state.originalTestNumbers.set(prepared.testRun.testRunId, numbered.record); state.originalTestRunsByNumber.set(numbered.record.testNumber,prepared.testRun.testRunId); state.originalTestNumberCounter = numbered.counter;}
       return { testRun: prepared.testRun, created: prepared.created, ...(numbered ? {originalTestNumber: numbered.record.testNumber} : {}) };
     },
     async saveTestRun(testRun) {
       guardResultArtifactCollections(state, {tenantId: testRun.tenantId, workspaceId: testRun.workspaceId, participantSessionId: testRun.participantSessionId});
-      state.testRuns.set(testRun.testRunId, withOriginalTestRunMode(testRun,state.participantSessions.get(testRun.participantSessionId)));
+      state.testRuns.set(testRun.testRunId,preserveOriginalTestState(withOriginalTestRunMode(testRun,state.participantSessions.get(testRun.participantSessionId)),state.testRuns.get(testRun.testRunId)??null));
     },
     async activateParticipantController(input) {
       const result = prepareParticipantControllerActivation(input,
@@ -1017,6 +1038,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         testRuns: Array.from(state.testRuns.values()).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
       if (prepared?.effect) {
         const effect = prepared.effect;
+        if(effect.originalTestState!==undefined&&(effect.testLogs.some(row=>state.participantTestLogs.has(row.participantTestLogId))||effect.activityEvents.some(row=>state.workspaceActivityEvents.has(row.activityEventId))||new Set(effect.testLogs.map(row=>row.participantTestLogId)).size!==effect.testLogs.length||new Set(effect.activityEvents.map(row=>row.activityEventId)).size!==effect.activityEvents.length))throw Error('Run mutation artifact identity already exists.');
         const command = effect.commandInput ? appendParticipantRunCommand(effect.commandInput, effect.testRun, {
           existing: state.participantRunCommands.get(JSON.stringify([input.testRunId, effect.commandInput.commandId])) ?? null,
           lastSequence: Array.from(state.participantRunCommands.values()).reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)
@@ -1067,6 +1089,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         for (const [key, receipt] of state.participantProgressDeliveries) {
           if (receipt.testRunId === testRunId) state.participantProgressDeliveries.delete(key);
         }
+        const nativeNumber=state.originalTestNumbers.get(testRunId);if(nativeNumber)state.originalTestRunsByNumber.delete(nativeNumber.testNumber);
         state.originalTestNumbers.delete(testRunId);
         if (state.testRuns.delete(testRunId)) {
           deletedCount += 1;

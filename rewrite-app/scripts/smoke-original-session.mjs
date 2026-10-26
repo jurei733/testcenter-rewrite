@@ -125,6 +125,26 @@ try {
   mark('browser-native-test-put-returns-stable-raw-number-without-opening-the-test');
   const peerWork = (await request('POST', '/session/challenge', {loginType: 'login', name: 'native-peer', password})).value;
   const peer = (await request('PUT', '/session', await solve(peerWork))).value;
+  const peerChallenge=(await request('POST','/session/person/challenge',{code:'Shared'},peer.token)).value;
+  const peerPerson=(await request('PUT','/session',await solve(peerChallenge),peer.token)).value;
+  const peerTest=await request('PUT','/test',{bookletName:'OWNED.BROWSER'},peerPerson.token,201);
+  await request('GET','/test/'+peerTest.rawText,undefined,person.token,403);
+  const opened=(await request('GET','/test/'+peerTest.rawText,undefined,peerPerson.token)).value;
+  assert.deepEqual(Object.keys(opened),['mode','laststate','xml','resources','firstStart','workspaceId','presetBookletStates']);
+  assert.equal(opened.firstStart,true);assert.deepEqual(opened.laststate,[]);assert.deepEqual(opened.resources,{'OWNED.UNIT':{usesPlayer:['Resource/player.html']}});
+  assert.equal((await request('GET','/test/'+peerTest.rawText,undefined,peerPerson.token)).value.firstStart,false);
+  await request('PATCH','/test/'+peerTest.rawText+'/state',[{key:'browserChoice',content:false,timeStamp:9},{key:'browserObject',content:{b:'Ω/x',a:1},timeStamp:1}],peerPerson.token);
+  await request('PATCH','/test/'+peerTest.rawText+'/state',[{key:'browserChoice',content:'later packet',timeStamp:1}],peerPerson.token);
+  const state=(await request('GET','/test/'+peerTest.rawText,undefined,peerPerson.token)).value.laststate;
+  assert.deepEqual(state,{browserChoice:'later packet',browserObject:'{"b":"\\u03a9\\/x","a":1}'});
+  mark('browser-native-test-read-opens-once-and-preserves-source-typed-packet-state');
+  setPhase('browser-native-group-resource');
+  const resource=await page.evaluate(async({token,workspaceId})=>{
+    const response=await fetch('/file/'+token+'/ws_'+workspaceId+'/Resource/player.html');
+    return{status:response.status,cache:response.headers.get('cache-control'),type:response.headers.get('content-type'),source:response.headers.get('x-source'),text:await response.text()};
+  },{token:peerPerson.groupToken,workspaceId:opened.workspaceId});
+  assert.equal(resource.status,200);assert.equal(resource.cache,'private');assert.equal(resource.type,'text/html;charset=UTF-8');assert.equal(resource.source,'backend');assert.ok(resource.text.includes('<main>Owned fixture</main>'));
+  mark('browser-native-group-resource-preserves-current-player-headers-and-bytes');
   const repeat = await solve((await request('POST', '/session/person/challenge', {code: 'SHARED'}, login.token)).value);
   await request('PUT', '/session', repeat, peer.token, 400);
   const former = person.token; person = (await request('PUT', '/session', repeat, login.token)).value;

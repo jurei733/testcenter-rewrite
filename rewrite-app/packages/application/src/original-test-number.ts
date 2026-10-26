@@ -46,3 +46,8 @@ export function assertOriginalTestCreationCandidate(run: TestRun): void {
     throw new TypeError('Native Test creation requires an unopened, response-free candidate.');
   }
 }
+
+export function selectOwnedOriginalTestNumber(input:{testNumber:string;tenantId:string;workspaceId:string;participantSessionId:string},record:OriginalTestNumberRecord|undefined,run:TestRun|null,person:ParticipantSession|null):OriginalTestNumberRecord|null{
+  if(!record||!run||!person||record.testNumber!==input.testNumber||['tenantId','workspaceId','participantSessionId'].some(key=>record[key as keyof typeof input]!==input[key as keyof typeof input])||keys.some(key=>run[key]!==record[key])||person.participantSessionId!==record.participantSessionId||person.tenantId!==record.tenantId||person.workspaceId!==record.workspaceId||person.contentReleaseId!==record.contentReleaseId||person.originalLoginKey===undefined||person.originalNameSuffix===undefined)return null;
+  return{...record};
+}

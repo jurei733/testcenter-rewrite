@@ -1,4 +1,4 @@
-import {handleOriginalTestHttp, originalTestCreationPath} from './original-test-http.js';
+import {handleOriginalTestHttp, originalTestCreationPath,originalTestRouteLabel,originalResourceLogPath} from './original-test-http.js';
 import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
 import {OriginalSessionProof} from './original-session-proof.js';
 import {handleOriginalSessionHttp, originalSessionRoutes} from './original-session-http.js';
@@ -3322,7 +3322,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /system-check";
   }
 
-  if (pathname === originalTestCreationPath) return `${method} ${originalTestCreationPath}`;
+  const originalLabel=originalTestRouteLabel(method,pathname);if(originalLabel)return originalLabel;
   if (originalSessionRoutes.get(pathname)?.includes(method)) return `${method} ${pathname}`;
 
   if (method === "GET" && pathname === "/healthz") {
@@ -4670,8 +4670,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const context = {
         requestId, method, route: routeLabel,
         // Resource suffixes contain capabilities, including encoded spellings.
-        path: participantResourcePattern.test(requestPathname)
-          ? requestPathname.replace(/(\/resources\/).*/u, "$1:resourcePath") : requestPathname,
+        path: originalResourceLogPath(requestPathname) ?? originalTestRouteLabel('',requestPathname)?.trimStart() ?? (participantResourcePattern.test(requestPathname)
+          ? requestPathname.replace(/(\/resources\/).*/u, "$1:resourcePath") : requestPathname),
         durationMs: Number(durationMs.toFixed(3)), storageKind: runtime.repositoryConfig.kind
       };
       if (aborted) {
@@ -4974,7 +4974,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       if (await handleOriginalTestHttp({request, pathname, services,
         readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),
         send: (status, value) => sendJson(response, status, value),
-        raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); response.end(text);}
+        raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
+        binary:(bytes,contentType)=>{response.writeHead(200,{...securityHeaders,"content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}
       })) return;
 
       if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,

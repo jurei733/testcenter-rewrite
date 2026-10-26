@@ -1,3 +1,5 @@
+import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
 import {allocateOriginalTestNumber} from './original-test-number.js';
 import {rollbackAfterFailure} from './transaction-rollback.js';
@@ -597,6 +599,7 @@ const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
   row
     ? {
         ...(row.controller_entry_json == null ? {} : { controllerEntry: JSON.parse(String(row.controller_entry_json)) as TestRun["controllerEntry"] }),
+        ...(row.original_test_state_json == null ? {} : {originalTestState:JSON.parse(String(row.original_test_state_json)) as NonNullable<TestRun['originalTestState']>}),
         ...(row.original_result_state_json == null ? {} : { originalResultState: (typeof row.original_result_state_json === "string" ? JSON.parse(row.original_result_state_json) : row.original_result_state_json) as TestRun["originalResultState"] }),
         ...(row.state_revision == null ? {} : { stateRevision: Number(row.state_revision) }),
         ...(row.controller_dispatches_json == null ? {} : { controllerDispatches: JSON.parse(String(row.controller_dispatches_json)) as TestRun["controllerDispatches"] }),
@@ -1760,6 +1763,15 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
         FOREIGN KEY(participant_session_id) REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE
       );`
   }
+  ,{
+    version: 74,
+    name: "original_native_test_read",
+    sql: `ALTER TABLE test_runs ADD COLUMN original_test_state_json TEXT;
+      CREATE TABLE original_workspace_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+      INSERT INTO original_workspace_number_counter(singleton,last_number) VALUES(1,'0');
+      CREATE TABLE original_workspace_numbers(workspace_number TEXT PRIMARY KEY,workspace_id TEXT NOT NULL UNIQUE,tenant_id TEXT NOT NULL,
+        FOREIGN KEY(workspace_id) REFERENCES workspaces(workspace_id) ON DELETE CASCADE);`
+  }
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -1912,8 +1924,8 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
   const result = database
     .prepare(
       `INSERT INTO test_runs (
-        test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json, original_test_state_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ${updateExisting ? `ON CONFLICT(test_run_id) DO UPDATE SET
         participant_session_id = excluded.participant_session_id,
         tenant_id = excluded.tenant_id,
@@ -1945,7 +1957,8 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
         state_revision = excluded.state_revision,
         controller_dispatches_json = excluded.controller_dispatches_json,
         original_result_state_json = excluded.original_result_state_json,
-        response_part_types_json = excluded.response_part_types_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`
+        response_part_types_json = excluded.response_part_types_json,
+        original_test_state_json = excluded.original_test_state_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`
     )
     .run(
       testRun.testRunId,
@@ -1979,7 +1992,8 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
       testRun.stateRevision ?? null,
       testRun.controllerDispatches === undefined ? null : JSON.stringify(testRun.controllerDispatches),
       testRun.originalResultState === undefined ? null : JSON.stringify(testRun.originalResultState),
-      testRun.unitResponsePartTypes === undefined ? null : JSON.stringify(testRun.unitResponsePartTypes)
+      testRun.unitResponsePartTypes === undefined ? null : JSON.stringify(testRun.unitResponsePartTypes),
+      testRun.originalTestState === undefined ? null : JSON.stringify(testRun.originalTestState)
     );
   return Number(result.changes) === 1;
 };
@@ -2713,6 +2727,7 @@ export const createSqliteFirstSliceStorage = (
         }));
     },
     async saveWorkspace(scope) {
+      database.exec("BEGIN IMMEDIATE");try{
       database
         .prepare(
           `INSERT INTO workspaces (
@@ -2735,6 +2750,8 @@ export const createSqliteFirstSliceStorage = (
           scope.workspace.status,
           scope.workspace.createdAt
         );
+      allocateOriginalWorkspaceNumber(database,scope.workspace,scope.workspace);database.exec("COMMIT");
+      }catch(error){rollbackAfterFailure(database,error);}
     },
     async deleteWorkspaceAggregate(input) {
       database.exec("BEGIN IMMEDIATE");
@@ -3683,6 +3700,14 @@ export const createSqliteFirstSliceStorage = (
       }
       return result;
     },
+    async getOrCreateOriginalWorkspaceNumber(input){database.exec("BEGIN IMMEDIATE");try{
+      const row=mapWorkspace(database.prepare('SELECT * FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(input.tenantId,input.workspaceId) as Record<string,unknown>|undefined);
+      const number=allocateOriginalWorkspaceNumber(database,input,row);database.exec("COMMIT");return number;
+    }catch(error){return rollbackAfterFailure(database,error);}},
+    async matchesOriginalWorkspaceNumber(input){return Boolean(database.prepare('SELECT 1 FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_id=? AND n.tenant_id=? AND n.workspace_number=? AND w.status=? AND v.status=?').get(input.workspaceId,input.tenantId,input.workspaceNumber,'active','active'));},
+    async findOriginalTestNumber(input){const row=database.prepare(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id
+      JOIN participant_sessions p ON p.participant_session_id=m.participant_session_id AND p.tenant_id=m.tenant_id AND p.workspace_id=m.workspace_id AND p.content_release_id=m.content_release_id
+      WHERE m.test_number=? AND m.tenant_id=? AND m.workspace_id=? AND m.participant_session_id=? AND p.original_login_key IS NOT NULL AND p.original_name_suffix IS NOT NULL`).get(input.testNumber,input.tenantId,input.workspaceId,input.participantSessionId);return row?{testNumber:String(row.test_number),testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id)}:null;},
     async getOrCreateOriginalTestNumber(input) {
       return withResultArtifactParent(database, input, () => {
         const run = mapTestRun(database.prepare('SELECT * FROM test_runs WHERE test_run_id=?').get(input.testRunId) as Record<string, unknown> | undefined);
@@ -3693,7 +3718,7 @@ export const createSqliteFirstSliceStorage = (
     async getTestRunById(testRunId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json, original_test_state_json
            FROM test_runs
            WHERE test_run_id = ?`
         )
@@ -3716,7 +3741,7 @@ export const createSqliteFirstSliceStorage = (
     async listTestRunsByParticipantSessionId(participantSessionId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json, original_test_state_json
            FROM test_runs
            WHERE participant_session_id = ?`
         )
@@ -3726,7 +3751,7 @@ export const createSqliteFirstSliceStorage = (
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json, original_test_state_json
            FROM test_runs
            WHERE participant_session_id = ? AND status != 'completed'
            ORDER BY updated_at ASC
@@ -3738,7 +3763,7 @@ export const createSqliteFirstSliceStorage = (
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json, controller_entry_json, state_revision, controller_dispatches_json, original_result_state_json, response_part_types_json, original_test_state_json
            FROM test_runs
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -3794,7 +3819,8 @@ export const createSqliteFirstSliceStorage = (
       return withAssetWrite(()=>{
         guardResultArtifactParent(database, {tenantId:testRun.tenantId,workspaceId:testRun.workspaceId,participantSessionId:testRun.participantSessionId});
         const parent=mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(testRun.participantSessionId));
-        persistTestRun(database, withOriginalTestRunMode(testRun,parent));
+        const before=database.prepare('SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,original_test_state_json,original_result_state_json,state_revision FROM test_runs WHERE test_run_id=?').get(testRun.testRunId);const previous=before?{testRunId:String(before.test_run_id),participantSessionId:String(before.participant_session_id),tenantId:String(before.tenant_id),workspaceId:String(before.workspace_id),contentReleaseId:String(before.content_release_id),...(before.original_test_state_json==null?{}:{originalTestState:JSON.parse(String(before.original_test_state_json))}),...(before.original_result_state_json==null?{}:{originalResultState:JSON.parse(String(before.original_result_state_json))}),...(before.state_revision==null?{}:{stateRevision:Number(before.state_revision)})}:null;
+        persistTestRun(database,preserveOriginalTestState(withOriginalTestRunMode(testRun,parent),previous));
       });
     },
     async activateParticipantController(input) {
@@ -3903,7 +3929,7 @@ export const createSqliteFirstSliceStorage = (
           persistTestRun(database, effect.testRun);
           for (const log of effect.testLogs) database.prepare(`INSERT INTO participant_test_logs
             (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = excluded.tenant_id, workspace_id = excluded.workspace_id, participant_session_id = excluded.participant_session_id, test_run_id = excluded.test_run_id, unit_key = excluded.unit_key, original_unit_id = excluded.original_unit_id, log_key = excluded.log_key, log_content = excluded.log_content, timestamp = excluded.timestamp, recorded_at = excluded.recorded_at, original_timestamp = excluded.original_timestamp`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)${effect.originalTestState!==undefined?'':` ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = excluded.tenant_id, workspace_id = excluded.workspace_id, participant_session_id = excluded.participant_session_id, test_run_id = excluded.test_run_id, unit_key = excluded.unit_key, original_unit_id = excluded.original_unit_id, log_key = excluded.log_key, log_content = excluded.log_content, timestamp = excluded.timestamp, recorded_at = excluded.recorded_at, original_timestamp = excluded.original_timestamp`}`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
               log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
               log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
           for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events

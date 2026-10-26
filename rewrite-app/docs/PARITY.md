@@ -1,5 +1,21 @@
 # Testcenter parity checklist
 
+### Native Test read/state/resource candidate (2026-10-26)
+
+Person-owned literal Test GET/PATCH and group-capability Resource delivery now
+connect to all four real stores. Production Source37 evidence pins typed state,
+packet clocks, exact first opening, numeric workspace identity and physical bytes.
+The mandatory existing service/unit/PostgreSQL suite and protected browser smoke
+include the additions; no broad CI matrix or repeated frontend build was added.
+[Scope and remaining edges](ORIGINAL-SESSION.md); [validation](CI.md).
+
+The predecessor [full run 40249520035](https://github.com/jurei733/testcenter-rewrite/actions/runs/40249520035)
+is terminal **89/89 success**, with 4,360 unit/frontend and 2,585 PostgreSQL passes
+and all 57 exit scenarios. It accepts head `52a2ef4f055073b300cbf041c8b1606c502a9da3`,
+not this subsequent candidate. Native Unit transport, numeric administration,
+production frontend/report adoption and all eight broad visual rows remain open.
+Ledger stays **27 done / 22 partial**; estimate remains **4–8 engineering weeks**.
+
 ### Native unopened Test creation candidate (2026-10-26)
 
 Literal person-authenticated `PUT /test` now creates stable decimal identities and

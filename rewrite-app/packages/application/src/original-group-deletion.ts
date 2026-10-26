@@ -48,6 +48,7 @@ const remove = <Row>(collection: Collection<Row>, predicate: (row: Row, key: str
 export type OriginalGroupDeletionCollections = {
   originalParticipantGroups: Collection<OriginalParticipantGroup>; originalLoginBindings: Collection<OriginalLoginBinding>;
   originalSessionTokens: Collection<OriginalSessionToken>; participantSessions: Collection<ParticipantSession>;
+  originalTestRunsByNumber?: Collection<string>;
   originalTestNumbers?: Collection<OriginalTestNumberRecord>;
   participantAccessCredentials: Collection<{participantSessionId: string}>; testRuns: Collection<TestRun>;
   workspaceReviews: Collection<WorkspaceReview>; participantTestLogs: Collection<ParticipantTestLog>;
@@ -74,6 +75,7 @@ export function deleteOriginalGroupsFromCollections(state: OriginalGroupDeletion
     typeof row.details.reviewId === 'string' && reviews.has(row.details.reviewId)));
   remove(state.participantRunCommands, descendant); remove(state.participantProgressDeliveries, descendant);
   if (state.originalTestNumbers) remove(state.originalTestNumbers, descendant);
+  if(state.originalTestRunsByNumber)remove(state.originalTestRunsByNumber,id=>runs.has(id));
   remove(state.participantPresence, row => runs.has(row.testRunId));
   remove(state.participantAccessCredentials, row => people.has(row.participantSessionId));
   const deletedTestCount = remove(state.testRuns, row => scoped(row) && runs.has(row.testRunId));
