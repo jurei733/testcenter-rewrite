@@ -1,0 +1,93 @@
+name: Paired Starter review hover qualification
+
+on:
+  push:
+    branches: [codex/starter-review-hover-linux-20261026]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-starter-review-hover
+  cancel-in-progress: true
+
+jobs:
+  participant-starter:
+    name: Complete Original Starter family and paired viewports (not complete acceptance)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: "true"
+      UI_SMOKE_HEADFUL: "true"
+      FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: iqb-berlin/testcenter
+          ref: eedae41840cbe90e5547c0211da818bdf620f5aa
+          path: original-reference
+          persist-credentials: false
+      - name: Record exact native browser image
+        run: bash scripts/ci-browser-cohort.sh record
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Audit the complete locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - name: Verify all CI selection and Source provenance controls
+        run: npm run test:ci-policy && node --test scripts/original-browser-reference.test.mjs
+      - name: Verify pinned Original source and dependencies
+        run: node scripts/original-browser-reference.mjs verify-source ../original-reference
+      - run: npm ci --no-audit --no-fund
+        working-directory: original-reference/frontend
+      - name: Compile the unchanged Original frontend
+        working-directory: original-reference/frontend
+        run: |
+          cp src/environments/environment.dev.ts src/environments/environment.ts
+          npm run build -- --configuration production
+      - name: Verify and pack every compiled Source file
+        run: node scripts/original-browser-reference.mjs pack ../original-reference
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
+      - name: Download locked Chromium for native material producer
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Install authenticated native packages and verify actual browser material
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - name: Verify genuine native paint, layout and diagnostic controls
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/starter-captures
+      - name: Build fresh production
+        run: npm run build
+      - name: Preserve all existing real Starter functional and advisory checks
+        run: xvfb-run --auto-servernum npm run smoke:ui:original-starter:built && xvfb-run --auto-servernum npm run smoke:ui:original-starter-advisories:built
+      - name: Preserve the complete Original Starter family and qualify all paired viewports
+        run: xvfb-run --auto-servernum node scripts/original-browser-reference.mjs capture starter
+        env:
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ github.workspace }}/original-reference/frontend/dist/testcenter-frontend/browser
+          ORIGINAL_BROWSER_CAPTURE_DIR: ${{ runner.temp }}/starter-captures
+      - name: Retain actual Source, Rewrite, repeat and fault-control pixels
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: participant-starter-viewports-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/starter-captures/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Retain owned runtime material diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-material-participant-starter-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: ignore
+          retention-days: 7
