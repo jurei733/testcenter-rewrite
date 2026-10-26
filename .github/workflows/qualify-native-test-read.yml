@@ -1,0 +1,77 @@
+name: Native Test read, state and resources qualification
+
+on:
+  push:
+    branches: [codex/native-test-read-linux-20261026]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-native-test-read
+  cancel-in-progress: true
+
+jobs:
+  original-results:
+    uses: ./.github/workflows/rewrite-service-focus.yml
+    with:
+      check: original-results
+  focused-native-test-read:
+    name: Actual protected Test read/state/resource feedback (not complete acceptance)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: "true"
+      UI_SMOKE_HEADFUL: "true"
+      FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Record exact native browser image
+        run: bash scripts/ci-browser-cohort.sh record
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Audit the complete locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - name: Verify CI selection and failure-propagation policy
+        run: npm run test:ci-policy
+      - name: Qualify native Debian archive inspection without installation
+        run: node --test scripts/ci-browser-system-linux.test.mjs
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
+      - name: Download locked Chromium for native material producer
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Install authenticated native packages and verify actual browser material
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - name: Qualify real native activation and bounded diagnostic capture
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+      - name: Build fresh production and retain both complete proof-of-work cell entries
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-test-read-browser
+        run: npm run ci:focus -- quick/proof-of-work
+      - name: Retain owned runtime material diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-material-native-test-read-focus-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain bounded native Session, Test and Resource receipts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-test-read-receipts-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-test-read-browser/native-session/*.json
+            ${{ runner.temp }}/native-test-read-browser/native-session/*.png
+          if-no-files-found: ignore
+          retention-days: 7
