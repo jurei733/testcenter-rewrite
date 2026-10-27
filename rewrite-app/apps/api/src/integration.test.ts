@@ -4773,6 +4773,31 @@ test("platform application settings are public, durable, validated, and audited"
     }
   );
   assert.equal(deletedGlobalAsset.status, 200);
+
+  // Uploaded names are valid Unicode. HTTP headers require an ASCII fallback
+  // and RFC 5987 encoding; raw non-Latin-1 names previously produced HTTP 500.
+  for (const originalName of ["Bild Ω 中文 🙂.png", "Bild ä.png", "Bild \"(')*.png"]) {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const uploaded = await requestJson<{applicationAsset: {applicationAssetId: string}}>(
+      "/api/v1/admin/application-assets", {method: "POST", headers: {authorization},
+        body: {originalName, mediaType: "image/png", dataBase64: bytes.toString("base64")}});
+    assert.equal(uploaded.status, 201);
+    const id = uploaded.body.applicationAsset.applicationAssetId;
+    for (const query of [
+      "originalName=" + encodeURIComponent(originalName), "applicationAssetId=" + encodeURIComponent(id)
+    ]) {
+      const download = await fetch(`${baseUrl}/api/v1/system/application-assets?${query}`);
+      assert.equal(download.status, 200);
+      assert.equal(download.headers.get("content-type"), "image/png");
+      const disposition = download.headers.get("content-disposition") ?? "";
+      assert.match(disposition, /^inline; filename="[\x20-\x21\x23-\x5b\x5d-\x7e]+"; filename\*=UTF-8''[^\s]+$/);
+      assert.equal(decodeURIComponent(disposition.split("filename*=UTF-8''")[1]!), originalName);
+      assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
+    }
+    const deleted = await requestJson(`/api/v1/admin/application-assets?applicationAssetId=${encodeURIComponent(id)}`,
+      {method: "DELETE", headers: {authorization}});
+    assert.equal(deleted.status, 200);
+  }
 });
 
 test("participant custom texts retain global-login-booklet precedence inputs", async () => {
