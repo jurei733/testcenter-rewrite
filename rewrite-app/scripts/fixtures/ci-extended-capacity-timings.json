@@ -1,0 +1,159 @@
+{
+  "runId": 40317717809,
+  "runUrl": "https://github.com/jurei733/testcenter-rewrite/actions/runs/40317717809",
+  "headSha": "529d52070120ad8a5d017a10d686ea0f1570dd55",
+  "mergeSha": "18ca6c1a12251f1c62ff4d3e2374b76b304b63b1",
+  "status": "completed",
+  "conclusion": "success",
+  "totalJobs": 89,
+  "successfulJobs": 89,
+  "first": "2026-10-26T11:47:49Z",
+  "last": "2026-10-26T12:25:40Z",
+  "spanSeconds": 2271,
+  "baselineRunId": 40312936341,
+  "baselineSpanSeconds": 2032,
+  "extendedSlots": 4,
+  "measurement": "Actual completed_at minus started_at including setup; isolated queue models are not whole-run timing guarantees.",
+  "extendedJobs": [
+    {
+      "jobId": 121557254839,
+      "check": "activation-roster-warnings",
+      "startedAt": "2026-10-26T11:58:00Z",
+      "completedAt": "2026-10-26T12:12:22Z",
+      "seconds": 862
+    },
+    {
+      "jobId": 121557254873,
+      "check": "original-runtime-error-contract",
+      "startedAt": "2026-10-26T12:08:23Z",
+      "completedAt": "2026-10-26T12:14:16Z",
+      "seconds": 353
+    },
+    {
+      "jobId": 121557254880,
+      "check": "verona-player",
+      "startedAt": "2026-10-26T12:05:08Z",
+      "completedAt": "2026-10-26T12:12:37Z",
+      "seconds": 449
+    },
+    {
+      "jobId": 121557254893,
+      "check": "original-runtime-error",
+      "startedAt": "2026-10-26T12:12:24Z",
+      "completedAt": "2026-10-26T12:16:38Z",
+      "seconds": 254
+    },
+    {
+      "jobId": 121557254902,
+      "check": "content",
+      "startedAt": "2026-10-26T12:18:00Z",
+      "completedAt": "2026-10-26T12:21:14Z",
+      "seconds": 194
+    },
+    {
+      "jobId": 121557254923,
+      "check": "original-exit-completeness",
+      "startedAt": "2026-10-26T11:58:52Z",
+      "completedAt": "2026-10-26T12:08:20Z",
+      "seconds": 568
+    },
+    {
+      "jobId": 121557254935,
+      "check": "original-paused-exit",
+      "startedAt": "2026-10-26T12:12:39Z",
+      "completedAt": "2026-10-26T12:16:29Z",
+      "seconds": 230
+    },
+    {
+      "jobId": 121557254954,
+      "check": "original-header",
+      "startedAt": "2026-10-26T12:20:47Z",
+      "completedAt": "2026-10-26T12:23:31Z",
+      "seconds": 164
+    },
+    {
+      "jobId": 121557254966,
+      "check": "participant-review",
+      "startedAt": "2026-10-26T12:16:41Z",
+      "completedAt": "2026-10-26T12:20:03Z",
+      "seconds": 202
+    },
+    {
+      "jobId": 121557255009,
+      "check": "original-starter-advisories",
+      "startedAt": "2026-10-26T12:20:32Z",
+      "completedAt": "2026-10-26T12:23:16Z",
+      "seconds": 164
+    },
+    {
+      "jobId": 121557255015,
+      "check": "original-player-exit",
+      "startedAt": "2026-10-26T12:16:32Z",
+      "completedAt": "2026-10-26T12:20:29Z",
+      "seconds": 237
+    },
+    {
+      "jobId": 121557255040,
+      "check": "participant-entry",
+      "startedAt": "2026-10-26T12:14:19Z",
+      "completedAt": "2026-10-26T12:17:57Z",
+      "seconds": 218
+    },
+    {
+      "jobId": 121557255086,
+      "check": "json-roster",
+      "startedAt": "2026-10-26T12:06:28Z",
+      "completedAt": "2026-10-26T12:20:44Z",
+      "seconds": 856
+    },
+    {
+      "jobId": 121557255113,
+      "check": "original-player-version-error",
+      "startedAt": "2026-10-26T12:20:05Z",
+      "completedAt": "2026-10-26T12:22:59Z",
+      "seconds": 174
+    },
+    {
+      "jobId": 121557256833,
+      "check": "participant-debug",
+      "startedAt": "2026-10-26T12:23:33Z",
+      "completedAt": "2026-10-26T12:25:05Z",
+      "seconds": 92
+    },
+    {
+      "jobId": 121557256836,
+      "check": "original-administration",
+      "startedAt": "2026-10-26T12:23:01Z",
+      "completedAt": "2026-10-26T12:25:17Z",
+      "seconds": 136
+    },
+    {
+      "jobId": 121557256922,
+      "check": "attachment-custom-text",
+      "startedAt": "2026-10-26T12:23:19Z",
+      "completedAt": "2026-10-26T12:25:01Z",
+      "seconds": 102
+    },
+    {
+      "jobId": 121557256929,
+      "check": "original-starter",
+      "startedAt": "2026-10-26T12:21:16Z",
+      "completedAt": "2026-10-26T12:23:30Z",
+      "seconds": 134
+    },
+    {
+      "jobId": 121557257108,
+      "check": "system-check-saved",
+      "startedAt": "2026-10-26T12:23:33Z",
+      "completedAt": "2026-10-26T12:24:35Z",
+      "seconds": 62
+    },
+    {
+      "jobId": 121557257110,
+      "check": "offline-shell",
+      "startedAt": "2026-10-26T12:24:37Z",
+      "completedAt": "2026-10-26T12:25:33Z",
+      "seconds": 56
+    }
+  ]
+}
