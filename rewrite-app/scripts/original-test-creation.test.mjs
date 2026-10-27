@@ -496,6 +496,77 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         assert.deepEqual((await repository.getTestRunById(runs[0].testRunId)).originalResultState,before);
       }finally{await second.shutdown();}
     });
+    await t.test('native Test log storage appends atomically under metadata ownership without changing or decoding its Run',async t=>{
+      const testNumber=await request(main,'OWNED.ASSIGNED#log:storage');
+      const input=await repository.findOriginalTestNumber({...ids,participantSessionId:main.person.participantSession.participantSessionId,testNumber});assert.ok(input);
+      const before=await repository.getTestRunById(input.testRunId),person=await repository.getParticipantSessionById(input.participantSessionId);
+      const make=(fields={})=>({participantTestLogId:randomUUID(),...ids,participantSessionId:input.participantSessionId,testRunId:input.testRunId,unitKey:null,originalUnitId:null,logKey:'owned-append',logContent:'"Owned Ω/x"',timestamp:0,recordedAt:stamp,...fields});
+      const logs=async()=>(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId)).filter(row=>row.testRunId===input.testRunId).sort((a,b)=>a.participantTestLogId.localeCompare(b.participantTestLogId));
+      const unchanged=async()=>{assert.deepEqual(await repository.getTestRunById(input.testRunId),before);assert.deepEqual(await repository.getParticipantSessionById(input.participantSessionId),person);};
+      await t.test('append and repeated packets persist exact independent rows while empty batches retain every Run field',async()=>{
+        const batch=[make(),make({timestamp:42,logContent:'false'})];await repository.appendOriginalTestLogs(input,batch);
+        const duplicate=batch.map(row=>({...row,participantTestLogId:randomUUID()}));await repository.appendOriginalTestLogs(input,duplicate);
+        const expected=[...batch,...duplicate].sort((a,b)=>a.participantTestLogId.localeCompare(b.participantTestLogId));assert.deepEqual(await logs(),expected);await unchanged();
+        await repository.appendOriginalTestLogs(input,[]);assert.deepEqual(await logs(),expected);await unchanged();
+        assert.equal(await repository.getOriginalUnit({...input,unitName:'OWNED.NATIVE.UNIT'}),null);
+        await reopen();assert.deepEqual(await logs(),expected);await unchanged();
+      });
+      await t.test('an artifact ID named __proto__ remains an own durable log entry across every store',async()=>{
+        const row=make({participantTestLogId:'__proto__'});await repository.appendOriginalTestLogs(input,[row]);
+        assert.deepEqual((await logs()).find(value=>value.participantTestLogId===row.participantTestLogId),row);await unchanged();
+        await reopen();assert.deepEqual((await logs()).find(value=>value.participantTestLogId===row.participantTestLogId),row);await unchanged();
+      });
+      await t.test('current native mapping and every parent column authorize before examining private append rows',async()=>{
+        const saved=await logs();
+        for(const key of ['testRunId','participantSessionId','tenantId','workspaceId','contentReleaseId']){
+          await assert.rejects(repository.appendOriginalTestLogs({...input,[key]:'foreign'},[null]),denied(409,'result_parent_scope_changed'));
+        }
+        await assert.rejects(repository.appendOriginalTestLogs({...input,testNumber:'9223372036854775807'},[null]),denied(409,'result_parent_scope_changed'));
+        assert.deepEqual(await logs(),saved);await unchanged();
+      });
+      await t.test('late existing-ID collisions, duplicate batch IDs and foreign or Unit rows roll back the entire append',async()=>{
+        const saved=await logs(),existing=saved[0];
+        await assert.rejects(repository.appendOriginalTestLogs(input,[make(),{...existing}]),/collision|constraint|duplicate|unique/i);
+        const same=make();await assert.rejects(repository.appendOriginalTestLogs(input,[same,same]),/collision/i);
+        for(const row of [make({unitKey:'OWNED.NATIVE.UNIT'}),make({originalUnitId:'native-unit'}),make({testRunId:'foreign'}),make({timestamp:NaN}),make({originalTimestamp:0,timestamp:42})])await assert.rejects(repository.appendOriginalTestLogs(input,[make(),row]));
+        assert.deepEqual(await logs(),saved);await unchanged();await reopen();assert.deepEqual(await logs(),saved);await unchanged();
+      });
+      if(kind==='sqlite'||kind==='postgres')await t.test('the actual owner can append without decoding malformed unrelated canonical response data',async()=>{
+        const connection=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
+        const query=async(sql,args=[])=>kind==='sqlite'?connection.prepare(sql).all(...args):(await connection.query(sql,args)).rows;
+        const update=async value=>kind==='sqlite'?connection.prepare('UPDATE test_runs SET unit_responses_json=? WHERE test_run_id=?').run(value,input.testRunId):connection.query('UPDATE test_runs SET unit_responses_json=$1 WHERE test_run_id=$2',[value,input.testRunId]);
+        const saved=(await query(kind==='sqlite'?'SELECT unit_responses_json FROM test_runs WHERE test_run_id=?':'SELECT unit_responses_json FROM test_runs WHERE test_run_id=$1',[input.testRunId]))[0].unit_responses_json;
+        const marker='{"owned_private_response_that_must_not_be_decoded":';
+        try{
+          await update(marker);await assert.rejects(repository.getTestRunById(input.testRunId));
+          const row=make({logKey:'metadata-only'});await repository.appendOriginalTestLogs(input,[row]);assert.ok((await logs()).some(value=>value.participantTestLogId===row.participantTestLogId));
+          assert.equal((await query(kind==='sqlite'?'SELECT unit_responses_json FROM test_runs WHERE test_run_id=?':'SELECT unit_responses_json FROM test_runs WHERE test_run_id=$1',[input.testRunId]))[0].unit_responses_json,marker);
+        }finally{await update(saved);if(kind==='sqlite')connection.close();else await connection.end();}
+        await unchanged();
+      });
+      if(kind==='sqlite'||kind==='postgres')await t.test('a real late log INSERT failure rolls back earlier rows without changing the parent',async()=>{
+        const connection=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()}),exec=sql=>kind==='sqlite'?connection.exec(sql):connection.query(sql),saved=await logs();
+        try{
+          await exec(kind==='sqlite'?"CREATE TRIGGER owned_testlog_append_failure BEFORE INSERT ON participant_test_logs WHEN NEW.log_key='owned-append-fail' BEGIN SELECT RAISE(ABORT,'owned native Testlog append failure'); END":
+            "CREATE FUNCTION owned_testlog_append_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned native Testlog append failure'; END $$; CREATE TRIGGER owned_testlog_append_failure BEFORE INSERT ON participant_test_logs FOR EACH ROW WHEN (NEW.log_key='owned-append-fail') EXECUTE FUNCTION owned_testlog_append_failure()");
+          await assert.rejects(repository.appendOriginalTestLogs(input,[make(),make({logKey:'owned-append-fail'})]),/owned native Testlog append failure/);
+          assert.deepEqual(await logs(),saved);await unchanged();
+        }finally{await exec(kind==='sqlite'?'DROP TRIGGER owned_testlog_append_failure':'DROP TRIGGER owned_testlog_append_failure ON participant_test_logs; DROP FUNCTION owned_testlog_append_failure()');if(kind==='sqlite')connection.close();else await connection.end();}
+      });
+      if(kind==='file')await t.test('late File publication failure retains the durable log set and the in-process cache',async()=>{
+        const saved=await logs(),backup=file+'.testlog-append-backup';await rename(file,backup);await mkdir(file);
+        try{await assert.rejects(repository.appendOriginalTestLogs(input,[make()]));assert.deepEqual(await logs(),saved);await unchanged();}
+        finally{await rm(file,{recursive:true});await rename(backup,file);}
+        await reopen();assert.deepEqual(await logs(),saved);await unchanged();
+      });
+      await t.test('a retired mapping cannot be reused by a stale writer or recreate orphan logs',async()=>{
+        const saved=await logs();assert.equal(await repository.deleteTestRunsByIds([input.testRunId]),1);
+        const after=await logs();await assert.rejects(repository.appendOriginalTestLogs(input,[make()]),denied(409,'result_parent_scope_changed'));assert.deepEqual(await logs(),after);
+        // Parent UUID reuse is an owned countercase, not a migration policy.
+        await repository.saveTestRun(before);await assert.rejects(repository.appendOriginalTestLogs(input,[make()]),denied(409,'result_parent_scope_changed'));
+        assert.deepEqual(await logs(),after);assert.ok(saved.length>=4);
+      });
+    });
     await t.test('generic Test deletion retires its number mapping without reusing the number for the same private UUID',async()=>{
       const session=await auth('owned-after-delete'),old=await request(session,native.bookletName),[saved]=await owned(session.person);
       const unitName='OWNED.DELETED.UNIT';await services.originalUnit.patchState({token:session.person.token,testNumber:old,unitName,body:{originalUnitId:'NEVER.REVIVE',newState:[{key:'private',content:'must be retired',timeStamp:1}]}});assert.ok(await repository.getOriginalUnit({...saved,unitName}));

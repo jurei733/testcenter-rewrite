@@ -1,3 +1,4 @@
+import {appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
@@ -1775,6 +1776,10 @@ const createFileRepository = (
     async matchesOriginalWorkspaceNumber(input){const current=await getState(),row=current.originalWorkspaceNumbers?.[input.workspaceId];return row?.tenantId===input.tenantId&&row.workspaceNumber===input.workspaceNumber&&Object.values(current.workspacesByScope).some(w=>w.workspaceId===input.workspaceId&&w.tenantId===input.tenantId&&w.status==='active')&&Object.values(current.tenants).some(t=>t.tenantId===input.tenantId&&t.status==='active');},
     async findOriginalTestNumber(input){const current=await getState(),id=current.originalTestRunsByNumber[input.testNumber],row=id?current.originalTestNumbers?.[id]:undefined;
       return selectOwnedOriginalTestNumber(input,row,id?current.testRuns[id]??null:null,current.participantSessions[input.participantSessionId]??null);
+    },
+    async appendOriginalTestLogs(input, logs) {
+      if (logs.length === 0) {appendOriginalTestLogCollection(await getState(), input, logs); return;}
+      await mutate(state => appendOriginalTestLogCollection(state, input, logs));
     },
     async getOrCreateOriginalTestNumber(input) {
       return enqueueMutation(async () => {
