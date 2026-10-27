@@ -132,11 +132,18 @@ jobs:
           CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
         run: bash scripts/ci-browser-cohort.sh check
       - uses: ./.github/actions/rewrite-runtime
+        id: runtime
         with:
           prebuilt: "true"
+          browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
+          browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
+          browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
           build-attempt: ${{ needs.build.outputs.attempt }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        if: steps.runtime.outputs.browser-install-route != 'certified'
         with:
           name: browser-system-${{ github.sha }}-${{ needs.browser-system-dependencies.outputs.attempt }}
           path: ${{ runner.temp }}/browser-system/
@@ -147,7 +154,16 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
       - name: Install locked Chromium without another system-package request
         run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Prepare exact qualified archives without package installation
+        if: steps.runtime.outputs.browser-install-route == 'certified'
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+          CI_BROWSER_SYSTEM_CERTIFICATE_ID: ${{ steps.runtime.outputs.browser-certificate-id }}
+          CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256: ${{ steps.runtime.outputs.browser-certificate-sha256 }}
+          CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.runtime.outputs.browser-producer-attempt }}
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs prepare-certified
       - name: Reproduce native APT inventory without network access
+        if: steps.runtime.outputs.browser-install-route != 'certified'
         env:
           CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
           CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ needs.browser-system-dependencies.outputs.attempt }}
@@ -155,6 +171,14 @@ jobs:
           CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION: ${{ needs.browser-system-dependencies.outputs.image-version }}
           CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
         run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore
+      - name: Reproduce the qualified native oracle through fresh offline installation
+        if: steps.runtime.outputs.browser-install-route == 'certified'
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+          CI_BROWSER_SYSTEM_CERTIFICATE_ID: ${{ steps.runtime.outputs.browser-certificate-id }}
+          CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256: ${{ steps.runtime.outputs.browser-certificate-sha256 }}
+          CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.runtime.outputs.browser-producer-attempt }}
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore-certified
       - name: Qualify actual native Chromium rendering and capture
         run: xvfb-run --auto-servernum npm run test:browser-capture:built
 
@@ -252,6 +276,7 @@ jobs:
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
           browser-material-label: ${{ strategy.job-index }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -364,6 +389,7 @@ jobs:
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
           browser-material-label: ${{ strategy.job-index }}
       - name: Run Quick browser gates
         shell: bash
@@ -472,6 +498,7 @@ jobs:
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
           browser-material-label: ${{ strategy.job-index }}
       - name: Run Quick browser gates
         shell: bash
@@ -575,6 +602,7 @@ jobs:
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
           browser-material-label: ${{ strategy.job-index }}
       - name: Run ${{ matrix.check }}
         env:
@@ -707,6 +735,7 @@ jobs:
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
           browser-material-label: ${{ strategy.job-index }}
       - name: Run ${{ matrix.check }}
         env:
@@ -861,6 +890,7 @@ jobs:
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
           browser-material-label: ${{ strategy.job-index }}
       - name: Run protected PostgreSQL UI
         shell: bash
