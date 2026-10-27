@@ -184,3 +184,6 @@ jobs:
             ${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.png
           if-no-files-found: warn
           retention-days: 7
+env:
+  CI: "true"
+  FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
