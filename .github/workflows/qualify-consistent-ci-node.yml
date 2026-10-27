@@ -1,0 +1,68 @@
+name: Exact CI Node material qualification (not UI acceptance)
+on:
+  push:
+    branches: [codex/consistent-ci-node-linux-20261027]
+permissions:
+  contents: read
+jobs:
+  native:
+    name: Independent authenticated native oracle (${{ matrix.replica }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [first, second, third, fourth]
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: "true"
+      CI_BROWSER_SYSTEM_FORMAT: "3"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Verify the actual pinned Node patch
+        run: node --input-type=module -e "import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';assert.equal(process.version,'v'+readFileSync('../.node-version','utf8').trim());"
+      - name: Complete policy and native archive controls
+        run: npm run test:ci-policy && node --test scripts/ci-browser-system-linux.test.mjs
+      - name: Audit the complete locked candidate graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - name: Download the exact locked Chromium
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Independently authenticate native APT and measure actual material
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/native-browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - name: Verify exact complete material against independently derived cohort expectations
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          import {join} from 'node:path';
+          const known={
+            '20261023.334.3':{before:'b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002',material:'6a07814d129d7b1fe678828d2bc267d75276f8a216b7fa8f97a8137914afacb7'},
+            '20261026.354.1':{before:'4929c08bad3700f8295b82da58c5de3f04b22d07d9438d0207befafdfef90ac8',material:'8ccdbcf8e71d7c9df370900e9dfb0c513954d58857e0ec200ecb3654a90a883f'}
+          };
+          const path=join(process.env.RUNNER_TEMP,'native-browser-system','manifest.json');
+          const manifest=JSON.parse(await readFile(path,'utf8')),expected=known[manifest.context.imageVersion];
+          assert.ok(expected,'An unmeasured cohort is not accepted by this qualification');
+          assert.equal(manifest.context.commit,process.env.GITHUB_SHA);
+          assert.equal(createHash('sha256').update(manifest.beforeInventory).digest('hex'),expected.before);
+          assert.equal(manifest.runtimeMaterial.material.nodeVersion,'v22.23.4');
+          assert.equal(manifest.runtimeMaterial.materialSha256,expected.material,'Every actual native file/font/package/Source-pixel input must match the full independent expectation');
+          console.log(JSON.stringify({imageVersion:manifest.context.imageVersion,node:manifest.runtimeMaterial.material.nodeVersion,materialSha256:expected.material,exactFullMaterial:true,scope:'Native qualification; full89-job UI acceptance still pending'}));
+          NODE
+      - name: Retain only owned native inventories and public material evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: consistent-ci-node-${{ matrix.replica }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-browser-system/manifest.json
+            ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: warn
+          retention-days: 7
