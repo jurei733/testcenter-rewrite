@@ -35,7 +35,7 @@ gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
 const errors = [], checks = [], nativeRequests = [], observations = [], releases = [], pages = [];
 const pendingRequests = new Map();
-let browser, page;
+let browser, page, crashFailureEvidence, ownedOrigin = '';
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) { if (await predicate()) return; await delay(50); }
@@ -49,6 +49,7 @@ try {
     server.once("exit", () => { clearTimeout(timer); reject(Error("Owned API exited before startup")); });
   });
   const base = `http://127.0.0.1:${port}`;
+  ownedOrigin = new URL(base).origin;
   const api = async (path, body, token) => {
     const response = await fetch(base + path, { method: body === undefined ? "GET" : "POST",
       headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) },
@@ -76,7 +77,8 @@ try {
     target.on('requestfinished', finished); target.on('requestfailed', finished);
     target.on('close', () => {for (const request of active) pendingRequests.delete(request); active.clear();});
     target.on("pageerror", error => errors.push(String(error))); };
-  await verifyParticipantNativeCrashRecovery({ base, workspaceKey, api, repository, artifacts, track, mark, observations });
+  await verifyParticipantNativeCrashRecovery({ base, workspaceKey, api, repository, artifacts, track, mark, observations,
+    onFailure: error => {crashFailureEvidence = nativeTabFailureEvidence(error, checks, pendingRequests, ownedOrigin);} });
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
   await verifyNativeTabReadiness(browser, base, mark);
   page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
@@ -205,8 +207,8 @@ try {
   assert.deepEqual(errors, []);
 } catch (error) {
   await mkdir(publicEvidence, {recursive: true});
-  const origin = page ? new URL(page.url()).origin : '';
-  await writeFile(join(publicEvidence, 'public-failure.json'), JSON.stringify(nativeTabFailureEvidence(error, checks, pendingRequests, origin), null, 2));
+  await writeFile(join(publicEvidence, 'public-failure.json'), JSON.stringify(
+    crashFailureEvidence ?? nativeTabFailureEvidence(error, checks, pendingRequests, ownedOrigin), null, 2));
   await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => {});
   await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, nativeRequests,
     body: await page?.locator("body").innerText().catch(() => "") }, null, 2)); throw error;
