@@ -127,6 +127,8 @@ jobs:
           CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.route.outputs.producer-attempt }}
         run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore-certified
       - name: Execute every native capture control after actual offline installation
+        env:
+          UI_SMOKE_HEADFUL: "true"
         run: xvfb-run --auto-servernum npm run test:browser-capture:built
       - name: Retain only owned public oracle and capture evidence
         if: always()
