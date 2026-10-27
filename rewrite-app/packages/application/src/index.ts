@@ -1,3 +1,4 @@
+export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection} from './original-test-log.js';
 import {createOriginalUnitPort} from './original-unit.js';
 export {formatOriginalUnitReadJson} from './original-unit.js';
 export type {OriginalUnitPort,OriginalUnitRead} from './original-unit.js';
@@ -1617,6 +1618,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   getOrCreateOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope): Promise<string>;
   matchesOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope & {workspaceNumber:string}): Promise<boolean>;
   findOriginalTestNumber(input: {testNumber:string;tenantId:string;workspaceId:string;participantSessionId:string}): Promise<import('./original-test-number.js').OriginalTestNumberRecord|null>;
+  /** Append native Test logs under current metadata ownership, without rewriting its Run. */
+  appendOriginalTestLogs(input: import('./original-test-number.js').OriginalTestNumberRecord, logs: ParticipantTestLog[]): Promise<void>;
   getOrCreateOriginalTestNumber(input: import('./original-test-number.js').OriginalTestNumberInput): Promise<string>;
   saveTestRun(testRun: TestRun): Promise<void>;
   /** Read current parent/Run and commit the pure projection, logs and activity in one write boundary. */
