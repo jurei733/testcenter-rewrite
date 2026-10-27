@@ -1,0 +1,145 @@
+name: Actual shared browser runtime routes (not full acceptance)
+on:
+  push:
+    branches: [codex/certified-browser-runtime-linux-20261027]
+permissions:
+  contents: read
+jobs:
+  producer:
+    name: Real same-run authenticated package and material producer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      attempt: ${{ github.run_attempt }}
+      image: ${{ steps.cohort.outputs.image-version }}
+      material: ${{ steps.packages.outputs.material-sha256 }}
+      before: ${{ steps.packages.outputs.before-inventory-sha256 }}
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Record actual producer cohort
+        id: cohort
+        run: bash scripts/ci-browser-cohort.sh record
+      - uses: ./.github/actions/rewrite-runtime
+      - run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - run: npm run test:ci-policy
+      - run: node --test scripts/ci-browser-system-linux.test.mjs
+      - run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Produce actual current-run archives and native oracle
+        id: packages
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/global-browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-system-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/global-browser-system/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: runtime-producer-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/global-browser-system/manifest.json
+            ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: warn
+          retention-days: 7
+  consumer:
+    name: Actual shared action (${{ matrix.mode }})
+    needs: producer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [actual-global-producer, owned-opposite-cohort]
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .node-version
+      - run: node scripts/ci-node-runtime.mjs
+      - name: Select actual global metadata or the declared owned routing counterfactual
+        id: selection
+        env:
+          MODE: ${{ matrix.mode }}
+          PRODUCER_IMAGE: ${{ needs.producer.outputs.image }}
+          PRODUCER_MATERIAL: ${{ needs.producer.outputs.material }}
+          PRODUCER_BEFORE: ${{ needs.producer.outputs.before }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {appendFile} from 'node:fs/promises';
+          import {loadCohortCertificates,cohortDigest} from './scripts/ci-browser-cohort-certificates.mjs';
+          let image=process.env.PRODUCER_IMAGE,material=process.env.PRODUCER_MATERIAL,before=process.env.PRODUCER_BEFORE;
+          if(process.env.MODE==='owned-opposite-cohort'){
+            const records=await loadCohortCertificates(process.cwd());
+            assert.equal(records.filter(record=>record.id===process.env.ImageVersion).length,1);
+            const other=records.find(record=>record.id!==process.env.ImageVersion);assert.ok(other);
+            image=other.id;material=other.nativeOracle.runtimeMaterial.materialSha256;before=cohortDigest(other.nativeOracle.beforeInventory);
+          }else assert.equal(process.env.MODE,'actual-global-producer');
+          assert.match(image,/^[A-Za-z0-9._-]{1,80}$/);assert.match(material,/^[a-f0-9]{64}$/);assert.match(before,/^[a-f0-9]{64}$/);
+          await appendFile(process.env.GITHUB_OUTPUT,'image='+image+'\nmaterial='+material+'\nbefore='+before+'\n');
+          NODE
+      - name: Execute the actual shared runtime action
+        id: runtime
+        uses: ./.github/actions/rewrite-runtime
+        with:
+          playwright: "true"
+          browser-system-attempt: ${{ needs.producer.outputs.attempt }}
+          browser-system-image-version: ${{ steps.selection.outputs.image }}
+          browser-system-profile-format: "3"
+          browser-system-material-sha256: ${{ steps.selection.outputs.material }}
+          browser-system-before-inventory-sha256: ${{ steps.selection.outputs.before }}
+          browser-system-certified-cohorts: "true"
+          browser-material-label: ${{ strategy.job-index }}
+      - name: Verify actual selected path and truthful bundle/oracle provenance
+        env:
+          MODE: ${{ matrix.mode }}
+          SELECTED_ROUTE: ${{ steps.runtime.outputs.browser-install-route }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFile} from 'node:fs/promises';
+          import {join} from 'node:path';
+          const route=process.env.SELECTED_ROUTE;
+          assert.ok(['same-run','certified'].includes(route));
+          if(process.env.MODE==='owned-opposite-cohort')assert.equal(route,'certified');
+          const manifest=JSON.parse(await readFile(join(process.env.RUNNER_TEMP,'browser-system','manifest.json'),'utf8'));
+          assert.equal(manifest.context.commit,process.env.GITHUB_SHA);assert.equal(manifest.context.runId,process.env.GITHUB_RUN_ID);
+          assert.equal(manifest.version,route==='certified'?4:3);
+          if(route==='certified'){
+            assert.equal(manifest.nativeOracle.context.runId,'40571016364');
+            assert.equal(manifest.context.runAttempt,process.env.GITHUB_RUN_ATTEMPT);
+          }
+          console.log(JSON.stringify({actualSharedRuntime:true,route,imageVersion:process.env.ImageVersion,bundleVersion:manifest.version,
+            bundleRunId:manifest.context.runId,oracleRunId:manifest.nativeOracle?.context.runId??manifest.context.runId}));
+          NODE
+      - run: npm run test:ci-policy
+      - name: Execute all native capture controls on the restored shared runtime
+        env:
+          UI_SMOKE_HEADFUL: "true"
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+      - name: Retain only owned public bundle and capture evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: runtime-consumer-${{ matrix.mode }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/browser-system/manifest.json
+            ${{ runner.temp }}/browser-material-*/
+            ${{ runner.temp }}/browser-cohort/
+          if-no-files-found: warn
+          retention-days: 7
