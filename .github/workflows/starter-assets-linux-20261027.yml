@@ -1,0 +1,181 @@
+name: Scoped Starter assets and Unicode downloads (not full acceptance)
+on:
+  push:
+    branches:
+      - codex/starter-assets-linux-20261027
+permissions:
+  contents: read
+jobs:
+  build:
+    outputs:
+      attempt: ${{ github.run_attempt }}
+    name: Shared production build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - run: npm run build
+      - name: Package commit-bound production outputs
+        env:
+          CI_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-build
+        run: node scripts/ci-build-artifact.mjs pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rewrite-build-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rewrite-build/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+  browser-system-dependencies:
+    outputs:
+      attempt: ${{ github.run_attempt }}
+      image-version: ${{ steps.cohort.outputs.image-version }}
+      profile-format: ${{ steps.packages.outputs.profile-format }}
+      material-sha256: ${{ steps.packages.outputs.material-sha256 }}
+      before-inventory-sha256: ${{ steps.packages.outputs.before-inventory-sha256 }}
+    name: Authenticated browser system packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Record exact browser producer image
+        id: cohort
+        run: bash scripts/ci-browser-cohort.sh record
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Qualify native Debian archive inspection without installation
+        run: node --test scripts/ci-browser-system-linux.test.mjs
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
+      - name: Download locked Chromium for native material producer
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Capture authenticated packages and native APT result
+        id: packages
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-system-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-system/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Retain owned runtime material diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-material-${{ github.job }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: ignore
+          retention-days: 7
+  original-reference-build:
+    outputs:
+      attempt: ${{ github.run_attempt }}
+    name: Pinned Original browser build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: iqb-berlin/testcenter
+          ref: eedae41840cbe90e5547c0211da818bdf620f5aa
+          path: original-reference
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: original-reference/frontend/package-lock.json
+      - name: Qualify exact Node version and executable permissions
+        working-directory: ${{ github.workspace }}
+        run: node rewrite-app/scripts/ci-node-runtime.mjs
+      - run: node rewrite-app/scripts/original-browser-reference.mjs verify-source original-reference
+      - run: npm ci --no-audit --no-fund
+        working-directory: original-reference/frontend
+      - name: Compile the unchanged Original frontend
+        working-directory: original-reference/frontend
+        run: |
+          cp src/environments/environment.dev.ts src/environments/environment.ts
+          npm run build -- --configuration production
+      - run: node rewrite-app/scripts/original-browser-reference.mjs pack original-reference
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: original-reference-${{ github.sha }}-${{ github.run_attempt }}
+          path: original-reference/frontend/dist/testcenter-frontend/browser/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+  qualify-assets:
+    name: Native Starter assets and retained Starter family
+    needs:
+      - build
+      - original-reference-build
+      - browser-system-dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      UI_SMOKE_HEADFUL: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          build-attempt: ${{ needs.build.outputs.attempt }}
+          playwright: "true"
+          browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
+          browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
+          browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
+          browser-material-label: starter-assets
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}
+          path: ${{ runner.temp }}/original-browser
+          digest-mismatch: error
+      - name: Retain every CI policy requirement
+        run: npm run test:ci-policy
+      - name: Real Unicode upload and byte-exact download on memory, file and SQLite
+        run: |-
+          for store in memory file sqlite; do
+            FIRST_SLICE_STORE="$store" FIRST_SLICE_FILE="$RUNNER_TEMP/assets-file.json" FIRST_SLICE_SQLITE_FILE="$RUNNER_TEMP/assets-sqlite.sqlite" node --test --test-name-pattern="^platform application settings are public, durable, validated, and audited$" apps/api/dist/apps/api/src/integration.test.js
+          done
+      - name: Verify native viewport capture
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/original-captures
+      - run: xvfb-run --auto-servernum node scripts/original-browser-reference.mjs capture starter
+        env:
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
+          ORIGINAL_BROWSER_CAPTURE_DIR: ${{ runner.temp }}/original-captures
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: original-captures-starter-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/original-captures/
+          if-no-files-found: warn
+          retention-days: 30
