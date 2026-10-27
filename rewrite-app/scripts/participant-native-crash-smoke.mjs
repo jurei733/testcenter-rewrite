@@ -4,11 +4,12 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
+import {waitForParticipantNativeTabReady} from './participant-native-tab-readiness.mjs';
 
 // Effectful terminal commands are not answer outbox records. Without a proven
 // document handoff, reentry reads the server and requires a new command.
 export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey, api, repository,
-  artifacts, track, mark, observations }) {
+  artifacts, track, mark, observations, onFailure }) {
   const prefix = "testcenter-rewrite:participant-native-command:v1:";
   const ownerKey = "testcenter-rewrite:participant-native-owner:v1";
   const markerKey = "testcenter-rewrite:owned-native-crash-probe";
@@ -40,7 +41,7 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
       name: "Owned browser session recovery probe", version: "1.0", permissions: ["sessions"],
       background: { service_worker: "background.js" } }));
     await writeFile(join(extension, "background.js"), "chrome.runtime.onInstalled.addListener(() => {});\nchrome.sessions.onChanged.addListener(() => {});\n");
-    let initial, recovered, activePage, crashed = false, releaseReceipt, journalEnumerationChanged = false,domStorageProbe;
+    let initial, recovered, activePage, crashed = false, releaseReceipt, journalEnumerationChanged = false,domStorageProbe,restoredBackground;
     const requests = [], replies = [], completionRequests = [];
     const receiptGate = new Promise(done => { releaseReceipt = done; });
     const observe = (page, phase) => {
@@ -155,6 +156,14 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
       await disconnected; crashed = true; releaseReceipt();
 
       recovered = await launch(profile, extension);
+      // A genuine restored participant document must boot while an unrelated
+      // owned transport stays open. This deliberately makes networkidle false
+      // without changing credentials, journals or application network replies.
+      const readinessBackground = base + '/__owned-native-restore-readiness';
+      await recovered.route(readinessBackground, route => {restoredBackground = route;});
+      await recovered.addInitScript(url => {
+        if (location.origin === new URL(url).origin) void fetch(url).catch(() => {});
+      }, readinessBackground);
       recovered.on("page", page => track(page, `crash-${kind}-after`));
       recovered.on("request", request => {
         if (new URL(request.url()).pathname.endsWith("/native-commands")) requests.push({ phase: "after", request: request.postDataJSON() });
@@ -172,12 +181,20 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
       activePage = reopened;
       // Let the restored document itself boot. Another goto here could cancel
       // an unsafe automatic replay before this gate had observed its effect.
-      await reopened.waitForLoadState("networkidle"); await methods(reopened);
+      // Require this restored document and every native binding to boot.
+      // A background transport is not a participant readiness signal; the
+      // existing owned blocked-request control qualifies this exact helper.
+      await waitForParticipantNativeTabReady(reopened);
+      await poll(() => Promise.resolve(!!restoredBackground), "The restored document did not start its owned readiness transport");
+      await assert.rejects(reopened.waitForLoadState("networkidle", {timeout: 200}), {name: "TimeoutError"});
       assert.equal(new URL(reopened.url()).pathname, new URL(entryUrl).pathname);
       const restoredSessionMarker = await reopened.evaluate(key => sessionStorage.getItem(key), markerKey);
       assert.ok(restoredSessionMarker === null || restoredSessionMarker === "original-tab-session");
       assert.equal(await reopened.evaluate(key => localStorage.getItem(key), markerKey), "armed-without-pagehide");
-      assert.notEqual(await reopened.evaluate(key => sessionStorage.getItem(key), ownerKey), oldOwner);
+      const reenteredOwner = await reopened.evaluate(key => sessionStorage.getItem(key), ownerKey);
+      assert.ok(typeof reenteredOwner === 'string' && reenteredOwner.length > 0,
+        'The restored document must establish its own nonempty native owner');
+      assert.notEqual(reenteredOwner, oldOwner);
       // Cover a retry interval and an actual online wake-up on the reentered route.
       await reopened.evaluate(() => dispatchEvent(new Event("online"))); await delay(1_200);
       assert.deepEqual(requests.filter(request => request.phase === "after"), [], "An unproven pre-crash intent was replayed");
@@ -220,18 +237,23 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
         newOwner: await reopened.evaluate(key => sessionStorage.getItem(key), ownerKey), pagehideFired: false, browserTabRestored: true,
         originalTabSessionStorageRetained: restoredSessionMarker === "original-tab-session",
         restoreMethod: "chrome.sessions.restore",
+        nativeBindingsReadyWithHeldBackgroundTransport: true,
         browserOpenSessionPersistedBeforeCrash: true,
         domStorageCrashMarkerObservedOnDiskBeforeCrash: true,
         journalEnumerationChanged,
         oldJournalEntries: entries.length, oldCommandExecutionLogs: oldLogs.length, oldJournalPreserved: true, freshRequests: fresh });
       mark(`browser-process-crash-${kind}-fresh-commands-retain-trusted-answers-and-clocks`);
     } catch (error) {
+      // Capture bounded public request metadata before context.close removes
+      // the actual pending requests from the parent tracker.
+      onFailure?.(error);
       await activePage?.screenshot({ path: join(artifacts, `native-crash-${kind}-failure.png`), fullPage: true }).catch(() => {});
       await writeFile(join(artifacts, `native-crash-${kind}-failure.json`), JSON.stringify({ error: String(error), stack: error.stack, requests,
         journal: await journal(activePage).catch(() => null),domStorageProbe }, null, 2));
       throw error;
     } finally {
-      releaseReceipt(); await recovered?.close().catch(() => {});
+      releaseReceipt(); await restoredBackground?.fulfill({status: 204}).catch(() => {});
+      await recovered?.close().catch(() => {});
       if (!crashed) await initial?.close().catch(() => {});
       // A browser profile contains participant credentials; keep observations,
       // never the profile itself, in the durable proof.
