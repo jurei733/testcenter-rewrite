@@ -790,12 +790,14 @@ test('all v3 consumers use exact immutable producer format and digest and cannot
  const producer=workflow.jobs['browser-system-dependencies'];
  assert.equal(producer.outputs['profile-format'],'${{ steps.packages.outputs.profile-format }}');
  assert.equal(producer.outputs['material-sha256'],'${{ steps.packages.outputs.material-sha256 }}');
+ assert.equal(producer.outputs['before-inventory-sha256'],'${{ steps.packages.outputs.before-inventory-sha256 }}');
  const pack=producer.steps.find(step=>step.id==='packages');assert.equal(pack.env.CI_BROWSER_SYSTEM_FORMAT,'3');
  assert.ok(producer.steps.findIndex(step=>step.run?.includes('playwright install chromium'))<producer.steps.indexOf(pack));
  for(const [name,job]of Object.entries(workflow.jobs))for(const step of job.steps??[]){
   if(step.uses!=='./.github/actions/rewrite-runtime'||!step.with?.playwright||step.with.playwright==='false')continue;
   assert.equal(step.with['browser-system-profile-format'],'${{ needs.browser-system-dependencies.outputs.profile-format }}',name);
   assert.equal(step.with['browser-system-material-sha256'],'${{ needs.browser-system-dependencies.outputs.material-sha256 }}',name);
+  assert.equal(step.with['browser-system-before-inventory-sha256'],'${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}',name);
   assert.equal(step.with['browser-material-label'],'${{ strategy.job-index }}',name);
  }
  const qualification=workflow.jobs['browser-system-qualification'];
@@ -811,4 +813,26 @@ test('native Test creation is mandatory in complete units, PostgreSQL and focuse
  const suite='scripts/original-test-creation.test.mjs';
  for(const script of ['test:unit:built','test:original-results:built'])assert.ok(scripts[script].split(/\s+/).includes(suite));
  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
+});
+
+
+test('trusted initial inventory rejects before npm or browser downloads while retaining bounded package evidence',()=>{
+ const setup=action.runs.steps.findIndex(step=>step.uses?.startsWith('actions/setup-node@'));
+ const preflight=action.runs.steps.findIndex(step=>step.run==='node scripts/ci-browser-inventory-preflight.mjs');
+ const install=action.runs.steps.findIndex(step=>step.run==='npm ci --no-audit --no-fund');
+ assert.ok(setup<preflight&&preflight<install);
+ const step=action.runs.steps[preflight];
+ assert.equal(step.if,"inputs.browser-system-before-inventory-sha256 != ''");
+ assert.equal(step.env.CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256,'${{ inputs.browser-system-before-inventory-sha256 }}');
+ assert.equal(step.env.CI_BROWSER_COHORT_DIAGNOSTIC_DIR,'${{ runner.temp }}/browser-cohort');
+ assert.equal(action.inputs['browser-system-before-inventory-sha256'].default,'','Earlier wrappers retain complete offline verification');
+ const download=action.runs.steps.findIndex(step=>step.uses?.startsWith('actions/download-artifact@'));
+ assert.ok(preflight<download,'Known incompatible hosts must reject before any browser artifact download');
+ const qualification=workflow.jobs['browser-system-qualification'].steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
+ assert.equal(qualification.with['browser-system-before-inventory-sha256'],'${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}');
+ const retained=action.runs.steps.find(step=>step.name==='Retain rejected initial package inventory');
+ assert.equal(retained.if,"failure() && inputs.browser-system-before-inventory-sha256 != ''");
+ assert.equal(retained.with.path,'${{ runner.temp }}/browser-cohort/');assert.equal(retained.with['retention-days'],7);
+ assert.ok(retained.with.name.includes('${{ inputs.browser-material-label }}'));
+ assert.ok(action.runs.steps.some(step=>step.run?.includes('ci-browser-system.mjs restore')),'Early comparison cannot replace the complete offline gate');
 });

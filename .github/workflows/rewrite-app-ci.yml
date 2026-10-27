@@ -65,6 +65,7 @@ jobs:
       image-version: ${{ steps.cohort.outputs.image-version }}
       profile-format: ${{ steps.packages.outputs.profile-format }}
       material-sha256: ${{ steps.packages.outputs.material-sha256 }}
+      before-inventory-sha256: ${{ steps.packages.outputs.before-inventory-sha256 }}
     name: Authenticated browser system packages
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -133,6 +134,7 @@ jobs:
       - uses: ./.github/actions/rewrite-runtime
         with:
           prebuilt: "true"
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
           build-attempt: ${{ needs.build.outputs.attempt }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
@@ -246,6 +248,7 @@ jobs:
           browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
           browser-material-label: ${{ strategy.job-index }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -354,6 +357,7 @@ jobs:
           browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
           browser-material-label: ${{ strategy.job-index }}
       - name: Run Quick browser gates
         shell: bash
@@ -461,6 +465,7 @@ jobs:
           browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
           browser-material-label: ${{ strategy.job-index }}
       - name: Run Quick browser gates
         shell: bash
@@ -563,6 +568,7 @@ jobs:
           browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
           browser-material-label: ${{ strategy.job-index }}
       - name: Run ${{ matrix.check }}
         env:
@@ -694,6 +700,7 @@ jobs:
           browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
           browser-material-label: ${{ strategy.job-index }}
       - name: Run ${{ matrix.check }}
         env:
@@ -847,6 +854,7 @@ jobs:
           browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
           browser-material-label: ${{ strategy.job-index }}
       - name: Run protected PostgreSQL UI
         shell: bash
