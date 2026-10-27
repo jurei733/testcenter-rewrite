@@ -1,0 +1,314 @@
+{
+  "version": 1,
+  "repository": "jurei733/testcenter-rewrite",
+  "run": 40317717809,
+  "head": "529d52070120ad8a5d017a10d686ea0f1570dd55",
+  "tree": "6e60575d0cf0aea5207b4f3b9a9ece7fa8627244",
+  "status": "completed",
+  "conclusion": "success",
+  "totalJobs": 89,
+  "successfulJobs": 89,
+  "wholeRunSeconds": 2271,
+  "scope": "Actual complete accepted same-product job timings; priority and capacity model only, not a speed guarantee.",
+  "technical": [
+    {
+      "name": "Shared production build",
+      "completed": "2026-10-26T11:49:00Z"
+    },
+    {
+      "name": "verify-memory-sqlite (typecheck)",
+      "completed": "2026-10-26T11:48:57Z"
+    },
+    {
+      "name": "Dependency audit",
+      "completed": "2026-10-26T11:47:55Z"
+    },
+    {
+      "name": "verify-memory-sqlite (unit)",
+      "completed": "2026-10-26T11:50:58Z"
+    },
+    {
+      "name": "Authenticated browser system packages",
+      "completed": "2026-10-26T11:48:42Z"
+    }
+  ],
+  "fastFeedbackCompleted": "2026-10-26T11:54:42Z",
+  "postgresUi": {
+    "name": "verify-postgres-ui",
+    "started": "2026-10-26T11:54:45Z",
+    "completed": "2026-10-26T12:10:35Z",
+    "seconds": 950
+  },
+  "completedBeforeFeedback": [
+    {
+      "name": "Docker image runtime smoke",
+      "completed": "2026-10-26T11:49:32Z"
+    },
+    {
+      "name": "Offline browser system qualification",
+      "completed": "2026-10-26T11:50:13Z"
+    }
+  ],
+  "jobs": [
+    {
+      "check": "ui-full",
+      "started": "2026-10-26T11:51:01Z",
+      "completed": "2026-10-26T12:08:18Z",
+      "seconds": 1037
+    },
+    {
+      "check": "ui-monitor-review",
+      "started": "2026-10-26T11:51:01Z",
+      "completed": "2026-10-26T12:04:51Z",
+      "seconds": 830
+    },
+    {
+      "check": "ui-monitor-detail-review",
+      "started": "2026-10-26T11:51:00Z",
+      "completed": "2026-10-26T12:05:53Z",
+      "seconds": 893
+    },
+    {
+      "check": "ui-activation-blocking-runtime",
+      "started": "2026-10-26T11:51:00Z",
+      "completed": "2026-10-26T12:06:44Z",
+      "seconds": 944
+    },
+    {
+      "check": "ui-ops",
+      "started": "2026-10-26T11:51:00Z",
+      "completed": "2026-10-26T12:08:04Z",
+      "seconds": 1024
+    },
+    {
+      "check": "ui-participant-detail-review",
+      "started": "2026-10-26T11:51:00Z",
+      "completed": "2026-10-26T12:03:14Z",
+      "seconds": 734
+    },
+    {
+      "check": "ui-run-detail-review",
+      "started": "2026-10-26T11:51:01Z",
+      "completed": "2026-10-26T12:04:12Z",
+      "seconds": 791
+    },
+    {
+      "check": "ui-open-run-sync",
+      "started": "2026-10-26T11:51:00Z",
+      "completed": "2026-10-26T12:04:55Z",
+      "seconds": 835
+    },
+    {
+      "check": "ui-review-readiness",
+      "started": "2026-10-26T11:51:00Z",
+      "completed": "2026-10-26T12:02:53Z",
+      "seconds": 713
+    },
+    {
+      "check": "ui-unit-detail-review",
+      "started": "2026-10-26T11:51:01Z",
+      "completed": "2026-10-26T12:06:14Z",
+      "seconds": 913
+    },
+    {
+      "check": "ui-monitor-auto-next",
+      "started": "2026-10-26T11:51:01Z",
+      "completed": "2026-10-26T12:05:20Z",
+      "seconds": 859
+    },
+    {
+      "check": "ui-monitor-bulk",
+      "started": "2026-10-26T11:52:03Z",
+      "completed": "2026-10-26T12:05:59Z",
+      "seconds": 836
+    },
+    {
+      "check": "ui-delete-group-results",
+      "started": "2026-10-26T11:51:17Z",
+      "completed": "2026-10-26T12:06:16Z",
+      "seconds": 899
+    },
+    {
+      "check": "ui-monitor-finish-all",
+      "started": "2026-10-26T11:51:37Z",
+      "completed": "2026-10-26T12:05:34Z",
+      "seconds": 837
+    },
+    {
+      "check": "ui-controller-timer",
+      "started": "2026-10-26T12:01:44Z",
+      "completed": "2026-10-26T12:07:39Z",
+      "seconds": 355
+    },
+    {
+      "check": "ui-participant-monitor-live",
+      "started": "2026-10-26T11:59:33Z",
+      "completed": "2026-10-26T12:01:04Z",
+      "seconds": 91
+    },
+    {
+      "check": "ui-attachments",
+      "started": "2026-10-26T12:03:17Z",
+      "completed": "2026-10-26T12:06:25Z",
+      "seconds": 188
+    },
+    {
+      "check": "ui-adaptive-runtime",
+      "started": "2026-10-26T12:02:56Z",
+      "completed": "2026-10-26T12:03:57Z",
+      "seconds": 61
+    },
+    {
+      "check": "ui-workspace-delete",
+      "started": "2026-10-26T11:59:11Z",
+      "completed": "2026-10-26T12:01:06Z",
+      "seconds": 115
+    },
+    {
+      "check": "ui-deletion-confirmation",
+      "started": "2026-10-26T12:06:00Z",
+      "completed": "2026-10-26T12:07:33Z",
+      "seconds": 93
+    },
+    {
+      "check": "ui-workspace-rename",
+      "started": "2026-10-26T12:04:56Z",
+      "completed": "2026-10-26T12:06:25Z",
+      "seconds": 89
+    },
+    {
+      "check": "integration-memory",
+      "started": "2026-10-26T12:01:06Z",
+      "completed": "2026-10-26T12:02:30Z",
+      "seconds": 84
+    },
+    {
+      "check": "ui-console-debug",
+      "started": "2026-10-26T12:04:53Z",
+      "completed": "2026-10-26T12:05:59Z",
+      "seconds": 66
+    },
+    {
+      "check": "integration-file",
+      "started": "2026-10-26T12:05:51Z",
+      "completed": "2026-10-26T12:10:39Z",
+      "seconds": 288
+    },
+    {
+      "check": "shutdown",
+      "started": "2026-10-26T12:01:09Z",
+      "completed": "2026-10-26T12:01:42Z",
+      "seconds": 33
+    },
+    {
+      "check": "startup-file",
+      "started": "2026-10-26T12:05:36Z",
+      "completed": "2026-10-26T12:05:58Z",
+      "seconds": 22
+    },
+    {
+      "check": "integration-sqlite",
+      "started": "2026-10-26T12:04:15Z",
+      "completed": "2026-10-26T12:05:57Z",
+      "seconds": 102
+    },
+    {
+      "check": "local-demo",
+      "started": "2026-10-26T12:03:56Z",
+      "completed": "2026-10-26T12:05:05Z",
+      "seconds": 69
+    },
+    {
+      "check": "ui-original-xml-schema",
+      "started": "2026-10-26T12:02:32Z",
+      "completed": "2026-10-26T12:03:53Z",
+      "seconds": 81
+    },
+    {
+      "check": "ui-participant-console",
+      "started": "2026-10-26T12:05:56Z",
+      "completed": "2026-10-26T12:09:08Z",
+      "seconds": 192
+    },
+    {
+      "check": "compatibility",
+      "started": "2026-10-26T12:04:00Z",
+      "completed": "2026-10-26T12:04:54Z",
+      "seconds": 54
+    },
+    {
+      "check": "ui-admin-workspace-access",
+      "started": "2026-10-26T12:06:01Z",
+      "completed": "2026-10-26T12:07:35Z",
+      "seconds": 94
+    },
+    {
+      "check": "ui-original-workspace-files",
+      "started": "2026-10-26T12:06:27Z",
+      "completed": "2026-10-26T12:08:46Z",
+      "seconds": 139
+    },
+    {
+      "check": "shutdown-file",
+      "started": "2026-10-26T12:05:23Z",
+      "completed": "2026-10-26T12:05:48Z",
+      "seconds": 25
+    },
+    {
+      "check": "ui-participant-command-completion",
+      "started": "2026-10-26T12:05:39Z",
+      "completed": "2026-10-26T12:06:50Z",
+      "seconds": 71
+    },
+    {
+      "check": "ui-participant-native-routes",
+      "started": "2026-10-26T12:06:01Z",
+      "completed": "2026-10-26T12:09:07Z",
+      "seconds": 186
+    },
+    {
+      "check": "ui-original-review",
+      "started": "2026-10-26T12:06:18Z",
+      "completed": "2026-10-26T12:09:03Z",
+      "seconds": 165
+    },
+    {
+      "check": "ui-verona-development",
+      "started": "2026-10-26T12:06:16Z",
+      "completed": "2026-10-26T12:07:44Z",
+      "seconds": 88
+    },
+    {
+      "check": "ui-admin-delete",
+      "started": "2026-10-26T12:06:01Z",
+      "completed": "2026-10-26T12:08:39Z",
+      "seconds": 158
+    },
+    {
+      "check": "startup",
+      "started": "2026-10-26T12:06:40Z",
+      "completed": "2026-10-26T12:07:02Z",
+      "seconds": 22
+    }
+  ],
+  "rejectedRunObservation": {
+    "run": 40581607333,
+    "conclusion": "failure",
+    "successfulJobs": 87,
+    "totalJobs": 89,
+    "validSpeedBenchmark": false,
+    "fastFeedbackSeconds": 382,
+    "fastFeedbackRunnerWaitSeconds": 42,
+    "postgresUiStarted": "2026-10-27T21:01:08Z",
+    "postgresUiCompleted": "2026-10-27T21:22:09Z",
+    "postgresUiSeconds": 1261,
+    "postgresUiWaitAfterFeedbackSeconds": 252
+  },
+  "proposedModel": {
+    "earlyJourneyCount": 12,
+    "observedRunnerCapacityModel": 20,
+    "SourceFamilies": 5,
+    "earlyDatabaseApiJobs": 1,
+    "earlyDatabaseBrowserJobs": 1
+  }
+}
