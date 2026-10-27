@@ -156,6 +156,7 @@ export const originalReferenceTasks = {
     task("starter", "reference-original-starter.mjs", {}, "metrics.json"),
     task('starter-viewports', 'reference-original-starter-viewports.mjs', {}, 'starter-viewports.json'),
     task('starter-empty-viewports', 'reference-original-starter-empty-viewports.mjs', {}, 'starter-viewports.json'),
+    task('starter-asset-viewports', 'reference-original-starter-asset-viewports.mjs', {}, 'starter-asset-viewports.json'),
     task("paused", "reference-original-paused-exit.mjs"),
     task("paused-locked", "reference-original-paused-exit.mjs", { ORIGINAL_PAUSED_LOCK_ONLY: "true" }),
     task("advisories", "reference-original-starter-advisories.mjs")

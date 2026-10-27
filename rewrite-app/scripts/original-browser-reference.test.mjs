@@ -100,8 +100,8 @@ for (const change of ["corrupt", "extra", "missing", "symlink", "directory-link"
 test("capture tasks cover each renderer family without duplicates or substituted Source", async () => {
   assert.deepEqual(Object.keys(originalReferenceTasks), ["entry", "dialogs", "starter", "administration", "directory"]);
   const tasks = Object.values(originalReferenceTasks).flat();
-  assert.equal(tasks.length, 23); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
-  assert.deepEqual(tasks.map(task => task.name).filter(name => !['directory','entry-viewports','starter-viewports','starter-empty-viewports'].includes(name)).sort(), [
+  assert.equal(tasks.length, 24); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
+  assert.deepEqual(tasks.map(task => task.name).filter(name => !['directory','entry-viewports','starter-viewports','starter-empty-viewports','starter-asset-viewports'].includes(name)).sort(), [
     'system-check-welcome', 'login', 'insecure-participant', 'insecure-admin', 'header-login', 'header-admin', 'header-starter',
     'exit', 'completeness', 'legacy-completeness', 'runtime', 'runtime-contract', 'version-missing', 'version-unsupported',
     'starter', 'paused', 'paused-locked', 'advisories', 'settings'
@@ -113,6 +113,8 @@ test("capture tasks cover each renderer family without duplicates or substituted
     [{name:'starter-viewports',script:'reference-original-starter-viewports.mjs',environment:{},output:'starter-viewports.json'}]);
   assert.deepEqual(originalReferenceTasks.starter.filter(task=>task.name==='starter-empty-viewports'),
     [{name:'starter-empty-viewports',script:'reference-original-starter-empty-viewports.mjs',environment:{},output:'starter-viewports.json'}]);
+  assert.deepEqual(originalReferenceTasks.starter.filter(task=>task.name==='starter-asset-viewports'),
+    [{name:'starter-asset-viewports',script:'reference-original-starter-asset-viewports.mjs',environment:{},output:'starter-asset-viewports.json'}]);
   for (const task of tasks) {
     assert.match(task.script, /^reference-original-[\w-]+\.mjs$/);
     await readFile(new URL(task.script, import.meta.url));
