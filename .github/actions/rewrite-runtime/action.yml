@@ -22,6 +22,9 @@ inputs:
   browser-system-material-sha256:
     description: Exact producer material digest for mandatory v3 verification
     default: ""
+  browser-system-before-inventory-sha256:
+    description: Optional trusted producer initial inventory digest for additional early rejection
+    default: ""
   browser-material-label:
     description: Unique caller matrix cell label for owned public diagnostics
     default: single
@@ -42,6 +45,14 @@ runs:
         node-version: 22
         cache: npm
         cache-dependency-path: rewrite-app/package-lock.json
+    - name: Reject incompatible native inventories before installing dependencies
+      if: inputs.browser-system-before-inventory-sha256 != ''
+      shell: bash
+      working-directory: rewrite-app
+      env:
+        CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256: ${{ inputs.browser-system-before-inventory-sha256 }}
+        CI_BROWSER_COHORT_DIAGNOSTIC_DIR: ${{ runner.temp }}/browser-cohort
+      run: node scripts/ci-browser-inventory-preflight.mjs
     - shell: bash
       working-directory: rewrite-app
       run: npm ci --no-audit --no-fund
@@ -95,5 +106,13 @@ runs:
       with:
         name: browser-material-${{ github.job }}-${{ inputs.browser-material-label }}-${{ github.sha }}-${{ github.run_attempt }}
         path: ${{ runner.temp }}/browser-material-*/
+        if-no-files-found: ignore
+        retention-days: 7
+    - name: Retain rejected initial package inventory
+      if: failure() && inputs.browser-system-before-inventory-sha256 != ''
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: browser-cohort-${{ github.job }}-${{ inputs.browser-material-label }}-${{ github.sha }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/browser-cohort/
         if-no-files-found: ignore
         retention-days: 7

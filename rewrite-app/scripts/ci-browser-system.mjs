@@ -253,7 +253,7 @@ export async function browserSystem(mode,root,directory){
     validateManifest(manifest,context,before,policy);
     await writeFile(join(directory,'manifest.json'),JSON.stringify(manifest)+'\n',{flag:'wx'});
     const verified=await verifyArtifact(directory,context,before,undefined,policy);
-    if(format===3&&process.env.GITHUB_OUTPUT)await appendFile(process.env.GITHUB_OUTPUT,'profile-format=3\nmaterial-sha256='+policy.materialSha256+'\n');
+    if(format===3&&process.env.GITHUB_OUTPUT)await appendFile(process.env.GITHUB_OUTPUT,'profile-format=3\nmaterial-sha256='+policy.materialSha256+'\nbefore-inventory-sha256='+sha(before)+'\n');
     console.log(JSON.stringify({ciBrowserSystem:{mode,elapsedMs:Date.now()-started,packages:packages.length,bytes:verified.bytes,...manifest.timings}}));
   }else if(mode==='restore'){
     const verified=await verifyArtifact(directory,context,before,undefined,policy);
