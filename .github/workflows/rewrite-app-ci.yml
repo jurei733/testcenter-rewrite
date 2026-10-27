@@ -384,10 +384,10 @@ jobs:
         working-directory: rewrite-app
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 8
       matrix:
         include:
-          # Longest measured journeys first; retain four slots and every scenario.
+          # Longest measured journeys first; eight isolated runners, every scenario.
           - check: activation-roster-warnings
             group: content
             command: npm run smoke:ui:activation-roster-warnings:built

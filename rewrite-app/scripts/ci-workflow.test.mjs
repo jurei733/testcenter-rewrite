@@ -345,7 +345,7 @@ test("all 28 browser scenarios run once across fast and extended shards, with co
   const shards = [...quick.strategy.matrix.include, ...extended.strategy.matrix.include];
   assert.equal(quick.strategy["fail-fast"], false);
   assert.equal(extended.strategy["fail-fast"], false);
-  assert.equal(extended.strategy["max-parallel"], 4, "Long prefix journeys must leave capacity for Postgres and the broad matrix");
+  assert.equal(extended.strategy["max-parallel"], 8, "Bound the extended group while releasing its measured four-slot tail");
   assert.deepEqual([...new Set(shards.map(item => item.group))], ["entry", "system-check", "participant", "content"]);
   assert.equal(shards.length, 28);
   assert.equal(new Set(shards.map(item => item.check)).size, shards.length);
@@ -382,7 +382,7 @@ test("the early browser set is bounded and retains real authentication, isolatio
   assert.deepEqual(workflow.jobs["quick-extended"].needs,["build","fast-feedback","browser-system-dependencies"]);
   assert.ok(!workflow.jobs["fast-feedback"].needs.includes("quick-extended"));
 });
-test("extended dispatch avoids the measured long tail without adding slots or dropping journeys", () => {
+test("extended dispatch retains the historical four-slot ordering improvement", () => {
   const recorded = JSON.parse(read("./fixtures/ci-browser-timings.json"));
   const extended = workflow.jobs["quick-extended"].strategy;
   const current = extended.matrix.include.map(item => item.check);
@@ -391,13 +391,37 @@ test("extended dispatch avoids the measured long tail without adding slots or dr
   assert.deepEqual([...recorded.previousOrder].sort(), [...current].sort());
   assert.ok(Object.values(weights).every(value => Number.isInteger(value) && value > 0));
   const duration = order => {
-    const slots = Array(extended["max-parallel"]).fill(0);
+    const slots = Array(4).fill(0); // Historical receipt used four slots, independently of today's limit.
     for (const check of order) slots[slots.indexOf(Math.min(...slots))] += weights[check];
     return Math.max(...slots);
   };
-  assert.equal(extended["max-parallel"], 4);
   assert.ok(duration(current) <= duration(recorded.previousOrder) - 300,
     "Keep at least five minutes of the recorded four-slot queue improvement; this is not an actual CI timing guarantee");
+});
+test('extended capacity covers every measured journey and reduces its isolated queue model', () => {
+  const recorded = JSON.parse(read('./fixtures/ci-extended-capacity-timings.json'));
+  const strategy = workflow.jobs['quick-extended'].strategy;
+  assert.equal(recorded.status, 'completed'); assert.equal(recorded.conclusion, 'success');
+  assert.equal(recorded.totalJobs, 89); assert.equal(recorded.successfulJobs, 89);
+  assert.equal(recorded.spanSeconds, (Date.parse(recorded.last) - Date.parse(recorded.first)) / 1000);
+  assert.ok(recorded.spanSeconds > recorded.baselineSpanSeconds, 'Retain the failed whole-pipeline speed experiment');
+  assert.equal(recorded.extendedSlots, 4);
+  const weights = new Map(recorded.extendedJobs.map(job => {
+    assert.ok(Number.isInteger(job.seconds) && job.seconds > 0);
+    assert.equal(job.seconds, (Date.parse(job.completedAt) - Date.parse(job.startedAt)) / 1000);
+    return [job.check, job.seconds];
+  }));
+  const checks = strategy.matrix.include.map(item => item.check);
+  assert.equal(weights.size, 20); assert.equal(recorded.extendedJobs.length, 20);
+  assert.deepEqual([...weights.keys()].sort(), [...checks].sort());
+  const duration = capacity => {
+    const slots = Array(capacity).fill(0);
+    for (const check of checks) slots[slots.indexOf(Math.min(...slots))] += weights.get(check);
+    return Math.max(...slots);
+  };
+  assert.equal(strategy['max-parallel'], 8);
+  assert.ok(duration(strategy['max-parallel']) <= duration(recorded.extendedSlots) - 500,
+    'Retain the measured isolated-queue benefit; a fresh complete run must establish actual makespan');
 });
 test('broad verification dispatches recorded long jobs first without changing coverage or runner limits', () => {
   const recorded = JSON.parse(read('./fixtures/ci-verification-timings.json'));
