@@ -108,7 +108,7 @@ export function expectedBrowserArtifact(consumer,producerAttempt,{format='2',pro
 }
 
 export function validateManifest(value,expected,before,policy={format:2}){
-  assert([2,3].includes(policy.format)&&value?.version===policy.format&&JSON.stringify(value.context)===JSON.stringify(expected),'Browser system workflow/lock/image mismatch');
+  assert([2,3,4].includes(policy.format)&&value?.version===policy.format&&JSON.stringify(value.context)===JSON.stringify(expected),'Browser system workflow/lock/image mismatch');
   assert(value.beforeInventory===before,'Browser system initial dpkg inventory mismatch');
   assert(/^[a-f0-9]{64}$/.test(value.fontInventorySha256??''),'Invalid native font inventory digest');
   const initial=parseInventory(value.beforeInventory),after=parseInventory(value.afterInventory);
@@ -139,6 +139,21 @@ export function validateManifest(value,expected,before,policy={format:2}){
     assert(/^[a-f0-9]{64}$/.test(policy.materialSha256??'')&&profile.materialSha256===policy.materialSha256,'Browser material producer output mismatch');
     assert(profile.material.packageInventorySha256===sha(value.afterInventory),'Browser material package inventory mismatch');
     assert(profile.material.fontCatalogSha256===value.fontInventorySha256,'Browser material font inventory mismatch');
+  }
+  if(policy.format===4){
+    assert(JSON.stringify(Object.keys(value).sort())===JSON.stringify(['version','context','beforeInventory','afterInventory','fontInventorySha256','packages','timings','nativeOracle','certificate'].sort()),'Unexpected certified browser manifest fields');
+    const certificate=policy.certificate,oracle=certificate?.nativeOracle;
+    assert(certificate&&oracle&&policy.certificateSha256===sha(JSON.stringify(certificate)),'Missing or changed trusted native certificate');
+    assert(value.certificate&&JSON.stringify(Object.keys(value.certificate).sort())===JSON.stringify(['id','sha256'])&&
+      value.certificate.id===certificate.id&&value.certificate.sha256===policy.certificateSha256,'Certified browser bundle provenance mismatch');
+    assert(JSON.stringify(value.nativeOracle)===JSON.stringify(oracle),'Certified native oracle measurement or original context changed');
+    validateManifest(oracle,oracle.context,oracle.beforeInventory,{format:3,collectorSha256:policy.collectorSha256,materialSha256:policy.materialSha256});
+    for(const key of ['imageOS','imageVersion','osSha256','platform','arch','nodeMajor','lockSha256','nativeDepsSha256','playwrightVersion','requested'])
+      assert(JSON.stringify(expected[key])===JSON.stringify(oracle.context[key]),'Certified browser runtime input mismatch');
+    assert(before===oracle.beforeInventory&&value.afterInventory===oracle.afterInventory&&value.fontInventorySha256===oracle.fontInventorySha256,'Certified browser package or font target changed');
+    const records=entries=>JSON.stringify([...entries].sort((a,b)=>a.file<b.file?-1:a.file>b.file?1:0).map(entry=>
+      Object.fromEntries(Object.entries(entry).sort(([a],[b])=>a<b?-1:a>b?1:0))));
+    assert(records(value.packages)===records(oracle.packages),'Authenticated downloads differ from qualified native archives');
   }
   return {files:[...files],bytes};
 }
@@ -198,46 +213,81 @@ async function collectRuntimeMaterial(root,expectedContext,expectedInventory,art
   return profile;
 }
 export function verifyRuntimeObservation(observed,consumer,manifest,policy){
-  validateRuntimeMaterial(observed);validateRuntimeMaterial(manifest.runtimeMaterial);
-  assert(JSON.stringify(manifest.runtimeMaterial.context)===JSON.stringify(manifest.context),'Browser material producer context mismatch');
+  validateRuntimeMaterial(observed);
+  const reference=policy.format===4?policy.certificate?.nativeOracle?.runtimeMaterial:manifest.runtimeMaterial;
+  validateRuntimeMaterial(reference);
+  if(policy.format===4){
+    validateManifest(manifest,manifest.context,manifest.beforeInventory,policy);
+    assert(JSON.stringify(manifest.context)===JSON.stringify(consumer),'Certified browser bundle context mismatch');
+  }else assert(JSON.stringify(reference.context)===JSON.stringify(manifest.context),'Browser material producer context mismatch');
   assert(JSON.stringify(observed.context)===JSON.stringify(consumer),'Observed browser material context mismatch');
-  assert(observed.materialSha256===policy.materialSha256&&observed.materialSha256===manifest.runtimeMaterial.materialSha256,'Actual browser material or Original pixels differ from producer');
-  return {producerImageVersion:manifest.context.imageVersion,consumerImageVersion:consumer.imageVersion,materialSha256:observed.materialSha256};
+  assert(observed.materialSha256===policy.materialSha256&&observed.materialSha256===reference.materialSha256,'Actual browser material or Original pixels differ from producer');
+  return {producerImageVersion:reference.context.imageVersion,consumerImageVersion:consumer.imageVersion,materialSha256:observed.materialSha256,
+    ...(policy.format===4?{oracleRunId:reference.context.runId,bundleRunId:manifest.context.runId,certificateId:policy.certificate.id}:{})};
+}
+
+
+async function downloadAuthenticatedPackages(context,before,directory,report){
+  await mkdir(directory);
+  const staging=await mkdtemp(join(dirname(directory),'browser-system-apt-')),cache=join(staging,'archives');
+  await chmod(staging,0o755); // Preserve APT's _apt download sandbox traversal.
+  await mkdir(cache,{mode:0o755});await configureApt(staging);
+  const options=authenticatedAptOptions;
+  report('apt_update');install(['apt-get',...options,'update','--error-on=any']);
+  const downloadStarted=Date.now();
+  const cacheOptions=['-o','Dir::Cache::archives='+cache,'-o','APT::Keep-Downloaded-Packages=true'];
+  report('apt_download',{requested:context.requested.length});
+  install(['apt-get',...options,...cacheOptions,'install','-y','--no-remove','--no-install-recommends','--download-only',...context.requested]);
+  const downloadMs=Date.now()-downloadStarted;
+  assert(inventory()===before,'Package download unexpectedly changed dpkg inventory');
+  const packages=[];
+  for(const file of await readdir(cache)){
+    if(['partial','lock'].includes(file))continue;
+    assert(file.endsWith('.deb'),'Unexpected downloaded package member');
+    const path=join(cache,file),bytes=await regular(path,maxBytes),sha256=sha(bytes),name=sha256+'.deb';
+    packages.push({file:name,cacheFileName:file,sha256,bytes:bytes.length,...inspectPackage(path)});
+    await writeFile(join(directory,name),bytes,{flag:'wx'});
+  }
+  return {packages,downloadMs,cacheOptions};
 }
 
 export async function browserSystem(mode,root,directory){
-  assert(['pack','restore'].includes(mode),'Expected pack or restore');
-  const format=browserSystemFormat(process.env.CI_BROWSER_SYSTEM_FORMAT);
+  assert(['pack','restore','prepare-certified','restore-certified'].includes(mode),'Expected pack or restore, or explicit certified preparation/restore');
+  const certified=mode==='prepare-certified'||mode==='restore-certified';
+  const format=certified?4:browserSystemFormat(process.env.CI_BROWSER_SYSTEM_FORMAT);
   const started=Date.now(),consumer=await nativeContext(root);
-  const artifact=mode==='restore'?expectedBrowserArtifact(consumer,process.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT,{
-    format:String(format),producerImageVersion:process.env.CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION,materialSha256:process.env.CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256})
-    :{context:consumer,policy:{format}};
+  const before=inventory();parseInventory(before);
+  let artifact;
+  if(certified){
+    const {loadCohortCertificates,chooseCohortCertificate,readCohortBindings,certifiedBrowserSelection}=await import('./ci-browser-cohort-certificates.mjs');
+    const certificate=chooseCohortCertificate(await loadCohortCertificates(root),consumer,before,await readCohortBindings(root),{requireRuntimeGraph:true});
+    const policy=certifiedBrowserSelection(certificate,consumer,{certificateId:process.env.CI_BROWSER_SYSTEM_CERTIFICATE_ID,
+      certificateSha256:process.env.CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256,producerAttempt:process.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT});
+    artifact={context:consumer,policy};
+  }else artifact=mode==='restore'?expectedBrowserArtifact(consumer,process.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT,{
+      format:String(format),producerImageVersion:process.env.CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION,materialSha256:process.env.CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256})
+      :{context:consumer,policy:{format}};
   const {context,policy}=artifact;
   if(format===3)policy.collectorSha256=sha(await readFile(join(root,'scripts/ci-browser-material-profile.mjs')));
-  const before=inventory();parseInventory(before);
   const report=(phase,values={})=>console.log(JSON.stringify({ciBrowserSystem:{mode,phase,elapsedMs:Date.now()-started,...values}}));
   report('base_verified',{inventorySha256:sha(before),imageVersion:consumer.imageVersion,producerImageVersion:context.imageVersion,format});
-  if(mode==='pack'){
-    await mkdir(directory);
-    const staging=await mkdtemp(join(dirname(directory),'browser-system-apt-')),cache=join(staging,'archives');
-    await chmod(staging,0o755); // Preserve APT's _apt download sandbox traversal.
-    await mkdir(cache,{mode:0o755});await configureApt(staging);
+  if(mode==='prepare-certified'){
+    const {packages,downloadMs}=await downloadAuthenticatedPackages(context,before,directory,report);
+    const oracle=policy.certificate.nativeOracle;
+    const manifest={version:4,context,beforeInventory:before,afterInventory:oracle.afterInventory,
+      fontInventorySha256:oracle.fontInventorySha256,packages,timings:{downloadMs},nativeOracle:oracle,
+      certificate:{id:policy.certificate.id,sha256:policy.certificateSha256}};
+    // Only authenticated downloads have occurred. The fresh initial package
+    // state must survive until the real network-isolated offline installer.
+    assert(inventory()===before,'Certified package preparation changed the initial inventory');
+    validateManifest(manifest,context,before,policy);
+    await writeFile(join(directory,'manifest.json'),JSON.stringify(manifest)+'\n',{flag:'wx'});
+    const verified=await verifyArtifact(directory,context,before,undefined,policy);
+    report('certified_prepared',{certificateId:policy.certificate.id,oracleRunId:oracle.context.runId,
+      packages:packages.length,bytes:verified.bytes,downloadMs});
+  }else if(mode==='pack'){
+    const {packages,downloadMs,cacheOptions}=await downloadAuthenticatedPackages(context,before,directory,report);
     const options=authenticatedAptOptions;
-    report('apt_update');install(['apt-get',...options,'update','--error-on=any']);
-    const downloadStarted=Date.now();
-    const cacheOptions=['-o','Dir::Cache::archives='+cache,'-o','APT::Keep-Downloaded-Packages=true'];
-    report('apt_download',{requested:context.requested.length});
-    install(['apt-get',...options,...cacheOptions,'install','-y','--no-remove','--no-install-recommends','--download-only',...context.requested]);
-    const downloadMs=Date.now()-downloadStarted;
-    assert(inventory()===before,'Package download unexpectedly changed dpkg inventory');
-    const packages=[];
-    for(const file of await readdir(cache)){
-      if(['partial','lock'].includes(file))continue;
-      assert(file.endsWith('.deb'),'Unexpected downloaded package member');
-      const path=join(cache,file),bytes=await regular(path,maxBytes),sha256=sha(bytes),name=sha256+'.deb';
-      packages.push({file:name,cacheFileName:file,sha256,bytes:bytes.length,...inspectPackage(path)});
-      await writeFile(join(directory,name),bytes,{flag:'wx'});
-    }
     // This is the ordinary native APT oracle, using the authenticated cache.
     // A fresh consumer must reproduce its exact dpkg state offline.
     const installStarted=Date.now();
@@ -255,7 +305,7 @@ export async function browserSystem(mode,root,directory){
     const verified=await verifyArtifact(directory,context,before,undefined,policy);
     if(format===3&&process.env.GITHUB_OUTPUT)await appendFile(process.env.GITHUB_OUTPUT,'profile-format=3\nmaterial-sha256='+policy.materialSha256+'\nbefore-inventory-sha256='+sha(before)+'\n');
     console.log(JSON.stringify({ciBrowserSystem:{mode,elapsedMs:Date.now()-started,packages:packages.length,bytes:verified.bytes,...manifest.timings}}));
-  }else if(mode==='restore'){
+  }else if(mode==='restore'||mode==='restore-certified'){
     const verified=await verifyArtifact(directory,context,before,undefined,policy);
     const installStarted=Date.now();
     report('offline_install',{packages:verified.paths.length,bytes:verified.bytes,
@@ -276,7 +326,7 @@ export async function browserSystem(mode,root,directory){
     assert(native('dpkg',['--audit']).trim()===''&&inventory()===verified.manifest.afterInventory,'Offline dpkg result differs from native APT');
     assert(fontDigest()===verified.manifest.fontInventorySha256,'Offline native font inventory differs from native APT');
     const offlineInstallMs=Date.now()-installStarted;let materialCaptureMs=0;
-    if(format===3){
+    if(format===3||format===4){
       const captureStarted=Date.now();
       const observed=await collectRuntimeMaterial(root,consumer,verified.manifest.afterInventory,directory);
       report('material_verified',verifyRuntimeObservation(observed,consumer,verified.manifest,policy));
