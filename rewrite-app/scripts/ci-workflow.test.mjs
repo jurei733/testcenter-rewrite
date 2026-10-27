@@ -52,7 +52,7 @@ test('dependency audit skips installation while preserving the complete locked g
  const audit=workflow.jobs.dependencies;
  assert.ok(!audit.steps.some(step=>step.uses==='./.github/actions/rewrite-runtime'||/npm (?:ci|install|update)|audit fix|--force|--omit/.test(step.run??'')));
  const setup=audit.steps.find(step=>step.uses?.startsWith('actions/setup-node@'));
- assert.equal(setup.with['node-version'],22);assert.equal(setup.with['package-manager-cache'],false);
+ assert.equal(setup.with['node-version-file'],'.node-version');assert.equal(setup.with['package-manager-cache'],false);
  const check=audit.steps.find(step=>step.run?.startsWith('npm audit '));
  assert.equal(check['working-directory'],'rewrite-app');
  assert.equal(check.run,'npm audit --package-lock-only --include=dev --include=optional --audit-level=high');
@@ -835,4 +835,16 @@ test('trusted initial inventory rejects before npm or browser downloads while re
  assert.equal(retained.with.path,'${{ runner.temp }}/browser-cohort/');assert.equal(retained.with['retention-days'],7);
  assert.ok(retained.with.name.includes('${{ inputs.browser-material-label }}'));
  assert.ok(action.runs.steps.some(step=>step.run?.includes('ci-browser-system.mjs restore')),'Early comparison cannot replace the complete offline gate');
+});
+
+
+test('all CI Node producers and consumers use one exact patch file instead of runner-cache-dependent major selection',()=>{
+ const pin=read('../../.node-version');assert.equal(pin,'22.23.4\n');assert.match(pin.trim(),/^22\.[0-9]+\.[0-9]+$/);
+ const all=[...action.runs.steps,...Object.values(workflow.jobs).flatMap(job=>job.steps??[])];
+ const setups=all.filter(step=>step.uses?.startsWith('actions/setup-node@'));
+ assert.equal(setups.length,4,'Shared runtime plus Original compilation, locked audit and container smoke owners');
+ for(const setup of setups){
+  assert.equal(setup.with['node-version-file'],'.node-version');
+  assert.equal(setup.with['node-version'],undefined,'A major range would reintroduce producer/consumer patch drift');
+ }
 });

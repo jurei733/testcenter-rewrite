@@ -200,7 +200,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: original-reference/frontend/package-lock.json
       - run: node rewrite-app/scripts/original-browser-reference.mjs verify-source original-reference
@@ -282,7 +282,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .node-version
           package-manager-cache: false
       - name: Audit the complete locked dependency graph without installation
         run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
@@ -907,7 +907,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .node-version
       - name: Build and run production image smoke
         run: |
           APP_BUILD_SHA="${GITHUB_SHA::12}" \
