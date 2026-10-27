@@ -337,6 +337,10 @@ export async function browserSystem(mode,root,directory){
   }else throw Error('Expected pack or restore');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  try{await browserSystem(process.argv[2],process.cwd(),resolve(process.env.CI_BROWSER_SYSTEM_DIR));}
-  catch(error){console.error(error.message);process.exitCode=error.exitCode??1;}
+  // Finish evaluating this reusable module before loading a certificate module
+  // that imports its validators. Top-level await here creates a module cycle.
+  void (async()=>{
+    try{await browserSystem(process.argv[2],process.cwd(),resolve(process.env.CI_BROWSER_SYSTEM_DIR));}
+    catch(error){console.error(error.message);process.exitCode=error.exitCode??1;}
+  })();
 }
