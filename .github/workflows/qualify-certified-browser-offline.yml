@@ -1,0 +1,141 @@
+name: Certified fresh offline browser installation (not full UI acceptance)
+on:
+  push:
+    branches: [codex/certified-browser-cohorts-linux-20261027]
+permissions:
+  contents: read
+jobs:
+  offline:
+    name: Fresh certified offline installation and native controls (${{ matrix.replica }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [one, two, three, four]
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .node-version
+      - name: Qualify exact Node before any dependency installation
+        run: node scripts/ci-node-runtime.mjs
+      - name: Derive the owned opposite-cohort routing counterfactual
+        id: other
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {appendFile} from 'node:fs/promises';
+          import {loadCohortCertificates,cohortDigest} from './scripts/ci-browser-cohort-certificates.mjs';
+          const records=await loadCohortCertificates(process.cwd());
+          assert.equal(records.filter(record=>record.id===process.env.ImageVersion).length,1);
+          const other=records.find(record=>record.id!==process.env.ImageVersion);assert.ok(other);
+          await appendFile(process.env.GITHUB_OUTPUT,'image='+other.id+'\nmaterial='+other.nativeOracle.runtimeMaterial.materialSha256+
+            '\nbefore='+cohortDigest(other.nativeOracle.beforeInventory)+'\n');
+          NODE
+      - name: Execute the real cross-cohort selector before npm
+        id: route
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_ALLOW_CERTIFIED: "true"
+          CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ github.run_attempt }}
+          CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION: ${{ steps.other.outputs.image }}
+          CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256: ${{ steps.other.outputs.material }}
+          CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256: ${{ steps.other.outputs.before }}
+          CI_BROWSER_COHORT_DIAGNOSTIC_DIR: ${{ runner.temp }}/cohort-rejection
+        run: node scripts/ci-browser-cohort-route.mjs
+      - name: Execute all certificate, material and routing cases without npm dependencies
+        run: node --test scripts/ci-browser-cohort-certificates.test.mjs scripts/ci-browser-certified-material.test.mjs scripts/ci-browser-cohort-route.test.mjs
+      - run: npm ci --no-audit --no-fund
+      - run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - run: npm run test:ci-policy
+      - run: node --test scripts/ci-browser-system-linux.test.mjs
+      - run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Reject changed selection and attempts before any APT preparation
+        env:
+          SELECTED_ROUTE: ${{ steps.route.outputs.route }}
+          CI_BROWSER_SYSTEM_CERTIFICATE_ID: ${{ steps.route.outputs.certificate-id }}
+          CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256: ${{ steps.route.outputs.certificate-sha256 }}
+          CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.route.outputs.producer-attempt }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {existsSync} from 'node:fs';
+          import {spawnSync} from 'node:child_process';
+          import {join} from 'node:path';
+          assert.equal(process.env.SELECTED_ROUTE,'certified');
+          for(const [name,change,pattern]of [
+            ['certificate',{CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256:'0'.repeat(64)},/selection changed or is missing/],
+            ['attempt',{CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT:'0'},/current exact attempt/]
+          ]){
+            const directory=join(process.env.RUNNER_TEMP,'rejected-'+name);
+            const child=spawnSync(process.execPath,['scripts/ci-browser-system.mjs','prepare-certified'],
+              {encoding:'utf8',timeout:30000,env:{...process.env,...change,CI_BROWSER_SYSTEM_DIR:directory}});
+            assert.equal(child.status,1,child.stderr);assert.match(child.stderr,pattern);
+            assert.ok(!child.stdout.includes('apt_update'));assert.equal(existsSync(directory),false);
+          }
+          console.log('Actual selection/attempt rejection controls passed before package preparation.');
+          NODE
+      - name: Prepare freshly authenticated archives without package installation
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/certified-browser-system
+          CI_BROWSER_SYSTEM_CERTIFICATE_ID: ${{ steps.route.outputs.certificate-id }}
+          CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256: ${{ steps.route.outputs.certificate-sha256 }}
+          CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.route.outputs.producer-attempt }}
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs prepare-certified
+      - name: Reject actual corrupted manifest and archive before any offline installation
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/certified-browser-system
+          CI_BROWSER_SYSTEM_CERTIFICATE_ID: ${{ steps.route.outputs.certificate-id }}
+          CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256: ${{ steps.route.outputs.certificate-sha256 }}
+          CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.route.outputs.producer-attempt }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFile,writeFile} from 'node:fs/promises';
+          import {spawnSync} from 'node:child_process';
+          import {join} from 'node:path';
+          import {canonicalNativeInventory} from './scripts/ci-browser-inventory-preflight.mjs';
+          const directory=process.env.CI_BROWSER_SYSTEM_DIR,path=join(directory,'manifest.json');
+          const original=await readFile(path),manifest=JSON.parse(original),before=canonicalNativeInventory();
+          assert.equal(before,manifest.beforeInventory,'Preparation must preserve the fresh pre-install package state.');
+          const reject=pattern=>{
+            const child=spawnSync(process.execPath,['scripts/ci-browser-system.mjs','restore-certified'],
+              {encoding:'utf8',timeout:30000,env:process.env});
+            assert.equal(child.status,1,child.stderr);assert.match(child.stderr,pattern);
+            assert.ok(!child.stdout.includes('offline_install'));assert.equal(canonicalNativeInventory(),before);
+          };
+          const changed=structuredClone(manifest);changed.certificate.sha256='0'.repeat(64);
+          try{await writeFile(path,JSON.stringify(changed));reject(/bundle provenance mismatch/);}
+          finally{await writeFile(path,original);}
+          const archive=join(directory,manifest.packages[0].file),bytes=await readFile(archive),corrupt=Buffer.from(bytes);
+          corrupt[0]^=1;
+          try{await writeFile(archive,corrupt);reject(/digest\/size mismatch/);}
+          finally{await writeFile(archive,bytes);}
+          console.log('Actual bundle and archive rejection controls passed with unchanged initial inventory.');
+          NODE
+      - name: Install offline on the fresh host and verify complete actual native material
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/certified-browser-system
+          CI_BROWSER_SYSTEM_CERTIFICATE_ID: ${{ steps.route.outputs.certificate-id }}
+          CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256: ${{ steps.route.outputs.certificate-sha256 }}
+          CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.route.outputs.producer-attempt }}
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore-certified
+      - name: Execute every native capture control after actual offline installation
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+      - name: Retain only owned public oracle and capture evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: certified-browser-offline-${{ matrix.replica }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/certified-browser-system/manifest.json
+            ${{ runner.temp }}/browser-material-*/
+            ${{ runner.temp }}/cohort-rejection/
+          if-no-files-found: warn
+          retention-days: 7
