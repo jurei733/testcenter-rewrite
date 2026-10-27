@@ -848,3 +848,17 @@ test('all CI Node producers and consumers use one exact patch file instead of ru
   assert.equal(setup.with['node-version'],undefined,'A major range would reintroduce producer/consumer patch drift');
  }
 });
+
+
+test('every Node setup immediately qualifies the exact executable before npm or artifact access',()=>{
+ for(const steps of [action.runs.steps,...Object.values(workflow.jobs).map(job=>job.steps??[])]){
+  for(const [index,step]of steps.entries())if(step.uses?.startsWith('actions/setup-node@')){
+   const next=steps[index+1];assert.equal(next.name,'Qualify exact Node version and executable permissions');
+   assert.ok(['node scripts/ci-node-runtime.mjs','node rewrite-app/scripts/ci-node-runtime.mjs'].includes(next.run));
+   assert.equal(next['continue-on-error'],undefined);
+  }
+ }
+ const setup=action.runs.steps.findIndex(step=>step.uses?.startsWith('actions/setup-node@'));
+ const inventory=action.runs.steps.findIndex(step=>step.run==='node scripts/ci-browser-inventory-preflight.mjs');
+ assert.ok(setup+1<inventory,'Node normalization precedes the trusted initial inventory gate');
+});

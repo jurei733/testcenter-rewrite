@@ -203,6 +203,9 @@ jobs:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: original-reference/frontend/package-lock.json
+      - name: Qualify exact Node version and executable permissions
+        working-directory: ${{ github.workspace }}
+        run: node rewrite-app/scripts/ci-node-runtime.mjs
       - run: node rewrite-app/scripts/original-browser-reference.mjs verify-source original-reference
       - run: npm ci --no-audit --no-fund
         working-directory: original-reference/frontend
@@ -284,6 +287,9 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+      - name: Qualify exact Node version and executable permissions
+        working-directory: ${{ github.workspace }}
+        run: node rewrite-app/scripts/ci-node-runtime.mjs
       - name: Audit the complete locked dependency graph without installation
         run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
         working-directory: rewrite-app
@@ -908,6 +914,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
+      - name: Qualify exact Node version and executable permissions
+        working-directory: ${{ github.workspace }}
+        run: node rewrite-app/scripts/ci-node-runtime.mjs
       - name: Build and run production image smoke
         run: |
           APP_BUILD_SHA="${GITHUB_SHA::12}" \

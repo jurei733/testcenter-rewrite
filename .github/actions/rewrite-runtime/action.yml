@@ -45,6 +45,10 @@ runs:
         node-version-file: .node-version
         cache: npm
         cache-dependency-path: rewrite-app/package-lock.json
+    - name: Qualify exact Node version and executable permissions
+      shell: bash
+      working-directory: rewrite-app
+      run: node scripts/ci-node-runtime.mjs
     - name: Reject incompatible native inventories before installing dependencies
       if: inputs.browser-system-before-inventory-sha256 != ''
       shell: bash
