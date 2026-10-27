@@ -179,3 +179,6 @@ jobs:
           path: ${{ runner.temp }}/original-captures/
           if-no-files-found: warn
           retention-days: 30
+env:
+  CI: "true"
+  FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
