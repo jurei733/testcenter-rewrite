@@ -3,9 +3,14 @@ import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 import {settleFailedSmokeRoute} from './smoke-route-failure.mjs';
 
 /** Retire only this scenario's handlers, then prove every owned callback has
- * settled. Do not wait on Playwright's global history of unrelated routes. */
+ * settled. Do not wait on Playwright's global history of unrelated routes.
+ * A never-matching guard retains the page interceptor while owned callbacks
+ * finish: removing its last pattern otherwise auto-continues held responses. */
 export function createOwnedSmokeRoutes(page, {timeout = 20_000, observe = () => {}} = {}) {
   const registrations = [], active = new Set(), failures = [];
+  const guardPattern = /(?!)/;
+  const guardHandler = () => { throw Error('The owned route guard must never match'); };
+  let guardInstalled = false;
   const snapshot = () => [...active].map(item => ({label: item.label, stage: item.stage}));
   const remove = async pattern => {
     for (const entry of [...registrations]) {
@@ -16,6 +21,9 @@ export function createOwnedSmokeRoutes(page, {timeout = 20_000, observe = () => 
   };
   return {
     async route(pattern, callback, label) {
+      if (!guardInstalled) {
+        await page.route(guardPattern, guardHandler); guardInstalled = true;
+      }
       const handler = async route => {
         let finish;
         const done = new Promise(resolve => { finish = resolve; });
@@ -34,6 +42,9 @@ export function createOwnedSmokeRoutes(page, {timeout = 20_000, observe = () => 
       await raceWithSmokeDeadline((async () => {
         await remove();
         await Promise.all([...active].map(item => item.done));
+        if (guardInstalled) {
+          await page.unroute(guardPattern, guardHandler); guardInstalled = false;
+        }
       })(), timeout, () => {
         const pending = snapshot(); observe(pending);
         throw Error('Owned smoke routes did not settle: ' + JSON.stringify(pending));
@@ -78,4 +89,24 @@ export async function qualifyOwnedSmokeRouteDrain(browser, base) {
     await raceWithSmokeDeadline(failed, 5000, () => {throw Error('Owned failed callback did not abort its request');});
     await assert.rejects(scope.drain(), error => error instanceof AggregateError && error.errors[0].message === 'Owned unexpected route failure');
   } finally {release();releaseUnrelated();await scope.drain().catch(() => {});await page.close();}
+
+  // No unrelated route may accidentally keep the page interceptor alive.
+  const onlyPage = await browser.newPage(), onlyScope = createOwnedSmokeRoutes(onlyPage, {timeout:5000});
+  let enterOnly, releaseOnly;
+  const onlyEntered = new Promise(resolve => {enterOnly=resolve;});
+  const onlyGate = new Promise(resolve => {releaseOnly=resolve;});
+  try {
+    await onlyPage.goto(base + '/app/', {waitUntil:'domcontentloaded'});
+    await onlyScope.route('**/__owned_only_route', async (route, stage) => {
+      stage('held'); enterOnly(); await onlyGate;
+      stage('fulfill'); await route.fulfill({body:'owned last response'});
+    }, 'only-owned-fixture');
+    await onlyPage.evaluate(() => {window.ownedOnlyReply=fetch('/__owned_only_route').then(response=>response.text());});
+    await raceWithSmokeDeadline(onlyEntered,5000,()=>{throw Error('The sole owned route did not enter');});
+    await onlyScope.remove();
+    assert.equal(onlyScope.snapshot().length,1,'Removing the last owned pattern must retain its held callback');
+    releaseOnly(); await onlyScope.drain();
+    assert.equal(await onlyPage.evaluate(()=>window.ownedOnlyReply),'owned last response');
+    assert.deepEqual(onlyScope.snapshot(),[]);
+  } finally {releaseOnly();await onlyScope.drain().catch(()=>{});await onlyPage.close();}
 }

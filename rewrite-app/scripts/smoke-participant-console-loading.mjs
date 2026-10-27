@@ -106,39 +106,45 @@ try {
   reportSmokePhase('loading-context');
   const loadingContext = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
   const loadingPage = await loadingContext.newPage(); page = loadingPage;
+  const loadingRoutes = createOwnedSmokeRoutes(loadingPage,{observe:pending=>reportSmokeObservation(`initial-loading:pending-owned-routes:${JSON.stringify(pending)}`)});
   const loadingRepository = createSqliteFirstSliceRepository(file);
   let releaseLoading; const loadingGate = new Promise(done => { releaseLoading = done; });
   releases.push(releaseLoading);
+  const loadingRequests = [], loadingCompletions = [], loadingViews = []; let initialRun;
   try {
     loadingPage.on("pageerror", error => errors.push(String(error)));
-    const loadingRequests = [], loadingCompletions = [], loadingViews = []; let initialRun;
     loadingPage.on("request", request => {
       const path = new URL(request.url()).pathname;
       if (path.endsWith("/native-commands")) { loadingRequests.push(request.postDataJSON()); loadingObservations.push({ request: request.postDataJSON() }); }
       if (path.endsWith("/command-completions")) loadingCompletions.push(request.postDataJSON());
     });
-    await loadingPage.route("**/current-state?*", async route => {
+    await loadingRoutes.route("**/current-state?*", async (route,stage) => {
       const view = { responseStatus: null, fulfilled: false, cancelled: false };
       loadingViews.push(view);
       try {
-        const response = await route.fetch(); view.responseStatus = response.status();
+        stage("fetch");const response = await route.fetch(); view.responseStatus = response.status();
         assert.equal(view.responseStatus, 200);
         initialRun ??= (await response.json()).currentRunState.testRun;
-        await loadingGate;
+        stage("held-current-view");await loadingGate;
         // Early Resume can cancel its older view read. Only a proven browser
         // abort of a successful held response is an expected transport outcome.
         if (loadingRequests.length === 1 && route.request().failure()?.errorText === "net::ERR_ABORTED") {
+          const outcome=await settleFailedSmokeRoute(route,Error("Owned successful loading view was cancelled"));
+          if(outcome.error)throw outcome.error;
           view.cancelled = true; return;
         }
-        await route.fulfill({ response }); view.fulfilled = true;
+        stage("fulfill");await route.fulfill({ response }); view.fulfilled = true;
       } catch (error) {
         if (view.responseStatus === 200 && loadingRequests.length === 1 &&
             route.request().failure()?.errorText === "net::ERR_ABORTED") {
+          const outcome=await settleFailedSmokeRoute(route,error);
+          if(outcome.error)routeErrors.push(outcome.error);
           view.cancelled = true; return;
         }
-        routeErrors.push(error);
+        view.failureCode=/^net::ERR_[A-Z_]+$/.test(route.request().failure()?.errorText??'')?route.request().failure().errorText:null;
+        view.fulfillFailed=true;routeErrors.push(error);
       }
-    });
+    },"initial-loading-view");
     await phaseStep("loading-page-entry",()=>loadingPage.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" }));
     reportSmokePhase("loading-sign-in");
     await loadingPage.locator("#originalLoginName").fill("loading-person");
@@ -165,7 +171,7 @@ try {
     await poll(async () => /STATUS:\s*RUNNING/.test(await loadingPane.innerText()), "Resume receipt did not advance the loading controller");
     assert.equal(await loadingPage.locator("iframe").count(), 0);
     const releasedLoadingAt = Date.now();
-    releaseLoading(); await phaseStep("loading-release-current-view-routes",()=>loadingPage.unrouteAll({ behavior: "wait" }));
+    releaseLoading(); await phaseStep("loading-release-current-view-routes",()=>loadingRoutes.drain());
     await poll(() => Promise.resolve(loadingViews.some(view => view.fulfilled)), "No current loading view was actually delivered after Resume");
     await phaseStep("loading-player-ready",()=>loadingPage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor());
     const run = await loadingRepository.getTestRunById(initialRun.testRunId);
@@ -189,9 +195,10 @@ try {
     reportConsolePhase("participant_console_loading=early-resume-observes-loading-and-persists-the-real-controller-transition:passed");
   } catch (error) {
     console.error("Initial loading fixture failure:", error.stack ?? String(error));
+    console.error(JSON.stringify({initialLoadingRoutes:{views:loadingViews.slice(-100),owned:loadingRoutes.snapshot(),nativeCommands:loadingRequests.length,completions:loadingCompletions.length}}));
     await loadingPage.screenshot({ path: join(artifacts, "loading-resume-failure.png"), fullPage: true }).catch(() => {});
     throw error;
-  } finally { reportSmokePhase("loading-context-cleanup"); releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" }).catch(() => {}); await loadingContext.close(); }
+  } finally { reportSmokePhase("loading-context-cleanup"); releaseLoading(); await loadingRoutes.drain().catch(() => {}); await loadingContext.close(); }
   // An application receipt changes the controller before a following full
   // view arrives. Holding that view must not block the next accepted command.
   const remoteIdentity = await api(productionApiRoutes.participant.signIn, {tenantKey:"demo-tenant",workspaceKey,loginKey:"remote-person"});
