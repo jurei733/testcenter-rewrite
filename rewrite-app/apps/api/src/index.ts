@@ -1484,7 +1484,11 @@ const sendCsv = (
   endResponse(response, text);
 };
 
-const buildAttachmentContentDisposition = (filename: string, preserveWhitespace = false): string => {
+const buildAttachmentContentDisposition = (
+  filename: string,
+  preserveWhitespace = false,
+  disposition: "attachment" | "inline" = "attachment"
+): string => {
   const safeFileName = basename(filename).replace(/[\u0000-\u001f\u007f/\\]/g, "_");
   const normalizedFileName = (preserveWhitespace ? safeFileName : safeFileName.trim()) || "download";
   const asciiFallback = normalizedFileName
@@ -1495,7 +1499,7 @@ const buildAttachmentContentDisposition = (filename: string, preserveWhitespace 
     /['()*]/g,
     character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
   );
-  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFileName}`;
+  return `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encodedFileName}`;
 };
 
 const sendAsset = (
@@ -5116,7 +5120,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           Buffer.from(applicationAsset.dataBase64, "base64"),
           {
             "cache-control": "public, max-age=300",
-            "content-disposition": `inline; filename="${applicationAsset.originalName.replace(/["\\\r\n]/g, "_")}"`
+            "content-disposition": buildAttachmentContentDisposition(
+              applicationAsset.originalName, false, "inline"
+            )
           }
         );
         return;
