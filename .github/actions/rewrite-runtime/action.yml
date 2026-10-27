@@ -42,7 +42,7 @@ runs:
       run: bash rewrite-app/scripts/ci-browser-cohort.sh check
     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
-        node-version: 22
+        node-version-file: .node-version
         cache: npm
         cache-dependency-path: rewrite-app/package-lock.json
     - name: Reject incompatible native inventories before installing dependencies
