@@ -1,0 +1,122 @@
+name: Initial inventory preflight qualification (not UI acceptance)
+on:
+  push:
+    branches: [codex/browser-inventory-preflight-linux-20261027]
+permissions:
+  contents: read
+jobs:
+  producer:
+    name: Native authenticated oracle and complete policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      before-sha256: ${{ steps.packages.outputs.before-inventory-sha256 }}
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - run: npm run test:ci-policy
+      - run: node --test scripts/ci-browser-system-linux.test.mjs
+      - run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Authenticate native APT and capture actual material
+        id: packages
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/native-browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: initial-inventory-producer-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-browser-system/manifest.json
+            ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: error
+          retention-days: 7
+  probes:
+    name: Dependency-free native guard and rejection controls (${{ matrix.replica }})
+    needs: producer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [one, two, three, four]
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+      - name: Execute real preflight tests before any npm installation
+        run: node --test scripts/ci-browser-inventory-preflight.test.mjs
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: initial-inventory-producer-${{ github.sha }}
+          path: ${{ runner.temp }}/producer-evidence
+          digest-mismatch: error
+      - name: Verify actual native baseline and mandatory rejection through the real CLI
+        env:
+          EXPECTED_BEFORE_SHA256: ${{ needs.producer.outputs.before-sha256 }}
+          PROBE_ROOT: ${{ runner.temp }}/inventory-probe
+          PRODUCER_MANIFEST: ${{ runner.temp }}/producer-evidence/native-browser-system/manifest.json
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          import {spawnSync} from 'node:child_process';
+          import {mkdir,readFile,writeFile} from 'node:fs/promises';
+          import {join} from 'node:path';
+          import {canonicalNativeInventory} from './scripts/ci-browser-inventory-preflight.mjs';
+          import {parseInventory} from './scripts/ci-browser-system.mjs';
+          const digest=value=>createHash('sha256').update(value).digest('hex');
+          const {EXPECTED_BEFORE_SHA256:expected,PROBE_ROOT:root,PRODUCER_MANIFEST:path}=process.env;
+          assert.equal(expected.length,64);assert.match(expected,/^[a-f0-9]{64}$/);
+          const producer=JSON.parse(await readFile(path,'utf8'));
+          assert.equal(producer.version,3);assert.equal(producer.context.commit,process.env.GITHUB_SHA);
+          assert.equal(producer.context.runId,process.env.GITHUB_RUN_ID);
+          assert.equal(digest(producer.beforeInventory),expected);
+          const actual=canonicalNativeInventory(),actualHash=digest(actual);
+          const baseline=parseInventory(producer.beforeInventory),observed=parseInventory(actual);
+          const changes=[...new Set([...baseline.keys(),...observed.keys()])].sort()
+            .filter(key=>baseline.get(key)?.row!==observed.get(key)?.row)
+            .map(key=>({key,before:baseline.get(key)??null,after:observed.get(key)??null}));
+          await mkdir(root,{recursive:true});
+          const run=(hash,name)=>spawnSync(process.execPath,['scripts/ci-browser-inventory-preflight.mjs'],
+            {encoding:'utf8',env:{...process.env,CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256:hash,
+              CI_BROWSER_COHORT_DIAGNOSTIC_DIR:join(root,name)}});
+          const native=run(expected,'actual');
+          assert.equal(native.status,actualHash===expected?0:1,native.stderr);
+          if(actualHash!==expected){
+            assert.match(native.stderr,/mismatch before dependency installation/);
+            assert.equal(await readFile(join(root,'actual','observed-inventory.tsv'),'utf8'),actual);
+          }
+          const counterfactual=(actualHash[0]==='0'?'1':'0')+actualHash.slice(1);
+          const rejected=run(counterfactual,'counterfactual');assert.equal(rejected.status,1);
+          assert.match(rejected.stderr,/mismatch before dependency installation/);
+          const invalid=run('$(echo owned)','invalid');assert.equal(invalid.status,1);
+          assert.match(invalid.stderr,/invalid producer initial inventory digest/);
+          assert.ok(!invalid.stderr.includes('$(echo owned)'));
+          const result={scope:'Native guard conformance and diagnostics only; an actual mismatch still rejects production CI',
+            imageVersion:process.env.ImageVersion,producerImageVersion:producer.context.imageVersion,
+            expected,actual:actualHash,nativeStatus:native.status,matching:actualHash===expected,
+            counterfactualRejected:true,invalidMetadataRejected:true,changedPackageCount:changes.length,changes};
+          await writeFile(join(root,'cohort-observation.json'),JSON.stringify(result,null,2)+'\n');
+          console.log(JSON.stringify({...result,changes:changes.slice(0,12)}));
+          NODE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: initial-inventory-probe-${{ matrix.replica }}-${{ github.sha }}
+          path: ${{ runner.temp }}/inventory-probe/
+          if-no-files-found: error
+          retention-days: 7
