@@ -1,0 +1,186 @@
+name: Native crash readiness and owned restore controls (not full acceptance)
+on:
+  push:
+    branches:
+      - codex/native-crash-readiness-linux-20261027
+permissions:
+  contents: read
+jobs:
+  build:
+    outputs:
+      attempt: ${{ github.run_attempt }}
+    name: Shared production build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Locked dependency audit
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - name: Every CI failure, timeout and provenance policy
+        run: npm run test:ci-policy
+      - run: npm run build
+      - name: Package commit-bound production outputs
+        env:
+          CI_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-build
+        run: node scripts/ci-build-artifact.mjs pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rewrite-build-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rewrite-build/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+  browser-system-dependencies:
+    outputs:
+      attempt: ${{ github.run_attempt }}
+      image-version: ${{ steps.cohort.outputs.image-version }}
+      profile-format: ${{ steps.packages.outputs.profile-format }}
+      material-sha256: ${{ steps.packages.outputs.material-sha256 }}
+      before-inventory-sha256: ${{ steps.packages.outputs.before-inventory-sha256 }}
+    name: Authenticated browser system packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Record exact browser producer image
+        id: cohort
+        run: bash scripts/ci-browser-cohort.sh record
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Qualify native Debian archive inspection without installation
+        run: node --test scripts/ci-browser-system-linux.test.mjs
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
+      - name: Download locked Chromium for native material producer
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Capture authenticated packages and native APT result
+        id: packages
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-system-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-system/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Retain owned runtime material diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-material-${{ github.job }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: ignore
+          retention-days: 7
+  native-crash:
+    needs:
+      - build
+      - browser-system-dependencies
+    name: Actual complete native route and tabs (${{ matrix.check }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: rewrite-app
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: ui-participant-native-routes
+            command: npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
+            playwright: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          build-attempt: ${{ needs.build.outputs.attempt }}
+          playwright: ${{ matrix.playwright && 'true' || 'false' }}
+          browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
+          browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
+          browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
+          browser-material-label: ${{ strategy.job-index }}
+      - name: Run ${{ matrix.check }}
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
+          UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT: ${{ runner.temp }}/controller-timer-diagnostics
+        run: ${{ matrix.command }}
+      - name: Retain the exact failing browser document
+        if: (failure() || cancelled()) && matrix.playwright
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ui-failure-${{ matrix.check }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/failure.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/failure.png
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Retain failed console loading evidence
+        if: (failure() || cancelled()) && matrix.check == 'ui-participant-console'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: participant-console-loading-evidence-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.png
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Retain failed console debug evidence
+        if: failure() && matrix.check == 'ui-console-debug'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: participant-console-debug-evidence-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.png
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Retain scoped native tab failure evidence
+        if: (failure() || cancelled()) && matrix.check == 'ui-participant-native-routes'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: participant-native-tabs-evidence-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rewrite-ui-artifacts/participant-native-tabs/public-failure.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Retain failed controller timer diagnostics
+        if: (failure() || cancelled()) && matrix.check == 'ui-controller-timer'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: controller-timer-diagnostics-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/controller-timer-diagnostics/**/failure.json
+            ${{ runner.temp }}/controller-timer-diagnostics/**/api.log
+            ${{ runner.temp }}/controller-timer-diagnostics/**/supervision.json
+            ${{ runner.temp }}/controller-timer-diagnostics/**/worker-reference.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Retain Original sample transport diagnostics
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: original-sample-${{ matrix.check }}-diagnostics-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.png
+          if-no-files-found: warn
+          retention-days: 7
