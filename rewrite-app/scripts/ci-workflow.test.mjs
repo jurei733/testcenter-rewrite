@@ -66,7 +66,7 @@ test('every actual browser consumer waits for the authenticated same-run package
  assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','quick','quick-extended','verify-long-ui','verify-memory-sqlite','verify-postgres-ui'].sort());
  for(const [name,job]of consumers)assert.ok(job.needs.includes('browser-system-dependencies'),name);
  const download=action.runs.steps.find(step=>step.name==='Restore authenticated same-run browser system packages');
- assert.equal(download.if,"inputs.playwright == 'true'");assert.equal(download.with.name,'browser-system-${{ github.sha }}-${{ inputs.browser-system-attempt }}');
+ assert.equal(download.if,"inputs.playwright == 'true' && steps.browser-route.outputs.route != 'certified'");assert.equal(download.with.name,'browser-system-${{ github.sha }}-${{ inputs.browser-system-attempt }}');
  assert.equal(download.with['digest-mismatch'],'error');assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
  const restore=action.runs.steps.find(step=>step.name==='Verify and install browser system packages offline');
  assert.equal(restore.if,download.if);assert.equal(restore.env.CI_BROWSER_SYSTEM_DIR,download.with.path);
@@ -156,10 +156,10 @@ test('the actual browser restore and Chromium commands preserve every nonzero ch
  const directory=mkdtempSync(join(tmpdir(),'owned-offline-browser-status-'));
  try{
   writeFileSync(join(directory,'timeout'),'#!/bin/sh\n[ "$1" = --signal=TERM ] && [ "$2" = --kill-after=15s ] && [ "$3" = 5m ] || exit 65\nshift 3\nexec "$@"\n');
-  writeFileSync(join(directory,'node'),'#!/bin/sh\n[ "$#" = 2 ] && [ "$1" = scripts/ci-browser-system.mjs ] && [ "$2" = restore ] || exit 65\n[ "$CI_BROWSER_SYSTEM_DIR" = "$OWNED_PACKAGE_DIRECTORY" ] || exit 66\nexit "$OWNED_STATUS"\n');
+  writeFileSync(join(directory,'node'),'#!/bin/sh\n[ "$#" = 2 ] && [ "$1" = scripts/ci-browser-system.mjs ] || exit 65\ncase "$2" in restore|prepare-certified|restore-certified) ;; *) exit 65 ;; esac\n[ "$CI_BROWSER_SYSTEM_DIR" = "$OWNED_PACKAGE_DIRECTORY" ] || exit 66\nexit "$OWNED_STATUS"\n');
   writeFileSync(join(directory,'npx'),'#!/bin/sh\n[ "$#" = 4 ] && [ "$1" = --no-install ] && [ "$2" = playwright ] && [ "$3" = install ] && [ "$4" = chromium ] || exit 65\nexit "$OWNED_STATUS"\n');
   for(const name of ['timeout','node','npx'])chmodSync(join(directory,name),0o755);
-  const scripts=action.runs.steps.filter(step=>step.run?.startsWith('timeout '));assert.equal(scripts.length,3);
+  const scripts=action.runs.steps.filter(step=>step.run?.startsWith('timeout '));assert.equal(scripts.length,5);
   for(const step of scripts)for(const status of [0,37,51,100]){
    const result=spawnSync('bash',['--noprofile','--norc','-e','-o','pipefail','-c',step.run],{encoding:'utf8',
     env:{...process.env,PATH:directory+':'+process.env.PATH,CI_BROWSER_SYSTEM_DIR:directory,OWNED_PACKAGE_DIRECTORY:directory,OWNED_STATUS:String(status)}});
@@ -798,6 +798,7 @@ test('all v3 consumers use exact immutable producer format and digest and cannot
   assert.equal(step.with['browser-system-profile-format'],'${{ needs.browser-system-dependencies.outputs.profile-format }}',name);
   assert.equal(step.with['browser-system-material-sha256'],'${{ needs.browser-system-dependencies.outputs.material-sha256 }}',name);
   assert.equal(step.with['browser-system-before-inventory-sha256'],'${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}',name);
+  assert.equal(step.with['browser-system-certified-cohorts'],'true',name);
   assert.equal(step.with['browser-material-label'],'${{ strategy.job-index }}',name);
  }
  const qualification=workflow.jobs['browser-system-qualification'];
@@ -822,7 +823,7 @@ test('trusted initial inventory rejects before npm or browser downloads while re
  const install=action.runs.steps.findIndex(step=>step.run==='npm ci --no-audit --no-fund');
  assert.ok(setup<preflight&&preflight<install);
  const step=action.runs.steps[preflight];
- assert.equal(step.if,"inputs.browser-system-before-inventory-sha256 != ''");
+ assert.equal(step.if,"inputs.browser-system-before-inventory-sha256 != '' && inputs.browser-system-certified-cohorts != 'true'");
  assert.equal(step.env.CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256,'${{ inputs.browser-system-before-inventory-sha256 }}');
  assert.equal(step.env.CI_BROWSER_COHORT_DIAGNOSTIC_DIR,'${{ runner.temp }}/browser-cohort');
  assert.equal(action.inputs['browser-system-before-inventory-sha256'].default,'','Earlier wrappers retain complete offline verification');
@@ -861,4 +862,54 @@ test('every Node setup immediately qualifies the exact executable before npm or 
  const setup=action.runs.steps.findIndex(step=>step.uses?.startsWith('actions/setup-node@'));
  const inventory=action.runs.steps.findIndex(step=>step.run==='node scripts/ci-browser-inventory-preflight.mjs');
  assert.ok(setup+1<inventory,'Node normalization precedes the trusted initial inventory gate');
+});
+
+
+test('certified routing is explicit before npm and preserves same-run authentication and native failure behavior',()=>{
+ assert.equal(action.inputs['browser-system-certified-cohorts'].default,'false');
+ const route=action.runs.steps.find(step=>step.id==='browser-route');
+ assert.equal(route.if,"inputs.browser-system-certified-cohorts == 'true'");
+ assert.equal(route.run,'node scripts/ci-browser-cohort-route.mjs');
+ assert.ok(action.runs.steps.indexOf(route)<action.runs.steps.findIndex(step=>step.run==='npm ci --no-audit --no-fund'));
+ for(const [env,input]of [['CI_BROWSER_SYSTEM_FORMAT','browser-system-profile-format'],['CI_BROWSER_SYSTEM_ALLOW_CERTIFIED','browser-system-certified-cohorts'],
+  ['CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT','browser-system-attempt'],['CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION','browser-system-image-version'],
+  ['CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256','browser-system-material-sha256'],['CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256','browser-system-before-inventory-sha256']])
+   assert.equal(route.env[env],'${{ inputs.'+input+' }}');
+ for(const field of ['browser-install-route','browser-certificate-id','browser-certificate-sha256','browser-producer-attempt'])assert.ok(action.outputs[field].value.includes('steps.browser-route.outputs.'));
+});
+test('each browser route has exactly one archive source and one real offline installer without catch-and-retry',()=>{
+ const selected=name=>action.runs.steps.find(step=>step.name===name);
+ const global=selected('Restore authenticated same-run browser system packages');
+ const prepare=selected('Prepare exact qualified native archives without package installation');
+ const ordinary=selected('Verify and install browser system packages offline');
+ const certified=selected('Install exact certified archives offline and verify actual material');
+ for(const step of [global,ordinary])assert.equal(step.if,"inputs.playwright == 'true' && steps.browser-route.outputs.route != 'certified'");
+ for(const step of [prepare,certified])assert.equal(step.if,"inputs.playwright == 'true' && steps.browser-route.outputs.route == 'certified'");
+ assert.equal(global.with['digest-mismatch'],'error');
+ assert.match(prepare.run,/ci-browser-system\.mjs prepare-certified$/);assert.match(certified.run,/ci-browser-system\.mjs restore-certified$/);
+ assert.ok(action.runs.steps.indexOf(prepare)<action.runs.steps.indexOf(certified));
+ for(const step of [prepare,certified]){
+  assert.equal(step['continue-on-error'],undefined);
+  assert.equal(step.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT,'${{ steps.browser-route.outputs.producer-attempt }}');
+  assert.equal(step.env.CI_BROWSER_SYSTEM_CERTIFICATE_ID,'${{ steps.browser-route.outputs.certificate-id }}');
+  assert.equal(step.env.CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256,'${{ steps.browser-route.outputs.certificate-sha256 }}');
+ }
+});
+test('direct offline qualification retains fresh certified installation and every native capture control',()=>{
+ const job=workflow.jobs['browser-system-qualification'],runtime=job.steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
+ assert.equal(runtime.id,'runtime');assert.equal(runtime.with['browser-system-certified-cohorts'],'true');
+ assert.equal(runtime.with['browser-system-attempt'],'${{ needs.browser-system-dependencies.outputs.attempt }}');
+ const prepare=job.steps.find(step=>step.run?.endsWith('ci-browser-system.mjs prepare-certified'));
+ const installed=job.steps.find(step=>step.run?.endsWith('ci-browser-system.mjs restore-certified'));
+ const ordinary=job.steps.find(step=>step.run?.endsWith('ci-browser-system.mjs restore'));
+ const capture=job.steps.find(step=>step.run==='xvfb-run --auto-servernum npm run test:browser-capture:built');
+ assert.equal(prepare.if,"steps.runtime.outputs.browser-install-route == 'certified'");
+ assert.equal(installed.if,prepare.if);assert.equal(ordinary.if,"steps.runtime.outputs.browser-install-route != 'certified'");
+ assert.ok(job.steps.indexOf(prepare)<job.steps.indexOf(installed)&&job.steps.indexOf(installed)<job.steps.indexOf(capture));
+ for(const step of [prepare,installed]){
+  assert.equal(step.env.CI_BROWSER_SYSTEM_CERTIFICATE_ID,'${{ steps.runtime.outputs.browser-certificate-id }}');
+  assert.equal(step.env.CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256,'${{ steps.runtime.outputs.browser-certificate-sha256 }}');
+  assert.equal(step.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT,'${{ steps.runtime.outputs.browser-producer-attempt }}');
+ }
+ assert.equal(capture.if,undefined,'No cohort can skip the native capture controls');
 });

@@ -25,9 +25,25 @@ inputs:
   browser-system-before-inventory-sha256:
     description: Optional trusted producer initial inventory digest for additional early rejection
     default: ""
+  browser-system-certified-cohorts:
+    description: Explicitly permit exact independently qualified local archives for a different known initial cohort
+    default: "false"
   browser-material-label:
     description: Unique caller matrix cell label for owned public diagnostics
     default: single
+outputs:
+  browser-install-route:
+    description: Explicit same-run or certified route selected before npm installation
+    value: ${{ steps.browser-route.outputs.route }}
+  browser-certificate-id:
+    description: Qualified local native oracle identifier
+    value: ${{ steps.browser-route.outputs.certificate-id }}
+  browser-certificate-sha256:
+    description: Exact selected native certificate digest
+    value: ${{ steps.browser-route.outputs.certificate-sha256 }}
+  browser-producer-attempt:
+    description: Exact original global attempt or current local preparation attempt
+    value: ${{ steps.browser-route.outputs.producer-attempt }}
 runs:
   using: composite
   steps:
@@ -50,18 +66,32 @@ runs:
       working-directory: rewrite-app
       run: node scripts/ci-node-runtime.mjs
     - name: Reject incompatible native inventories before installing dependencies
-      if: inputs.browser-system-before-inventory-sha256 != ''
+      if: inputs.browser-system-before-inventory-sha256 != '' && inputs.browser-system-certified-cohorts != 'true'
       shell: bash
       working-directory: rewrite-app
       env:
         CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256: ${{ inputs.browser-system-before-inventory-sha256 }}
         CI_BROWSER_COHORT_DIAGNOSTIC_DIR: ${{ runner.temp }}/browser-cohort
       run: node scripts/ci-browser-inventory-preflight.mjs
+    - name: Select an explicit independently qualified browser installation route
+      id: browser-route
+      if: inputs.browser-system-certified-cohorts == 'true'
+      shell: bash
+      working-directory: rewrite-app
+      env:
+        CI_BROWSER_SYSTEM_FORMAT: ${{ inputs.browser-system-profile-format }}
+        CI_BROWSER_SYSTEM_ALLOW_CERTIFIED: ${{ inputs.browser-system-certified-cohorts }}
+        CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ inputs.browser-system-attempt }}
+        CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION: ${{ inputs.browser-system-image-version }}
+        CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256: ${{ inputs.browser-system-material-sha256 }}
+        CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256: ${{ inputs.browser-system-before-inventory-sha256 }}
+        CI_BROWSER_COHORT_DIAGNOSTIC_DIR: ${{ runner.temp }}/browser-cohort
+      run: node scripts/ci-browser-cohort-route.mjs
     - shell: bash
       working-directory: rewrite-app
       run: npm ci --no-audit --no-fund
     - name: Restore authenticated same-run browser system packages
-      if: inputs.playwright == 'true'
+      if: inputs.playwright == 'true' && steps.browser-route.outputs.route != 'certified'
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
       with:
         digest-mismatch: error
@@ -77,8 +107,18 @@ runs:
       shell: bash
       working-directory: rewrite-app
       run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+    - name: Prepare exact qualified native archives without package installation
+      if: inputs.playwright == 'true' && steps.browser-route.outputs.route == 'certified'
+      shell: bash
+      working-directory: rewrite-app
+      env:
+        CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+        CI_BROWSER_SYSTEM_CERTIFICATE_ID: ${{ steps.browser-route.outputs.certificate-id }}
+        CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256: ${{ steps.browser-route.outputs.certificate-sha256 }}
+        CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.browser-route.outputs.producer-attempt }}
+      run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs prepare-certified
     - name: Verify and install browser system packages offline
-      if: inputs.playwright == 'true'
+      if: inputs.playwright == 'true' && steps.browser-route.outputs.route != 'certified'
       shell: bash
       working-directory: rewrite-app
       env:
@@ -88,6 +128,16 @@ runs:
         CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION: ${{ inputs.browser-system-image-version }}
         CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256: ${{ inputs.browser-system-material-sha256 }}
       run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore
+    - name: Install exact certified archives offline and verify actual material
+      if: inputs.playwright == 'true' && steps.browser-route.outputs.route == 'certified'
+      shell: bash
+      working-directory: rewrite-app
+      env:
+        CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+        CI_BROWSER_SYSTEM_CERTIFICATE_ID: ${{ steps.browser-route.outputs.certificate-id }}
+        CI_BROWSER_SYSTEM_EXPECTED_CERTIFICATE_SHA256: ${{ steps.browser-route.outputs.certificate-sha256 }}
+        CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ steps.browser-route.outputs.producer-attempt }}
+      run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore-certified
     - if: inputs.playwright == 'true' && inputs.browser-system-profile-format == '2'
       shell: bash
       working-directory: rewrite-app
