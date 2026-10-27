@@ -10,6 +10,7 @@ import {originalBrowserSource,verifyOriginalBuild} from './original-browser-refe
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 import {captureStableViewport} from './stable-viewport-capture.mjs';
 import {compareScreenshots} from './exact-rgba-comparison.mjs';
+import {waitForStarterScrollReadiness} from './starter-scroll-ready.mjs';
 
 // Unchanged Source frontend with owned UI DTOs; real protected candidate API.
 // These images are not evidence of Source backend authentication.
@@ -184,20 +185,12 @@ try {
           if(phase==='initial')await page.mouse.move(0,0);
           await page.evaluate(()=>document.fonts.ready);
           await page.waitForFunction(()=>[...document.images].every(image=>image.complete&&image.naturalWidth>0));
-          // The Original first observes its sentinel before asynchronous claims
-          // render. Await its actual visibility-driven UI update, not just the
-          // card layout: a stale initial callback can outlive three PNG frames.
-          const sentinelIntersecting=await starter.locator('.sentinel').evaluate(element=>new Promise(done=>{
-            const observer=new IntersectionObserver(([entry])=>{observer.disconnect();done(entry.isIntersecting);});
-            observer.observe(element);
-          }));
-          await page.waitForFunction(({selector,visible})=>
-            !!document.querySelector(selector+' .scroll-button')===visible,
-            {selector:source?'tc-starter':'#originalParticipantStarter',visible:!sentinelIntersecting});
-          await page.waitForFunction(()=>!document.querySelector('.mat-ripple-element:not(.mat-radio-persistent-ripple)')&&
-            document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity)
-              .every(animation=>!animation.pending&&(animation.playState==='finished'||animation.playState==='idle')));
-          await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+          const requiredImages=[['starterCompanion','companion-image'],['starterCardDone','done-image']].map(([slot,className])=>({className,
+            url:expected[slot]?(source?sourceBase+'/fs/owned-starter-assets/'+encodeURIComponent(expected[slot]):base+'/api/v1/system/application-assets?originalName='+encodeURIComponent(expected[slot])):
+              new URL('assets/images/'+defaultImages[slot],source?sourceBase+'/':base+'/app/').href}));
+          await page.waitForFunction(({selector,images})=>images.every(({className,url})=>{
+            const image=document.querySelector(selector+' img.'+className);return image?.currentSrc===url&&image.complete&&image.naturalWidth>0;
+          }),{selector:source?'tc-starter':'#originalParticipantStarter',images:requiredImages});
           const images=await starter.locator('img.companion-image, img.done-image').evaluateAll(images=>images.map(image=>({className:image.className,src:image.currentSrc,width:image.naturalWidth,height:image.naturalHeight})));
           assert.equal(images.length,2,'Companion and the locked-card decoration must both render.');
           for(const [slot,className]of [['starterCompanion','companion-image'],['starterCardDone','done-image']]) {
@@ -211,8 +204,19 @@ try {
             }
           }
           imageFacts.push({key,kind,expected,images});
+          let scrollReady;
+          try{scrollReady=await waitForStarterScrollReadiness(page,source?'tc-starter':'#originalParticipantStarter');}
+          catch(error){
+            await writeFile(join(artifacts,key+'-'+kind+'-scroll-readiness-failure.json'),JSON.stringify({key,kind,evidence:error.starterScrollEvidence??null},null,2)).catch(()=>{});
+            throw error;
+          }
+          const sentinelIntersecting=scrollReady.sentinelIntersecting;
+          await page.waitForFunction(()=>!document.querySelector('.mat-ripple-element:not(.mat-radio-persistent-ripple)')&&
+            document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity)
+              .every(animation=>!animation.pending&&(animation.playState==='finished'||animation.playState==='idle')));
+          await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
           const result=await captureStableViewport(page,measure,join(artifacts,key+'-'+phase+'-'+kind+'.png'));
-          diagnostics.push({key,phase,kind,readiness:{sentinelIntersecting},geometry:result.geometry,paint:result.paintDiagnostics});
+          diagnostics.push({key,phase,kind,readiness:{sentinelIntersecting,scrollReady},geometry:result.geometry,paint:result.paintDiagnostics});
           if(kind==='source')captures[phase]=result.bytes;
           else if(kind==='rewrite')comparisons[key+'-'+phase]=await compareScreenshots(page,captures[phase],result.bytes);
           else referenceReproducibility[key+'-'+phase]=await compareScreenshots(page,captures[phase],result.bytes);

@@ -12,6 +12,24 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+test('optional package/browser cache segments are bounded at every actual owner without weakening qualification',()=>{
+ const users=[...Object.values(workflow.jobs).flatMap(job=>job.steps??[]),...action.runs.steps]
+  .filter(step=>/^actions\/(setup-node|cache)@/.test(step.uses??''));
+ assert.equal(users.length,7);
+ for(const step of users){
+  assert.deepEqual(step.env,{SEGMENT_DOWNLOAD_TIMEOUT_MINS:'1'});
+  assert.equal(step['continue-on-error'],undefined);
+  if(step.uses.startsWith('actions/setup-node@'))assert.equal(step.with['node-version-file'],'.node-version');
+ }
+ assert.ok(scripts['test:browser-capture:built'].split(/\s+/).includes('scripts/starter-scroll-ready.test.mjs'));
+ const driver=read('./reference-original-starter-asset-viewports.mjs');
+ assert.ok(driver.includes('waitForStarterScrollReadiness(page,'));
+ assert.ok(driver.indexOf('imageFacts.push')<driver.indexOf('scrollReady=await waitForStarterScrollReadiness'));
+ const consoleDriver=read('./smoke-participant-console-loading.mjs');
+ assert.ok(consoleDriver.includes('loadingRoutes.route("**/current-state?*"'));
+ assert.ok(consoleDriver.includes('"loading-release-current-view-routes",()=>loadingRoutes.drain()'));
+ assert.ok(!consoleDriver.includes('loadingPage.unrouteAll('));
+});
 test('manual service feedback retains full selected suites, a fresh core build and the full security gate',()=>{
  const focused=parse(read('../../.github/workflows/rewrite-service-focus.yml'));
  assert.deepEqual(Object.keys(focused.on).sort(),['workflow_call','workflow_dispatch']);
@@ -672,7 +690,7 @@ test("paired reference families require real browser paint and layout negative c
   assert.equal(control.if, "matrix.family == 'administration' || matrix.family == 'directory' || matrix.family == 'entry' || matrix.family == 'starter'");
   assert.equal(control.run, "xvfb-run --auto-servernum npm run test:browser-capture:built");
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
-  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs scripts/exit-completeness-diagnostics.test.mjs scripts/ci-browser-material-capture.test.mjs");
+  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs scripts/exit-completeness-diagnostics.test.mjs scripts/ci-browser-material-capture.test.mjs scripts/starter-scroll-ready.test.mjs");
 });
 test("isolated console shards retain each of the eight prior checks without a long serial prefix", () => {
   const names=["ui-controller-timer","ui-console-debug","ui-participant-console","ui-participant-command-completion","ui-participant-native-routes"];
