@@ -1,3 +1,4 @@
+import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
 import {lockOriginalTest} from './original-test-lock.js';
 import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import {appendOriginalTestLogs} from './original-test-log.js';
@@ -1716,6 +1717,9 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
       PRIMARY KEY(test_run_id,unit_name),FOREIGN KEY(test_run_id) REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
       FOREIGN KEY(participant_session_id) REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE);`
   }
+  ,{version: 70, name: "original_operational_login_credentials",
+    sql: `ALTER TABLE operational_login_migration_candidates ADD COLUMN native_logins_json JSONB NOT NULL DEFAULT '[]';`
+  }
 ];
 
 export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
@@ -3415,21 +3419,28 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async replaceOperationalLoginMigrationCandidatesByWorkspace(
       tenantId,
       workspaceId,
-      candidates
+      candidates,
+      nativeLogins = []
     ) {
+      const privateLogins = prepareOriginalOperationalLogins(candidates, nativeLogins);
       return withAssetWrite(async client=>{
+        if(privateLogins.length && !(await client.query('SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE',[tenantId,workspaceId])).rowCount)throw new Error('Native operational workspace no longer exists.');
         const assets=await assetNames(client);
         for(const candidate of candidates)validateApplicationAssetReferences(candidate.assetAssignments,assets);
       await client.query(
         `INSERT INTO operational_login_migration_candidates (
-          tenant_id, workspace_id, candidates_json, updated_at
-        ) VALUES ($1, $2, $3::jsonb, $4)
+          tenant_id, workspace_id, candidates_json, updated_at, native_logins_json
+        ) VALUES ($1, $2, $3::jsonb, $4, $5::jsonb)
         ON CONFLICT (tenant_id, workspace_id) DO UPDATE SET
           candidates_json = EXCLUDED.candidates_json,
-          updated_at = EXCLUDED.updated_at`,
-        [tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString()]
+          updated_at = EXCLUDED.updated_at, native_logins_json = EXCLUDED.native_logins_json`,
+        [tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString(), JSON.stringify(privateLogins)]
       );
       });
+    },
+    async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
+      const result = await pool.query<{native_logins_json: import('@testcenter-rewrite-app/application').OriginalOperationalLogin[]}>('SELECT native_logins_json FROM operational_login_migration_candidates WHERE tenant_id=$1 AND workspace_id=$2', [tenantId,workspaceId]);
+      return result.rows[0]?.native_logins_json ?? [];
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
       const result = await pool.query<{ password_hash: string | null }>(

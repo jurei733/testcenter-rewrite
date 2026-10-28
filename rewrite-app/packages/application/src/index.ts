@@ -43,6 +43,8 @@ export {prepareOriginalSessionToken, selectOriginalSessionToken, originalSession
   createOriginalSessionToken, OriginalSessionTokenCollisionError} from './original-session-token.js';
 export type {OriginalSessionToken, OriginalSessionTokenRepository} from './original-session-token.js';
 import {createOriginalAuthentication} from './original-authentication.js';
+export {prepareOriginalOperationalLogins} from './original-operational-login.js';
+export type {OriginalOperationalLogin} from './original-operational-login.js';
 export type {OriginalAuthenticationPort, OriginalAuthenticationState} from './original-authentication.js';
 import type {WorkspaceFilePublicationInput} from "./workspace-file-publication.js";
 export {createWorkspaceFilePublicationRevision,prepareWorkspaceFilePublication} from "./workspace-file-publication.js";
@@ -1573,8 +1575,11 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   replaceOperationalLoginMigrationCandidatesByWorkspace(
     tenantId: string,
     workspaceId: string,
-    candidates: OriginalTestcenterOperationalLoginCandidate[]
+    candidates: OriginalTestcenterOperationalLoginCandidate[],
+    nativeLogins?: import('./original-operational-login.js').OriginalOperationalLogin[]
   ): Promise<void>;
+  /** Private native identities; never serialized as public migration candidates. */
+  listOriginalOperationalLoginsByWorkspace(tenantId: string, workspaceId: string): Promise<import('./original-operational-login.js').OriginalOperationalLogin[]>;
   getParticipantRosterPasswordHash(
     tenantId: string,
     workspaceId: string,
@@ -25391,6 +25396,7 @@ export const createFirstSliceServices = (
     const operationalLoginCandidates = [] as OriginalTestcenterOperationalLoginCandidate[];
     const nativeEntries = new Set<ReturnType<typeof parseParticipantRosterText>[number]>();
     const nativeOperationalEntries = new Set<OriginalTestcenterOperationalLoginCandidate>();
+    const nativeOperationalPasswords = new Map<OriginalTestcenterOperationalLoginCandidate, string>();
 
     for (const rosterDocument of input.rosterDocuments) {
       const jsonInspection = inspectParticipantRosterJsonSource(
@@ -25434,7 +25440,15 @@ export const createFirstSliceServices = (
         const root = new DOMParser().parseFromString(rosterDocument.rosterText, "application/xml").documentElement;
         if (root && xmlElementLocalName(root) === "Testtakers") {
           for (const entry of documentEntries) nativeEntries.add(entry);
-          for (const entry of documentOperationalEntries) nativeOperationalEntries.add(entry);
+          for (const entry of documentOperationalEntries) {
+            nativeOperationalEntries.add(entry);
+            const elements = Array.from(root.getElementsByTagName('*')).filter(element =>
+              xmlElementLocalName(element) === 'Login' && element.getAttribute('name') === entry.loginKey &&
+              element.getAttribute('mode') === entry.loginMode);
+            if (elements.length !== 1) throw new FirstSliceError(400, 'original_operational_login_invalid', 'Native operational login identity is ambiguous.');
+            const password = elements[0]!.getAttribute('pw') ?? '';
+            nativeOperationalPasswords.set(entry, password);
+          }
         }
       }
       parsedEntries.push(...documentEntries);
@@ -25545,6 +25559,11 @@ export const createFirstSliceServices = (
       return { parsedEntry, validFrom, validTo };
     });
 
+    // Delay expensive credential derivation until the complete import has passed validation.
+    const nativeOperationalLogins = Array.from(nativeOperationalPasswords, ([entry, password]) => ({
+      loginKey: entry.loginKey, loginMode: entry.loginMode, passwordHash: password ? hashPassword(password) : null
+    }));
+
     const existingEntries =
       await repository.listParticipantRosterEntriesByWorkspace(
         workspace.tenantId,
@@ -25645,7 +25664,8 @@ export const createFirstSliceServices = (
     await repository.replaceOperationalLoginMigrationCandidatesByWorkspace(
       workspace.tenantId,
       workspace.workspaceId,
-      operationalLoginCandidates
+      operationalLoginCandidates,
+      nativeOperationalLogins
     );
 
     const migrationOnly = parsedEntries.length === 0;

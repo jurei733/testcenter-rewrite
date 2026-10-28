@@ -1,3 +1,4 @@
+import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
 import {lockOriginalTest} from './original-test-lock.js';
 import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import {appendOriginalTestLogs} from './original-test-log.js';
@@ -1783,6 +1784,9 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
       PRIMARY KEY(test_run_id,unit_name),FOREIGN KEY(test_run_id) REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
       FOREIGN KEY(participant_session_id) REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE);`
   }
+  ,{version: 76, name: "original_operational_login_credentials",
+    sql: `ALTER TABLE operational_login_migration_candidates ADD COLUMN native_logins_json TEXT NOT NULL DEFAULT '[]';`
+  }
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -3565,22 +3569,29 @@ export const createSqliteFirstSliceStorage = (
     async replaceOperationalLoginMigrationCandidatesByWorkspace(
       tenantId,
       workspaceId,
-      candidates
+      candidates,
+      nativeLogins = []
     ) {
+      const privateLogins = prepareOriginalOperationalLogins(candidates, nativeLogins);
       return withAssetWrite(()=>{
+        if(privateLogins.length && !database.prepare('SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(tenantId,workspaceId))throw new Error('Native operational workspace no longer exists.');
         const assets=assetNames();
         for(const candidate of candidates)validateApplicationAssetReferences(candidate.assetAssignments,assets);
       database
         .prepare(
           `INSERT INTO operational_login_migration_candidates (
-            tenant_id, workspace_id, candidates_json, updated_at
-          ) VALUES (?, ?, ?, ?)
+            tenant_id, workspace_id, candidates_json, updated_at, native_logins_json
+          ) VALUES (?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id) DO UPDATE SET
             candidates_json = excluded.candidates_json,
-            updated_at = excluded.updated_at`
+            updated_at = excluded.updated_at, native_logins_json = excluded.native_logins_json`
         )
-        .run(tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString());
+        .run(tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString(), JSON.stringify(privateLogins));
       });
+    },
+    async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
+      const row = database.prepare('SELECT native_logins_json FROM operational_login_migration_candidates WHERE tenant_id=? AND workspace_id=?').get(tenantId,workspaceId) as {native_logins_json:string}|undefined;
+      return row ? JSON.parse(row.native_logins_json) : [];
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
       const row = database

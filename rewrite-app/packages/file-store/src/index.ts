@@ -1,3 +1,4 @@
+import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
 import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
@@ -123,6 +124,7 @@ type PersistedFirstSliceState = {
     string,
     OperationalLoginMigrationCandidate[]
   >;
+  originalOperationalLogins: Record<string, import('@testcenter-rewrite-app/application').OriginalOperationalLogin[]>;
   participantRosterPasswordHashes: Record<string, string>;
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
@@ -186,6 +188,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantAccessCredentials: {},
   participantRosterEntries: {},
   operationalLoginMigrationCandidates: {},
+  originalOperationalLogins: {},
   participantRosterPasswordHashes: {},
   participantLoginAttempts: {},
   testRuns: {},
@@ -1266,6 +1269,7 @@ const createFileRepository = (
         delete state.operationalLoginMigrationCandidates[
           `${input.tenantId}::${input.workspaceId}`
         ];
+        delete state.originalOperationalLogins[`${input.tenantId}::${input.workspaceId}`];
         delete state.workspacesByScope[scopeKey];
         const remainingWorkspaceWithSameKey = Object.values(
           state.workspacesByScope
@@ -1687,14 +1691,22 @@ const createFileRepository = (
     async replaceOperationalLoginMigrationCandidatesByWorkspace(
       tenantId,
       workspaceId,
-      candidates
+      candidates,
+      nativeLogins = []
     ) {
+      const privateLogins = prepareOriginalOperationalLogins(candidates, nativeLogins);
       await mutate(state => {
+        if(privateLogins.length && !Object.values(state.workspacesByScope).some(w=>w.tenantId===tenantId&&w.workspaceId===workspaceId))throw new Error('Native operational workspace no longer exists.');
+        state.originalOperationalLogins[`${tenantId}::${workspaceId}`] = privateLogins;
         for(const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Object.values(state.applicationAssets));
         state.operationalLoginMigrationCandidates[
           `${tenantId}::${workspaceId}`
         ] = candidates;
       });
+    },
+    async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return structuredClone(state.originalOperationalLogins[`${tenantId}::${workspaceId}`] ?? []);
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
       const state = await getState();

@@ -2236,6 +2236,7 @@ export const parseOriginalTestcenterOperationalLogins = (
 
   const customTexts = parseXmlRosterCustomTexts(rosterText);
   rosterText = prepareXmlRosterStructure(rosterText);
+  const originalTesttakers = /^\s*<(?:[A-Za-z_][\w.-]*:)?Testtakers\b/i.test(rosterText);
 
   const groupContextRanges = collectXmlRosterContextRanges(
     rosterText,
@@ -2289,15 +2290,13 @@ export const parseOriginalTestcenterOperationalLogins = (
     if (!loginMode || !operationalModes.has(loginMode)) {
       continue;
     }
-    const loginKey = normalizeRosterTextValue(
-      readXmlAttribute(attributes, "name", "login", "loginKey", "username")
-    );
+    const rawLoginKey = readXmlAttribute(attributes, "name", "login", "loginKey", "username");
+    const loginKey = originalTesttakers ? rawLoginKey : normalizeRosterTextValue(rawLoginKey);
     if (!loginKey) {
       continue;
     }
-    const password = normalizeRosterTextValue(
-      readXmlAttribute(attributes, "password", "pw", "passwort", "kennwort")
-    );
+    const rawPassword = readXmlAttribute(attributes, "password", "pw", "passwort", "kennwort");
+    const password = originalTesttakers ? rawPassword : normalizeRosterTextValue(rawPassword);
     const groupKey = findNearestXmlRosterContextValue(
       groupContextRanges,
       entryOffset
