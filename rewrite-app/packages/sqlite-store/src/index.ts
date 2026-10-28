@@ -1,3 +1,4 @@
+import {lockOriginalTest} from './original-test-lock.js';
 import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
@@ -3719,6 +3720,7 @@ export const createSqliteFirstSliceStorage = (
     async findOriginalTestNumber(input){const row=database.prepare(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id
       JOIN participant_sessions p ON p.participant_session_id=m.participant_session_id AND p.tenant_id=m.tenant_id AND p.workspace_id=m.workspace_id AND p.content_release_id=m.content_release_id
       WHERE m.test_number=? AND m.tenant_id=? AND m.workspace_id=? AND m.participant_session_id=? AND p.original_login_key IS NOT NULL AND p.original_name_suffix IS NOT NULL`).get(input.testNumber,input.tenantId,input.workspaceId,input.participantSessionId);return row?{testNumber:String(row.test_number),testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id)}:null;},
+    async lockOriginalTest(input, timestamp) {await lockOriginalTest(database, input, timestamp);},
     async appendOriginalTestLogs(input, logs) {await appendOriginalTestLogs(database, input, logs);},
     async getOrCreateOriginalTestNumber(input) {
       return withResultArtifactParent(database, input, () => {

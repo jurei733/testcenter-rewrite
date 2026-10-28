@@ -1,4 +1,4 @@
-import {appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
+import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
@@ -1777,6 +1777,7 @@ const createFileRepository = (
     async findOriginalTestNumber(input){const current=await getState(),id=current.originalTestRunsByNumber[input.testNumber],row=id?current.originalTestNumbers?.[id]:undefined;
       return selectOwnedOriginalTestNumber(input,row,id?current.testRuns[id]??null:null,current.participantSessions[input.participantSessionId]??null);
     },
+    async lockOriginalTest(input, timestamp) {await mutate(state => lockOriginalTestCollection(state, input, timestamp));},
     async appendOriginalTestLogs(input, logs) {
       if (logs.length === 0) {appendOriginalTestLogCollection(await getState(), input, logs); return;}
       await mutate(state => appendOriginalTestLogCollection(state, input, logs));

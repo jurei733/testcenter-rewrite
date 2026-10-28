@@ -1,5 +1,6 @@
 import {exactParticipantTestLogTimestamp,compareParticipantTestLogTimestamps} from '@testcenter-rewrite-app/domain';
 export {decodeOriginalTestLogJson,encodeOriginalTestLogContent,parseOriginalTestLogEntries} from './original-test-log-json.js';
+export {prepareOriginalTestLock,lockOriginalTestCollection} from './original-test-lock.js';
 export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection,formatOriginalTestLogEntry} from './original-test-log.js';
 import {createOriginalUnitPort} from './original-unit.js';
 export {formatOriginalUnitReadJson} from './original-unit.js';
@@ -1622,6 +1623,7 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   findOriginalTestNumber(input: {testNumber:string;tenantId:string;workspaceId:string;participantSessionId:string}): Promise<import('./original-test-number.js').OriginalTestNumberRecord|null>;
   /** Append native Test logs under current metadata ownership, without rewriting its Run. */
   appendOriginalTestLogs(input: import('./original-test-number.js').OriginalTestNumberRecord, logs: ParticipantTestLog[]): Promise<void>;
+  lockOriginalTest(input: import('./original-test-number.js').OriginalTestNumberRecord, timestamp: string): Promise<void>;
   getOrCreateOriginalTestNumber(input: import('./original-test-number.js').OriginalTestNumberInput): Promise<string>;
   saveTestRun(testRun: TestRun): Promise<void>;
   /** Read current parent/Run and commit the pure projection, logs and activity in one write boundary. */

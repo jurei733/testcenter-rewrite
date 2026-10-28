@@ -1,11 +1,11 @@
-import {originalTestLogIdPrefix,type ContentReleaseBookletEntry,type ParticipantSession,type TestRun} from '@testcenter-rewrite-app/domain';
+import {originalTestStateLogIdPrefix,originalTestLogIdPrefix,type ContentReleaseBookletEntry,type ParticipantSession,type TestRun} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {parseOriginalTestStatePatch,applyOriginalTestStatePatch,assertOriginalTestState,originalPhpMap} from './original-test-state.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
-import {parseOriginalTestLogEntries} from './original-test-log-json.js';
+import {readOriginalTestLockFields,parseOriginalTestLockLog,parseOriginalTestLogEntries} from './original-test-log-json.js';
 import {hashOriginalSessionToken} from './original-session-token.js';
 import type {OriginalBookletFiles} from './original-test-files.js';
 import {parseOriginalNativeTestNumber,readOriginalPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
@@ -35,6 +35,7 @@ export type OriginalTestPort = {
   requirePerson(input: {token: string}): Promise<void>;
   requireOwner(input:{token:string;testNumber:string}):Promise<void>;
   putLog(input:{token:string;testNumber:string;body:unknown}):Promise<void>;
+  patchLock(input:{token:string;testNumber:string;body:unknown}):Promise<void>;
   create(input: {token: string; bookletName: string}): Promise<string>;
   read(input:{token:string;testNumber:string}):Promise<OriginalTestRead>;
   patchState(input:{token:string;testNumber:string;patch:unknown}):Promise<void>;
@@ -71,11 +72,22 @@ export function createOriginalTestPort(input: {
     async patchState({token,testNumber:raw,patch}){
       const{run}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch);
       const result=await input.repository.mutateParticipantRun(run,context=>{const values=applyOriginalTestStatePatch(savedState(context.testRun),entries),timestamp=input.now();
-        const testLogs=entries.map(entry=>({participantTestLogId:input.id(),tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,testRunId:run.testRunId,unitKey:null,originalUnitId:null,logKey:entry.key,logContent:encodeOriginalReportJson(entry.content),timestamp:entry.timeStamp,recordedAt:timestamp,...(entry.timeStamp===0?{originalTimestamp:0 as const}:{})}));
+        const testLogs=entries.map(entry=>({participantTestLogId:originalTestStateLogIdPrefix+input.id(),tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,testRunId:run.testRunId,unitKey:null,originalUnitId:null,logKey:entry.key,logContent:encodeOriginalReportJson(entry.content),timestamp:entry.timeStamp,recordedAt:timestamp,...(entry.timeStamp===0?{originalTimestamp:0 as const}:{})}));
         return{testRun:{...context.testRun,updatedAt:timestamp},originalTestState:values,originalResultModifiedAt:timestamp,testLogs,activityEvents:[]};});
       if(!result)throw forbidden(raw);
     },
     async requireOwner({token,testNumber}){await resolveOriginalOwnedTestScope(input,token,testNumber);},
+    async patchLock({token,testNumber,body}){
+      const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber);
+      const fields=readOriginalTestLockFields(body);
+      // Source57 proves a constructor/INSERT failure must leave this committed.
+      await input.repository.lockOriginalTest(scope,input.now());
+      const entry=parseOriginalTestLockLog(fields),recordedAt=input.now();
+      await input.repository.appendOriginalTestLogs(scope,[{participantTestLogId:originalTestLogIdPrefix+input.id(),
+        tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId,testRunId:scope.testRunId,
+        unitKey:null,originalUnitId:null,logKey:entry.key,logContent:entry.content,timestamp:entry.timeStamp,
+        ...(entry.originalClientTimestamp===undefined?{}:{originalClientTimestamp:entry.originalClientTimestamp}),recordedAt}]);
+    },
     async putLog({token,testNumber,body}){
       const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber);
       const entries=parseOriginalTestLogEntries(body);

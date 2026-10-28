@@ -45,3 +45,35 @@ test("The UI server gate consumes split UTF-8 chunks and the last line without a
   await finished;
   assert.throws(gate.assertHealthy, /own-ä/);
 });
+
+const expectedSourceFailure = { requestId: 'owned-source-request', method: 'PATCH', route: 'PATCH /test/:testId/lock', path: '/test/:testId/lock', statusCode: 500 };
+const observedSourceFailure = { event: 'http_request_completed', ...expectedSourceFailure };
+test('The UI server gate requires an independently supplied exact receipt for a Source-proven negative case', () => {
+  const gate = createServerRequestFailureGate();
+  gate.observeLine(JSON.stringify(observedSourceFailure));
+  assert.throws(gate.assertHealthy, /The own API emitted failed requests/);
+  assert.doesNotThrow(() => gate.assertHealthy([expectedSourceFailure]));
+  assert.throws(gate.assertHealthy, /The own API emitted failed requests/, 'Checking a receipt must not discard the original failure.');
+});
+for (const key of ['requestId', 'method', 'route', 'path', 'statusCode']) {
+  test('The UI server gate rejects an expected receipt with the wrong '+key, () => {
+    const gate = createServerRequestFailureGate();gate.observeLine(JSON.stringify(observedSourceFailure));
+    assert.throws(() => gate.assertHealthy([{...expectedSourceFailure,[key]:key==='statusCode'?503:'different-request-field'}]));
+  });
+}
+test('The UI server gate rejects missing, duplicate or incomplete receipts and additional failures', () => {
+  const gate = createServerRequestFailureGate();
+  assert.throws(() => gate.assertHealthy([expectedSourceFailure]), /not observed/);
+  gate.observeLine(JSON.stringify(observedSourceFailure));
+  assert.throws(() => gate.assertHealthy([expectedSourceFailure,expectedSourceFailure]), /cannot be repeated/);
+  assert.throws(() => gate.assertHealthy([{requestId:expectedSourceFailure.requestId,statusCode:500}]), /every exact request field/);
+  gate.observeLine(JSON.stringify({...observedSourceFailure,requestId:'another-failed-request'}));
+  assert.throws(() => gate.assertHealthy([expectedSourceFailure]), /The own API emitted failed requests/);
+});
+test('The UI server gate never accepts a backend exception as the expected negative HTTP response', () => {
+  for (const order of ['before','after']) {
+    const gate = createServerRequestFailureGate(),failed={event:'http_request_failed',requestId:expectedSourceFailure.requestId,error:{message:'real database or disk failure'}};
+    for (const item of order==='before'?[failed,observedSourceFailure]:[observedSourceFailure,failed])gate.observeLine(JSON.stringify(item));
+    assert.throws(() => gate.assertHealthy([expectedSourceFailure]), /not observed/);
+  }
+});
