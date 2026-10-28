@@ -11,7 +11,7 @@ import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
 import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
 const artifacts=process.env.UI_SMOKE_ARTIFACT_DIR?resolve(process.env.UI_SMOKE_ARTIFACT_DIR,'native-monitor'):await mkdtemp(join(tmpdir(),'owned-native-monitor-ui-'));await mkdir(artifacts,{recursive:true});
 console.log('owned_artifacts='+artifacts);
-const file=join(artifacts,'store.sqlite'),storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(resolve('.data/original-xml-schemas'),false),services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+const file=join(artifacts,'store.sqlite'),storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE||'.data/original-xml-schemas'),false),services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
 const password='Owned native monitor browser password',monitorName='owned-ui-monitor',one='owned-ui-alpha',two='owned-ui-beta',group='OWNED.UI.GROUP',firstId='9007199254740993',secondId='9007199254740994';
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
 let browser,server,page;const errors=[],wire=[],markers=[];const check=name=>{markers.push(name);console.log('native_monitor_ui='+name+':passed');};
