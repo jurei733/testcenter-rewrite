@@ -3,7 +3,7 @@ import {MatDialogTitle,MatDialogContent,MatDialogActions,MatDialogClose} from '@
 import {MatInput} from '@angular/material/input';
 import {MatButton} from '@angular/material/button';
 import { Component, inject, type OnInit } from '@angular/core';
-import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { FormControl, Validators } from '@angular/forms';
 
 export interface TimeRestrictionDialogData {
@@ -22,6 +22,7 @@ export interface TimeRestrictionDialogData {
   imports: [ReactiveFormsModule,MatDialogTitle,MatDialogContent,MatDialogActions,MatDialogClose,MatInput,MatButton]
 })
 export class TimeRestrictionDialogComponent implements OnInit {
+  private readonly dialogRef = inject(MatDialogRef<TimeRestrictionDialogComponent>);
   readonly dialogData=inject<TimeRestrictionDialogData>(MAT_DIALOG_DATA);
   showcancel: boolean = true;
   setTime = new FormControl(this.dialogData.remainingTime, [Validators.max(this.dialogData.remainingTime)]);
@@ -47,6 +48,12 @@ export class TimeRestrictionDialogComponent implements OnInit {
     ) {
       this.dialogData.cancelbuttonlabel = 'Abbrechen';
     }
+  }
+
+  confirm(): void {
+    // Read the control at the click, not a mat-dialog-close input cached by
+    // an earlier render. Reactive Forms updates need not render synchronously.
+    this.dialogRef.close(this.returnValue());
   }
 
   returnValue(): boolean | number {
