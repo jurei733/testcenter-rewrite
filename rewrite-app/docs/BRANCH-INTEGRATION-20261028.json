@@ -1,0 +1,1684 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-28T14:09:52.938393+00:00",
+  "purpose": "Consolidate the outstanding Testcenter rewrite branch histories and validated monitor backend into main under the explicit 2026-10-28 user instruction.",
+  "baseMain": "103752d181c0fdc4073087b33e149eda2c7e5e48",
+  "validatedApplicationCommit": "ec08089812a987a7e703c3b76c9aa61b52cb9108",
+  "validatedTree": "2b2fc7090ac436db4f7228397910442ea8fe9225",
+  "allRefsIncludedBeforeManifestCommit": true,
+  "refs": [
+    {
+      "ref": "refs/heads/apt-order-deadline-local-20261022",
+      "commit": "68186326018cc0ff8a2cbcefcdfdaac4969715ad",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/apt-signal-control-local-20261022",
+      "commit": "b7e33c467e9dcab6e24c69d47cf16ebdff84f683",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/asset-cascade-local-20261020-2053",
+      "commit": "6b0c7e74639072a98ad588f880c13eaec032ec6d",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/atomic-settings-local-20261021-0828",
+      "commit": "07df10eb39b4ccb631cd0edcf651944df8814a08",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/attachment-scope-local",
+      "commit": "b92c9f4eac8c0a490382f771137c1ed766339f7c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/attachment-text-local",
+      "commit": "eb7487bb870711ebced5bf9e22daf6392cceca35",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/body-parser-qualified-local-20261024",
+      "commit": "932214f104c2f4313ceeb3c8d016c3deded5a723",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/bounded-evidence-os-local-20261022",
+      "commit": "17b1f43456857402f5f779be39c72b62211d368c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/browser-material-diagnostic-local-20261023",
+      "commit": "dfe2a4a3ed7ea6acd724c50ba7ee399ba9a7841a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/browser-material-qualified-local-20261024",
+      "commit": "3b3b8f13f3714b699a3d1c0260f9070a7ae0b42f",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/browser-readiness-local",
+      "commit": "3c2f015620604fee6e5e5aac0e362ecc0424af81",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/browser-reuse-qualified-local-20261023",
+      "commit": "2826e64601cba3284d58514d5781ee3c8dd9532a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/browser-runtime-v3-local-20261024",
+      "commit": "e3e973e3d004beadf768799fddbfd70b135f6609",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/browser-runtime-v3-qualified-20261024",
+      "commit": "9e8e659524ed610706ebfab7b906988aded2a2b8",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/browser-system-qualified-local-20261023",
+      "commit": "e7bcc168b415e8dc67ef74abf3ac2eea210843bc",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/build-dependency-local-20261020-2100",
+      "commit": "2587c071a5e93881854cbdc7a5352184e4ff8a9a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/browser-completion-local-20261028",
+      "commit": "e571cc4d84b3bd051209f19f4272b7cb6c767102",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/browser-completion-qualified-local-20261028",
+      "commit": "126ba1d10b22216368613891a472f17cdcfb5683",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/browser-inventory-preflight-20261027",
+      "commit": "5e4ab974e5fc2e0f7713e194c1071cbe77defba1",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/browser-inventory-preflight-doc-local-20261027",
+      "commit": "b4dc3bed1bf13c0d8034f6603a60c850bba85dbc",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/browser-inventory-preflight-local-20261027",
+      "commit": "8da39a98f99c1aa0c064a1a13a2300746057bfcf",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/browser-system-probe-20261023",
+      "commit": "ac8c32355e4cff0a5d8346f75a4ab7ee76d370f3",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/certified-browser-ci-20261027",
+      "commit": "c848ebbdacf73cd915744b2a2af8ac4ba0276170",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/certified-browser-ci-local-20261027",
+      "commit": "6a70814407ed0c7991eab41464babf4982cb2d0c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/certified-browser-cohorts-20261027",
+      "commit": "bdb53d55702a6e4166e7124b73270cc14fe46727",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/certified-browser-cohorts-local-20261027",
+      "commit": "f16a440afb09b0d876f9a73d10ba17a0d924f802",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/certified-browser-entry-local-20261027",
+      "commit": "569232fa71296345ad6d6fbdfcd027cf06562a13",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/certified-browser-qualified-docs-local-20261027",
+      "commit": "4d8f3bb702babf808d244293afcbad1a9255edfa",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/checkpoint-priority-20261027",
+      "commit": "170a303e548d97368e74b7333aa8078538cc7f67",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/checkpoint-priority-local-20261027",
+      "commit": "e5b54b562f930a193b62348d0543057abd88f0a7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/ci-wait-boundaries-20261027",
+      "commit": "f88f67e956f0c984eabfc524c2bed1738afb9faf",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/ci-wait-boundaries-local-20261027",
+      "commit": "ec588a1abe7a122aa7a4384047714fc143a303ed",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/ci-wait-boundaries-qualified-local-20261027",
+      "commit": "e27912d139b18237c1fc7756adcab1e0d95269b1",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/consistent-ci-node-20261027",
+      "commit": "725573f040abdefe8d684e9fca739fbf52a12243",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/consistent-ci-node-local-20261027",
+      "commit": "7bd1d20479e59e900648ea9808ac6d369c229f28",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/consistent-ci-node-mode-20261027",
+      "commit": "5c5d8376019e4d93d965962bfe75d6445f8efc3c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/consistent-ci-node-mode-doc-local-20261027",
+      "commit": "7ba08327777ef46607e1e5aa8ea8d2b793ef2eda",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/consistent-ci-node-mode-local-20261027",
+      "commit": "80f45613f82c24bbf1eb6599e6efd18c82d400d4",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/critical-path-scheduling-20261026",
+      "commit": "9ce4c227505dc33e2088263585a20d36cda1417b",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/critical-path-scheduling-local-20261026",
+      "commit": "d56bff3f6feab35a22f286040e001376c6bd1200",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/docker-schema-expectation-20261028",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/docker-schema-local-pre-publish-20261028",
+      "commit": "eb5d1544d3a00a7bb9dbed81ca0ab96631070e4a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/early-long-ui-20261026",
+      "commit": "529d52070120ad8a5d017a10d686ea0f1570dd55",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/early-long-ui-local-20261026",
+      "commit": "da0c32b2a2f212edffad5d2e44b407ec3fbf1681",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/early-long-ui-qualified-doc-local-20261026",
+      "commit": "50d1bce126dcbc262f68ae25aeec4a7d69b120e2",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/exit-completeness-diagnosis-20261025",
+      "commit": "5ebfdf38d1f20c911ddcf1a1254e7a79e1ea2aa0",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/faster-service-iteration-20261024",
+      "commit": "e56da35bfd6bbec20e5281a3ea6791fac248a2b7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/global-ci-priority-20261028",
+      "commit": "f1ad50606f0159186dce3e2fc45631fcc92bf049",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/global-ci-priority-local-20261028",
+      "commit": "a036582a774d7adaffd3151436c6ba97a6d4e5d7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/global-ci-priority-qualified-local-20261028",
+      "commit": "04585b2074a2dfca2f925aba8c8d44f6ad2e0ac0",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/main-integration-20261028",
+      "commit": "2a2f70b188c96c18b8bfe9fc0da9cf19cc27f238",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-crash-readiness-20261027",
+      "commit": "c3d6308f234968f1a5b59a6a0c464a24ff0eedf0",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-crash-readiness-local-20261027",
+      "commit": "6c045ca26a6034a86655cdd90b35e8ab5b0fad61",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-group-cascade-20261025",
+      "commit": "3f284d665f41327dbc35fc7a686be6b8a587fb43",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-monitor-auth-20261028",
+      "commit": "0299e131a215d32b9ca0411ada3aa97ccca8df15",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-monitor-auth-local-pre-publish-20261028",
+      "commit": "19964726e98e98c29b588677ff17a668eea6ef3c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-monitor-sessions-20261028",
+      "commit": "ec08089812a987a7e703c3b76c9aa61b52cb9108",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-report-wire-20261025",
+      "commit": "4d800e83d844ea2bdedb502984418f4cbe298dcd",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-command-20261028",
+      "commit": "493cc8258821b452a1a8e744146f0dc253cea75f",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-command-local-pre-publish-20261028",
+      "commit": "76288d6aecef79cc38d8a2b3c58fb5a709b5722b",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-create-20261026",
+      "commit": "d1622311228beb137a87f2903d458eb961ec7d53",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-create-final-local-20261026",
+      "commit": "d1622311228beb137a87f2903d458eb961ec7d53",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-create-qualified-local-20261026",
+      "commit": "8f83edcd399e1981af86f1e763511d094a861cc7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-lock-20261028",
+      "commit": "e27ca9deb7fce9c3b75c3b613b180abd972478de",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-lock-local-pre-publish-20261028",
+      "commit": "0363e3b5ef5667cc00dbdeb60b77b5581cb83468",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-lock-qualified-doc-local-pre-publish-20261028",
+      "commit": "5a09b072d3816c81cd1761d5760cbcdf68014190",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-read-20261026",
+      "commit": "4cecdd2af7ee71906cfa1117a450312abe252122",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-read-local-20261026",
+      "commit": "d87715c6c5a7cb76748581f773ad2ea3d2e845a2",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-scope-20261026",
+      "commit": "6896077ff21467edf2e68fe24550a9e445bf314c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-test-scope-qualified-local-20261026",
+      "commit": "6896077ff21467edf2e68fe24550a9e445bf314c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-testlog-20261028",
+      "commit": "897a9e2688039f77e4be44acb9e6f75fb908f1cf",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-testlog-before-qualified-ci-local-20261028",
+      "commit": "7bb87615b597aa4e34e42a7777d21c8004a8a6d8",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-testlog-pre-global-local-20261028",
+      "commit": "d6f156fa45d4c5d9f3e50fd71c577c68f4ac17b9",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-testlog-qualified-doc-local-pre-publish-20261028",
+      "commit": "f51e8249314fa2f0084b65ffe57ec3c8c2eff616",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-testlog-source53-local-pre-publish-20261028",
+      "commit": "936c002af4b751f91662aa9e475db15d938f7bbd",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-unit-transport-20261026",
+      "commit": "b02d3d07329591a356938429045ebeae35f48bf4",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/native-unit-transport-local-20261026",
+      "commit": "861b5bd1366e0815606d1b933e35fba30aa16216",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/paired-starter-viewports-20261026",
+      "commit": "2c487f2803279106e2b8d18cfee484d177474b4f",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/paired-starter-viewports-local-20261026",
+      "commit": "006ad72b44745a63c6fc11bea81638006afca8c6",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/participant-console-qualified-doc-local-20261026",
+      "commit": "1d92e476d07c2ffeb481103e29ebb08fe517010d",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/participant-console-regression-20261026",
+      "commit": "9f96b4cca45eeca887bd59399ff1db11af3fdc51",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/participant-console-regression-local-20261026",
+      "commit": "a5a7e163df8e3b3514ec3ab48322cda72198545a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/participant-entry-qualified-doc-local-20261026",
+      "commit": "1c31d9443dea1b76105ecb477dac0b8d490fc88b",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/participant-entry-viewports-20261026",
+      "commit": "b9881f25b67084fbb51efaa17b67befc33d45076",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/participant-entry-viewports-local-20261026",
+      "commit": "bcfe745dbf997315e1aa3b86003f34696a0a2700",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/pipeline-and-starter-integration-20261027",
+      "commit": "2a627eb650bd0a765ee3bb4db07327030c6d3f51",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/pipeline-and-starter-integration-local-20261027",
+      "commit": "d7c77b216725c7b024ebcfabcde4afa452782ef9",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/qualification-capacity-20261027",
+      "commit": "0ff38af5c410831a83717ffa0d271214123eb2a7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/qualification-capacity-local-20261027",
+      "commit": "7cfe1be7b212d7a49957ceb209cbfdb5ed7ead34",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/response-part-types-20261025",
+      "commit": "1e520949c212964f70641e5b799125f6e081c290",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-asset-views-20261026",
+      "commit": "529d52070120ad8a5d017a10d686ea0f1570dd55",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-asset-views-20261027",
+      "commit": "7d3d88a3b27430853a7ab0c583fd42170b9c532c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-assets-after-ci-20261027",
+      "commit": "71786a9e6784ac7039f526336d14527faae278a2",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-assets-after-ci-local-20261027",
+      "commit": "0b76aa4641461efb13eb488888dcc752f000e4ce",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-empty-qualified-doc-local-20261026",
+      "commit": "a0ed415c0124a052a7905d224c0383fcf13b77da",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-empty-views-20261026",
+      "commit": "cb080fb934acbbb9193ea0eef1f4176bd3c7810a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-empty-views-local-20261026",
+      "commit": "27db2abf35d9b38a73bbba5a05c24c2889a0d2bd",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-qualified-doc-local-20261026",
+      "commit": "1d30df47763113bb448323f250ee78b56fb3f7dc",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-review-hover-20261026",
+      "commit": "1b3857745993df3acf9cc5bda28eeb5df81b21a0",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-review-hover-local-20261026",
+      "commit": "f02f2faa4783a2b6a6be62b5b626bdec086de1b0",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-scroll-readiness-20261026",
+      "commit": "dff3baa4494365bf25cb4670e32a99aaee6608dc",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/starter-scroll-readiness-local-20261026",
+      "commit": "50ab894ae6dfdf00abd93d3abba3ce44ed5cd5f3",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/codex/timer-focus-feedback-20261025",
+      "commit": "884cd5a7797dfbf3d2a71b57d9cb406bc0d1cd15",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/console-observations-local-20261022",
+      "commit": "21f8ec3fff8165d216d9c4f54d95031ce1b2e169",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/console-supervisor-local-20261021",
+      "commit": "1cd4c201fab85c1ddc9af4cd058a8cb70ca250e8",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/content-activation-qualified-local-20261023",
+      "commit": "0c673270f2ce24ab0c1fe5d245e57315259bf00c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/delete-dialog-local-20261021",
+      "commit": "1dceba8940cc81f9d57b21adc213425486121f16",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/dialog84-local-20261021",
+      "commit": "10ee6a03d4ea171deaebc69567c33cacb51a7e93",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/directory-family-local-20261021",
+      "commit": "c7b0603562ce78a812945d11fb2d36a0318df988",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/directory-longest-first-local-20261021",
+      "commit": "12225530a00a020e8be5fb1d179891469279a273",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/directory-mutation-local-20261021",
+      "commit": "f2335714af8ca3772806c46cc009a57661f4d29d",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/directory-selection-local-20261021",
+      "commit": "c7606f4fd5f201d4cd8fba92e204217488f6c5ab",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/focused-ci-local-20261022",
+      "commit": "b3b8b2fdb5dec61f3540c8683cfb38b279265401",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/fresh-native-paint-local-20261021-0926",
+      "commit": "b79e5f11b294f82dcbd7b67bcd4556e29c0f7dcf",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/linux-visual-local",
+      "commit": "a71df3b63df7809c2b345ebe74967f25a46fa21d",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/live-workspace-qualified-local-20261023",
+      "commit": "0f7a04715bf3f7d896043f3e8692a4ceacf4b03c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/lockfile-audit-local-20261023",
+      "commit": "295a21c440a18caba418d7345c61f73b7e689cfc",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/lockfile-audit-qualified-local-20261023",
+      "commit": "f7e130968849c67b57dcba36f1e5e71d077208c7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/main",
+      "commit": "143dc3e73ae83f379de4b2fe38edef25c7286a4a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/monitor-entry-qualified-local-20261023",
+      "commit": "1b895322511af5fc8613b48f0ed3b320cce2a05b",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-assignments-qualified-local-20261025",
+      "commit": "ccf9242ec71423a1d3f3bddcb4bfeff4870c88ff",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-auth-core-qualified-local-20261025",
+      "commit": "8ecdb4a396bef4d59796e607e030d5e14b6bf714",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-binary-login-qualified-local-20261024",
+      "commit": "5437a8de73410651e9fc16ef446ed0eb3032168a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-booklet-identity-qualified-local-20261024",
+      "commit": "b78d9c65b493e9d0e2578d88f411171d0b358d86",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-booklet-source53-and-ci-qualified-local-20261024",
+      "commit": "9f06872063a4a1a3c77d1a6485fa37a652818cd9",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-booklet-source53-qualified-local-20261024",
+      "commit": "c37ccf60f5797dfd704a23e08640261d1bd4cc14",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-display-qualified-local-20261025",
+      "commit": "751a3f5a52d4743bb1477d7c648c5c1446ffc774",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-exit-completeness-diagnostics-qualified-local-20261025",
+      "commit": "6710fb004be9ba04426b6231631d0f5b6ce5f502",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-exit-completeness-qualified-local-20261025",
+      "commit": "9b234b10aa54f05f863959ae5c694136ff9d4a02",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-group-cascade-qualified-local-20261025",
+      "commit": "e56da35bfd6bbec20e5281a3ea6791fac248a2b7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-group-deletion-reference-local-20261025",
+      "commit": "97888de4d6cce2a8cff0c5de93ce6c12a9938002",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-identities-qualified-local-20261024",
+      "commit": "60a876b7161d159a012bed3b88a0f75aa34f32ba",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-live-mode-qualified-local-20261024",
+      "commit": "17878ce801977498b907b7aeb496617e0fd90d26",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-paint-exit-shards-local-20261021-0906",
+      "commit": "acc279acb68895f7362bef2b2b35504dbbc5983c",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-person-data-and-browser-gates-local-20261024",
+      "commit": "d28b48b4b1ff66ab859e98e448eba199ba8f3f53",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-person-resolver-qualified-local-20261024",
+      "commit": "3c0f6c055f2dde315b8e8167257214e167d458c2",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-release-free-qualified-local-20261025",
+      "commit": "d21616bfcd6d0fdae5b65d0976938834689f3596",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-report-source28-qualified-local-20261025",
+      "commit": "1558b64fe4a976357898e33a299caee9e236f32a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-report-wire-qualified-local-20261025",
+      "commit": "a8cc2658eaad7e25528e5ecb4bf3cffb6381164b",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-response-part-types-evidence-local-20261025",
+      "commit": "b049aef0c2fbad9c3fc75a02aa816fb7afad9c66",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-response-part-types-qualified-local-20261025",
+      "commit": "eaf21dfd49e47147bd8bca75e1cfdb0d7a8979dc",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-security-qualified-local-20261024",
+      "commit": "cbfd7a38f0c0ad7ac1ce70fe4029ce427d8372d6",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-session-qualified-local-20261025",
+      "commit": "dc639f901ea60711a19bd61fee27a2e6d3caa5c1",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-settings-observation-local-20261021-0812",
+      "commit": "850165b84f7239bee1bda54836cec5c5c57be2e1",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-syscheck-qualified-local-20261023",
+      "commit": "c602aa00d5187604d338aa7f8b557df3af8c25b6",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-workspace-files-qualified-local-20261022",
+      "commit": "bab742f5d53f22222dd54f8dfd95c8f0ef8e88ad",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/native-zero-source62-and-ui-diagnostics-local-20261024",
+      "commit": "a2989dbbc54a3d3f52d16f4b909dda745df172e7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-administration-local",
+      "commit": "b4208327baffdd558cb896ac48cb1906e2179975",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-diagnostics-local-20261022",
+      "commit": "deb7868184b6a379e1efc5f4056ac3ab20ed2766",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-group-labels-qualified-local-20261024",
+      "commit": "568424ca781ace6781efd7a1b8a30d845ef88ee7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-group-snapshots-local-20261023",
+      "commit": "e8ed2f0217f01db8eefee4c2428276d68501218e",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-groups-qualified-local-20261025",
+      "commit": "ed4bb6c8299ccbf4f6573ddc43d53c26e4db0cdb",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-heading-model-local-20261021-0620",
+      "commit": "f0072232a4973b90f1f1db0cb496700993582e43",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-heading-text-local-20261021-0620",
+      "commit": "7580de6de373eff7e4a425b1f5657ba37bbbb43f",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-lock-clock-qualified-local-20261023",
+      "commit": "585a607881ec549e3d0008282e4a589da7f9cba3",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-reference-repeat-local-20261021-0725",
+      "commit": "121043673fc765d132f18ba4df266ea781ebdcdf",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-result-state-qualified-local-20261023",
+      "commit": "fcd3060157b3f36006eb455c3a57e4c3e5246f8e",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-sample-readiness-qualified-local-20261023",
+      "commit": "c6b372a0cabb7acfe3f7d994cbcc8529dd39467e",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-settings-local",
+      "commit": "880e18e77543101c8d69b4f1f7a3f171562067a2",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-settings-reference-local-20261020-2147",
+      "commit": "8fa4dd665d8ffee49f9c1c9f82eee47bfa387f7a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/original-stable-viewport-local-20261021-0705",
+      "commit": "b36ce26d4051c904688fb57a00cf5a665b463690",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/pipeline-dispatch-qualified-local-20261024",
+      "commit": "ae1d9db990923999e28b687c4bf08efe24a424be",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/pipeline-local",
+      "commit": "af3e92f54089fb4af76a3bf7cc4c8159ddafd40a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/pipeline-route-cleanup-qualified-local-20261022",
+      "commit": "64b3378caaec9c15c03226cc9c3a26cda88ab19d",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/postgres-independent-feedback-qualified-local-20261023",
+      "commit": "efc4d2bf2fc1724a8c901e407291fb52682e2ee0",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/producer-attempt-qualified-local-20261023",
+      "commit": "685008ce80985082dbdc8f7fc5f5e3e9ac279a1a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/qualified-native-pipeline-local-20261022",
+      "commit": "2edb86c327c341120e7bfd5e1dce9d544e0ab219",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/quick-audit-local",
+      "commit": "8aaa6cc25691f0405a3901944d58a48f70e51f7a",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/quick-qualification-local",
+      "commit": "939d7709cd10a643b21ec9af50d03e8f78661436",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/resume-pipeline-local-20261022",
+      "commit": "baeda3bedb7b040365efbcf48e6fa1b1ac91b6f7",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/service-focus-qualified-local-20261024",
+      "commit": "4eafc81bf86526d9663dc5186d10b25879d4c571",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/smoke-deadlines-local",
+      "commit": "4858831d564d1db6453b6eb7f8caebaaf8d78345",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/source-reference-local",
+      "commit": "077c4259c88bf0359802751de85dd59edcc41152",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/source-unit-export-qualified-local-20261023",
+      "commit": "484b8401543012a4de5f084607b9679fe03f8f33",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/stable-capture-local",
+      "commit": "5540f956c90cec58043287809c8235642b5644df",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/syscheck-export-qualified-local-20261023",
+      "commit": "bba502505d08bf4c04b8e37455951f6549f69f08",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/syscheck-ro-qualified-local-20261023",
+      "commit": "fb151f9c267e1b2f8fe5903a61fd854272ac99ae",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/systemcheck-paint-local",
+      "commit": "8f4cf091cc7ec7f986c839797bf05b1d8ac5b7d0",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/testcenter-production-readiness",
+      "commit": "ee09f710466c92025f894c950b2694a0f6e6c831",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/testcenter-rewrite-parity",
+      "commit": "eeabdcf29584f7a78df8d86c9fa7efda2b360f5f",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/tiered-feedback-local",
+      "commit": "f6c7986a806c6c718f82c6a749d92f13f7076bb9",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/timer-bounded-qualified-local-20261025",
+      "commit": "0376011224404bfd73f7b80eb6c4a12e4352ab92",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/timer-focus-qualified-local-20261025",
+      "commit": "d519a38273d6c016b258bbd92ca56f3b90424b8b",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/typecheck-noemit-local-20261021",
+      "commit": "3d671b1122d43efee503600dd529d5f534040314",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/variant-reference-local",
+      "commit": "82fbbd509876ffc74da676a440fd7a63edf66f0e",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/viewport-preservation-local",
+      "commit": "d482c3c6700655697ceddd1f78defbb77fa74cab",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/workspace-catalog-local-20261022",
+      "commit": "02e9bcaea9abcca830a518affbde55c16682dbdb",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/workspace-first-upload-qualified-local-20261022",
+      "commit": "f99cceb499852c4b103017b601609cc29ca4d8bf",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/workspace-replacement-qualified-local-20261022",
+      "commit": "99cf61bed3a840bfb2130e6ef5de2fc73855e117",
+      "included": true
+    },
+    {
+      "ref": "refs/heads/workspace-source-reference-local-20261022",
+      "commit": "20d8c1d8c9eb86df6bbdcbed41eb80af1281b6a5",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/HEAD",
+      "commit": "103752d181c0fdc4073087b33e149eda2c7e5e48",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/browser-completion-crash-linux-20261028",
+      "commit": "a5727d7b5e87d795b19f66a6f94129eabba0fe7d",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/browser-inventory-preflight-20261027",
+      "commit": "5e4ab974e5fc2e0f7713e194c1071cbe77defba1",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/browser-inventory-preflight-linux-20261027",
+      "commit": "b51d81daa8ffcbde8c9cfffce70cfbf7721fa34b",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/browser-material-profile-20261023",
+      "commit": "3d8cb50d1ab677c849404a05e5ce064ab135401b",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/browser-material-v3-20261024",
+      "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/browser-system-probe-20261023",
+      "commit": "450f18d02c2f05548303b0268d27dafe103f91a6",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/certified-browser-ci-20261027",
+      "commit": "acb86f1ba69ba80d435967301870cb2a0e83c157",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/certified-browser-cohorts-20261027",
+      "commit": "1fcaacb814f0af8a31f3da42fe40b9e05b82a1f5",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/certified-browser-cohorts-linux-20261027",
+      "commit": "6a2d31bc6ddbc2cee7a0236470ca7423274f5c18",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/certified-browser-runtime-linux-20261027",
+      "commit": "bfd6fa2fc4ddca090452cc2602f93499cfdaaaf8",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/checkpoint-priority-20261027",
+      "commit": "170a303e548d97368e74b7333aa8078538cc7f67",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/ci-wait-boundaries-20261027",
+      "commit": "f88f67e956f0c984eabfc524c2bed1738afb9faf",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/ci-wait-boundaries-linux-20261027",
+      "commit": "51a9fa0f5e09b27f9d7410f3ac543e0530ced376",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/consistent-ci-node-20261027",
+      "commit": "725573f040abdefe8d684e9fca739fbf52a12243",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/consistent-ci-node-linux-20261027",
+      "commit": "41519bc431bed47eb4165706dbf3a316c2982069",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/consistent-ci-node-mode-20261027",
+      "commit": "5c5d8376019e4d93d965962bfe75d6445f8efc3c",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/consistent-ci-node-mode-linux-20261027",
+      "commit": "6afb1cba82fe52fa736fa5af5eec9cecf127e8da",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/critical-path-scheduling-20261026",
+      "commit": "9ce4c227505dc33e2088263585a20d36cda1417b",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/docker-schema-expectation-20261028",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/docker-schema-linux-20261028",
+      "commit": "f02ac0b614325b45d539eb12d5c98b98fca5231e",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/early-long-ui-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/early-long-ui-linux-policy-20261026",
+      "commit": "b6ff845e6d032257fbd9f59ffb7f1f7dc4566134",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/exit-completeness-diagnosis-20261025",
+      "commit": "5ebfdf38d1f20c911ddcf1a1254e7a79e1ea2aa0",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/exit-completeness-linux-20261025",
+      "commit": "4b3679244b981131a933ba2a2616f07d1ed97d13",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/exit-completeness-qualified-20261025",
+      "commit": "206ef29e7927adf06829972f79741d99209a0f7b",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/exit-fallback-input-probe-20261023",
+      "commit": "05177d781dad7463424e2c8ebc8056f47ab570c0",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/faster-service-iteration-20261024",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/global-ci-priority-20261028",
+      "commit": "f03d1bd76a2bdee93d9c44799bbb328eb4489eb9",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/global-ci-priority-linux-20261028",
+      "commit": "1bec33c81aca8a38a94c8aedfd18080d18d739ef",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/lockfile-audit-20261023",
+      "commit": "8413d5de4f35a12beb87e183e089d183f2f20b96",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-cohort-diagnostic-20261027",
+      "commit": "adeb0727c4ea46ad990c3bf61ccce3d4e29d01d3",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-crash-readiness-20261027",
+      "commit": "c3d6308f234968f1a5b59a6a0c464a24ff0eedf0",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-crash-readiness-linux-20261027",
+      "commit": "7117803ed3b8202b5cbed1837f6dc6aa8308e185",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-group-cascade-20261025",
+      "commit": "1e520949c212964f70641e5b799125f6e081c290",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-monitor-auth-20261028",
+      "commit": "0299e131a215d32b9ca0411ada3aa97ccca8df15",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-monitor-auth-linux-20261028",
+      "commit": "141b8a7a670a88426af2b10c4f4d624008f2e7a2",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-monitor-sessions-20261028",
+      "commit": "c3a89862b83472dcde1df40f54ecb0cbcfa5087d",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-report-wire-20261025",
+      "commit": "4d800e83d844ea2bdedb502984418f4cbe298dcd",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-command-20261028",
+      "commit": "493cc8258821b452a1a8e744146f0dc253cea75f",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-command-linux-20261028",
+      "commit": "c9cfb3346f1c2f9a42b0dcdbdc7abe91f1bc87e3",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-create-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-create-linux-20261026",
+      "commit": "c75296d8feef72d9f3e3f7c2e4f1c10e81e4a335",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-lock-linux-20261028",
+      "commit": "ae8a2640e04be2c1522e12faa28b5587ce3760d3",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-read-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-read-linux-20261026",
+      "commit": "32f1fce2b8f29f85e786ff8c09b4fffd044a1694",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-scope-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-test-scope-linux-20261026",
+      "commit": "a75fc5bfa552de5e95e4ab86e0d8d0c22697d470",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-testlog-linux-20261028",
+      "commit": "bd5cc0e99d751833a59bb31f9d83b727d56cac73",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-undici-audit-20261024",
+      "commit": "e5b43571679374a640d82c9599e7e8dbd32909be",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-unit-transport-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/native-unit-transport-linux-20261026",
+      "commit": "806d0aff3c4615da8ac907a4417e9c6d46d52dc1",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/original-sample-readiness-20261023",
+      "commit": "043c4bd2996cdf18f090eb80e6996e85383f03d7",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/paired-starter-viewports-20261026",
+      "commit": "2c487f2803279106e2b8d18cfee484d177474b4f",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/paired-starter-viewports-linux-20261026",
+      "commit": "ceb57a153d82daa2540fcae63f3ae67fdcc8b372",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/participant-console-regression-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/participant-console-regression-linux-20261026",
+      "commit": "43d8cf9e0e6df99b00583c95558bdad6e9c75a6c",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/participant-entry-viewports-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/participant-entry-viewports-linux-20261026",
+      "commit": "d3fe5a805c9f58ae5617f5f1f023591ddbb43a7b",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/pipeline-and-starter-integration-20261027",
+      "commit": "2a627eb650bd0a765ee3bb4db07327030c6d3f51",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/qualification-capacity-20261027",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/response-part-types-20261025",
+      "commit": "1e520949c212964f70641e5b799125f6e081c290",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/response-part-types-linux-20261025",
+      "commit": "8b26bc4485c7706b302fbc0c2c3dc34b699cff2f",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-live-mode-20261024",
+      "commit": "337034f4c820d2dd71e63bb24bfcf96b47fded8c",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-native-assignments-20261025",
+      "commit": "32cb9676913d7a386a55bac7c673db00c3c4193f",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-native-auth-core-20261025",
+      "commit": "ce9591d14a52b3c78422f32e82ade1fa9cd496e5",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-native-binary-20261024",
+      "commit": "3126bb2759fe93b8d54eb82cfb4f120400868961",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-native-cascade-20261025",
+      "commit": "25ff5c58e6ac3370c8ba4c957eb77ed2ccdbe333",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-native-session-20261025",
+      "commit": "2ed5f30bcc8db8475f85340132f0574c15edd96d",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-original-groups-20261025",
+      "commit": "113864c4733f3467aa1e488c724ff0eda7b822fa",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-qualification-20261024",
+      "commit": "6af21a4e8caf56864cb710235b161c231d6365ff",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-release-free-20261025",
+      "commit": "d4771affc7b6f00031944008af3d95e9f185c0c7",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-report-wire-20261025",
+      "commit": "4beb0c76edc53b89c1dc8e667532f77c61437035",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/service-focus-source28-20261025",
+      "commit": "9e12b216fe4533ff7c21ece44bc728c3e705d40b",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-group-labels-20261024",
+      "commit": "64a0e1e3fb6e8617342512b54a762558ab53cab3",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-group-deletion-20261025",
+      "commit": "4779500c23135a3d8c6c38698c1f5d89b0abb5c0",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-login-protocol-20261024",
+      "commit": "0a81b3bf5e8cbe6a112c7d7092e1c5d4b488ce03",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-person-labels-20261024",
+      "commit": "7afd631e97eb3708f20f5691d6af2c0f7a5c937c",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-person-lifecycle-20261024",
+      "commit": "9192fe560283a3b94c7ebc442d62c12fc7a602f6",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-pow-20261025",
+      "commit": "ffa67c0c015a041f8103de723f5a1ead8b8f11a9",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-result-projection-20261024",
+      "commit": "06a4a878554f07b72c968f8be9f168edd3d1c6d6",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-command-20261028",
+      "commit": "85c14b751a20a9a497ad060446142873ae26b66a",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-command-boundaries-20261028",
+      "commit": "d3c855d1a5c22e268429e61afcf221b96e6c4360",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-command-polling-20261028",
+      "commit": "693a169891aa8ae186ff231b4895160a0e614a66",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-command-seconds-20261028",
+      "commit": "109f3f4df44667d6e728fc8e1a7c782a69c973ab",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-command-xml-20261028",
+      "commit": "19d749b4e90359c41c79761ff04ac4714177dfb5",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-create-20261025",
+      "commit": "9009dcb83d05c356e26cb5816ed0e25b396ea8bc",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-lock-20261028",
+      "commit": "868b3219c1d94422149bed2817de984d3889fa6e",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-lock-order-20261028",
+      "commit": "463f704c4fd4fd86ad92d27a07250332bcad60ac",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-test-read-20261026",
+      "commit": "3eb8c918dce070f4ff5cf240605255524812a0cb",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-testlog-20261028",
+      "commit": "9926bbfa9d6f626898dfcb481614c2b03becbb9d",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-testlog-boundaries-20261028",
+      "commit": "75093ce061d36b11e7411e463d581ba3efcc4e3e",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-testlog-codec-20261028",
+      "commit": "e675495310b606d7eb9996a513afb883985b4d95",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-testlog-floats-20261028",
+      "commit": "0d1c0e4556a5b8b83736bc25eb0ddfc6d23385ba",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-unit-reports-20261025",
+      "commit": "5010312460a7dfb0b569028099a03b8d10e29e0c",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-native-unit-transport-20261026",
+      "commit": "363e8575fd5925d4d286fc7afafcff1f3a18f028",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-result-group-20261023",
+      "commit": "a1f0677d9b37524e70118d5afd7e453b87365240",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-result-lock-clock-20261023",
+      "commit": "e4cf2a9d1be066bcb3fb31b6dd5ad1ec027c3826",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-results-oracle-20261023",
+      "commit": "8e7d7bb26af02009e396c08999eb7a799619c890",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/source-workspace-oracle-20261023",
+      "commit": "731b09e556e0b92f25a237656373c48f0f32c9df",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/starter-assets-after-ci-20261027",
+      "commit": "71786a9e6784ac7039f526336d14527faae278a2",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/starter-assets-linux-20261027",
+      "commit": "f90c945301b2493d32ba84c5223177a5a29d359b",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/starter-empty-views-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/starter-empty-views-linux-20261026",
+      "commit": "119b0082cbb1d8a9470ab7b72c626484eeab9c9e",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/starter-review-hover-20261026",
+      "commit": "1b3857745993df3acf9cc5bda28eeb5df81b21a0",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/starter-review-hover-linux-20261026",
+      "commit": "5702895f27abd0ef7aaaa2963a5bc7ff3351be24",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/starter-scroll-readiness-20261026",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/starter-scroll-readiness-linux-20261026",
+      "commit": "2245f6f3895c6e89f69a26994a2e90eead264c64",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/timer-focus-feedback-20261025",
+      "commit": "884cd5a7797dfbf3d2a71b57d9cb406bc0d1cd15",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/timer-focus-linux-20261025",
+      "commit": "35007a903093398a6a3bbe9b5b7c81e53e78b63d",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/codex/verona-native-input-probe-20261023",
+      "commit": "eb733b73546715b6080620ffede85a167fa943dc",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/main",
+      "commit": "103752d181c0fdc4073087b33e149eda2c7e5e48",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/testcenter-production-readiness",
+      "commit": "0f4271729cdd794a0ed847e9b2010c069578acda",
+      "included": true
+    },
+    {
+      "ref": "refs/remotes/origin/testcenter-rewrite-parity",
+      "commit": "eeabdcf29584f7a78df8d86c9fa7efda2b360f5f",
+      "included": true
+    }
+  ],
+  "historicalIntegration": {
+    "initialAuditedRefs": 302,
+    "strictPatchEquivalentRefs": 121,
+    "strictDistinctHeads": 118,
+    "strictMergeCommits": 8,
+    "remainingDistinctHeads": 106,
+    "remainingMergeCommits": 7,
+    "normalMergePreviewsWithAdditionalProductPaths": 0,
+    "noTreeChangePreviews": 29,
+    "decision": "Historical branch heads were merged using the ours strategy after byte-exact patch comparison and normal merge-tree previews favoring the newer qualified implementation. This preserves every original commit/blob as merge ancestry and retains the current qualified code, fixture and documentation variants. Temporary diagnosis/qualification workflows remain available through their original commits rather than becoming active main workflows.",
+    "temporaryPathsAbsentFromQualifiedHead": [
+      ".github/probes/source-native-group-deletion-oracle.mjs",
+      ".github/probes/source-native-group-deletion.compose.yml",
+      ".github/probes/source-native-login-protocol-oracle.mjs",
+      ".github/probes/source-native-pow-oracle.mjs",
+      ".github/probes/source-native-pow.compose.yml",
+      ".github/probes/source-native-test-command-boundaries-oracle.mjs",
+      ".github/probes/source-native-test-command-boundaries.compose.yml",
+      ".github/probes/source-native-test-command-oracle.mjs",
+      ".github/probes/source-native-test-command-polling-oracle.mjs",
+      ".github/probes/source-native-test-command-polling.compose.yml",
+      ".github/probes/source-native-test-command-seconds-oracle.mjs",
+      ".github/probes/source-native-test-command-seconds.compose.yml",
+      ".github/probes/source-native-test-command-xml-oracle.mjs",
+      ".github/probes/source-native-test-command-xml.compose.yml",
+      ".github/probes/source-native-test-command.compose.yml",
+      ".github/probes/source-native-test-create-oracle.mjs",
+      ".github/probes/source-native-test-create.compose.yml",
+      ".github/probes/source-native-test-lock-oracle.mjs",
+      ".github/probes/source-native-test-lock-order-oracle.mjs",
+      ".github/probes/source-native-test-lock-order.compose.yml",
+      ".github/probes/source-native-test-lock.compose.yml",
+      ".github/probes/source-native-test-read-oracle.mjs",
+      ".github/probes/source-native-test-read.compose.yml",
+      ".github/probes/source-native-testlog-boundaries-oracle.mjs",
+      ".github/probes/source-native-testlog-boundaries.compose.yml",
+      ".github/probes/source-native-testlog-codec-oracle.mjs",
+      ".github/probes/source-native-testlog-codec.compose.yml",
+      ".github/probes/source-native-testlog-floats-oracle.mjs",
+      ".github/probes/source-native-testlog-floats.compose.yml",
+      ".github/probes/source-native-testlog-oracle.mjs",
+      ".github/probes/source-native-testlog.compose.yml",
+      ".github/probes/source-native-unit-reports-oracle.mjs",
+      ".github/probes/source-native-unit-reports.compose.yml",
+      ".github/probes/source-native-unit-transport-oracle.mjs",
+      ".github/probes/source-native-unit-transport.compose.yml",
+      ".github/probes/source-workspace-oracle.compose.yml",
+      ".github/probes/source-workspace-oracle.mjs",
+      ".github/workflows/browser-completion-crash-linux-20261028.yml",
+      ".github/workflows/browser-system-probe.yml",
+      ".github/workflows/ci-wait-boundaries-linux.yml",
+      ".github/workflows/docker-schema-linux-20261028.yml",
+      ".github/workflows/exit-completeness-linux-qualification.yml",
+      ".github/workflows/exit-fallback-input-probe.yml",
+      ".github/workflows/global-ci-priority-linux.yml",
+      ".github/workflows/lockfile-audit-oracle.yml",
+      ".github/workflows/material-profile-oracle.yml",
+      ".github/workflows/material-v3-oracle.yml",
+      ".github/workflows/native-crash-readiness-linux-20261027.yml",
+      ".github/workflows/native-monitor-auth-linux-20261028.yml",
+      ".github/workflows/native-test-command-linux-20261028.yml",
+      ".github/workflows/native-test-create-qualification.yml",
+      ".github/workflows/native-test-lock-linux-20261028.yml",
+      ".github/workflows/native-test-scope-qualification.yml",
+      ".github/workflows/native-testlog-linux-20261028.yml",
+      ".github/workflows/native-undici-audit-probe.yml",
+      ".github/workflows/native-verona-input-probe.yml",
+      ".github/workflows/original-sample-readiness-probe.yml",
+      ".github/workflows/qualify-browser-inventory-preflight.yml",
+      ".github/workflows/qualify-certified-browser-offline.yml",
+      ".github/workflows/qualify-certified-browser-runtime.yml",
+      ".github/workflows/qualify-consistent-ci-node-mode.yml",
+      ".github/workflows/qualify-consistent-ci-node.yml",
+      ".github/workflows/qualify-early-long-ui-policy.yml",
+      ".github/workflows/qualify-native-cohort-diagnostic.yml",
+      ".github/workflows/qualify-native-test-read.yml",
+      ".github/workflows/qualify-native-unit-transport.yml",
+      ".github/workflows/qualify-participant-console-routes.yml",
+      ".github/workflows/qualify-participant-entry-viewports.yml",
+      ".github/workflows/qualify-starter-empty-views.yml",
+      ".github/workflows/qualify-starter-review-hover.yml",
+      ".github/workflows/qualify-starter-scroll-readiness.yml",
+      ".github/workflows/qualify-starter-viewports.yml",
+      ".github/workflows/response-part-types-linux-qualification.yml",
+      ".github/workflows/service-focus-native-assignments-qualification.yml",
+      ".github/workflows/service-focus-native-auth-core-qualification.yml",
+      ".github/workflows/service-focus-native-cascade-qualification.yml",
+      ".github/workflows/service-focus-native-report-wire-qualification.yml",
+      ".github/workflows/service-focus-native-session-qualification.yml",
+      ".github/workflows/service-focus-original-groups-qualification.yml",
+      ".github/workflows/service-focus-qualification.yml",
+      ".github/workflows/service-focus-release-free-qualification.yml",
+      ".github/workflows/service-focus-source28-qualification.yml",
+      ".github/workflows/source-group-label-oracle.yml",
+      ".github/workflows/source-native-group-deletion.yml",
+      ".github/workflows/source-native-login-protocol.yml",
+      ".github/workflows/source-native-person-labels-oracle.yml",
+      ".github/workflows/source-native-person-lifecycle-oracle.yml",
+      ".github/workflows/source-native-pow.yml",
+      ".github/workflows/source-native-result-projection-oracle.yml",
+      ".github/workflows/source-native-test-command-20261028.yml",
+      ".github/workflows/source-native-test-command-boundaries-20261028.yml",
+      ".github/workflows/source-native-test-command-polling-20261028.yml",
+      ".github/workflows/source-native-test-command-seconds-20261028.yml",
+      ".github/workflows/source-native-test-command-xml-20261028.yml",
+      ".github/workflows/source-native-test-create-qualification.yml",
+      ".github/workflows/source-native-test-lock-20261028.yml",
+      ".github/workflows/source-native-test-lock-order-20261028.yml",
+      ".github/workflows/source-native-test-read-qualification.yml",
+      ".github/workflows/source-native-testlog-20261028.yml",
+      ".github/workflows/source-native-testlog-boundaries-20261028.yml",
+      ".github/workflows/source-native-testlog-codec-20261028.yml",
+      ".github/workflows/source-native-testlog-floats-20261028.yml",
+      ".github/workflows/source-native-unit-reports.yml",
+      ".github/workflows/source-native-unit-transport-qualification.yml",
+      ".github/workflows/source-workspace-oracle.yml",
+      ".github/workflows/starter-assets-linux-20261027.yml",
+      ".github/workflows/timer-focus-linux-qualification.yml",
+      "rewrite-app/scripts/probe-exit-fallback-input.mjs",
+      "rewrite-app/scripts/probe-native-verona-input.mjs"
+    ]
+  },
+  "localValidation": {
+    "unitAndFrontend": {
+      "passed": 4805,
+      "failed": 0,
+      "skipped": 0
+    },
+    "postgres": {
+      "passed": 3032,
+      "failed": 0,
+      "skipped": 0
+    },
+    "ciPolicy": {
+      "passed": 331,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "Existing GNU timeout qualification requires Linux; current host is macOS."
+    },
+    "productionBuild": true,
+    "typecheck": true,
+    "actionlint": true,
+    "dependencyVulnerabilities": 0,
+    "headedChrome": {
+      "markers": 16,
+      "unexpectedFailures": 0,
+      "exactExpectedSourceFailures": 1
+    }
+  },
+  "cloudAcceptance": "A fresh complete pull-request workflow is required for this integration candidate before the final main merge.",
+  "remainingProductAcceptance": "Full functional and visual Original parity remains unproven; production native monitor frontend/poll/apply/ACK adoption and all eight broad visual rows remain open.",
+  "Original": "Read-only at eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "deploymentAuthorized": false
+}
