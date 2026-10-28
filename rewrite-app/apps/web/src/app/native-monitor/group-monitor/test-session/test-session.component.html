@@ -333,13 +333,7 @@
       >
       <div class="vertical-align-middle">
         @if (isBooklet(testSession.booklet)) {
-          @if (testSession.bookletStates && testSession.bookletStates[bookletState.key]) {
-            {{testSession.booklet.states[bookletState.key].options[testSession.bookletStates[bookletState.key]].label}}
-          } @else {
-            @if (testSession.booklet.states[bookletState.key]) {
-              {{testSession.booklet.states[bookletState.key].options[testSession.booklet.states[bookletState.key].default].label}}
-            }
-          }
+          {{bookletStateLabel(testSession, bookletState.key)}}
         }
       </div>
     </td>

@@ -57,14 +57,14 @@ function managerFixture(){
  return {backend,controller,manager,streams,writes,rows};
 }
 function componentFixture(){
- const params=new rx.Subject(),profiles=new Map(),connected=[],navigated=[],confirmations=new rx.Subject();let finishes=0;
+ const params=new rx.Subject(),profiles=new Map(),connected=[],navigated=[],confirmations=new rx.Subject(),gotoDialog=new rx.Subject(),gotos=[];let finishes=0;
  const controller=new AbortController();const backend={accessSignal:controller.signal,connectionStatus$:new rx.BehaviorSubject('initial'),getProfile(id){const stream=new rx.Subject();profiles.set(id,stream);return stream;}};
  const empty=()=>({allChecked:false,numberOfSessions:0,differentBooklets:0,differentBookletSpecies:0,pausedSessions:0,lockedSessions:0,bookletStateLabels:{}});
- const tsm={sessions$:new rx.BehaviorSubject([]),sessionsStats$:new rx.BehaviorSubject(empty()),checkedStats$:new rx.BehaviorSubject(empty()),commandResponses$:new rx.Subject(),checkingOptions:{enableAutoCheckAll:true},filterOptions:{},connect(group){connected.push(group);},disconnect(){},resetFilters(){this.filterOptions={quick:{selected:false,filter:{value:''}}};},refreshFilters(){},commandFinishEverything(){finishes++;return rx.of({commandType:'terminate',testIds:['1']});}};
+ const tsm={checked:[],getMaxTimeAcrossAllSessions:()=>10,testCommandGoto(selection,time,targets){gotos.push({selection,time,targets});return rx.of(true);},sessions$:new rx.BehaviorSubject([]),sessionsStats$:new rx.BehaviorSubject(empty()),checkedStats$:new rx.BehaviorSubject(empty()),commandResponses$:new rx.Subject(),checkingOptions:{enableAutoCheckAll:true},filterOptions:{},connect(group){connected.push(group);},disconnect(){},resetFilters(){this.filterOptions={quick:{selected:false,filter:{value:''}}};},refreshFilters(){},commandFinishEverything(){finishes++;return rx.of({commandType:'terminate',testIds:['1']});}};
  const cts={getCustomText:()=>null};bindings.set(shared.CustomtextService,cts);
- const component=new GroupMonitorComponent({}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},{},{},{},{showConfirmDialog:()=>confirmations});
+ const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog})}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},{},{},{},{showConfirmDialog:()=>confirmations});
  component.ngOnInit();
- return {component,params,profiles,connected,navigated,confirmations,controller,tsm,get finishes(){return finishes;}};
+ return {component,params,profiles,connected,navigated,confirmations,controller,tsm,gotoDialog,gotos,get finishes(){return finishes;}};
 }
 const profile=(settings={},filters=[])=>({settings,filters,filtersEnabled:{}});
 
@@ -84,7 +84,7 @@ test('snapshot failure is not a successful empty snapshot and a later tick can r
  t.mock.timers.tick(5000);await settle();assert.deepEqual(rows,[[]]);assert.equal(backend.problem$.value,'');sub.unsubscribe();
 });
 test('Booklet errors retry while successful results remain shared and scoped',async()=>{
- let count=0;const backend={cacheIdentity:{owned:1},getBooklet:()=>rx.defer(()=>{count++;return rx.of(count===1?{error:'general',species:null}:'owned XML');})};
+ let count=0;const backend={cacheIdentity:{owned:1},accessSignal:new AbortController().signal,connectionClosed$:new rx.Subject(),getBooklet:()=>rx.defer(()=>{count++;return rx.of(count===1?{error:'general',species:null}:'owned XML');})};
  const service=new BookletService(backend);service.parseXml=()=>({metadata:{label:'Owned'},species:'owned'});
  assert.equal((await rx.firstValueFrom(service.getBooklet('BOOK'))).error,'general');
  const good=await rx.firstValueFrom(service.getBooklet('BOOK'));assert.equal(good.metadata.label,'Owned');
@@ -92,7 +92,7 @@ test('Booklet errors retry while successful results remain shared and scoped',as
  backend.cacheIdentity={owned:2};await rx.firstValueFrom(service.getBooklet('BOOK'));assert.equal(count,3);
 });
 test('a retired access failure cannot evict the replacement Booklet request',async()=>{
- const old=new rx.Subject(),next=new rx.Subject();let count=0;const backend={cacheIdentity:{owned:1},getBooklet:()=>++count===1?old:next};
+ const old=new rx.Subject(),next=new rx.Subject();let count=0;const backend={cacheIdentity:{owned:1},accessSignal:new AbortController().signal,connectionClosed$:new rx.Subject(),getBooklet:()=>++count===1?old:next};
  const service=new BookletService(backend);service.parseXml=xml=>({metadata:{label:xml},species:xml});
  const first=service.getBooklet('BOOK').subscribe();backend.cacheIdentity={owned:2};const second=service.getBooklet('BOOK');const result=rx.firstValueFrom(second);
  old.next({error:'general',species:null});assert.equal(service.getBooklet('BOOK'),second);next.next('Peer');assert.equal((await result).metadata.label,'Peer');assert.equal(count,2);first.unsubscribe();
@@ -126,4 +126,78 @@ test('finish returns to the actual native chooser after the existing delay',t=>{
 });
 for(const phase of ['confirmation','navigation'])test('route change cancels stale finish '+phase,t=>{
  clock(t);const f=componentFixture();f.params.next({'group-name':'A'});f.component.finishEverythingCommand();if(phase==='navigation')f.confirmations.next(true);f.params.next({'group-name':'B'});if(phase==='confirmation')f.confirmations.next(true);t.mock.timers.tick(3000);assert.deepEqual(f.navigated,[]);assert.equal(f.finishes,phase==='confirmation'?0:1);assert.equal(f.component.isClosing,false);f.component.ngOnDestroy();
+});
+function selectGoto(f){
+ const row={data:{testId:'9007199254740993'},booklet:{},timeLeft:{B1:0}};
+ f.tsm.checked=[row];f.component.currentlySelected={element:{id:'B1',blockId:'B1'},originSession:row,nthClick:'first',inversion:false};
+ return {row,selection:f.component.currentlySelected};
+}
+for(const transition of ['route','access','destroy','selection','targets'])test('Goto rejects a stale '+transition+' confirmation',()=>{
+ const f=componentFixture();f.params.next({'group-name':'A'});selectGoto(f);f.component.testCommandGoto();
+ if(transition==='route'){f.params.next({'group-name':'B'});selectGoto(f);f.tsm.checked[0].data.testId='9007199254740994';}
+ else if(transition==='access')f.controller.abort();
+ else if(transition==='destroy')f.component.ngOnDestroy();
+ else if(transition==='selection')f.component.currentlySelected={...f.component.currentlySelected};
+ else f.tsm.checked=[{...f.tsm.checked[0],data:{testId:'9007199254740994'}}];
+ f.gotoDialog.next(7);assert.deepEqual(f.gotos,[]);if(transition!=='destroy')f.component.ngOnDestroy();
+});
+test('Goto sends only the originally confirmed rows and retains their exact numeric identities',()=>{
+ const f=componentFixture();f.params.next({'group-name':'A'});const {row,selection}=selectGoto(f);const targets=f.tsm.checked;f.component.testCommandGoto();
+ f.tsm.checked=[{...row}];f.gotoDialog.next(7);assert.equal(f.gotos.length,1);assert.equal(f.gotos[0].targets,targets);assert.equal(f.gotos[0].selection,selection);assert.equal(f.gotos[0].time,7);assert.equal(f.gotos[0].targets[0].data.testId,'9007199254740993');f.component.ngOnDestroy();
+});
+test('a Booklet read survives repeated snapshots, but an unfinished replacement aborts and retries after disconnect',async t=>{
+ clock(t);const {backend,session}=transport(),requests=[],snapshots=new rx.Subject();
+ session.text=(...args)=>{const wait=deferred();requests.push({signal:args[5],wait});return wait.promise;};backend.observeSessionsMonitor=()=>snapshots;
+ const material=new BookletService(backend);material.parseXml=()=>({metadata:{label:'Owned slow'},species:'owned',states:{}});
+ bindings.set(GROUP_MONITOR_CONFIG,{checkForIdleInterval:0});const manager=new TestSessionManager(backend,material);
+ const packet={testId:'9007199254740993',personLabel:'Owned',bookletName:'BOOK',testState:{CONNECTION:'POLLING'},timestamp:1};
+ manager.connect('A');snapshots.next([packet]);assert.equal(requests.length,1);t.mock.timers.tick(5000);snapshots.next([{...packet,timestamp:2}]);
+ assert.equal(requests.length,1);assert.equal(requests[0].signal.aborted,false);t.mock.timers.tick(1000);requests[0].wait.resolve('Owned XML');await settle();assert.equal(manager.sessions.length,1);assert.equal(manager.sessions[0].data.timestamp,2);
+ snapshots.next([{...packet,bookletName:'LATE'}]);assert.equal(requests.length,2);manager.disconnect();assert.equal(requests[1].signal.aborted,true);
+ manager.connect('A');snapshots.next([{...packet,bookletName:'LATE'}]);assert.equal(requests.length,3);requests[1].wait.resolve('Retired XML');requests[2].wait.resolve('Current XML');await settle();assert.equal(manager.sessions.length,1);manager.disconnect();
+});
+test('access invalidation cancels an in-flight shared material request even with no current snapshot subscriber',async()=>{
+ const {backend,session,controller}=transport(),wait=deferred();let signal;
+ session.text=(...args)=>{signal=args[5];return wait.promise;};const service=new BookletService(backend);service.parseXml=()=>({species:'owned'});
+ const subscription=service.getBooklet('BOOK').subscribe();subscription.unsubscribe();assert.equal(signal.aborted,false);controller.abort();assert.equal(signal.aborted,true);wait.resolve('Old XML');await settle();
+});
+test('mixed, missing and obsolete Booklet-state values sort without killing the live monitor',()=>{
+ const f=managerFixture();const state={id:'route',label:'Route',default:'a',options:{a:{label:'Alpha'},b:{label:'Beta'}}};
+ const row=(id,states,values)=>({data:{testId:id},booklet:{states,species:'owned'},bookletStates:values});
+ const rows=[row('1',{route:state},{route:'b'}),row('2',{},{}),row('3',{route:state},{}),row('4',{route:state},{route:'obsolete'})];
+ const sorted=f.manager.sortSessions({active:'bookletState:route',direction:'asc'},rows);assert.deepEqual(sorted.map(x=>x.data.testId),['3','1','2','4']);
+ // Use the real production stats/filter/sort subscription with absent states.
+ const material={getBooklet:name=>rx.of({metadata:{label:name},species:'owned',states:name==='A'?{route:state}:{}})};
+ const manager=new TestSessionManager(f.backend,material);manager.connect('mixed');manager.sortBy$.next({active:'bookletState:route',direction:'asc'});
+ const packet=(id,name,values)=>({testId:id,bookletName:name,personLabel:id,timestamp:1,testState:{BOOKLET_STATES:JSON.stringify(values)}});
+ f.streams.get('mixed').next([packet('1','A',{route:'b'}),packet('2','B',{})]);assert.equal(manager.sessions.length,2);
+ f.streams.get('mixed').next([packet('1','A',{route:'obsolete'}),packet('2','B',{}),packet('3','A',{})]);assert.equal(manager.sessions.length,3);assert.equal(manager.sessions[0].data.testId,'3');manager.disconnect();
+});
+test('finish locks materialized pending tests but never sends terminate to pending or nonpositive IDs',t=>{
+ clock(t);const f=managerFixture();f.manager.connect('A');
+ f.streams.get('A').next([
+  {testId:'9007199254740993',personLabel:'Running',bookletName:'BOOK',testState:{status:'running',CONNECTION:'POLLING'},timestamp:1},
+  {testId:'9007199254740994',personLabel:'Pending',bookletName:'BOOK',testState:{status:'pending'},timestamp:1},
+  {testId:'0',personLabel:'Ghost',bookletName:'BOOK',testState:{status:'pending'},timestamp:1}
+ ]);
+ f.manager.commandFinishEverything().subscribe();assert.deepEqual(f.writes[0].ids,['9007199254740994','9007199254740993']);t.mock.timers.tick(1500);assert.deepEqual(f.writes[1].ids,['9007199254740993']);f.manager.disconnect();
+});
+test('the actual Goto producer uses captured targets and cannot start after its group was retired',()=>{
+ const f=managerFixture();f.manager.connect('A');
+ const block={id:'B1',blockId:'B1',restrictions:{},children:[{id:'UNIT',alias:'owned-target',label:'Owned'}]};
+ const row=id=>({data:{testId:id,bookletName:'BOOK'},booklet:{species:'owned',states:{},units:{children:[block]}},timeLeft:{B1:0}});
+ const a=row('9007199254740993'),b=row('9007199254740994'),selection={element:block};
+ f.manager._checked={other:b};f.manager.testCommandGoto(selection,7,[a]).subscribe();assert.deepEqual(f.writes[0],{type:'goto',args:['id','owned-target','| closed timeblock reopened - new remaining time 7'],ids:['9007199254740993']});
+ f.writes.length=0;const pending=f.manager.testCommandGoto(selection,7,[a]);f.manager.connect('B');pending.subscribe();assert.deepEqual(f.writes,[]);f.manager.disconnect();
+});
+for(const action of ['Pause','Resume','Unlock'])for(const transition of ['group','access'])test(action+' cannot outlive its '+transition+' context',()=>{
+ const f=managerFixture(),pending=new rx.Subject();f.backend.command=()=>pending;f.backend.unlock=()=>pending;f.manager.connect('A');
+ f.streams.get('A').next([{testId:'1',personLabel:'Owned',bookletName:'BOOK',timestamp:1,testState:{status:action==='Unlock'?'locked':'running',CONNECTION:'POLLING',CONTROLLER:'RUNNING'}}]);
+ f.manager['testCommand'+action]();assert.equal(pending.observed,true);
+ if(transition==='group')f.manager.connect('B');else f.controller.abort();assert.equal(pending.observed,false);f.manager.disconnect();
+});
+test('a failed immediate command reports its error without an unhandled subscription failure',async()=>{
+ const {backend,session}=transport(),snapshots=new rx.Subject();backend.observeSessionsMonitor=()=>snapshots;
+ session.text=async()=>{throw Error('Owned visible failure');};bindings.set(GROUP_MONITOR_CONFIG,{checkForIdleInterval:0});
+ const manager=new TestSessionManager(backend,{getBooklet:()=>rx.of({error:'general',species:null})});manager.connect('A');snapshots.next([{testId:'1',personLabel:'Owned',bookletName:'BOOK',timestamp:1,testState:{status:'running',CONNECTION:'POLLING',CONTROLLER:'RUNNING'}}]);manager.testCommandPause();await settle();assert.equal(backend.problem$.value,'Owned visible failure');manager.disconnect();assert.equal(backend.problem$.value,'');
 });

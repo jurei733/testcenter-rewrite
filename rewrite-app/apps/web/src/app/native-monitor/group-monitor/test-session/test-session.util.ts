@@ -11,6 +11,12 @@ import {
 } from '../group-monitor.interfaces';
 
 export class TestSessionUtil {
+  static bookletStateLabel(session: TestSession, stateId: string): string | undefined {
+    const state = isBooklet(session.booklet) ? session.booklet.states[stateId] : undefined;
+    const option = session.bookletStates?.[stateId] || state?.default;
+    return option ? state?.options[option]?.label : undefined;
+  }
+
   static hasState(state: Record<string, unknown>, key: string, value: string | null = null): boolean {
     return ((typeof state[key] !== 'undefined') && ((value !== null) ? (state[key] === value) : true));
   }

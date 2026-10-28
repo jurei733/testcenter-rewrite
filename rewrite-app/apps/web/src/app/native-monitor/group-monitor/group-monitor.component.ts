@@ -323,11 +323,17 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
       return;
     }
 
-    (this.tsm.checked
+    const selection = this.currentlySelected;
+    const targets = this.tsm.checked;
+    const ids = targets.map(session => session.data.testId);
+    const scope = this.bs.accessSignal;
+    const current = () => this.currentlySelected === selection && scope === this.bs.accessSignal && !scope.aborted &&
+      JSON.stringify(this.tsm.checked.map(session => session.data.testId)) === JSON.stringify(ids);
+    this.subscriptions.push((targets
       .some(testSession => isBooklet(testSession.booklet) &&
-          this.currentlySelected?.element &&
+          selection.element &&
           testSession.timeLeft &&
-          (testSession.timeLeft[this.currentlySelected?.element?.id] <= 0)
+          (testSession.timeLeft[selection.element.id] <= 0)
       ) ?
       this.dialog.open(
         TimeRestrictionDialogComponent, {
@@ -339,18 +345,21 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
                 this.cts.getCustomText('gm_control_goto_unlock_blocks_confirm_text'),
             confirmbuttonlabel: 'OK',
             showcancel: true,
-            remainingTime: this.tsm.getMaxTimeAcrossAllSessions(this.currentlySelected)
+            remainingTime: this.tsm.getMaxTimeAcrossAllSessions(selection)
           }
         }
       ).afterClosed() :
       of(1) // 1 as in 'true'
-    )
-      .subscribe((confirmed?: number | boolean) => {
-        if (!confirmed || confirmed === 0 || !this.currentlySelected) return;
-        const newTimeLeft = confirmed as number;
-        this.tsm.testCommandGoto(this.currentlySelected, newTimeLeft)
-          .subscribe(() => this.selectNextBlock());
-      });
+    ).pipe(
+      take(1),
+      filter((confirmed?: number | boolean) => !!confirmed && current()),
+      switchMap(confirmed => this.tsm.testCommandGoto(selection, Number(confirmed), targets)),
+      takeUntil(this.routeChanged$),
+      takeUntil(fromEvent(scope, 'abort'))
+    ).subscribe({
+      next: () => { if (current()) this.selectNextBlock(); },
+      error: () => { this.messages.push({ level: 'error', customtext: '', text: 'Der Sprung konnte nicht ausgeführt werden.' }); }
+    }));
   }
 
   private selectNextBlock(): void {

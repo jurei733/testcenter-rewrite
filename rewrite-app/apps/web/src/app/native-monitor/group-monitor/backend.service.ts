@@ -1,5 +1,5 @@
 import {Injectable,inject} from '@angular/core';
-import {BehaviorSubject,EMPTY,Observable,of,timer} from 'rxjs';
+import {BehaviorSubject,EMPTY,Observable,of,Subject,timer} from 'rxjs';
 import {catchError,exhaustMap,map,tap} from 'rxjs/operators';
 import type {BookletError,CommandResponse,Profile,TestSessionData} from './group-monitor.interfaces';
 import type {ConnectionStatus} from '../shared/shared.module';
@@ -10,6 +10,8 @@ export class BackendService {
  private readonly session=inject(NativeMonitorSessionService);
  readonly connectionStatus$=new BehaviorSubject<ConnectionStatus>('initial');
  readonly problem$=new BehaviorSubject('');
+ private readonly connectionClosed=new Subject<void>();
+ readonly connectionClosed$=this.connectionClosed.asObservable();
  get cacheIdentity(){return this.session.access();}
  get accessSignal(){return this.session.accessSignal;}
  private request(method:string,path:string,body?:unknown,raw=false):Observable<string>{
@@ -32,7 +34,7 @@ export class BackendService {
    );
   }));
  }
- cutConnection(){this.connectionStatus$.next('initial');}
+ cutConnection(){this.connectionClosed.next();this.connectionStatus$.next('initial');this.problem$.next('');}
  getBooklet(name:string):Observable<string|BookletError>{return this.request('GET','/booklet/'+encodeURIComponent(name)).pipe(catchError(error=>of({error:error.status===404?'missing-file':'general',species:null} as BookletError)));}
  private write(path:string,ids:string[],fields:Record<string,unknown>={},method='POST'):Observable<CommandResponse>{
   return this.request(method,path,nativeMonitorSelectionBody(ids,fields),true).pipe(map(()=>({commandType:String(fields['keyword']??(path.endsWith('/unlock')?'unlock':'lock')),testIds:ids})),tap(()=>this.problem$.next('')),catchError(error=>{this.problem$.next(error instanceof Error?error.message:'Befehl fehlgeschlagen');throw error;}));

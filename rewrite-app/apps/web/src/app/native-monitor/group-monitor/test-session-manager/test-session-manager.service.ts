@@ -281,6 +281,19 @@ export class TestSessionManager {
     return typeof filterOut !== 'undefined';
   }
 
+  private send(request: Observable<CommandResponse>): void {
+    const scope = this.bs.accessSignal;
+    if (!this.groupName || scope.aborted) return;
+    request.pipe(
+      takeUntil(this.disconnected$),
+      takeUntil(fromEvent(scope, 'abort'))
+    ).subscribe({
+      next: response => this._commandResponses$.next(response),
+      // BackendService already exposes the redacted failure to the view.
+      error: () => {}
+    });
+  }
+
   testCommandPause(): void {
     const testIds = this.checked
       .filter(session => !TestSessionUtil.isPaused(session))
@@ -290,9 +303,7 @@ export class TestSessionManager {
       this._commandResponses$.next({ commandType: 'pause', testIds });
       return;
     }
-    this.bs.command('pause', [], testIds).subscribe(
-      response => this._commandResponses$.next(response)
-    );
+    this.send(this.bs.command('pause', [], testIds));
   }
 
   testCommandResume(): void {
@@ -303,30 +314,27 @@ export class TestSessionManager {
       this._commandResponses$.next({ commandType: 'resume', testIds });
       return;
     }
-    this.bs.command('resume', [], testIds).subscribe(
-      response => this._commandResponses$.next(response)
-    );
+    this.send(this.bs.command('resume', [], testIds));
   }
 
-  testCommandGoto(selection: Selected, newTimeLeft: number): Observable<true> {
-    const gfg = TestSessionManager.groupForGoto(this.checked, selection);
-    const allTestIds = this.checked.map(s => s.data.testId);
-    return zip(
-      Object.keys(gfg)
-        .map(unitAlias => this.bs.command(
+  testCommandGoto(selection: Selected, newTimeLeft: number, targets: TestSession[] = this.checked): Observable<true> {
+    const gfg = TestSessionManager.groupForGoto(targets, selection);
+    const allTestIds = targets.map(s => s.data.testId);
+    const group = this.groupName;
+    const revision = this.connectionRevision;
+    const scope = this.bs.accessSignal;
+    return defer(() => group && group === this.groupName && revision === this.connectionRevision &&
+      scope === this.bs.accessSignal && !scope.aborted ? zip(
+        Object.keys(gfg).map(unitAlias => this.bs.command(
           'goto',
           ['id', unitAlias, gfg[unitAlias].isClosed ? `| closed timeblock reopened - new remaining time ${newTimeLeft}` : ''],
-          gfg[unitAlias].ids)
-        )
-    ).pipe(
-      tap(() => {
-        this._commandResponses$.next({
-          commandType: 'goto',
-          testIds: allTestIds
-        });
-      }),
-      map(() => true)
-    );
+          gfg[unitAlias].ids))
+      ).pipe(
+        takeUntil(this.disconnected$),
+        takeUntil(fromEvent(scope, 'abort')),
+        tap(() => { this._commandResponses$.next({ commandType: 'goto', testIds: allTestIds }); }),
+        map(() => true as const)
+      ) : EMPTY);
   }
 
   testCommandUnlock(): void {
@@ -339,9 +347,7 @@ export class TestSessionManager {
       return;
     }
 
-    this.bs.unlock(this.groupName, testIds).subscribe(
-      response => this._commandResponses$.next(response)
-    );
+    this.send(this.bs.unlock(this.groupName, testIds));
   }
 
   // todo unit test
@@ -354,7 +360,7 @@ export class TestSessionManager {
       .map(session => session.data.testId);
     const getUnlockedTestIds = () => Object.values(this._sessions$.getValue())
       .filter(session => BigInt(session.data.testId) > 0n)
-      .filter(session => !['pending', 'locked'].includes(session.state))
+      .filter(session => session.state !== 'locked')
       .map(session => session.data.testId);
 
     this.filters$.next([]);
@@ -408,12 +414,10 @@ export class TestSessionManager {
         }
         if (sort.active.startsWith('bookletState:')) {
           const bookletState = sort.active.replace('bookletState:', '');
-          const a = session1.bookletStates && isBooklet(session1.booklet) ?
-            session1.booklet.states[bookletState].options[session1.bookletStates[bookletState]].label :
-            'zzzzzzzzzz';
-          const b = session2.bookletStates && isBooklet(session2.booklet) ?
-            session2.booklet.states[bookletState].options[session2.bookletStates[bookletState]].label :
-            'zzzzzzzzzz';
+          const label = (session: TestSession): string =>
+            TestSessionUtil.bookletStateLabel(session, bookletState) ?? 'zzzzzzzzzz';
+          const a = label(session1);
+          const b = label(session2);
           return a.localeCompare(b) * sortDirectionFactor;
         }
         let valA = session1.data[sort.active as keyof typeof session1.data] ?? 'zzzzzzzzzz';

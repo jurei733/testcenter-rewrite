@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { map, shareReplay, tap } from 'rxjs/operators';
+import { defer, EMPTY, fromEvent, merge, Observable, of } from 'rxjs';
+import { finalize, map, shareReplay, takeUntil, tap } from 'rxjs/operators';
 import { BackendService } from '../backend.service';
 import {
   isBooklet, isUnit, type Booklet, type Testlet, type BookletError, type Unit, type BookletState, type BookletStateOption
@@ -30,7 +30,9 @@ export class BookletService extends BookletParserService<Unit, Testlet, BookletS
     if (bookletName === '') {
       this.booklets[bookletName] = of<Booklet | BookletError>({ error: 'missing-id', species: null });
     } else {
-      const request = this.bs.getBooklet(bookletName).pipe(
+      const identity = this.accessIdentity;
+      const scope = this.bs.accessSignal;
+      const request = defer(() => scope.aborted || identity !== this.bs.cacheIdentity ? EMPTY : this.bs.getBooklet(bookletName)).pipe(
         map((response: string | BookletError) => (typeof response === 'string' ? this.parseXml(response) : response)),
         tap(booklet => {
           // Retry failures later; an old request must not evict a new access's cache.
@@ -39,7 +41,13 @@ export class BookletService extends BookletParserService<Unit, Testlet, BookletS
             else delete this.booklets[bookletName];
           }
         }),
-        shareReplay({ bufferSize: 1, refCount: true })
+        // Snapshot replacement must not starve slow material. Explicit
+        // connection/access cancellation still aborts the underlying read.
+        takeUntil(merge(this.bs.connectionClosed$, fromEvent(scope, 'abort'))),
+        finalize(() => {
+          if (this.booklets[bookletName] === request) delete this.booklets[bookletName];
+        }),
+        shareReplay({ bufferSize: 1, refCount: false })
       );
       this.booklets[bookletName] = request;
     }

@@ -54,11 +54,12 @@
     "Fixed Source SVG glyph paths are rendered locally with the Material icon host geometry.",
     "Real polling, protected native entry, account lifecycle and dotted native browser routes are connected. WebSocket transport is not yet implemented.",
     "Operator account details retain their prior DOM and styles in a deferred component so the unchanged 470 kB initial budget passes.",
-    "Finish-all captures its original group/access/int64 targets and cancels on route/access changes; profiles reset and cancel on selection/destruction; slow in-flight polls retain the unchanged20s deadline; failed Booklet reads retry while successful private material remains scoped and cached."
+    "Finish-all captures its original group/access/int64 targets and cancels on route/access changes; profiles reset and cancel on selection/destruction; slow in-flight polls retain the unchanged20s deadline; failed Booklet reads retry while successful private material remains scoped and cached.",
+    "Goto confirmations capture the original selection and exact recipients; producer requests cancel on connection/access changes and report errors within their current view. Slow Booklet reads survive polling replacements but abort on disconnect/access changes. Shared state-label resolution safely renders/sorts missing or obsolete values. Finish-all locks real positive-ID pending tests without terminating them; Source recorded unopened Test195+ proves this is not a ghost row."
   ],
   "qualificationLimits": [
     "No measured Original visual parity claimed for this port.",
     "Native participant poll/apply/empty ACK adoption remains open.",
-    "Basic confirmed/cancelled finish-all, original numeric recipients, native chooser return, six-second snapshot and transient material recovery are proven in headed Chrome. Goto/time adjustments and broader layout/profile/filter combinations still need native browser qualification."
+    "Native Goto confirmation/producer arguments, state rendering/sorting, six-second material enrichment and pending finish locking are browser-qualified with the retained scenarios. Receiver-side native Goto/time effects and broader layout/profile/filter combinations remain open."
   ]
 }

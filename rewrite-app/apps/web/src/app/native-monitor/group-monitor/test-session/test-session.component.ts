@@ -62,6 +62,7 @@ export class TestSessionComponent {
 
   // TODO use pipes for the following functions
   stateString = TestSessionUtil.stateString;
+  bookletStateLabel = TestSessionUtil.bookletStateLabel;
   hasState = TestSessionUtil.hasState;
   isBooklet = isBooklet;
   isTestlet = isTestlet;
