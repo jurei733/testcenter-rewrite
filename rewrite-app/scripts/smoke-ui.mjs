@@ -14412,7 +14412,30 @@ try {
 
   stopAfter("participant-original-stars-28-unit-background-sync");
   logStep("participant-original-stars-browser-process-crash-recovery");
-  const starsRendererCrashResponses = await captureStarsResponses(starsParticipantSessionId, "browser-crash");
+  const starsCrashObservations = [];
+  const observeStarsCrashSaves = (observedPage, owner) => {
+    const listener = request => {
+      if (request.method() !== "POST" || request.url() !== starsSaveProgressUrl) return;
+      const packet = request.postDataJSON();
+      if (packet?.responseUnitKey !== "2" || starsCrashObservations.length >= 100) return;
+      const response = parseVeronaUnitResponse(packet.unitResponse);
+      const marker = response?.unitState?.dataParts?.ownedRecovery;
+      let captureClock = null;
+      try {
+        const clock = JSON.parse(packet.unitResponse)?.fieldTimestamps?.dataParts?.ownedRecovery;
+        if (Number.isSafeInteger(clock) && clock >= 0) captureClock = clock;
+      } catch {}
+      starsCrashObservations.push({ owner, at: Date.now(),
+        phase: typeof marker === "string" && marker.startsWith("browser-crash:") ? "crash" :
+          typeof marker === "string" && marker.startsWith("background:") ? "background" : "other",
+        exactExpected: packet.unitResponse === starsRendererCrashResponses?.["2"],
+        captureClock });
+    };
+    observedPage.on("request", listener); return () => observedPage.off("request", listener);
+  };
+  const stopOriginalCrashObservation = observeStarsCrashSaves(page, "original-page");
+  const stopCrashObservations = [stopOriginalCrashObservation];
+  let starsRendererCrashResponses;
   const matchesStarsRendererCrashResponse = (unitKey, response) => response === starsRendererCrashResponses[unitKey] ||
     unitKey === "2" && matchesRecovery(response, starsRendererCrashResponses[unitKey]);
   const browserCrashProfileDirectory = await mkdtemp(
@@ -14436,12 +14459,43 @@ try {
     const crashingStarsPage =
       crashingStarsContext.pages()[0] ??
       (await crashingStarsContext.newPage());
+    stopCrashObservations.push(observeStarsCrashSaves(crashingStarsPage, "crashing-page"));
+    const initialCrashRun = (await pollJson(`${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`)).currentRunState.testRun;
+    const initialCrashResponse = initialCrashRun.unitResponses["2"];
+    const initialCrashClock = JSON.parse(initialCrashResponse).fieldTimestamps?.dataParts?.ownedRecovery;
+    assert.ok(Number.isSafeInteger(initialCrashClock));
+    // STARS reports its restored state after rendering. That genuine capture
+    // owns its own delayed outbox write; wait for its acknowledged transaction
+    // before inserting the later offline crash fixture.
+    const initialCrashSave = crashingStarsPage.waitForResponse(response => {
+      if (response.request().method() !== "POST" || response.url() !== starsSaveProgressUrl) return false;
+      const packet = response.request().postDataJSON();
+      if (packet?.responseUnitKey !== "2" || typeof packet.unitResponse !== "string") return false;
+      try {
+        return JSON.parse(packet.unitResponse).fieldTimestamps?.dataParts?.ownedRecovery > initialCrashClock &&
+          matchesRecovery(packet.unitResponse, initialCrashResponse);
+      } catch { return false; }
+    }, { timeout: 30_000 });
+    void initialCrashSave.catch(() => {});
     await participantHttpActor.goto(crashingStarsPage,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         starsParticipantSessionId
       )}`,
       { waitUntil: "domcontentloaded" }
     );
+    // The crash fixture represents input after this real Player has restored
+    // its selected answer. DOMContentLoaded alone precedes Start and the
+    // Player's initial state notification, which can replace a seeded outbox.
+    await crashingStarsPage.locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
+      .waitFor({ timeout: 30_000 });
+    const crashRestoredChoice = crashingStarsPage.frameLocator("#participantVeronaPlayerFrame")
+      .locator('[data-cy="button-1"] input');
+    await crashRestoredChoice.waitFor({ state: "attached", timeout: 30_000 });
+    assert.equal(await crashRestoredChoice.isChecked(), true);
+    const initialCrashAcknowledgement = await initialCrashSave;
+    assert.equal(initialCrashAcknowledgement.status(), 200);
+    await initialCrashAcknowledgement.finished();
     await crashingStarsPage.evaluate(async () => {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(
@@ -14449,6 +14503,7 @@ try {
       );
     });
     await crashingStarsContext.setOffline(true);
+    starsRendererCrashResponses = await captureStarsResponses(starsParticipantSessionId, "browser-crash");
     await crashingStarsPage.evaluate(
       ({ storageKey, crashMarkerKey, testRunId, currentUnitKey, responses }) => {
         const queuedAt = Date.now();
@@ -14501,6 +14556,13 @@ try {
     // that observed persistence window before terminating the complete
     // process; the interruption itself must still run without pagehide.
     await delay(6_000);
+    const crashJournal = await crashingStarsPage.evaluate(storageKey => JSON.parse(localStorage.getItem(storageKey) ?? "null"),
+      "testcenter-rewrite:participant-save-outbox:v1");
+    assert.equal(crashJournal?.entries?.length, starsUnitKeys.length);
+    assert.deepEqual(starsUnitKeys.filter(unitKey => {
+      const entry = crashJournal.entries.find(entry => entry.testRunId === starsTestRunId && entry.unitKey === unitKey);
+      return !entry || !matchesStarsRendererCrashResponse(unitKey, entry.response);
+    }), [], "All 28 expected answers must still be secured immediately before the real process crash.");
     const crashingStarsBrowser = crashingStarsContext.browser();
     assert.ok(crashingStarsBrowser);
     const browserDisconnected = new Promise((resolvePromise, reject) => {
@@ -14536,6 +14598,7 @@ try {
     const recoveredStarsPage =
       recoveredStarsContext.pages()[0] ??
       (await recoveredStarsContext.newPage());
+    stopCrashObservations.push(observeStarsCrashSaves(recoveredStarsPage, "recovered-page"));
     await participantHttpActor.goto(recoveredStarsPage,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         starsParticipantSessionId
@@ -14574,6 +14637,8 @@ try {
       { timeout: 30_000 }
     );
   } finally {
+    for (const stop of stopCrashObservations) stop();
+    console.log(`stars_crash_save_owners=${JSON.stringify(starsCrashObservations)}`);
     await recoveredStarsContext?.close().catch(() => undefined);
     if (!starsBrowserCrashed) {
       await crashingStarsContext?.close().catch(() => undefined);
