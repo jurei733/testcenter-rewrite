@@ -3555,3 +3555,40 @@ Fresh production build, complete type checks, locked dependency audit with zero 
 The complete unchanged `smoke:ui:monitor-review:built` command reaches its required `study-monitor-review-queue-review-response` stop and owned teardown through all 459 observed stages (122569238780). Its real browser-process crash now preserves all 28 pre-crash journal responses and restores every response under the original exact/semantic clock rules. Bounded provenance shows the expected prior startup capture, followed by expected new crash content from the recovered Player; the original page emits none in that observation. Every subsequent mid-drain, capacity, Player family, controller, label and Monitor Review assertion remains and succeeds. The complete corrected local journey also passes all 459 stages, and every 73+1,211 parent assertion call remains in the AST inventory. Neither the rejected metadata-only candidate nor the diagnostic failure is accepted or retried unchanged.
 
 The successor records this certificate in documentation only. A fresh complete integrated 89-job/24-Source-task run is still required to accept the new global scheduling and browser boundaries together and to measure elapsed/Fast-feedback/runner-time effects. The 17:48 focused qualification is not a whole-pipeline benchmark or a broad parity closure.
+
+
+## Native input isolation for player confirmation fallback (2026-10-28)
+
+The first complete integration run
+[40703537790](https://github.com/jurei733/testcenter-rewrite/actions/runs/40703537790),
+head `97a910a9`, repeats the earlier missing-lazy-dialog fallback failure after
+all 36 theme/width/header/exit-policy cases and the resumed-state case pass.
+The trace completes its single Stay click at (510.55, 505). The native observer
+records no Stay pointer/click and instead records focus leaving Stay for the
+sandboxed Player iframe. The visible confirmation stays open and the Run stays
+running. This establishes escaped input/focus, but does not identify Chromium's
+internal input-routing cause. Independently downloaded artifact `12823109483`
+is 5,449,385 bytes with ZIP SHA256
+`c0ad34733baa1cd0fbfb5743d104dbb7ab3d5bc9d2e619f3d66c954c7fbad424`;
+it retains the failure JSON, PNG, and complete trace.
+
+The live Verona host now has native `inert` while a participant confirmation is
+pending. This explicitly suspends its browsing context's input while preserving
+the frame, protocol, response state and save processing. Closing the confirmation
+removes `inert`. The existing complete player-exit journey retains its single
+real Stay click, all scenarios, and the same deadlines. It additionally checks
+that the actual host is inert, no modal pointer enters the frame, the trusted
+Stay click reaches its button, the same frame survives cancellation, a subsequent
+real textarea edit receives its save acknowledgement, and the next confirmation
+isolates the host again.
+
+The complete local headed locked-Chromium journey passes all 44 markers,
+including the failed-import fallback and the six Rewrite policy cases.
+All 2,029 frontend-state tests (including 117 confirmation cases), production
+build and typecheck pass. The same complete browser script against the unchanged
+old frontend build passes the 36 matrix cases and resumed-state case, then fails
+exactly the new real-host isolation assertion (`inert` is false). This negative
+control confirms the added check detects the missing isolation. A fresh complete
+Linux acceptance run on the changed
+head remains required before merging; this local result is not a claim of broad
+visual parity or proof that every native input-routing issue is solved.
