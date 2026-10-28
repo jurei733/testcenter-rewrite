@@ -1241,6 +1241,8 @@ export type ParticipantTestLog = {
 };
 
 export const originalTestLogIdPrefix = 'original-test-log:';
+/** Native state logs also carry pre-encoded PHP content, while remaining state events. */
+export const originalTestStateLogIdPrefix = 'original-test-state:';
 
 /** SQL stores the full int64. The numeric projection matches a JS client;
  * its original decimal is retained for lossless native JSON/CSV and backups. */

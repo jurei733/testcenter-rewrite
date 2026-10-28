@@ -122,6 +122,21 @@ export function encodeOriginalTestLogContent(input: unknown): string {
   try { return encode(input,0); } catch (error) { if (error instanceof FirstSliceError) throw error; throw internal(); }
 }
 
+/** Required-field extraction precedes the durable lock; strict TestLog field
+ * validation follows it, matching the observed production controller order. */
+export function readOriginalTestLockFields(body: unknown): {message: unknown; timeStamp: unknown} {
+  const field = (name: string): unknown => body instanceof PhpObject ? body.fields.get(name) :
+    body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body,name) ? (body as Record<string,unknown>)[name] : undefined;
+  const timeStamp = field('timeStamp');
+  if (timeStamp === undefined || timeStamp === null) throw missing('timeStamp');
+  return {message: field('message') ?? '', timeStamp};
+}
+export function parseOriginalTestLockLog(fields: {message: unknown; timeStamp: unknown}): ReturnType<typeof parseOriginalTestLogEntries>[number] {
+  const entry = parseOriginalTestLogEntries([{key: fields.message, timeStamp: fields.timeStamp}])[0]!;
+  // Lock passes a raw key and absent content to TestLog, not a JSON string.
+  return {...entry, content: ''};
+}
+
 export function parseOriginalTestLogEntries(body: unknown): Array<{key:string;content:string;timeStamp:number;originalClientTimestamp?:string}> {
   if (!Array.isArray(body)) throw new FirstSliceError(400,'original_test_state_invalid','body has to be an array');
   return body.map(row => {

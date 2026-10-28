@@ -6,7 +6,7 @@ import {join, resolve} from 'node:path';
 import test from 'node:test';
 import {DatabaseSync} from 'node:sqlite';
 import {Pool} from 'pg';
-import {createFirstSliceServices, parseOriginalTestName, prepareOriginalTestNumber,prepareOriginalWorkspaceNumber,parseOriginalTestStatePatch,applyOriginalTestStatePatch,formatOriginalTestReadJson,formatOriginalUnitReadJson,formatOriginalTestLogEntry,decodeOriginalTestLogJson,parseOriginalTestLogEntries} from '@testcenter-rewrite-app/application';
+import {createFirstSliceServices, prepareOriginalTestLock, parseOriginalTestName, prepareOriginalTestNumber,prepareOriginalWorkspaceNumber,parseOriginalTestStatePatch,applyOriginalTestStatePatch,formatOriginalTestReadJson,formatOriginalUnitReadJson,formatOriginalTestLogEntry,decodeOriginalTestLogJson,parseOriginalTestLogEntries} from '@testcenter-rewrite-app/application';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage, SQLITE_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/sqlite-store';
@@ -48,6 +48,10 @@ const boundaryCases=boundaryReceipt.checks[51].boundaries;
 const floatEvidence=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-log-floats/',import.meta.url);
 const floatReceipt=JSON.parse(await readFile(new URL('receipt.json',floatEvidence),'utf8')),floatManifest=JSON.parse(await readFile(new URL('manifest.json',floatEvidence),'utf8'));
 const floatCases=floatReceipt.checks[52].values,floatReportRows=JSON.parse(await readFile(new URL('testlog-codec-floats.json',floatEvidence),'utf8'));
+
+const lockEvidence=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-lock/',import.meta.url);
+const lockReceipt=JSON.parse(await readFile(new URL('receipt.json',lockEvidence),'utf8')),lockManifest=JSON.parse(await readFile(new URL('manifest.json',lockEvidence),'utf8'));
+const lockCases=lockReceipt.checks[54].outcomes,lockReportRows=JSON.parse(await readFile(new URL('test-lock.json',lockEvidence),'utf8'));
 
 const stamp = '2026-10-26T00:00:00.000Z', password = 'Owned-native-create-secret';
 const schemas = {Unit:'unit-xml/17.6',Booklet:'testcenter-booklet-xml/18.0',Testtakers:'testcenter-testtaker-xml/18.0'};
@@ -114,6 +118,28 @@ test('production Source53 pins177 independent PHP float encodings including sign
  assert.equal(floatReceipt.success,true);assert.equal(floatReceipt.testMode,false);assert.equal(floatReceipt.checks.length,53);assert.equal(floatCases.length,177);
  assert.deepEqual(floatReceipt.checks.slice(0,52).map(x=>x.name),boundaryReceipt.checks.map(x=>x.name));assert.deepEqual(floatReceipt.sourceFiles,boundaryReceipt.sourceFiles);
  for(const[name,sha]of Object.entries(floatManifest.files))assert.equal(createHash('sha256').update(await readFile(new URL(name,floatEvidence))).digest('hex'),sha);
+});
+
+test('production Source57 retains all Source53 controls and independently correlates21 native lock outcomes with exact raw reports',async()=>{
+ assert.equal(lockManifest.sourceCommit,'eedae41840cbe90e5547c0211da818bdf620f5aa');assert.equal(lockManifest.probeCommit,'463f704c4fd4fd86ad92d27a07250332bcad60ac');
+ assert.equal(lockManifest.probeTree,'0477dbace9a5dcfef9f6ee5c7eb1a8f214435918');assert.equal(lockManifest.runId,40626328250);assert.equal(lockManifest.jobId,122611999994);
+ assert.equal(lockManifest.artifactId,12790055538);assert.equal(lockManifest.artifactSha256,'12798546eeced668acd3e28a69599d08c1a58a11218936b8dc68c90ce597aeff');
+ assert.equal(lockManifest.sourceProbeSha256,'4a6c8ac1e5d180ffaebd259b99c6e778f65c8ecd1e317617557dfb12e369be77');
+ assert.equal(lockReceipt.success,true);assert.equal(lockReceipt.testMode,false);assert.equal(lockReceipt.checks.length,57);assert.equal(lockCases.length,21);assert.equal(Object.keys(lockReceipt.sourceFiles).length,36);
+ assert.deepEqual(lockReceipt.checks.slice(0,53).map(x=>x.name),floatReceipt.checks.map(x=>x.name));assert.deepEqual(lockReceipt.sourceFiles,floatReceipt.sourceFiles);
+ for(const[name,digest]of Object.entries(lockManifest.files)){assert.match(name,/^[a-z0-9][a-z0-9.-]*$/);assert.equal(createHash('sha256').update(await readFile(new URL(name,lockEvidence))).digest('hex'),digest,name);}
+ const current=await readFile(new URL('source-probe.mjs',lockEvidence),'utf8'),old=await readFile(new URL('source-probe.mjs',floatEvidence),'utf8');
+ assert.equal(current.split('  // Independent native lock observations;')[0],old.split('  receipt.success = true;')[0]);
+ assert.equal(JSON.parse(await readFile(new URL('http-observations.json',lockEvidence),'utf8')).length,545);assert.equal(lockReportRows.length,11);
+ for(const entry of lockCases){const selected=lockReportRows.filter(row=>row.bookletname==='ORACLE.POW.BOOK#lock:'+entry.label);assert.equal(selected.length,entry.appendCount);assert.deepEqual(entry.entries.map(row=>row.bookletname),selected.map(row=>row.bookletname));assert.deepEqual(entry.entries.map(row=>row.logentry),selected.map(row=>row.logentry));}
+ const raw=await readFile(new URL('test-lock.json',lockEvidence),'utf8');assert.ok(raw.includes('9223372036854775807'));assert.ok(raw.includes('-9223372036854775808'));
+});
+
+test('native lock validates related server evidence without inventing malformed historical dates',()=>{
+ const before={bookletName:'KNOWN',bookletLabel:'Known',lastOpenedAt:null,lastTestStateAt:null,lastTestModifiedAt:'2026-10-26T00:00:00.000Z',hasTestState:false};
+ assert.deepEqual(prepareOriginalTestLock('2026-10-28T00:00:00.000Z',before),{locked:true,updatedAt:'2026-10-28T00:00:00.000Z',originalResultState:{...before,lastTestModifiedAt:'2026-10-28T00:00:00.000Z'}});
+ for(const key of['lastOpenedAt','lastTestStateAt','lastTestModifiedAt'])for(const value of[0,false,{},[], 'not a date'])assert.throws(()=>prepareOriginalTestLock('2026-10-28T00:00:00.000Z',{...before,[key]:value}));
+ assert.throws(()=>prepareOriginalTestLock('not a date',before));assert.throws(()=>prepareOriginalTestLock('2026-10-28T00:00:00.000Z',undefined));assert.equal(before.lastTestModifiedAt,'2026-10-26T00:00:00.000Z');
 });
 
 test('native TestName keeps Source whitespace, duplicate-key and first-key-order semantics without prototype assignment', () => {
@@ -465,7 +491,8 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
     await t.test('late native state failures preserve the previous state, clocks, logs and caches',async()=>{
       const before=await repository.getTestRunById(run.testRunId),logs=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),patch=[{key:'ownedLateNativeState',content:'must roll back',timeStamp:1}];
       if(kind==='memory'){
-        const failing=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19',idGenerator:()=>logs.find(row=>row.testRunId===run.testRunId).participantTestLogId});
+        const prefix='original-test-state:',collision=logs.find(row=>row.testRunId===run.testRunId&&row.participantTestLogId.startsWith(prefix));assert.ok(collision);
+        const failing=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19',idGenerator:()=>collision.participantTestLogId.slice(prefix.length)});
         await assert.rejects(failing.originalTest.patchState({token:main.person.token,testNumber:number,patch}),/identity|already|collision/i);
       }else if(kind==='file'){
         const backup=file+'.native-state-backup',mutate=repository.mutateParticipantRun;let projected=false;
@@ -764,6 +791,102 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         assert.deepEqual(await repository.getTestRunById(input.testRunId),before);
       });
     });
+    await t.test('Source57 native lock matches all21 actual outcomes and preserves unrelated Test data',async t=>{
+      const wireScope={tenantKey:tenant.tenantKey,workspaceKey:'native-log-wire'};
+      await services.contentIntake.uploadWorkspaceFile({...wireScope,fileName:'people.xml',mediaType:'application/xml',sourceDocument:xml('Testtakers','<Metadata/><Group id="ORACLE.TEST.LOCK" label="Owned native Test lock"><Login name="owned-native-test-lock" pw="'+password+'" mode="run-review"><Booklet codes="Shared">ORACLE.POW.BOOK</Booklet></Login></Group>')});
+      const workspace=await repository.getWorkspaceByScope(wireScope.tenantKey,wireScope.workspaceKey);assert.ok(workspace);
+      const login=await services.originalAuthentication.login({name:'owned-native-test-lock',password}),person=await services.originalAuthentication.person({loginToken:login.token,code:'Shared'});
+      const byBooklet=new Map();
+      const create=async label=>{
+        const bookletName='ORACLE.POW.BOOK#lock:'+label,testNumber=await services.originalTest.create({token:person.token,bookletName});
+        const scope=await repository.findOriginalTestNumber({tenantId:tenant.tenantId,workspaceId:workspace.workspaceId,participantSessionId:person.participantSession.participantSessionId,testNumber});assert.ok(scope);
+        const value={bookletName,testNumber,scope};byBooklet.set(bookletName,value);return value;
+      };
+      const logs=async scope=>(await repository.listParticipantTestLogsByWorkspace(scope.tenantId,scope.workspaceId)).filter(row=>row.testRunId===scope.testRunId);
+      const unchangedExceptLock=(before,after)=>assert.deepEqual(after,{...before,locked:true,updatedAt:after.updatedAt,originalResultState:{...before.originalResultState,lastTestModifiedAt:after.updatedAt}});
+      await t.test('foreign and wrong-kind capabilities cannot lock before required-field validation',async()=>{
+        const value=await create('authorization'),before=await repository.getTestRunById(value.scope.testRunId);
+        for(const token of[login.token,person.groupToken,other.person.token])await assert.rejects(services.originalTest.patchLock({token,testNumber:value.testNumber,body:{}}),denied(403));
+        assert.deepEqual(await repository.getTestRunById(value.scope.testRunId),before);assert.deepEqual(await logs(value.scope),[]);
+      });
+      for(const scenario of lockCases)await t.test(scenario.label+': actual Source'+scenario.status+' with durable locked='+scenario.locked,async()=>{
+        const value=await create(scenario.label),before=await repository.getTestRunById(value.scope.testRunId),beforePerson=await repository.getParticipantSessionById(value.scope.participantSessionId);
+        const invoke=async()=>services.originalTest.patchLock({token:person.token,testNumber:value.testNumber,body:scenario.body===''?undefined:decodeOriginalTestLogJson(scenario.body)});
+        if(scenario.status===200)await invoke();else await assert.rejects(invoke,error=>scenario.label==='malformed'?(assert.ok(error instanceof SyntaxError),true):denied(scenario.status)(error));
+        await reopen();const after=await repository.getTestRunById(value.scope.testRunId);assert.equal(after.locked,scenario.locked);
+        if(scenario.locked){unchangedExceptLock(before,after);await assert.rejects(services.originalTest.create({token:person.token,bookletName:value.bookletName}),denied(423));await assert.rejects(services.originalTest.read({token:person.token,testNumber:value.testNumber}),denied(423));}
+        else assert.deepEqual(after,before);
+        assert.deepEqual(await repository.getParticipantSessionById(value.scope.participantSessionId),beforePerson);
+        const actual=await logs(value.scope);assert.equal(actual.length,scenario.appendCount);assert.deepEqual(actual.map(formatOriginalTestLogEntry),scenario.entries.map(x=>x.logentry));
+        if(actual.length){assert.equal(actual[0].originalTimestamp,undefined);assert.equal(actual[0].unitKey,null);assert.equal(actual[0].originalUnitId,null);assert.equal(actual[0].logContent,'');}
+        if(scenario.label==='int64-max')assert.equal(actual[0].originalClientTimestamp,'9223372036854775807');
+        if(scenario.label==='int64-min')assert.equal(actual[0].originalClientTimestamp,'-9223372036854775808');
+      });
+      await t.test('repeated locks append distinct raw-key rows and retain every state timer and response',async()=>{
+        const value=await create('repeat'),before=await repository.getTestRunById(value.scope.testRunId);
+        const body=decodeOriginalTestLogJson('{"timeStamp":42,"message":"repeated raw key"}');
+        await services.originalTest.patchLock({token:person.token,testNumber:'000'+value.testNumber,body});
+        await services.originalTest.patchLock({token:person.token,testNumber:value.testNumber,body});await reopen();
+        const actual=await logs(value.scope);assert.equal(actual.length,2);assert.equal(new Set(actual.map(x=>x.participantTestLogId)).size,2);assert.deepEqual(actual.map(formatOriginalTestLogEntry),lockReceipt.checks[55].repeatEntries.map(x=>x.logentry));
+        unchangedExceptLock(before,await repository.getTestRunById(value.scope.testRunId));
+        const opened=await create('opened');assert.equal((await services.originalTest.read({token:person.token,testNumber:opened.testNumber})).firstStart,true);
+        await services.originalTest.patchState({token:person.token,testNumber:opened.testNumber,patch:[{key:'ownedLockState',content:'preserved',timeStamp:1}]});
+        const beforeLock=await repository.getTestRunById(opened.scope.testRunId);
+        const latest=(await repository.listLatestParticipantTestStateLogsByWorkspace(opened.scope.tenantId,opened.scope.workspaceId,['ownedLockState'])).filter(row=>row.testRunId===opened.scope.testRunId);assert.equal(latest.length,1);assert.equal(latest[0].logContent,'"preserved"');
+        await services.originalTest.patchLock({token:person.token,testNumber:opened.testNumber,body:{timeStamp:99,message:'opened lock'}});await reopen();
+        const after=await repository.getTestRunById(opened.scope.testRunId);unchangedExceptLock(beforeLock,after);assert.deepEqual(after.originalTestState,{ownedLockState:'preserved'});
+        await assert.rejects(services.originalTest.read({token:person.token,testNumber:opened.testNumber}),denied(423));
+      });
+      await t.test('complete protected Source57 JSON and CSV bytes match real reopened logs using the production entry formatter',async()=>{
+        const {formatOriginalParticipantLogEntry}=await import('../packages/application/dist/packages/application/src/original-report-csv.js');
+        await reopen();const parent=await repository.getParticipantSessionById(person.participantSession.participantSessionId);
+        const pool=[];for(const value of byBooklet.values())for(const log of await logs(value.scope))pool.push({bookletname:value.bookletName,log});
+        const projected=lockReportRows.map(source=>{
+          const index=pool.findIndex(x=>x.bookletname===source.bookletname&&x.log.timestamp===source.timestamp);assert.ok(index>=0);const {bookletname,log}=pool.splice(index,1)[0];
+          return{groupname:parent.groupKey,loginname:parent.originalLoginKey,code:parent.originalNameSuffix,bookletname,unitname:'',originalUnitId:'',timestamp:log.timestamp,...(log.originalClientTimestamp===undefined?{}:{originalClientTimestamp:log.originalClientTimestamp}),logentry:formatOriginalParticipantLogEntry(log)};
+        });assert.equal(pool.length,0);
+        // Source DAO does not promise append order. This is exact collection /
+        // formatter proof in its observed order, not literal report transport.
+        for(const format of['json','csv'])assert.equal(formatOriginalLogReport(projected,format),await readFile(new URL('test-lock.'+format,lockEvidence),'utf8'));
+      });
+      await t.test('the lock store rechecks every immutable scope before timestamp validation',async()=>{
+        const value=await create('store-scope'),before=await repository.getTestRunById(value.scope.testRunId);
+        for(const key of['testNumber','testRunId','participantSessionId','tenantId','workspaceId','contentReleaseId']){
+          await assert.rejects(repository.lockOriginalTest({...value.scope,[key]:key==='testNumber'?'9223372036854775807':'foreign-owned-scope'},'not a timestamp'));
+          assert.deepEqual(await repository.getTestRunById(value.scope.testRunId),before);
+        }
+        await assert.rejects(repository.lockOriginalTest(value.scope,'not a timestamp'),TypeError);assert.deepEqual(await repository.getTestRunById(value.scope.testRunId),before);
+      });
+      await t.test('retired native mappings cannot lock a privately restored Run through the old number',async()=>{
+        const value=await create('retired'),before=await repository.getTestRunById(value.scope.testRunId);
+        await repository.deleteTestRunsByIds([value.scope.testRunId]);await repository.saveTestRun(before);
+        await assert.rejects(repository.lockOriginalTest(value.scope,stamp));
+        await assert.rejects(services.originalTest.patchLock({token:person.token,testNumber:value.testNumber,body:{timeStamp:1}}),denied(403));
+        assert.deepEqual(await repository.getTestRunById(value.scope.testRunId),before);assert.deepEqual(await logs(value.scope),[]);
+      });
+      if(kind==='sqlite'||kind==='postgres')await t.test('metadata-owned lock and its later log do not decode unrelated corrupt response JSON',async()=>{
+        const value=await create('unrelated-json'),before=await repository.getTestRunById(value.scope.testRunId);
+        const connection=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
+        const update=async content=>kind==='sqlite'?connection.prepare('UPDATE test_runs SET unit_responses_json=? WHERE test_run_id=?').run(content,value.scope.testRunId):connection.query('UPDATE test_runs SET unit_responses_json=$1 WHERE test_run_id=$2',[content,value.scope.testRunId]);
+        try{await update('{owned corrupt response');await services.originalTest.patchLock({token:person.token,testNumber:value.testNumber,body:{timeStamp:1,message:'metadata lock'}});}
+        finally{await update(JSON.stringify(before.unitResponses));if(kind==='sqlite')connection.close();else await connection.end();}
+        await reopen();unchangedExceptLock(before,await repository.getTestRunById(value.scope.testRunId));assert.equal((await logs(value.scope)).length,1);
+      });
+      if(kind==='sqlite'||kind==='postgres')await t.test('actual log INSERT failure leaves the prior lock durable and no partial log',async()=>{
+        const value=await create('insert-failure'),before=await repository.getTestRunById(value.scope.testRunId);
+        const connection=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()}),exec=sql=>kind==='sqlite'?connection.exec(sql):connection.query(sql);
+        await exec(kind==='sqlite'?"CREATE TRIGGER owned_lock_log_failure BEFORE INSERT ON participant_test_logs BEGIN SELECT RAISE(ABORT,'owned lock log failure'); END":"CREATE FUNCTION owned_lock_log_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned lock log failure'; END $$; CREATE TRIGGER owned_lock_log_failure BEFORE INSERT ON participant_test_logs FOR EACH ROW EXECUTE FUNCTION owned_lock_log_failure()");
+        try{await assert.rejects(services.originalTest.patchLock({token:person.token,testNumber:value.testNumber,body:{timeStamp:5,message:'lock survives actual INSERT failure'}}),/owned lock log failure/);}
+        finally{await exec(kind==='sqlite'?'DROP TRIGGER owned_lock_log_failure':'DROP TRIGGER owned_lock_log_failure ON participant_test_logs; DROP FUNCTION owned_lock_log_failure()');if(kind==='sqlite')connection.close();else await connection.end();}
+        await reopen();unchangedExceptLock(before,await repository.getTestRunById(value.scope.testRunId));assert.deepEqual(await logs(value.scope),[]);
+      });
+      if(kind==='file')await t.test('actual File log publication failure retains the separately committed lock after reopening',async()=>{
+        const value=await create('publication-failure'),before=await repository.getTestRunById(value.scope.testRunId),backup=file+'.owned-lock-backup';
+        const failing=createFirstSliceServices({repository:{...repository,async appendOriginalTestLogs(scope,entries){await rename(file,backup);await mkdir(file);try{await repository.appendOriginalTestLogs(scope,entries);}finally{await rm(file,{recursive:true});await rename(backup,file);}}},originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+        await assert.rejects(failing.originalTest.patchLock({token:person.token,testNumber:value.testNumber,body:{timeStamp:5,message:'durable lock before File failure'}}));
+        await reopen();unchangedExceptLock(before,await repository.getTestRunById(value.scope.testRunId));assert.deepEqual(await logs(value.scope),[]);
+      });
+    });
     await t.test('generic Test deletion retires its number mapping without reusing the number for the same private UUID',async()=>{
       const session=await auth('owned-after-delete'),old=await request(session,native.bookletName),[saved]=await owned(session.person);
       const unitName='OWNED.DELETED.UNIT';await services.originalUnit.patchState({token:session.person.token,testNumber:old,unitName,body:{originalUnitId:'NEVER.REVIVE',newState:[{key:'private',content:'must be retired',timeStamp:1}]}});assert.ok(await repository.getOriginalUnit({...saved,unitName}));
@@ -900,6 +1023,36 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         await call('GET',httpPerson.person.token,undefined,405);await call('DELETE',adminToken,undefined,405);
         await call('PUT',httpPerson.person.token,JSON.stringify({bookletName:'OWNED.MISSING'}),404);
         assert.equal((await owned(httpPerson.person)).length,before.length);assert.equal(initialized.adminUser.username,'owned-native-admin');
+        const lockOutput=[],lockWrite=process.stdout.write;process.stdout.write=function(chunk,encoding,callback){lockOutput.push(String(chunk));if(typeof encoding==='function')encoding();else if(typeof callback==='function')callback();return true;};
+        try{
+          const createHttpLock=async label=>{
+            const bookletName='OWNED.ASSIGNED#http-lock:'+label,created=await nativeRequest('PUT','/test',httpPerson.person.token,{bookletName},201),testNumber=created.text;
+            const scope=await repository.findOriginalTestNumber({...ids,participantSessionId:httpPerson.person.participantSession.participantSessionId,testNumber});assert.ok(scope);return{bookletName,testNumber,scope,path:'/test/'+testNumber+'/lock'};
+          };
+          const authLock=await createHttpLock('authorization'),beforeAuth=await repository.getTestRunById(authLock.scope.testRunId);
+          const missing=await rawLog(authLock.path,undefined,'{',401,'PATCH');assert.equal(missing.text,'Auth Header not sufficient: missing');
+          for(const token of[httpPerson.login.token,httpPerson.person.groupToken,adminToken,other.person.token]){const denied=await rawLog(authLock.path,token,'{',403,'PATCH');assert.equal(denied.text.includes(token),false);}
+          assert.deepEqual(await repository.getTestRunById(authLock.scope.testRunId),beforeAuth);
+          for(const scenario of lockCases){
+            const value=await createHttpLock(scenario.label),before=await repository.getTestRunById(value.scope.testRunId);
+            const response=await rawLog(value.path,httpPerson.person.token,scenario.body,scenario.status,'PATCH');assert.equal(response.headers.get('content-type'),scenario.contentType);
+            if(scenario.status===200)assert.equal(response.bytes.length,0);else{assert.equal(response.headers.get('test-mode'),'NO');assert.match(response.headers.get('error-id'),/^error-/);if(scenario.status===500)assert.equal(response.text,'Internal error.');}
+            const after=await repository.getTestRunById(value.scope.testRunId);assert.equal(after.locked,scenario.locked);
+            if(scenario.locked)assert.deepEqual(after,{...before,locked:true,updatedAt:after.updatedAt,originalResultState:{...before.originalResultState,lastTestModifiedAt:after.updatedAt}});else assert.deepEqual(after,before);
+            const actual=(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId)).filter(x=>x.testRunId===value.scope.testRunId);assert.equal(actual.length,scenario.appendCount);assert.deepEqual(actual.map(formatOriginalTestLogEntry),scenario.entries.map(x=>x.logentry));
+            if(scenario.label==='int64-max')assert.equal(actual[0].originalClientTimestamp,'9223372036854775807');if(scenario.label==='int64-min')assert.equal(actual[0].originalClientTimestamp,'-9223372036854775808');
+            await nativeRequest('PUT','/test',httpPerson.person.token,{bookletName:value.bookletName},scenario.locked?423:201);
+          }
+          const padded=await createHttpLock('padded'),ok=await rawLog('/test/000'+padded.testNumber+'/lock',httpPerson.person.token,'{"timeStamp":0}',200,'PATCH');assert.equal(ok.bytes.length,0);
+          const wrong=await rawLog(padded.path,httpPerson.person.token,undefined,405,'PUT');assert.equal(wrong.headers.get('allow'),'PATCH');assert.equal(wrong.text,'Method not allowed. Must be one of: PATCH');
+          const escaped=await rawLog('/test/%3Cscript%3E/lock',httpPerson.person.token,'{}',400,'PATCH');assert.equal(escaped.text,'No valid test-Id: &lt;script&gt;');
+          await rawLog('/test/0/lock',httpPerson.person.token,'{',400,'PATCH');await rawLog('/test/9223372036854775807/lock',httpPerson.person.token,'{',403,'PATCH');
+          const invalidUtf8=await createHttpLock('invalid-utf8'),beforeUtf8=await repository.getTestRunById(invalidUtf8.scope.testRunId);
+          await rawLog(invalidUtf8.path,other.person.token,Buffer.from([0xff]),403,'PATCH');await rawLog(invalidUtf8.path,httpPerson.person.token,Buffer.from([0xff]),500,'PATCH');assert.deepEqual(await repository.getTestRunById(invalidUtf8.scope.testRunId),beforeUtf8);
+        }finally{process.stdout.write=lockWrite;}
+        assert.ok(lockOutput.some(line=>line.includes('"path":"/test/:testId/lock"')),'Native lock logging must use its redacted route label');
+        assert.equal(lockOutput.some(line=>[httpPerson.person.token,httpPerson.login.token,httpPerson.person.groupToken,adminToken,other.person.token].some(token=>line.includes(token))),false,'Native lock logs leaked a bearer');
+
       }finally{if(server)await new Promise((done,reject)=>server.close(error=>error&&error.code!=='ERR_SERVER_NOT_RUNNING'?reject(error):done()));}
     });
     if(kind==='file')await t.test('late File publication failure rolls back the new Test, number, first content binding and cache',async()=>{

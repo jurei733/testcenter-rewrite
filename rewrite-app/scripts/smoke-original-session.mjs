@@ -15,7 +15,7 @@ await access(join(root, 'dist/apps/web/browser/index.html'));
 const scratch = await mkdtemp(join(tmpdir(), 'owned-native-session-browser-'));
 const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, 'native-session') : join(scratch, 'public');
 await mkdir(artifacts, {recursive: true});
-const gate = createServerRequestFailureGate(), checks = [];
+const gate = createServerRequestFailureGate(), checks = [], expectedServerFailures = [];
 const module = pathToFileURL(resolve('apps/api/dist/apps/api/src/index.js')).href;
 const server = spawn(process.execPath, ['--input-type=module', '-e', `
  import {createProductionApiServer} from ${JSON.stringify(module)};
@@ -203,6 +203,23 @@ try {
   assert.equal((await request('PUT', '/test', {bookletName: 'OWNED.BROWSER'}, identity.sessionToken, 201)).rawText, createdTest.rawText);
   assert.equal((await request('GET', '/session', undefined, identity.sessionToken)).value.claims.test[0].flags.running, true);
   mark('actual-protected-original-ui-enters-the-same-native-created-test-and-starts-its-controller');
+  setPhase('browser-native-test-lock');
+  const foreignLock=await page.evaluate(async({id,token})=>{const response=await fetch('/test/'+id+'/lock',{method:'PATCH',headers:{AuthToken:token,'content-type':'application/json'},body:'{'});return{status:response.status,text:await response.text()};},{id:peerTest.rawText,token:identity.sessionToken});
+  assert.equal(foreignLock.status,403);assert.equal(foreignLock.text.includes(identity.sessionToken),false);
+  const nativeLock=await request('PATCH','/test/000'+peerTest.rawText+'/lock',{timeStamp:0,message:'browserNativeLock Ω'},peerPerson.token);
+  assert.equal(nativeLock.empty,true);assert.equal(nativeLock.contentType,'text/html; charset=UTF-8');
+  await request('GET','/test/'+peerTest.rawText,undefined,peerPerson.token,423);
+  await request('PUT','/test',{bookletName:'OWNED.BROWSER'},peerPerson.token,423);
+  assert.deepEqual((await request('GET',unitRead,undefined,peerPerson.token)).value,unit);
+  const flags=(await request('GET','/session',undefined,peerPerson.token)).value.claims.test[0].flags;assert.equal(flags.locked,true);assert.equal(flags.running,true);
+  const failedLockTest=await request('PUT','/test',{bookletName:'OWNED.BROWSER#lock:constructor-failure'},peerPerson.token,201);
+  const partial=await page.evaluate(async({id,token})=>{const response=await fetch('/test/'+id+'/lock',{method:'PATCH',headers:{AuthToken:token,'content-type':'application/json'},body:'{"timeStamp":"invalid integer","message":"strict native clock"}'});return{status:response.status,text:await response.text(),type:response.headers.get('content-type'),requestId:response.headers.get('x-request-id')};},{id:failedLockTest.rawText,token:peerPerson.token});
+  assert.equal(partial.status,500);assert.equal(partial.text,'Internal error.');assert.equal(partial.type,'text/html;charset=UTF-8');
+  assert.match(partial.requestId,/^[0-9a-f-]{36}$/i);expectedServerFailures.push({requestId:partial.requestId,method:'PATCH',route:'PATCH /test/:testId/lock',path:'/test/:testId/lock',statusCode:500});
+  await request('GET','/test/'+failedLockTest.rawText,undefined,peerPerson.token,423);
+  await page.frameLocator('iframe').locator('main[data-started="true"]').waitFor();
+  mark('browser-native-test-lock-preserves-unit-data-and-keeps-source-proven-lock-after-constructor-error');
+
 } catch (error) {
   await page?.screenshot({path: join(artifacts, 'failure.png'), fullPage: true}).catch(() => {});
   // Retain a useful bounded failure location without serializing Playwright's
@@ -215,7 +232,8 @@ try {
   process.exitCode = 1; console.error('original_session_browser=failed; category=' + errorName + '; phase=' + phase + '; kind=' + failureKind);
 } finally {
   await page?.close(); await browser?.close(); server.kill('SIGTERM');
-  await closed; gate.assertHealthy();
-  await writeFile(join(artifacts, 'native-session-protocol.json'), JSON.stringify({checks}, null, 2));
+  await closed; gate.assertHealthy(expectedServerFailures);
+  console.log('unexpected_server_failures=0; exact_expected_source_failures='+expectedServerFailures.length);
+  await writeFile(join(artifacts, 'native-session-protocol.json'), JSON.stringify({checks, expectedServerFailures}, null, 2));
   console.log('owned_api=shutdown');
 }
