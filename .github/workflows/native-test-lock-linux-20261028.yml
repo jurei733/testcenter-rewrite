@@ -1,0 +1,191 @@
+name: Native Source-paired Test lock (not full acceptance)
+on:
+  push:
+    branches:
+      - codex/native-test-lock-linux-20261028
+permissions:
+  contents: read
+env:
+  CI: "true"
+  FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
+jobs:
+  build:
+    outputs:
+      attempt: ${{ github.run_attempt }}
+    name: Shared production build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Retain locked graph, all policies and type checks
+        run: |-
+          npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+          npm run test:ci-policy
+          npm run typecheck
+      - run: npm run build
+      - name: Retain complete unit and frontend regression inventory
+        run: npm run test:unit:built
+      - name: Package commit-bound production outputs
+        env:
+          CI_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-build
+        run: node scripts/ci-build-artifact.mjs pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rewrite-build-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rewrite-build/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+  browser-system-dependencies:
+    outputs:
+      attempt: ${{ github.run_attempt }}
+      image-version: ${{ steps.cohort.outputs.image-version }}
+      profile-format: ${{ steps.packages.outputs.profile-format }}
+      material-sha256: ${{ steps.packages.outputs.material-sha256 }}
+      before-inventory-sha256: ${{ steps.packages.outputs.before-inventory-sha256 }}
+    name: Authenticated browser system packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Record exact browser producer image
+        id: cohort
+        run: bash scripts/ci-browser-cohort.sh record
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Qualify native Debian archive inspection without installation
+        run: node --test scripts/ci-browser-system-linux.test.mjs
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "1"
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
+      - name: Download locked Chromium for native material producer
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Capture authenticated packages and native APT result
+        id: packages
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-system-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-system/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Retain owned runtime material diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-material-${{ github.job }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: ignore
+          retention-days: 7
+  native-postgres:
+    needs:
+      - build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: rewrite-app
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rewrite_app
+          POSTGRES_USER: rewrite
+          POSTGRES_PASSWORD: rewrite
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U rewrite -d rewrite_app" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@127.0.0.1:5432/rewrite_app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          build-attempt: ${{ needs.build.outputs.attempt }}
+      - run: npm run db:migrate:postgres:built
+      - run: npm run db:doctor:postgres:built
+      - name: Run Postgres runtime preflight
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          FIRST_SLICE_STORE=postgres \
+          RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true \
+          npm run preflight:runtime:built
+      - run: npm run test:integration:postgres:built
+      - name: Run protected Postgres startup smoke
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true \
+          npm run smoke:startup:postgres:built
+  native-protected-browser:
+    name: Native protected proof-of-work and complete Original session
+    needs:
+      - build
+      - browser-system-dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      UI_SMOKE_HEADFUL: "true"
+    defaults:
+      run:
+        working-directory: rewrite-app
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: proof-of-work
+            group: entry
+            command: npm run smoke:ui:proof-of-work:built && npm run smoke:ui:original-session:built
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          build-attempt: ${{ needs.build.outputs.attempt }}
+          playwright: "true"
+          browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
+          browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
+          browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
+          browser-material-label: ${{ strategy.job-index }}
+      - name: Run Quick browser gates
+        shell: bash
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
+          CI_BROWSER_COMMAND: ${{ matrix.command }}
+        run: xvfb-run --auto-servernum bash --noprofile --norc -e -o pipefail -c "$CI_BROWSER_COMMAND" 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
+      - name: Retain failed Quick browser log
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ui-quick-${{ matrix.check }}-diagnostics-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-quick.log
+            ${{ runner.temp }}/rewrite-ui-artifacts/
+          if-no-files-found: warn
+          retention-days: 7
