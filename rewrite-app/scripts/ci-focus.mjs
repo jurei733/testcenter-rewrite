@@ -16,7 +16,7 @@ const coreOnlyScripts = new Set(['test:unit:built', 'test:participant-auth:built
 // arbitrary shell command can silently diverge from the complete CI gates.
 export function focusChecks(workflow, scripts) {
   const checks = [];
-  for (const [job, prefix] of [['quick', 'quick'], ['quick-extended', 'qualification'],
+  for (const [job, prefix] of [['quick', 'quick'], ['quick-extended-long', 'qualification'], ['quick-extended', 'qualification'],
     ['verify-long-ui', 'verify'], ['verify-memory-sqlite', 'verify']]) {
     for (const item of workflow.jobs[job].strategy.matrix.include) {
       checks.push({ id: `${prefix}/${item.check}`, check: item.check, build: true,

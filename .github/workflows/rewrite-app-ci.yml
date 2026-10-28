@@ -416,6 +416,59 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  quick-extended-long:
+    name: verify-memory-sqlite (ui-qualification-${{ matrix.check }})
+    needs: [build, typecheck, dependencies, unit, browser-system-dependencies]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      UI_SMOKE_HEADFUL: "true"
+    defaults:
+      run:
+        working-directory: rewrite-app
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          # The globally measured long qualification starts behind every technical/security prerequisite.
+          - check: json-roster
+            group: content
+            command: npm run smoke:ui:json-roster:built
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          build-attempt: ${{ needs.build.outputs.attempt }}
+          playwright: "true"
+          browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
+          browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
+          browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
+          browser-material-label: ${{ strategy.job-index }}
+      - name: Run Quick browser gates
+        shell: bash
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
+          CI_BROWSER_COMMAND: ${{ matrix.command }}
+        run: xvfb-run --auto-servernum bash --noprofile --norc -e -o pipefail -c "$CI_BROWSER_COMMAND" 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
+      - name: Retain failed Quick browser log
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-quick-${{ matrix.check }}-diagnostics-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rewrite-ui-quick.log
+            ${{ runner.temp }}/rewrite-ui-artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+
   quick-extended:
     name: verify-memory-sqlite (ui-qualification-${{ matrix.check }})
     needs: [build, fast-feedback, browser-system-dependencies]
@@ -431,13 +484,10 @@ jobs:
       max-parallel: 8
       matrix:
         include:
-          # Longest measured journeys first; eight isolated runners, every scenario.
+          # All nineteen remaining qualification journeys retain the eight-runner limit.
           - check: activation-roster-warnings
             group: content
             command: npm run smoke:ui:activation-roster-warnings:built
-          - check: json-roster
-            group: content
-            command: npm run smoke:ui:json-roster:built
           - check: original-exit-completeness
             group: participant
             command: npm run smoke:ui:original-exit-completeness:built
@@ -450,48 +500,48 @@ jobs:
           - check: original-runtime-error
             group: participant
             command: npm run smoke:ui:original-runtime-error:built
-          - check: original-paused-exit
-            group: participant
-            command: npm run smoke:ui:original-paused-exit:built
-          - check: participant-entry
-            group: participant
-            command: npm run smoke:ui:participant-entry:built
           - check: original-player-exit
             group: participant
             command: npm run smoke:ui:original-player-exit:built
+          - check: original-paused-exit
+            group: participant
+            command: npm run smoke:ui:original-paused-exit:built
           - check: participant-review
             group: participant
             command: npm run smoke:ui:participant-review:built
-          - check: content
-            group: content
-            command: npm run smoke:ui:content:built
+          - check: participant-entry
+            group: participant
+            command: npm run smoke:ui:participant-entry:built
           - check: original-player-version-error
             group: participant
             command: npm run smoke:ui:original-player-version-error:built
+          - check: content
+            group: content
+            command: npm run smoke:ui:content:built
           - check: original-starter-advisories
             group: participant
             command: npm run smoke:ui:original-starter-advisories:built
-          - check: original-header
-            group: entry
-            command: npm run smoke:ui:original-header:built
-          - check: original-starter
-            group: participant
-            command: npm run smoke:ui:original-starter:built
           - check: original-administration
             group: entry
             command: npm run smoke:ui:original-administration:built
+          - check: original-starter
+            group: participant
+            command: npm run smoke:ui:original-starter:built
+          - check: original-header
+            group: entry
+            command: npm run smoke:ui:original-header:built
           - check: attachment-custom-text
             group: system-check
             command: npm run smoke:ui:attachment-custom-text:built
           - check: participant-debug
             group: participant
             command: npm run smoke:ui:participant-debug:built
-          - check: system-check-saved
-            group: system-check
-            command: npm run smoke:ui:system-check-saved:built
           - check: offline-shell
             group: entry
             command: npm run smoke:ui:offline-shell:built
+          - check: system-check-saved
+            group: system-check
+            command: npm run smoke:ui:system-check-saved:built
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -553,42 +603,39 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Priority from complete accepted run40317717809; see ci-priority-capacity-timings.json.
-          - check: ui-full
-            command: npm run smoke:ui:built
-            playwright: true
-          - check: ui-ops
-            command: npm run smoke:ui:operator-auth:built
+          # Eleven globally measured broad journeys; one early qualification gives twelve in total.
+          - check: ui-unit-detail-review
+            command: npm run smoke:ui:unit-detail-review:built
             playwright: true
           - check: ui-activation-blocking-runtime
             command: npm run smoke:ui:activation-blocking-runtime:built && npm run smoke:ui:participant-save-retry:built
             playwright: true
-          - check: ui-unit-detail-review
-            command: npm run smoke:ui:unit-detail-review:built
-            playwright: true
-          - check: ui-delete-group-results
-            command: npm run smoke:ui:delete-group-results:built
-            playwright: true
-          - check: ui-monitor-detail-review
-            command: npm run smoke:ui:monitor-detail-review:built
-            playwright: true
-          - check: ui-monitor-auto-next
-            command: npm run smoke:ui:monitor-auto-next:built
+          - check: ui-run-detail-review
+            command: npm run smoke:ui:run-detail-review:built
             playwright: true
           - check: ui-monitor-finish-all
             command: npm run smoke:ui:monitor-finish-all:built
             playwright: true
-          - check: ui-monitor-bulk
-            command: npm run smoke:ui:monitor-bulk:built
+          - check: ui-full
+            command: npm run smoke:ui:built
+            playwright: true
+          - check: ui-delete-group-results
+            command: npm run smoke:ui:delete-group-results:built
             playwright: true
           - check: ui-open-run-sync
             command: npm run smoke:ui:open-run-sync:built
             playwright: true
-          - check: ui-monitor-review
-            command: npm run smoke:ui:monitor-review:built
+          - check: ui-participant-detail-review
+            command: npm run smoke:ui:participant-detail-review:built
             playwright: true
-          - check: ui-run-detail-review
-            command: npm run smoke:ui:run-detail-review:built
+          - check: ui-monitor-auto-next
+            command: npm run smoke:ui:monitor-auto-next:built
+            playwright: true
+          - check: ui-review-readiness
+            command: npm run smoke:ui:review-readiness:built
+            playwright: true
+          - check: ui-ops
+            command: npm run smoke:ui:operator-auth:built
             playwright: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -644,12 +691,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Priority from complete accepted run40317717809; see ci-priority-capacity-timings.json.
-          - check: ui-participant-detail-review
-            command: npm run smoke:ui:participant-detail-review:built
+          # Every other original broad command remains behind the complete Fast feedback gate.
+          - check: ui-monitor-detail-review
+            command: npm run smoke:ui:monitor-detail-review:built
             playwright: true
-          - check: ui-review-readiness
-            command: npm run smoke:ui:review-readiness:built
+          - check: ui-monitor-review
+            command: npm run smoke:ui:monitor-review:built
+            playwright: true
+          - check: ui-monitor-bulk
+            command: npm run smoke:ui:monitor-bulk:built
             playwright: true
           - check: ui-controller-timer
             command: npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built
@@ -663,38 +713,38 @@ jobs:
           - check: ui-attachments
             command: npm run smoke:ui:attachments:built && npm run smoke:ui:attachments-live:built && UI_SMOKE_ATTACHMENT_CAMERA_FACING=front npm run smoke:ui:attachments-live:built
             playwright: true
-          - check: ui-participant-native-routes
-            command: npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
-            playwright: true
-          - check: ui-original-review
-            command: npm run smoke:ui:original-review:built
-            playwright: true
           - check: ui-admin-delete
             command: npm run smoke:ui:admin-delete:built
+            playwright: true
+          - check: ui-participant-native-routes
+            command: npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
             playwright: true
           - check: ui-original-workspace-files
             command: npm run smoke:ui:original-workspace-files:built
             playwright: true
-          - check: ui-workspace-delete
-            command: npm run smoke:ui:workspace-delete:built
+          - check: ui-original-review
+            command: npm run smoke:ui:original-review:built
+            playwright: true
+          - check: ui-verona-development
+            command: npm run smoke:ui:verona-development:built
+            playwright: true
+          - check: ui-admin-workspace-access
+            command: npm run smoke:ui:admin-workspace-access:built
             playwright: true
           - check: integration-sqlite
             command: npm run test:integration:sqlite:built
             playwright: false
-          - check: ui-admin-workspace-access
-            command: npm run smoke:ui:admin-workspace-access:built
-            playwright: true
-          - check: ui-deletion-confirmation
-            command: npm run smoke:ui:deletion-confirmation:built
-            playwright: true
           - check: ui-participant-monitor-live
             command: npm run smoke:ui:participant-monitor-live:built
             playwright: true
           - check: ui-workspace-rename
             command: npm run smoke:ui:workspace-rename:built
             playwright: true
-          - check: ui-verona-development
-            command: npm run smoke:ui:verona-development:built
+          - check: ui-deletion-confirmation
+            command: npm run smoke:ui:deletion-confirmation:built
+            playwright: true
+          - check: ui-workspace-delete
+            command: npm run smoke:ui:workspace-delete:built
             playwright: true
           - check: integration-memory
             command: npm run test:integration:memory:built
@@ -711,17 +761,17 @@ jobs:
           - check: ui-console-debug
             command: npm run smoke:ui:participant-debug:built
             playwright: true
-          - check: ui-adaptive-runtime
-            command: npm run smoke:ui:adaptive-runtime:built
-            playwright: true
           - check: compatibility
             command: npm run test:compatibility:built
             playwright: false
-          - check: shutdown
-            command: npm run smoke:shutdown:sqlite:built
-            playwright: false
+          - check: ui-adaptive-runtime
+            command: npm run smoke:ui:adaptive-runtime:built
+            playwright: true
           - check: shutdown-file
             command: npm run smoke:shutdown:file:built
+            playwright: false
+          - check: shutdown
+            command: npm run smoke:shutdown:sqlite:built
             playwright: false
           - check: startup
             command: npm run smoke:startup:sqlite:built
@@ -1004,7 +1054,7 @@ jobs:
   acceptance:
     name: CI acceptance
     if: always()
-    needs: [build, browser-system-dependencies, browser-system-qualification, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, quick-extended, verify-long-ui, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
+    needs: [build, browser-system-dependencies, browser-system-qualification, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, quick-extended, quick-extended-long, verify-long-ui, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

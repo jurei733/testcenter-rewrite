@@ -15,7 +15,7 @@ const checks = focusChecks(workflow, scripts);
 const cli = fileURLToPath(new URL('./ci-focus.mjs', import.meta.url));
 
 test('every actual Quick, qualification and memory/SQLite shard has an executable focused plan', () => {
-  const actual = ['quick', 'quick-extended', 'verify-long-ui', 'verify-memory-sqlite']
+  const actual = ['quick', 'quick-extended-long', 'quick-extended', 'verify-long-ui', 'verify-memory-sqlite']
     .flatMap(job => workflow.jobs[job].strategy.matrix.include);
   assert.equal(checks.length, actual.length + 6);
   for (const item of actual) {
