@@ -35,3 +35,16 @@ test("Original 19 CSV preserves delimiters, newlines and literal backslash quote
   assert.equal(csv, '\uFEFF"log;""entry";"unitname"\n"PLAYER_STATE_CHANGED = {""value"":""A;B"",""quoted"":""\\""answer\\""""}\nsecond line";"A\r\nB"');
   assert.equal(formatOriginalReportCsv(["logentry"], []), '\uFEFF"logentry"');
 });
+
+// Native UnitDAO receives encoded log content and raw state values. Canonical
+// logs store plain strings, so provenance must not be guessed from JSON syntax.
+test('native Unit logs retain one encoding layer for structured values and state',()=>{
+  const base={unitKey:'G8-GEO',logKey:'BEHAVIOR',participantTestLogId:'original-unit-log:owned'};
+  for(const content of ['{"synthetic":true,"answer":["A","C"]}','"Text \\"Ω\\""','[1,false,null]','true','""']) {
+    assert.equal(formatOriginalParticipantLogEntry({...base,logContent:content}),`BEHAVIOR = ${content}`);
+  }
+  assert.equal(formatOriginalParticipantLogEntry({...base,logContent:'complete'}),'BEHAVIOR = complete');
+  assert.equal(formatOriginalParticipantLogEntry({...base,logContent:'0'}),'BEHAVIOR');
+  assert.equal(formatOriginalParticipantLogEntry({...base,logContent:''}),'BEHAVIOR');
+  assert.equal(formatOriginalParticipantLogEntry({...base,participantTestLogId:'canonical-id',logContent:'{"value":1}'}),'BEHAVIOR = '+JSON.stringify('{"value":1}'));
+});

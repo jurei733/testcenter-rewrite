@@ -3803,6 +3803,7 @@ export const createSqliteFirstSliceStorage = (
       return mapTestRun(row);
     },
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(database, input);},
+    async listOriginalUnitsByWorkspace(tenantId,workspaceId){return database.prepare('SELECT unit_json FROM original_native_units WHERE tenant_id=? AND workspace_id=?').all(tenantId,workspaceId).map(row=>JSON.parse(String(row.unit_json)));},
     async getOriginalUnit(input){return readOriginalNativeUnit(database,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(database,input,transform);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {

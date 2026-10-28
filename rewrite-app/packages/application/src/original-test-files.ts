@@ -31,6 +31,17 @@ export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;pr
    const document=new DOMParser({onError(){}}).parseFromString(xml,'application/xml'),root=document.documentElement;
    const definitions:Element[]=[];for(let child=root?.firstChild;child;child=child.nextSibling)if(child.nodeType===1&&['Definition','DefinitionRef'].includes((child as Element).tagName))definitions.push(child as Element);
    const inline=definitions.find(node=>node.tagName==='Definition');let definition='';for(let node=inline?.firstChild;node;node=node.nextSibling)if(node.nodeType===3||node.nodeType===4)definition+=node.nodeValue??'';
+   if(!inline&&definitions.some(node=>node.tagName==='DefinitionRef')){
+    // Resolve through the validated current catalog, never through an arbitrary
+    // filesystem path or a resource from another workspace/publication.
+    const references=file.dependencies.filter(row=>row.relationship==='isDefinedBy');
+    const resource=references.length===1?catalog.items.find(row=>row.sourcePackageId===references[0]!.sourcePackageId&&row.fileType==='Resource'):null;
+    const resourceSource=resource?physical.find(row=>row.sourcePackageId===resource.sourcePackageId):null;
+    const decoded=resourceSource?deps.decode(resourceSource):null;
+    if(!decoded)throw new FirstSliceError(404,'original_unit_file_unavailable','The current physical Unit definition is unavailable.');
+    try{definition=new TextDecoder('utf-8',{fatal:true}).decode(decoded.bytes);}
+    catch{throw new FirstSliceError(409,'original_unit_definition_encoding','The Unit definition is not valid UTF-8.');}
+   }
    const player=file.dependencies.find(row=>row.relationship==='usesPlayer'),target=player?catalog.items.find(row=>row.sourcePackageId===player.sourcePackageId):null;
    const raw=definitions[0]?.getAttribute('player')??'',definitionType=(target?.metadata.identifier??normalizeWorkspacePlayerResourceId(raw)??'').replace(/[A-Z]/g,c=>c.toLowerCase());
    return{definition,definitionType};

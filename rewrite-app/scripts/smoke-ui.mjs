@@ -26451,6 +26451,14 @@ try {
         try {
           navigation = await page.locator("html").evaluate(() => ({
             path: location.pathname, focused: document.hasFocus(), visibility: document.visibilityState,
+            starterScroll: (() => {
+              const sentinel=document.querySelector("#participantStarterBottomSentinel"),button=document.querySelector("#participantStarterScrollButton");
+              const box=sentinel?.getBoundingClientRect(),buttonBox=button?.getBoundingClientRect();
+              return {viewport:[innerWidth,innerHeight],scroll:[scrollX,scrollY],
+                sentinel:box?{top:box.top,bottom:box.bottom,left:box.left,right:box.right}:null,
+                button:buttonBox?{top:buttonBox.top,bottom:buttonBox.bottom,display:getComputedStyle(button).display}:null,
+                entryStatus:document.querySelector("#participantEntryStatus")?.textContent?.trim()??null};
+            })(),
             activeElement: { id: document.activeElement?.id, tag: document.activeElement?.tagName },
             events: window.__ownedNavigationEvents ?? [],
             links: [...document.querySelectorAll("[data-view-nav]")].map(element => {

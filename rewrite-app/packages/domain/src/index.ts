@@ -1243,6 +1243,8 @@ export type ParticipantTestLog = {
   recordedAt: string;
 };
 
+/** UnitDAO stores encoded custom logs and raw native state values. */
+export const originalUnitLogIdPrefix = 'original-unit-log:';
 export const originalTestLogIdPrefix = 'original-test-log:';
 /** Native state logs also carry pre-encoded PHP content, while remaining state events. */
 export const originalTestStateLogIdPrefix = 'original-test-state:';
