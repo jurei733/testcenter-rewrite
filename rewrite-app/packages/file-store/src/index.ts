@@ -1,3 +1,4 @@
+import {appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
@@ -1776,6 +1777,10 @@ const createFileRepository = (
     async findOriginalTestNumber(input){const current=await getState(),id=current.originalTestRunsByNumber[input.testNumber],row=id?current.originalTestNumbers?.[id]:undefined;
       return selectOwnedOriginalTestNumber(input,row,id?current.testRuns[id]??null:null,current.participantSessions[input.participantSessionId]??null);
     },
+    async appendOriginalTestLogs(input, logs) {
+      if (logs.length === 0) {appendOriginalTestLogCollection(await getState(), input, logs); return;}
+      await mutate(state => appendOriginalTestLogCollection(state, input, logs));
+    },
     async getOrCreateOriginalTestNumber(input) {
       return enqueueMutation(async () => {
         const current = await getState();
@@ -2014,7 +2019,7 @@ const createFileRepository = (
           state.testRuns[input.testRunId] ?? null,
           state.participantSessions[input.participantSessionId] ?? null,
           Object.values(state.participantTestLogs).reduce((latest, log) =>
-            log.testRunId === input.testRunId && log.unitKey === null && log.logKey === "CONNECTION"
+            log.testRunId === input.testRunId && log.unitKey === null && !log.participantTestLogId.startsWith("original-test-log:") && log.logKey === "CONNECTION"
               ? Math.max(latest, log.timestamp) : latest, 0));
         if (result.presence) state.participantPresence[input.testRunId] = result.presence;
         else delete state.participantPresence[input.testRunId];

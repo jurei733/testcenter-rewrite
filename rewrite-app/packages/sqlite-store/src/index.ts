@@ -1,3 +1,5 @@
+import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
+import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
@@ -849,7 +851,7 @@ const mapParticipantTestLog = (
           row.original_unit_id == null ? null : String(row.original_unit_id),
         logKey: String(row.log_key),
         logContent: String(row.log_content),
-        timestamp: Number(row.timestamp),
+        ...readParticipantTestLogTimestamp(row.timestamp),
         ...(row.original_timestamp === 0 ? { originalTimestamp: 0 as const } : {}),
         recordedAt: String(row.recorded_at)
       }
@@ -3717,6 +3719,7 @@ export const createSqliteFirstSliceStorage = (
     async findOriginalTestNumber(input){const row=database.prepare(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id
       JOIN participant_sessions p ON p.participant_session_id=m.participant_session_id AND p.tenant_id=m.tenant_id AND p.workspace_id=m.workspace_id AND p.content_release_id=m.content_release_id
       WHERE m.test_number=? AND m.tenant_id=? AND m.workspace_id=? AND m.participant_session_id=? AND p.original_login_key IS NOT NULL AND p.original_name_suffix IS NOT NULL`).get(input.testNumber,input.tenantId,input.workspaceId,input.participantSessionId);return row?{testNumber:String(row.test_number),testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id)}:null;},
+    async appendOriginalTestLogs(input, logs) {await appendOriginalTestLogs(database, input, logs);},
     async getOrCreateOriginalTestNumber(input) {
       return withResultArtifactParent(database, input, () => {
         const run = mapTestRun(database.prepare('SELECT * FROM test_runs WHERE test_run_id=?').get(input.testRunId) as Record<string, unknown> | undefined);
@@ -3808,7 +3811,7 @@ export const createSqliteFirstSliceStorage = (
           (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
             log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
-            log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+            (log.originalClientTimestamp === undefined ? log.timestamp : BigInt(exactParticipantTestLogTimestamp(log))), log.recordedAt, log.originalTimestamp ?? null);
         for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
           (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(event.activityEventId, event.tenantId, event.workspaceId,
@@ -3942,7 +3945,7 @@ export const createSqliteFirstSliceStorage = (
             (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)${effect.originalTestState!==undefined?'':` ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = excluded.tenant_id, workspace_id = excluded.workspace_id, participant_session_id = excluded.participant_session_id, test_run_id = excluded.test_run_id, unit_key = excluded.unit_key, original_unit_id = excluded.original_unit_id, log_key = excluded.log_key, log_content = excluded.log_content, timestamp = excluded.timestamp, recorded_at = excluded.recorded_at, original_timestamp = excluded.original_timestamp`}`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
               log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
-              log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+              (log.originalClientTimestamp === undefined ? log.timestamp : BigInt(exactParticipantTestLogTimestamp(log))), log.recordedAt, log.originalTimestamp ?? null);
           for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
             (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(activity_event_id) DO UPDATE SET tenant_id = excluded.tenant_id, workspace_id = excluded.workspace_id, event_type = excluded.event_type, actor_id = excluded.actor_id, subject_type = excluded.subject_type, subject_id = excluded.subject_id, occurred_at = excluded.occurred_at, summary = excluded.summary, details_json = excluded.details_json`).run(event.activityEventId, event.tenantId, event.workspaceId,
@@ -3980,7 +3983,7 @@ export const createSqliteFirstSliceStorage = (
             (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
               log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
-              log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+              (log.originalClientTimestamp === undefined ? log.timestamp : BigInt(exactParticipantTestLogTimestamp(log))), log.recordedAt, log.originalTimestamp ?? null);
           for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
             (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(event.activityEventId, event.tenantId, event.workspaceId,
@@ -4007,10 +4010,10 @@ export const createSqliteFirstSliceStorage = (
     async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
+          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, CAST(timestamp AS TEXT) AS timestamp, recorded_at, original_timestamp
            FROM participant_test_logs
            WHERE tenant_id = ? AND workspace_id = ?
-           ORDER BY timestamp DESC, recorded_at DESC`
+           ORDER BY participant_test_logs.timestamp DESC, recorded_at DESC`
         )
         .all(tenantId, workspaceId) as Record<string, unknown>[];
       return rows
@@ -4028,7 +4031,7 @@ export const createSqliteFirstSliceStorage = (
       const placeholders = logKeys.map(() => "?").join(", ");
       const rows = database
         .prepare(
-          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
+          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, CAST(timestamp AS TEXT) AS timestamp, recorded_at, original_timestamp
            FROM (
              SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp,
                     ROW_NUMBER() OVER (
@@ -4039,6 +4042,7 @@ export const createSqliteFirstSliceStorage = (
              WHERE tenant_id = ?
                AND workspace_id = ?
                AND unit_key IS NULL
+               AND substr(participant_test_log_id,1,18) <> 'original-test-log:'
                AND log_key IN (${placeholders})
            ) AS latest_test_state
            WHERE state_rank = 1`
@@ -4084,7 +4088,7 @@ export const createSqliteFirstSliceStorage = (
             testLog.originalUnitId,
             testLog.logKey,
             testLog.logContent,
-            testLog.timestamp,
+            (testLog.originalClientTimestamp === undefined ? testLog.timestamp : BigInt(exactParticipantTestLogTimestamp(testLog))),
             testLog.recordedAt,
             testLog.originalTimestamp ?? null
           );
@@ -4105,7 +4109,7 @@ export const createSqliteFirstSliceStorage = (
         const row = database.prepare("SELECT presence_json FROM participant_connection_presence WHERE test_run_id = ?")
           .get(input.testRunId) as Record<string, unknown> | undefined;
         const latest = database.prepare(`SELECT MAX(timestamp) AS timestamp FROM participant_test_logs
-          WHERE test_run_id = ? AND unit_key IS NULL AND log_key = 'CONNECTION'`)
+          WHERE test_run_id = ? AND unit_key IS NULL AND log_key = 'CONNECTION' AND substr(participant_test_log_id,1,18) <> 'original-test-log:'`)
           .get(input.testRunId) as Record<string, unknown>;
         const result = transitionParticipantPresence(input,
           row ? JSON.parse(String(row.presence_json)) as ParticipantPresence : null,
@@ -4124,7 +4128,7 @@ export const createSqliteFirstSliceStorage = (
              unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
             VALUES (?, ?, ?, ?, ?, NULL, NULL, 'CONNECTION', ?, ?, ?, ?)`).run(log.participantTestLogId,
             log.tenantId, log.workspaceId, log.participantSessionId, log.testRunId,
-            log.logContent, log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+            log.logContent, (log.originalClientTimestamp === undefined ? log.timestamp : BigInt(exactParticipantTestLogTimestamp(log))), log.recordedAt, log.originalTimestamp ?? null);
         }
         database.exec("COMMIT");
         return result;

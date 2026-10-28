@@ -1,3 +1,6 @@
+import {exactParticipantTestLogTimestamp,compareParticipantTestLogTimestamps} from '@testcenter-rewrite-app/domain';
+export {decodeOriginalTestLogJson,encodeOriginalTestLogContent,parseOriginalTestLogEntries} from './original-test-log-json.js';
+export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection,formatOriginalTestLogEntry} from './original-test-log.js';
 import {createOriginalUnitPort} from './original-unit.js';
 export {formatOriginalUnitReadJson} from './original-unit.js';
 export type {OriginalUnitPort,OriginalUnitRead} from './original-unit.js';
@@ -1617,6 +1620,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   getOrCreateOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope): Promise<string>;
   matchesOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope & {workspaceNumber:string}): Promise<boolean>;
   findOriginalTestNumber(input: {testNumber:string;tenantId:string;workspaceId:string;participantSessionId:string}): Promise<import('./original-test-number.js').OriginalTestNumberRecord|null>;
+  /** Append native Test logs under current metadata ownership, without rewriting its Run. */
+  appendOriginalTestLogs(input: import('./original-test-number.js').OriginalTestNumberRecord, logs: ParticipantTestLog[]): Promise<void>;
   getOrCreateOriginalTestNumber(input: import('./original-test-number.js').OriginalTestNumberInput): Promise<string>;
   saveTestRun(testRun: TestRun): Promise<void>;
   /** Read current parent/Run and commit the pure projection, logs and activity in one write boundary. */
@@ -7660,7 +7665,7 @@ const listParticipantTestLogsForWorkspace = (input: {
       (!input.logKey || item.testLog.logKey === input.logKey)
     )
     .sort((left, right) =>
-      right.testLog.timestamp - left.testLog.timestamp ||
+      compareParticipantTestLogTimestamps(right.testLog,left.testLog) ||
       right.testLog.recordedAt.localeCompare(left.testLog.recordedAt) ||
       right.testLog.participantTestLogId.localeCompare(
         left.testLog.participantTestLogId
@@ -7683,7 +7688,7 @@ const formatParticipantTestLogCsv = (
     "logentry"
   ];
   const chronologicalItems = [...items].sort((left, right) =>
-    left.testLog.timestamp - right.testLog.timestamp ||
+    compareParticipantTestLogTimestamps(left.testLog,right.testLog) ||
     left.testLog.recordedAt.localeCompare(right.testLog.recordedAt) ||
     left.testLog.participantTestLogId.localeCompare(
       right.testLog.participantTestLogId
@@ -7700,7 +7705,7 @@ const formatParticipantTestLogCsv = (
         bookletname: item.bookletAssignmentKey,
         unitname: item.testLog.unitKey ?? "",
         originalUnitId: item.testLog.originalUnitId ?? "",
-        timestamp: item.testLog.originalTimestamp ?? item.testLog.timestamp,
+        timestamp: item.testLog.originalTimestamp ?? exactParticipantTestLogTimestamp(item.testLog),
         logentry: logEntry
       };
     })
@@ -16189,7 +16194,7 @@ const buildOriginalLogReportRows = (input: {
       bookletname: item.bookletAssignmentKey,
       unitname: item.testLog.unitKey ?? "",
       originalUnitId: item.testLog.originalUnitId ?? "",
-      timestamp: String(item.testLog.originalTimestamp ?? item.testLog.timestamp),
+      timestamp: String(item.testLog.originalTimestamp ?? exactParticipantTestLogTimestamp(item.testLog)),
       logentry: formatOriginalParticipantLogEntry(item.testLog)
     }))
     .sort(

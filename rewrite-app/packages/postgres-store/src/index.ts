@@ -1,3 +1,5 @@
+import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
+import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
@@ -834,7 +836,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
           row.original_unit_id == null ? null : String(row.original_unit_id),
         logKey: String(row.log_key),
         logContent: String(row.log_content),
-        timestamp: Number(row.timestamp),
+        ...readParticipantTestLogTimestamp(row.timestamp),
         ...(row.original_timestamp === 0 ? { originalTimestamp: 0 as const } : {}),
         recordedAt: String(row.recorded_at)
       }
@@ -3558,6 +3560,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async findOriginalTestNumber(input){const row=(await pool.query(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id
       JOIN participant_sessions p ON p.participant_session_id=m.participant_session_id AND p.tenant_id=m.tenant_id AND p.workspace_id=m.workspace_id AND p.content_release_id=m.content_release_id
       WHERE m.test_number=$1 AND m.tenant_id=$2 AND m.workspace_id=$3 AND m.participant_session_id=$4 AND p.original_login_key IS NOT NULL AND p.original_name_suffix IS NOT NULL`,[input.testNumber,input.tenantId,input.workspaceId,input.participantSessionId])).rows[0];return row?{testNumber:String(row.test_number),testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id)}:null;},
+    async appendOriginalTestLogs(input, logs) {await appendOriginalTestLogs(pool, input, logs);},
     async getOrCreateOriginalTestNumber(input) {
       return withResultArtifactParent(pool, input, async client => {
         const run = mapTestRun((await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE test_run_id=$1`,[input.testRunId])).rows[0]);
@@ -3655,7 +3658,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [log.participantTestLogId, log.tenantId,
             log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
-            log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+            exactParticipantTestLogTimestamp(log), log.recordedAt, log.originalTimestamp ?? null]);
         for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
           (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`, [event.activityEventId, event.tenantId, event.workspaceId,
@@ -3789,7 +3792,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
             (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)${effect.originalTestState!==undefined?'':` ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id, participant_session_id = EXCLUDED.participant_session_id, test_run_id = EXCLUDED.test_run_id, unit_key = EXCLUDED.unit_key, original_unit_id = EXCLUDED.original_unit_id, log_key = EXCLUDED.log_key, log_content = EXCLUDED.log_content, timestamp = EXCLUDED.timestamp, recorded_at = EXCLUDED.recorded_at, original_timestamp = EXCLUDED.original_timestamp`}`, [log.participantTestLogId, log.tenantId,
               log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
-              log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+              exactParticipantTestLogTimestamp(log), log.recordedAt, log.originalTimestamp ?? null]);
           for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
             (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb) ON CONFLICT(activity_event_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id, event_type = EXCLUDED.event_type, actor_id = EXCLUDED.actor_id, subject_type = EXCLUDED.subject_type, subject_id = EXCLUDED.subject_id, occurred_at = EXCLUDED.occurred_at, summary = EXCLUDED.summary, details_json = EXCLUDED.details_json`, [event.activityEventId, event.tenantId, event.workspaceId,
@@ -3828,7 +3831,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
             (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [log.participantTestLogId, log.tenantId,
               log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
-              log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+              exactParticipantTestLogTimestamp(log), log.recordedAt, log.originalTimestamp ?? null]);
           for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
             (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`, [event.activityEventId, event.tenantId, event.workspaceId,
@@ -3878,6 +3881,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
          WHERE tenant_id = $1
            AND workspace_id = $2
            AND unit_key IS NULL
+           AND substr(participant_test_log_id,1,18) <> 'original-test-log:'
            AND log_key = ANY($3::text[])
          ORDER BY test_run_id, log_key, timestamp DESC, recorded_at DESC, participant_test_log_id DESC`,
         [tenantId, workspaceId, logKeys],
@@ -3920,7 +3924,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
               testLog.originalUnitId,
               testLog.logKey,
               testLog.logContent,
-              testLog.timestamp,
+              exactParticipantTestLogTimestamp(testLog),
               testLog.recordedAt,
               testLog.originalTimestamp ?? null
             ]
@@ -3947,7 +3951,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         const row = (await client.query(
           "SELECT presence_json FROM participant_connection_presence WHERE test_run_id = $1", [input.testRunId])).rows[0];
         const latest = (await client.query(`SELECT MAX(timestamp) AS timestamp FROM participant_test_logs
-          WHERE test_run_id = $1 AND unit_key IS NULL AND log_key = 'CONNECTION'`, [input.testRunId])).rows[0];
+          WHERE test_run_id = $1 AND unit_key IS NULL AND log_key = 'CONNECTION' AND substr(participant_test_log_id,1,18) <> 'original-test-log:'`, [input.testRunId])).rows[0];
         const result = transitionParticipantPresence(input,
           row ? row.presence_json as ParticipantPresence : null, run, session, Number(latest?.timestamp ?? 0));
         if (result.presence) {
@@ -3964,7 +3968,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
              unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
             VALUES ($1, $2, $3, $4, $5, NULL, NULL, 'CONNECTION', $6, $7, $8, $9)`,
             [log.participantTestLogId, log.tenantId, log.workspaceId, log.participantSessionId,
-             log.testRunId, log.logContent, log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+             log.testRunId, log.logContent, exactParticipantTestLogTimestamp(log), log.recordedAt, log.originalTimestamp ?? null]);
         }
         await client.query("COMMIT");
         return result;

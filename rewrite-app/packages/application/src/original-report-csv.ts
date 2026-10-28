@@ -1,3 +1,5 @@
+import {originalTestLogIdPrefix} from '@testcenter-rewrite-app/domain';
+import {formatOriginalTestLogEntry} from './original-test-log.js';
 // IQB Testcenter 19 CSV::build/cell dialect: UTF-8 BOM, semicolons, quoted
 // non-null cells (including headers), doubled quotes and LF row boundaries.
 export const originalReportCsvCell = (value: unknown): string => {
@@ -15,8 +17,9 @@ export const formatOriginalReportCsv = (
 ].join("\n")}`;
 
 export const formatOriginalParticipantLogEntry = (log: {
-  unitKey: string | null; logKey: string; logContent: string; originalTimestamp?: 0;
+  unitKey: string | null; logKey: string; logContent: string; originalTimestamp?: 0; participantTestLogId?: string;
 }): string => {
+  if (log.participantTestLogId?.startsWith(originalTestLogIdPrefix)) return formatOriginalTestLogEntry(log);
   // TestController::updateTestState quotes the key, not the server value.
   if (log.originalTimestamp === 0 && log.unitKey === null && log.logKey === "CONNECTION") {
     return `${JSON.stringify(log.logKey)} : ${log.logContent}`;

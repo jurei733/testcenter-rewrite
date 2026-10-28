@@ -1,3 +1,4 @@
+import {exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import type {OriginalReportFormat} from '@testcenter-rewrite-app/contracts';
 import {formatOriginalReportCsv} from './original-report-csv.js';
 
@@ -6,7 +7,7 @@ export type OriginalResponseReportRecord = Identity & {
   laststate:string|null; originalUnitId:string;
   responses:Array<{id:string; content:string; ts:number; responseType:string}>;
 };
-export type OriginalLogReportRecord = Identity & {originalUnitId:string; timestamp:number; logentry:string};
+export type OriginalLogReportRecord = Identity & {originalUnitId:string; timestamp:number; originalClientTimestamp?:string; logentry:string};
 /** DAO-shaped data: code is the stored person suffix, and reviewtime has
  * already been rendered in the configured system timezone. */
 export type OriginalReviewReportRecord = Identity & {
@@ -59,7 +60,8 @@ export function formatOriginalResponseReport(rows:OriginalResponseReportRecord[]
 export function formatOriginalLogReport(rows:OriginalLogReportRecord[], format:OriginalReportFormat):string {
   // AdminDAO uses UNION ALL, without an ORDER BY: retain the supplied sequence.
   return render(format, rows.map(row => ({...identity(row), originalUnitId:row.originalUnitId,
-    timestamp:row.timestamp, logentry:row.logentry})),
+    timestamp:row.originalClientTimestamp === undefined ? row.timestamp : format === 'csv' ? exactParticipantTestLogTimestamp(row) :
+      (JSON as unknown as {rawJSON:(value:string)=>unknown}).rawJSON(exactParticipantTestLogTimestamp(row)), logentry:row.logentry})),
   ['groupname','loginname','code','bookletname','unitname','originalUnitId','timestamp','logentry']);
 }
 

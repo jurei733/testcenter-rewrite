@@ -2187,7 +2187,9 @@ const readMultipartAttachmentUpload = async (
 
 const readJsonBody = async <T>(
   request: IncomingMessage,
-  maxJsonBodyBytes: number
+  maxJsonBodyBytes: number,
+  allowEmpty = false,
+  decode?: (payload: Uint8Array) => unknown
 ): Promise<T> => {
   const contentLengthHeader = request.headers["content-length"];
   const contentLength =
@@ -2210,8 +2212,9 @@ const readJsonBody = async <T>(
     chunks.push(buffer);
   }
 
-  const payload = Buffer.concat(chunks).toString("utf8");
-  return JSON.parse(payload) as T;
+  const bytes = Buffer.concat(chunks);
+  if (allowEmpty && bytes.length === 0) return undefined as T;
+  return (decode ? decode(bytes) : JSON.parse(bytes.toString("utf8"))) as T;
 };
 
 const readOptionalJsonBody = async <T>(
@@ -4976,7 +4979,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       if (await handleOriginalTestHttp({request, pathname, services,
-        readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),
+        readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),
         send: (status, value) => sendJson(response, status, value),
         raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
         binary:(bytes,contentType)=>{response.writeHead(200,{...securityHeaders,"content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}

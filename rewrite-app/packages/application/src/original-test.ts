@@ -1,13 +1,14 @@
-import type {ContentReleaseBookletEntry, ParticipantSession, TestRun} from '@testcenter-rewrite-app/domain';
+import {originalTestLogIdPrefix,type ContentReleaseBookletEntry,type ParticipantSession,type TestRun} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {parseOriginalTestStatePatch,applyOriginalTestStatePatch,assertOriginalTestState,originalPhpMap} from './original-test-state.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {parseOriginalTestLogEntries} from './original-test-log-json.js';
 import {hashOriginalSessionToken} from './original-session-token.js';
 import type {OriginalBookletFiles} from './original-test-files.js';
-import {parseOriginalNativeTestNumber,readOriginalPerson,resolveOriginalOwnedTest} from './original-test-access.js';
+import {parseOriginalNativeTestNumber,readOriginalPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
 import {defaultParticipantExecutionMode,type ParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
 
 /** PHP TestName preserves first key position while duplicate values replace it. */
@@ -32,6 +33,8 @@ export function formatOriginalTestReadJson(value:OriginalTestRead):string{
 }
 export type OriginalTestPort = {
   requirePerson(input: {token: string}): Promise<void>;
+  requireOwner(input:{token:string;testNumber:string}):Promise<void>;
+  putLog(input:{token:string;testNumber:string;body:unknown}):Promise<void>;
   create(input: {token: string; bookletName: string}): Promise<string>;
   read(input:{token:string;testNumber:string}):Promise<OriginalTestRead>;
   patchState(input:{token:string;testNumber:string;patch:unknown}):Promise<void>;
@@ -71,6 +74,16 @@ export function createOriginalTestPort(input: {
         const testLogs=entries.map(entry=>({participantTestLogId:input.id(),tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,testRunId:run.testRunId,unitKey:null,originalUnitId:null,logKey:entry.key,logContent:encodeOriginalReportJson(entry.content),timestamp:entry.timeStamp,recordedAt:timestamp,...(entry.timeStamp===0?{originalTimestamp:0 as const}:{})}));
         return{testRun:{...context.testRun,updatedAt:timestamp},originalTestState:values,originalResultModifiedAt:timestamp,testLogs,activityEvents:[]};});
       if(!result)throw forbidden(raw);
+    },
+    async requireOwner({token,testNumber}){await resolveOriginalOwnedTestScope(input,token,testNumber);},
+    async putLog({token,testNumber,body}){
+      const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber);
+      const entries=parseOriginalTestLogEntries(body);
+      if(!entries.length){await input.repository.appendOriginalTestLogs(scope,[]);return;}
+      const recordedAt=input.now();
+      await input.repository.appendOriginalTestLogs(scope,entries.map(entry=>({participantTestLogId:originalTestLogIdPrefix+input.id(),
+        tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId,testRunId:scope.testRunId,
+        unitKey:null,originalUnitId:null,logKey:entry.key,logContent:entry.content,timestamp:entry.timeStamp,...(entry.originalClientTimestamp===undefined?{}:{originalClientTimestamp:entry.originalClientTimestamp}),recordedAt})));
     },
     async resource({groupToken,workspaceNumber,path}){
       if(typeof groupToken!=='string'||!groupToken)throw new FirstSliceError(401,'original_group_token_missing','No Token given');

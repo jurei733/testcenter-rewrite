@@ -1,3 +1,4 @@
+import {appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
@@ -932,6 +933,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const id=state.originalTestRunsByNumber.get(input.testNumber);const row=id?state.originalTestNumbers.get(id):undefined;
       return selectOwnedOriginalTestNumber(input,row,id?state.testRuns.get(id)??null:null,state.participantSessions.get(input.participantSessionId)??null);
     },
+    async appendOriginalTestLogs(input, logs) {appendOriginalTestLogCollection(state, input, logs);},
     async getOrCreateOriginalTestNumber(input) {
       guardResultArtifactCollections(state, input);
       const prepared = prepareOriginalTestNumber(input, state.testRuns.get(input.testRunId) ?? null,
@@ -1142,7 +1144,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         state.testRuns.get(input.testRunId) ?? null,
         state.participantSessions.get(input.participantSessionId) ?? null,
         Array.from(state.participantTestLogs.values()).reduce((latest, log) =>
-          log.testRunId === input.testRunId && log.unitKey === null && log.logKey === "CONNECTION"
+          log.testRunId === input.testRunId && log.unitKey === null && !log.participantTestLogId.startsWith("original-test-log:") && log.logKey === "CONNECTION"
             ? Math.max(latest, log.timestamp) : latest, 0));
       if (result.presence) state.participantPresence.set(input.testRunId, result.presence);
       else state.participantPresence.delete(input.testRunId);
