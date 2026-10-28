@@ -1,3 +1,8 @@
+import {createOriginalCommandPort} from './original-command.js';
+export type {OriginalCommandPort} from './original-command.js';
+export * from './original-command-queue.js';
+export {parseOriginalCommandFields,prepareOriginalCommandInsert,readOriginalLastCommandId,formatOriginalCommandsJson,originalCommandFloatString,originalCommandInteger} from './original-command-codec.js';
+export type {OriginalCommandFields,OriginalCommandPacket} from './original-command-codec.js';
 import {exactParticipantTestLogTimestamp,compareParticipantTestLogTimestamps} from '@testcenter-rewrite-app/domain';
 export {decodeOriginalTestLogJson,encodeOriginalTestLogContent,parseOriginalTestLogEntries} from './original-test-log-json.js';
 export {prepareOriginalTestLock,lockOriginalTestCollection} from './original-test-lock.js';
@@ -1284,6 +1289,7 @@ export type FirstSlicePorts = {
   /** Trusted native authentication core; HTTP must separately enforce configured proof of work. */
   originalAuthentication: import('./original-authentication.js').OriginalAuthenticationPort;
   originalTest: import('./original-test.js').OriginalTestPort;
+  originalCommand: import('./original-command.js').OriginalCommandPort;
   originalUnit:import('./original-unit.js').OriginalUnitPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
@@ -1420,7 +1426,7 @@ export type FirstSliceServices = FirstSlicePorts & {
   }): Promise<CreateImportJobResult>;
 };
 
-export type FirstSliceRepository = ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
+export type FirstSliceRepository = import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
@@ -32486,6 +32492,7 @@ export const createFirstSliceServices = (
     participantAccess,
     originalAuthentication,
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
+    originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator}),
     originalTest: createOriginalTestPort({auth: originalAuthentication, repository, now, id: idGenerator,
       readBooklet:(scope,fileId)=>originalTestFiles.booklet(scope,fileId),
       readResource:(scope,path)=>originalTestFiles.resource(scope,path),

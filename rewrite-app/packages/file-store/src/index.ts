@@ -1,3 +1,5 @@
+import {nextOriginalCommandNumber,findOriginalCommandTargetCollection,appendOriginalCommandCollection,listOriginalCommandsCollection,acknowledgeOriginalCommandCollection,touchOriginalCommandPollingCollection} from '@testcenter-rewrite-app/application';
+import type {OriginalCommandDelivery} from '@testcenter-rewrite-app/application';
 import {prepareOriginalOperationalLogins,projectOriginalOperationalModes} from '@testcenter-rewrite-app/application';
 import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
@@ -134,6 +136,8 @@ type PersistedFirstSliceState = {
   originalTestRunsByNumber: Record<string,string>;
   originalWorkspaceNumbers: Record<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
+  originalNativeCommands: Record<string,OriginalCommandDelivery>;
+  originalNativeCommandCounter: string;
   participantRunCommands: Record<string, ParticipantRunCommand>;
   participantProgressDeliveries: Record<string, ParticipantProgressDelivery>;
   participantTestLogs: Record<string, ParticipantTestLog>;
@@ -198,6 +202,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   originalTestRunsByNumber: {},
   originalWorkspaceNumbers: {},
   originalWorkspaceNumberCounter: "0",
+  originalNativeCommands: {},
+  originalNativeCommandCounter: '0',
   participantRunCommands: {},
   participantProgressDeliveries: {},
   participantTestLogs: {},
@@ -1208,6 +1214,7 @@ const createFileRepository = (
         const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
           value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
         deleteMatching(state.participantRunCommands, workspaceMatches);
+        deleteMatching(state.originalNativeCommands, workspaceMatches);
       deleteMatching(state.participantProgressDeliveries, workspaceMatches);
         deleteMatching(state.originalLoginBindings, workspaceMatches);
         deleteMatching(state.originalSessionTokens, workspaceMatches);
@@ -1707,6 +1714,12 @@ const createFileRepository = (
         ] = candidates;
       });
     },
+    async reserveOriginalCommandNumber(){return mutate(state=>{const next=nextOriginalCommandNumber(state.originalNativeCommandCounter);state.originalNativeCommandCounter=next;return next;});},
+    async findOriginalCommandTarget(actor,testNumber){return findOriginalCommandTargetCollection(await getState(),actor,testNumber);},
+    async appendOriginalCommand(actor,command,targets){await mutate(state=>appendOriginalCommandCollection(state,actor,command,targets));},
+    async listOriginalCommands(scope,lastCommandId){return listOriginalCommandsCollection(await getState(),scope,lastCommandId);},
+    async acknowledgeOriginalCommand(scope,commandNumber){return mutate(state=>acknowledgeOriginalCommandCollection(state,scope,commandNumber));},
+    async touchOriginalCommandPolling(scope,timestamp){return mutate(state=>touchOriginalCommandPollingCollection(state,scope,timestamp));},
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
       const state = await getState();
       return structuredClone(state.originalOperationalLogins[`${tenantId}::${workspaceId}`] ?? []);
@@ -1981,6 +1994,7 @@ const createFileRepository = (
       await mutate(state => {
         for (const testRunId of testRunIds) {
           delete state.participantPresence[testRunId];
+          for(const[key,row]of Object.entries(state.originalNativeCommands))if(row.testRunId===testRunId)delete state.originalNativeCommands[key];
           for (const [key, command] of Object.entries(state.participantRunCommands)) {
             if (command.testRunId === testRunId) delete state.participantRunCommands[key];
           }

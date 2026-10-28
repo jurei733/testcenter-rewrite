@@ -6,3 +6,4 @@ source-workspace-results/native-test-lock/test-lock.csv whitespace=-blank-at-eol
 
 # Retained Source57 raw CSV inside the cumulative command oracle.
 source-workspace-results/native-test-command/test-lock.csv whitespace=-blank-at-eol
+source-workspace-results/native-test-command-boundaries/test-lock.csv whitespace=-blank-at-eol

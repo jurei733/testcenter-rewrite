@@ -56,7 +56,7 @@ for(const kind of kinds)test(`${kind}: Source65 native monitor is an uncoded per
    const exec=async sql=>kind==='sqlite'?control.exec(sql):control.query(sql);
    const columns=async()=>kind==='sqlite'?control.prepare('PRAGMA table_info(participant_sessions)').all().map(row=>row.name):(await control.query("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='participant_sessions'")).rows.map(row=>row.column_name);
    try{
-    await exec(`ALTER TABLE participant_sessions DROP COLUMN original_operational_mode; DELETE FROM schema_migrations WHERE version>=${version}`);
+    await exec(`DROP TABLE IF EXISTS original_native_commands; DROP TABLE IF EXISTS original_native_command_counter; ALTER TABLE participant_sessions DROP COLUMN original_operational_mode; DELETE FROM schema_migrations WHERE version>=${version}`);
     await exec(kind==='sqlite'?`CREATE TRIGGER owned_monitor_mode_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned monitor mode failure'); END`:`CREATE FUNCTION owned_monitor_mode_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned monitor mode failure'; END $$; CREATE TRIGGER owned_monitor_mode_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_monitor_mode_failure()`);
     await assert.rejects(open(),/owned monitor mode failure/);assert.equal((await columns()).includes('original_operational_mode'),false);
     await exec(kind==='sqlite'?'DROP TRIGGER owned_monitor_mode_failure':'DROP TRIGGER owned_monitor_mode_failure ON schema_migrations; DROP FUNCTION owned_monitor_mode_failure()');

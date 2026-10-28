@@ -4979,6 +4979,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       if (await handleOriginalTestHttp({request, pathname, services,
+        reason: text => {response.statusMessage=text;},
         readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),
         send: (status, value) => sendJson(response, status, value),
         raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},

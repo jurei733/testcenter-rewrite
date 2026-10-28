@@ -17,7 +17,7 @@ const cli = fileURLToPath(new URL('./ci-focus.mjs', import.meta.url));
 test('every actual Quick, qualification and memory/SQLite shard has an executable focused plan', () => {
   const actual = ['quick', 'quick-extended-long', 'quick-extended', 'verify-long-ui', 'verify-memory-sqlite']
     .flatMap(job => workflow.jobs[job].strategy.matrix.include);
-  assert.equal(checks.length, actual.length + 6);
+  assert.equal(checks.length, actual.length + 7);
   for (const item of actual) {
     const plan = planFocus([item.check], checks);
     assert.equal(plan.checks[0].check, item.check);
@@ -150,4 +150,19 @@ test('participant authentication focus retains all existing identity, HTTP, cred
   assert.deepEqual(calls,['build:core','test:participant-auth:built']);
   assert.equal(planFocus(['participant-auth','original-results','unit'],checks).buildScript,'build:core');
   assert.equal(planFocus(['participant-auth','original-login'],checks).buildScript,'build');
+});
+
+
+test('native command focus builds core once and retains mandatory codec, lifecycle and actual Postgres coverage', () => {
+  const plan=planFocus(['original-commands'],checks),calls=[];
+  assert.equal(plan.buildScript,'build:core');assert.equal(plan.completeAcceptance,false);
+  assert.equal(scripts['test:original-commands'],'npm run build:core && npm run test:original-commands:built');
+  assert.equal(scripts['test:original-commands:built'],'node --test scripts/original-command-codec.test.mjs scripts/original-command.test.mjs');
+  for(const file of ['scripts/original-command-codec.test.mjs','scripts/original-command.test.mjs']){
+    for(const inventory of ['test:unit:built','test:original-results:built'])assert.ok(scripts[inventory].split(/\s+/).includes(file),file+' remains in '+inventory);
+  }
+  assert.ok(readFileSync(new URL('./run-postgres-integration.mjs',import.meta.url),'utf8').includes('"scripts/original-command.test.mjs"'));
+  assert.equal(executeFocus(plan,step=>{calls.push(step.script);return 0;}),0);assert.deepEqual(calls,['build:core','test:original-commands:built']);
+  assert.equal(planFocus(['original-commands','participant-auth','unit'],checks).buildScript,'build:core');
+  assert.equal(planFocus(['original-commands','original-login'],checks).buildScript,'build');
 });

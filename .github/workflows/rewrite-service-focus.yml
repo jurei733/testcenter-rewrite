@@ -8,7 +8,7 @@ on:
         type: choice
         required: true
         default: participant-auth
-        options: [participant-auth, original-results, system-check-reports]
+        options: [participant-auth, original-results, original-commands, system-check-reports]
   workflow_call:
     inputs:
       check:
@@ -56,7 +56,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate the selected service before installing dependencies
-        run: node -e 'if (!["participant-auth", "original-results", "system-check-reports"].includes(process.env.FOCUS_CHECK)) process.exit(2)'
+        run: node -e 'if (!["participant-auth", "original-results", "original-commands", "system-check-reports"].includes(process.env.FOCUS_CHECK)) process.exit(2)'
       - uses: ./.github/actions/rewrite-runtime
       - name: Audit the complete locked graph
         run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
