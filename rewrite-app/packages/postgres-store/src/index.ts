@@ -1,3 +1,4 @@
+import {prepareOriginalPersonNumber,selectOriginalPersonNumber} from '@testcenter-rewrite-app/application';
 import {createOriginalCommandRepository} from './original-command-queue.js';
 import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
 import {lockOriginalTest} from './original-test-lock.js';
@@ -1734,6 +1735,13 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
       timestamp_seconds BIGINT CHECK(timestamp_seconds>0) NOT NULL,executed BOOLEAN NOT NULL DEFAULT FALSE,
       PRIMARY KEY(command_number,test_number));
       CREATE INDEX original_native_commands_target ON original_native_commands(test_number,executed,timestamp_seconds,command_number);`}
+,{version:73,name:"original_native_person_numbers",sql:`CREATE TABLE original_person_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+      INSERT INTO original_person_number_counter(singleton,last_number) VALUES(1,'0');
+      CREATE UNIQUE INDEX original_person_number_parent_scope ON participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix);
+      CREATE TABLE original_person_numbers(person_number TEXT PRIMARY KEY,participant_session_id TEXT NOT NULL UNIQUE,
+        tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,original_login_key TEXT NOT NULL,original_name_suffix TEXT NOT NULL,
+        FOREIGN KEY(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix)
+          REFERENCES participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) ON DELETE CASCADE);`}
 ];
 
 export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
@@ -3332,6 +3340,12 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
       return (await pool.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY login_key",[tenantId,workspaceId])).rows.map(mapOriginalLoginBinding);
     },
+    async getOriginalPersonNumber(input){
+      const row=(await pool.query('SELECT n.* FROM original_person_numbers n JOIN participant_sessions p ON p.participant_session_id=n.participant_session_id AND p.tenant_id=n.tenant_id AND p.workspace_id=n.workspace_id AND p.original_login_key=n.original_login_key AND p.original_name_suffix=n.original_name_suffix WHERE n.participant_session_id=$1 AND n.tenant_id=$2 AND n.workspace_id=$3 AND n.original_login_key=$4 AND n.original_name_suffix=$5',[input.participantSessionId,input.tenantId,input.workspaceId,input.originalLoginKey,input.originalNameSuffix])).rows[0];
+      if(!row)return null;
+      const record={participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),originalLoginKey:String(row.original_login_key),originalNameSuffix:String(row.original_name_suffix),personNumber:String(row.person_number)};
+      return selectOriginalPersonNumber(input,record,record);
+    },
     async resolveOriginalParticipantSession(candidate,validate) {
       const client=await pool.connect();
       try {
@@ -3346,6 +3360,12 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         const runs=(await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE`,[person.tenantId,person.workspaceId,person.originalLoginKey])).rows.map(mapTestRun).filter((run):run is TestRun=>run!==null);
         projectOriginalPersonRuns(person,runs,people);
         if(result.created)await client.query("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix,original_operational_mode) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null,person.originalOperationalMode??null]);
+        if(result.created){
+          const counter=(await client.query('SELECT last_number FROM original_person_number_counter WHERE singleton=1 FOR UPDATE')).rows[0];
+          const numbered=prepareOriginalPersonNumber(person,String(counter?.last_number));
+          await client.query('UPDATE original_person_number_counter SET last_number=$1 WHERE singleton=1',[numbered.counter]);
+          await client.query('INSERT INTO original_person_numbers(person_number,participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) VALUES($1,$2,$3,$4,$5,$6)',[numbered.record.personNumber,person.participantSessionId,person.tenantId,person.workspaceId,person.originalLoginKey,person.originalNameSuffix]);
+        }
         await client.query("UPDATE participant_sessions SET group_key=$1,execution_mode=$2,original_operational_mode=$6 WHERE tenant_id=$3 AND workspace_id=$4 AND original_login_key=$5 AND (group_key IS DISTINCT FROM $1 OR execution_mode IS DISTINCT FROM $2 OR original_operational_mode IS DISTINCT FROM $6)",[person.groupKey,person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey,person.originalOperationalMode??null]);
         await client.query("UPDATE test_runs SET execution_mode=$1 WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4) AND execution_mode IS DISTINCT FROM $1",[person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey]);
         await client.query("COMMIT");return result;

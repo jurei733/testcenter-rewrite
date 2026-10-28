@@ -24,6 +24,8 @@ import {createOriginalTestPort} from './original-test.js';
 export {parseOriginalTestName} from './original-test.js';
 export type {OriginalTestPort} from './original-test.js';
 import {originalParticipantGroupKeysEqual as sameOriginalTestName} from './original-participant-group.js';
+export {prepareOriginalPersonNumber,selectOriginalPersonNumber,validateOriginalPersonNumbers} from './original-person-number.js';
+export type {OriginalPersonNumberScope,OriginalPersonNumberRecord} from './original-person-number.js';
 export {prepareOriginalTestNumber, assertOriginalTestCreationCandidate} from './original-test-number.js';
 export type {OriginalTestNumberScope, OriginalTestNumberRecord, OriginalTestNumberInput} from './original-test-number.js';
 export {assertResultArtifactParent, guardResultArtifactCollections, activityResultParent, attachmentResultParent, resultParentUnavailable, type ResultArtifactParent} from './result-artifact-parent.js';
@@ -1565,6 +1567,8 @@ export type FirstSliceRepository = import('./original-command-queue.js').Origina
   updateParticipantSessionValidity(input: {participantSessionId: string; tenantId: string; workspaceId: string; validUntil: string | null}): Promise<void>;
   /** Atomic native Login/suffix lookup and creation; validate runs before any durable effect. */
   resolveOriginalParticipantSession(candidate: ParticipantSession, validate?: (person: Readonly<ParticipantSession>) => void): Promise<import('./original-person-identity.js').OriginalPersonResolution | null>;
+  /** Genuine durable native identity; unknown historical people return null. */
+  getOriginalPersonNumber(input: import('./original-person-number.js').OriginalPersonNumberScope): Promise<string | null>;
   /** First validated credential login wins; returns null if the workspace was deleted. */
   getOrCreateOriginalParticipantGroup(input: Omit<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup, "lastModifiedAt">): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup | null>;
   listOriginalParticipantGroupsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup[]>;

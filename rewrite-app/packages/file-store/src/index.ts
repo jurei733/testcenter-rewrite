@@ -1,3 +1,4 @@
+import {prepareOriginalPersonNumber,selectOriginalPersonNumber,validateOriginalPersonNumbers,type OriginalPersonNumberRecord} from '@testcenter-rewrite-app/application';
 import {nextOriginalCommandNumber,findOriginalCommandTargetCollection,appendOriginalCommandCollection,listOriginalCommandsCollection,acknowledgeOriginalCommandCollection,touchOriginalCommandPollingCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalCommandDelivery} from '@testcenter-rewrite-app/application';
 import {prepareOriginalOperationalLogins,projectOriginalOperationalModes} from '@testcenter-rewrite-app/application';
@@ -133,6 +134,8 @@ type PersistedFirstSliceState = {
   originalNativeUnits: Record<string,OriginalNativeUnit>;
   originalTestNumbers: Record<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
+  originalPersonNumbers: Record<string, OriginalPersonNumberRecord>;
+  originalPersonNumberCounter: string;
   originalTestRunsByNumber: Record<string,string>;
   originalWorkspaceNumbers: Record<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
@@ -199,6 +202,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   originalNativeUnits: {},
   originalTestNumbers: {},
   originalTestNumberCounter: "0",
+  originalPersonNumbers: {},
+  originalPersonNumberCounter: "0",
   originalTestRunsByNumber: {},
   originalWorkspaceNumbers: {},
   originalWorkspaceNumberCounter: "0",
@@ -768,6 +773,7 @@ const createFileRepository = (
       externalizedCollections = loaded.externalizedCollections;
       {const entries=Object.values(loaded.state.originalTestNumbers??{});const index=Object.fromEntries(entries.map(row=>[row.testNumber,row.testRunId]));if(Object.keys(index).length!==entries.length)throw Error('Duplicate native Test number.');loaded.state.originalTestRunsByNumber=index;}
 
+      validateOriginalPersonNumbers(loaded.state.originalPersonNumbers,loaded.state.originalPersonNumberCounter,loaded.state.participantSessions);
       return loaded.state;
     });
     return cachePromise;
@@ -1220,6 +1226,7 @@ const createFileRepository = (
         deleteMatching(state.originalSessionTokens, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
         deleteMatching(state.originalNativeUnits,workspaceMatches);
+        deleteMatching(state.originalPersonNumbers,workspaceMatches);
         if(state.originalTestNumbers)deleteMatching(state.originalTestNumbers,row=>{if(!workspaceMatches(row))return false;delete state.originalTestRunsByNumber[row.testNumber];return true;});
         if(state.originalWorkspaceNumbers)deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
@@ -1643,6 +1650,7 @@ const createFileRepository = (
       const state = await getState();
       return structuredClone(Object.values(state.originalLoginBindings).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
     },
+    async getOriginalPersonNumber(input){const state=await getState();return selectOriginalPersonNumber(input,state.originalPersonNumbers[input.participantSessionId],state.participantSessions[input.participantSessionId]);},
     async resolveOriginalParticipantSession(candidate,validate) {
       return enqueueMutation(async()=>{
         const state=await getState();
@@ -1651,7 +1659,8 @@ const createFileRepository = (
         const storedPeople=Object.values(state.participantSessions),result=resolveOriginalPerson(candidate,binding,storedPeople,validate);
         const people=projectOriginalPersonSessions(result.participantSession,storedPeople),storedRuns=Object.values(state.testRuns),runs=projectOriginalPersonRuns(result.participantSession,storedRuns,people);
         if(!result.created && people.every((person,index)=>person===storedPeople[index]) && runs.every((run,index)=>run===storedRuns[index]))return structuredClone(result);
-        const next={...state,participantSessions:Object.fromEntries(people.map(person=>[person.participantSessionId,person])),
+        const numbered=result.created?prepareOriginalPersonNumber(result.participantSession,state.originalPersonNumberCounter):undefined;
+        const next={...state,...(numbered?{originalPersonNumbers:{...state.originalPersonNumbers,[result.participantSession.participantSessionId]:numbered.record},originalPersonNumberCounter:numbered.counter}:{}),participantSessions:Object.fromEntries(people.map(person=>[person.participantSessionId,person])),
           testRuns:Object.fromEntries(runs.map(run=>[run.testRunId,run]))};
         await persistState(next);cachePromise=Promise.resolve(next);return structuredClone(result);
       });

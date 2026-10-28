@@ -1,3 +1,4 @@
+import {prepareOriginalPersonNumber,selectOriginalPersonNumber} from '@testcenter-rewrite-app/application';
 import {createOriginalCommandRepository} from './original-command-queue.js';
 import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
 import {lockOriginalTest} from './original-test-lock.js';
@@ -1802,6 +1803,13 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
       timestamp_seconds TEXT NOT NULL,executed INTEGER NOT NULL DEFAULT FALSE,
       PRIMARY KEY(command_number,test_number));
       CREATE INDEX original_native_commands_target ON original_native_commands(test_number,executed,timestamp_seconds,command_number);`}
+,{version:79,name:"original_native_person_numbers",sql:`CREATE TABLE original_person_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+      INSERT INTO original_person_number_counter(singleton,last_number) VALUES(1,'0');
+      CREATE UNIQUE INDEX original_person_number_parent_scope ON participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix);
+      CREATE TABLE original_person_numbers(person_number TEXT PRIMARY KEY,participant_session_id TEXT NOT NULL UNIQUE,
+        tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,original_login_key TEXT NOT NULL,original_name_suffix TEXT NOT NULL,
+        FOREIGN KEY(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix)
+          REFERENCES participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) ON DELETE CASCADE);`}
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -3474,6 +3482,12 @@ export const createSqliteFirstSliceStorage = (
     async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
       return database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? ORDER BY login_key").all(tenantId,workspaceId).map(mapOriginalLoginBinding);
     },
+    async getOriginalPersonNumber(input){
+      const row=database.prepare('SELECT n.* FROM original_person_numbers n JOIN participant_sessions p ON p.participant_session_id=n.participant_session_id AND p.tenant_id=n.tenant_id AND p.workspace_id=n.workspace_id AND p.original_login_key=n.original_login_key AND p.original_name_suffix=n.original_name_suffix WHERE n.participant_session_id=? AND n.tenant_id=? AND n.workspace_id=? AND n.original_login_key=? AND n.original_name_suffix=?').get(input.participantSessionId,input.tenantId,input.workspaceId,input.originalLoginKey,input.originalNameSuffix);
+      if(!row)return null;
+      const record={participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),originalLoginKey:String(row.original_login_key),originalNameSuffix:String(row.original_name_suffix),personNumber:String(row.person_number)};
+      return selectOriginalPersonNumber(input,record,record);
+    },
     async resolveOriginalParticipantSession(candidate,validate) {
       database.exec("BEGIN IMMEDIATE");
       try {
@@ -3485,6 +3499,12 @@ export const createSqliteFirstSliceStorage = (
         const runs=database.prepare("SELECT * FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)").all(person.tenantId,person.workspaceId,person.originalLoginKey!).map(mapTestRun).filter((run):run is TestRun=>run!==null);
         projectOriginalPersonRuns(person,runs,people);
         if(result.created)database.prepare("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix,original_operational_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(...[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null,person.originalOperationalMode??null]);
+        if(result.created){
+          const counter=database.prepare('SELECT last_number FROM original_person_number_counter WHERE singleton=1').get();
+          const numbered=prepareOriginalPersonNumber(person,String(counter?.last_number));
+          database.prepare('UPDATE original_person_number_counter SET last_number=? WHERE singleton=1').run(numbered.counter);
+          database.prepare('INSERT INTO original_person_numbers(person_number,participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) VALUES(?,?,?,?,?,?)').run(numbered.record.personNumber,person.participantSessionId,person.tenantId,person.workspaceId,person.originalLoginKey!,person.originalNameSuffix!);
+        }
         database.prepare("UPDATE participant_sessions SET group_key=?,execution_mode=?,original_operational_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND (group_key IS NOT ? OR execution_mode IS NOT ? OR original_operational_mode IS NOT ?)").run(person.groupKey,person.executionMode??null,person.originalOperationalMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.groupKey,person.executionMode??null,person.originalOperationalMode??null);
         database.prepare("UPDATE test_runs SET execution_mode=? WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT ?").run(person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.executionMode??null);
         database.exec("COMMIT");return result;
