@@ -1,3 +1,4 @@
+import {createOriginalCommandRepository} from './original-command-queue.js';
 import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
 import {lockOriginalTest} from './original-test-lock.js';
 import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
@@ -1789,6 +1790,18 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
     sql: `ALTER TABLE operational_login_migration_candidates ADD COLUMN native_logins_json TEXT NOT NULL DEFAULT '[]';`
   }
   ,{version: 77, name: "original_operational_person_mode", sql: `ALTER TABLE participant_sessions ADD COLUMN original_operational_mode TEXT;`}
+  ,{version:78,name:"original_native_command_queue",sql:`CREATE TABLE original_native_command_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL); INSERT INTO original_native_command_counter(singleton,last_number) VALUES(1,'0');
+      CREATE TABLE original_native_commands (
+      command_number TEXT NOT NULL,
+      test_number TEXT NOT NULL REFERENCES original_test_numbers(test_number) ON DELETE CASCADE,
+      test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+      participant_session_id TEXT NOT NULL REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE,
+      tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_release_id TEXT NOT NULL,
+      commander_participant_session_id TEXT REFERENCES participant_sessions(participant_session_id) ON DELETE SET NULL,
+      keyword VARCHAR(50) NOT NULL CHECK(length(keyword)<=50), arguments_json TEXT NOT NULL,
+      timestamp_seconds TEXT NOT NULL,executed INTEGER NOT NULL DEFAULT FALSE,
+      PRIMARY KEY(command_number,test_number));
+      CREATE INDEX original_native_commands_target ON original_native_commands(test_number,executed,timestamp_seconds,command_number);`}
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -2183,6 +2196,7 @@ export const createSqliteFirstSliceStorage = (
   };
 
   const repository: FirstSliceRepository = {
+    ...createOriginalCommandRepository(database),
     async getApplicationSettings() {
       const row = database
         .prepare(

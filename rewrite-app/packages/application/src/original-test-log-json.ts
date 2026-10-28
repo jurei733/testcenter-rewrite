@@ -166,3 +166,6 @@ export function parseOriginalTestLogEntries(body: unknown): Array<{key:string;co
       content:separator < 0 ? content : ''};
   });
 }
+
+// Shared lexical PHP JSON values; command casts differ from strict TestLog fields.
+export {PhpNumber as OriginalPhpNumber, PhpObject as OriginalPhpObject};

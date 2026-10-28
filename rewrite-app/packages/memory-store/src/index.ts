@@ -1,3 +1,5 @@
+import {nextOriginalCommandNumber,findOriginalCommandTargetCollection,appendOriginalCommandCollection,listOriginalCommandsCollection,acknowledgeOriginalCommandCollection,touchOriginalCommandPollingCollection} from '@testcenter-rewrite-app/application';
+import type {OriginalCommandDelivery} from '@testcenter-rewrite-app/application';
 import {prepareOriginalOperationalLogins,projectOriginalOperationalModes} from '@testcenter-rewrite-app/application';
 import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
@@ -116,6 +118,8 @@ type InMemoryFirstSliceState = {
   originalTestRunsByNumber: Map<string,string>;
   originalWorkspaceNumbers: Map<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
+  originalNativeCommands: Map<string,OriginalCommandDelivery>;
+  originalNativeCommandCounter: string;
   participantRunCommands: Map<string, ParticipantRunCommand>;
   participantProgressDeliveries: Map<string, ParticipantProgressDelivery>;
   participantTestLogs: Map<string, ParticipantTestLog>;
@@ -158,6 +162,8 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   originalTestRunsByNumber: new Map(),
   originalWorkspaceNumbers: new Map(),
   originalWorkspaceNumberCounter: "0",
+  originalNativeCommands: new Map(),
+  originalNativeCommandCounter: '0',
   participantRunCommands: new Map(),
   participantProgressDeliveries: new Map(),
   participantTestLogs: new Map(),
@@ -450,6 +456,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
         value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
       deleteMatching(state.participantRunCommands, workspaceMatches);
+      deleteMatching(state.originalNativeCommands, workspaceMatches);
       deleteMatching(state.participantProgressDeliveries, workspaceMatches);
       deleteMatching(state.originalLoginBindings, workspaceMatches);
       deleteMatching(state.originalSessionTokens, workspaceMatches);
@@ -874,6 +881,12 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       for(const run of modes.testRuns)state.testRuns.set(run.testRunId,run);
       state.originalOperationalLogins.set(`${tenantId}::${workspaceId}`, privateLogins);
     },
+    async reserveOriginalCommandNumber(){const next=nextOriginalCommandNumber(state.originalNativeCommandCounter);state.originalNativeCommandCounter=next;return next;},
+    async findOriginalCommandTarget(actor,testNumber){return findOriginalCommandTargetCollection(state,actor,testNumber);},
+    async appendOriginalCommand(actor,command,targets){appendOriginalCommandCollection(state,actor,command,targets);},
+    async listOriginalCommands(scope,lastCommandId){return listOriginalCommandsCollection(state,scope,lastCommandId);},
+    async acknowledgeOriginalCommand(scope,commandNumber){return acknowledgeOriginalCommandCollection(state,scope,commandNumber);},
+    async touchOriginalCommandPolling(scope,timestamp){return touchOriginalCommandPollingCollection(state,scope,timestamp);},
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
       return structuredClone(state.originalOperationalLogins.get(`${tenantId}::${workspaceId}`) ?? []);
     },
@@ -1111,6 +1124,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       let deletedCount = 0;
       for (const testRunId of testRunIds) {
         state.participantPresence.delete(testRunId);
+        for(const[key,row]of state.originalNativeCommands)if(row.testRunId===testRunId)state.originalNativeCommands.delete(key);
         for (const [key, command] of state.participantRunCommands) {
           if (command.testRunId === testRunId) state.participantRunCommands.delete(key);
         }

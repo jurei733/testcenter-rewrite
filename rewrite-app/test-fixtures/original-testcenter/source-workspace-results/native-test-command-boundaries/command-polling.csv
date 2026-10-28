@@ -1,0 +1,7 @@
+﻿"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"timestamp";"logentry"
+"ORACLE.COMMAND";"owned-native-command-one";"Shared";"ORACLE.POW.BOOK#command:one";"";"";"777";"CONNECTION : ""LOST"""
+"ORACLE.COMMAND";"owned-native-command-one";"Shared";"ORACLE.POW.BOOK#command:one";"";"";"0";"""CONNECTION"" : POLLING"
+"ORACLE.COMMAND";"owned-native-command-one";"Shared";"ORACLE.POW.BOOK#command:one";"";"";"0";"""CONNECTION"" : POLLING"
+"ORACLE.COMMAND";"owned-native-command-one";"Shared";"ORACLE.POW.BOOK#command:one";"";"";"1793158850";"Owned command locked polling"
+"ORACLE.COMMAND";"owned-native-command-one";"Shared";"ORACLE.POW.BOOK#command:one";"";"";"0";"""CONNECTION"" : POLLING"
+"ORACLE.COMMAND";"owned-native-command-one";"Shared";"ORACLE.POW.BOOK#command:one";"";"";"0";"""CONNECTION"" : POLLING"

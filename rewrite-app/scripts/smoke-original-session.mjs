@@ -239,6 +239,38 @@ try {
   assert.equal((await request('PUT','/test',{bookletName:'OWNED.BROWSER'},monitorAgain.token,201)).rawText,monitorTest.rawText);
   await page.frameLocator('iframe').locator('main[data-started="true"]').waitFor();
   mark('browser-native-monitor-has-dual-claims-honest-own-test-mode-and-isolated-bearer');
+  setPhase('browser-native-command-producer-and-shared-delivery');
+  const commandRequest=async(method,path,body,token,status=200)=>{
+    setPhase('native-command-http:'+method+' '+path);
+    const result=await page.evaluate(async({method,path,body,token})=>{
+      const response=await fetch(path,{method,headers:{...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'content-type':'application/json'})},...(body===undefined?{}:{body:typeof body==='string'?body:JSON.stringify(body)})});
+      const text=await response.text();let value=null;try{value=text?JSON.parse(text):null;}catch{value=text;}
+      return{status:response.status,reason:response.statusText,text,value,contentType:response.headers.get('content-type'),cache:response.headers.get('cache-control')};
+    },{method,path,body,token});console.log('native_command_http_status='+result.status+'; expected='+status);assert.equal(result.status,status,'Native browser command HTTP status');assert.equal(result.cache,'private, no-store');return result;
+  };
+  await commandRequest('PUT','/monitor/command','{',identity.sessionToken,403);
+  await commandRequest('GET','/test/'+peerTest.rawText+'/commands',undefined,identity.sessionToken,403);
+  const issued=1793158810,targets=[Number(createdTest.rawText),Number(peerTest.rawText),Number(createdTest.rawText)];
+  const delivered=await commandRequest('PUT','/monitor/command',{keyword:'owned.browser.command',arguments:['Ω/x',0,false,true,null,42,1.5],timestamp:issued,testIds:targets},monitorAgain.token,201);assert.equal(delivered.text,'');
+  const commands=(await commandRequest('GET','/test/'+createdTest.rawText+'/commands',undefined,identity.sessionToken)).value;
+  const peerCommands=(await commandRequest('GET','/test/'+peerTest.rawText+'/commands',undefined,peerPerson.token)).value;
+  assert.equal(commands.length,1);assert.deepEqual(peerCommands,commands);assert.deepEqual(commands[0].arguments,['Ω/x','0','','1','','42','1.5']);assert.equal(commands[0].timestamp,issued);assert.deepEqual(Object.keys(commands[0]),['id','keyword','arguments','timestamp']);
+  assert.deepEqual((await commandRequest('GET','/test/'+createdTest.rawText+'/commands?lastCommandId='+commands[0].id,undefined,identity.sessionToken)).value,commands);
+  mark('browser-native-command-producer-keeps-shared-id-typed-arguments-clock-and-locked-recipient');
+  setPhase('browser-native-command-acknowledgement');
+  const commandId=commands[0].id,commandPath='/test/'+createdTest.rawText+'/command/'+commandId+'/executed';
+  const ack=await commandRequest('PATCH',commandPath,'{',identity.sessionToken),repeated=await commandRequest('PATCH',commandPath,undefined,identity.sessionToken);
+  assert.equal(ack.text,'');assert.equal(ack.reason,'OK');assert.equal(repeated.text,'');assert.equal(repeated.reason,'OK, was already marked as executed');
+  assert.deepEqual((await commandRequest('GET','/test/'+createdTest.rawText+'/commands',undefined,identity.sessionToken)).value,[]);
+  assert.deepEqual((await commandRequest('GET','/test/'+peerTest.rawText+'/commands',undefined,peerPerson.token)).value,commands);
+  await commandRequest('PATCH','/test/'+createdTest.rawText+'/command/'+commandId+'/executed',undefined,peerPerson.token,403);
+  await commandRequest('PATCH','/test/'+peerTest.rawText+'/command/'+commandId+'/executed',undefined,peerPerson.token);
+  const untouchedResponse=await fetch(base+'/api/v1/participant/sessions/'+identity.participantSession.participantSessionId+'/current-state',{headers:{authorization:'Bearer '+identity.sessionToken}});assert.equal(untouchedResponse.status,200);
+  const untouched=(await untouchedResponse.json()).currentRunState.testRun;
+  assert.equal(untouched.status,current.status);assert.equal(untouched.currentUnitKey,current.currentUnitKey);assert.deepEqual(untouched.unitResponses,current.unitResponses);assert.deepEqual(untouched.controllerEntry,current.controllerEntry);assert.deepEqual(untouched.testletTimers,current.testletTimers);
+  await page.frameLocator('iframe').locator('main[data-started="true"]').waitFor();
+  mark('browser-native-command-ack-is-scoped-idempotent-and-preserves-controller-with-exact-source-reason');
+
 
 
 } catch (error) {

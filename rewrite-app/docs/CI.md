@@ -1,5 +1,24 @@
 # CI iteration and complete acceptance
 
+## Native command service feedback (2026-10-28)
+
+`npm run ci:focus -- original-commands` runs one fresh core build followed by
+`original-command-codec.test.mjs` and `original-command.test.mjs`. Its actual
+local selected-test step passes93 checks in8.07 seconds, including all52 measured
+Source67 producer vectors across Memory, File and SQLite. This is scoped
+iteration feedback, not a measurement of full CI speed. Both suites remain in
+mandatory unit/Original-result inventories; the lifecycle suite also runs against
+actual PostgreSQL in complete integration. No broad job is added or removed.
+
+The same selector is allowed by the existing manual/reusable service workflow.
+It retains exact input validation before dependency installation, pinned actions,
+read-only permissions, locked runtime, whole-lock audit, mandatory policy and a
+fresh core build. The owned PostgreSQL16 service makes all four stores run.
+The isolated native-command Linux qualification also invokes that exact reusable
+workflow, beside complete build/unit/PostgreSQL and protected headed-browser
+checks. Its result is separate from full89-job acceptance.
+
+
 ## Native Unit candidate and realistic SQLite contention feedback (2026-10-26)
 
 The accepted predecessor [40256061895](https://github.com/jurei733/testcenter-rewrite/actions/runs/40256061895)
@@ -775,7 +794,7 @@ visible; the follow-up's evidence retention does not claim its root cause fixed.
 ## Standalone Linux service feedback with complete security checks (2026-10-24)
 
 `.github/workflows/rewrite-service-focus.yml` provides a separate manual/reusable
-workflow for `participant-auth`, `original-results` or `system-check-reports`.
+workflow for `participant-auth`, `original-results`, `original-commands` or `system-check-reports`.
 Each invocation validates that exact selection before installation, checks out
 without persisted credentials, installs the locked Node/dependency runtime,
 audits the entire lock including dev/optional dependencies, runs CI policy and
@@ -2018,7 +2037,7 @@ it does not weaken the real installer bound or qualify that failed matrix.
 
 From `rewrite-app`, `npm run ci:focus -- --list` lists the actual Quick,
 extended-qualification and memory/SQLite workflow shards, plus `policy`,
-`typecheck`, `unit`, `participant-auth`, `original-results` and
+`typecheck`, `unit`, `participant-auth`, `original-results`, `original-commands` and
 `system-check-reports`. Select one or several, for example:
 
 ```sh
@@ -2028,6 +2047,7 @@ npm run ci:focus -- policy typecheck
 npm run ci:focus -- participant-auth
 npm run ci:focus -- unit
 npm run ci:focus -- original-results
+npm run ci:focus -- original-commands
 ```
 
 The runner reads `.github/workflows/rewrite-app-ci.yml` on each invocation and

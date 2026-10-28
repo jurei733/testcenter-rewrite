@@ -1,3 +1,4 @@
+import type {OriginalCommandDelivery} from './original-command-queue.js';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import type {OriginalTestNumberRecord} from './original-test-number.js';
 import type {AttachmentFile, OriginalLoginBinding, OriginalParticipantGroup, ParticipantSession, TestRun, WorkspaceActivityEvent, WorkspaceReview, ParticipantTestLog, ParticipantRunCommand, ParticipantProgressDelivery} from '@testcenter-rewrite-app/domain';
@@ -52,6 +53,7 @@ export type OriginalGroupDeletionCollections = {
   originalTestRunsByNumber?: Collection<string>;
   originalTestNumbers?: Collection<OriginalTestNumberRecord>;
   originalNativeUnits?:Collection<OriginalNativeUnit>;
+  originalNativeCommands?:Collection<OriginalCommandDelivery>;
   participantAccessCredentials: Collection<{participantSessionId: string}>; testRuns: Collection<TestRun>;
   workspaceReviews: Collection<WorkspaceReview>; participantTestLogs: Collection<ParticipantTestLog>;
   participantRunCommands: Collection<ParticipantRunCommand>; participantProgressDeliveries: Collection<ParticipantProgressDelivery>;
@@ -77,6 +79,13 @@ export function deleteOriginalGroupsFromCollections(state: OriginalGroupDeletion
     typeof row.details.reviewId === 'string' && reviews.has(row.details.reviewId)));
   remove(state.participantRunCommands, descendant); remove(state.participantProgressDeliveries, descendant);
   if(state.originalNativeUnits)remove(state.originalNativeUnits,descendant);
+  if(state.originalNativeCommands){
+    remove(state.originalNativeCommands,descendant);
+    const commands=state.originalNativeCommands;
+    for(const [key,row] of commands instanceof Map?commands.entries():Object.entries(commands))if(row.commanderParticipantSessionId!==null&&people.has(row.commanderParticipantSessionId)){
+      const updated={...row,commanderParticipantSessionId:null};if(commands instanceof Map)commands.set(key,updated);else Object.defineProperty(commands,key,{value:updated,writable:true,enumerable:true,configurable:true});
+    }
+  }
   if (state.originalTestNumbers) remove(state.originalTestNumbers, descendant);
   if(state.originalTestRunsByNumber)remove(state.originalTestRunsByNumber,id=>runs.has(id));
   remove(state.participantPresence, row => runs.has(row.testRunId));

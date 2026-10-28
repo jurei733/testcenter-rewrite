@@ -63,7 +63,7 @@ test('the actual service input validator rejects broader suites and shell payloa
  const command=focused.jobs['focused-service'].steps.find(step=>step.name==='Validate the selected service before installing dependencies').run;
  const match=/^node -e '([^']+)'$/.exec(command);assert.ok(match);
  const allowed=focused.on.workflow_dispatch.inputs.check.options;
- assert.deepEqual(allowed,['participant-auth','original-results','system-check-reports']);
+ assert.deepEqual(allowed,['participant-auth','original-results','original-commands','system-check-reports']);
  for(const check of [...allowed,'unit','original-login','--list','participant-auth original-results','participant-auth; echo owned','$(echo owned)','']){
   const child=spawnSync(process.execPath,['-e',match[1]],{encoding:'utf8',env:{...process.env,FOCUS_CHECK:check}});
   assert.equal(child.status,allowed.includes(check)?0:2,check);assert.equal(child.stdout,'');assert.equal(child.stderr,'');
@@ -251,7 +251,7 @@ test('Original result export iteration retains the complete archive suite in uni
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
  assert.equal(scripts['test:original-results'],'npm run build:core && npm run test:original-results:built');
- assert.equal(scripts['test:original-results:built'],'node --test scripts/original-workspace-report-wire.test.mjs '+suite+' scripts/original-group-results.test.mjs scripts/original-group-deletion.test.mjs scripts/original-result-state.test.mjs scripts/participant-response-part-types.test.mjs scripts/original-participant-group.test.mjs scripts/original-login-binding.test.mjs scripts/original-test-identity.test.mjs scripts/original-person-identity.test.mjs scripts/original-login-protocol.test.mjs scripts/original-session.test.mjs scripts/original-test-creation.test.mjs scripts/original-native-command-source.test.mjs scripts/original-operational-login.test.mjs scripts/original-monitor-auth.test.mjs scripts/original-person-content-migration.test.mjs scripts/participant-run-creation-api.test.mjs');
+ assert.equal(scripts['test:original-results:built'],'node --test scripts/original-workspace-report-wire.test.mjs '+suite+' scripts/original-group-results.test.mjs scripts/original-group-deletion.test.mjs scripts/original-result-state.test.mjs scripts/participant-response-part-types.test.mjs scripts/original-participant-group.test.mjs scripts/original-login-binding.test.mjs scripts/original-test-identity.test.mjs scripts/original-person-identity.test.mjs scripts/original-login-protocol.test.mjs scripts/original-session.test.mjs scripts/original-test-creation.test.mjs scripts/original-native-command-source.test.mjs scripts/original-command-codec.test.mjs scripts/original-command.test.mjs scripts/original-operational-login.test.mjs scripts/original-monitor-auth.test.mjs scripts/original-person-content-migration.test.mjs scripts/participant-run-creation-api.test.mjs');
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes('scripts/original-result-state.test.mjs'));
  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify('scripts/original-result-state.test.mjs')));
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes('scripts/original-person-identity.test.mjs'));
