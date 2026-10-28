@@ -8,6 +8,10 @@ import {
 import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
 
 export const appRoutes: Routes = [
+  {path:'group-monitor',loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),children:[
+    {path:':group-name/:profile-id',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)},
+    {path:':group-name',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)}
+  ]},
   { path: "", pathMatch: "full", redirectTo: "home" },
   {
     path: "home",

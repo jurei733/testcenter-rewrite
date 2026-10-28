@@ -434,3 +434,14 @@ foreign workspace denial, SQL decoder guards over private answers/state, lossles
 64-bit IDs and configured proof-of-work production HTTP. These endpoints support
 the forthcoming literal native Monitor frontend. Their backend qualification does
 not close the visible Monitor or broad visual parity requirements.
+
+
+### Native Monitor frontend integration (2026-10-28)
+
+`/app/group-monitor` now opens a native monitor session, including the production ALTCHA challenge and attached profile choices. Its group/profile routes use native `AuthToken` requests for snapshots, Booklet XML, profiles, commands and selected unlocks. Signed-int64 JSON IDs stay exact strings in the view and are serialized as numeric tokens for native selection bodies. Dotted group/profile IDs also resolve to the production browser entry on reload.
+
+The Source Monitor views, Booklet parser, filters, selection and controls are adapted to standalone Angular components, built-in control flow, ordinary Source view computations and signal updates. Fixed SVG glyphs retain the pinned Source paths. Private Booklet caches change with the current access object; group changes, empty snapshots and revoked native roles clear prior monitor data. Source provenance and limitations are recorded in `NATIVE-MONITOR-SOURCE.json`.
+
+The mandatory native Monitor browser gate exercises real protected login, two profile choices, IDs beyond JavaScript safe integers, actual pause/resume queues, owner state changes, selected unlock, quick filtering, reload, confirmed logout, another workspace with the same physical Booklet ID, empty snapshots after a real membership move, and current-role revocation. It preserves the visible Quick browser mode. The existing operator account details retain their DOM and styles in a deferred component to keep the initial bundle below the unchanged 470 kB hard limit.
+
+This integration is not a measured visual-parity qualification. Broader control/profile/layout coverage, native WebSocket transport and native participant poll/apply/empty-ACK adoption remain open.

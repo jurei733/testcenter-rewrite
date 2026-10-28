@@ -3186,7 +3186,10 @@ const serveFrontendRequest = async (
       ? ""
       : pathname.replace(/^\/app\/?/, "");
 
-  if (relativePath === "" || !relativePath.includes(".")) {
+  // Native group/profile IDs are path data and can contain dots. Recognize
+  // exactly this client route before applying the static-asset extension rule.
+  const nativeMonitorRoute = /^group-monitor(?:\/[^/]+){0,2}\/?$/.test(relativePath);
+  if (relativePath === "" || nativeMonitorRoute || !relativePath.includes(".")) {
     const html = await readFile(frontendIndexPath, "utf8");
     sendHtml(response, 200, html);
     return true;

@@ -362,6 +362,9 @@ jobs:
           - check: bug-report
             group: entry
             command: npm run smoke:ui:bug-report:built
+          - check: native-monitor
+            group: entry
+            command: npm run smoke:ui:native-monitor:built
           - check: original-login
             group: entry
             command: npm run smoke:ui:original-login:built

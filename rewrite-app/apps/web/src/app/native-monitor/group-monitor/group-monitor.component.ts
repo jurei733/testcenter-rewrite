@@ -1,0 +1,470 @@
+import {NativeMonitorEntriesView} from '../native-monitor-entries.pipe';
+import {FormsModule} from '@angular/forms';
+import {NativeMonitorIconComponent as MatIcon} from '../native-monitor-icon.component';
+import {MatButton,MatIconButton} from '@angular/material/button';
+import {MatMenu,MatMenuItem,MatMenuTrigger} from '@angular/material/menu';
+import {MatDrawerContainer,MatDrawer,MatDrawerContent} from '@angular/material/sidenav';
+import {MatSlideToggle} from '@angular/material/slide-toggle';
+import {MatCheckbox} from '@angular/material/checkbox';
+import {MatSort,MatSortHeader} from '@angular/material/sort';
+import {MatTooltip} from '@angular/material/tooltip';
+import {MatCard,MatCardContent} from '@angular/material/card';
+import {CdkTrapFocus} from '@angular/cdk/a11y';
+import {CustomtextPipe,AlertComponent} from '../shared/shared.module';
+import {TestSessionComponent} from './test-session/test-session.component';
+import {
+  Component, inject, signal, ElementRef, type OnDestroy, type OnInit, ViewChild
+} from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import type { Sort } from '@angular/material/sort';
+import { MatSidenav } from '@angular/material/sidenav';
+import {
+  interval, Observable, of, Subscription
+} from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
+import { MatCheckboxChange } from '@angular/material/checkbox';
+import { catchError, switchMap } from 'rxjs/operators';
+import type { KeyValue } from '@angular/common';
+import {
+  CustomtextService, type ConnectionStatus,
+  MainDataService
+} from '../shared/shared.module';
+import { BackendService } from './backend.service';
+import {
+  type TestViewDisplayOptions,
+  type TestViewDisplayOptionKey,
+  type Selected,
+  type TestSession,
+  type TestSessionSetStat,
+  type CommandResponse,
+  type UIMessage,
+  isBooklet,
+  type TestSessionFilter,
+  type TestSessionFilterListEntry,
+  testSessionFilterListEntrySources, type Profile, isColumnOption, isViewOption, isYesNoOption
+} from './group-monitor.interfaces';
+import { TestSessionManager } from './test-session-manager/test-session-manager.service';
+import { BookletUtil } from './booklet/booklet.util';
+import { AddFilterDialogComponent } from './components/add-filter-dialog/add-filter-dialog.component';
+import {
+  TimeRestrictionDialogComponent,
+  type TimeRestrictionDialogData
+} from './time-restriction-dialog/time-restriction-dialog.component';
+import { ComponentUtilService } from '../shared/services/component-util.service';
+import { HeaderService } from '../shared/services/header.service';
+import { MessageService } from '../shared/services/message.service';
+
+@Component({
+  selector: 'tc-group-monitor',
+  templateUrl: './group-monitor.component.html',
+  styleUrls: [
+    './group-monitor.component.css'
+  ],
+  standalone: true,
+  imports: [FormsModule, MatIcon, MatButton, MatIconButton, MatMenu, MatMenuItem, MatMenuTrigger, MatDrawerContainer, MatDrawer, MatDrawerContent, MatSlideToggle, MatCheckbox, MatSort, MatSortHeader, MatTooltip, MatCard, MatCardContent, CdkTrapFocus, AlertComponent, TestSessionComponent]
+})
+export class GroupMonitorComponent implements OnInit, OnDestroy {
+  readonly entries = new NativeMonitorEntriesView().transform;
+  private readonly nativeText = new CustomtextPipe(inject(CustomtextService));
+  readonly customtext = this.nativeText.transform.bind(this.nativeText);
+  readonly connectionStatus = signal<ConnectionStatus>('initial');
+  readonly sessionRows = signal<TestSession[]>([]);
+  readonly checkedStats = signal<TestSessionSetStat | null>(null);
+  readonly sessionsStats = signal<TestSessionSetStat | null>(null);
+
+  groupLabel = '';
+
+  currentlySelected: Selected | null = null;
+  CurrentlyMarked: Selected | null = null;
+
+  displayOptions: TestViewDisplayOptions = {
+    view: 'medium',
+    groupColumn: 'hide',
+    bookletColumn: 'show',
+    blockColumn: 'show',
+    unitColumn: 'hide',
+    bookletStatesColumns: [],
+    highlightSpecies: false,
+    manualChecking: false,
+    autoselectNextBlock: true
+  };
+
+  isScrollable = false;
+  isClosing = false;
+  checkedSessionCount = 0;
+
+  quickFilter: string = '';
+  quickFilterBoxOpen: boolean = false;
+
+  messages: UIMessage[] = [];
+
+  bookletStates: { [p: string]: string } = {};
+
+  private subscriptions: Subscription[] = [];
+
+  @ViewChild('adminbackground') mainElem!: ElementRef;
+  @ViewChild('sidenav', { static: true }) sidenav!: MatSidenav;
+
+  constructor(
+    public dialog: MatDialog,
+    private route: ActivatedRoute,
+    private bs: BackendService,
+    public tsm: TestSessionManager,
+    private router: Router,
+    private cts: CustomtextService,
+    public mds: MainDataService,
+    private addFilterDialog: MatDialog,
+    private componentUtilService: ComponentUtilService,
+    private headerService: HeaderService,
+    private messageService: MessageService
+  ) {}
+
+  ngOnInit(): void {
+    this.subscriptions = [
+      this.tsm.sessions$.subscribe(rows => this.sessionRows.set(rows)),
+      this.bs.connectionStatus$.subscribe(status => this.connectionStatus.set(status)),
+      this.route.params.subscribe(params => {
+        this.groupLabel = this.mds.getAccessObject('testGroupMonitor', params['group-name']).label;
+        const profileId = params['profile-id'];
+        if (profileId) {
+          this.bs.getProfile(profileId).subscribe(profile => this.applyProfile(profile));
+        }
+        this.tsm.connect(params['group-name']);
+      }),
+      this.tsm.sessionsStats$.subscribe(stats => {
+        this.sessionsStats.set(stats);
+        this.onSessionsUpdate(stats);
+      }),
+      this.tsm.checkedStats$.subscribe(stats => {
+        this.checkedStats.set(stats);
+        this.onCheckedChange(stats);
+      }),
+      this.tsm.commandResponses$.subscribe(commandResponse => {
+        this.messages.push(this.commandResponseToMessage(commandResponse));
+      }),
+      this.tsm.commandResponses$
+        .pipe(switchMap(() => interval(7000)))
+        .subscribe(() => { this.messages.shift(); })
+    ];
+
+    this.mds.appSubTitle$.next(this.cts.getCustomText('gm_headline') ?? '');
+    this.tsm.resetFilters();
+
+    this.headerService.title = `${this.mds.appTitle$.value} ${this.mds.appSubTitle$.value} - ${this.groupLabel}`;
+  }
+
+  private commandResponseToMessage(commandResponse: CommandResponse): UIMessage {
+    const command = this.cts.getCustomText(`gm_control_${commandResponse.commandType}`) || commandResponse.commandType;
+    const successWarning = this.cts.getCustomText(`gm_control_${commandResponse.commandType}_success_warning`) || '';
+    if (!commandResponse.testIds.length) {
+      return {
+        level: 'warning',
+        text: 'Keine Tests Betroffen von: `%s`',
+        customtext: 'gm_message_no_session_affected_by_command',
+        replacements: [command, commandResponse.testIds.length.toString(10)]
+      };
+    }
+    return {
+      level: successWarning ? 'warning' : 'info',
+      text: '`%s` an `%s` tests gesendet! %s',
+      customtext: 'gm_message_command_sent_n_sessions',
+      replacements: [command, commandResponse.testIds.length.toString(10), successWarning]
+    };
+  }
+
+  ngOnDestroy(): void {
+    this.tsm.disconnect();
+    this.subscriptions.forEach(subscription => subscription.unsubscribe());
+  }
+
+  ngAfterViewChecked(): void {
+    this.isScrollable = this.mainElem.nativeElement.clientHeight < this.mainElem.nativeElement.scrollHeight;
+  }
+
+  private onSessionsUpdate(stats: TestSessionSetStat): void {
+    this.displayOptions.highlightSpecies = (stats.differentBookletSpecies > 1);
+
+    if (!this.tsm.checkingOptions.enableAutoCheckAll) {
+      this.displayOptions.manualChecking = true;
+    }
+
+    this.bookletStates = stats.bookletStateLabels;
+  }
+
+  private onCheckedChange(stats: TestSessionSetStat): void {
+    // the test commands act on the checked sessions, so the toolbar disables them when there are none
+    this.checkedSessionCount = stats.numberOfSessions;
+
+    if (stats.differentBookletSpecies > 1) {
+      this.currentlySelected = null;
+    }
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  trackSession = (index: number, session: TestSession): string => session.data.testId;
+
+  setTableSorting(sort: Sort): void {
+    if (!sort.active || sort.direction === '') {
+      return;
+    }
+    this.tsm.sortBy$?.next(sort);
+  }
+
+  setDisplayOption(option: TestViewDisplayOptionKey, value: TestViewDisplayOptions[TestViewDisplayOptionKey]): void {
+    if (Object.keys(this.displayOptions).includes(option)) {
+      (this.displayOptions as {
+        [option in TestViewDisplayOptionKey]: TestViewDisplayOptions[TestViewDisplayOptionKey]
+      })[option] = value;
+    }
+  }
+
+  toggleBookletStatesColumn(column: string): void {
+    this.displayOptions.bookletStatesColumns =
+      (this.displayOptions.bookletStatesColumns.includes(column)) ?
+        this.displayOptions.bookletStatesColumns.filter(c => c !== column) :
+        [...this.displayOptions.bookletStatesColumns, column].sort();
+  }
+
+  scrollDown(): void {
+    this.mainElem.nativeElement.scrollTo(0, this.mainElem.nativeElement.scrollHeight);
+  }
+
+  updateScrollHint(): void {
+    const elem = this.mainElem.nativeElement;
+    const reachedBottom = (elem.scrollTop + elem.clientHeight === elem.scrollHeight);
+    elem.classList[reachedBottom ? 'add' : 'remove']('hide-scroll-hint');
+  }
+
+  getSessionColor(session: TestSession): string {
+    const stripes = (c1: string, c2: string) => `repeating-linear-gradient(45deg, ${c1}, ${c1} 10px, ${c2} 10px, ${c2} 20px)`;
+    const hsl = (h: number, s: number, l: number) => `hsl(${h}, ${s}%, ${l}%)`;
+    const colorful = this.displayOptions.highlightSpecies && session.booklet.species;
+    const h = colorful ? (
+      session.booklet.species.length *
+      session.booklet.species.charCodeAt(0) *
+      session.booklet.species.charCodeAt(session.booklet.species.length / 4) *
+      session.booklet.species.charCodeAt(session.booklet.species.length / 4) *
+      session.booklet.species.charCodeAt(session.booklet.species.length / 2) *
+      session.booklet.species.charCodeAt(3 * (session.booklet.species.length / 4)) *
+      session.booklet.species.charCodeAt(session.booklet.species.length - 1)
+    ) % 360 : 0;
+
+    switch (session.state) {
+      case 'paused':
+        return hsl(h, colorful ? 45 : 0, 90);
+      case 'pending':
+      case 'locked':
+        return stripes(hsl(h, colorful ? 75 : 0, 95), hsl(0, 0, 92));
+      case 'error':
+        return stripes(hsl(h, colorful ? 75 : 0, 95), hsl(0, 30, 95));
+      default:
+        return hsl(h, colorful ? 75 : 0, colorful ? 95 : 100);
+    }
+  }
+
+  markElement(marking: Selected): void {
+    this.CurrentlyMarked = marking;
+  }
+
+  selectElement(selected: Selected): void {
+    this.tsm.checkSessionsBySelection(selected);
+    this.currentlySelected = selected;
+  }
+
+  finishEverythingCommand(): void {
+    this.messageService.showConfirmDialog({
+      title: 'Testdurchführung beenden',
+      content: 'Achtung! Diese Aktion sperrt und beendet sämtliche Tests dieser Sitzung.',
+      confirmText: 'Ja, ich möchte die Testdurchführung beenden'
+    }).subscribe((confirmed: boolean) => {
+      if (confirmed) {
+        this.isClosing = true;
+        this.tsm.commandFinishEverything()
+          .pipe(catchError(err => {
+            this.isClosing = false;
+            throw err;
+          }))
+          .subscribe(() => {
+            setTimeout(() => { this.router.navigateByUrl('/r/starter'); }, 2000);
+          });
+      }
+    });
+  }
+
+  testCommandGoto(): void {
+    if (!this.currentlySelected?.element?.blockId) {
+      this.messages.push({
+        level: 'warning',
+        customtext: 'gm_test_command_no_selected_block',
+        text: 'Kein Zielblock ausgewählt'
+      });
+      return;
+    }
+
+    (this.tsm.checked
+      .some(testSession => isBooklet(testSession.booklet) &&
+          this.currentlySelected?.element &&
+          testSession.timeLeft &&
+          (testSession.timeLeft[this.currentlySelected?.element?.id] <= 0)
+      ) ?
+      this.dialog.open(
+        TimeRestrictionDialogComponent, {
+          width: 'auto',
+          data: <TimeRestrictionDialogData>{
+            title:
+                this.cts.getCustomText('gm_control_goto_unlock_blocks_confirm_headline'),
+            content:
+                this.cts.getCustomText('gm_control_goto_unlock_blocks_confirm_text'),
+            confirmbuttonlabel: 'OK',
+            showcancel: true,
+            remainingTime: this.tsm.getMaxTimeAcrossAllSessions(this.currentlySelected)
+          }
+        }
+      ).afterClosed() :
+      of(1) // 1 as in 'true'
+    )
+      .subscribe((confirmed?: number | boolean) => {
+        if (!confirmed || confirmed === 0 || !this.currentlySelected) return;
+        const newTimeLeft = confirmed as number;
+        this.tsm.testCommandGoto(this.currentlySelected, newTimeLeft)
+          .subscribe(() => this.selectNextBlock());
+      });
+  }
+
+  private selectNextBlock(): void {
+    if (!this.displayOptions.autoselectNextBlock) return;
+    if (!this.currentlySelected) return;
+    if (!isBooklet(this.currentlySelected.originSession.booklet)) return;
+    this.currentlySelected = {
+      element: this.currentlySelected.element?.nextBlockId ?
+        BookletUtil.getBlockById(
+          this.currentlySelected.element.nextBlockId,
+          this.currentlySelected.originSession.booklet
+        ) : null,
+      inversion: false,
+      originSession: this.currentlySelected.originSession,
+      nthClick: this.currentlySelected.nthClick
+    };
+  }
+
+  unlockCommand(): void {
+    this.tsm.testCommandUnlock();
+  }
+
+  toggleChecked(session: TestSession): void {
+    if (!this.tsm.isChecked(session)) {
+      this.tsm.checkSession(session);
+    } else {
+      if (session.data.testId === this.currentlySelected?.originSession?.data?.testId) {
+        this.currentlySelected = null;
+      }
+      this.tsm.uncheckSession(session);
+    }
+  }
+
+  invertChecked(event: Event): boolean {
+    event.preventDefault();
+    this.tsm.invertChecked();
+    return false;
+  }
+
+  toggleAlwaysCheckAll(event: MatSlideToggleChange): void {
+    if (this.tsm.checkingOptions.enableAutoCheckAll && event.checked) {
+      // TODO not ideal - try to reset the state properly, instead of reloading the component
+      this.componentUtilService.reloadComponent(true);
+    } else {
+      this.tsm.checkNone();
+      this.displayOptions.manualChecking = true;
+      this.tsm.checkingOptions.autoCheckAll = false;
+      this.currentlySelected = null;
+    }
+  }
+
+  toggleCheckAll(event: MatCheckboxChange): void {
+    if (event.checked) {
+      this.tsm.checkAll();
+    } else {
+      this.tsm.checkNone();
+      this.currentlySelected = null;
+    }
+  }
+
+  addFilter(): void {
+    this.openFilterDialog();
+  }
+
+  editFilter(key: string): void {
+    this.openFilterDialog(this.tsm.filterOptions[key]);
+  }
+
+  private openFilterDialog(filterEntry: TestSessionFilterListEntry | undefined = undefined) {
+    const data = filterEntry ? filterEntry.filter : {};
+    const dialogRef = this.addFilterDialog.open(AddFilterDialogComponent, { width: 'auto', data });
+
+    dialogRef.afterClosed().subscribe((newFilter: TestSessionFilter) => {
+      if (!newFilter) return;
+      this.tsm.filterOptions[newFilter.id] = {
+        selected: true,
+        filter: newFilter,
+        source: filterEntry?.source || 'custom'
+      };
+      this.tsm.refreshFilters();
+    });
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  sortFilterMenuEntries(
+    a: KeyValue<string, TestSessionFilterListEntry>,
+    b: KeyValue<string, TestSessionFilterListEntry>
+  ): number {
+    const aLevel = testSessionFilterListEntrySources.indexOf(a.value.source);
+    const bLevel = testSessionFilterListEntrySources.indexOf(b.value.source);
+    if (aLevel !== bLevel) return aLevel - bLevel;
+    return a.value.filter.label > b.value.filter.label ? 1 : -1;
+  }
+
+  quickFilterOnUpdateModel() {
+    if (!this.quickFilter) {
+      this.tsm.filterOptions.quick.selected = false;
+    } else {
+      this.tsm.filterOptions.quick.selected = true;
+      this.tsm.filterOptions.quick.filter.value = this.quickFilter;
+    }
+
+    this.tsm.refreshFilters();
+  }
+
+  toggleQuickFilterBox(): void {
+    this.quickFilterBoxOpen = !this.quickFilterBoxOpen;
+  }
+
+  quickFilterOnFocusOut(): void {
+    if (!this.quickFilter) this.quickFilterBoxOpen = false;
+  }
+
+  private applyProfile(p: Profile): void {
+    if (isColumnOption(p.settings.blockColumn)) this.displayOptions.blockColumn = p.settings.blockColumn;
+    if (isColumnOption(p.settings.unitColumn)) this.displayOptions.unitColumn = p.settings.unitColumn;
+    if (isColumnOption(p.settings.groupColumn)) this.displayOptions.groupColumn = p.settings.groupColumn;
+    if (isColumnOption(p.settings.bookletColumn)) this.displayOptions.bookletColumn = p.settings.bookletColumn;
+    if (isViewOption(p.settings.view)) this.displayOptions.view = p.settings.view;
+    if (isYesNoOption(p.settings.autoselectNextBlock)) this.displayOptions.autoselectNextBlock = p.settings.autoselectNextBlock !== 'no';
+
+    (p.filters || [])
+      .forEach((filter: TestSessionFilter, index: number) => {
+        filter.id = `profile_filter:${index}`;
+        this.tsm.filterOptions[filter.id] = { selected: true, filter, source: 'profile' };
+      });
+
+    this.displayOptions.bookletStatesColumns = (p.settings.bookletStatesColumns || '').split(/[\W,]+/);
+
+    Object.entries(p.filtersEnabled || [])
+      .forEach(([f, onOff]) => {
+        if (this.tsm.filterOptions[f]) {
+          this.tsm.filterOptions[f].selected = ['1', 'true', 'on', 'yes'].includes(onOff);
+        }
+      });
+    this.tsm.refreshFilters();
+  }
+}

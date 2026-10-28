@@ -1,0 +1,39 @@
+<app-original-overlay-styles />
+<header>
+ <mat-toolbar data-cy="header">
+  <div class="side">
+   @if(session.access()){
+    <button matIconButton class="account-button" [matMenuTriggerFor]="accountMenu" data-cy="account-button" aria-label="Nutzerinformationen"><mat-icon svgIcon="person" /></button>
+    <mat-menu #accountMenu="matMenu"><div class="account-heading">Nutzerinformationen</div><dl><dt>Anmeldename:</dt><dd>{{session.access()?.loginName}}</dd><dt>Gruppe:</dt><dd>{{session.access()?.groupLabel}}</dd><dt>Berechtigung:</dt><dd>Gruppenmonitor</dd></dl><button mat-menu-item (click)="selection()">Sitzung auswählen</button><button mat-menu-item (click)="logout()" data-cy="logout-button">Abmelden</button></mat-menu>
+   }
+  </div>
+  <div class="center"><h1>{{hasChild ? header.title : settings.settings().appTitle}}</h1></div>
+  <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div>
+ </mat-toolbar>
+</header>
+@if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
+@if(ready()){
+ @if(session.restoring()){<p role="status">Sitzung wird geprüft …</p>}@else if(!session.access()){
+  <div class="login-page">
+   <div class="welcome-section"><img [src]="settings.assetUrl('loginIllustration')" alt="" /><div><p class="heading">Willkommen im IQB‑Testcenter</p><p>Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.</p></div></div>
+   <div class="login-section"><form (ngSubmit)="submit()">
+    @if(!passwordStep()){
+     <h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" autocapitalize="off" autocomplete="username" /></mat-form-field>
+    }@else{
+     <div class="password-headline"><button matIconButton type="button" (click)="passwordStep.set(false);password=''" aria-label="Zurück"><mat-icon svgIcon="chevron_left" /></button><h2>Kennwort eingeben</h2></div>
+     <mat-form-field appearance="outline"><mat-label>Kennwort</mat-label><input matInput name="password" [(ngModel)]="password" [type]="showPassword?'text':'password'" autocomplete="current-password" /><button mat-icon-button matSuffix type="button" aria-label="Kennwort anzeigen" (click)="showPassword=!showPassword"><mat-icon svgIcon="visibility" /></button></mat-form-field>
+    }
+    <button matButton="filled" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">{{passwordStep()?'Anmelden':'Weiter'}}</button>
+    @if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}
+   </form></div>
+  </div>
+ }@else if(hasChild&&allowedChild){
+  @if(backendProblem();as problem){<p class="native-error" role="alert">{{problem}}</p>}
+  <router-outlet />
+ }@else{
+  <section class="monitor-selection"><h2>Gruppenmonitor</h2>
+   @if(hasChild){<p role="alert">Für diese Gruppe liegt keine Berechtigung vor.</p>}
+   @for(claim of session.access()?.claims?.testGroupMonitor??[];track $index){<button matButton="outlined" class="monitor-claim" (click)="open(claim)" [attr.data-group]="claim.id"><strong>{{claim.label}}</strong><span>{{claimLabel(claim)}}</span></button>}
+  </section>
+ }
+}

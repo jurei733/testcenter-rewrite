@@ -369,7 +369,7 @@ test('compound browser gates share one display and preserve either command failu
     }
   } finally { rmSync(scratch, {recursive: true, force: true}); }
 });
-test("all 28 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
+test("all 29 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
   const quick = workflow.jobs.quick;
   const extended = workflow.jobs["quick-extended"];
   const shards = [...quick.strategy.matrix.include, ...qualificationRows];
@@ -377,7 +377,7 @@ test("all 28 browser scenarios run once across fast and extended shards, with co
   assert.equal(extended.strategy["fail-fast"], false);
   assert.equal(extended.strategy["max-parallel"], 8, "Bound the extended group while releasing its measured four-slot tail");
   assert.deepEqual([...new Set(shards.map(item => item.group))], ["entry", "system-check", "participant", "content"]);
-  assert.equal(shards.length, 28);
+  assert.equal(shards.length, 29);
   assert.equal(new Set(shards.map(item => item.check)).size, shards.length);
   const split = command => expand(command).split("&&").map(value => value.trim()).filter(Boolean);
   const complete = split("npm run ci:browser:quick:built");
@@ -407,7 +407,7 @@ test("all 28 browser scenarios run once across fast and extended shards, with co
 });
 test("the early browser set is bounded and retains real authentication, isolation, Start restoration and Systemcheck", () => {
   assert.deepEqual(workflow.jobs.quick.strategy.matrix.include.map(item=>item.check).sort(),
-    ["bug-report","original-login","original-login-protected","original-admin-login","proof-of-work","system-check","participant-variant","ib-player"].sort());
+    ["bug-report","native-monitor","original-login","original-login-protected","original-admin-login","proof-of-work","system-check","participant-variant","ib-player"].sort());
   assert.equal(qualificationRows.length,20);
   assert.equal(workflow.jobs["quick-extended"].strategy.matrix.include.length,19);
   assert.deepEqual(workflow.jobs["quick-extended-long"].strategy.matrix.include.map(row=>row.check),["json-roster"]);
@@ -572,17 +572,19 @@ test('global early eligibility uses the complete accepted 60-row observation wit
  assert.equal(actual.length+data.model.SourceFamilies+data.model.databaseApi+data.model.databaseBrowser+data.model.checkpointSlots,20);
  assert.equal(workflow.jobs['original-browser-reference'].strategy.matrix.family.length,5);
  assert.equal(workflow.jobs['quick-extended'].strategy['max-parallel'],8);
- const instances=Object.values(workflow.jobs).reduce((n,job)=>n+(job.strategy?.matrix?.include?.length??job.strategy?.matrix?.family?.length??1),0);assert.equal(instances,89);
+ const instances=Object.values(workflow.jobs).reduce((n,job)=>n+(job.strategy?.matrix?.include?.length??job.strategy?.matrix?.family?.length??1),0);assert.equal(instances,90); // The 89 recorded jobs are retained; native Monitor adds one Quick gate.
  assert.deepEqual(qualificationEarly.needs,broadEarly.needs);
  assert.deepEqual(qualificationEarly.needs,['build','typecheck','dependencies','unit','browser-system-dependencies']);
  const ancestors=new Set();const visit=id=>{for(const need of[workflow.jobs[id].needs??[]].flat())if(!ancestors.has(need)){ancestors.add(need);visit(need);}};visit('quick-extended-long');
  assert.equal(ancestors.has('quick'),false);assert.equal(ancestors.has('fast-feedback'),false);
  assert.ok(workflow.jobs.acceptance.needs.includes('quick-extended-long'));assert.equal(qualificationEarly.if,undefined);
  const unchanged=structuredClone(workflow);delete unchanged.jobs['quick-extended-long'];
+ assert.deepEqual(unchanged.jobs.quick.strategy.matrix.include.filter(row=>row.check==='native-monitor'),[{check:'native-monitor',group:'entry',command:'npm run smoke:ui:native-monitor:built'}]);
+ unchanged.jobs.quick.strategy.matrix.include=unchanged.jobs.quick.strategy.matrix.include.filter(row=>row.check!=='native-monitor');
  for(const id of['verify-long-ui','verify-memory-sqlite','quick-extended'])unchanged.jobs[id].strategy.matrix.include=[];
  unchanged.jobs.acceptance.needs=unchanged.jobs.acceptance.needs.filter(id=>id!=='quick-extended-long');
  assert.equal(createHash('sha256').update(JSON.stringify(unchanged)).digest('hex'),data.baselineContextSha256,
-  'Only the three matrix partitions, one cloned early owner and its mandatory acceptance edge may change.');
+  'Only the three recorded matrix partitions, their early owner and acceptance edge, plus the explicitly checked additional native Monitor gate may change.');
  const clone=structuredClone(qualificationEarly),later=workflow.jobs['quick-extended'];
  clone.needs=later.needs;clone.strategy.matrix.include=later.strategy.matrix.include;
  assert.deepEqual(clone,later,'The promoted qualification retains its complete prior shell, artifact ownership, browser mode and execution context.');
@@ -1055,4 +1057,14 @@ test('Docker and Compose schema assertions use the same dependency-free complete
    assert.ok(driver.includes('readiness.storage?.schemaVersion'));assert.ok(driver.includes('manifest.storage?.schemaVersion'));
    assert.ok(!driver.includes('source.matchAll('));
  }
+});
+
+test('native monitor keeps protected real-browser coverage and all numeric, record and session regressions mandatory',()=>{
+ const row=workflow.jobs.quick.strategy.matrix.include.find(row=>row.check==='native-monitor');
+ assert.equal(row.command,'npm run smoke:ui:native-monitor:built');
+ assert.equal(workflow.jobs.quick.env.UI_SMOKE_HEADFUL,'true');
+ assert.equal(scripts['smoke:ui:native-monitor:built'],'node scripts/smoke-native-monitor.mjs');
+ for(const file of ['native-monitor-wire','native-monitor-number','native-monitor-views','native-monitor-session'])assert.ok(scripts['test:frontend-state'].split(/\s+/).includes('scripts/'+file+'.test.mjs'));
+ const driver=read('./smoke-native-monitor.mjs');
+ for(const marker of ['real-native-protected-login-and-profile-choice','literal-int64-snapshots-real-booklet-and-profile-rendering','same-browser-workspace-switch-does-not-reuse-private-booklet-or-selection','real-empty-native-snapshot-clears-previous-rows','current-native-role-revocation-clears-monitor-and-local-bearer'])assert.ok(driver.includes(marker));
 });
