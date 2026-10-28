@@ -33,7 +33,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
 gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
 const errors = [], checks = [], requests = [], nativeRequests = [], progressRequests = [];
-let browser, page, releaseSnapshot;
+let browser, page, releaseSnapshot, releasePauseCompletion;
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) { if (await predicate()) return; await delay(100); }
@@ -93,11 +93,16 @@ try {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();
   const commandApplications = new Map();
+  const commandCompletions = new Map();
   const loadCompleteAcknowledgements = new Map();
   page.on("response", response => {
     const pathname = new URL(response.url()).pathname;
     const match = pathname.match(/^\/api\/v1\/participant\/sessions\/[^/]+\/commands\/([^/]+)\/application$/);
     if (match && response.request().method() === "POST") commandApplications.set(match[1], response);
+    if (/^\/api\/v1\/participant\/sessions\/[^/]+\/command-completions$/.test(pathname) && response.request().method() === "POST") {
+      const packet = response.request().postDataJSON();
+      if (packet?.command?.kind === "remote") commandCompletions.set(packet.command.commandId, response);
+    }
     const load = pathname.match(/^\/api\/v1\/participant\/test-runs\/([^/]+)\/test-logs$/);
     if (load && response.request().method() === "POST" && response.ok() &&
       response.request().postDataJSON()?.logs?.some(batch => batch.entries?.some(entry => entry.key === "LOADCOMPLETE"))) {
@@ -216,19 +221,48 @@ try {
   await debug(["off"]); await tabs.waitFor({ state: "detached" }); assert.equal(await page.evaluate(() => localStorage.getItem("tc-debug")), null);
   assert.equal((await previousOffLogged).status(), 200);
   const issue = async (type, args) => (await api(workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: type, ...(args ? { debugArguments: args } : {}) }, operator)).command;
-  const issueApplied = async (type, args) => {
+  const issueApplied = async (type, args, beforeCompletion) => {
     const command = await issue(type, args);
     await poll(() => Promise.resolve(commandApplications.has(command.commandId)), `Missing ${type} application receipt`);
     const response = commandApplications.get(command.commandId); assert.equal(response.status(), 200);
     const { application } = await response.json();
     assert.equal(application.command.commandId, command.commandId);
     assert.ok(application.command.executedAt); assert.ok(application.command.executionSequence > 0);
+    await beforeCompletion?.(command);
+    // browser-v1 records command execution in a separate transaction after
+    // the client continuation. The application receipt cannot settle its log.
+    await poll(() => Promise.resolve(commandCompletions.has(command.commandId)), `Missing ${type} completion receipt`);
+    const completionResponse = commandCompletions.get(command.commandId);
+    assert.equal(completionResponse.status(), 200);
+    const { completion } = await completionResponse.json();
+    assert.equal(completion.command.kind, "remote"); assert.equal(completion.command.commandId, command.commandId);
+    assert.equal(completion.testRunId, run.testRunId);
     return command;
   };
   // Visible state may precede the durable execution log. Snapshot only after
-  // both exact remote commands have committed their application receipts.
+  // both exact remote commands have committed their completion receipts.
   await issueApplied("debug", ["on"]); await tabs.waitFor(); mark("remote-debug-through-real-receiver");
-  await issueApplied("pause"); await poll(async () => (await durable()).run.status === "paused", "Real monitor pause missing");
+  // Hold the real, separate completion before its database transaction. This
+  // makes the former application-only barrier fail deterministically.
+  let pauseCompletionHeld = false;
+  const pauseCompletionGate = new Promise(done => { releasePauseCompletion = done; });
+  const holdPauseCompletion = async route => {
+    const packet = route.request().postDataJSON();
+    if (packet?.testRunId !== run.testRunId || packet?.command?.kind !== "remote") return route.continue();
+    pauseCompletionHeld = true; await pauseCompletionGate; await route.continue();
+  };
+  await page.route("**/command-completions", holdPauseCompletion);
+  await issueApplied("pause", undefined, async command => {
+    await poll(() => Promise.resolve(pauseCompletionHeld), "Pause completion did not reach its held transaction");
+    assert.equal(commandCompletions.has(command.commandId), false);
+    assert.equal((await durable()).run.status, "paused");
+    const pendingLogs = await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId);
+    assert.equal(pendingLogs.filter(log => log.testRunId === run.testRunId && log.logKey === "command executed" && log.logContent === "pause").length, 0);
+    releasePauseCompletion();
+  });
+  await page.unroute("**/command-completions", holdPauseCompletion); releasePauseCompletion = null;
+  mark("remote-application-does-not-settle-held-completion-log");
+  await poll(async () => (await durable()).run.status === "paused", "Real monitor pause missing");
   await poll(async () => /STATUS:\s*PAUSED/.test(await windowPane("main").innerText()), "Pane did not show PAUSED");
   const paused = await durable(); const logPath = workspace + `/test-logs?testRunId=${run.testRunId}&logKey=command%20executed`;
   const prior = (await api(logPath, undefined, operator)).items.map(item => item.testLog);
@@ -367,7 +401,7 @@ try {
   await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, requests, nativeRequests, progressRequests, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
   throw error;
 } finally {
-  releaseSnapshot?.();
+  releaseSnapshot?.(); releasePauseCompletion?.();
   await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests, nativeRequests, progressRequests }, null, 2));
   await browser?.close();
   if (server.exitCode === null) { server.kill("SIGTERM"); await raceWithSmokeDeadline(closed, 5_000, () => undefined); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
