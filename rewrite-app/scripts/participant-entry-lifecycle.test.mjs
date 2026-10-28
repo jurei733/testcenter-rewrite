@@ -457,3 +457,44 @@ test("a stale error dialog cannot reload a different active error", async () => 
     assert.equal(calls.actions.length, 0); assert.equal(calls.settled, 0);
   });
 });
+
+
+// Exercise the production observer and ViewChild lifecycle. An unobserved
+// target can still occur in an already queued batch (Intersection Observer 3.2).
+const observationNames=['showStarterScrollButton','starterBottomElement','starterScrollObserver','participantStarterBottomSentinel'];
+const observationMembers=observationNames.map(name=>{
+  const node=componentClass.members.find(member=>member.name?.getText(componentAst)===name);assert.ok(node);
+  return node.getText(componentAst).replace(/@ViewChild\("participantStarterBottomSentinel"\)\s*/, '');
+});
+const observationModule=ts.transpileModule(`export const createObservationHost=(IntersectionObserver,signal)=>class ObservationHost {${observationMembers.join('\n')}}`,{
+  compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}
+}).outputText;
+const {createObservationHost}=await import(`data:text/javascript;base64,${Buffer.from(observationModule).toString('base64')}`);
+const observationFixture=()=>{
+  class Observer {constructor(callback){this.callback=callback;this.targets=new Set();}observe(element){this.targets.add(element);}unobserve(element){this.targets.delete(element);}}
+  const signal=initial=>{let value=initial;const read=()=>value;read.set=next=>{value=next;};return read;};
+  const Host=createObservationHost(Observer,signal),host=new Host(),retired={},current={};
+  host.participantStarterBottomSentinel={nativeElement:retired};host.participantStarterBottomSentinel={nativeElement:current};
+  assert.equal(host.starterScrollObserver.targets.has(retired),false);assert.equal(host.starterScrollObserver.targets.has(current),true);
+  return{host,retired,current,notify:entries=>host.starterScrollObserver.callback(entries)};
+};
+test('a coalesced retired/current intersection batch follows the active starter sentinel',()=>{
+  const {host,retired,current,notify}=observationFixture();
+  notify([{target:retired,isIntersecting:true},{target:current,isIntersecting:false}]);
+  assert.equal(host.showStarterScrollButton(),true);
+});
+test('late observations for a retired starter cannot hide the current scroll control',()=>{
+  const {host,retired,current,notify}=observationFixture();
+  notify([{target:current,isIntersecting:false}]);assert.equal(host.showStarterScrollButton(),true);
+  notify([{target:retired,isIntersecting:true}]);assert.equal(host.showStarterScrollButton(),true);
+});
+test('the last observation of the active starter wins within a mixed queued batch',()=>{
+  const {host,retired,current,notify}=observationFixture();
+  notify([{target:current,isIntersecting:false},{target:retired,isIntersecting:false},{target:current,isIntersecting:true}]);
+  assert.equal(host.showStarterScrollButton(),false);
+});
+test('removing the starter cannot resurrect its scroll control through queued callbacks',()=>{
+  const {host,current,notify}=observationFixture();host.participantStarterBottomSentinel=undefined;
+  assert.equal(host.starterScrollObserver.targets.size,0);
+  notify([{target:current,isIntersecting:false}]);assert.equal(host.showStarterScrollButton(),false);
+});

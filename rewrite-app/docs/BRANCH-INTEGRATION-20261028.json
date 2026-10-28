@@ -1731,5 +1731,23 @@
       "actionlint": true
     },
     "cloudAcceptance": "The final combined candidate is published on a separate integration PR so useful running CI on PR7 is retained. All 89 fresh CI jobs for the final exact head must pass before its normal main merge."
+  },
+  "starterObserverFollowUp": {
+    "failureRun": 40713749261,
+    "failureHead": "cab476d60563126faccbfe8f83b1c8925d067a6b",
+    "artifact": 12829879151,
+    "artifactSHA256": "e9be9d28198d6c447f2153ee130f3b3006f4ea27707da3f44e24f552daa00e38",
+    "actualFailedFrameCause": "Not established from the retained geometry-free snapshot.",
+    "reproducedDefect": "Production observer selects a retired target from coalesced notifications; countercase fails before and passes after current-target filtering.",
+    "regressions": 4,
+    "entryLifecyclePassed": 64,
+    "unitFrontendPassed": 4816,
+    "failed": 0,
+    "skipped": 0,
+    "headedSqliteReviewPrefixPassed": true,
+    "webBuild": true,
+    "typecheck": true,
+    "qualifiedPostgresTestsOnUnchangedBackend": 3036,
+    "cloudAcceptance": "Fresh complete89 on changed PR11 exact head required."
   }
 }

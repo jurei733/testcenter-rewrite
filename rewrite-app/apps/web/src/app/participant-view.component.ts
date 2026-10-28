@@ -1254,8 +1254,13 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   private readonly starterScrollObserver =
     typeof IntersectionObserver === "undefined"
       ? null
-      : new IntersectionObserver(([entry]) => {
-          this.showStarterScrollButton.set(Boolean(entry && !entry.isIntersecting));
+      : new IntersectionObserver(entries => {
+          // Queued notifications may still belong to the previous view.
+          for (const entry of entries) {
+            if (entry.target === this.starterBottomElement) {
+              this.showStarterScrollButton.set(!entry.isIntersecting);
+            }
+          }
         });
 
   @ViewChild("participantStarterBottomSentinel")

@@ -3592,3 +3592,42 @@ control confirms the added check detects the missing isolation. A fresh complete
 Linux acceptance run on the changed
 head remains required before merging; this local result is not a claim of broad
 visual parity or proof that every native input-routing issue is solved.
+
+
+## Retired starter intersection notifications (2026-10-28)
+
+Final integration run
+[40713749261](https://github.com/jurei733/testcenter-rewrite/actions/runs/40713749261)
+on `cab476d6` fails the `ui-activation-blocking-runtime` leaf at its shared
+`participant-entry-review-comments` prefix, waiting for the canonical starter
+scroll button (`smoke-ui.mjs:8051`). This is the same prefix as the older failure
+recorded above. Independently downloaded artifact `12829879151` is 313,605 bytes;
+ZIP SHA256 is `e9be9d28198d6c447f2153ee130f3b3006f4ea27707da3f44e24f552daa00e38`.
+It retains failure JSON and a full-page PNG. Those files do not retain the actual
+failing viewport/scroll geometry, so that frame's precise cause is still unknown.
+An observer-only local diagnostic copy completes the unchanged old production
+prefix; that non-recurrence does not establish a fix. The temporary copies are
+retired after their hashes are checked.
+
+A separate countercase executes the actual production component's observer and
+ViewChild setter. Its first queued notification can belong to a retired sentinel,
+while a later entry describes the current out-of-view sentinel. The old callback
+uses only the first entry and hides the current control. The countercase fails
+before and passes after filtering entries by the current element. This is a
+reproduced lifecycle defect, rather than proof of the failed hosted frame's
+layout history. The [Intersection Observer algorithms](https://w3c.github.io/IntersectionObserver/#unobserve-target-element)
+remove observation registrations separately from the queued notification list.
+
+The component now processes matching current-target entries in order and ignores
+retired targets. Four production-class regression cases cover mixed old/new
+batches, late retired callbacks, the last current entry, and removal without
+resurrection. All existing browser steps, assertions and timeouts remain intact.
+Future failures also retain viewport, scroll, sentinel/button rectangles and
+entry status before the full-page screenshot changes observation geometry.
+
+The production web build and typecheck pass. All **4,816 unit/frontend tests**
+pass without skips, including **64 entry lifecycle tests**. The real headed
+SQLite journey through the complete unchanged review-comments prefix passes on
+the rebuilt application. API/domain/storage code is unchanged from the qualified
+3,036-test PostgreSQL application. A fresh complete 89-job run on the changed
+head is still required before main merge; this is not broad visual parity.
