@@ -95,6 +95,17 @@ for (const kind of kinds) test(`${kind}: atomic native person numbers retain sco
         await query('DROP TABLE original_person_numbers'); await query('DROP TABLE original_person_number_counter');
         await query('DROP INDEX original_person_number_parent_scope');
         await query('DELETE FROM schema_migrations WHERE version=' + (kind === 'sqlite' ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION));
+        if (kind === 'postgres') {
+          const failureName = schema + '_failed_startup', failureUrl = new URL(url);
+          failureUrl.searchParams.set('application_name', failureName);
+          await query("CREATE FUNCTION owned_person_upgrade_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned-person-upgrade-failure'; END; $$");
+          await query('CREATE TRIGGER owned_person_upgrade_failure BEFORE INSERT ON schema_migrations FOR EACH ROW EXECUTE FUNCTION owned_person_upgrade_failure()');
+          try {
+            await assert.rejects(createPostgresFirstSliceStorage(failureUrl.toString()), /owned-person-upgrade-failure/);
+            assert.equal(Number((await query('SELECT count(*) AS count FROM pg_stat_activity WHERE application_name=$1', [failureName]))[0].count), 0,
+              'A rejected migration must close its real PostgreSQL connections before returning its original failure');
+          } finally { await query('DROP TRIGGER owned_person_upgrade_failure ON schema_migrations'); await query('DROP FUNCTION owned_person_upgrade_failure()'); }
+        }
         if (kind === 'sqlite') control.close(); else await control.end(); control = null;
         await open();
       }

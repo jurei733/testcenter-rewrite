@@ -4131,16 +4131,37 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
 
 export const createPostgresFirstSliceStorage = async (connectionString: string) => {
   const pool = new Pool({ connectionString });
-  await applyMigrations(pool);
+  // pg-pool may resolve end() after removing idle clients from its array but
+  // before their sockets close. Keep ownership until its public remove event,
+  // which fires from the client's actual end callback, including connecting
+  // clients and removals that were already in flight when shutdown began.
+  const connections = new Set<PoolClient>();
+  let resolveDrain: (() => void) | undefined;
+  const checkDrained = () => {
+    if (connections.size === 0 && pool.totalCount === 0) resolveDrain?.();
+  };
+  pool.on("connect", client => connections.add(client));
+  pool.on("remove", client => {connections.delete(client); checkDrained();});
+  let shutdownPromise: Promise<void> | undefined;
+  const shutdown = (): Promise<void> => shutdownPromise ??= (async () => {
+    const drained = new Promise<void>(resolve => {resolveDrain = resolve;});
+    await pool.end();
+    checkDrained();
+    await drained;
+  })();
+  try { await applyMigrations(pool); }
+  catch (error) {
+    try { await shutdown(); }
+    catch (cleanupError) { throw new AggregateError([error, cleanupError], "PostgreSQL startup and connection cleanup failed.", {cause: error}); }
+    throw error;
+  }
 
   return {
     repository: createRepositoryFromPool(pool),
     readinessCheck: async (): Promise<void> => {
       await pool.query("SELECT 1");
     },
-    shutdown: async (): Promise<void> => {
-      await pool.end();
-    }
+    shutdown
   };
 };
 
