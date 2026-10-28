@@ -1,3 +1,5 @@
+import type {OriginalMonitorProfile} from '@testcenter-rewrite-app/contracts';
+import {copyOriginalMonitorProfiles} from './original-monitor-profile.js';
 import type {OperationalLoginMigrationCandidate} from '@testcenter-rewrite-app/domain';
 
 /** Private server-side identity established only by the validated Original XML import.
@@ -6,6 +8,7 @@ export type OriginalOperationalLogin = {
   loginKey: string;
   loginMode: OperationalLoginMigrationCandidate['loginMode'];
   passwordHash: string | null;
+  originalMonitorProfiles?: OriginalMonitorProfile[];
 };
 
 /** Validate before entering any store transaction; never persist caller-owned objects. */
@@ -23,7 +26,7 @@ export function prepareOriginalOperationalLogins(candidates: OperationalLoginMig
       throw new TypeError('Invalid private Original operational login.');
     }
     seen.add(login.loginKey);
-    return {loginKey: login.loginKey, loginMode: login.loginMode, passwordHash: login.passwordHash};
+    return {loginKey: login.loginKey, loginMode: login.loginMode, passwordHash: login.passwordHash, ...(login.originalMonitorProfiles === undefined ? {} : {originalMonitorProfiles: copyOriginalMonitorProfiles(login.originalMonitorProfiles)})};
   });
 }
 
@@ -33,6 +36,7 @@ export type OriginalOperationalDefinition = Omit<import('@testcenter-rewrite-app
   originalLoginIdentity: true;
   originalOperationalMode: 'monitor-group' | 'monitor-study';
   monitorProfiles: import('@testcenter-rewrite-app/domain').MonitorViewProfile[];
+  originalMonitorProfiles?: OriginalMonitorProfile[];
   executionMode?: never;
 };
 export type OriginalNativeLogin = (import('@testcenter-rewrite-app/domain').ParticipantRosterEntry & {originalOperationalMode?: never}) | OriginalOperationalDefinition;
@@ -55,6 +59,7 @@ export async function findOriginalOperationalDefinition(repository: import('./in
   const validFrom=normalizeBoundary(candidate.validFrom),validTo=normalizeBoundary(candidate.validTo);
   if((candidate.validFrom&&!validFrom)||(candidate.validTo&&!validTo)||(validFrom&&validTo&&validFrom>validTo))throw new TypeError('Native operational Login validity is invalid.');
   return {passwordHash:matches[0]!.passwordHash,definition:{...candidate,...scope,originalLoginIdentity:true,
+    ...(matches[0]!.originalMonitorProfiles === undefined ? {} : {originalMonitorProfiles: copyOriginalMonitorProfiles(matches[0]!.originalMonitorProfiles)}),
     originalOperationalMode:matches[0]!.loginMode as 'monitor-group'|'monitor-study',groupKey:candidate.groupKey,validFrom,validTo,
     // A missing authored ViewSettings stays absent, rather than inventing UI defaults.
     viewSettings:candidate.viewSettings??{}}};

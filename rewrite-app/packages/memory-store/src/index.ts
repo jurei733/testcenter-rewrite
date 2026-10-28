@@ -1,3 +1,4 @@
+import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {readOriginalMonitorCollections} from '@testcenter-rewrite-app/application';
 import {prepareOriginalPersonNumber,selectOriginalPersonNumber,type OriginalPersonNumberRecord} from '@testcenter-rewrite-app/application';
@@ -833,6 +834,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return structuredClone(Array.from(state.originalLoginBindings.values()).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
     },
     async readOriginalMonitorSessions(actor,groupKey){return readOriginalMonitorCollections(state,actor,groupKey);},
+    async changeOriginalMonitorTestLock(actor,groupKey,testNumber,locked,timestamp){return changeOriginalMonitorLockCollection(state,actor,groupKey,testNumber,locked,timestamp);},
     async ensureOriginalPersonCredential(input){
       if(!originalPersonCredentialMatches(input,state.participantSessions.get(input.participantSessionId)))return false;
       if(!state.participantAccessCredentials.get(input.participantSessionId)?.tokenHash)state.participantAccessCredentials.set(input.participantSessionId,{participantSessionId:input.participantSessionId,tokenHash:input.tokenHash,updatedAt:input.updatedAt});

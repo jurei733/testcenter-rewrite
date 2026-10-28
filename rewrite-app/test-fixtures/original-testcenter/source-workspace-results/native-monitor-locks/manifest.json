@@ -1,0 +1,23 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "success": true,
+  "testMode": false,
+  "qualification": "Unchanged protected production Source, actual ALTCHA, schema-validated uploads and HTTP only; no SQL seeds or Source patches. All91 prior groups retained.",
+  "dockerProject": "source-monitor-locks-20261028",
+  "image": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "checks": 109,
+  "precedingChecksRetained": 91,
+  "httpObservations": 1282,
+  "sourceFilesIndependentlyMatched": 50,
+  "runtimeImageSourceFilesMatched": 48,
+  "nonRuntimeFilesNotShippedInBackendImage": [
+    "backend/composer.lock",
+    "frontend/src/app/group-monitor/backend.service.ts"
+  ],
+  "files": {
+    "oracle.mjs": "d575bc1f9b03b43f06b3b44386b6647692ea612414e2c8818333b25735b27d52",
+    "receipt.json": "7bec7c5e10820cabd8981f87c845fafa821653d1858ef06ed90e2e833c35fac8",
+    "http-observations.json": "b385e2400b08e0d5d8025eeed9e3ec0a8e0c74105610ef7e28694cd549b06a6a"
+  },
+  "updated": "2026-10-28T18:22:00.686382+00:00"
+}

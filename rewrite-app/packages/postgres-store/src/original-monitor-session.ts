@@ -5,7 +5,7 @@ const decode=(value:unknown):any=>value==null?undefined:typeof value==='string'?
 const text=(value:unknown):string|undefined=>value==null?undefined:String(value);
 function person(row:Row):OriginalMonitorData['people'][number]{return {participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:row.content_release_id==null?null:String(row.content_release_id),groupKey:String(row.group_key),originalLoginKey:text(row.original_login_key),originalNameSuffix:text(row.original_name_suffix),originalOperationalMode:text(row.original_operational_mode) as OriginalMonitorData['people'][number]['originalOperationalMode']};}
 const personColumns='p.participant_session_id,p.tenant_id,p.workspace_id,p.content_release_id,p.group_key,p.original_login_key,p.original_name_suffix,p.original_operational_mode';
-async function readSnapshot(db:PoolClient,actor:OriginalMonitorActor,requested?:string):Promise<OriginalMonitorPacket[]>{
+export async function readOriginalMonitorActorData(db:PoolClient,actor:OriginalMonitorActor):Promise<OriginalMonitorData>{
  const q=async(sql:string,args:string[]=[]):Promise<Row[]> => (await db.query(sql,args)).rows;
  const scope=[actor.tenantId,actor.workspaceId];
  const tenant=await q('SELECT status FROM tenants WHERE tenant_id=$1',[actor.tenantId]);
@@ -15,6 +15,12 @@ async function readSnapshot(db:PoolClient,actor:OriginalMonitorActor,requested?:
  const data:OriginalMonitorData={scope:actor,tenantActive:tenant[0]?.status==='active',workspaceActive:workspace[0]?.status==='active',
   people:(await q('SELECT '+personColumns+' FROM participant_sessions p WHERE p.participant_session_id=$1 AND p.tenant_id=$2 AND p.workspace_id=$3',[actor.participantSessionId,...scope])).map(person),
   bindings,operationalLogins:decode(privateRow?.native_logins_json)??[],entries:[],runs:[],units:[],personNumbers:[],testNumbers:[]};
+ return data;
+}
+async function readSnapshot(db:PoolClient,actor:OriginalMonitorActor,requested?:string):Promise<OriginalMonitorPacket[]>{
+ const q=async(sql:string,args:string[]=[]):Promise<Row[]> => (await db.query(sql,args)).rows;
+ const scope=[actor.tenantId,actor.workspaceId];
+ const data=await readOriginalMonitorActorData(db,actor);
  assertOriginalMonitorActor(data,actor);
  const selected=originalMonitorGroupSelection(actor,requested);if(selected===null)return[];
  data.entries=(await q('SELECT tenant_id,workspace_id,login_key,group_key,group_label,execution_mode,original_login_identity FROM participant_roster_entries WHERE tenant_id=$1 AND workspace_id=$2',scope)).map(row=>({tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),loginKey:String(row.login_key),groupKey:String(row.group_key),groupLabel:text(row.group_label),executionMode:text(row.execution_mode) as OriginalMonitorData['entries'][number]['executionMode'],originalLoginIdentity:row.original_login_identity===true||row.original_login_identity===1?true:undefined}));
@@ -35,4 +41,4 @@ async function readSnapshot(db:PoolClient,actor:OriginalMonitorActor,requested?:
  return selectOriginalMonitorSessions(data,actor,requested);
 }
 
-export function createOriginalMonitorRepository(pool:Pool):OriginalMonitorRepository{return{async readOriginalMonitorSessions(actor,groupKey){const client=await pool.connect();try{await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');const packets=await readSnapshot(client,actor,groupKey);await client.query('COMMIT');return packets;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}}};}
+export function createOriginalMonitorRepository(pool:Pool):Pick<OriginalMonitorRepository,'readOriginalMonitorSessions'>{return{async readOriginalMonitorSessions(actor,groupKey){const client=await pool.connect();try{await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');const packets=await readSnapshot(client,actor,groupKey);await client.query('COMMIT');return packets;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}}};}

@@ -4980,7 +4980,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
-      if (await handleOriginalMonitorHttp({request,pathname,services,header:(name,value)=>response.setHeader(name,value),
+      if (await handleOriginalMonitorHttp({request,pathname,services,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
         raw:(status,text,contentType)=>{response.writeHead(status,{'content-type':contentType});response.end(text);}})) return;
       if (await handleOriginalTestHttp({request, pathname, services,
         reason: text => {response.statusMessage=text;},

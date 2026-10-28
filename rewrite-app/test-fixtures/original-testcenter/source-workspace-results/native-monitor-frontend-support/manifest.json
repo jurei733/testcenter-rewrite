@@ -1,0 +1,23 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "success": true,
+  "testMode": false,
+  "qualification": "Unchanged local production Apache/PHP/PostgreSQL image; actual ALTCHA, protected validated XML/HTTP only; no SQL seeds or Source patches. All 50 source files match the immutable Git commit, 48 runtime files additionally match the running backend image; lockfile and frontend source are not shipped in that backend image. Source scope defects are evidence, not authorization policy.",
+  "dockerProject": "source-monitor-frontend-v4-20261028",
+  "image": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "checks": 91,
+  "httpObservations": 1226,
+  "sourceFilesIndependentlyMatched": 50,
+  "runtimeImageSourceFilesMatched": 48,
+  "nonRuntimeFilesNotShippedInBackendImage": [
+    "backend/composer.lock",
+    "frontend/src/app/group-monitor/backend.service.ts"
+  ],
+  "precedingChecksRetained": 79,
+  "files": {
+    "receipt.json": "99b8e7d4564e7d8699fd095c03c278b56f7b1efd8029bcb029a6137563c9fc99",
+    "http-observations.json": "e7ada9d011b5e392059c7564e78ad14cd7d8160b0330488380f9070577fdab2c",
+    "oracle.mjs": "dd1b4e733011b5403b2460ab5640806926279ef4a9a61eff5cf1f6e9893a5c91"
+  },
+  "updated": "2026-10-28T18:00:26.224660+00:00"
+}

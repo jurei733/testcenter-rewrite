@@ -335,3 +335,102 @@ constructor500. These results qualify the backend and existing transport;
 production frontend monitor/poll/apply/ACK adoption, system-check authentication,
 live broadcast and all8 broad visual acceptance rows remain open. No broad
 parity row closes.
+
+### Native monitor frontend prerequisites (2026-10-28; Source91)
+
+The protected production Source91 oracle retains all Source79 control names and
+assertions, then measures the monitor's ancillary HTTP paths. Its unchanged image
+is `sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328`.
+The receipt records 91 groups and 1,226 HTTP observations. All 50 referenced files
+match the read-only Source commit `eedae41840cbe90e5547c0211da818bdf620f5aa`;
+48 runtime files also match the running backend image. The Composer lockfile and
+frontend service source are build inputs absent from that backend image. The
+hash-bound evidence is in
+`test-fixtures/original-testcenter/source-workspace-results/native-monitor-frontend-support`.
+
+The Rewrite now serves `GET /monitor/profile/{id}` using native `AuthToken` and
+current private validated-XML provenance. A separate private representation keeps
+the authored strings; the existing public migration profiles retain their
+canonical normalization contract. Missing native attributes remain empty strings,
+missing `subValue` remains `""`, and only trimmed, case-insensitive `"true"` makes
+`Filter.not` true (`not="1"` is false). Source's numeric string comparison makes
+`/profile/7` select an attached profile named `007`. Only attached profiles are
+returned. Reimport is visible through the same person token. A legacy profile
+whose raw authored representation is unavailable fails with 409 and requires
+validated XML reimport; it is not rebuilt from normalized defaults. Private raw
+profile records and password hashes stay out of migration-candidate responses.
+Native monitor claims also use the raw profile label as their `subLabel`.
+
+`GET /booklet/{name}` returns the current validated physical XML with
+`application/xml`. It requires a native person token, permits native group/study
+monitors within their workspace and permits ordinary people only their assigned
+physical Booklets (including the physical file of an assigned preset). Reads do
+not open a Test, write state, or start timers. Source accepts ASCII case variants;
+a full `BOOK#preset:value` lookup returns 404 instead of stripping the preset.
+Role checks precede URI decoding. Responses are private and not cached.
+
+Source91 additionally records selected Test lock/unlock behavior for the next
+frontend adoption step: empty selections return empty 200; repeated locks append
+another `locked by monitor : <numeric actor person ID>` zero-clock log; unlock
+adds no log and restores pending for an unopened Test. The lock updates its server
+clock independently of saved state. When a later selected Test belongs to another
+group, an earlier successful lock remains committed. These selected monitor
+mutation routes are **measured but not implemented by this change**.
+
+Security differences are intentional and explicit. Source allows an ordinary
+person to fetch an unassigned Booklet in its workspace. Its group route-parameter
+mismatch also lets a group monitor lock Tests in foreign groups and even foreign
+workspaces. The Rewrite keeps person assignment and tenant/workspace/group
+boundaries; successful Source vulnerability probes do not authorize matching
+behavior. `scripts/original-monitor-frontend-support.test.mjs` exercises actual
+Memory/File/SQLite/PostgreSQL persistence and restart, real protected production
+HTTP, credential-kind checks before malformed URI decoding, exact profile values,
+current publication reads, and denial after removing private provenance.
+
+This closes two native frontend prerequisites, not the monitor UI parity row.
+Production participant login and the visible monitor still use canonical flows.
+Literal native Monitor rendering/actions and native participant poll/apply/empty
+ACK adoption remain required, as do the broad functional and visual parity gates.
+
+### Native selected monitor locks (2026-10-28; Source109)
+
+`POST /monitor/group/{group}/tests/lock` and `/unlock` now accept the literal
+native `AuthToken` protocol. The Source109 oracle retains every Source91 control
+and adds strict selection vectors: 109 groups and 1,282 protected HTTP observations.
+The unchanged image, read-only Source commit, 50 source hashes and 48 runtime image
+hashes are recorded in `source-workspace-results/native-monitor-locks`.
+
+Selection matches Source's actual stages. Missing/null/scalar `testIds` selects
+nothing; a JSON object iterates its property values. Each item must have a JSON
+integer type: numeric strings, booleans, null and floating tokens (including
+`1.0`) fail 500 when reached. Unknown integer IDs fail 404. Duplicate IDs are
+processed repeatedly. Native signed-int64 integer tokens remain decimal strings
+internally; their values never pass through a rounded JavaScript Number.
+
+A lock changes only `locked` and the native server modification clock. It then
+appends a separate zero-clock `locked by monitor : <numeric person ID>` Test log.
+Repeated locks append again. Unlock changes the clock and restores the existing
+pending/running projection without adding a log. Each selected lock commits before
+its log; earlier selected items and a successful lock remain committed if a later
+item or its log fails. Test and Unit states, responses, controller state and timers
+remain untouched. Native locked Test reads continue to use their existing 423 gate.
+
+All four stores recheck the current native monitor, private operational provenance,
+active tenant/workspace, genuine actor person number, target mapping and current
+imported Login group inside the mutation transaction. SQLite uses an immediate
+transaction; PostgreSQL locks parent people before Runs, with stable person order,
+and protects current membership/provenance rows. Neither SQL path selects or
+decodes saved Test state, responses or Unit payloads. The metadata actor reader is
+shared with the existing monitor snapshots. A study monitor may select groups in
+its own workspace. A group monitor's foreign group route is rejected before body
+decoding, preserving the Rewrite security boundary despite Source91's foreign
+workspace mutation vulnerability. Within an authorized route, the current target
+group spelling remains exact, as measured by Source109.
+
+The integration suite exercises all four real stores, pending/running/review-mode
+and monitor-owned Tests, repeated selections, partial failures, log-write faults,
+current membership reimport and provenance revocation, actual persistence/restart,
+foreign workspace denial, SQL decoder guards over private answers/state, lossless
+64-bit IDs and configured proof-of-work production HTTP. These endpoints support
+the forthcoming literal native Monitor frontend. Their backend qualification does
+not close the visible Monitor or broad visual parity requirements.
