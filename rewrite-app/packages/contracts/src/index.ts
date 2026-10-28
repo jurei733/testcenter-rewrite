@@ -1774,3 +1774,5 @@ export const resolveRoutePath = (
 
   return path;
 };
+
+export type {OriginalMonitorProfile} from './original-monitor.js';

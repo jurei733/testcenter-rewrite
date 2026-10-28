@@ -1,3 +1,4 @@
+import {collectOriginalMonitorProfiles} from './original-monitor-profile.js';
 import {createOriginalPersonTest,parseOriginalTestName} from './original-test.js';
 import {collectOriginalParticipantAssignments} from './original-participant-assignments.js';
 import {createOriginalSessionToken,hashOriginalSessionToken,OriginalSessionTokenCollisionError} from './original-session-token.js';
@@ -25467,7 +25468,7 @@ export const createFirstSliceServices = (
     const operationalLoginCandidates = [] as OriginalTestcenterOperationalLoginCandidate[];
     const nativeEntries = new Set<ReturnType<typeof parseParticipantRosterText>[number]>();
     const nativeOperationalEntries = new Set<OriginalTestcenterOperationalLoginCandidate>();
-    const nativeOperationalPasswords = new Map<OriginalTestcenterOperationalLoginCandidate, string>();
+    const nativeOperationalPasswords = new Map<OriginalTestcenterOperationalLoginCandidate, {password: string; profiles: import('@testcenter-rewrite-app/contracts').OriginalMonitorProfile[]}>();
 
     for (const rosterDocument of input.rosterDocuments) {
       const jsonInspection = inspectParticipantRosterJsonSource(
@@ -25518,7 +25519,7 @@ export const createFirstSliceServices = (
               element.getAttribute('mode') === entry.loginMode);
             if (elements.length !== 1) throw new FirstSliceError(400, 'original_operational_login_invalid', 'Native operational login identity is ambiguous.');
             const password = elements[0]!.getAttribute('pw') ?? '';
-            nativeOperationalPasswords.set(entry, password);
+            nativeOperationalPasswords.set(entry, {password, profiles: collectOriginalMonitorProfiles(root, elements[0]!)});
           }
         }
       }
@@ -25631,8 +25632,8 @@ export const createFirstSliceServices = (
     });
 
     // Delay expensive credential derivation until the complete import has passed validation.
-    const nativeOperationalLogins = Array.from(nativeOperationalPasswords, ([entry, password]) => ({
-      loginKey: entry.loginKey, loginMode: entry.loginMode, passwordHash: password ? hashPassword(password) : null
+    const nativeOperationalLogins = Array.from(nativeOperationalPasswords, ([entry, {password, profiles}]) => ({
+      loginKey: entry.loginKey, loginMode: entry.loginMode, passwordHash: password ? hashPassword(password) : null, originalMonitorProfiles: profiles
     }));
 
     const existingEntries =
@@ -32603,7 +32604,14 @@ export const createFirstSliceServices = (
     originalAuthentication,
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
     originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator}),
-    originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository}),
+    originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository,
+      async profiles(actor){const entry=(await operationalDefinition(actor,actor.originalLoginKey))?.definition;
+        return entry?.originalMonitorProfiles??(entry?.monitorProfiles.length===0?[]:undefined);},
+      async assignedBooklets(person){const entry=(await repository.listParticipantRosterEntriesByWorkspace(person.tenantId,person.workspaceId))
+        .find(entry=>entry.originalLoginIdentity===true&&entry.loginKey===person.originalLoginKey);
+        return entry?selectOriginalParticipantAssignments(getOriginalParticipantBookletAssignments(entry),person.participantCode??'').map(assignment=>assignment.assignmentKey):[];},
+      readBooklet:(scope,name)=>originalTestFiles.booklet(scope,name)
+    }),
     originalTest: createOriginalTestPort({auth: originalAuthentication, repository, now, id: idGenerator,
       readBooklet:(scope,fileId)=>originalTestFiles.booklet(scope,fileId),
       readResource:(scope,path)=>originalTestFiles.resource(scope,path),
@@ -32634,7 +32642,8 @@ export const createFirstSliceServices = (
           const flags:{expired?:number;scheduled?:number}=to&&clock>Math.floor(Date.parse(to)/1000)*1000?{expired:Math.floor(Date.parse(to)/1000)*1000}:
             from&&clock<Math.floor(Date.parse(from)/1000)*1000?{scheduled:Math.floor(Date.parse(from)/1000)*1000}:{};
           const base={id:group.groupKey,type:'testGroupMonitor' as const,label:group.groupLabel};
-          return entry.monitorProfiles.length?entry.monitorProfiles.map(profile=>({...base,flags:{...flags,profile:profile.profileId,subLabel:profile.label}})):
+          const profiles=entry.originalMonitorProfiles?.map(profile=>({profileId:profile.id,label:profile.label}))??entry.monitorProfiles;
+          return profiles.length?profiles.map(profile=>({...base,flags:{...flags,profile:profile.profileId,subLabel:profile.label}})):
             [{...base,flags:Object.keys(flags).length?flags:[] as []}];
         });
       },

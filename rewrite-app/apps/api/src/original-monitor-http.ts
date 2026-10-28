@@ -1,9 +1,12 @@
+import {randomUUID} from 'node:crypto';
 import type {IncomingMessage} from 'node:http';
 import {FirstSliceError, encodeOriginalReportJson, type FirstSliceServices} from '@testcenter-rewrite-app/application';
 
+const profilePath = /^\/monitor\/profile\/([^/]+)$/;
+const bookletPath = /^\/booklet\/([^/]+)$/;
 const groupPath = /^\/monitor\/group\/([^/]+)\/test-sessions$/;
 export function originalMonitorRouteLabel(method: string, pathname: string): string | null {
-  return pathname === '/monitor/test-sessions' ? method + ' /monitor/test-sessions' : groupPath.test(pathname) ? method + ' /monitor/group/:groupName/test-sessions' : null;
+  return pathname === '/monitor/test-sessions' ? method + ' /monitor/test-sessions' : groupPath.test(pathname) ? method + ' /monitor/group/:groupName/test-sessions' : profilePath.test(pathname) ? method + ' /monitor/profile/:profileId' : bookletPath.test(pathname) ? method + ' /booklet/:bookletName' : null;
 }
 export async function handleOriginalMonitorHttp(input: {request: IncomingMessage; pathname: string; services: FirstSliceServices;
   header: (name: string, value: string) => void; raw: (status: number, text: string, contentType: string) => void}): Promise<boolean> {
@@ -14,14 +17,21 @@ export async function handleOriginalMonitorHttp(input: {request: IncomingMessage
     const token = input.request.headers.authtoken;
     if (typeof token !== 'string' || !token) throw new FirstSliceError(401, 'original_token_missing', 'Auth Header not sufficient: missing or empty');
     // Role and current private credential provenance precede group decoding.
-    await input.services.originalMonitor.requireMonitor({token});
+    const booklet=bookletPath.exec(input.pathname),profile=profilePath.exec(input.pathname);
+    if(booklet)await input.services.originalTest.requirePerson({token});else await input.services.originalMonitor.requireMonitor({token});
+    if(booklet||profile){let identifier:string;try{identifier=decodeURIComponent((booklet??profile)![1]!);}catch{throw new FirstSliceError(400,'original_monitor_path_invalid','Invalid path.');}
+      if(booklet)input.raw(200,await input.services.originalMonitor.booklet({token,bookletName:identifier}),'application/xml');
+      else input.raw(200,encodeOriginalReportJson(await input.services.originalMonitor.profile({token,profileId:identifier})),'application/json');return true;}
     let groupKey: string | undefined;
     const match = groupPath.exec(input.pathname);
     if (match) {try {groupKey = decodeURIComponent(match[1]!);} catch {throw new FirstSliceError(400, 'original_monitor_path_invalid', 'Invalid path.');}}
     input.raw(200, await input.services.originalMonitor.sessions({token, groupKey}), 'application/json');
   } catch (error) {
     if (!(error instanceof FirstSliceError)) throw error;
-    input.raw(error.statusCode, encodeOriginalReportJson(error.message), 'application/json');
+    if(profilePath.test(input.pathname)||bookletPath.test(input.pathname)){
+      input.header('Error-ID','error-'+randomUUID());input.header('Test-Mode','NO');
+      input.raw(error.statusCode,error.message.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#039;'),'text/html;charset=UTF-8');
+    }else input.raw(error.statusCode, encodeOriginalReportJson(error.message), 'application/json');
   }
   return true;
 }
