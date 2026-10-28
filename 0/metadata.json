@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M623SMD7EQ75PFRRW2X47DHF",
+  "session_id": "01a18436-272c-7c83-a621-2d6d4e5012d4",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-28T20:39:01.220581Z",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "agent": "Codex",
+  "model": "",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 87363,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 211840,
+    "output_tokens": 3056,
+    "api_call_count": 10
+  },
+  "redaction": {
+    "replacements": 27,
+    "layers": {
+      "betterleaks": 18,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 9,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "kind": "agent_review",
+  "review_prompt": "Review the exact committed Testcenter rewrite change ad92a0864ac56987a4896fd5770abab0c0c9b271..60df907d432078e0edbda71568becdb5af6cd193. Your dimension is code-review. Find concrete correctness, regression, lifecycle, rendering/control and test-contract defects introduced by the patch. Verify identity precision, profile selection, auth transitions and asynchronous work.\nInspect the actual diff and source. The worktree is pinned to HEAD. Original is read-only at /Users/julian/Documents/Codex/2026-10-20/en/work/testcenter-original (eedae41840cbe90e5547c0211da818bdf620f5aa). Preserve stronger tenant/workspace/group boundaries and existing browser, deadline, privacy and 470kB budget gates.\nThis is an incremental draft native Monitor UI port, not a whole-project parity claim. Known future scope (broader controls/visual qualification, native participant receiver and WebSocket transport) remains explicit; flag concrete introduced defects rather than restating unfinished project scope.\nSupplied evidence: /Users/julian/Documents/Codex/2026-10-28/lies-users-julian-documents-codex-2026/outputs/testcenter-native-monitor-ui-20261028.json and /Users/julian/Documents/Codex/2026-10-28/lies-users-julian-documents-codex-2026/work/native-monitor-ui-cache-env-proof/result.json. Earlier 5d9 CI failed because the smoke hard-coded its schema cache. This HEAD fixes it, with a reproduced old failure and complete 12-marker Chrome pass using only the configured cache. Do not call old failed CI green or claim this HEAD already CI-qualified.\nReturn requested JSON only. Findings need a tracked repository-relative path, exact current line, evidence and remedy. Use request_changes for any unresolved substantive defect, inconclusive if review could not complete, unknown for missing signal evidence. Explain what you actually verified and the remaining limits."
+}
