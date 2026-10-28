@@ -1680,5 +1680,56 @@
   "cloudAcceptance": "A fresh complete pull-request workflow is required for this integration candidate before the final main merge.",
   "remainingProductAcceptance": "Full functional and visual Original parity remains unproven; production native monitor frontend/poll/apply/ACK adoption and all eight broad visual rows remain open.",
   "Original": "Read-only at eedae41840cbe90e5547c0211da818bdf620f5aa",
-  "deploymentAuthorized": false
+  "deploymentAuthorized": false,
+  "postAuditIntegrations": {
+    "observedAt": "2026-10-28T15:00:41.495090+00:00",
+    "branches": [
+      {
+        "ref": "fix/native-response-export",
+        "head": "a3a082491fc690adcb57d4b8e06afe0b09191671",
+        "PR": 8,
+        "merge": "3ecf87ca",
+        "resolution": "Both new archive imports and all current monitor/person imports retained; other paths merged normally."
+      },
+      {
+        "ref": "fix/native-definition-ref",
+        "head": "9db510ab62e1d44e31e1c13837589694bb5e8e16",
+        "PR": 9,
+        "merge": "a4cb1fed",
+        "resolution": "Normal merge without conflicts."
+      },
+      {
+        "ref": "fix/native-unit-log-format",
+        "head": "59b47fa445eab9ea3d601015f0ad3ce2dbbdedad",
+        "PR": 10,
+        "merge": "18692dbb",
+        "resolution": "Normal merge without conflicts."
+      }
+    ],
+    "modalIsolationFix": "48ab60c3cfaabb45e981d469ee48e2f7aad1bdf8",
+    "verification": "Rebuild and requalify the final combined application; full fresh 89-job acceptance still required before main merge.",
+    "validatedApplicationCommit": "18692dbb4b526bb32aaa444f2e257bc314f76684",
+    "localValidation": {
+      "build": true,
+      "typecheck": true,
+      "unitFrontend": {
+        "passed": 4812,
+        "failed": 0,
+        "skipped": 0
+      },
+      "postgres": {
+        "passed": 3036,
+        "failed": 0,
+        "skipped": 0
+      },
+      "headedChrome": {
+        "nativeMarkers": 16,
+        "unexpectedServerFailures": 0,
+        "exactExpectedSourceFailures": 1
+      },
+      "auditVulnerabilities": 0,
+      "actionlint": true
+    },
+    "cloudAcceptance": "The final combined candidate is published on a separate integration PR so useful running CI on PR7 is retained. All 89 fresh CI jobs for the final exact head must pass before its normal main merge."
+  }
 }
