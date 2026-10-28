@@ -53,11 +53,12 @@
     "Native transport uses AuthToken and literal signed-int64 JSON identities; private Booklet caches are scoped to the current access object.",
     "Fixed Source SVG glyph paths are rendered locally with the Material icon host geometry.",
     "Real polling, protected native entry, account lifecycle and dotted native browser routes are connected. WebSocket transport is not yet implemented.",
-    "Operator account details retain their prior DOM and styles in a deferred component so the unchanged 470 kB initial budget passes."
+    "Operator account details retain their prior DOM and styles in a deferred component so the unchanged 470 kB initial budget passes.",
+    "Finish-all captures its original group/access/int64 targets and cancels on route/access changes; profiles reset and cancel on selection/destruction; slow in-flight polls retain the unchanged20s deadline; failed Booklet reads retry while successful private material remains scoped and cached."
   ],
   "qualificationLimits": [
     "No measured Original visual parity claimed for this port.",
     "Native participant poll/apply/empty ACK adoption remains open.",
-    "Goto/time adjustments/finish-all and all layout/profile/filter combinations need broader native browser qualification."
+    "Basic confirmed/cancelled finish-all, original numeric recipients, native chooser return, six-second snapshot and transient material recovery are proven in headed Chrome. Goto/time adjustments and broader layout/profile/filter combinations still need native browser qualification."
   ]
 }

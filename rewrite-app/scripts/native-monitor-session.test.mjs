@@ -34,3 +34,13 @@ test('snapshot cancellation is combined with the existing finite HTTP deadline',
  globalThis.fetch=async()=>response(access('current'));const session=new NativeMonitorSessionService();await session.login('owned','password');const controller=new AbortController();let received;
  globalThis.fetch=async(path,options)=>{received=options.signal;return response([]);};await session.text('GET','/monitor/group/owned/test-sessions',undefined,undefined,false,controller.signal);assert.notEqual(received,controller.signal);assert.equal(received.aborted,false);controller.abort();assert.equal(received.aborted,true);
 }));
+test('access changes abort in-flight transport and reject an already-received late body',()=>fixture(async()=>{
+ globalThis.fetch=async()=>response(access('current'));const session=new NativeMonitorSessionService();await session.login('owned','password');
+ const body=deferred();let signal;globalThis.fetch=async(path,options)=>{signal=options.signal;return {ok:true,text:()=>body.promise};};
+ const read=session.text('GET','/booklet/BOOK'),rejected=assert.rejects(read,error=>error.name==='AbortError');await settle();const old=session.accessSignal;
+ session.clear();assert.equal(signal.aborted,true);assert.equal(old.aborted,true);assert.notEqual(session.accessSignal,old);body.resolve('Private old Booklet');await rejected;assert.equal(session.access(),null);
+}));
+test('starting a replacement login invalidates pending actions from the old access',()=>fixture(async()=>{
+ globalThis.fetch=async()=>response(access('current'));const session=new NativeMonitorSessionService();await session.login('owned','password');const old=session.accessSignal;
+ globalThis.fetch=async()=>response(access('replacement'));await session.login('replacement','password');assert.equal(old.aborted,true);assert.notEqual(session.accessSignal,old);assert.equal(session.access().token,'replacement');
+}));

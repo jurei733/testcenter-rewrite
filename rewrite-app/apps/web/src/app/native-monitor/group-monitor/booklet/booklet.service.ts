@@ -1,9 +1,9 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { map, shareReplay } from 'rxjs/operators';
+import { map, shareReplay, tap } from 'rxjs/operators';
 import { BackendService } from '../backend.service';
 import {
-  isUnit, type Booklet, type Testlet, type BookletError, type Unit, type BookletState, type BookletStateOption
+  isBooklet, isUnit, type Booklet, type Testlet, type BookletError, type Unit, type BookletState, type BookletStateOption
 } from '../group-monitor.interfaces';
 import { BookletParserService } from '../../shared/services/booklet-parser.service';
 import {
@@ -30,11 +30,18 @@ export class BookletService extends BookletParserService<Unit, Testlet, BookletS
     if (bookletName === '') {
       this.booklets[bookletName] = of<Booklet | BookletError>({ error: 'missing-id', species: null });
     } else {
-      this.booklets[bookletName] = this.bs.getBooklet(bookletName)
-        .pipe(
-          map((response: string | BookletError) => (typeof response === 'string' ? this.parseXml(response) : response)),
-          shareReplay(1)
-        );
+      const request = this.bs.getBooklet(bookletName).pipe(
+        map((response: string | BookletError) => (typeof response === 'string' ? this.parseXml(response) : response)),
+        tap(booklet => {
+          // Retry failures later; an old request must not evict a new access's cache.
+          if (this.booklets[bookletName] === request) {
+            if (isBooklet(booklet)) this.booklets[bookletName] = of(booklet);
+            else delete this.booklets[bookletName];
+          }
+        }),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+      this.booklets[bookletName] = request;
     }
     return this.booklets[bookletName];
   }

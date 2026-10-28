@@ -1,10 +1,10 @@
 import { inject, Injectable } from '@angular/core';
 import {
-  BehaviorSubject, combineLatest, interval, Observable, of, Subject, Subscription, zip
+  BehaviorSubject, combineLatest, defer, EMPTY, fromEvent, interval, Observable, of, Subject, Subscription, zip
 } from 'rxjs';
 import type { Sort } from '@angular/material/sort';
 import {
-  delay, filter, mergeMap, map, startWith, switchMap, tap
+  delay, filter, mergeMap, map, startWith, switchMap, takeUntil, tap
 } from 'rxjs/operators';
 import { BackendService } from '../backend.service';
 import { BookletService } from '../booklet/booklet.service';
@@ -81,6 +81,8 @@ export class TestSessionManager {
   };
 
   private groupName: string = '';
+  private connectionRevision = 0;
+  private readonly disconnected$ = new Subject<void>();
   private monitor$: Observable<TestSession[]> = new Observable<TestSession[]>();
   private _sessions$: BehaviorSubject<TestSession[]> = new BehaviorSubject<TestSession[]>([]);
   private _checked: { [sessionTestSessionId: string]: TestSession } = {};
@@ -172,11 +174,14 @@ export class TestSessionManager {
   }
 
   disconnect(): void {
+    this.connectionRevision++;
+    this.disconnected$.next();
     this.groupName = '';
     this.monitorSubscription?.unsubscribe();
     this.bs.cutConnection();
     this._sessions$.next([]);
     this._checked={};
+    this._sessionsStats$.next(TestSessionManager.getEmptyStats());
     this._checkedStats$.next(TestSessionManager.getEmptyStats());
   }
 
@@ -354,11 +359,19 @@ export class TestSessionManager {
 
     this.filters$.next([]);
 
-    return this.bs.lock(this.groupName, getUnlockedTestIds())
-      .pipe(
-        delay(1500),
-        mergeMap(() => this.bs.command('terminate', ['lock'], getUnlockedConnectedTestIds()))
-      );
+    const group = this.groupName;
+    const revision = this.connectionRevision;
+    const scope = this.bs.accessSignal;
+    const lockIds = getUnlockedTestIds();
+    const terminateIds = getUnlockedConnectedTestIds();
+    const current = () => !!group && revision === this.connectionRevision &&
+      group === this.groupName && scope === this.bs.accessSignal && !scope.aborted;
+    return defer(() => current() ? this.bs.lock(group, lockIds).pipe(
+      delay(1500),
+      mergeMap(() => current() ? this.bs.command('terminate', ['lock'], terminateIds) : EMPTY),
+      takeUntil(this.disconnected$),
+      takeUntil(fromEvent(scope, 'abort'))
+    ) : EMPTY);
   }
 
   sortSessions(sort: Sort, sessions: TestSession[]): TestSession[] {

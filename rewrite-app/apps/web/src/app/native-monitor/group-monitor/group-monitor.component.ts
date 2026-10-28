@@ -19,12 +19,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import type { Sort } from '@angular/material/sort';
 import { MatSidenav } from '@angular/material/sidenav';
 import {
-  interval, Observable, of, Subscription
+  EMPTY, fromEvent, interval, Observable, of, Subject, Subscription
 } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { MatCheckboxChange } from '@angular/material/checkbox';
-import { catchError, switchMap } from 'rxjs/operators';
+import { catchError, delay, filter, finalize, switchMap, take, takeUntil, tap } from 'rxjs/operators';
 import type { KeyValue } from '@angular/common';
 import {
   CustomtextService, type ConnectionStatus,
@@ -78,7 +78,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   currentlySelected: Selected | null = null;
   CurrentlyMarked: Selected | null = null;
 
-  displayOptions: TestViewDisplayOptions = {
+  private static defaultDisplayOptions(): TestViewDisplayOptions { return {
     view: 'medium',
     groupColumn: 'hide',
     bookletColumn: 'show',
@@ -88,7 +88,8 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
     highlightSpecies: false,
     manualChecking: false,
     autoselectNextBlock: true
-  };
+  }; }
+  displayOptions = GroupMonitorComponent.defaultDisplayOptions();
 
   isScrollable = false;
   isClosing = false;
@@ -102,6 +103,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   bookletStates: { [p: string]: string } = {};
 
   private subscriptions: Subscription[] = [];
+  private readonly routeChanged$ = new Subject<void>();
 
   @ViewChild('adminbackground') mainElem!: ElementRef;
   @ViewChild('sidenav', { static: true }) sidenav!: MatSidenav;
@@ -124,14 +126,32 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
     this.subscriptions = [
       this.tsm.sessions$.subscribe(rows => this.sessionRows.set(rows)),
       this.bs.connectionStatus$.subscribe(status => this.connectionStatus.set(status)),
-      this.route.params.subscribe(params => {
+      this.route.params.pipe(switchMap(params => {
+        this.routeChanged$.next();
+        this.tsm.disconnect();
+        this.tsm.resetFilters();
+        this.displayOptions = GroupMonitorComponent.defaultDisplayOptions();
+        this.currentlySelected = null;
+        this.CurrentlyMarked = null;
+        this.quickFilter = '';
+        this.quickFilterBoxOpen = false;
+        this.messages = [];
+        this.bookletStates = {};
         this.groupLabel = this.mds.getAccessObject('testGroupMonitor', params['group-name']).label;
+        this.headerService.title = `${this.mds.appTitle$.value} ${this.cts.getCustomText('gm_headline') ?? ''} - ${this.groupLabel}`;
         const profileId = params['profile-id'];
-        if (profileId) {
-          this.bs.getProfile(profileId).subscribe(profile => this.applyProfile(profile));
-        }
-        this.tsm.connect(params['group-name']);
-      }),
+        const profile$: Observable<Profile | null> = profileId ? this.bs.getProfile(profileId) : of(null);
+        return profile$.pipe(
+          tap(profile => {
+            this.tsm.connect(params['group-name']);
+            if (profile) this.applyProfile(profile);
+          }),
+          catchError(() => {
+            this.messages.push({ level: 'error', customtext: '', text: 'Das Monitorprofil konnte nicht geladen werden.' });
+            return EMPTY;
+          })
+        );
+      })).subscribe(),
       this.tsm.sessionsStats$.subscribe(stats => {
         this.sessionsStats.set(stats);
         this.onSessionsUpdate(stats);
@@ -149,8 +169,6 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
     ];
 
     this.mds.appSubTitle$.next(this.cts.getCustomText('gm_headline') ?? '');
-    this.tsm.resetFilters();
-
     this.headerService.title = `${this.mds.appTitle$.value} ${this.mds.appSubTitle$.value} - ${this.groupLabel}`;
   }
 
@@ -174,6 +192,8 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.routeChanged$.next();
+    this.routeChanged$.complete();
     this.tsm.disconnect();
     this.subscriptions.forEach(subscription => subscription.unsubscribe());
   }
@@ -273,23 +293,24 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   }
 
   finishEverythingCommand(): void {
-    this.messageService.showConfirmDialog({
+    const scope = this.bs.accessSignal;
+    this.subscriptions.push(this.messageService.showConfirmDialog({
       title: 'Testdurchführung beenden',
       content: 'Achtung! Diese Aktion sperrt und beendet sämtliche Tests dieser Sitzung.',
       confirmText: 'Ja, ich möchte die Testdurchführung beenden'
-    }).subscribe((confirmed: boolean) => {
-      if (confirmed) {
-        this.isClosing = true;
-        this.tsm.commandFinishEverything()
-          .pipe(catchError(err => {
-            this.isClosing = false;
-            throw err;
-          }))
-          .subscribe(() => {
-            setTimeout(() => { this.router.navigateByUrl('/r/starter'); }, 2000);
-          });
-      }
-    });
+    }).pipe(
+      take(1),
+      filter((confirmed: boolean) => confirmed),
+      tap(() => { this.isClosing = true; }),
+      switchMap(() => this.tsm.commandFinishEverything()),
+      delay(2000),
+      takeUntil(this.routeChanged$),
+      takeUntil(fromEvent(scope, 'abort')),
+      finalize(() => { this.isClosing = false; })
+    ).subscribe({
+      next: () => { void this.router.navigateByUrl('/group-monitor'); },
+      error: () => { this.messages.push({ level: 'error', customtext: '', text: 'Die Testdurchführung konnte nicht beendet werden.' }); }
+    }));
   }
 
   testCommandGoto(): void {

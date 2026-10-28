@@ -8,6 +8,9 @@ export class NativeMonitorSessionService {
  readonly busy=signal(false);
  readonly restoring=signal(false);
  private revision=0;
+ private accessController=new AbortController();
+ get accessSignal():AbortSignal{return this.accessController.signal;}
+ private renewAccessScope(){this.accessController.abort();this.accessController=new AbortController();}
  readonly problem=signal('');
  constructor(){try{const token=localStorage.getItem(key);if(token)void this.restore(token);}catch{}}
  private async restore(token:string){
@@ -17,7 +20,7 @@ export class NativeMonitorSessionService {
   finally{if(revision===this.revision)this.restoring.set(false);}
  }
  async login(name:string,password:string):Promise<OriginalAccessSet>{
-  const revision=++this.revision;this.restoring.set(false);this.busy.set(true);this.problem.set('');
+  this.renewAccessScope();const revision=++this.revision;this.restoring.set(false);this.busy.set(true);this.problem.set('');
   try{
    if(password&&!globalThis.isSecureContext)throw new Error('Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich.');
    let access:OriginalAccessSet;
@@ -36,11 +39,13 @@ export class NativeMonitorSessionService {
  }
  async refresh(){const token=this.access()?.token,revision=this.revision;if(token){const access=await this.json<OriginalAccessSet>('GET','/session',undefined,token);if(revision===this.revision)this.set(access);}}
  async logout(){const token=this.access()?.token;this.clear();if(token)await this.text('DELETE','/session',undefined,token);}
- private set(access:OriginalAccessSet){if(!access.token||!access.claims?.testGroupMonitor?.length){this.clear();throw new Error('Dieser Zugang hat keine Berechtigung für den Gruppenmonitor.');}this.access.set(access);try{localStorage.setItem(key,access.token);}catch{}}
- clear(){this.revision++;this.restoring.set(false);this.busy.set(false);this.access.set(null);try{localStorage.removeItem(key);}catch{}}
+ private set(access:OriginalAccessSet){if(!access.token||!access.claims?.testGroupMonitor?.length){this.clear();throw new Error('Dieser Zugang hat keine Berechtigung für den Gruppenmonitor.');}this.renewAccessScope();this.access.set(access);try{localStorage.setItem(key,access.token);}catch{}}
+ clear(){this.renewAccessScope();this.revision++;this.restoring.set(false);this.busy.set(false);this.access.set(null);try{localStorage.removeItem(key);}catch{}}
  async text(method:string,path:string,body?:unknown,token=this.access()?.token??'',rawBody=false,signal?:AbortSignal):Promise<string>{
-  const response=await fetch(path,{method,headers:{Accept:'application/json',...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:rawBody?String(body):JSON.stringify(body)}),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(20000)]):AbortSignal.timeout(20000),cache:'no-store'});
-  const text=await response.text();if(!response.ok){
+  const scope=token&&token===this.access()?.token?this.accessSignal:undefined;
+  const signals=[AbortSignal.timeout(20000),...(signal?[signal]:[]),...(scope?[scope]:[])];
+  const response=await fetch(path,{method,headers:{Accept:'application/json',...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:rawBody?String(body):JSON.stringify(body)}),signal:AbortSignal.any(signals),cache:'no-store'});
+  const text=await response.text();scope?.throwIfAborted();if(!response.ok){
    if([401,403].includes(response.status)&&token&&token===this.access()?.token)this.clear();
    throw new NativeMonitorHttpError(response.status,token?text.replaceAll(token,'[redacted]'):text);
   }return text;
