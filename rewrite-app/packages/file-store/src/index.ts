@@ -1,3 +1,4 @@
+import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {readOriginalMonitorCollections} from '@testcenter-rewrite-app/application';
 import {prepareOriginalPersonNumber,selectOriginalPersonNumber,validateOriginalPersonNumbers,type OriginalPersonNumberRecord} from '@testcenter-rewrite-app/application';
@@ -1653,6 +1654,7 @@ const createFileRepository = (
       return structuredClone(Object.values(state.originalLoginBindings).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
     },
     async readOriginalMonitorSessions(actor,groupKey){return readOriginalMonitorCollections(await getState(),actor,groupKey);},
+    async changeOriginalMonitorTestLock(actor,groupKey,testNumber,locked,timestamp){return mutate(state=>changeOriginalMonitorLockCollection(state,actor,groupKey,testNumber,locked,timestamp));},
     async ensureOriginalPersonCredential(input){return enqueueMutation(async()=>{
       const current=await getState();if(!originalPersonCredentialMatches(input,current.participantSessions[input.participantSessionId]))return false;
       if(current.participantAccessCredentials[input.participantSessionId]?.tokenHash)return true;

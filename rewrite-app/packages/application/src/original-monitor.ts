@@ -1,3 +1,6 @@
+import {originalTestLogIdPrefix} from '@testcenter-rewrite-app/domain';
+import {originalMonitorGroupSelection} from './original-monitor-session.js';
+import {originalMonitorLockSelection,originalMonitorLockTestNumber} from './original-monitor-lock.js';
 import type {OriginalMonitorProfile} from '@testcenter-rewrite-app/contracts';
 import type {ParticipantSession} from '@testcenter-rewrite-app/domain';
 import {originalMonitorProfileIdsEqual} from './original-monitor-profile.js';
@@ -10,12 +13,13 @@ import {formatOriginalMonitorSessionsJson, type OriginalMonitorActor} from './or
 import {FirstSliceError} from './first-slice-error.js';
 
 export type OriginalMonitorPort = {
-  requireMonitor(input: {token: string}): Promise<void>;
+  requireMonitor(input: {token: string; groupKey?: string}): Promise<void>;
+  changeLocks(input: {token: string; groupKey: string; locked: boolean; body: unknown}): Promise<void>;
   profile(input: {token: string; profileId: string}): Promise<OriginalMonitorProfile>;
   booklet(input: {token: string; bookletName: string}): Promise<string>;
   sessions(input: {token: string; groupKey?: string}): Promise<string>;
 };
-export function createOriginalMonitorPort(input: {auth: OriginalAuthenticationPort; repository: OriginalMonitorRepository;
+export function createOriginalMonitorPort(input: {auth: OriginalAuthenticationPort; repository: OriginalMonitorRepository & Pick<import('./index.js').FirstSliceRepository,'appendOriginalTestLogs'>; now:()=>string; id:()=>string;
   profiles: (actor: OriginalMonitorActor) => Promise<OriginalMonitorProfile[] | undefined>;
   assignedBooklets: (person: ParticipantSession) => Promise<string[]>;
   readBooklet: (scope: {tenantId: string; workspaceId: string}, name: string) => Promise<{xml: string}>;
@@ -31,7 +35,17 @@ export function createOriginalMonitorPort(input: {auth: OriginalAuthenticationPo
       originalLoginKey: person.originalLoginKey!, groupKey: person.groupKey, mode: person.originalOperationalMode as OriginalMonitorActor['mode']};
   };
   return {
-    async requireMonitor({token}) {await actor(token);},
+    async requireMonitor({token,groupKey}) {const monitor=await actor(token);if(groupKey!==undefined)originalMonitorGroupSelection(monitor,groupKey);},
+    async changeLocks({token,groupKey,locked,body}) {
+      const monitor=await actor(token);originalMonitorGroupSelection(monitor,groupKey);
+      for(const value of originalMonitorLockSelection(body)) {
+        const testNumber=originalMonitorLockTestNumber(value);
+        const {scope,actorPersonNumber}=await input.repository.changeOriginalMonitorTestLock(monitor,groupKey,testNumber,locked,input.now());
+        if(locked)await input.repository.appendOriginalTestLogs(scope,[{participantTestLogId:originalTestLogIdPrefix+input.id(),
+          tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId,testRunId:scope.testRunId,
+          unitKey:null,originalUnitId:null,logKey:'locked by monitor',logContent:actorPersonNumber,timestamp:0,originalTimestamp:0,recordedAt:input.now()}]);
+      }
+    },
     async profile({token, profileId}) {
       const profiles = await input.profiles(await actor(token));
       if (profiles === undefined) throw new FirstSliceError(409, 'original_monitor_profile_history_unknown', 'The original authored profile is unavailable; import its validated Testtakers XML again.');

@@ -1,3 +1,5 @@
+export {prepareOriginalMonitorSelectedLock,changeOriginalMonitorLockCollection} from './original-monitor-lock.js';
+export type {OriginalMonitorLockResult,OriginalMonitorLockTarget} from './original-monitor-lock.js';
 import {collectOriginalMonitorProfiles} from './original-monitor-profile.js';
 import {createOriginalPersonTest,parseOriginalTestName} from './original-test.js';
 import {collectOriginalParticipantAssignments} from './original-participant-assignments.js';
@@ -32604,7 +32606,7 @@ export const createFirstSliceServices = (
     originalAuthentication,
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
     originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator}),
-    originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository,
+    originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository,now,id:idGenerator,
       async profiles(actor){const entry=(await operationalDefinition(actor,actor.originalLoginKey))?.definition;
         return entry?.originalMonitorProfiles??(entry?.monitorProfiles.length===0?[]:undefined);},
       async assignedBooklets(person){const entry=(await repository.listParticipantRosterEntriesByWorkspace(person.tenantId,person.workspaceId))

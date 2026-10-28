@@ -391,3 +391,46 @@ This closes two native frontend prerequisites, not the monitor UI parity row.
 Production participant login and the visible monitor still use canonical flows.
 Literal native Monitor rendering/actions and native participant poll/apply/empty
 ACK adoption remain required, as do the broad functional and visual parity gates.
+
+### Native selected monitor locks (2026-10-28; Source109)
+
+`POST /monitor/group/{group}/tests/lock` and `/unlock` now accept the literal
+native `AuthToken` protocol. The Source109 oracle retains every Source91 control
+and adds strict selection vectors: 109 groups and 1,282 protected HTTP observations.
+The unchanged image, read-only Source commit, 50 source hashes and 48 runtime image
+hashes are recorded in `source-workspace-results/native-monitor-locks`.
+
+Selection matches Source's actual stages. Missing/null/scalar `testIds` selects
+nothing; a JSON object iterates its property values. Each item must have a JSON
+integer type: numeric strings, booleans, null and floating tokens (including
+`1.0`) fail 500 when reached. Unknown integer IDs fail 404. Duplicate IDs are
+processed repeatedly. Native signed-int64 integer tokens remain decimal strings
+internally; their values never pass through a rounded JavaScript Number.
+
+A lock changes only `locked` and the native server modification clock. It then
+appends a separate zero-clock `locked by monitor : <numeric person ID>` Test log.
+Repeated locks append again. Unlock changes the clock and restores the existing
+pending/running projection without adding a log. Each selected lock commits before
+its log; earlier selected items and a successful lock remain committed if a later
+item or its log fails. Test and Unit states, responses, controller state and timers
+remain untouched. Native locked Test reads continue to use their existing 423 gate.
+
+All four stores recheck the current native monitor, private operational provenance,
+active tenant/workspace, genuine actor person number, target mapping and current
+imported Login group inside the mutation transaction. SQLite uses an immediate
+transaction; PostgreSQL locks parent people before Runs, with stable person order,
+and protects current membership/provenance rows. Neither SQL path selects or
+decodes saved Test state, responses or Unit payloads. The metadata actor reader is
+shared with the existing monitor snapshots. A study monitor may select groups in
+its own workspace. A group monitor's foreign group route is rejected before body
+decoding, preserving the Rewrite security boundary despite Source91's foreign
+workspace mutation vulnerability. Within an authorized route, the current target
+group spelling remains exact, as measured by Source109.
+
+The integration suite exercises all four real stores, pending/running/review-mode
+and monitor-owned Tests, repeated selections, partial failures, log-write faults,
+current membership reimport and provenance revocation, actual persistence/restart,
+foreign workspace denial, SQL decoder guards over private answers/state, lossless
+64-bit IDs and configured proof-of-work production HTTP. These endpoints support
+the forthcoming literal native Monitor frontend. Their backend qualification does
+not close the visible Monitor or broad visual parity requirements.

@@ -1,3 +1,4 @@
+import {changeOriginalMonitorTestLock} from './original-monitor-lock.js';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {createOriginalMonitorRepository} from './original-monitor-session.js';
 import {prepareOriginalPersonNumber,selectOriginalPersonNumber} from '@testcenter-rewrite-app/application';
@@ -2134,6 +2135,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   return {
     ...createOriginalCommandRepository(pool),
     ...createOriginalMonitorRepository(pool),
+    async changeOriginalMonitorTestLock(actor,groupKey,testNumber,locked,timestamp){return changeOriginalMonitorTestLock(pool,actor,groupKey,testNumber,locked,timestamp);},
     async getApplicationSettings() {
       return one(
         `SELECT app_title, main_logo, theme_name, intro_html,

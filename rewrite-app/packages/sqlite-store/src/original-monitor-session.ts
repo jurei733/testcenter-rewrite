@@ -6,7 +6,7 @@ const decode=(value:unknown):any=>value==null?undefined:typeof value==='string'?
 const text=(value:unknown):string|undefined=>value==null?undefined:String(value);
 function person(row:Row):OriginalMonitorData['people'][number]{return {participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:row.content_release_id==null?null:String(row.content_release_id),groupKey:String(row.group_key),originalLoginKey:text(row.original_login_key),originalNameSuffix:text(row.original_name_suffix),originalOperationalMode:text(row.original_operational_mode) as OriginalMonitorData['people'][number]['originalOperationalMode']};}
 const personColumns='p.participant_session_id,p.tenant_id,p.workspace_id,p.content_release_id,p.group_key,p.original_login_key,p.original_name_suffix,p.original_operational_mode';
-function readSnapshot(db:DatabaseSync,actor:OriginalMonitorActor,requested?:string):OriginalMonitorPacket[]{
+export function readOriginalMonitorActorData(db:DatabaseSync,actor:OriginalMonitorActor):OriginalMonitorData{
  const q=(sql:string,args:string[]=[]):Row[]=>db.prepare(sql).all(...args);
  const scope=[actor.tenantId,actor.workspaceId];
  const tenant=q('SELECT status FROM tenants WHERE tenant_id=?',[actor.tenantId]);
@@ -16,6 +16,12 @@ function readSnapshot(db:DatabaseSync,actor:OriginalMonitorActor,requested?:stri
  const data:OriginalMonitorData={scope:actor,tenantActive:tenant[0]?.status==='active',workspaceActive:workspace[0]?.status==='active',
   people:(q('SELECT '+personColumns+' FROM participant_sessions p WHERE p.participant_session_id=? AND p.tenant_id=? AND p.workspace_id=?',[actor.participantSessionId,...scope])).map(person),
   bindings,operationalLogins:decode(privateRow?.native_logins_json)??[],entries:[],runs:[],units:[],personNumbers:[],testNumbers:[]};
+ return data;
+}
+function readSnapshot(db:DatabaseSync,actor:OriginalMonitorActor,requested?:string):OriginalMonitorPacket[]{
+ const q=(sql:string,args:string[]=[]):Row[]=>db.prepare(sql).all(...args);
+ const scope=[actor.tenantId,actor.workspaceId];
+ const data=readOriginalMonitorActorData(db,actor);
  assertOriginalMonitorActor(data,actor);
  const selected=originalMonitorGroupSelection(actor,requested);if(selected===null)return[];
  data.entries=(q('SELECT tenant_id,workspace_id,login_key,group_key,group_label,execution_mode,original_login_identity FROM participant_roster_entries WHERE tenant_id=? AND workspace_id=?',scope)).map(row=>({tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),loginKey:String(row.login_key),groupKey:String(row.group_key),groupLabel:text(row.group_label),executionMode:text(row.execution_mode) as OriginalMonitorData['entries'][number]['executionMode'],originalLoginIdentity:row.original_login_identity===true||row.original_login_identity===1?true:undefined}));
@@ -36,4 +42,4 @@ function readSnapshot(db:DatabaseSync,actor:OriginalMonitorActor,requested?:stri
  return selectOriginalMonitorSessions(data,actor,requested);
 }
 
-export function createOriginalMonitorRepository(db:DatabaseSync):OriginalMonitorRepository{return{async readOriginalMonitorSessions(actor,groupKey){db.exec('BEGIN');try{const packets=readSnapshot(db,actor,groupKey);db.exec('COMMIT');return packets;}catch(error){return rollbackAfterFailure(db,error);}}};}
+export function createOriginalMonitorRepository(db:DatabaseSync):Pick<OriginalMonitorRepository,'readOriginalMonitorSessions'>{return{async readOriginalMonitorSessions(actor,groupKey){db.exec('BEGIN');try{const packets=readSnapshot(db,actor,groupKey);db.exec('COMMIT');return packets;}catch(error){return rollbackAfterFailure(db,error);}}};}

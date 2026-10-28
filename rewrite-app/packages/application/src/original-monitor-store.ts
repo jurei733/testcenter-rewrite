@@ -17,7 +17,10 @@ export type OriginalMonitorData = {
   entries: readonly OriginalMonitorLogin[]; runs: readonly OriginalMonitorTest[]; units: readonly OriginalMonitorUnit[];
   personNumbers: readonly OriginalPersonNumberRecord[]; testNumbers: readonly OriginalTestNumberRecord[];
 };
-export type OriginalMonitorRepository = {readOriginalMonitorSessions(actor: OriginalMonitorActor, groupKey?: string): Promise<OriginalMonitorPacket[]>};
+export type OriginalMonitorRepository = {
+  readOriginalMonitorSessions(actor: OriginalMonitorActor, groupKey?: string): Promise<OriginalMonitorPacket[]>;
+  changeOriginalMonitorTestLock(actor: OriginalMonitorActor, groupKey: string, testNumber: string, locked: boolean, timestamp: string): Promise<import('./original-monitor-lock.js').OriginalMonitorLockResult>;
+};
 const unknown = () => new FirstSliceError(409, 'original_monitor_history_unknown', 'The historical Original monitor state is unavailable.');
 export function assertOriginalMonitorActor(data: OriginalMonitorData, actor: OriginalMonitorActor): void {
   const person = data.people.find(row => row.participantSessionId === actor.participantSessionId);

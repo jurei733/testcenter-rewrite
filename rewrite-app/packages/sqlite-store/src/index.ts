@@ -1,3 +1,4 @@
+import {changeOriginalMonitorTestLock} from './original-monitor-lock.js';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {createOriginalMonitorRepository} from './original-monitor-session.js';
 import {prepareOriginalPersonNumber,selectOriginalPersonNumber} from '@testcenter-rewrite-app/application';
@@ -2208,6 +2209,7 @@ export const createSqliteFirstSliceStorage = (
   const repository: FirstSliceRepository = {
     ...createOriginalCommandRepository(database),
     ...createOriginalMonitorRepository(database),
+    async changeOriginalMonitorTestLock(actor,groupKey,testNumber,locked,timestamp){return changeOriginalMonitorTestLock(database,actor,groupKey,testNumber,locked,timestamp);},
     async getApplicationSettings() {
       const row = database
         .prepare(
