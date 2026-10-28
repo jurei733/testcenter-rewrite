@@ -1,6 +1,7 @@
+import {readExpectedSchemaVersion} from './smoke-schema-version.mjs';
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -167,20 +168,9 @@ const capture = (command, args, options = {}) =>
     });
   });
 
-const readExpectedPostgresSchemaVersion = async () => {
-  const source = await readFile(
-    new URL("../packages/postgres-store/src/index.ts", import.meta.url),
-    "utf8"
-  );
-  const versions = Array.from(
-    source.matchAll(/\bversion:\s*(\d+)\b/g),
-    match => Number.parseInt(match[1], 10)
-  );
-  if (versions.length === 0) {
-    throw new Error("Could not resolve expected Postgres schema version.");
-  }
-  return Math.max(...versions);
-};
+const readExpectedPostgresSchemaVersion = () => readExpectedSchemaVersion(
+  new URL("../packages/postgres-store/src/index.ts", import.meta.url)
+);
 
 const pollJson = url => pollSmokeJson(url, {fetcher: fetch,
   onPhase: phase => console.log('compose_json_phase='+JSON.stringify(phase))});

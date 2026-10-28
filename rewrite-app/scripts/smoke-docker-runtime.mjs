@@ -1,6 +1,6 @@
+import {readExpectedSchemaVersion} from './smoke-schema-version.mjs';
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 
 const imageTag = process.env.DOCKER_IMAGE_TAG ?? "testcenter-rewrite-app:smoke";
@@ -60,19 +60,9 @@ const findOpenPort = () =>
     });
   });
 
-const readExpectedSqliteSchemaVersion = async () => {
-  const source = await readFile(
-    new URL("../packages/sqlite-store/src/index.ts", import.meta.url),
-    "utf8"
-  );
-  const migrationVersions = [
-    ...source.matchAll(/^\s+version:\s*(\d+),\s*$/gm)
-  ].map(match => Number.parseInt(match[1], 10));
-  if (migrationVersions.length === 0) {
-    throw new Error("Could not resolve expected SQLite schema version.");
-  }
-  return Math.max(...migrationVersions);
-};
+const readExpectedSqliteSchemaVersion = () => readExpectedSchemaVersion(
+  new URL("../packages/sqlite-store/src/index.ts", import.meta.url)
+);
 
 const fetchWithTimeout = async (url, timeoutMs = 5_000) => {
   const controller = new AbortController();

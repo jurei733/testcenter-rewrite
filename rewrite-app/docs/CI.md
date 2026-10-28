@@ -1,5 +1,22 @@
 # CI iteration and complete acceptance
 
+## Complete Docker schema expectation across migration layouts (2026-10-28)
+
+Full run40660668675 exposes a Docker smoke expectation defect: production
+readiness reports SQLite78, while the source reader returns75. Its line-anchored
+regular expression skips the compact76–78 declarations. This run remains rejected;
+the independent5-job native qualification does not replace the Docker gate.
+
+Docker and Compose now share a dependency-free host reader that includes inline
+and multiline numeric declarations and rejects missing, duplicate, skipped or
+reordered versions. It still derives the expected value from the checked-out
+store source, independently of the running image. Existing strict readiness,
+manifest and runtime-config comparisons remain intact. New mandatory CI-policy
+controls independently parse every actual SQLite/PostgreSQL migration with the
+TypeScript AST, reproduce a compact follow-up declaration and prove malformed
+inventories fail closed. No image/runtime assertion or deadline is removed.
+
+
 ## Native command service feedback (2026-10-28)
 
 `npm run ci:focus -- original-commands` runs one fresh core build followed by

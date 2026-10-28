@@ -1035,3 +1035,15 @@ test('direct offline qualification retains fresh certified installation and ever
  }
  assert.equal(capture.if,undefined,'No cohort can skip the native capture controls');
 });
+
+
+test('Docker and Compose schema assertions use the same dependency-free complete migration reader',()=>{
+ assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/smoke-schema-version.test.mjs'));
+ const helper=read('./smoke-schema-version.mjs');assert.ok(!/^import.*from ['"](?!node:)/m.test(helper));
+ for(const [file,store]of [['smoke-docker-runtime.mjs','sqlite'],['smoke-compose-postgres.mjs','postgres']]){
+   const driver=read('./'+file);assert.ok(driver.includes("import {readExpectedSchemaVersion} from './smoke-schema-version.mjs'"));
+   assert.ok(driver.includes('new URL("../packages/'+store+'-store/src/index.ts", import.meta.url)'));
+   assert.ok(driver.includes('readiness.storage?.schemaVersion'));assert.ok(driver.includes('manifest.storage?.schemaVersion'));
+   assert.ok(!driver.includes('source.matchAll('));
+ }
+});
