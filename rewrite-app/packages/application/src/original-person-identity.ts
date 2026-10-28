@@ -65,7 +65,7 @@ export function projectOriginalPersonSessions(person:ParticipantSession,people:P
   return projected;
 }
 
-export function projectOriginalPersonRuns(person:ParticipantSession,runs:TestRun[],people:ParticipantSession[]=[person]):TestRun[] {
+export function projectOriginalPersonRuns<Run extends NativeModeRun>(person:ParticipantSession,runs:Run[],people:ParticipantSession[]=[person]):Run[] {
   const ids=new Set(people.filter(other=>sameLogin(person,other)).map(other=>other.participantSessionId));ids.add(person.participantSessionId);
   return runs.map(run=>{
     if(!ids.has(run.participantSessionId))return run;

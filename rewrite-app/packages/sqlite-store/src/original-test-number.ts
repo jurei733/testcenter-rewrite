@@ -1,9 +1,9 @@
 import type {DatabaseSync} from 'node:sqlite';
-import type {ParticipantSession, TestRun} from '@testcenter-rewrite-app/domain';
-import {prepareOriginalTestNumber, type OriginalTestNumberInput} from '@testcenter-rewrite-app/application';
+import type {ParticipantSession} from '@testcenter-rewrite-app/domain';
+import {prepareOriginalTestNumber, type OriginalTestNumberInput, type OriginalTestNumberRun} from '@testcenter-rewrite-app/application';
 
 /** Caller owns BEGIN IMMEDIATE and the current parent/Run scope. */
-export function allocateOriginalTestNumber(database: DatabaseSync, input: OriginalTestNumberInput, run: TestRun | null, person: ParticipantSession | null): string {
+export function allocateOriginalTestNumber(database: DatabaseSync, input: OriginalTestNumberInput, run: OriginalTestNumberRun | null, person: ParticipantSession | null): string {
   const row = database.prepare('SELECT * FROM original_test_numbers WHERE test_run_id=?').get(input.testRunId);
   const existing = row ? {testNumber:String(row.test_number),testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id)} : undefined;
   const counter = database.prepare('SELECT last_number FROM original_test_number_counter WHERE singleton=1').get();

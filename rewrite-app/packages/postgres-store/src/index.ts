@@ -1,3 +1,5 @@
+import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
+import {createOriginalMonitorRepository} from './original-monitor-session.js';
 import {prepareOriginalPersonNumber,selectOriginalPersonNumber} from '@testcenter-rewrite-app/application';
 import {createOriginalCommandRepository} from './original-command-queue.js';
 import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
@@ -2131,6 +2133,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
 
   return {
     ...createOriginalCommandRepository(pool),
+    ...createOriginalMonitorRepository(pool),
     async getApplicationSettings() {
       return one(
         `SELECT app_title, main_logo, theme_name, intro_html,
@@ -3340,6 +3343,13 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
       return (await pool.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 ORDER BY login_key",[tenantId,workspaceId])).rows.map(mapOriginalLoginBinding);
     },
+    async ensureOriginalPersonCredential(input){const client=await pool.connect();try{await client.query('BEGIN');
+      const person=mapParticipantSession((await client.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1 FOR KEY SHARE',[input.participantSessionId])).rows[0]);
+      if(!originalPersonCredentialMatches(input,person)){await client.query('ROLLBACK');return false;}
+      await client.query('INSERT INTO participant_access_credentials(participant_session_id,token_hash,updated_at) VALUES($1,$2,$3) ON CONFLICT(participant_session_id) DO UPDATE SET token_hash=excluded.token_hash,updated_at=excluded.updated_at WHERE participant_access_credentials.token_hash IS NULL',[input.participantSessionId,input.tokenHash,input.updatedAt]);
+      await client.query('COMMIT');return true;
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}},
+    async listOriginalPersonTestIdentities(scope){return (await pool.query("SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,booklet_key,booklet_assignment_key,locked,original_result_state_json->>'bookletName' AS booklet_name,original_result_state_json->>'bookletLabel' AS booklet_label FROM test_runs WHERE participant_session_id=$1 AND tenant_id=$2 AND workspace_id=$3",[scope.participantSessionId,scope.tenantId,scope.workspaceId])).rows.map(row=>projectOriginalPersonTestIdentity({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id),bookletKey:String(row.booklet_key),bookletAssignmentKey:row.booklet_assignment_key==null?undefined:String(row.booklet_assignment_key),locked:row.locked===true,originalResultState:{bookletName:typeof row.booklet_name==='string'?row.booklet_name:undefined,bookletLabel:typeof row.booklet_label==='string'?row.booklet_label:undefined}}));},
     async getOriginalPersonNumber(input){
       const row=(await pool.query('SELECT n.* FROM original_person_numbers n JOIN participant_sessions p ON p.participant_session_id=n.participant_session_id AND p.tenant_id=n.tenant_id AND p.workspace_id=n.workspace_id AND p.original_login_key=n.original_login_key AND p.original_name_suffix=n.original_name_suffix WHERE n.participant_session_id=$1 AND n.tenant_id=$2 AND n.workspace_id=$3 AND n.original_login_key=$4 AND n.original_name_suffix=$5',[input.participantSessionId,input.tenantId,input.workspaceId,input.originalLoginKey,input.originalNameSuffix])).rows[0];
       if(!row)return null;
@@ -3357,7 +3367,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         const binding=(await client.query("SELECT * FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3",[candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null])).rows[0];
         const people=(await client.query("SELECT * FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3 ORDER BY participant_session_id FOR UPDATE",[candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null])).rows.map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
         const result=resolveOriginalPerson(candidate,binding?mapOriginalLoginBinding(binding):null,people,validate),person=result.participantSession;
-        const runs=(await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE`,[person.tenantId,person.workspaceId,person.originalLoginKey])).rows.map(mapTestRun).filter((run):run is TestRun=>run!==null);
+        const runs=(await client.query("SELECT test_run_id,participant_session_id,tenant_id,workspace_id,execution_mode FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE",[person.tenantId,person.workspaceId,person.originalLoginKey])).rows.map(row=>({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),executionMode:row.execution_mode==null?undefined:row.execution_mode as TestRun['executionMode']}));
         projectOriginalPersonRuns(person,runs,people);
         if(result.created)await client.query("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix,original_operational_mode) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null,person.originalOperationalMode??null]);
         if(result.created){
@@ -3616,7 +3626,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async appendOriginalTestLogs(input, logs) {await appendOriginalTestLogs(pool, input, logs);},
     async getOrCreateOriginalTestNumber(input) {
       return withResultArtifactParent(pool, input, async client => {
-        const run = mapTestRun((await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE test_run_id=$1`,[input.testRunId])).rows[0]);
+        const row=(await client.query("SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,original_result_state_json->>'bookletName' AS booklet_name,original_result_state_json->>'bookletLabel' AS booklet_label FROM test_runs WHERE test_run_id=$1",[input.testRunId])).rows[0];
+        const run=row?{testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id),originalResultState:{bookletName:typeof row.booklet_name==='string'?row.booklet_name:undefined,bookletLabel:typeof row.booklet_label==='string'?row.booklet_label:undefined}}:null;
         const person = mapParticipantSession((await client.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1',[input.participantSessionId])).rows[0]);
         return allocateOriginalTestNumber(client, input, run, person);
       });
@@ -3674,6 +3685,18 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapTestRun
       );
     },
+    async getOrCreateOriginalPersonTest(candidate){const client=await pool.connect();try{await client.query('BEGIN');
+      await client.query('SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE',[candidate.tenantId,candidate.workspaceId]);
+      const parent=mapParticipantSession((await client.query('SELECT * FROM participant_sessions WHERE participant_session_id=$1 FOR UPDATE',[candidate.participantSessionId])).rows[0]);
+      const identities=(await client.query("SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,booklet_key,booklet_assignment_key,locked,original_result_state_json->>'bookletName' AS booklet_name,original_result_state_json->>'bookletLabel' AS booklet_label FROM test_runs WHERE participant_session_id=$1 OR test_run_id=$2",[candidate.participantSessionId,candidate.testRunId])).rows.map(row=>projectOriginalPersonTestIdentity({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id),bookletKey:String(row.booklet_key),bookletAssignmentKey:row.booklet_assignment_key==null?undefined:String(row.booklet_assignment_key),locked:row.locked===true,originalResultState:{bookletName:typeof row.booklet_name==='string'?row.booklet_name:undefined,bookletLabel:typeof row.booklet_label==='string'?row.booklet_label:undefined}}));
+      const row=parent?.contentReleaseId===null?(await client.query('SELECT content_release_id,tenant_id,workspace_id,status FROM content_releases WHERE content_release_id=$1 AND tenant_id=$2 AND workspace_id=$3 FOR SHARE',[candidate.contentReleaseId,parent.tenantId,parent.workspaceId])).rows[0]:undefined;
+      const release=row?{contentReleaseId:String(row.content_release_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),status:row.status as ContentRelease['status']}:null;
+      const prepared=prepareOriginalPersonTestCreation(candidate,parent,identities,release);
+      if(prepared.fresh&&!await persistTestRun(client,prepared.fresh,false))throw new Error('Native Test reservation was not persisted.');
+      if(prepared.participantSession)await client.query('UPDATE participant_sessions SET content_release_id=$1 WHERE participant_session_id=$2',[prepared.participantSession.contentReleaseId,candidate.participantSessionId]);
+      const originalTestNumber=await allocateOriginalTestNumber(client,{...prepared.testRun,consumeSequence:true},prepared.testRun,prepared.participantSession??parent);
+      await client.query('COMMIT');return{testRun:prepared.testRun,created:prepared.created,originalTestNumber};
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}},
     async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
       if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}
       const client = await pool.connect();

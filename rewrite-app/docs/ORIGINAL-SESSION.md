@@ -286,3 +286,52 @@ Tenant, workspace, native monitor role, group binding and recipient group are re
 The protected visible-browser scenario retains all14 prior markers and adds shared delivery/locked-recipient and scoped/idempotent ACK checks. Its actual Original UI iframe keeps its running controller, unit responses and timers. Exactly one request-specific Source lock constructor500 is expected; unexpected server failures remain forbidden. These checks qualify transport beside the existing UI. Native frontend producer/poll/apply/ACK adoption, complete monitor UI, study/system-check authentication, additional operational memberships/settings, native monitor session lists, live broadcast and all8 broad visual rows remain open. No broad functional or visual row closes.
 
 For iteration, `npm run ci:focus -- original-commands` performs one fresh core build and the exact codec/lifecycle suites. Its plan remains `completeAcceptance:false`; the tests also remain in mandatory unit/Original-result inventories, and the store lifecycle suite remains in complete PostgreSQL integration. Mixed browser selections still request a fresh full build. No acceptance gate, browser mode, wait or timeout is removed.
+
+
+### Native monitor materialization and session snapshots (2026-10-28; Source79)
+
+The current monitor backend implements `GET /monitor/test-sessions` and
+`GET /monitor/group/:groupName/test-sessions`. The pinned unmodified production
+Source79 receipt retains all75 preceding groups and records79 groups,
+1,157 real HTTP observations and48 independently matched Original files.
+The cumulative oracle, HTTP observations and hash manifest are retained under
+`test-fixtures/original-testcenter/source-workspace-results/native-monitor-materialization`.
+
+Constructing an uncoded monitor Login AccessSet registers its dependent
+monitorable, reusable people and every assigned unopened Test. Authored code
+buckets, normalized Booklet references and separate preset attributes retain
+Source's distinct rules. Existing numeric person/Test identities, opening
+history, saved clocks, locks and active participant bearers survive monitor
+reentry. Credential-only internal authentication, person-code entry and
+`GET /session` remain independent of registration. Conditional credential
+initialization cannot rotate a concurrent human login or restore a missing or
+foreign parent. First Test, parent content binding and numeric identity reserve
+inside the same durable writer; exhausted numbering rolls back a new Test.
+
+A snapshot uses current Login mode/group labels, stable numeric identities and
+saved native Test/Unit state. It derives locked, pending or running status and
+uses the saved server Test clock. Polling does not open a Test, enter a
+controller or update state. SQL snapshots and fresh monitor reservations read
+identity metadata without decoding responses or unrelated group state. Active
+negative controls poison genuine response/foreign-state payloads, prove full
+reads fail, then exercise polling, repeated registration and a newly assigned
+preset through the protected production HTTP boundary. Unknown or ambiguous
+native history remains an explicit failure.
+
+Native study monitors materialize and list only their authenticated workspace
+and expose the measured group claims without inventing their own Test claims.
+Source's default group-array behavior is retained. Its explicit foreign-group
+access vulnerability is not copied: group monitors remain scoped to their own
+group and study monitors to their workspace. Proof-of-work login, replay,
+wrong token types, malformed paths, methods and cache policy are exercised on
+actual SQLite and PostgreSQL HTTP servers.
+
+Local verification passes4,805 complete unit/frontend cases and3,032 complete
+PostgreSQL cases with zero failures or skips. All332 policy cases execute;
+331 pass and the existing real Linux GNU-timeout control is omitted on macOS.
+Fresh production builds and typechecks pass. Actual headed Chrome retains all16
+native markers, zero unexpected failures and the one exact expected Source lock
+constructor500. These results qualify the backend and existing transport;
+production frontend monitor/poll/apply/ACK adoption, system-check authentication,
+live broadcast and all8 broad visual acceptance rows remain open. No broad
+parity row closes.

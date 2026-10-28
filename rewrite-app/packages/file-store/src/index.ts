@@ -1,3 +1,5 @@
+import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
+import {readOriginalMonitorCollections} from '@testcenter-rewrite-app/application';
 import {prepareOriginalPersonNumber,selectOriginalPersonNumber,validateOriginalPersonNumbers,type OriginalPersonNumberRecord} from '@testcenter-rewrite-app/application';
 import {nextOriginalCommandNumber,findOriginalCommandTargetCollection,appendOriginalCommandCollection,listOriginalCommandsCollection,acknowledgeOriginalCommandCollection,touchOriginalCommandPollingCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalCommandDelivery} from '@testcenter-rewrite-app/application';
@@ -1650,6 +1652,14 @@ const createFileRepository = (
       const state = await getState();
       return structuredClone(Object.values(state.originalLoginBindings).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
     },
+    async readOriginalMonitorSessions(actor,groupKey){return readOriginalMonitorCollections(await getState(),actor,groupKey);},
+    async ensureOriginalPersonCredential(input){return enqueueMutation(async()=>{
+      const current=await getState();if(!originalPersonCredentialMatches(input,current.participantSessions[input.participantSessionId]))return false;
+      if(current.participantAccessCredentials[input.participantSessionId]?.tokenHash)return true;
+      const next={...current,participantAccessCredentials:{...current.participantAccessCredentials,[input.participantSessionId]:{participantSessionId:input.participantSessionId,tokenHash:input.tokenHash,updatedAt:input.updatedAt}}};
+      await persistState(next);cachePromise=Promise.resolve(next);return true;
+    });},
+    async listOriginalPersonTestIdentities(scope){const state=await getState();return Object.values(state.testRuns).filter(run=>run.participantSessionId===scope.participantSessionId&&run.tenantId===scope.tenantId&&run.workspaceId===scope.workspaceId).map(projectOriginalPersonTestIdentity);},
     async getOriginalPersonNumber(input){const state=await getState();return selectOriginalPersonNumber(input,state.originalPersonNumbers[input.participantSessionId],state.participantSessions[input.participantSessionId]);},
     async resolveOriginalParticipantSession(candidate,validate) {
       return enqueueMutation(async()=>{
@@ -1885,6 +1895,18 @@ const createFileRepository = (
       return Object.values(state.testRuns).filter(
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
+    },
+    async getOrCreateOriginalPersonTest(candidate){
+      const result=await mutateParticipantRunApplication(state=>{
+        const parent=state.participantSessions[candidate.participantSessionId]??null;
+        const prepared=prepareOriginalPersonTestCreation(candidate,parent,Object.values(state.testRuns).map(projectOriginalPersonTestIdentity),state.contentReleases[candidate.contentReleaseId]);
+        const numbered=prepareOriginalTestNumber({...prepared.testRun,consumeSequence:true},prepared.testRun,prepared.participantSession??parent,state.originalTestNumbers[prepared.testRun.testRunId],state.originalTestNumberCounter??'0');
+        if(prepared.fresh)state.testRuns[prepared.fresh.testRunId]=prepared.fresh;
+        if(prepared.participantSession)state.participantSessions[prepared.participantSession.participantSessionId]=prepared.participantSession;
+        if(numbered.changed){state.originalTestNumbers[prepared.testRun.testRunId]=numbered.record;state.originalTestRunsByNumber[numbered.record.testNumber]=prepared.testRun.testRunId;state.originalTestNumberCounter=numbered.counter;}
+        return{testRun:prepared.testRun,created:prepared.created,originalTestNumber:numbered.record.testNumber,applied:prepared.created||numbered.changed};
+      },true);
+      return{testRun:result.testRun,created:result.created,originalTestNumber:result.originalTestNumber};
     },
     async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
       if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}

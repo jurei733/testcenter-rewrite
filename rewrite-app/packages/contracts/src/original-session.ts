@@ -5,7 +5,7 @@ export const originalSessionPaths = {
   challenge: '/session/challenge', personChallenge: '/session/person/challenge'
 } as const;
 export type OriginalTestAccess = {id: string; type: 'test'; label: string; flags: {locked: boolean; running: boolean}};
-export type OriginalTestGroupMonitorAccess = {id:string;type:'testGroupMonitor';label:string;flags:[]};
+export type OriginalTestGroupMonitorAccess = {id:string;type:'testGroupMonitor';label:string;flags:[]|{expired?:number;scheduled?:number;profile?:string;subLabel?:string}};
 export type OriginalAccessSet = {
   token: string; displayName: string; loginName: string; groupLabel: string; id: null; pwSetByAdmin: null;
   customTexts: Record<string, string>; flags: string[];
