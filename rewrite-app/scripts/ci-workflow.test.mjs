@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +13,8 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+const qualificationTiers = ['quick-extended-long','quick-extended'].map(id => workflow.jobs[id]);
+const qualificationRows = qualificationTiers.flatMap(job => job.strategy.matrix.include);
 test('optional package/browser cache segments are bounded at every actual owner without weakening qualification',()=>{
  const users=[...Object.values(workflow.jobs).flatMap(job=>job.steps??[]),...action.runs.steps]
   .filter(step=>/^actions\/(setup-node|cache)@/.test(step.uses??''));
@@ -81,7 +84,7 @@ test('dependency audit skips installation while preserving the complete locked g
 test('every actual browser consumer waits for the authenticated same-run package producer',()=>{
  const consumers=Object.entries(workflow.jobs).filter(([,job])=>job.steps?.some(step=>
   step.uses==='./.github/actions/rewrite-runtime' && step.with?.playwright && step.with.playwright!=='false'));
- assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','quick','quick-extended','verify-long-ui','verify-memory-sqlite','verify-postgres-ui'].sort());
+ assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','quick','quick-extended-long','quick-extended','verify-long-ui','verify-memory-sqlite','verify-postgres-ui'].sort());
  for(const [name,job]of consumers)assert.ok(job.needs.includes('browser-system-dependencies'),name);
  const download=action.runs.steps.find(step=>step.name==='Restore authenticated same-run browser system packages');
  assert.equal(download.if,"inputs.playwright == 'true' && steps.browser-route.outputs.route != 'certified'");assert.equal(download.with.name,'browser-system-${{ github.sha }}-${{ inputs.browser-system-attempt }}');
@@ -343,7 +346,7 @@ test('compound browser gates share one display and preserve either command failu
     // that failure rather than only asserting a workflow string.
     const old = execute('xvfb-run --auto-servernum owned-browser-command first && owned-browser-command second 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"');
     assert.equal(old.status, 92); assert.equal(old.stdout.trim().split('\n').length, 1);
-    for (const name of ['quick', 'quick-extended']) {
+    for (const name of ['quick', 'quick-extended-long', 'quick-extended']) {
       const command = workflow.jobs[name].steps.find(step => step.name === 'Run Quick browser gates').run;
       const success = execute(command); assert.equal(success.status, 0, success.stderr);
       const lines = success.stdout.trim().split('\n').map(line => line.split(' '));
@@ -360,7 +363,7 @@ test('compound browser gates share one display and preserve either command failu
 test("all 28 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
   const quick = workflow.jobs.quick;
   const extended = workflow.jobs["quick-extended"];
-  const shards = [...quick.strategy.matrix.include, ...extended.strategy.matrix.include];
+  const shards = [...quick.strategy.matrix.include, ...qualificationRows];
   assert.equal(quick.strategy["fail-fast"], false);
   assert.equal(extended.strategy["fail-fast"], false);
   assert.equal(extended.strategy["max-parallel"], 8, "Bound the extended group while releasing its measured four-slot tail");
@@ -376,7 +379,7 @@ test("all 28 browser scenarios run once across fast and extended shards, with co
     assert.deepEqual(shards.filter(item => item.group === group).flatMap(item => split(item.command)).sort(),
       split(`npm run ci:browser:quick:${group}:built`).sort());
   }
-  for (const tier of [quick, extended]) {
+  for (const tier of [quick, ...qualificationTiers]) {
     const execution = tier.steps.find(step => step.run?.includes("| tee"));
     assert.equal(execution.env.CI_BROWSER_COMMAND, '${{ matrix.command }}');
     assert.equal(execution.run, 'xvfb-run --auto-servernum bash --noprofile --norc -e -o pipefail -c "$CI_BROWSER_COMMAND" 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"');
@@ -396,14 +399,16 @@ test("all 28 browser scenarios run once across fast and extended shards, with co
 test("the early browser set is bounded and retains real authentication, isolation, Start restoration and Systemcheck", () => {
   assert.deepEqual(workflow.jobs.quick.strategy.matrix.include.map(item=>item.check).sort(),
     ["bug-report","original-login","original-login-protected","original-admin-login","proof-of-work","system-check","participant-variant","ib-player"].sort());
-  assert.equal(workflow.jobs["quick-extended"].strategy.matrix.include.length,20);
+  assert.equal(qualificationRows.length,20);
+  assert.equal(workflow.jobs["quick-extended"].strategy.matrix.include.length,19);
+  assert.deepEqual(workflow.jobs["quick-extended-long"].strategy.matrix.include.map(row=>row.check),["json-roster"]);
   assert.deepEqual(workflow.jobs["quick-extended"].needs,["build","fast-feedback","browser-system-dependencies"]);
   assert.ok(!workflow.jobs["fast-feedback"].needs.includes("quick-extended"));
 });
 test("extended dispatch retains the historical four-slot ordering improvement", () => {
   const recorded = JSON.parse(read("./fixtures/ci-browser-timings.json"));
   const extended = workflow.jobs["quick-extended"].strategy;
-  const current = extended.matrix.include.map(item => item.check);
+  const current = qualificationRows.map(item => item.check);
   const weights = recorded.secondsByCheck;
   assert.deepEqual([...current].sort(), Object.keys(weights).sort());
   assert.deepEqual([...recorded.previousOrder].sort(), [...current].sort());
@@ -429,7 +434,7 @@ test('extended capacity covers every measured journey and reduces its isolated q
     assert.equal(job.seconds, (Date.parse(job.completedAt) - Date.parse(job.startedAt)) / 1000);
     return [job.check, job.seconds];
   }));
-  const checks = strategy.matrix.include.map(item => item.check);
+  const checks = qualificationRows.map(item => item.check);
   assert.equal(weights.size, 20); assert.equal(recorded.extendedJobs.length, 20);
   assert.deepEqual([...weights.keys()].sort(), [...checks].sort());
   const duration = capacity => {
@@ -453,14 +458,15 @@ test('broad verification dispatches recorded long jobs first without changing co
   const weights = recorded.secondsByCheck;
   assert.deepEqual(Object.keys(weights).sort(), recorded.previousMatrix.map(item => item.check).sort());
   assert.ok(Object.values(weights).every(value => Number.isInteger(value) && value > 0));
-  const latest = JSON.parse(read('./fixtures/ci-priority-capacity-timings.json'));
+  const latest = JSON.parse(read('./fixtures/ci-global-priority-capacity-timings.json'));
   assert.equal(latest.status, 'completed'); assert.equal(latest.conclusion, 'success');
-  const latestWeights = Object.fromEntries(latest.jobs.map(job => {
+  const latestJobs = latest.rows.filter(job => job.kind === 'broad');
+  const latestWeights = Object.fromEntries(latestJobs.map(job => {
     assert.equal(job.seconds, (Date.parse(job.completed) - Date.parse(job.started)) / 1000);
     assert.ok(Number.isInteger(job.seconds) && job.seconds > 0);
     return [job.check, job.seconds];
   }));
-  assert.equal(latest.jobs.length, Object.keys(latestWeights).length);
+  assert.equal(latestJobs.length, Object.keys(latestWeights).length);
   assert.deepEqual(Object.keys(latestWeights).sort(), Object.keys(weights).sort());
   const longestFirst = [...recorded.previousMatrix].sort((a, b) => latestWeights[b.check] - latestWeights[a.check] || a.check.localeCompare(b.check));
   // Keep the historical receipt and its improvement controls below. Refresh
@@ -474,8 +480,11 @@ test('broad verification dispatches recorded long jobs first without changing co
   };
   // A deterministic scheduling model using observed job times, not a claim
   // about GitHub's shared runner availability or actual end-to-end speedup.
+  const historical = JSON.parse(read('./fixtures/ci-priority-capacity-timings.json'));
+  const historicalWeights = new Map(historical.jobs.map(job=>[job.check,job.seconds]));
+  const historicalOrder = [...recorded.previousMatrix].sort((a,b)=>historicalWeights.get(b.check)-historicalWeights.get(a.check)||a.check.localeCompare(b.check));
   for (const count of [15, 16]) {
-    assert.ok(duration(measuredCurrent, count) <= duration(recorded.previousMatrix, count) - 300);
+    assert.ok(duration(historicalOrder, count) <= duration(recorded.previousMatrix, count) - 300);
   }
 });
 test('the early long tier preserves exact workloads and browser mode behind every technical/security prerequisite', () => {
@@ -492,11 +501,11 @@ test('the early long tier preserves exact workloads and browser mode behind ever
   assert.equal(priority.status, 'completed'); assert.equal(priority.conclusion, 'success');
   const weights = new Map(priority.jobs.map(job => [job.check,job.seconds]));
   assert.equal(weights.size,40);
-  const selected = [...measured].sort((a,b)=>weights.get(b)-weights.get(a)||a.localeCompare(b))
-    .slice(0,priority.proposedModel.earlyJourneyCount);
-  assert.equal(selected.length,12);
+  const global = JSON.parse(read('./fixtures/ci-global-priority-capacity-timings.json'));
+  const selected = global.selected.filter(key=>key.startsWith('broad/')).map(key=>key.slice('broad/'.length));
+  assert.equal(selected.length,11); assert.ok(selected.every(check=>measured.includes(check)));
   assert.deepEqual(early.strategy.matrix.include.map(item => item.check), selected);
-  assert.equal(later.strategy.matrix.include.length, 28);
+  assert.equal(later.strategy.matrix.include.length, 29);
   assert.equal(matrix.length, new Set(matrix.map(item => item.check)).size);
   assert.deepEqual(matrix.map(item => item.check).sort(), receipt.jobs.map(item => item.check).sort());
   assert.deepEqual(early.needs, ['build','typecheck','dependencies','unit','browser-system-dependencies']);
@@ -521,7 +530,55 @@ test('the early long tier preserves exact workloads and browser mode behind ever
   assert.ok(workflow.jobs.acceptance.needs.includes('verify-long-ui'));
   assert.ok(workflow.jobs.acceptance.needs.includes('verify-memory-sqlite'));
 });
-test('checkpoint capacity defers only the two shorter isolated journeys and releases the PostgreSQL browser behind all technical gates',()=>{
+test('global early eligibility uses the complete accepted 60-row observation without changing any workload or other execution context',()=>{
+ const data=JSON.parse(read('./fixtures/ci-global-priority-capacity-timings.json'));
+ assert.equal(data.run,40600025889);assert.equal(data.head,'f88f67e956f0c984eabfc524c2bed1738afb9faf');
+ assert.equal(data.tree,'35feddb124b910040a8ce41a12ad9da22193c89f');assert.equal(data.merge,'be3039911a3a668b900eafe6b66adbb6204bac66');
+ assert.equal(data.status,'completed');assert.equal(data.conclusion,'success');
+ assert.equal(data.totalJobs,89);assert.equal(data.successfulJobs,89);assert.equal(data.SourceTasks,24);
+ assert.equal(data.wholeRunSeconds,(Date.parse(data.completed)-Date.parse(data.started))/1000);
+ assert.equal(data.allJobs.length,89);assert.equal(new Set(data.allJobs.map(job=>job.id)).size,89);
+ assert.ok(data.allJobs.every(job=>job.conclusion==='success'));
+ const records=[...matrix.map(row=>({kind:'broad',row})),...qualificationRows.map(row=>({kind:'extended',row}))];
+ assert.equal(records.length,60);assert.equal(data.rows.length,60);
+ const observed=new Map(data.rows.map(row=>[row.key,row]));assert.equal(observed.size,60);
+ for(const{kind,row}of records){
+  const measurement=observed.get(kind+'/'+row.check);assert.ok(measurement);assert.deepEqual(row,measurement.row);
+  assert.equal(measurement.seconds,(Date.parse(measurement.completed)-Date.parse(measurement.started))/1000);
+  assert.ok(measurement.seconds>0&&measurement.commandSeconds>0&&measurement.commandSeconds<=measurement.seconds);
+  const job=data.allJobs.find(job=>job.id===measurement.jobId);assert.ok(job);assert.equal(job.name,measurement.name);
+  assert.equal(job.started,measurement.started);assert.equal(job.completed,measurement.completed);
+ }
+ const selected=[...data.rows].sort((a,b)=>b.seconds-a.seconds||a.key.localeCompare(b.key)).slice(0,12).map(row=>row.key);
+ assert.deepEqual(data.selected,selected);
+ const broadEarly=workflow.jobs['verify-long-ui'],qualificationEarly=workflow.jobs['quick-extended-long'];
+ const actual=[...broadEarly.strategy.matrix.include.map(row=>'broad/'+row.check),...qualificationEarly.strategy.matrix.include.map(row=>'extended/'+row.check)];
+ assert.deepEqual([...actual].sort(),[...selected].sort());assert.equal(actual.length,12);
+ assert.deepEqual(data.promoted,['broad/ui-participant-detail-review','extended/json-roster','broad/ui-review-readiness']);
+ assert.deepEqual(data.deferred.sort(),['broad/ui-monitor-bulk','broad/ui-monitor-detail-review','broad/ui-monitor-review']);
+ assert.ok(Math.min(...data.promoted.map(key=>observed.get(key).seconds))>Math.max(...data.deferred.map(key=>observed.get(key).seconds)));
+ assert.ok(data.promoted.every(key=>observed.get(key).startAfterRunSeconds>=1000&&observed.get(key).commandSeconds>=700),
+  'Preserve the actual late start and long command evidence rather than calling these short journeys.');
+ assert.deepEqual(data.model,{earlyTotal:12,earlyBroad:11,earlyExtended:1,observedRunnerCapacity:20,SourceFamilies:5,databaseApi:1,databaseBrowser:1,checkpointSlots:1,lateQualificationLimit:8});
+ assert.equal(actual.length+data.model.SourceFamilies+data.model.databaseApi+data.model.databaseBrowser+data.model.checkpointSlots,20);
+ assert.equal(workflow.jobs['original-browser-reference'].strategy.matrix.family.length,5);
+ assert.equal(workflow.jobs['quick-extended'].strategy['max-parallel'],8);
+ const instances=Object.values(workflow.jobs).reduce((n,job)=>n+(job.strategy?.matrix?.include?.length??job.strategy?.matrix?.family?.length??1),0);assert.equal(instances,89);
+ assert.deepEqual(qualificationEarly.needs,broadEarly.needs);
+ assert.deepEqual(qualificationEarly.needs,['build','typecheck','dependencies','unit','browser-system-dependencies']);
+ const ancestors=new Set();const visit=id=>{for(const need of[workflow.jobs[id].needs??[]].flat())if(!ancestors.has(need)){ancestors.add(need);visit(need);}};visit('quick-extended-long');
+ assert.equal(ancestors.has('quick'),false);assert.equal(ancestors.has('fast-feedback'),false);
+ assert.ok(workflow.jobs.acceptance.needs.includes('quick-extended-long'));assert.equal(qualificationEarly.if,undefined);
+ const unchanged=structuredClone(workflow);delete unchanged.jobs['quick-extended-long'];
+ for(const id of['verify-long-ui','verify-memory-sqlite','quick-extended'])unchanged.jobs[id].strategy.matrix.include=[];
+ unchanged.jobs.acceptance.needs=unchanged.jobs.acceptance.needs.filter(id=>id!=='quick-extended-long');
+ assert.equal(createHash('sha256').update(JSON.stringify(unchanged)).digest('hex'),data.baselineContextSha256,
+  'Only the three matrix partitions, one cloned early owner and its mandatory acceptance edge may change.');
+ const clone=structuredClone(qualificationEarly),later=workflow.jobs['quick-extended'];
+ clone.needs=later.needs;clone.strategy.matrix.include=later.strategy.matrix.include;
+ assert.deepEqual(clone,later,'The promoted qualification retains its complete prior shell, artifact ownership, browser mode and execution context.');
+});
+test('historical deferral receipts stay truthful while the PostgreSQL browser and global early tier retain every technical gate',()=>{
  const data=JSON.parse(read('./fixtures/ci-priority-capacity-timings.json'));
  assert.equal(data.totalJobs,89);assert.equal(data.successfulJobs,89);assert.equal(data.wholeRunSeconds,2271);
  assert.equal(data.run,40317717809);assert.equal(data.conclusion,'success');
@@ -533,9 +590,12 @@ test('checkpoint capacity defers only the two shorter isolated journeys and rele
  assert.equal(weights.size,40);
  const early=workflow.jobs['verify-long-ui'],later=workflow.jobs['verify-memory-sqlite'],pg=workflow.jobs['verify-postgres-ui'];
  const prior=JSON.parse(read('./fixtures/ci-long-ui-timings.json')).jobs.filter(job=>job.seconds>=700).map(job=>job.check);
- const selected=early.strategy.matrix.include.map(row=>row.check),deferred=prior.filter(check=>!selected.includes(check));
+ const selected=[...prior].sort((a,b)=>weights.get(b)-weights.get(a)||a.localeCompare(b)).slice(0,data.proposedModel.earlyJourneyCount);
+ const deferred=prior.filter(check=>!selected.includes(check));
  assert.deepEqual(deferred.sort(),['ui-participant-detail-review','ui-review-readiness']);
- assert.ok(deferred.every(check=>later.strategy.matrix.include.some(row=>row.check===check)));
+ assert.ok(deferred.every(check=>matrix.some(row=>row.check===check)));
+ const actualEarlyCount=early.strategy.matrix.include.length+workflow.jobs['quick-extended-long'].strategy.matrix.include.length;
+ assert.equal(actualEarlyCount,12);
  assert.deepEqual(pg.needs,early.needs);assert.equal(pg.if,undefined);
  assert.equal(pg.services.postgres.image,workflow.jobs['verify-postgres'].services.postgres.image);
  assert.equal(pg['timeout-minutes'],30);assert.ok(workflow.jobs.acceptance.needs.includes('verify-postgres-ui'));
@@ -545,7 +605,7 @@ test('checkpoint capacity defers only the two shorter isolated journeys and rele
  const model=data.proposedModel;
  assert.deepEqual(model,{earlyJourneyCount:12,observedRunnerCapacityModel:20,SourceFamilies:5,earlyDatabaseApiJobs:1,earlyDatabaseBrowserJobs:1});
  assert.equal(workflow.jobs['original-browser-reference'].strategy.matrix.family.length,model.SourceFamilies);
- assert.equal(selected.length+model.SourceFamilies+model.earlyDatabaseApiJobs+model.earlyDatabaseBrowserJobs,model.observedRunnerCapacityModel-1,
+ assert.equal(actualEarlyCount+model.SourceFamilies+model.earlyDatabaseApiJobs+model.earlyDatabaseBrowserJobs,model.observedRunnerCapacityModel-1,
   'The observed capacity model leaves a checkpoint slot once short prerequisites finish; not a hosted queue guarantee.');
  assert.deepEqual(data.technical.map(row=>row.name).sort(),['Shared production build','verify-memory-sqlite (typecheck)','Dependency audit','verify-memory-sqlite (unit)','Authenticated browser system packages'].sort());
  assert.deepEqual(data.completedBeforeFeedback.map(row=>row.name).sort(),['Offline browser system qualification','Docker image runtime smoke'].sort());
@@ -565,7 +625,7 @@ test("a green early checkpoint cannot certify missing, cancelled or failed exten
     encoding:"utf8",env:{...process.env,RESULTS:JSON.stringify(values)}
   });
   assert.equal(execute(results).status,0);
-  for (const id of ['quick-extended', 'verify-long-ui', 'verify-memory-sqlite'])
+  for (const id of ['quick-extended-long', 'quick-extended', 'verify-long-ui', 'verify-memory-sqlite'])
     for (const result of ["skipped","cancelled","failure"]) {
       const outcome=execute({...results,[id]:{result}});
       assert.equal(outcome.status,1); assert.match(outcome.stderr,new RegExp(`${id}: ${result}`));
@@ -793,12 +853,12 @@ test('the Original sample retains scoped input/message/save evidence without wid
 });
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);
-  for (const id of ["unit", "quick", "quick-extended", "verify-long-ui", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {
+  for (const id of ["unit", "quick", "quick-extended-long", "quick-extended", "verify-long-ui", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {
     const job = workflow.jobs[id];
     if (id === "unit") assert.equal(job.needs, "build");
     else if(id === "quick") assert.deepEqual(job.needs,["build","browser-system-dependencies"]);
     else if(id === "verify-postgres") assert.deepEqual(job.needs,["build","typecheck","dependencies","unit"]);
-    else if(["verify-long-ui","verify-postgres-ui"].includes(id)) assert.deepEqual(job.needs,["build","typecheck","dependencies","unit","browser-system-dependencies"]);
+    else if(["verify-long-ui","quick-extended-long","verify-postgres-ui"].includes(id)) assert.deepEqual(job.needs,["build","typecheck","dependencies","unit","browser-system-dependencies"]);
     else if(["quick-extended","verify-memory-sqlite"].includes(id)) assert.deepEqual(job.needs,["build","fast-feedback","browser-system-dependencies"]);
     else assert.deepEqual(job.needs, ["build", "fast-feedback"]);
     const setup = job.steps.find(step => step.uses === "./.github/actions/rewrite-runtime");
