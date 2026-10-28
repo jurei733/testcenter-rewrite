@@ -23,11 +23,13 @@ export class BackendService {
    return()=>abort.abort();
   });
  }
+ getSessionsMonitor(groupName:string):Observable<TestSessionData[]>{
+  return this.request('GET','/monitor/group/'+encodeURIComponent(groupName)+'/test-sessions').pipe(map(parseNativeMonitorSnapshot));
+ }
  observeSessionsMonitor(groupName:string):Observable<TestSessionData[]>{
   return timer(0,5000).pipe(exhaustMap(()=>{
    this.connectionStatus$.next('polling-fetch');
-   return this.request('GET','/monitor/group/'+encodeURIComponent(groupName)+'/test-sessions').pipe(
-    map(parseNativeMonitorSnapshot),
+   return this.getSessionsMonitor(groupName).pipe(
     tap(()=>{this.connectionStatus$.next('polling-sleep');this.problem$.next('');}),
     // An error is never an empty successful snapshot. The next tick can retry.
     catchError(error=>{this.connectionStatus$.next('error');this.problem$.next(error instanceof Error?error.message:'Verbindungsfehler');return EMPTY;})

@@ -51,22 +51,22 @@ function transport(){
 }
 function managerFixture(){
  const controller=new AbortController(),streams=new Map(),writes=[];
- const backend={accessSignal:controller.signal,cutConnection(){},observeSessionsMonitor(group){const stream=new rx.Subject();streams.set(group,stream);return stream;},lock(group,ids){writes.push({type:'lock',group,ids});return rx.of({commandType:'lock',testIds:ids});},command(keyword,args,ids){writes.push({type:keyword,args,ids});return rx.of({commandType:keyword,testIds:ids});}};
+ const backend={accessSignal:controller.signal,getSessionsMonitor(){return rx.of(manager.sessions.map(row=>row.data));},cutConnection(){},observeSessionsMonitor(group){const stream=new rx.Subject();streams.set(group,stream);return stream;},lock(group,ids){writes.push({type:'lock',group,ids});return rx.of({commandType:'lock',testIds:ids});},command(keyword,args,ids){writes.push({type:keyword,args,ids});return rx.of({commandType:keyword,testIds:ids});}};
  bindings.set(GROUP_MONITOR_CONFIG,{checkForIdleInterval:0});
  const manager=new TestSessionManager(backend,{getBooklet:()=>rx.of({error:'general',species:null})});
  const rows=(group,ids)=>streams.get(group).next(ids.map(testId=>({testId,groupName:group,personLabel:testId,bookletName:'BOOK',timestamp:Date.now()/1000,testState:{CONTROLLER:'RUNNING',CONNECTION:'POLLING'}})));
  return {backend,controller,manager,streams,writes,rows};
 }
 function componentFixture(){
- const params=new rx.Subject(),profiles=new Map(),connected=[],navigated=[],confirmations=new rx.Subject(),gotoDialog=new rx.Subject(),gotos=[];let finishes=0;
+ const params=new rx.Subject(),profiles=new Map(),connected=[],navigated=[],confirmations=new rx.Subject(),gotoDialog=new rx.Subject(),gotos=[];let finishes=0,dialogRenders=0;
  const controller=new AbortController();const backend={accessSignal:controller.signal,connectionStatus$:new rx.BehaviorSubject('initial'),getProfile(id){const stream=new rx.Subject();profiles.set(id,stream);return stream;}};
  const empty=()=>({allChecked:false,numberOfSessions:0,differentBooklets:0,differentBookletSpecies:0,pausedSessions:0,lockedSessions:0,bookletStateLabels:{}});
  const tsm={checked:[],getMaxTimeAcrossAllSessions:()=>10,testCommandGoto(selection,time,targets){gotos.push({selection,time,targets});return rx.of(true);},sessions$:new rx.BehaviorSubject([]),sessionsStats$:new rx.BehaviorSubject(empty()),checkedStats$:new rx.BehaviorSubject(empty()),commandResponses$:new rx.Subject(),checkingOptions:{enableAutoCheckAll:true},filterOptions:{},connect(group){connected.push(group);},disconnect(){},resetFilters(){this.filterOptions={quick:{selected:false,filter:{value:''}}};},refreshFilters(){},commandFinishEverything(){finishes++;return rx.of({commandType:'terminate',testIds:['1']});}};
  const filterDialog=new rx.Subject(),filterOpen=[];let filterCloses=0;const filterOverlay={open:(component,config)=>{filterOpen.push(config);return {afterClosed:()=>filterDialog,close:()=>{filterCloses++;}};}};
  const cts={getCustomText:()=>null};bindings.set(shared.CustomtextService,cts);
- const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog})}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},filterOverlay,{},{},{showConfirmDialog:()=>confirmations});
+ const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog,componentRef:{changeDetectorRef:{detectChanges(){dialogRenders++;}}}})}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},filterOverlay,{},{},{showConfirmDialog:()=>confirmations});
  component.ngOnInit();
- return {component,params,profiles,connected,navigated,confirmations,controller,tsm,gotoDialog,gotos,filterDialog,filterOpen,get filterCloses(){return filterCloses;},get finishes(){return finishes;}};
+ return {component,params,profiles,connected,navigated,confirmations,controller,tsm,gotoDialog,gotos,filterDialog,filterOpen,get dialogRenders(){return dialogRenders;},get filterCloses(){return filterCloses;},get finishes(){return finishes;}};
 }
 const profile=(settings={},filters=[])=>({settings,filters,filtersEnabled:{}});
 
@@ -230,4 +230,31 @@ for(const transition of ['route','access','destroy'])test('filter completion can
  if(transition==='route')f.params.next({'group-name':'B'});else if(transition==='access')f.controller.abort();else f.component.ngOnDestroy();
  assert.equal(f.filterDialog.observed,false);assert.equal(f.filterCloses,1);
  f.filterDialog.next({id:'stale',label:'Stale',target:'personLabel',value:'alpha',not:false,type:'equal'});assert.equal(f.tsm.filterOptions.stale,undefined);if(transition!=='destroy')f.component.ngOnDestroy();
+});
+
+const finishPacket=(id,state={})=>({testId:id,groupName:'A',personLabel:id,bookletName:'BOOK',timestamp:1,testState:{CONTROLLER:'RUNNING',CONNECTION:'POLLING',...state}});
+test('finish before first render waits for a fresh complete snapshot and uses its exact int64 targets',t=>{
+ clock(t);const f=managerFixture(),fresh=new rx.Subject();f.manager.connect('A');let reads=0;f.backend.getSessionsMonitor=group=>{assert.equal(group,'A');reads++;return fresh;};
+ f.manager.commandFinishEverything().subscribe();assert.equal(reads,1);assert.deepEqual(f.writes,[]);
+ fresh.next([finishPacket('9007199254740993'),finishPacket('9007199254740994',{status:'pending'}),finishPacket('0',{status:'pending'})]);
+ assert.deepEqual(f.writes,[{type:'lock',group:'A',ids:['9007199254740993','9007199254740994']}]);
+ t.mock.timers.tick(1500);assert.deepEqual(f.writes[1],{type:'terminate',args:['lock'],ids:['9007199254740993']});f.manager.disconnect();
+});
+test('finish gets current native targets independently of stale rendered material',t=>{
+ clock(t);const f=managerFixture();f.manager.connect('A');f.rows('A',['9007199254740993']);
+ f.backend.getSessionsMonitor=()=>rx.of([finishPacket('9007199254740994')]);f.manager.commandFinishEverything().subscribe();
+ assert.deepEqual(f.writes[0],{type:'lock',group:'A',ids:['9007199254740994']});t.mock.timers.tick(1500);assert.deepEqual(f.writes[1].ids,['9007199254740994']);f.manager.disconnect();
+});
+test('a failed finish snapshot never writes stale targets or reports successful completion',t=>{
+ clock(t);const f=managerFixture();f.manager.connect('A');f.rows('A',['9007199254740993']);const failure=Error('Owned fresh snapshot failed');f.backend.getSessionsMonitor=()=>rx.throwError(()=>failure);let seen,success=false;
+ f.manager.commandFinishEverything().subscribe({next:()=>{success=true;},error:error=>{seen=error;}});t.mock.timers.tick(2000);assert.equal(seen,failure);assert.equal(success,false);assert.deepEqual(f.writes,[]);f.manager.disconnect();
+});
+for(const transition of ['group','access','disconnect'])test('finish pending snapshot cannot outlive '+transition+' context',t=>{
+ clock(t);const f=managerFixture(),fresh=new rx.Subject();f.manager.connect('A');f.backend.getSessionsMonitor=()=>fresh;f.manager.commandFinishEverything().subscribe();assert.equal(fresh.observed,true);
+ if(transition==='group')f.manager.connect('B');else if(transition==='access')f.controller.abort();else f.manager.disconnect();
+ assert.equal(fresh.observed,false);fresh.next([finishPacket('9007199254740993')]);t.mock.timers.tick(2000);assert.deepEqual(f.writes,[]);f.manager.disconnect();
+});
+
+test('Goto initializes the real form view before exposing its confirmation stream',()=>{
+ const f=componentFixture();f.params.next({'group-name':'A'});selectGoto(f);f.component.testCommandGoto();assert.equal(f.dialogRenders,1);assert.equal(f.gotoDialog.observed,true);f.component.ngOnDestroy();
 });

@@ -21,7 +21,7 @@ import { MatSidenav } from '@angular/material/sidenav';
 import {
   EMPTY, fromEvent, interval, Observable, of, Subject, Subscription
 } from 'rxjs';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { catchError, delay, filter, finalize, switchMap, take, takeUntil, tap } from 'rxjs/operators';
@@ -336,7 +336,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
           testSession.timeLeft &&
           (testSession.timeLeft[selection.element.id] <= 0)
       ) ?
-      this.dialog.open(
+      this.initializeDialog(this.dialog.open(
         TimeRestrictionDialogComponent, {
           width: 'auto',
           data: <TimeRestrictionDialogData>{
@@ -349,7 +349,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
             remainingTime: this.tsm.getMaxTimeAcrossAllSessions(selection)
           }
         }
-      ).afterClosed() :
+      )).afterClosed() :
       of(1) // 1 as in 'true'
     ).pipe(
       take(1),
@@ -429,11 +429,18 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
     this.openFilterDialog(this.tsm.filterOptions[key]);
   }
 
+  private initializeDialog<T, R>(dialog: MatDialogRef<T, R>): MatDialogRef<T, R> {
+    // A zoneless overlay exposes its DOM before its scheduled first update.
+    // Bind controls now so an immediate input cannot be overwritten by setup.
+    dialog.componentRef?.changeDetectorRef.detectChanges();
+    return dialog;
+  }
+
   private openFilterDialog(filterEntry: TestSessionFilterListEntry | undefined = undefined) {
     const scope = this.bs.accessSignal;
     if (scope.aborted) return;
     const data = filterEntry ? filterEntry.filter : {};
-    const dialogRef = this.addFilterDialog.open(AddFilterDialogComponent, { width: 'auto', data, viewContainerRef: this.filterDialogView });
+    const dialogRef = this.initializeDialog(this.addFilterDialog.open(AddFilterDialogComponent, { width: 'auto', data, viewContainerRef: this.filterDialogView }));
 
     this.subscriptions.push(dialogRef.afterClosed().pipe(
       take(1), takeUntil(this.routeChanged$), takeUntil(fromEvent(scope, 'abort')),

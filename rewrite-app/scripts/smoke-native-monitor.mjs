@@ -3,18 +3,25 @@ import {spawn} from 'node:child_process';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {tmpdir} from 'node:os';
-import {pathToFileURL} from 'node:url';
+import {pathToFileURL,fileURLToPath} from 'node:url';
+import {isSupervisedSmokeChild,runSupervisedSmoke,reportSmokePhase} from './supervised-smoke.mjs';
+import {readNativeSmokeResponse,stopNativeSmokeServer} from './native-monitor-smoke-io.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {chromium} from 'playwright';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
 import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
 import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
-const artifacts=process.env.UI_SMOKE_ARTIFACT_DIR?resolve(process.env.UI_SMOKE_ARTIFACT_DIR,'native-monitor'):await mkdtemp(join(tmpdir(),'owned-native-monitor-ui-'));await mkdir(artifacts,{recursive:true});
+const artifactRoot=process.env.UI_SMOKE_ARTIFACT_DIR?resolve(process.env.UI_SMOKE_ARTIFACT_DIR):await mkdtemp(join(tmpdir(),'owned-native-monitor-ui-'));
+if(!isSupervisedSmokeChild(import.meta.url)){
+ process.exitCode=await runSupervisedSmoke({entry:fileURLToPath(import.meta.url),artifactDirectory:join(artifactRoot,'native-monitor-supervision'),env:{...process.env,UI_SMOKE_ARTIFACT_DIR:artifactRoot},phaseTimeoutMs:60000,totalTimeoutMs:480000});
+}else{
+reportSmokePhase('prepare-owned-native-fixtures');
+const artifacts=join(artifactRoot,'native-monitor');await mkdir(artifacts,{recursive:true});
 console.log('owned_artifacts='+artifacts);
 const file=join(artifacts,'store.sqlite'),storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE||'.data/original-xml-schemas'),false),services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
 const password='Owned native monitor browser password',monitorName='owned-ui-monitor',one='owned-ui-alpha',two='owned-ui-beta',group='OWNED.UI.GROUP',firstId='9007199254740993',secondId='9007199254740994';
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
-let browser,server,page;const errors=[],wire=[],markers=[];const check=name=>{markers.push(name);console.log('native_monitor_ui='+name+':passed');};
+let browser,server,page;const errors=[],wire=[],markers=[];const check=name=>{markers.push(name);console.log('native_monitor_ui='+name+':passed');reportSmokePhase(name);};
 try{
  const tenant=await services.platform.createTenant({tenantKey:'owned-ui',displayName:'Owned UI'}),workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'owned',displayName:'Owned UI'}),scope={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey};
  const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType});
@@ -22,13 +29,21 @@ try{
  await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.UI.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-ui-player@1.2.3">Owned</Definition>'));
  await upload('booklet.xml',xml('Booklet','<Metadata><Id>OWNED.UI.BOOK</Id><Label>Owned Monitor Booklet</Label></Metadata><States><State id="route" label="Owned Route"><Option id="a" label="Alpha"/><Option id="b" label="Beta"/></State></States><Units><Testlet id="B1" label="Owned Block"><Restrictions><TimeMax minutes="10"/></Restrictions><Unit id="OWNED.UI.UNIT" label="Owned Unit"/></Testlet></Units>'));
  const presetBooklet='OWNED.UI.BOOK#route:b';
- const initialRoster=xml('Testtakers','<Metadata/><Profiles><GroupMonitor><Profile id="full" label="Vollständig" view="full" groupColumn="show"/><Profile id="small" label="Kurz" view="small"/></GroupMonitor></Profiles>'+`<Group id="${group}" label="Owned Monitor Group"><Login name="${monitorName}" pw="${password}" mode="monitor-group"><Profile id="full"/><Profile id="small"/></Login>`+[one,two].map(name=>`<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet>${name===one?presetBooklet:'OWNED.UI.BOOK'}</Booklet></Login>`).join('')+'</Group>');
+ const earlyCases=['snapshot','material'].map(mode=>({mode,group:'OWNED.UI.EARLY.'+mode.toUpperCase(),monitor:'owned-ui-early-'+mode+'-monitor',names:[0,1,2].map(n=>'owned-ui-early-'+mode+'-'+n),tests:[]}));
+ const earlyRoster=earlyCases.map(item=>`<Group id="${item.group}" label="Owned early ${item.mode}"><Login name="${item.monitor}" pw="${password}" mode="monitor-group"/>`+item.names.map(name=>`<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet>OWNED.UI.BOOK</Booklet></Login>`).join('')+'</Group>').join('');
+ const initialRoster=xml('Testtakers','<Metadata/><CustomTexts><CustomText key="gm_message_command_sent_n_sessions">Owned feedback: %s / %s</CustomText><CustomText key="gm_control_pause">Owned Pause</CustomText></CustomTexts><Profiles><GroupMonitor><Profile id="full" label="Vollständig" view="full" groupColumn="show"/><Profile id="small" label="Kurz" view="small"/></GroupMonitor></Profiles>'+earlyRoster+`<Group id="${group}" label="Owned Monitor Group"><Login name="${monitorName}" pw="${password}" mode="monitor-group"><Profile id="full"/><Profile id="small"/></Login>`+[one,two].map(name=>`<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet>${name===one?presetBooklet:'OWNED.UI.BOOK'}</Booklet></Login>`).join('')+'</Group>');
  await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:initialRoster});
  const people=[];
  for(const name of[one,two]){
   const access=await services.originalSession.login({name,password}),person=(await services.originalAuthentication.read({token:access.token})).participantSession,id=await services.originalTest.create({token:access.token,bookletName:name===one?presetBooklet:'OWNED.UI.BOOK'});
   await services.originalTest.read({token:access.token,testNumber:id});await services.originalTest.patchState({token:access.token,testNumber:id,patch:[{key:'CURRENT_UNIT_ID',content:'OWNED.UI.UNIT',timeStamp:100},{key:'CONTROLLER',content:'RUNNING',timeStamp:101},{key:'CONNECTION',content:'POLLING',timeStamp:102}]});
   await services.originalUnit.patchState({token:access.token,testNumber:id,unitName:'OWNED.UI.UNIT',body:{newState:[{key:'PRESENTATION_PROGRESS',content:'some',timeStamp:103}]}});people.push({token:access.token,person,id});
+ }
+
+ for(const item of earlyCases)for(const [index,name]of item.names.entries()){
+  const access=await services.originalSession.login({name,password}),id=await services.originalTest.create({token:access.token,bookletName:'OWNED.UI.BOOK'});
+  if(index<2){await services.originalTest.read({token:access.token,testNumber:id});await services.originalTest.patchState({token:access.token,testNumber:id,patch:[{key:'CONTROLLER',content:'RUNNING',timeStamp:100},{key:'CONNECTION',content:'POLLING',timeStamp:101}]});}
+  item.tests.push({id,token:access.token});
  }
  // A second real workspace deliberately uses the same physical Booklet ID.
  const peerName='owned-ui-peer-monitor',peerPerson='owned-ui-peer-person',peerGroup='OWNED.UI.PEER';
@@ -46,7 +61,7 @@ try{
  const serverModule=pathToFileURL(resolve('apps/api/dist/apps/api/src/index.js')).href;
  server=spawn(process.execPath,['--input-type=module','-e',`import {createProductionApiServer} from ${JSON.stringify(serverModule)};const server=await createProductionApiServer();server.listen(0,'127.0.0.1',()=>process.send({port:server.address().port}));process.once('SIGTERM',()=>server.close(()=>process.exit(0)));`],{cwd:process.cwd(),stdio:['ignore','ignore','inherit','ipc'],env:{...process.env,FIRST_SLICE_STORE:'sqlite',FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',REQUIRE_LOGIN_PASSWORD:'false',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'participant,second_code',FIRST_SLICE_PROOF_OF_WORK_SECRET:'owned-monitor-browser-challenge-secret-not-production',FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET:'',FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER:'128'}});
  const port=await new Promise((done,reject)=>{const timeout=setTimeout(()=>reject(Error('Owned server readiness timeout')),20000);server.once('message',m=>{clearTimeout(timeout);done(m.port);});server.once('exit',()=>{clearTimeout(timeout);reject(Error('Owned server exited'));});});const base='http://127.0.0.1:'+port;
- const native=async(method,path,token,body)=>{const r=await fetch(base+path,{method,headers:{AuthToken:token,...(body===undefined?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)})});const text=await r.text();assert.ok(r.ok,method+' '+path+': '+r.status);return text?JSON.parse(text):null;};
+ const native=async(method,path,token,body)=>{const r=await readNativeSmokeResponse(base+path,{method,headers:{AuthToken:token,...(body===undefined?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)})});assert.ok(r.ok,method+' '+path+': '+r.status);return r.text?JSON.parse(r.text):null;};
  const channel=process.env.UI_SMOKE_BROWSER_CHANNEL||(process.env.CI==='true'?undefined:'chrome');browser=await chromium.launch({...(channel?{channel}:{}),headless:process.env.CI==='true'&&process.env.UI_SMOKE_HEADFUL!=='true'});const context=await browser.newContext({viewport:{width:1280,height:850},serviceWorkers:'block'});page=await context.newPage();await page.bringToFront();
  page.on('pageerror',error=>errors.push(String(error)));page.on('console',m=>{if(m.type()==='error'&&/NG\d{4}|TypeError|ReferenceError|SyntaxError|Error retrieving icon/.test(m.text()))errors.push(m.text());});
  page.on('request',r=>{const url=new URL(r.url());if(/^\/(?:session|monitor|booklet|test)(?:\/|$)/.test(url.pathname)){assert.equal(r.headers()['authorization'],undefined);wire.push({method:r.method(),path:url.pathname,body:r.postData(),hasNativeToken:!!r.headers()['authtoken']});}});
@@ -71,6 +86,7 @@ try{
  const beforePause=wire.length,pause=page.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT');await page.locator('[data-cy=GM_pause_button]').click();assert.equal((await pause).status(),201);const command=wire.slice(beforePause).find(r=>r.path==='/monitor/command');assert.ok(command.body.includes('"testIds":['+firstId+','+secondId+']'));assert.equal(command.hasNativeToken,true);
  for(let i=0;i<2;i++){const commands=await native('GET','/test/'+[firstId,secondId][i]+'/commands',people[i].token);assert.equal(commands.at(-1).keyword,'pause');}
  check('native-pause-delivery-preserves-both-int64-recipients');
+ await page.getByText('Owned feedback: Owned Pause / 2',{exact:true}).waitFor();check('configured-native-command-feedback-uses-live-key-and-replacements');
  await native('PATCH','/test/'+firstId+'/state',people[0].token,[{key:'CONTROLLER',content:'PAUSED',timeStamp:200}]);await page.locator('tc-test-session.paused').first().waitFor({timeout:15000});check('actual-owner-native-state-write-reaches-polled-monitor');
  const resumed=page.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT');await page.locator('[data-cy=GM_forward_button]').click();assert.equal((await resumed).status(),201);assert.equal((await native('GET','/test/'+firstId+'/commands',people[0].token)).at(-1).keyword,'resume');check('native-resume-delivery');
  await native('PATCH','/test/'+firstId+'/lock',people[0].token,{timeStamp:250,message:'Owned browser lock'});await page.locator('tc-test-session.locked').first().waitFor({timeout:15000});const unlocked=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/tests/unlock'));await page.locator('[data-cy=GM_lock_button]').click();assert.equal((await unlocked).status(),200);await page.locator('tc-test-session.locked').waitFor({state:'detached',timeout:15000});check('native-selected-unlock-without-canonical-session');
@@ -84,10 +100,11 @@ try{
  const beforeSmall=wire.length;await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'/small?ui=original',{waitUntil:'networkidle'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);assert.ok(wire.slice(beforeSmall).some(r=>r.path==='/monitor/profile/small'));await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'/full?ui=original',{waitUntil:'networkidle'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);check('both-claimed-profiles-open-through-restored-direct-routes');
  await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:join(artifacts,'native-monitor-desktop.png'),fullPage:false});await page.reload({waitUntil:'networkidle'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);check('native-bearer-restores-on-reload');
  // Exercise the real time confirmation and native Goto producer.
+ await page.evaluate(()=>{window.__ownedTimerEvents=[];for(const type of ['input','change','focus','blur','click'])document.addEventListener(type,event=>{const element=event.target;if(element?.id!=='setTimer'&&!element?.closest?.('time-restriction-dialog'))return;const input=document.querySelector('#setTimer');window.__ownedTimerEvents.push({type,trusted:event.isTrusted,target:element.tagName,value:input?.value,classes:input?.className,at:performance.now()});if(window.__ownedTimerEvents.length>200)window.__ownedTimerEvents.shift();},true);});
  await native('PATCH','/test/'+firstId+'/state',people[0].token,[{key:'TESTLETS_TIMELEFT',content:JSON.stringify({B1:0}),timeStamp:260}]);
  await page.locator('tc-test-session [svgicon=timer_off]').first().waitFor({timeout:15000});await page.locator('tc-test-session[data-test-id="'+firstId+'"] [data-cy=gm-testlet-select]').first().click();
  const beforeGoto=wire.length;await page.locator('[data-cy=GM_jump_button]').click();await page.locator('#setTimer').waitFor();await page.getByRole('dialog').getByRole('button',{name:'Abbrechen',exact:true}).click();await page.locator('mat-dialog-container').waitFor({state:'detached'});assert.ok(!wire.slice(beforeGoto).some(r=>r.method==='PUT'&&r.path==='/monitor/command'));check('native-goto-time-confirmation-cancel-sends-no-command');
- const wentTo=page.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT');void wentTo.catch(()=>{});await page.locator('[data-cy=GM_jump_button]').click();await page.locator('#setTimer').fill('5');await page.getByRole('dialog').getByRole('button',{name:'OK',exact:true}).click();assert.equal((await wentTo).status(),201);
+ const wentTo=page.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT');void wentTo.catch(()=>{});await page.locator('[data-cy=GM_jump_button]').click();await page.locator('#setTimer').fill('5');assert.equal(await page.locator('#setTimer').inputValue(),'5');await page.getByRole('dialog').getByRole('button',{name:'OK',exact:true}).click();assert.equal((await wentTo).status(),201);
  for(let i=0;i<2;i++){const command=(await native('GET','/test/'+[firstId,secondId][i]+'/commands',people[i].token)).at(-1);assert.equal(command.keyword,'goto');assert.equal(command.arguments[1],'OWNED.UI.UNIT');assert.ok(command.arguments[2].includes('new remaining time 5'));}check('native-goto-confirmation-sends-original-int64-targets');
  // An obsolete saved value is valid native history, not a UI crash.
  await page.locator('[data-cy=GM_setting_button]').click();await page.locator('[data-cy=GM_columns_button]').click();await page.locator('[data-cy=GM_columns_state_button-0]').click();
@@ -122,8 +139,37 @@ try{
  // participant to another group, then prove the native API snapshot is empty.
  const movedRoster=peerRoster(false).replace('</Testtakers>',`<Group id="OWNED.UI.MOVED" label="Owned moved"><Login name="${peerPerson}" pw="${password}" mode="run-hot-return"><Booklet>OWNED.UI.BOOK</Booklet></Login></Group></Testtakers>`);
  await reimport(movedRoster);
- assert.equal(await page.evaluate(async group=>{const r=await fetch('/monitor/group/'+encodeURIComponent(group)+'/test-sessions',{headers:{AuthToken:localStorage.getItem('testcenter-native-monitor-session')},cache:'no-store'});if(!r.ok)throw Error('Native snapshot returned '+r.status);return (await r.json()).length;},peerGroup),0);
+ assert.equal(await page.evaluate(async group=>{const r=await fetch('/monitor/group/'+encodeURIComponent(group)+'/test-sessions',{headers:{AuthToken:localStorage.getItem('testcenter-native-monitor-session')},cache:'no-store',signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('Native snapshot returned '+r.status);return (await r.json()).length;},peerGroup),0);
  await page.locator('tc-test-session').waitFor({state:'detached',timeout:15000});check('real-empty-native-snapshot-clears-previous-rows');
  await reimport(peerRoster(false,'run-hot-return'));await page.locator('input[name=name]').waitFor({timeout:15000});assert.equal(await page.locator('tc-test-session').count(),0);assert.equal(await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session')),null);check('current-native-role-revocation-clears-monitor-and-local-bearer');
- assert.deepEqual(errors,[]);await writeFile(join(artifacts,'result.json'),JSON.stringify({success:true,browser:browser.version(),markers,nativeRequests:wire.map(({body,...r})=>r),privateCredentialBodiesOmitted:true,sourceVisualParityClaimed:false},null,2));console.log('native_monitor_ui_success=true');
-}catch(error){if(page){await page.screenshot({path:join(artifacts,'failure.png'),fullPage:false}).catch(()=>{});await writeFile(join(artifacts,'failure.json'),JSON.stringify({error:String(error),browserErrors:errors,markers,requests:wire.map(({body,...r})=>r)},null,2));}throw error;}finally{await browser?.close();if(server){server.kill('SIGTERM');await new Promise(done=>{if(server.exitCode!==null)done();else server.once('exit',done);});}}
+
+ // Separate real groups exercise completion before the first rendered rows.
+ // Keep either the first poll or its private material pending. A failed fresh
+ // read must leave every owner queue untouched; a retry uses all native IDs.
+ for(const item of earlyCases){
+  const earlyContext=await browser.newContext({viewport:{width:1280,height:850},serviceWorkers:'block'}),earlyPage=await earlyContext.newPage(),requests=[];
+  let phase='initial',first=true,closing=false,releaseHeld,heldStarted;const held=new Promise(done=>{releaseHeld=done;}),started=new Promise(done=>{heldStarted=done;});
+  earlyPage.on('pageerror',error=>errors.push(String(error)));earlyPage.on('console',m=>{if(m.type()==='error'&&/NG\d{4}|TypeError|ReferenceError|SyntaxError|Error retrieving icon/.test(m.text()))errors.push(m.text());});
+  earlyPage.on('request',r=>{const path=new URL(r.url()).pathname;if(path.startsWith('/monitor/')){assert.equal(r.headers()['authorization'],undefined);requests.push({method:r.method(),path,body:r.postData()});}});
+  await earlyPage.route('**/monitor/group/*/test-sessions',async route=>{
+   if(first){first=false;if(item.mode==='snapshot'){heldStarted();await held;if(closing)return;}await route.continue();return;}
+   if(phase==='failure'){await route.fulfill({status:503,contentType:'text/plain',body:'Owned fresh snapshot failure'});return;}
+   await route.continue();
+  });
+  if(item.mode==='material')await earlyPage.route('**/booklet/OWNED.UI.BOOK',async route=>{heldStarted();await held;if(!closing)await route.continue();});
+  try{
+   await earlyPage.goto(base+'/app/group-monitor?ui=original',{waitUntil:'networkidle'});await earlyPage.locator('input[name=name]').fill(item.monitor);await earlyPage.locator('[data-cy=login-user]').click();await earlyPage.locator('input[name=password]').waitFor();await earlyPage.locator('input[name=password]').fill(password);await earlyPage.locator('[data-cy=login-user]').click();
+   await earlyPage.locator('[data-cy=GM_end_button]').waitFor();await started;assert.equal(await earlyPage.locator('tc-test-session').count(),0);
+   phase='failure';await earlyPage.locator('[data-cy=GM_end_button]').click();await earlyPage.locator('[data-cy=dialog-confirm]').click();await earlyPage.getByText('Die Testdurchführung konnte nicht beendet werden.',{exact:true}).waitFor();assert.ok(!requests.some(r=>r.method==='POST'||r.method==='PUT'));assert.ok(new URL(earlyPage.url()).pathname.includes(item.group));
+   for(const owner of item.tests)assert.deepEqual(await native('GET','/test/'+owner.id+'/commands',owner.token),[]);check('finish-'+item.mode+'-loading-read-failure-sends-no-command');
+   phase='success';const beforeRetry=requests.length,locked=earlyPage.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/tests/lock')),terminated=earlyPage.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT');void locked.catch(()=>{});void terminated.catch(()=>{});
+   await earlyPage.locator('[data-cy=GM_end_button]').click();await earlyPage.locator('[data-cy=dialog-confirm]').click();assert.equal((await locked).status(),200);assert.ok(requests.slice(beforeRetry).some(r=>r.method==='GET'&&r.path.endsWith('/test-sessions')));releaseHeld();assert.equal((await terminated).status(),201);await earlyPage.waitForURL(url=>url.pathname==='/app/group-monitor');
+   const lockBody=JSON.parse(requests.find(r=>r.path.endsWith('/tests/lock')).body);assert.deepEqual(lockBody.testIds.map(String).sort(),item.tests.map(owner=>owner.id).sort());
+   const token=await earlyPage.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session')),snapshot=await native('GET','/monitor/group/'+encodeURIComponent(item.group)+'/test-sessions',token);assert.equal(snapshot.length,3);assert.ok(snapshot.every(row=>row.testState.status==='locked'));
+   for(const owner of item.tests.slice(0,2)){const commands=await native('GET','/test/'+owner.id+'/commands',owner.token);assert.equal(commands.at(-1).keyword,'terminate');assert.deepEqual(commands.at(-1).arguments,['lock']);}assert.deepEqual(await native('GET','/test/'+item.tests[2].id+'/commands',item.tests[2].token),[]);check('finish-'+item.mode+'-loading-locks-complete-fresh-native-targets');
+  }finally{closing=true;releaseHeld();await earlyContext.close();}
+ }
+ assert.deepEqual(errors,[]);await writeFile(join(artifacts,'result.json'),JSON.stringify({success:true,browser:browser.version(),markers,nativeRequests:wire.map(({body,...r})=>r),timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),privateCredentialBodiesOmitted:true,sourceVisualParityClaimed:false},null,2));console.log('native_monitor_ui_success=true');
+}catch(error){if(page){await page.screenshot({path:join(artifacts,'failure.png'),fullPage:false}).catch(()=>{});await writeFile(join(artifacts,'failure.json'),JSON.stringify({error:String(error),browserErrors:errors,markers,timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),requests:wire.map(({body,...r})=>r)},null,2));}throw error;}finally{try{await browser?.close();}finally{if(server)await stopNativeSmokeServer(server);}}
+
+}

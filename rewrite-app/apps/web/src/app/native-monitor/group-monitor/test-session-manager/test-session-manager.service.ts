@@ -4,7 +4,7 @@ import {
 } from 'rxjs';
 import type { Sort } from '@angular/material/sort';
 import {
-  delay, filter, mergeMap, map, startWith, switchMap, takeUntil, tap
+  delay, filter, mergeMap, map, startWith, switchMap, take, takeUntil, tap
 } from 'rxjs/operators';
 import { BackendService } from '../backend.service';
 import { BookletService } from '../booklet/booklet.service';
@@ -350,31 +350,34 @@ export class TestSessionManager {
     this.send(this.bs.unlock(this.groupName, testIds));
   }
 
-  // todo unit test
   commandFinishEverything(): Observable<CommandResponse> {
-    const getUnlockedConnectedTestIds = () => Object.values(this._sessions$.getValue())
-      .filter(session => !['pending', 'locked'].includes(session.state) &&
-        !TestSessionUtil.hasState(session.data.testState, 'CONTROLLER', 'TERMINATED') &&
-        (TestSessionUtil.hasState(session.data.testState, 'CONNECTION', 'POLLING') ||
-          TestSessionUtil.hasState(session.data.testState, 'CONNECTION', 'WEBSOCKET')))
-      .map(session => session.data.testId);
-    const getUnlockedTestIds = () => Object.values(this._sessions$.getValue())
-      .filter(session => BigInt(session.data.testId) > 0n)
-      .filter(session => session.state !== 'locked')
-      .map(session => session.data.testId);
-
     this.filters$.next([]);
-
     const group = this.groupName;
     const revision = this.connectionRevision;
     const scope = this.bs.accessSignal;
-    const lockIds = getUnlockedTestIds();
-    const terminateIds = getUnlockedConnectedTestIds();
     const current = () => !!group && revision === this.connectionRevision &&
       group === this.groupName && scope === this.bs.accessSignal && !scope.aborted;
-    return defer(() => current() ? this.bs.lock(group, lockIds).pipe(
-      delay(1500),
-      mergeMap(() => current() ? this.bs.command('terminate', ['lock'], terminateIds) : EMPTY),
+    // Rendered rows may still await XML, or retain an older poll. Finish uses
+    // one fresh complete native snapshot, then keeps those exact targets even
+    // when the successful lock changes later snapshots to status=locked.
+    return defer(() => current() ? this.bs.getSessionsMonitor(group).pipe(
+      take(1),
+      switchMap(rows => {
+        if (!current()) return EMPTY;
+        const unlocked = rows.filter(row => BigInt(row.testId) > 0n &&
+          !TestSessionUtil.hasState(row.testState, 'status', 'locked'));
+        const lockIds = unlocked.map(row => row.testId);
+        const terminateIds = unlocked.filter(row =>
+          !TestSessionUtil.hasState(row.testState, 'status', 'pending') &&
+          !TestSessionUtil.hasState(row.testState, 'CONTROLLER', 'TERMINATED') &&
+          (TestSessionUtil.hasState(row.testState, 'CONNECTION', 'POLLING') ||
+            TestSessionUtil.hasState(row.testState, 'CONNECTION', 'WEBSOCKET')))
+          .map(row => row.testId);
+        return this.bs.lock(group, lockIds).pipe(
+          delay(1500),
+          mergeMap(() => current() ? this.bs.command('terminate', ['lock'], terminateIds) : EMPTY)
+        );
+      }),
       takeUntil(this.disconnected$),
       takeUntil(fromEvent(scope, 'abort'))
     ) : EMPTY);
