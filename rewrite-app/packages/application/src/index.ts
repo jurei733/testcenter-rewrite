@@ -1,4 +1,4 @@
-export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection} from './original-test-log.js';
+export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection,formatOriginalTestLogEntry} from './original-test-log.js';
 import {createOriginalUnitPort} from './original-unit.js';
 export {formatOriginalUnitReadJson} from './original-unit.js';
 export type {OriginalUnitPort,OriginalUnitRead} from './original-unit.js';

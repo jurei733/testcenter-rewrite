@@ -60,3 +60,9 @@ export function appendOriginalTestLogCollection(state: State, input: OriginalTes
     else Object.defineProperty(state.participantTestLogs, log.participantTestLogId, {value: log, writable: true, enumerable: true, configurable: true});
   }
 }
+
+/** TestDAO receives already PHP-JSON-encoded content. Its string "0" is falsy,
+ * while the encoded empty string (two quote characters) remains present. */
+export function formatOriginalTestLogEntry(log: Pick<ParticipantTestLog, 'logKey' | 'logContent'>): string {
+  return log.logKey + (log.logContent && log.logContent !== '0' ? ' : ' + log.logContent : '');
+}

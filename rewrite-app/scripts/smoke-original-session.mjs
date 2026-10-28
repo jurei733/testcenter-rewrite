@@ -156,6 +156,16 @@ try {
   const unit=(await request('GET',unitRead,undefined,peerPerson.token)).value;assert.deepEqual(unit.state,{choice:'newest'});assert.deepEqual(unit.dataParts,{a:'Exact browser Ω/x',b:'new default type'});assert.equal(unit.unitResponseType,'unknown');
   await request('PUT',unitPath+'/log',{logEntries:[{key:'browserNativeUnit',content:{owned:true},timeStamp:0}]},peerPerson.token,201);
   mark('browser-native-unit-restores-five-fields-with-persistent-state-clocks-and-independent-response-parts');
+  setPhase('browser-native-test-log');
+  const beforeLogState=(await request('GET','/test/'+peerTest.rawText,undefined,peerPerson.token)).value;
+  const nativeLog=await request('PUT','/test/'+peerTest.rawText+'/log',[{key:'browserNativeTestlog',content:{b:'Ω/x',a:1},timeStamp:0},{key:'browserDefaultContent',content:null,timeStamp:1}],peerPerson.token,201);
+  assert.equal(nativeLog.empty,true);assert.equal(nativeLog.contentType,'text/html; charset=UTF-8');
+  await request('PUT','/test/000'+peerTest.rawText+'/log',[],peerPerson.token,201);
+  const deniedLog=await page.evaluate(async({id,token})=>{const response=await fetch('/test/'+id+'/log',{method:'PUT',headers:{AuthToken:token,'content-type':'application/json'},body:'[{\"key\":\"foreign\",\"timeStamp\":0}]'});return{status:response.status,text:await response.text()};},{id:peerTest.rawText,token:person.token});
+  assert.equal(deniedLog.status,403);assert.equal(deniedLog.text.includes(person.token),false);
+  const afterLogState=(await request('GET','/test/'+peerTest.rawText,undefined,peerPerson.token)).value;
+  assert.deepEqual(afterLogState,beforeLogState);assert.deepEqual((await request('GET',unitRead,undefined,peerPerson.token)).value,unit);
+  mark('browser-native-test-log-appends-without-changing-test-or-unit-state');
   const repeat = await solve((await request('POST', '/session/person/challenge', {code: 'SHARED'}, login.token)).value);
   await request('PUT', '/session', repeat, peer.token, 400);
   const former = person.token; person = (await request('PUT', '/session', repeat, login.token)).value;

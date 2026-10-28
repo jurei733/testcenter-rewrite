@@ -1,0 +1,45 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "probeCommit": "9926bbfa9d6f626898dfcb481614c2b03becbb9d",
+  "probeTree": "6794f5571da6f25411a2d67063042f90ed044df4",
+  "runId": 40604121346,
+  "jobId": 122539254933,
+  "artifactId": 12780616116,
+  "artifactSha256": "3deec3bb689d89f1c337529cabb7318b409864aac52b0b9d3db690039c4665a6",
+  "sourceProbeSha256": "66dd8e7f6e65c46abc6fdf5ca70b36ec4d2fd6af5c52e35d3555f82199a9fcb3",
+  "preservedPriorGroups": 41,
+  "preservedPriorAssertionLines": 80,
+  "checks": 48,
+  "httpObservations": 284,
+  "sourceFileHashes": 36,
+  "files": {
+    "http-observations.json": "495e1f7f0e640f75cfdaa206a4392a9dcc75c65b1f38082fa299ea6a16bbf1b0",
+    "image-id.txt": "edc476c77bba6e7cd85b029a612cba2ef6ab5293eefeaaa2c1a019a53dab738e",
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
+    "receipt.json": "2db64c1fb936c526c0f118428f2ff6668ccb5176380e1669491146d6f9eb1ade",
+    "source-probe.compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    "source-probe.mjs": "66dd8e7f6e65c46abc6fdf5ca70b36ec4d2fd6af5c52e35d3555f82199a9fcb3",
+    "source-probe.workflow.yml": "e807f7ddcefa3196bb6df718df6fd944998b1e8d45f4d3f0cb5b00ab2456545a",
+    "testlog-append.csv": "423093c56e5a362605c5474bacadea205bd6aa1cb0ad040e2fb83dc38f9efe93",
+    "testlog-append.json": "dd6577dc5944737a7c82a26e1a8f401ec40a99a394320f6752104bbda58815b4",
+    "unit-parts-logs.csv": "cb21f0d3a73a3a8b7780fffe0334cc4d2ee9a6bf64603a181a91d1df4f3cec09",
+    "unit-parts-logs.json": "f5f140b330a5cd33ec34b3e87924d52dc189f60bb5d7cda733588d562c4a40f4",
+    "unit-parts-responses.csv": "4cd713b969ca86fb9680fe25cd3013fbfded9b679233873d7f86331f46ba1df9",
+    "unit-parts-responses.json": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+    "unit-parts-reviews-enhanced.csv": "f9352bdae9f9dfc9aba54a559ca8cd77e5a4988563be81399df721e6b6ee170f",
+    "unit-parts-reviews-enhanced.json": "d3e3f43583fbc6de783302ae99e18d890a3132a5c208b1df761692af78c6b5fc",
+    "unit-parts-reviews-legacy.csv": "196961bd11f409aa14d94ae93793be6f0c223114ddeec82e2da38e260dbab058",
+    "unit-parts-reviews-legacy.json": "6c215a15552d67bd517fe24111fd16912873a86172af55bff2b420a575b9caff"
+  },
+  "scope": "Actual unchanged production Apache and protected native Testlog HTTP/report behavior. The generic malformed-JSON HTML body is independently reconstructed from pinned ErrorHandler and matches the actual response digest. Paired Rewrite endpoint/report qualification remains separate.",
+  "knownMalformedJsonResponse": {
+    "status": 500,
+    "contentType": "text/html;charset=UTF-8",
+    "body": "Internal error.",
+    "sha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+  },
+  "additionalPinnedErrorSources": {
+    "backend/src/middleware/ErrorHandler.class.php": "94f8fd5a5a501ff03fb440f5201230b92e22224f59a0cabf7d4fc0dbc045965f",
+    "backend/index.php": "a4152e0457971f2047200478114e313a7a80ec58b37540baeaa8e18a0ab247d5"
+  }
+}

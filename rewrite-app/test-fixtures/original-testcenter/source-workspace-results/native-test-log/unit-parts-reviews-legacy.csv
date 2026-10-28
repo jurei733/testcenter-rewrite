@@ -1,0 +1,11 @@
+﻿"groupname";"loginname";"code";"bookletname";"unitname";"priority";"category: ";"category: 1";"category: 02";"category: 10";"category: 9223372036854775807";"category: 9223372036854775808";"category: 9223372036854775809";"reviewtime";"entry";"page";"pagelabel";"originalUnitId";"userAgent"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";;;"X";"X";;;;"2026-10-28 00:45:51";"Owned report review Ω
+""; 10 02";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";"X";"X";;;;;;"2026-10-28 00:45:51";"Owned report review Ω
+""; 2  1";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";;;;;;;"X";"2026-10-28 00:45:51";"Owned report review Ω
+""; 9223372036854775809";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";;;;;;"X";;"2026-10-28 00:45:51";"Owned report review Ω
+""; 9223372036854775808";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"2";;;;;"X";;;"2026-10-28 00:45:51";"Owned report review Ω
+""; 9223372036854775807";"2";"Owned page";"FIRST.PERSISTED.ID";"Owned report Oracle"
