@@ -1,0 +1,68 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "probeCommit": "7afd631e97eb3708f20f5691d6af2c0f7a5c937c",
+  "probeTree": "462bee828370725eeb35378b2603d330e873bd2d",
+  "baseCodeTree": "0d360189411ac648eb7122731fc8b1420a03b46a",
+  "runId": 40047944217,
+  "jobId": 120733830181,
+  "conclusion": "success",
+  "checks": 53,
+  "testMode": false,
+  "artifact": {
+    "id": 12542416097,
+    "bytes": 11684,
+    "sha256": "0449871bacc0a28efe6600b466fe9832a9e59c0505212fe2ea2dde822b52ffac"
+  },
+  "files": {
+    "groups-history.json": "8e8ed8c6ff331d35e0213a32fdd8a3114ef4b5840fbc5a1a8d71d7ef9cf99b2d",
+    "image-id.txt": "eaa818ab3495e0721706c08540a84364eb704279728445991a12cf04e8c3d0a4",
+    "logs.csv": "8766b7d1b78c659e673aaa7a8eaa094fe7ab6c82786bd10e2bbdae6c03a1d4c5",
+    "logs.json": "fdc74dff8de26f9eb03cf971adb5adf8522e3a4acd5aa1dc94fccf5179604752",
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
+    "receipt.json": "3727fb6d1eff00ad2780b2eff712b21c1fe8b0599e2a367fabe77b054498dd8e",
+    "responses.csv": "55edc47feb3b2ce850a87b4231cfaa18662a1ea1b597e33b043964688d06fc17",
+    "responses.json": "9771fa4eddd39c875b6d36bd39de35a4cdca0560245ae04414590b1ea37551ef",
+    "reviews-enhanced.csv": "f7d0743c8c3c8177360c2c88744e8d100d21a28dc6fb9242e8b4af38ed52d841",
+    "reviews-enhanced.json": "1200924af1ab516c9b24cb7c57e1dc899cd7355843b98c2fa277d89e2188516d",
+    "reviews-legacy.csv": "bbd0ccd2c4ffa41941aef59b75c9be606eb60d55ccb350b55e5f4ebe666448e8",
+    "reviews-legacy.json": "dd7628c65a1f4a616d5efc954dbb4b7b31d64513cc4bfbd9ec17f5c4afd290cf",
+    "test-sessions-history.json": "fa61ac22b13c7b3df88420fc266cd07870e3c8faf00bf949fcf10e854477071b"
+  },
+  "scripts": {
+    ".github/probes/source-workspace-oracle.mjs": {
+      "sha": "aa57785240b4f6a6ef4a7c21993274c3f19bf5e7",
+      "sha256": "d8f134fc9d984eab4a7d3eb944de99aaa97092f6e8322ec82e5df6f7eed6d738"
+    },
+    ".github/probes/source-workspace-oracle.compose.yml": {
+      "sha": "81f63f54ebea57325abbc693fe59982d10e8bdfb",
+      "sha256": "0808c7690308371e619ce1d42584f23888a9c32443304a798afec6c0df42528d"
+    },
+    ".github/workflows/source-native-person-labels-oracle.yml": {
+      "sha": "3d488ce8724c9b9158f0474f7aaa9dab1057ad35",
+      "sha256": "27c5b34eaaf8f4b5825492b199be8df4ffae0b74d382a65ebd078664084b770c"
+    }
+  },
+  "qualification": "Actual unchanged production Source53 HTTP controls; inherited Source47 retained; not Rewrite native authentication/listing parity.",
+  "sourceFiles": {
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/files/XMLFile.class.php": "517dc5ca052e52bcc569c9c4f974240094647eaaf3758125c0a0eb702ff70c61",
+    "backend/src/data-collection/FileData.class.php": "b74f6346353ea262a0c94fb51d36759442a59da6bba4d55a9d9105b62a5742c0",
+    "backend/src/data-collection/Login.class.php": "e33fdd4458b8d429b93341bb1294931415cfe3004f3ca3610af9ccbc8affda3c",
+    "backend/src/helper/Random.class.php": "d36a65e5c516e5238229b16ab08c26e788f800a350283379e79a7ab387dfca7d"
+  },
+  "status": "completed",
+  "verification": {
+    "publicMembers": 13,
+    "rawGroupObservations": 44,
+    "rawTestSessionObservations": 27,
+    "allPrevious47ControlsRetained": true,
+    "actualBookletRawLabelsVerified": true,
+    "firstRawCodeRetainedAcrossCaseReentry": true,
+    "actualAlwaysNewSuffixesVerified": true,
+    "actualPasswordChangeBetweenStepsVerified": true
+  }
+}

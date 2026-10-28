@@ -1,0 +1,42 @@
+[
+  {
+    "groupname": "ORACLE.GROUP",
+    "loginname": "owned-source-participant",
+    "code": "",
+    "bookletname": "ORACLE.BOOK.B",
+    "unitname": "ORACLE.UNIT",
+    "originalUnitId": "ORACLE.UNIT",
+    "timestamp": 1792803884219,
+    "logentry": "PRESENTATION_PROGRESS = some"
+  },
+  {
+    "groupname": "ORACLE.GROUP",
+    "loginname": "owned-source-participant",
+    "code": "",
+    "bookletname": "ORACLE.BOOK.B",
+    "unitname": "ORACLE.UNIT2",
+    "originalUnitId": "ORACLE.UNIT2",
+    "timestamp": 1792803884296,
+    "logentry": "PRESENTATION_PROGRESS = some"
+  },
+  {
+    "groupname": "ORACLE.GROUP",
+    "loginname": "owned-source-participant",
+    "code": "",
+    "bookletname": "ORACLE.BOOK.B",
+    "unitname": "ORACLE.UNIT2",
+    "originalUnitId": "ORACLE.UNIT2",
+    "timestamp": 1792803884329,
+    "logentry": "OWNED = \"second log-only unit\""
+  },
+  {
+    "groupname": "ORACLE.GROUP",
+    "loginname": "owned-source-participant",
+    "code": "",
+    "bookletname": "ORACLE.BOOK.B",
+    "unitname": "",
+    "originalUnitId": "",
+    "timestamp": 1792803884085,
+    "logentry": "CURRENT_UNIT_ID : \"ORACLE.UNIT2\""
+  }
+]

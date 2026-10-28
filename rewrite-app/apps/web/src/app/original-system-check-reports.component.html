@@ -1,0 +1,55 @@
+<div id="originalSystemCheckReports" class="columnhost" [attr.aria-busy]="controller.busy">
+  <div class="flex-row">
+    <button mat-raised-button data-cy="download-button"
+      matTooltip="Download Berichte als CSV für Excel" matTooltipPosition="below"
+      [disabled]="controller.busy || !controller.selected.size" (click)="download()">
+      <mat-icon originalWorkspaceFileIcon name="download" />Berichte
+    </button>
+    <button mat-raised-button data-cy="delete-systemcheck-reports"
+      matTooltip="Löschen Berichte für markierte Systemchecks" matTooltipPosition="below"
+      [disabled]="controller.busy || !controller.selected.size" (click)="deleteReports()">
+      <mat-icon originalWorkspaceFileIcon name="delete" />Löschen
+    </button>
+  </div>
+  @if (controller.busy) { <mat-progress-bar mode="indeterminate" /> }
+  @if (controller.problem) {
+    <p role="alert">{{controller.problem}}</p>
+    <button mat-raised-button [disabled]="controller.busy" (click)="controller.refresh()">Erneut laden</button>
+  }
+  <mat-table matSort [dataSource]="data">
+    <ng-container matColumnDef="selectCheckbox">
+      <mat-header-cell *matHeaderCellDef [style.max-width.px]="70">
+        <mat-checkbox aria-label="Alle Systemchecks auswählen" [disabled]="controller.busy"
+          [checked]="controller.allSelected" [indeterminate]="!!controller.selected.size && !controller.allSelected"
+          (change)="controller.checkAll()" />
+      </mat-header-cell>
+      <mat-cell *matCellDef="let row" [style.max-width.px]="70">
+        <mat-checkbox data-cy="systemcheck-checkbox" [aria-label]="row.checkLabel"
+          [disabled]="controller.busy" [checked]="controller.selected.has(row.checkId)"
+          (change)="controller.check(row.checkId,$event.checked)" />
+      </mat-cell>
+    </ng-container>
+    <ng-container matColumnDef="syscheckLabel">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header" [style.justify-content]="'center'">Systemcheck Name</mat-header-cell>
+      <mat-cell *matCellDef="let row" [style.justify-content]="'center'">{{row.checkLabel}}</mat-cell>
+    </ng-container>
+    <ng-container matColumnDef="number">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header" [style.justify-content]="'center'">Anzahl Berichte</mat-header-cell>
+      <mat-cell *matCellDef="let row" [style.justify-content]="'center'">{{row.reportCount}}</mat-cell>
+    </ng-container>
+    <ng-container matColumnDef="details-os">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header" [style.justify-content]="'center'">Betriebssysteme</mat-header-cell>
+      <mat-cell *matCellDef="let row" class="flex-column" [style.justify-content]="'center'">
+        @for (item of details(row.operatingSystemVersions); track item.value) { <div>{{item.value}}: {{item.count}}</div> }
+      </mat-cell>
+    </ng-container>
+    <ng-container matColumnDef="details-browser">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header" [style.justify-content]="'center'">Browser</mat-header-cell>
+      <mat-cell *matCellDef="let row" class="flex-column" [style.justify-content]="'center'">
+        @for (item of details(row.browserVersions); track item.value) { <div>{{item.value}}: {{item.count}}</div> }
+      </mat-cell>
+    </ng-container>
+    <mat-header-row *matHeaderRowDef="columns" />
+    <mat-row *matRowDef="let row; columns: columns;" />
+  </mat-table>
+</div>

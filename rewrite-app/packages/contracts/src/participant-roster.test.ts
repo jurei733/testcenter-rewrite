@@ -385,6 +385,20 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("treats only a standalone Original XML zero codes attribute as uncoded", () => {
+    const parseCodes = (codes: string) => parseParticipantRosterText(
+      `<?xml version="1.0"?><!-- owned --><Testtakers><Group id="owned"><Login name="zero"><Booklet codes="${codes}">OWNED</Booklet></Login></Group></Testtakers>`
+    )[0]!.bookletAssignments![0]!.accessCodes;
+    for (const codes of ["0", " 0 ", "&#48;", "&#x30;", "&#9;0&#10;"]) {
+      assert.equal(parseCodes(codes), undefined);
+    }
+    assert.deepEqual(parseCodes("0 AbC"), ["0", "AbC"]);
+    assert.deepEqual(parseCodes("AbC 0"), ["AbC", "0"]);
+    assert.deepEqual(parseCodes("00"), ["00"]);
+    assert.deepEqual(parseParticipantRosterText([{ loginKey: "canonical", booklets: [{ id: "OWNED", codes: "0" }] }])[0]!.bookletAssignments![0]!.accessCodes, ["0"]);
+    assert.deepEqual(parseParticipantRosterText('<Participants><Participant loginKey="legacy"><Booklet codes="0">OWNED</Booklet></Participant></Participants>')[0]!.bookletAssignments![0]!.accessCodes, ["0"]);
+  });
+
   it("parses participant Testcenter Login entries and excludes operational modes", () => {
     assert.deepEqual(
       parseParticipantRosterText(
@@ -879,6 +893,19 @@ describe("parseParticipantRosterText", () => {
         }
       ]
     );
+  });
+
+  for (const [shape, customTexts] of [
+    ["map", { empty: "", padded: "  Keep\ntext  ", whitespace: " \t ", zero: 0, ignored: null }],
+    ["value objects", { empty: { value: "" }, padded: { TEXT: "  Keep\ntext  " }, whitespace: { content: " \t " }, zero: { defaultValue: 0 }, ignored: { value: null } }],
+    ["entry array", { items: [
+      { key: "empty", value: "" }, { key: "padded", text: "  Keep\ntext  " },
+      { key: "whitespace", content: " \t " }, { key: "zero", defaultValue: 0 },
+      { key: "ignored", text: null }
+    ] }]
+  ] as const) it(`preserves exact JSON custom-text values in ${shape}`, () => {
+    const [entry] = parseParticipantRosterText({ customTexts, groups: [{ id: "g", logins: [{ name: "p", booklets: [{ id: "b" }] }] }] });
+    assert.deepEqual(entry?.customTexts, { empty: "", padded: "  Keep\ntext  ", whitespace: " \t ", zero: "0" });
   });
 
   it("parses native JSON roster objects and arrays", () => {

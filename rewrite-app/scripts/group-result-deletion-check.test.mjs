@@ -184,7 +184,11 @@ for (const {kind,timing} of snapshotStores.flatMap(kind =>
         const held = await services.monitorControl.issueRunCommand({ ...scope,
           testRunId:runIds[0],commandType:"pause",actorId:"owned-snapshot-operator" });
         assert.equal(held.testRun.testRunId,runIds[0]);
-        assert.equal(held.testRun.status,"paused");
+        assert.equal(held.testRun.status,"running","Issuance leaves the controller unchanged.");
+        const receiptScope = { participantSessionId: held.participantSession.participantSessionId, testRunId: runIds[0], commandId: held.commandId };
+        await services.participantRuntime.acknowledgeCommand(receiptScope);
+        const applied = await services.participantRuntime.executeCommand({ ...receiptScope, controllerStatus: "RUNNING" });
+        assert.equal(applied.testRun.status,"paused");
         ready = await captureResultGroupSnapshot(readJson,ownUrl,"selected");
         assert.equal(ready.testRuns[0].testletTimers["own-timer"].status,"paused");
         // Advance beyond the original active deadline. A real later monitor

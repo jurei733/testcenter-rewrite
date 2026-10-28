@@ -1,0 +1,29 @@
+[
+  {
+    "groupname": "ORACLE.GROUP",
+    "loginname": "owned-source-participant",
+    "code": "",
+    "bookletname": "ORACLE.BOOK.B",
+    "unitname": "ORACLE.UNIT",
+    "laststate": "{\"PRESENTATION_PROGRESS\": \"some\"}",
+    "originalUnitId": "ORACLE.UNIT",
+    "responses": [
+      {
+        "id": "owned",
+        "content": "Exact retained answer Ω",
+        "ts": 1792780782786,
+        "responseType": "owned"
+      }
+    ]
+  },
+  {
+    "groupname": "ORACLE.GROUP",
+    "loginname": "owned-source-participant",
+    "code": "",
+    "bookletname": "ORACLE.BOOK.B",
+    "unitname": "ORACLE.UNIT2",
+    "laststate": "{\"PRESENTATION_PROGRESS\": \"some\"}",
+    "originalUnitId": "ORACLE.UNIT2",
+    "responses": []
+  }
+]

@@ -4,7 +4,7 @@
 export function createParticipantHttpTestActor(nativeFetch = globalThis.fetch) {
   const tokens = new Map();
   const owners = new Map();
-  const browserCaptures = new Set();
+  const browserCaptures = new Map();
   const observedPages = new WeakSet();
   const key = (origin, id) => `${origin}\n${id}`;
   const isParticipant = url => new URL(url).pathname.startsWith("/api/v1/participant/");
@@ -39,7 +39,20 @@ export function createParticipantHttpTestActor(nativeFetch = globalThis.fetch) {
     return { authorization: `Bearer ${tokens.get(key(origin, sessionId)) ?? sessionId}` };
   };
   const fetch = async (url, init = {}) => {
-    while (browserCaptures.size) await Promise.all([...browserCaptures]);
+    // Only captures already in flight can establish this call's credentials.
+    // Following later state polling can starve an API call indefinitely.
+    const captures = [...browserCaptures];
+    if (captures.length) {
+      let timer;
+      try {
+        await Promise.race([
+          Promise.all(captures.map(([pending]) => pending)),
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(
+            `Participant fixture credential capture timed out: ${captures.map(([, path]) => path).join(", ")}`
+          )), 30_000); })
+        ]);
+      } finally { clearTimeout(timer); }
+    }
     const explicitHeaders = new Headers(init.headers);
     if (isParticipant(url) && !explicitHeaders.has("authorization")) {
       let body;
@@ -49,7 +62,13 @@ export function createParticipantHttpTestActor(nativeFetch = globalThis.fetch) {
     const response = await nativeFetch(url, { ...init, headers: explicitHeaders });
     if (response.ok && isParticipant(url) && !new URL(url).pathname.includes("/resources/") &&
         response.headers.get("content-type")?.includes("application/json")) {
-      capture(url, await response.clone().json(), explicitHeaders.get("authorization"));
+      try {
+        capture(url, await response.clone().json(), explicitHeaders.get("authorization"));
+      } catch (cause) {
+        // Add only method/path to the message; retain the native error and
+        // its protocol code as the cause for transport diagnosis.
+        throw new Error(`Participant fixture ${init.method ?? "GET"} ${new URL(url).pathname} JSON capture failed`, { cause });
+      }
     }
     return response;
   };
@@ -62,7 +81,7 @@ export function createParticipantHttpTestActor(nativeFetch = globalThis.fetch) {
       const pending = response.json().then(payload => {
         capture(response.url(), payload, response.request().headers().authorization);
       }).catch(() => {}).finally(() => browserCaptures.delete(pending));
-      browserCaptures.add(pending);
+      browserCaptures.set(pending, new URL(response.url()).pathname);
     });
   };
   const observeContext = context => {

@@ -36,14 +36,15 @@ export class AttachmentQrDecoder {
 
   constructor(private readonly dependencies = defaultDependencies) {}
 
-  decode(image: AttachmentQrImage): Promise<QrScanner.ScanResult> {
+  decode(image: AttachmentQrImage, scanRegion?: QrScanner.ScanRegion): Promise<QrScanner.ScanResult> {
     const operation = this.pending.then(async () => {
       this.assertOpen();
       const engine = await (this.engine ??= this.dependencies.createWorker());
       this.assertOpen();
       const result = await this.dependencies.scanImage(image, {
         qrEngine: engine,
-        alsoTryWithoutScanRegion: true,
+        ...(scanRegion ? { scanRegion } : {}),
+        alsoTryWithoutScanRegion: !scanRegion,
         returnDetailedScanResult: true
       });
       this.assertOpen();

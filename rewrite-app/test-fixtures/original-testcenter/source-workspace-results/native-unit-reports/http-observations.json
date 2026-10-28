@@ -1,0 +1,3088 @@
+[
+  {
+    "method": "GET",
+    "path": "/version",
+    "status": 200,
+    "wireSha256": "276de21c2e994b71dd74fece42fa92b5763fd6f56141ee5b10c26db1e3b2948f",
+    "value": {
+      "version": "19.0.0"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/system/config",
+    "status": 200,
+    "wireSha256": "740e5c22eda8e5b255b357e097eca655799c2a3e5ef14a250227ff136aaffa26",
+    "value": {
+      "version": "19.0.0",
+      "customTexts": {},
+      "appConfig": {},
+      "baseUrl": "http://127.0.0.1:32768",
+      "bruteForceProtection": [
+        "login",
+        "person"
+      ],
+      "veronaPlayerApiVersionMin": 2,
+      "veronaPlayerApiVersionMax": 6,
+      "iqbStandardResponseTypeMin": 1,
+      "iqbStandardResponseTypeMax": 1,
+      "xmlSchemaVersions": {
+        "Booklet": {
+          "repo": "testcenter-booklet-xml",
+          "min": 18,
+          "max": 18
+        },
+        "Testtakers": {
+          "repo": "testcenter-testtaker-xml",
+          "min": 17,
+          "max": 18
+        },
+        "Unit": {
+          "repo": "unit-xml",
+          "min": 17,
+          "max": 17
+        },
+        "SysCheck": {
+          "repo": "testcenter-syscheck-xml",
+          "min": 18,
+          "max": 18
+        }
+      },
+      "fileServiceUri": "",
+      "broadcastingServiceUri": "",
+      "supportedBrowsers": [
+        "chrome 154",
+        "chrome 153",
+        "edge 154",
+        "edge 153",
+        "firefox 157",
+        "firefox 156",
+        "firefox 140",
+        "ios_saf 27.0",
+        "ios_saf 26.6",
+        "safari 27",
+        "safari 26.6"
+      ],
+      "passwordMinLength": 8,
+      "passwordPattern": ".*"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/admin",
+    "status": 200,
+    "wireSha256": "aa245520b869f08107ec243a6e9b4fbd782fe36702e3a3b3ddbcee01210f2601",
+    "value": {
+      "token": "[redacted-owned-token-3]",
+      "displayName": "super",
+      "loginName": "super",
+      "groupLabel": null,
+      "id": 1,
+      "pwSetByAdmin": false,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "workspaceAdmin": [],
+        "superAdmin": []
+      },
+      "groupToken": null,
+      "viewSettings": [],
+      "access": {
+        "workspaceAdmin": [],
+        "superAdmin": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/workspace",
+    "status": 201,
+    "wireSha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "value": 1
+  },
+  {
+    "method": "PATCH",
+    "path": "/user/1/workspaces",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "2fd365a68f1d6eaecc7033ac03b95f2e54daa71edf5a98102991658e008dd3a5",
+    "value": {
+      "player.html": {
+        "info": [
+          "Verona-Version: 6.0"
+        ],
+        "warning": [
+          "Non-Standard-Filename: `owned-pow-player-6.0.html` expected.",
+          "Resource is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "c951058edcd4486b1e803bfc8610db0aff19f2e40ba5b4dd6117364e8857df7e",
+    "value": {
+      "unit.xml": {
+        "warning": [
+          "Unit is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "d69b2bc0364f160a19b50bed6a5d84414c9fb5529f3293912e54c7325cf0527f",
+    "value": {
+      "booklet.xml": {
+        "warning": [
+          "Booklet is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "26cef50780ef207f98d3b60075a0b7e6851ed3d06ebe79910cf379cea4e6e121",
+    "value": {
+      "people.xml": []
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 400,
+    "wireSha256": "de9fc11a4d628d3cefe8e7811056ec194ae39484f818b64bc01dad4a3ba46bef",
+    "value": "Brute Force protection active. Challenge for this password must be solved to create a session"
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "ce4e0762fc9c7f31f1ab9c24ed4b3c312165cb4664c43ec9f3890ff58661b6a9",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-4]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-5]",
+      "signature": "[redacted-owned-signature-6]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "dc65c4915c7596e2995dc7cdc9960a8023e983b293cd47a5cdc81d5c5c8483e2",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "dc65c4915c7596e2995dc7cdc9960a8023e983b293cd47a5cdc81d5c5c8483e2",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 403,
+    "wireSha256": "8ea7f52f69a01c17017f000be2fb711a69be9e51f118a78da9ed2e9592a5e7b9",
+    "value": "Token `[redacted-owned-token-3]` of type `admin` has wrong type - `login` required."
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 400,
+    "wireSha256": "c906140d9d712f038557f6c8dac3d79a5cf5806e4f34c091dd99337490c8730d",
+    "value": "Brute Force protection active. Challenge for this code must be solved to create a session"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "dc65c4915c7596e2995dc7cdc9960a8023e983b293cd47a5cdc81d5c5c8483e2",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "3a24cccc29e5fec991988d50f37cb3d6afb377becb7d7fd0f4482c0c880e8ae7",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-9]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-10]",
+      "signature": "[redacted-owned-signature-11]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "8ea7f52f69a01c17017f000be2fb711a69be9e51f118a78da9ed2e9592a5e7b9",
+    "value": "Token `[redacted-owned-token-3]` of type `admin` has wrong type - `login` required."
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "b93aa317188f4cc4d9e91992257e2bad38e9101a66d255f4b374f824dff0a9f4",
+    "value": {
+      "token": "[redacted-owned-token-12]",
+      "displayName": "Owned proof group/owned-native-pow/sHaReD",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "3faceed8ba5887704bda21df5b97eb5eb7cb44ced2ec9b3de14ba1af80307cd4",
+    "value": {
+      "token": "[redacted-owned-token-13]",
+      "displayName": "Owned proof group/owned-native-pow/sHaReD",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "428639933a125fe7c38e6e34c288ee96e8be41bfa6ddc51817d18f46f8ef68a0",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-14]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-15]",
+      "signature": "[redacted-owned-signature-16]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "b448ce740759b35b537af9e45c7530ee055c031cfb769ccd8e1d2e0d35af9742",
+    "value": {
+      "token": "[redacted-owned-token-17]",
+      "displayName": "Owned proof group/owned-native-pow-peer",
+      "loginName": "owned-native-pow-peer",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "8ec22447c4519b2c491dd2acc0d1507fc127751f4c0a7dab52f876f93157acaf",
+    "value": {
+      "token": "[redacted-owned-token-18]",
+      "displayName": "Owned proof group/owned-native-pow-peer/sHaReD",
+      "loginName": "owned-native-pow-peer",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "dc65c4915c7596e2995dc7cdc9960a8023e983b293cd47a5cdc81d5c5c8483e2",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/session",
+    "status": 205,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "dc65c4915c7596e2995dc7cdc9960a8023e983b293cd47a5cdc81d5c5c8483e2",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "b67e68b165ca685aaff64a948354cc2b059712c86585dc5be262d23ed01ac44a",
+    "value": {
+      "delete-people.xml": []
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "a3bf06fdbd177669ed20c600188baf32dd9b946fc5cc781d0ea8a498bb8939a0",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-20]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-21]",
+      "signature": "[redacted-owned-signature-22]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "b48bdebdbd7883d6f68c9b85aeab8a82a0d2702a20ebe039502a9bb79aa06b39",
+    "value": {
+      "token": "[redacted-owned-token-23]",
+      "displayName": "First deletion label/owned-delete-main",
+      "loginName": "owned-delete-main",
+      "groupLabel": "First deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-24]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "c0519e884b5bbb7886fa177ddc4fee0997a1123ea608b2fb810033df83a24fcc",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-25]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-26]",
+      "signature": "[redacted-owned-signature-27]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "2ef7ef654add267eb5c3d6e7fc7613a85961781d66de817b37cda9fe663bd875",
+    "value": {
+      "token": "[redacted-owned-token-28]",
+      "displayName": "First deletion label/owned-delete-main/Shared",
+      "loginName": "owned-delete-main",
+      "groupLabel": "First deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-24]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "value": 1
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/1/unit/ORACLE.POW.UNIT/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/1/unit/ORACLE.POW.UNIT/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/1/unit/ORACLE.POW.UNIT/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/1/log",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "f5df42c665e6ccf5cdef9469f1d7aeee646a2dfc3ebb035450451a4c05924b20",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-29]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-30]",
+      "signature": "[redacted-owned-signature-31]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "7dc099fd9e2159d96053f522ef5383db59099f5646da5352e3c1be1ab81cef4c",
+    "value": {
+      "token": "[redacted-owned-token-32]",
+      "displayName": "First deletion label/owned-delete-peer",
+      "loginName": "owned-delete-peer",
+      "groupLabel": "First deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-24]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "b617f91d5b309df56d3669ae06e5e8b11b7e8732e8ad6336eed28bf8665e70a2",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-33]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-34]",
+      "signature": "[redacted-owned-signature-35]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "6dfae42b2732ae6dfe2b1c769067f2f836c14c991df0eba7a4c91e75d66e401c",
+    "value": {
+      "token": "[redacted-owned-token-36]",
+      "displayName": "First deletion label/owned-delete-peer/Shared",
+      "loginName": "owned-delete-peer",
+      "groupLabel": "First deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-24]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+    "value": 2
+  },
+  {
+    "method": "GET",
+    "path": "/test/2",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/2/unit/ORACLE.POW.UNIT/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/2/unit/ORACLE.POW.UNIT/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/2/unit/ORACLE.POW.UNIT/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/2/log",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "ece7996e271af3b727b51324b985bdf69691d7222766af697469009db465e65b",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-37]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-38]",
+      "signature": "[redacted-owned-signature-39]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "938e8b7a757dd82ab32d5be22f63bb73eacd8b3cb5c605f6018b17b0aff3bfd5",
+    "value": {
+      "token": "[redacted-owned-token-40]",
+      "displayName": "Retained label/owned-delete-keep",
+      "loginName": "owned-delete-keep",
+      "groupLabel": "Retained label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-41]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "8283248af413b793d30732360c3a080ff0dad341cc599e3274c60c83b8bdcc61",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-42]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-43]",
+      "signature": "[redacted-owned-signature-44]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "1eef8ba731a5862b21fb8fb6ebe19c279299294cc4e080ffe0db29601e02645a",
+    "value": {
+      "token": "[redacted-owned-token-45]",
+      "displayName": "Retained label/owned-delete-keep/Shared",
+      "loginName": "owned-delete-keep",
+      "groupLabel": "Retained label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-41]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+    "value": 3
+  },
+  {
+    "method": "GET",
+    "path": "/test/3",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/3/unit/ORACLE.POW.UNIT/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/3/unit/ORACLE.POW.UNIT/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/3/unit/ORACLE.POW.UNIT/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/3/log",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "1f9547092b7e663d2cfc7aa42b5be025eead51d22cb6993e189355714e3b22a6",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-46]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-47]",
+      "signature": "[redacted-owned-signature-48]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "8e40157ec50ca8eae0dade377b661e81b6eebcf2f88d1f3deed0b3f74c62d386",
+    "value": {
+      "token": "[redacted-owned-token-49]",
+      "displayName": "Former label/owned-delete-moved",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Former label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-50]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "9c7668cc050f44d2b7fe3f4e0353e46360fe238171a75ff772c27004e54ed567",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-51]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-52]",
+      "signature": "[redacted-owned-signature-53]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "8c36b691049f8cf9d83e2f1eaab1171c822f52d72ba0fc98230f1dbc084bb6df",
+    "value": {
+      "token": "[redacted-owned-token-54]",
+      "displayName": "Former label/owned-delete-moved/Shared",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Former label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-50]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+    "value": 4
+  },
+  {
+    "method": "GET",
+    "path": "/test/4",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/4/unit/ORACLE.POW.UNIT/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/4/unit/ORACLE.POW.UNIT/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/4/unit/ORACLE.POW.UNIT/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/4/log",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "dde7e617432c98a6a394b5efbacef63593273f72e0675d72899cafb5c4c183bc",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.FORMER",
+        "groupLabel": "Former label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943298
+      },
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943297
+      },
+      {
+        "groupName": "ORACLE.DELETE.MAIN",
+        "groupLabel": "First deletion label",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943296
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "dcffb6a8cf6d7e410192f066221355b0d95f7e3e52478f5ae36233f6851007f9",
+    "value": {
+      "delete-people.xml": {
+        "warning": [
+          "File of name `delete-people.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "e148ddb4d6accfe70f514358c89b2649734a3a9568011a6f227240ef47483226",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-55]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-56]",
+      "signature": "[redacted-owned-signature-57]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "5fb8f4de1c2aa4a6b8ff0827e782acd346f76a32c436d145e461d5ab6bae76c2",
+    "value": {
+      "token": "[redacted-owned-token-49]",
+      "displayName": "Moved label/owned-delete-moved",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Moved label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-58]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "54efbdf84485503cbfafc95aa73799b1d09dfada75890474fe5a50fada49a65e",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943297
+      },
+      {
+        "groupName": "ORACLE.DELETE.MAIN",
+        "groupLabel": "First deletion label",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943296
+      },
+      {
+        "groupName": "ORACLE.DELETE.NEXT",
+        "groupLabel": "Moved label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943298
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "21f07ecc0a89cbde703dbf5b1b4b507ae1dca6b93c99e3132dcdb2f5cfb58f6d",
+    "value": {
+      "token": "[redacted-owned-token-54]",
+      "displayName": "Moved label/owned-delete-moved/Shared",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Moved label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-58]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/4",
+    "status": 200,
+    "wireSha256": "49196b8831c5615eb5dc59c4322c4ceea92e25c042c44416b27389d7954511a9",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/user",
+    "status": 201,
+    "wireSha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+    "value": 2
+  },
+  {
+    "method": "PATCH",
+    "path": "/user/2/workspaces",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/session/admin",
+    "status": 200,
+    "wireSha256": "664352ea31ccc61db4fd67b383083c2cc941f71fd9d90fd3dfcce153a1a24212",
+    "value": {
+      "token": "[redacted-owned-token-60]",
+      "displayName": "owned-delete-reader",
+      "loginName": "owned-delete-reader",
+      "groupLabel": null,
+      "id": 2,
+      "pwSetByAdmin": true,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "workspaceAdmin": [
+          {
+            "id": "1",
+            "type": "workspaceAdmin",
+            "label": "Owned native proof of work",
+            "flags": {
+              "mode": "RO"
+            }
+          }
+        ]
+      },
+      "groupToken": null,
+      "viewSettings": [],
+      "access": {
+        "workspaceAdmin": [
+          "1"
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "54efbdf84485503cbfafc95aa73799b1d09dfada75890474fe5a50fada49a65e",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943297
+      },
+      {
+        "groupName": "ORACLE.DELETE.MAIN",
+        "groupLabel": "First deletion label",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943296
+      },
+      {
+        "groupName": "ORACLE.DELETE.NEXT",
+        "groupLabel": "Moved label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943298
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 403,
+    "wireSha256": "cd961d209ce7e239c02dace6984953d06e0db7d311688c1af00c100292ed61dc",
+    "value": "Access Denied: Role `RW` on workspace `ws_1`, needed. Only `RO` provided."
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 403,
+    "wireSha256": "9507e9e80116c8b55dfccbb381a6a3ffb0e5c2b71bff0915a99163c0423c8733",
+    "value": "Token `[redacted-owned-token-28]` of type `person` has wrong type - `admin` required."
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "54efbdf84485503cbfafc95aa73799b1d09dfada75890474fe5a50fada49a65e",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943297
+      },
+      {
+        "groupName": "ORACLE.DELETE.MAIN",
+        "groupLabel": "First deletion label",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943296
+      },
+      {
+        "groupName": "ORACLE.DELETE.NEXT",
+        "groupLabel": "Moved label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943298
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/files",
+    "status": 200,
+    "wireSha256": "0e1d6041f404e7af235386ee231cd5841ee94e5945fac840a03cce5fb076fb59",
+    "value": {
+      "Booklet": [
+        {
+          "name": "booklet.xml",
+          "size": 300,
+          "modificationTime": 1792943293,
+          "type": "Booklet",
+          "id": "ORACLE.POW.BOOK",
+          "report": {
+            "warning": []
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned proof booklet",
+            "description": ""
+          }
+        }
+      ],
+      "Testtakers": [
+        {
+          "name": "delete-people.xml",
+          "size": 1118,
+          "modificationTime": 1792943298,
+          "type": "Testtakers",
+          "id": "DELETE-PEOPLE.XML",
+          "report": {
+            "warning": [
+              "File of name `delete-people.xml` did already exist and was overwritten."
+            ]
+          },
+          "dependencies": [],
+          "info": {
+            "label": "",
+            "description": "",
+            "testtakers": 5
+          }
+        },
+        {
+          "name": "people.xml",
+          "size": 518,
+          "modificationTime": 1792943293,
+          "type": "Testtakers",
+          "id": "PEOPLE.XML",
+          "report": [],
+          "dependencies": [],
+          "info": {
+            "label": "",
+            "description": "",
+            "testtakers": 2
+          }
+        }
+      ],
+      "Resource": [
+        {
+          "name": "player.html",
+          "size": 431,
+          "modificationTime": 1792943293,
+          "type": "Resource",
+          "id": "OWNED-POW-PLAYER-6.0",
+          "report": {
+            "info": [
+              "Verona-Version: 6.0"
+            ],
+            "warning": [
+              "Non-Standard-Filename: `owned-pow-player-6.0.html` expected."
+            ]
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned proof player",
+            "description": "Owned production HTTP fixture",
+            "veronaModuleType": "player",
+            "veronaVersion": "6.0",
+            "version": "6.0.4"
+          }
+        }
+      ],
+      "Unit": [
+        {
+          "name": "unit.xml",
+          "size": 282,
+          "modificationTime": 1792943293,
+          "type": "Unit",
+          "id": "ORACLE.POW.UNIT",
+          "report": {
+            "warning": []
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned unit",
+            "description": ""
+          }
+        }
+      ]
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/workspace/1/responses",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/results",
+    "status": 200,
+    "wireSha256": "ef5a96831313be03395f76d1b8a08344abac3165d5ad9ed3129da939194918ce",
+    "value": [
+      {
+        "groupName": "ORACLE.DELETE.KEEP",
+        "groupLabel": "Retained label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943297
+      },
+      {
+        "groupName": "ORACLE.DELETE.NEXT",
+        "groupLabel": "Moved label",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792943298
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "c6c45508e739d8c904bfdb0a78a93f32ab6890247413db8f143ab925abec91bb",
+    "value": "Invalid token: `[redacted-owned-token-23]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "0c3418138aea75472e2a9c928ee4f02a1adcd74e094aef4392922bd9db8f279b",
+    "value": "Invalid token: `[redacted-owned-token-28]`"
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "0c3418138aea75472e2a9c928ee4f02a1adcd74e094aef4392922bd9db8f279b",
+    "value": "Invalid token: `[redacted-owned-token-28]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "8d12e6ade4cd1093e8aed9d85282c4acb3961276d8a945040c0bb7bcaf1bf0ab",
+    "value": "Invalid token: `[redacted-owned-token-32]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "e7db6d85064474b438553dc3f58bf58d3a80481572f10c0b835319607c2127c7",
+    "value": "Invalid token: `[redacted-owned-token-36]`"
+  },
+  {
+    "method": "GET",
+    "path": "/test/2",
+    "status": 403,
+    "wireSha256": "e7db6d85064474b438553dc3f58bf58d3a80481572f10c0b835319607c2127c7",
+    "value": "Invalid token: `[redacted-owned-token-36]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "938e8b7a757dd82ab32d5be22f63bb73eacd8b3cb5c605f6018b17b0aff3bfd5",
+    "value": {
+      "token": "[redacted-owned-token-40]",
+      "displayName": "Retained label/owned-delete-keep",
+      "loginName": "owned-delete-keep",
+      "groupLabel": "Retained label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-41]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "754edcddace44a0478d908b0209dfcbf95692064c7e0b1fb5f3d28870999a77c",
+    "value": {
+      "token": "[redacted-owned-token-45]",
+      "displayName": "Retained label/owned-delete-keep/Shared",
+      "loginName": "owned-delete-keep",
+      "groupLabel": "Retained label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-41]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/3",
+    "status": 200,
+    "wireSha256": "49196b8831c5615eb5dc59c4322c4ceea92e25c042c44416b27389d7954511a9",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/3/unit/ORACLE.POW.UNIT/reviews",
+    "status": 200,
+    "wireSha256": "87af82ae35aa7329ce8e0ebc1ff63af5051ac96815dd028e9b89430e6e23fe40",
+    "value": [
+      {
+        "id": 3,
+        "unit_name": "ORACLE.POW.UNIT",
+        "test_id": 3,
+        "person_id": 5,
+        "reviewtime": "2026-10-25 15:48:17+00",
+        "priority": 2,
+        "categories": "owned",
+        "entry": "Owned cascade review owned-delete-keep",
+        "reviewer": "Owned reviewer",
+        "page": null,
+        "pagelabel": null,
+        "userAgent": "",
+        "originalUnitId": "ORACLE.POW.UNIT"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "5fb8f4de1c2aa4a6b8ff0827e782acd346f76a32c436d145e461d5ab6bae76c2",
+    "value": {
+      "token": "[redacted-owned-token-49]",
+      "displayName": "Moved label/owned-delete-moved",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Moved label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-58]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "21f07ecc0a89cbde703dbf5b1b4b507ae1dca6b93c99e3132dcdb2f5cfb58f6d",
+    "value": {
+      "token": "[redacted-owned-token-54]",
+      "displayName": "Moved label/owned-delete-moved/Shared",
+      "loginName": "owned-delete-moved",
+      "groupLabel": "Moved label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": true
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-58]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/4",
+    "status": 200,
+    "wireSha256": "49196b8831c5615eb5dc59c4322c4ceea92e25c042c44416b27389d7954511a9",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": false,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/4/unit/ORACLE.POW.UNIT/reviews",
+    "status": 200,
+    "wireSha256": "f43a7d5dfd87d6c4de0b1847add3aad0516afbd5cd40130671a36d0384e88890",
+    "value": [
+      {
+        "id": 4,
+        "unit_name": "ORACLE.POW.UNIT",
+        "test_id": 4,
+        "person_id": 6,
+        "reviewtime": "2026-10-25 15:48:18+00",
+        "priority": 2,
+        "categories": "owned",
+        "entry": "Owned cascade review owned-delete-moved",
+        "reviewer": "Owned reviewer",
+        "page": null,
+        "pagelabel": null,
+        "userAgent": "",
+        "originalUnitId": "ORACLE.POW.UNIT"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/files",
+    "status": 200,
+    "wireSha256": "0e1d6041f404e7af235386ee231cd5841ee94e5945fac840a03cce5fb076fb59",
+    "value": {
+      "Booklet": [
+        {
+          "name": "booklet.xml",
+          "size": 300,
+          "modificationTime": 1792943293,
+          "type": "Booklet",
+          "id": "ORACLE.POW.BOOK",
+          "report": {
+            "warning": []
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned proof booklet",
+            "description": ""
+          }
+        }
+      ],
+      "Testtakers": [
+        {
+          "name": "delete-people.xml",
+          "size": 1118,
+          "modificationTime": 1792943298,
+          "type": "Testtakers",
+          "id": "DELETE-PEOPLE.XML",
+          "report": {
+            "warning": [
+              "File of name `delete-people.xml` did already exist and was overwritten."
+            ]
+          },
+          "dependencies": [],
+          "info": {
+            "label": "",
+            "description": "",
+            "testtakers": 5
+          }
+        },
+        {
+          "name": "people.xml",
+          "size": 518,
+          "modificationTime": 1792943293,
+          "type": "Testtakers",
+          "id": "PEOPLE.XML",
+          "report": [],
+          "dependencies": [],
+          "info": {
+            "label": "",
+            "description": "",
+            "testtakers": 2
+          }
+        }
+      ],
+      "Resource": [
+        {
+          "name": "player.html",
+          "size": 431,
+          "modificationTime": 1792943293,
+          "type": "Resource",
+          "id": "OWNED-POW-PLAYER-6.0",
+          "report": {
+            "info": [
+              "Verona-Version: 6.0"
+            ],
+            "warning": [
+              "Non-Standard-Filename: `owned-pow-player-6.0.html` expected."
+            ]
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned proof player",
+            "description": "Owned production HTTP fixture",
+            "veronaModuleType": "player",
+            "veronaVersion": "6.0",
+            "version": "6.0.4"
+          }
+        }
+      ],
+      "Unit": [
+        {
+          "name": "unit.xml",
+          "size": 282,
+          "modificationTime": 1792943293,
+          "type": "Unit",
+          "id": "ORACLE.POW.UNIT",
+          "report": {
+            "warning": []
+          },
+          "dependencies": [],
+          "info": {
+            "label": "Owned unit",
+            "description": ""
+          }
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "dcffb6a8cf6d7e410192f066221355b0d95f7e3e52478f5ae36233f6851007f9",
+    "value": {
+      "delete-people.xml": {
+        "warning": [
+          "File of name `delete-people.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "8d1e93e08cbd4c2e5d7cb30ccfe7c28ef640be04d4afa8dda049908feefb3ef3",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-61]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-62]",
+      "signature": "[redacted-owned-signature-63]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "85ae85846df1f34d16b6a3f7295508ca3aba8536f8234d66dfdf501653c2b5cd",
+    "value": {
+      "token": "[redacted-owned-token-64]",
+      "displayName": "Recreated deletion label/owned-delete-main",
+      "loginName": "owned-delete-main",
+      "groupLabel": "Recreated deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-65]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "0518eedbe07f668658f19625a84f9b3ce3e3206a443abe61992aedd708a2c55a",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-66]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-67]",
+      "signature": "[redacted-owned-signature-68]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "30a1f01efe132be07b18ed5985f5646896b0e8c12bae666607cb210f20effb8b",
+    "value": {
+      "token": "[redacted-owned-token-69]",
+      "displayName": "Recreated deletion label/owned-delete-main/Shared",
+      "loginName": "owned-delete-main",
+      "groupLabel": "Recreated deletion label",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ],
+        "review": []
+      },
+      "groupToken": "[redacted-owned-groupToken-65]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ],
+        "review": []
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/test/1",
+    "status": 403,
+    "wireSha256": "dc6c1d7588120a08c758964a51ba972ca2d511e98e579d966f6f1ad007461754",
+    "value": "Access to test 1 is not provided."
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "c6c45508e739d8c904bfdb0a78a93f32ab6890247413db8f143ab925abec91bb",
+    "value": "Invalid token: `[redacted-owned-token-23]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "0c3418138aea75472e2a9c928ee4f02a1adcd74e094aef4392922bd9db8f279b",
+    "value": "Invalid token: `[redacted-owned-token-28]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "8d12e6ade4cd1093e8aed9d85282c4acb3961276d8a945040c0bb7bcaf1bf0ab",
+    "value": "Invalid token: `[redacted-owned-token-32]`"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "e7db6d85064474b438553dc3f58bf58d3a80481572f10c0b835319607c2127c7",
+    "value": "Invalid token: `[redacted-owned-token-36]`"
+  },
+  {
+    "method": "PUT",
+    "path": "/test",
+    "status": 201,
+    "wireSha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+    "value": 5
+  },
+  {
+    "method": "GET",
+    "path": "/test/5",
+    "status": 200,
+    "wireSha256": "11298f6ed11957faf77d9e79f2ffc1a16539c4f927ca28d389e312f29b7dcf1f",
+    "value": {
+      "mode": "run-review",
+      "laststate": [],
+      "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id=\"ORACLE.POW.UNIT\" label=\"Owned unit\"/></Units></Booklet>",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "firstStart": true,
+      "workspaceId": 1,
+      "presetBookletStates": []
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/response",
+    "status": 404,
+    "wireSha256": "b844da3868d1b6e29a95e99ce5ac7d7aecfae89dd809c6a3eb770a781bc04c11",
+    "value": "Unit response could not be saved because the unit does not exist (yet). Please try again."
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "a8bfbcf4cd0b384c08f4e0c934c0b3c87bd3bd07a744bc0680f8e7a33ec69e9c",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"some\"}",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "responses": []
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/response",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "23c8c1efd692c49febeb6e1165baf18788a5acc0b861cf1fe8ad24c15fe86348",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"some\"}",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "responses": [
+          {
+            "id": "part-a",
+            "content": "  Exact part Ω/β\n\"; \\ kept  ",
+            "ts": 1792929600010,
+            "responseType": "first/Ω"
+          },
+          {
+            "id": "part-c",
+            "content": "new c",
+            "ts": 1792929600010,
+            "responseType": "third/γ"
+          },
+          {
+            "id": "part-default",
+            "content": "default type",
+            "ts": 1792929600040,
+            "responseType": "unknown"
+          },
+          {
+            "id": "part-z",
+            "content": "new z",
+            "ts": 1792929600020,
+            "responseType": "second/β"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/state",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "responses": [
+          {
+            "id": "part-a",
+            "content": "  Exact part Ω/β\n\"; \\ kept  ",
+            "ts": 1792929600010,
+            "responseType": "first/Ω"
+          },
+          {
+            "id": "part-c",
+            "content": "new c",
+            "ts": 1792929600010,
+            "responseType": "third/γ"
+          },
+          {
+            "id": "part-default",
+            "content": "default type",
+            "ts": 1792929600040,
+            "responseType": "unknown"
+          },
+          {
+            "id": "part-z",
+            "content": "new z",
+            "ts": 1792929600020,
+            "responseType": "second/β"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "PUT",
+    "path": "/test/5/unit/OWNED.UNIT.ALIAS/review",
+    "status": 201,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.DELETE.MAIN&useNewVersion=true",
+    "status": 200,
+    "wireSha256": "ea44811cbb004dfaad33822414bbc40246ba2ec970b5fd082e3452968243c117",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": true,
+        "category_10": true,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 10 02",
+        "unitlabel": "",
+        "bookletlabel": "Owned proof booklet"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": true,
+        "category_1": true,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 2  1",
+        "unitlabel": "",
+        "bookletlabel": "Owned proof booklet"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": true,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775809",
+        "unitlabel": "",
+        "bookletlabel": "Owned proof booklet"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": true,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775808",
+        "unitlabel": "",
+        "bookletlabel": "Owned proof booklet"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": true,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775807",
+        "unitlabel": "",
+        "bookletlabel": "Owned proof booklet"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "684010b4cc9fbbf527b7257b86df24b365ffa884ea5fb28f62b6f9c3546dbe50",
+    "value": {
+      "booklet.xml": {
+        "warning": [
+          "Booklet is never used",
+          "File of name `booklet.xml` did already exist and was overwritten."
+        ]
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.DELETE.MAIN&useNewVersion=true",
+    "status": 200,
+    "wireSha256": "83974ff2c84d3ed0a6763223a149f5e47fed0488d34069aa919ab15910051952",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": true,
+        "category_10": true,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 10 02",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": true,
+        "category_1": true,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 2  1",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": true,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775809",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": true,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775808",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": true,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775807",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "responses": [
+          {
+            "id": "part-a",
+            "content": "  Exact part Ω/β\n\"; \\ kept  ",
+            "ts": 1792929600010,
+            "responseType": "first/Ω"
+          },
+          {
+            "id": "part-c",
+            "content": "new c",
+            "ts": 1792929600010,
+            "responseType": "third/γ"
+          },
+          {
+            "id": "part-default",
+            "content": "default type",
+            "ts": 1792929600040,
+            "responseType": "unknown"
+          },
+          {
+            "id": "part-z",
+            "content": "new z",
+            "ts": 1792929600020,
+            "responseType": "second/β"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.UNKNOWN",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "4cd713b969ca86fb9680fe25cd3013fbfded9b679233873d7f86331f46ba1df9",
+    "value": "﻿\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"responses\";\"laststate\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"FIRST.PERSISTED.ID\";\"[{\"\"id\"\":\"\"part-a\"\",\"\"content\"\":\"\"  Exact part \\u03a9\\/\\u03b2\\n\\\"\"; \\\\ kept  \"\",\"\"ts\"\":1792929600010,\"\"responseType\"\":\"\"first\\/\\u03a9\"\"},{\"\"id\"\":\"\"part-c\"\",\"\"content\"\":\"\"new c\"\",\"\"ts\"\":1792929600010,\"\"responseType\"\":\"\"third\\/\\u03b3\"\"},{\"\"id\"\":\"\"part-default\"\",\"\"content\"\":\"\"default type\"\",\"\"ts\"\":1792929600040,\"\"responseType\"\":\"\"unknown\"\"},{\"\"id\"\":\"\"part-z\"\",\"\"content\"\":\"\"new z\"\",\"\"ts\"\":1792929600020,\"\"responseType\"\":\"\"second\\/\\u03b2\"\"}]\";\"{\"\"CUSTOM_Ω\"\": \"\"  Exact Ä/β\\n\\\"\";  \"\", \"\"RESPONSE_PROGRESS\"\": \"\"none\"\", \"\"PRESENTATION_PROGRESS\"\": \"\"complete\"\"}\""
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.UNKNOWN",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/log?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "f5f140b330a5cd33ec34b3e87924d52dc189f60bb5d7cda733588d562c4a40f4",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "timestamp": 1792929600010,
+        "logentry": "PRESENTATION_PROGRESS = some"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "timestamp": 1792929600020,
+        "logentry": "RESPONSE_PROGRESS = none"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "timestamp": 1792929600030,
+        "logentry": "CUSTOM_Ω =   Exact Ä/β\n\";  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "timestamp": 1792929600011,
+        "logentry": "PRESENTATION_PROGRESS = complete"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "timestamp": 1792929600019,
+        "logentry": "RESPONSE_PROGRESS = stale response state"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "timestamp": 1792929600029,
+        "logentry": "CUSTOM_Ω = stale custom state"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/log?dataIds=ORACLE.UNKNOWN",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/log?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "cb21f0d3a73a3a8b7780fffe0334cc4d2ee9a6bf64603a181a91d1df4f3cec09",
+    "value": "﻿\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"timestamp\";\"logentry\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"FIRST.PERSISTED.ID\";\"1792929600010\";\"PRESENTATION_PROGRESS = some\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"FIRST.PERSISTED.ID\";\"1792929600020\";\"RESPONSE_PROGRESS = none\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"FIRST.PERSISTED.ID\";\"1792929600030\";\"CUSTOM_Ω =   Exact Ä/β\n\"\";  \"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"FIRST.PERSISTED.ID\";\"1792929600011\";\"PRESENTATION_PROGRESS = complete\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"FIRST.PERSISTED.ID\";\"1792929600019\";\"RESPONSE_PROGRESS = stale response state\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"FIRST.PERSISTED.ID\";\"1792929600029\";\"CUSTOM_Ω = stale custom state\""
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/log?dataIds=ORACLE.UNKNOWN",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "81d98f31c964f7a9738ffbd1f2abfc54036e8fbc69b35968a4af59a7561419c2",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category: ": null,
+        "category: 1": null,
+        "category: 02": "X",
+        "category: 10": "X",
+        "category: 9223372036854775807": null,
+        "category: 9223372036854775808": null,
+        "category: 9223372036854775809": null,
+        "reviewtime": "2026-10-25 16:48:21",
+        "entry": "Owned report review Ω\n\"; 10 02",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category: ": "X",
+        "category: 1": "X",
+        "category: 02": null,
+        "category: 10": null,
+        "category: 9223372036854775807": null,
+        "category: 9223372036854775808": null,
+        "category: 9223372036854775809": null,
+        "reviewtime": "2026-10-25 16:48:21",
+        "entry": "Owned report review Ω\n\"; 2  1",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category: ": null,
+        "category: 1": null,
+        "category: 02": null,
+        "category: 10": null,
+        "category: 9223372036854775807": null,
+        "category: 9223372036854775808": null,
+        "category: 9223372036854775809": "X",
+        "reviewtime": "2026-10-25 16:48:21",
+        "entry": "Owned report review Ω\n\"; 9223372036854775809",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category: ": null,
+        "category: 1": null,
+        "category: 02": null,
+        "category: 10": null,
+        "category: 9223372036854775807": null,
+        "category: 9223372036854775808": "X",
+        "category: 9223372036854775809": null,
+        "reviewtime": "2026-10-25 16:48:21",
+        "entry": "Owned report review Ω\n\"; 9223372036854775808",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle"
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category: ": null,
+        "category: 1": null,
+        "category: 02": null,
+        "category: 10": null,
+        "category: 9223372036854775807": "X",
+        "category: 9223372036854775808": null,
+        "category: 9223372036854775809": null,
+        "reviewtime": "2026-10-25 16:48:21",
+        "entry": "Owned report review Ω\n\"; 9223372036854775807",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.UNKNOWN",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "d36f1afdd3059cfd5a40e6c33e56c54799772ff9ee4bf9a51b34b429e28dd9b4",
+    "value": "﻿\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category: \";\"category: 1\";\"category: 02\";\"category: 10\";\"category: 9223372036854775807\";\"category: 9223372036854775808\";\"category: 9223372036854775809\";\"reviewtime\";\"entry\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";;;\"X\";\"X\";;;;\"2026-10-25 16:48:21\";\"Owned report review Ω\n\"\"; 10 02\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";\"X\";\"X\";;;;;;\"2026-10-25 16:48:21\";\"Owned report review Ω\n\"\"; 2  1\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";;;;;;;\"X\";\"2026-10-25 16:48:21\";\"Owned report review Ω\n\"\"; 9223372036854775809\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";;;;;;\"X\";;\"2026-10-25 16:48:21\";\"Owned report review Ω\n\"\"; 9223372036854775808\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";;;;;\"X\";;;\"2026-10-25 16:48:21\";\"Owned report review Ω\n\"\"; 9223372036854775807\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\""
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.UNKNOWN",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.DELETE.MAIN&useNewVersion=true",
+    "status": 200,
+    "wireSha256": "83974ff2c84d3ed0a6763223a149f5e47fed0488d34069aa919ab15910051952",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": true,
+        "category_10": true,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 10 02",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": true,
+        "category_1": true,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 2  1",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": true,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775809",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": false,
+        "category_9223372036854775808": true,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775808",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      },
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "priority": 2,
+        "category_": false,
+        "category_1": false,
+        "category_02": false,
+        "category_10": false,
+        "category_9223372036854775807": true,
+        "category_9223372036854775808": false,
+        "category_9223372036854775809": false,
+        "reviewtime": "2026-10-25 16:48:21",
+        "page": 2,
+        "pagelabel": "Owned page",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "userAgent": "Owned report Oracle",
+        "reviewer": "Owned report reviewer",
+        "entry": "Owned report review Ω\n\"; 9223372036854775807",
+        "unitlabel": "  Alias current Ω  ",
+        "bookletlabel": "  Current Booklet Ω\n  "
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.UNKNOWN&useNewVersion=true",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.DELETE.MAIN&useNewVersion=true",
+    "status": 200,
+    "wireSha256": "7ba9147812cbe4f42bb8c0f2ad9880feac0b90c3f8a29e6e0a194bbe734bf429",
+    "value": "﻿\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category_\";\"category_1\";\"category_02\";\"category_10\";\"category_9223372036854775807\";\"category_9223372036854775808\";\"category_9223372036854775809\";\"reviewtime\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\";\"reviewer\";\"entry\";\"unitlabel\";\"bookletlabel\"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";\"FALSE\";\"FALSE\";\"TRUE\";\"TRUE\";\"FALSE\";\"FALSE\";\"FALSE\";\"2026-10-25 16:48:21\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\";\"Owned report reviewer\";\"Owned report review Ω\n\"\"; 10 02\";\"  Alias current Ω  \";\"  Current Booklet Ω\n  \"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";\"TRUE\";\"TRUE\";\"FALSE\";\"FALSE\";\"FALSE\";\"FALSE\";\"FALSE\";\"2026-10-25 16:48:21\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\";\"Owned report reviewer\";\"Owned report review Ω\n\"\"; 2  1\";\"  Alias current Ω  \";\"  Current Booklet Ω\n  \"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";\"FALSE\";\"FALSE\";\"FALSE\";\"FALSE\";\"FALSE\";\"FALSE\";\"TRUE\";\"2026-10-25 16:48:21\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\";\"Owned report reviewer\";\"Owned report review Ω\n\"\"; 9223372036854775809\";\"  Alias current Ω  \";\"  Current Booklet Ω\n  \"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";\"FALSE\";\"FALSE\";\"FALSE\";\"FALSE\";\"FALSE\";\"TRUE\";\"FALSE\";\"2026-10-25 16:48:21\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\";\"Owned report reviewer\";\"Owned report review Ω\n\"\"; 9223372036854775808\";\"  Alias current Ω  \";\"  Current Booklet Ω\n  \"\n\"ORACLE.DELETE.MAIN\";\"owned-delete-main\";\"Shared\";\"ORACLE.POW.BOOK\";\"OWNED.UNIT.ALIAS\";\"2\";\"FALSE\";\"FALSE\";\"FALSE\";\"FALSE\";\"TRUE\";\"FALSE\";\"FALSE\";\"2026-10-25 16:48:21\";\"2\";\"Owned page\";\"FIRST.PERSISTED.ID\";\"Owned report Oracle\";\"Owned report reviewer\";\"Owned report review Ω\n\"\"; 9223372036854775807\";\"  Alias current Ω  \";\"  Current Booklet Ω\n  \""
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/review?dataIds=ORACLE.UNKNOWN&useNewVersion=true",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "responses": [
+          {
+            "id": "part-a",
+            "content": "  Exact part Ω/β\n\"; \\ kept  ",
+            "ts": 1792929600010,
+            "responseType": "first/Ω"
+          },
+          {
+            "id": "part-c",
+            "content": "new c",
+            "ts": 1792929600010,
+            "responseType": "third/γ"
+          },
+          {
+            "id": "part-default",
+            "content": "default type",
+            "ts": 1792929600040,
+            "responseType": "unknown"
+          },
+          {
+            "id": "part-z",
+            "content": "new z",
+            "ts": 1792929600020,
+            "responseType": "second/β"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 200,
+    "wireSha256": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+    "value": [
+      {
+        "groupname": "ORACLE.DELETE.MAIN",
+        "loginname": "owned-delete-main",
+        "code": "Shared",
+        "bookletname": "ORACLE.POW.BOOK",
+        "unitname": "OWNED.UNIT.ALIAS",
+        "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+        "originalUnitId": "FIRST.PERSISTED.ID",
+        "responses": [
+          {
+            "id": "part-a",
+            "content": "  Exact part Ω/β\n\"; \\ kept  ",
+            "ts": 1792929600010,
+            "responseType": "first/Ω"
+          },
+          {
+            "id": "part-c",
+            "content": "new c",
+            "ts": 1792929600010,
+            "responseType": "third/γ"
+          },
+          {
+            "id": "part-default",
+            "content": "default type",
+            "ts": 1792929600040,
+            "responseType": "unknown"
+          },
+          {
+            "id": "part-z",
+            "content": "new z",
+            "ts": 1792929600020,
+            "responseType": "second/β"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "GET",
+    "path": "/workspace/1/report/response?dataIds=ORACLE.DELETE.MAIN",
+    "status": 403,
+    "wireSha256": "c6e4030f39450ec17094ad0dd0e2ea29cf9945114cc94ec440532abd68a541dc",
+    "value": "Token `[redacted-owned-token-69]` of type `person` has wrong type - `admin` required."
+  }
+]

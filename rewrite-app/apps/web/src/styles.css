@@ -83,7 +83,10 @@
   --bg-start: #fcf9fe;
 }
 
-* {
+/* The Original administration uses the Source/Material box model. Keep this
+   zero-specificity Rewrite reset outside that view rather than overriding
+   Material's own border-box rules with a blanket reversal inside it. */
+*:not(:where(#originalSystemAdministration, #originalSystemAdministration *)) {
   box-sizing: border-box;
 }
 
@@ -279,7 +282,7 @@ h1 {
   padding: clamp(24px, 5vw, 36px);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: var(--surface, #fff);
   box-shadow: 0 28px 80px rgba(8, 22, 25, 0.36);
 }
 

@@ -208,6 +208,18 @@ try {
     channel: process.env.UI_SMOKE_BROWSER_CHANNEL || undefined });
   process.stdout.write(`ib_browser_version=${browser.version()}, ui=${interfaceMode}, headful=${headful}\n`);
   context = await browser.newContext();
+  const startPackets = [];
+  await context.exposeBinding("__recordOwnedIbStart", (source, packet) => {
+    startPackets.push({ frame: source.frame, ...packet });
+  });
+  await context.addInitScript(() => {
+    if (window === window.top) return;
+    window.addEventListener("message", event => {
+      if (event.source !== window.parent || event.data?.type !== "vopStartCommand") return;
+      void window.__recordOwnedIbStart({ unitState: structuredClone(event.data.unitState),
+        playerSessionId: event.data.sessionId, trusted: event.isTrusted });
+    });
+  });
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   page = await context.newPage();
   page.on("request", request => {
@@ -381,6 +393,7 @@ try {
   }, ibRuntimeReadyTimeoutMs);
   const stateDeadline = Date.now() + 10_000;
   let savedUnitResponse = "";
+  let savedPartTypes;
   let capturedInteractions = false;
   while (!capturedInteractions && Date.now() < stateDeadline) {
     await delay(250);
@@ -391,6 +404,7 @@ try {
     const currentState = await currentStateResponse.json();
     savedUnitResponse =
       currentState.currentRunState.testRun.unitResponses[unitKey] ?? "";
+    savedPartTypes = currentState.currentRunState.testRun.unitResponsePartTypes?.[unitKey];
     // The Player reports data parts separately. An initial envelope or the
     // checkbox save can arrive before the text interaction's score part.
     const parts = savedUnitResponse
@@ -411,6 +425,8 @@ try {
   );
   const savedUnitState = JSON.parse(savedUnitResponse).unitState;
   assert.equal(savedUnitState.unitStateDataType, "iqb-standard@1.4");
+  for (const part of ['variables', 'scores']) assert.equal(savedPartTypes?.[part], 'iqb-standard@1.4',
+    'The actual Player save must persist each accepted part type in the same Run transaction.');
   const savedVariables = JSON.parse(savedUnitState.dataParts.variables);
   assert.equal(savedVariables.find(variable => variable.id === "VarA")?.value, 0);
   const savedScores = JSON.parse(savedUnitState.dataParts.scores);
@@ -418,14 +434,60 @@ try {
     savedScores.find(score => score.id === "nbUserInteractions")?.value >= 2
   );
 
-  await participantHttpActor.goto(page,
-    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
-      participantSessionId
-    )}`,
-    { waitUntil: "domcontentloaded" }
-  );
+  // Old-page current-state replies may still arrive while navigation commits.
+  // Bind the restoration witness to requests started by the new document and
+  // consume their bodies immediately, before any later document can evict them.
+  let reEntryCommitted = false;
+  const freshRequests = new WeakSet();
+  const markReEntry = frame => {
+    if (frame === page.mainFrame() && new URL(frame.url()).searchParams.get("participantSessionId") === participantSessionId) reEntryCommitted = true;
+  };
+  const markFreshRequest = request => { if (reEntryCommitted) freshRequests.add(request); };
+  page.on("framenavigated", markReEntry);
+  page.on("request", markFreshRequest);
+  const reEntryResponse = page.waitForResponse(response => {
+    const pathname = new URL(response.url()).pathname;
+    return freshRequests.has(response.request()) && response.status() === 200 && [
+      `/api/v1/participant/sessions/${participantSessionId}/current-state`,
+      `/api/v1/participant/sessions/${participantSessionId}/resume`
+    ].includes(pathname);
+  }).then(response => response.json());
+  let reEntryPayload;
+  try {
+    await participantHttpActor.goto(page,
+      `${baseUrl}/participant?participantSessionId=${encodeURIComponent(participantSessionId)}`,
+      { waitUntil: "domcontentloaded" }
+    );
+    reEntryPayload = await reEntryResponse;
+  } finally {
+    page.off("framenavigated", markReEntry);
+    page.off("request", markFreshRequest);
+  }
+  const reEntryRun = reEntryPayload.currentRunState?.testRun ?? reEntryPayload.testRun;
+  assert.ok(reEntryRun?.unitResponses?.[unitKey], "The actual re-entry read must return the saved IB response.");
+  const reEntryResponseEnvelope = JSON.parse(reEntryRun.unitResponses[unitKey]);
+  assert.equal(reEntryResponseEnvelope.unitState.dataParts.variables, savedUnitState.dataParts.variables,
+    "Authored variables must survive the actual re-entry response exactly.");
+  const savedInteractionCount = savedScores.find(score => score.id === "nbUserInteractions").value;
+  const restoredInteractions = envelope => JSON.parse(envelope.unitState.dataParts.scores)
+    .find(score => score.id === "nbUserInteractions")?.value ?? -1;
+  assert.ok(restoredInteractions(reEntryResponseEnvelope) >= savedInteractionCount,
+    "The actual re-entry read must retain the trusted interaction scores, not default state.");
+  assert.deepEqual(reEntryResponseEnvelope.dataPartValueTypes, JSON.parse(savedUnitResponse).dataPartValueTypes);
   const reEntryResources = await withChromiumIbRuntime(context, page, participantSessionId, async runtime => {
     await runtime.waitVisible("input[type=text]");
+    const player = await page.locator("#participantVeronaPlayerFrame").elementHandle();
+    const restoredPlayerFrame = await player.contentFrame();
+    const deadline = Date.now() + 10_000;
+    let start;
+    while (!start && Date.now() < deadline) {
+      start = startPackets.find(packet => packet.frame === restoredPlayerFrame && packet.unitState?.dataParts);
+      if (!start) await delay(50);
+    }
+    assert.ok(start, "The exact restored opaque Player must receive its real parent Start command.");
+    assert.equal(start.trusted, true);
+    assert.deepEqual(start.unitState, reEntryResponseEnvelope.unitState,
+      "Every restored field and raw data part must reach the real IB Player unchanged.");
     const resources = await runtime.reloadResources();
     recordResourceProof("after-participant-re-entry", resources);
     return resources;
@@ -443,14 +505,24 @@ try {
   );
   assert.equal(restoredStateResponse.status, 200);
   const restoredState = await restoredStateResponse.json();
-  assert.equal(
-    restoredState.currentRunState.testRun.unitResponses[unitKey],
-    savedUnitResponse
-  );
+  const restoredEnvelope = JSON.parse(restoredState.currentRunState.testRun.unitResponses[unitKey]);
+  assert.equal(restoredState.currentRunState.testRun.testRunId, reEntryRun.testRunId);
+  assert.equal(restoredEnvelope.unitState.unitStateDataType, savedUnitState.unitStateDataType);
+  for (const part of ['variables', 'scores']) assert.equal(restoredState.currentRunState.testRun.unitResponsePartTypes?.[unitKey]?.[part], savedPartTypes[part],
+    'Reloaded native Player state must retain accepted per-part types.');
+  assert.equal(restoredEnvelope.unitState.dataParts.variables, savedUnitState.dataParts.variables);
+  assert.deepEqual(restoredEnvelope.dataPartValueTypes, reEntryResponseEnvelope.dataPartValueTypes);
+  assert.ok(restoredInteractions(restoredEnvelope) >= savedInteractionCount,
+    "New runtime clock notifications cannot erase persisted interactions.");
+  assert.equal(restoredEnvelope.unitState.responseProgress, savedUnitState.responseProgress);
+  assert.equal(restoredEnvelope.unitState.presentationProgress, savedUnitState.presentationProgress);
+  // The real IB runtime emits new execution-time scores after it resumes.
+  // Exact restoration is asserted at its actual Start command above, before
+  // those legitimate new notifications can replace the durable score part.
   assert.equal(participantOperatorCredentialLeaks, 0,
     "Participant browser requests must never carry the fixture operator credential.");
   process.stdout.write(
-    `IB player smoke passed trusted input, rejected foreign/covered targets and exact reload for store=${store}, ui=${interfaceMode}\n`
+    `IB player smoke passed trusted input, rejected foreign/covered targets and exact Start-state restoration and live score updates for store=${store}, ui=${interfaceMode}\n`
   );
   await page.screenshot({ path: join(artifacts, "restored.png"), fullPage: true });
   await context.tracing.stop({ path: join(artifacts, "trace.zip") });

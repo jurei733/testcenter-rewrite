@@ -1,0 +1,1721 @@
+{
+  "run": 40600025889,
+  "head": "f88f67e956f0c984eabfc524c2bed1738afb9faf",
+  "tree": "35feddb124b910040a8ce41a12ad9da22193c89f",
+  "merge": "be3039911a3a668b900eafe6b66adbb6204bac66",
+  "status": "completed",
+  "conclusion": "success",
+  "totalJobs": 89,
+  "successfulJobs": 89,
+  "started": "2026-10-27T23:08:33Z",
+  "completed": "2026-10-27T23:41:25Z",
+  "wholeRunSeconds": 1972,
+  "runnerSeconds": 27159,
+  "fastFeedbackSeconds": 313,
+  "SourceTasks": 24,
+  "earlyTechnicalNeeds": [
+    "build",
+    "typecheck",
+    "dependencies",
+    "unit",
+    "browser-system-dependencies"
+  ],
+  "priorEarly": [
+    "broad/ui-full",
+    "broad/ui-ops",
+    "broad/ui-activation-blocking-runtime",
+    "broad/ui-unit-detail-review",
+    "broad/ui-delete-group-results",
+    "broad/ui-monitor-detail-review",
+    "broad/ui-monitor-auto-next",
+    "broad/ui-monitor-finish-all",
+    "broad/ui-monitor-bulk",
+    "broad/ui-open-run-sync",
+    "broad/ui-monitor-review",
+    "broad/ui-run-detail-review"
+  ],
+  "selected": [
+    "broad/ui-unit-detail-review",
+    "broad/ui-activation-blocking-runtime",
+    "broad/ui-run-detail-review",
+    "broad/ui-monitor-finish-all",
+    "broad/ui-full",
+    "broad/ui-delete-group-results",
+    "broad/ui-open-run-sync",
+    "broad/ui-participant-detail-review",
+    "broad/ui-monitor-auto-next",
+    "extended/json-roster",
+    "broad/ui-review-readiness",
+    "broad/ui-ops"
+  ],
+  "promoted": [
+    "broad/ui-participant-detail-review",
+    "extended/json-roster",
+    "broad/ui-review-readiness"
+  ],
+  "deferred": [
+    "broad/ui-monitor-detail-review",
+    "broad/ui-monitor-bulk",
+    "broad/ui-monitor-review"
+  ],
+  "model": {
+    "earlyTotal": 12,
+    "earlyBroad": 11,
+    "earlyExtended": 1,
+    "observedRunnerCapacity": 20,
+    "SourceFamilies": 5,
+    "databaseApi": 1,
+    "databaseBrowser": 1,
+    "checkpointSlots": 1,
+    "lateQualificationLimit": 8
+  },
+  "rows": [
+    {
+      "kind": "broad",
+      "check": "ui-full",
+      "key": "broad/ui-full",
+      "row": {
+        "check": "ui-full",
+        "command": "npm run smoke:ui:built",
+        "playwright": true
+      },
+      "jobId": 122527129694,
+      "name": "verify-memory-sqlite (ui-full)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:20Z",
+      "seconds": 888,
+      "commandSeconds": 823,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-ops",
+      "key": "broad/ui-ops",
+      "row": {
+        "check": "ui-ops",
+        "command": "npm run smoke:ui:operator-auth:built",
+        "playwright": true
+      },
+      "jobId": 122527129570,
+      "name": "verify-memory-sqlite (ui-ops)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:25:46Z",
+      "seconds": 794,
+      "commandSeconds": 737,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-activation-blocking-runtime",
+      "key": "broad/ui-activation-blocking-runtime",
+      "row": {
+        "check": "ui-activation-blocking-runtime",
+        "command": "npm run smoke:ui:activation-blocking-runtime:built && npm run smoke:ui:participant-save-retry:built",
+        "playwright": true
+      },
+      "jobId": 122527129697,
+      "name": "verify-memory-sqlite (ui-activation-blocking-runtime)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:41Z",
+      "seconds": 909,
+      "commandSeconds": 834,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-unit-detail-review",
+      "key": "broad/ui-unit-detail-review",
+      "row": {
+        "check": "ui-unit-detail-review",
+        "command": "npm run smoke:ui:unit-detail-review:built",
+        "playwright": true
+      },
+      "jobId": 122527129599,
+      "name": "verify-memory-sqlite (ui-unit-detail-review)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:28:07Z",
+      "seconds": 935,
+      "commandSeconds": 859,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-delete-group-results",
+      "key": "broad/ui-delete-group-results",
+      "row": {
+        "check": "ui-delete-group-results",
+        "command": "npm run smoke:ui:delete-group-results:built",
+        "playwright": true
+      },
+      "jobId": 122527129662,
+      "name": "verify-memory-sqlite (ui-delete-group-results)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:19Z",
+      "seconds": 887,
+      "commandSeconds": 792,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-monitor-detail-review",
+      "key": "broad/ui-monitor-detail-review",
+      "row": {
+        "check": "ui-monitor-detail-review",
+        "command": "npm run smoke:ui:monitor-detail-review:built",
+        "playwright": true
+      },
+      "jobId": 122527129752,
+      "name": "verify-memory-sqlite (ui-monitor-detail-review)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:24:49Z",
+      "seconds": 737,
+      "commandSeconds": 692,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-monitor-auto-next",
+      "key": "broad/ui-monitor-auto-next",
+      "row": {
+        "check": "ui-monitor-auto-next",
+        "command": "npm run smoke:ui:monitor-auto-next:built",
+        "playwright": true
+      },
+      "jobId": 122527129733,
+      "name": "verify-memory-sqlite (ui-monitor-auto-next)",
+      "started": "2026-10-27T23:12:33Z",
+      "completed": "2026-10-27T23:26:57Z",
+      "seconds": 864,
+      "commandSeconds": 798,
+      "startAfterRunSeconds": 240
+    },
+    {
+      "kind": "broad",
+      "check": "ui-monitor-finish-all",
+      "key": "broad/ui-monitor-finish-all",
+      "row": {
+        "check": "ui-monitor-finish-all",
+        "command": "npm run smoke:ui:monitor-finish-all:built",
+        "playwright": true
+      },
+      "jobId": 122527129603,
+      "name": "verify-memory-sqlite (ui-monitor-finish-all)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:26Z",
+      "seconds": 894,
+      "commandSeconds": 820,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-monitor-bulk",
+      "key": "broad/ui-monitor-bulk",
+      "row": {
+        "check": "ui-monitor-bulk",
+        "command": "npm run smoke:ui:monitor-bulk:built",
+        "playwright": true
+      },
+      "jobId": 122527129583,
+      "name": "verify-memory-sqlite (ui-monitor-bulk)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:24:32Z",
+      "seconds": 720,
+      "commandSeconds": 623,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-open-run-sync",
+      "key": "broad/ui-open-run-sync",
+      "row": {
+        "check": "ui-open-run-sync",
+        "command": "npm run smoke:ui:open-run-sync:built",
+        "playwright": true
+      },
+      "jobId": 122527129647,
+      "name": "verify-memory-sqlite (ui-open-run-sync)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:18Z",
+      "seconds": 886,
+      "commandSeconds": 826,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-monitor-review",
+      "key": "broad/ui-monitor-review",
+      "row": {
+        "check": "ui-monitor-review",
+        "command": "npm run smoke:ui:monitor-review:built",
+        "playwright": true
+      },
+      "jobId": 122527129606,
+      "name": "verify-memory-sqlite (ui-monitor-review)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:24:37Z",
+      "seconds": 725,
+      "commandSeconds": 667,
+      "startAfterRunSeconds": 239
+    },
+    {
+      "kind": "broad",
+      "check": "ui-run-detail-review",
+      "key": "broad/ui-run-detail-review",
+      "row": {
+        "check": "ui-run-detail-review",
+        "command": "npm run smoke:ui:run-detail-review:built",
+        "playwright": true
+      },
+      "jobId": 122527129713,
+      "name": "verify-memory-sqlite (ui-run-detail-review)",
+      "started": "2026-10-27T23:12:33Z",
+      "completed": "2026-10-27T23:27:35Z",
+      "seconds": 902,
+      "commandSeconds": 808,
+      "startAfterRunSeconds": 240
+    },
+    {
+      "kind": "broad",
+      "check": "ui-participant-detail-review",
+      "key": "broad/ui-participant-detail-review",
+      "row": {
+        "check": "ui-participant-detail-review",
+        "command": "npm run smoke:ui:participant-detail-review:built",
+        "playwright": true
+      },
+      "jobId": 122527645750,
+      "name": "verify-memory-sqlite (ui-participant-detail-review)",
+      "started": "2026-10-27T23:26:44Z",
+      "completed": "2026-10-27T23:41:18Z",
+      "seconds": 874,
+      "commandSeconds": 812,
+      "startAfterRunSeconds": 1091
+    },
+    {
+      "kind": "broad",
+      "check": "ui-review-readiness",
+      "key": "broad/ui-review-readiness",
+      "row": {
+        "check": "ui-review-readiness",
+        "command": "npm run smoke:ui:review-readiness:built",
+        "playwright": true
+      },
+      "jobId": 122527645774,
+      "name": "verify-memory-sqlite (ui-review-readiness)",
+      "started": "2026-10-27T23:26:28Z",
+      "completed": "2026-10-27T23:39:54Z",
+      "seconds": 806,
+      "commandSeconds": 736,
+      "startAfterRunSeconds": 1075
+    },
+    {
+      "kind": "broad",
+      "check": "ui-controller-timer",
+      "key": "broad/ui-controller-timer",
+      "row": {
+        "check": "ui-controller-timer",
+        "command": "npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built",
+        "playwright": true
+      },
+      "jobId": 122527645643,
+      "name": "verify-memory-sqlite (ui-controller-timer)",
+      "started": "2026-10-27T23:24:34Z",
+      "completed": "2026-10-27T23:30:18Z",
+      "seconds": 344,
+      "commandSeconds": 298,
+      "startAfterRunSeconds": 961
+    },
+    {
+      "kind": "broad",
+      "check": "integration-file",
+      "key": "broad/integration-file",
+      "row": {
+        "check": "integration-file",
+        "command": "npm run test:integration:file:built",
+        "playwright": false
+      },
+      "jobId": 122527645926,
+      "name": "verify-memory-sqlite (integration-file)",
+      "started": "2026-10-27T23:20:11Z",
+      "completed": "2026-10-27T23:24:12Z",
+      "seconds": 241,
+      "commandSeconds": 219,
+      "startAfterRunSeconds": 698
+    },
+    {
+      "kind": "broad",
+      "check": "ui-participant-console",
+      "key": "broad/ui-participant-console",
+      "row": {
+        "check": "ui-participant-console",
+        "command": "npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built",
+        "playwright": true
+      },
+      "jobId": 122527645614,
+      "name": "verify-memory-sqlite (ui-participant-console)",
+      "started": "2026-10-27T23:23:02Z",
+      "completed": "2026-10-27T23:26:33Z",
+      "seconds": 211,
+      "commandSeconds": 128,
+      "startAfterRunSeconds": 869
+    },
+    {
+      "kind": "broad",
+      "check": "ui-attachments",
+      "key": "broad/ui-attachments",
+      "row": {
+        "check": "ui-attachments",
+        "command": "npm run smoke:ui:attachments:built && npm run smoke:ui:attachments-live:built && UI_SMOKE_ATTACHMENT_CAMERA_FACING=front npm run smoke:ui:attachments-live:built",
+        "playwright": true
+      },
+      "jobId": 122527645828,
+      "name": "verify-memory-sqlite (ui-attachments)",
+      "started": "2026-10-27T23:21:57Z",
+      "completed": "2026-10-27T23:25:09Z",
+      "seconds": 192,
+      "commandSeconds": 114,
+      "startAfterRunSeconds": 804
+    },
+    {
+      "kind": "broad",
+      "check": "ui-participant-native-routes",
+      "key": "broad/ui-participant-native-routes",
+      "row": {
+        "check": "ui-participant-native-routes",
+        "command": "npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built",
+        "playwright": true
+      },
+      "jobId": 122527646118,
+      "name": "verify-memory-sqlite (ui-participant-native-routes)",
+      "started": "2026-10-27T23:27:29Z",
+      "completed": "2026-10-27T23:30:30Z",
+      "seconds": 181,
+      "commandSeconds": 117,
+      "startAfterRunSeconds": 1136
+    },
+    {
+      "kind": "broad",
+      "check": "ui-original-review",
+      "key": "broad/ui-original-review",
+      "row": {
+        "check": "ui-original-review",
+        "command": "npm run smoke:ui:original-review:built",
+        "playwright": true
+      },
+      "jobId": 122527645843,
+      "name": "verify-memory-sqlite (ui-original-review)",
+      "started": "2026-10-27T23:22:02Z",
+      "completed": "2026-10-27T23:24:40Z",
+      "seconds": 158,
+      "commandSeconds": 97,
+      "startAfterRunSeconds": 809
+    },
+    {
+      "kind": "broad",
+      "check": "ui-admin-delete",
+      "key": "broad/ui-admin-delete",
+      "row": {
+        "check": "ui-admin-delete",
+        "command": "npm run smoke:ui:admin-delete:built",
+        "playwright": true
+      },
+      "jobId": 122527645953,
+      "name": "verify-memory-sqlite (ui-admin-delete)",
+      "started": "2026-10-27T23:26:37Z",
+      "completed": "2026-10-27T23:29:44Z",
+      "seconds": 187,
+      "commandSeconds": 120,
+      "startAfterRunSeconds": 1084
+    },
+    {
+      "kind": "broad",
+      "check": "ui-original-workspace-files",
+      "key": "broad/ui-original-workspace-files",
+      "row": {
+        "check": "ui-original-workspace-files",
+        "command": "npm run smoke:ui:original-workspace-files:built",
+        "playwright": true
+      },
+      "jobId": 122527645868,
+      "name": "verify-memory-sqlite (ui-original-workspace-files)",
+      "started": "2026-10-27T23:27:38Z",
+      "completed": "2026-10-27T23:30:28Z",
+      "seconds": 170,
+      "commandSeconds": 87,
+      "startAfterRunSeconds": 1145
+    },
+    {
+      "kind": "broad",
+      "check": "ui-workspace-delete",
+      "key": "broad/ui-workspace-delete",
+      "row": {
+        "check": "ui-workspace-delete",
+        "command": "npm run smoke:ui:workspace-delete:built",
+        "playwright": true
+      },
+      "jobId": 122527646019,
+      "name": "verify-memory-sqlite (ui-workspace-delete)",
+      "started": "2026-10-27T23:25:12Z",
+      "completed": "2026-10-27T23:26:41Z",
+      "seconds": 89,
+      "commandSeconds": 33,
+      "startAfterRunSeconds": 999
+    },
+    {
+      "kind": "broad",
+      "check": "integration-sqlite",
+      "key": "broad/integration-sqlite",
+      "row": {
+        "check": "integration-sqlite",
+        "command": "npm run test:integration:sqlite:built",
+        "playwright": false
+      },
+      "jobId": 122527645944,
+      "name": "verify-memory-sqlite (integration-sqlite)",
+      "started": "2026-10-27T23:25:39Z",
+      "completed": "2026-10-27T23:27:26Z",
+      "seconds": 107,
+      "commandSeconds": 78,
+      "startAfterRunSeconds": 1026
+    },
+    {
+      "kind": "broad",
+      "check": "ui-admin-workspace-access",
+      "key": "broad/ui-admin-workspace-access",
+      "row": {
+        "check": "ui-admin-workspace-access",
+        "command": "npm run smoke:ui:admin-workspace-access:built",
+        "playwright": true
+      },
+      "jobId": 122527645949,
+      "name": "verify-memory-sqlite (ui-admin-workspace-access)",
+      "started": "2026-10-27T23:26:36Z",
+      "completed": "2026-10-27T23:28:33Z",
+      "seconds": 117,
+      "commandSeconds": 52,
+      "startAfterRunSeconds": 1083
+    },
+    {
+      "kind": "broad",
+      "check": "ui-deletion-confirmation",
+      "key": "broad/ui-deletion-confirmation",
+      "row": {
+        "check": "ui-deletion-confirmation",
+        "command": "npm run smoke:ui:deletion-confirmation:built",
+        "playwright": true
+      },
+      "jobId": 122527645967,
+      "name": "verify-memory-sqlite (ui-deletion-confirmation)",
+      "started": "2026-10-27T23:26:01Z",
+      "completed": "2026-10-27T23:27:43Z",
+      "seconds": 102,
+      "commandSeconds": 33,
+      "startAfterRunSeconds": 1048
+    },
+    {
+      "kind": "broad",
+      "check": "ui-participant-monitor-live",
+      "key": "broad/ui-participant-monitor-live",
+      "row": {
+        "check": "ui-participant-monitor-live",
+        "command": "npm run smoke:ui:participant-monitor-live:built",
+        "playwright": true
+      },
+      "jobId": 122527645945,
+      "name": "verify-memory-sqlite (ui-participant-monitor-live)",
+      "started": "2026-10-27T23:24:40Z",
+      "completed": "2026-10-27T23:26:25Z",
+      "seconds": 105,
+      "commandSeconds": 34,
+      "startAfterRunSeconds": 967
+    },
+    {
+      "kind": "broad",
+      "check": "ui-workspace-rename",
+      "key": "broad/ui-workspace-rename",
+      "row": {
+        "check": "ui-workspace-rename",
+        "command": "npm run smoke:ui:workspace-rename:built",
+        "playwright": true
+      },
+      "jobId": 122527645931,
+      "name": "verify-memory-sqlite (ui-workspace-rename)",
+      "started": "2026-10-27T23:27:30Z",
+      "completed": "2026-10-27T23:29:13Z",
+      "seconds": 103,
+      "commandSeconds": 34,
+      "startAfterRunSeconds": 1137
+    },
+    {
+      "kind": "broad",
+      "check": "ui-verona-development",
+      "key": "broad/ui-verona-development",
+      "row": {
+        "check": "ui-verona-development",
+        "command": "npm run smoke:ui:verona-development:built",
+        "playwright": true
+      },
+      "jobId": 122527646039,
+      "name": "verify-memory-sqlite (ui-verona-development)",
+      "started": "2026-10-27T23:27:44Z",
+      "completed": "2026-10-27T23:29:42Z",
+      "seconds": 118,
+      "commandSeconds": 45,
+      "startAfterRunSeconds": 1151
+    },
+    {
+      "kind": "broad",
+      "check": "integration-memory",
+      "key": "broad/integration-memory",
+      "row": {
+        "check": "integration-memory",
+        "command": "npm run test:integration:memory:built",
+        "playwright": false
+      },
+      "jobId": 122527645869,
+      "name": "verify-memory-sqlite (integration-memory)",
+      "started": "2026-10-27T23:17:12Z",
+      "completed": "2026-10-27T23:18:35Z",
+      "seconds": 83,
+      "commandSeconds": 61,
+      "startAfterRunSeconds": 519
+    },
+    {
+      "kind": "broad",
+      "check": "ui-original-xml-schema",
+      "key": "broad/ui-original-xml-schema",
+      "row": {
+        "check": "ui-original-xml-schema",
+        "command": "npm run smoke:ui:original-xml-schema:built",
+        "playwright": true
+      },
+      "jobId": 122527646079,
+      "name": "verify-memory-sqlite (ui-original-xml-schema)",
+      "started": "2026-10-27T23:27:20Z",
+      "completed": "2026-10-27T23:28:42Z",
+      "seconds": 82,
+      "commandSeconds": 20,
+      "startAfterRunSeconds": 1127
+    },
+    {
+      "kind": "broad",
+      "check": "ui-participant-command-completion",
+      "key": "broad/ui-participant-command-completion",
+      "row": {
+        "check": "ui-participant-command-completion",
+        "command": "npm run smoke:ui:participant-command-completion:built",
+        "playwright": true
+      },
+      "jobId": 122527645951,
+      "name": "verify-memory-sqlite (ui-participant-command-completion)",
+      "started": "2026-10-27T23:24:16Z",
+      "completed": "2026-10-27T23:25:36Z",
+      "seconds": 80,
+      "commandSeconds": 15,
+      "startAfterRunSeconds": 943
+    },
+    {
+      "kind": "broad",
+      "check": "local-demo",
+      "key": "broad/local-demo",
+      "row": {
+        "check": "local-demo",
+        "command": "npm run smoke:local-demo:built",
+        "playwright": true
+      },
+      "jobId": 122527645887,
+      "name": "verify-memory-sqlite (local-demo)",
+      "started": "2026-10-27T23:18:38Z",
+      "completed": "2026-10-27T23:19:56Z",
+      "seconds": 78,
+      "commandSeconds": 25,
+      "startAfterRunSeconds": 605
+    },
+    {
+      "kind": "broad",
+      "check": "ui-console-debug",
+      "key": "broad/ui-console-debug",
+      "row": {
+        "check": "ui-console-debug",
+        "command": "npm run smoke:ui:participant-debug:built",
+        "playwright": true
+      },
+      "jobId": 122527646004,
+      "name": "verify-memory-sqlite (ui-console-debug)",
+      "started": "2026-10-27T23:24:51Z",
+      "completed": "2026-10-27T23:26:09Z",
+      "seconds": 78,
+      "commandSeconds": 20,
+      "startAfterRunSeconds": 978
+    },
+    {
+      "kind": "broad",
+      "check": "ui-adaptive-runtime",
+      "key": "broad/ui-adaptive-runtime",
+      "row": {
+        "check": "ui-adaptive-runtime",
+        "command": "npm run smoke:ui:adaptive-runtime:built",
+        "playwright": true
+      },
+      "jobId": 122527646031,
+      "name": "verify-memory-sqlite (ui-adaptive-runtime)",
+      "started": "2026-10-27T23:27:21Z",
+      "completed": "2026-10-27T23:28:13Z",
+      "seconds": 52,
+      "commandSeconds": 6,
+      "startAfterRunSeconds": 1128
+    },
+    {
+      "kind": "broad",
+      "check": "compatibility",
+      "key": "broad/compatibility",
+      "row": {
+        "check": "compatibility",
+        "command": "npm run test:compatibility:built",
+        "playwright": false
+      },
+      "jobId": 122527645909,
+      "name": "verify-memory-sqlite (compatibility)",
+      "started": "2026-10-27T23:24:43Z",
+      "completed": "2026-10-27T23:25:44Z",
+      "seconds": 61,
+      "commandSeconds": 33,
+      "startAfterRunSeconds": 970
+    },
+    {
+      "kind": "broad",
+      "check": "shutdown",
+      "key": "broad/shutdown",
+      "row": {
+        "check": "shutdown",
+        "command": "npm run smoke:shutdown:sqlite:built",
+        "playwright": false
+      },
+      "jobId": 122527645993,
+      "name": "verify-memory-sqlite (shutdown)",
+      "started": "2026-10-27T23:27:22Z",
+      "completed": "2026-10-27T23:27:47Z",
+      "seconds": 25,
+      "commandSeconds": 3,
+      "startAfterRunSeconds": 1129
+    },
+    {
+      "kind": "broad",
+      "check": "shutdown-file",
+      "key": "broad/shutdown-file",
+      "row": {
+        "check": "shutdown-file",
+        "command": "npm run smoke:shutdown:file:built",
+        "playwright": false
+      },
+      "jobId": 122527646002,
+      "name": "verify-memory-sqlite (shutdown-file)",
+      "started": "2026-10-27T23:27:00Z",
+      "completed": "2026-10-27T23:27:28Z",
+      "seconds": 28,
+      "commandSeconds": 3,
+      "startAfterRunSeconds": 1107
+    },
+    {
+      "kind": "broad",
+      "check": "startup",
+      "key": "broad/startup",
+      "row": {
+        "check": "startup",
+        "command": "npm run smoke:startup:sqlite:built",
+        "playwright": false
+      },
+      "jobId": 122527646083,
+      "name": "verify-memory-sqlite (startup)",
+      "started": "2026-10-27T23:26:11Z",
+      "completed": "2026-10-27T23:26:35Z",
+      "seconds": 24,
+      "commandSeconds": 4,
+      "startAfterRunSeconds": 1058
+    },
+    {
+      "kind": "broad",
+      "check": "startup-file",
+      "key": "broad/startup-file",
+      "row": {
+        "check": "startup-file",
+        "command": "npm run smoke:startup:file:built",
+        "playwright": false
+      },
+      "jobId": 122527645988,
+      "name": "verify-memory-sqlite (startup-file)",
+      "started": "2026-10-27T23:27:29Z",
+      "completed": "2026-10-27T23:27:49Z",
+      "seconds": 20,
+      "commandSeconds": 3,
+      "startAfterRunSeconds": 1136
+    },
+    {
+      "kind": "extended",
+      "check": "activation-roster-warnings",
+      "key": "extended/activation-roster-warnings",
+      "row": {
+        "check": "activation-roster-warnings",
+        "group": "content",
+        "command": "npm run smoke:ui:activation-roster-warnings:built"
+      },
+      "jobId": 122527645651,
+      "name": "verify-memory-sqlite (ui-qualification-activation-roster-warnings)",
+      "started": "2026-10-27T23:25:47Z",
+      "completed": "2026-10-27T23:37:23Z",
+      "seconds": 696,
+      "commandSeconds": 639,
+      "startAfterRunSeconds": 1034
+    },
+    {
+      "kind": "extended",
+      "check": "json-roster",
+      "key": "extended/json-roster",
+      "row": {
+        "check": "json-roster",
+        "group": "content",
+        "command": "npm run smoke:ui:json-roster:built"
+      },
+      "jobId": 122527645586,
+      "name": "verify-memory-sqlite (ui-qualification-json-roster)",
+      "started": "2026-10-27T23:25:48Z",
+      "completed": "2026-10-27T23:39:54Z",
+      "seconds": 846,
+      "commandSeconds": 786,
+      "startAfterRunSeconds": 1035
+    },
+    {
+      "kind": "extended",
+      "check": "original-exit-completeness",
+      "key": "extended/original-exit-completeness",
+      "row": {
+        "check": "original-exit-completeness",
+        "group": "participant",
+        "command": "npm run smoke:ui:original-exit-completeness:built"
+      },
+      "jobId": 122527645503,
+      "name": "verify-memory-sqlite (ui-qualification-original-exit-completeness)",
+      "started": "2026-10-27T23:23:59Z",
+      "completed": "2026-10-27T23:34:02Z",
+      "seconds": 603,
+      "commandSeconds": 540,
+      "startAfterRunSeconds": 926
+    },
+    {
+      "kind": "extended",
+      "check": "verona-player",
+      "key": "extended/verona-player",
+      "row": {
+        "check": "verona-player",
+        "group": "content",
+        "command": "npm run smoke:ui:verona-player:built"
+      },
+      "jobId": 122527645461,
+      "name": "verify-memory-sqlite (ui-qualification-verona-player)",
+      "started": "2026-10-27T23:15:15Z",
+      "completed": "2026-10-27T23:21:54Z",
+      "seconds": 399,
+      "commandSeconds": 341,
+      "startAfterRunSeconds": 402
+    },
+    {
+      "kind": "extended",
+      "check": "original-runtime-error-contract",
+      "key": "extended/original-runtime-error-contract",
+      "row": {
+        "check": "original-runtime-error-contract",
+        "group": "participant",
+        "command": "npm run smoke:ui:original-runtime-error-contract:built"
+      },
+      "jobId": 122527645505,
+      "name": "verify-memory-sqlite (ui-qualification-original-runtime-error-contract)",
+      "started": "2026-10-27T23:16:22Z",
+      "completed": "2026-10-27T23:21:59Z",
+      "seconds": 337,
+      "commandSeconds": 268,
+      "startAfterRunSeconds": 469
+    },
+    {
+      "kind": "extended",
+      "check": "original-runtime-error",
+      "key": "extended/original-runtime-error",
+      "row": {
+        "check": "original-runtime-error",
+        "group": "participant",
+        "command": "npm run smoke:ui:original-runtime-error:built"
+      },
+      "jobId": 122527645548,
+      "name": "verify-memory-sqlite (ui-qualification-original-runtime-error)",
+      "started": "2026-10-27T23:19:33Z",
+      "completed": "2026-10-27T23:23:49Z",
+      "seconds": 256,
+      "commandSeconds": 199,
+      "startAfterRunSeconds": 660
+    },
+    {
+      "kind": "extended",
+      "check": "original-paused-exit",
+      "key": "extended/original-paused-exit",
+      "row": {
+        "check": "original-paused-exit",
+        "group": "participant",
+        "command": "npm run smoke:ui:original-paused-exit:built"
+      },
+      "jobId": 122527645557,
+      "name": "verify-memory-sqlite (ui-qualification-original-paused-exit)",
+      "started": "2026-10-27T23:19:58Z",
+      "completed": "2026-10-27T23:23:57Z",
+      "seconds": 239,
+      "commandSeconds": 178,
+      "startAfterRunSeconds": 685
+    },
+    {
+      "kind": "extended",
+      "check": "participant-entry",
+      "key": "extended/participant-entry",
+      "row": {
+        "check": "participant-entry",
+        "group": "participant",
+        "command": "npm run smoke:ui:participant-entry:built"
+      },
+      "jobId": 122527645506,
+      "name": "verify-memory-sqlite (ui-qualification-participant-entry)",
+      "started": "2026-10-27T23:19:10Z",
+      "completed": "2026-10-27T23:22:59Z",
+      "seconds": 229,
+      "commandSeconds": 158,
+      "startAfterRunSeconds": 637
+    },
+    {
+      "kind": "extended",
+      "check": "original-player-exit",
+      "key": "extended/original-player-exit",
+      "row": {
+        "check": "original-player-exit",
+        "group": "participant",
+        "command": "npm run smoke:ui:original-player-exit:built"
+      },
+      "jobId": 122527645611,
+      "name": "verify-memory-sqlite (ui-qualification-original-player-exit)",
+      "started": "2026-10-27T23:27:45Z",
+      "completed": "2026-10-27T23:31:45Z",
+      "seconds": 240,
+      "commandSeconds": 175,
+      "startAfterRunSeconds": 1152
+    },
+    {
+      "kind": "extended",
+      "check": "participant-review",
+      "key": "extended/participant-review",
+      "row": {
+        "check": "participant-review",
+        "group": "participant",
+        "command": "npm run smoke:ui:participant-review:built"
+      },
+      "jobId": 122527645725,
+      "name": "verify-memory-sqlite (ui-qualification-participant-review)",
+      "started": "2026-10-27T23:27:50Z",
+      "completed": "2026-10-27T23:31:42Z",
+      "seconds": 232,
+      "commandSeconds": 157,
+      "startAfterRunSeconds": 1157
+    },
+    {
+      "kind": "extended",
+      "check": "content",
+      "key": "extended/content",
+      "row": {
+        "check": "content",
+        "group": "content",
+        "command": "npm run smoke:ui:content:built"
+      },
+      "jobId": 122527645663,
+      "name": "verify-memory-sqlite (ui-qualification-content)",
+      "started": "2026-10-27T23:27:52Z",
+      "completed": "2026-10-27T23:31:04Z",
+      "seconds": 192,
+      "commandSeconds": 126,
+      "startAfterRunSeconds": 1159
+    },
+    {
+      "kind": "extended",
+      "check": "original-player-version-error",
+      "key": "extended/original-player-version-error",
+      "row": {
+        "check": "original-player-version-error",
+        "group": "participant",
+        "command": "npm run smoke:ui:original-player-version-error:built"
+      },
+      "jobId": 122527645636,
+      "name": "verify-memory-sqlite (ui-qualification-original-player-version-error)",
+      "started": "2026-10-27T23:28:10Z",
+      "completed": "2026-10-27T23:31:26Z",
+      "seconds": 196,
+      "commandSeconds": 134,
+      "startAfterRunSeconds": 1177
+    },
+    {
+      "kind": "extended",
+      "check": "original-starter-advisories",
+      "key": "extended/original-starter-advisories",
+      "row": {
+        "check": "original-starter-advisories",
+        "group": "participant",
+        "command": "npm run smoke:ui:original-starter-advisories:built"
+      },
+      "jobId": 122527645526,
+      "name": "verify-memory-sqlite (ui-qualification-original-starter-advisories)",
+      "started": "2026-10-27T23:28:16Z",
+      "completed": "2026-10-27T23:31:13Z",
+      "seconds": 177,
+      "commandSeconds": 121,
+      "startAfterRunSeconds": 1183
+    },
+    {
+      "kind": "extended",
+      "check": "original-header",
+      "key": "extended/original-header",
+      "row": {
+        "check": "original-header",
+        "group": "entry",
+        "command": "npm run smoke:ui:original-header:built"
+      },
+      "jobId": 122527645529,
+      "name": "verify-memory-sqlite (ui-qualification-original-header)",
+      "started": "2026-10-27T23:31:06Z",
+      "completed": "2026-10-27T23:33:49Z",
+      "seconds": 163,
+      "commandSeconds": 99,
+      "startAfterRunSeconds": 1353
+    },
+    {
+      "kind": "extended",
+      "check": "original-starter",
+      "key": "extended/original-starter",
+      "row": {
+        "check": "original-starter",
+        "group": "participant",
+        "command": "npm run smoke:ui:original-starter:built"
+      },
+      "jobId": 122527645669,
+      "name": "verify-memory-sqlite (ui-qualification-original-starter)",
+      "started": "2026-10-27T23:31:21Z",
+      "completed": "2026-10-27T23:34:14Z",
+      "seconds": 173,
+      "commandSeconds": 96,
+      "startAfterRunSeconds": 1368
+    },
+    {
+      "kind": "extended",
+      "check": "original-administration",
+      "key": "extended/original-administration",
+      "row": {
+        "check": "original-administration",
+        "group": "entry",
+        "command": "npm run smoke:ui:original-administration:built"
+      },
+      "jobId": 122527645564,
+      "name": "verify-memory-sqlite (ui-qualification-original-administration)",
+      "started": "2026-10-27T23:31:29Z",
+      "completed": "2026-10-27T23:34:24Z",
+      "seconds": 175,
+      "commandSeconds": 95,
+      "startAfterRunSeconds": 1376
+    },
+    {
+      "kind": "extended",
+      "check": "attachment-custom-text",
+      "key": "extended/attachment-custom-text",
+      "row": {
+        "check": "attachment-custom-text",
+        "group": "system-check",
+        "command": "npm run smoke:ui:attachment-custom-text:built"
+      },
+      "jobId": 122527645507,
+      "name": "verify-memory-sqlite (ui-qualification-attachment-custom-text)",
+      "started": "2026-10-27T23:31:45Z",
+      "completed": "2026-10-27T23:33:40Z",
+      "seconds": 115,
+      "commandSeconds": 43,
+      "startAfterRunSeconds": 1392
+    },
+    {
+      "kind": "extended",
+      "check": "participant-debug",
+      "key": "extended/participant-debug",
+      "row": {
+        "check": "participant-debug",
+        "group": "participant",
+        "command": "npm run smoke:ui:participant-debug:built"
+      },
+      "jobId": 122527645575,
+      "name": "verify-memory-sqlite (ui-qualification-participant-debug)",
+      "started": "2026-10-27T23:31:47Z",
+      "completed": "2026-10-27T23:33:37Z",
+      "seconds": 110,
+      "commandSeconds": 20,
+      "startAfterRunSeconds": 1394
+    },
+    {
+      "kind": "extended",
+      "check": "system-check-saved",
+      "key": "extended/system-check-saved",
+      "row": {
+        "check": "system-check-saved",
+        "group": "system-check",
+        "command": "npm run smoke:ui:system-check-saved:built"
+      },
+      "jobId": 122527647848,
+      "name": "verify-memory-sqlite (ui-qualification-system-check-saved)",
+      "started": "2026-10-27T23:33:40Z",
+      "completed": "2026-10-27T23:34:51Z",
+      "seconds": 71,
+      "commandSeconds": 12,
+      "startAfterRunSeconds": 1507
+    },
+    {
+      "kind": "extended",
+      "check": "offline-shell",
+      "key": "extended/offline-shell",
+      "row": {
+        "check": "offline-shell",
+        "group": "entry",
+        "command": "npm run smoke:ui:offline-shell:built"
+      },
+      "jobId": 122527647880,
+      "name": "verify-memory-sqlite (ui-qualification-offline-shell)",
+      "started": "2026-10-27T23:33:43Z",
+      "completed": "2026-10-27T23:35:02Z",
+      "seconds": 79,
+      "commandSeconds": 12,
+      "startAfterRunSeconds": 1510
+    }
+  ],
+  "allJobs": [
+    {
+      "id": 122525535275,
+      "name": "Authenticated browser system packages",
+      "started": "2026-10-27T23:08:36Z",
+      "completed": "2026-10-27T23:09:39Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122525535548,
+      "name": "Pinned Original browser build",
+      "started": "2026-10-27T23:08:36Z",
+      "completed": "2026-10-27T23:09:10Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122525535553,
+      "name": "Shared production build",
+      "started": "2026-10-27T23:08:37Z",
+      "completed": "2026-10-27T23:09:55Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122525535577,
+      "name": "Dependency audit",
+      "started": "2026-10-27T23:08:36Z",
+      "completed": "2026-10-27T23:08:45Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122525535651,
+      "name": "verify-memory-sqlite (typecheck)",
+      "started": "2026-10-27T23:08:37Z",
+      "completed": "2026-10-27T23:09:55Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122525535829,
+      "name": "Docker image runtime smoke",
+      "started": "2026-10-27T23:08:36Z",
+      "completed": "2026-10-27T23:10:15Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096105,
+      "name": "verify-memory-sqlite (unit)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:12:29Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096119,
+      "name": "Offline browser system qualification",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:11:15Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096158,
+      "name": "Original browser reference (administration)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:15:52Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096186,
+      "name": "verify-memory-sqlite (ui-quick-system-check)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:12:03Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096227,
+      "name": "Original browser reference (entry)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:18:21Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096234,
+      "name": "verify-memory-sqlite (ui-quick-bug-report)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:11:17Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096250,
+      "name": "verify-memory-sqlite (ui-quick-original-login-protected)",
+      "started": "2026-10-27T23:09:59Z",
+      "completed": "2026-10-27T23:13:23Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096257,
+      "name": "Original browser reference (directory)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:19:31Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096258,
+      "name": "Original browser reference (starter)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:32:50Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096304,
+      "name": "verify-memory-sqlite (ui-quick-proof-of-work)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:13:41Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096315,
+      "name": "Original browser reference (dialogs)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:17:10Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096343,
+      "name": "verify-memory-sqlite (ui-quick-participant-variant)",
+      "started": "2026-10-27T23:09:58Z",
+      "completed": "2026-10-27T23:11:47Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096362,
+      "name": "verify-memory-sqlite (ui-quick-original-login)",
+      "started": "2026-10-27T23:09:59Z",
+      "completed": "2026-10-27T23:12:01Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096366,
+      "name": "verify-memory-sqlite (ui-quick-ib-player)",
+      "started": "2026-10-27T23:09:59Z",
+      "completed": "2026-10-27T23:11:34Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122526096413,
+      "name": "verify-memory-sqlite (ui-quick-original-admin-login)",
+      "started": "2026-10-27T23:09:59Z",
+      "completed": "2026-10-27T23:11:47Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129462,
+      "name": "verify-postgres-ui",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:32:33Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129570,
+      "name": "verify-memory-sqlite (ui-ops)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:25:46Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129583,
+      "name": "verify-memory-sqlite (ui-monitor-bulk)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:24:32Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129599,
+      "name": "verify-memory-sqlite (ui-unit-detail-review)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:28:07Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129603,
+      "name": "verify-memory-sqlite (ui-monitor-finish-all)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:26Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129606,
+      "name": "verify-memory-sqlite (ui-monitor-review)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:24:37Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129647,
+      "name": "verify-memory-sqlite (ui-open-run-sync)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:18Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129662,
+      "name": "verify-memory-sqlite (ui-delete-group-results)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:19Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129681,
+      "name": "verify-postgres",
+      "started": "2026-10-27T23:13:26Z",
+      "completed": "2026-10-27T23:19:08Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129694,
+      "name": "verify-memory-sqlite (ui-full)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:20Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129697,
+      "name": "verify-memory-sqlite (ui-activation-blocking-runtime)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:27:41Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129713,
+      "name": "verify-memory-sqlite (ui-run-detail-review)",
+      "started": "2026-10-27T23:12:33Z",
+      "completed": "2026-10-27T23:27:35Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129733,
+      "name": "verify-memory-sqlite (ui-monitor-auto-next)",
+      "started": "2026-10-27T23:12:33Z",
+      "completed": "2026-10-27T23:26:57Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527129752,
+      "name": "verify-memory-sqlite (ui-monitor-detail-review)",
+      "started": "2026-10-27T23:12:32Z",
+      "completed": "2026-10-27T23:24:49Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527610332,
+      "name": "Fast feedback",
+      "started": "2026-10-27T23:13:44Z",
+      "completed": "2026-10-27T23:13:46Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645268,
+      "name": "Deployability preflight",
+      "started": "2026-10-27T23:15:54Z",
+      "completed": "2026-10-27T23:16:19Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645292,
+      "name": "Compose Postgres smoke (standard)",
+      "started": "2026-10-27T23:13:49Z",
+      "completed": "2026-10-27T23:15:12Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645344,
+      "name": "Compose Postgres smoke (production-secret)",
+      "started": "2026-10-27T23:23:52Z",
+      "completed": "2026-10-27T23:25:58Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645372,
+      "name": "Compose Postgres smoke (demo)",
+      "started": "2026-10-27T23:18:24Z",
+      "completed": "2026-10-27T23:20:08Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645461,
+      "name": "verify-memory-sqlite (ui-qualification-verona-player)",
+      "started": "2026-10-27T23:15:15Z",
+      "completed": "2026-10-27T23:21:54Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645503,
+      "name": "verify-memory-sqlite (ui-qualification-original-exit-completeness)",
+      "started": "2026-10-27T23:23:59Z",
+      "completed": "2026-10-27T23:34:02Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645505,
+      "name": "verify-memory-sqlite (ui-qualification-original-runtime-error-contract)",
+      "started": "2026-10-27T23:16:22Z",
+      "completed": "2026-10-27T23:21:59Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645506,
+      "name": "verify-memory-sqlite (ui-qualification-participant-entry)",
+      "started": "2026-10-27T23:19:10Z",
+      "completed": "2026-10-27T23:22:59Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645507,
+      "name": "verify-memory-sqlite (ui-qualification-attachment-custom-text)",
+      "started": "2026-10-27T23:31:45Z",
+      "completed": "2026-10-27T23:33:40Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645526,
+      "name": "verify-memory-sqlite (ui-qualification-original-starter-advisories)",
+      "started": "2026-10-27T23:28:16Z",
+      "completed": "2026-10-27T23:31:13Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645529,
+      "name": "verify-memory-sqlite (ui-qualification-original-header)",
+      "started": "2026-10-27T23:31:06Z",
+      "completed": "2026-10-27T23:33:49Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645548,
+      "name": "verify-memory-sqlite (ui-qualification-original-runtime-error)",
+      "started": "2026-10-27T23:19:33Z",
+      "completed": "2026-10-27T23:23:49Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645557,
+      "name": "verify-memory-sqlite (ui-qualification-original-paused-exit)",
+      "started": "2026-10-27T23:19:58Z",
+      "completed": "2026-10-27T23:23:57Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645564,
+      "name": "verify-memory-sqlite (ui-qualification-original-administration)",
+      "started": "2026-10-27T23:31:29Z",
+      "completed": "2026-10-27T23:34:24Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645575,
+      "name": "verify-memory-sqlite (ui-qualification-participant-debug)",
+      "started": "2026-10-27T23:31:47Z",
+      "completed": "2026-10-27T23:33:37Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645586,
+      "name": "verify-memory-sqlite (ui-qualification-json-roster)",
+      "started": "2026-10-27T23:25:48Z",
+      "completed": "2026-10-27T23:39:54Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645611,
+      "name": "verify-memory-sqlite (ui-qualification-original-player-exit)",
+      "started": "2026-10-27T23:27:45Z",
+      "completed": "2026-10-27T23:31:45Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645614,
+      "name": "verify-memory-sqlite (ui-participant-console)",
+      "started": "2026-10-27T23:23:02Z",
+      "completed": "2026-10-27T23:26:33Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645636,
+      "name": "verify-memory-sqlite (ui-qualification-original-player-version-error)",
+      "started": "2026-10-27T23:28:10Z",
+      "completed": "2026-10-27T23:31:26Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645643,
+      "name": "verify-memory-sqlite (ui-controller-timer)",
+      "started": "2026-10-27T23:24:34Z",
+      "completed": "2026-10-27T23:30:18Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645651,
+      "name": "verify-memory-sqlite (ui-qualification-activation-roster-warnings)",
+      "started": "2026-10-27T23:25:47Z",
+      "completed": "2026-10-27T23:37:23Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645663,
+      "name": "verify-memory-sqlite (ui-qualification-content)",
+      "started": "2026-10-27T23:27:52Z",
+      "completed": "2026-10-27T23:31:04Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645669,
+      "name": "verify-memory-sqlite (ui-qualification-original-starter)",
+      "started": "2026-10-27T23:31:21Z",
+      "completed": "2026-10-27T23:34:14Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645725,
+      "name": "verify-memory-sqlite (ui-qualification-participant-review)",
+      "started": "2026-10-27T23:27:50Z",
+      "completed": "2026-10-27T23:31:42Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645750,
+      "name": "verify-memory-sqlite (ui-participant-detail-review)",
+      "started": "2026-10-27T23:26:44Z",
+      "completed": "2026-10-27T23:41:18Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645774,
+      "name": "verify-memory-sqlite (ui-review-readiness)",
+      "started": "2026-10-27T23:26:28Z",
+      "completed": "2026-10-27T23:39:54Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645828,
+      "name": "verify-memory-sqlite (ui-attachments)",
+      "started": "2026-10-27T23:21:57Z",
+      "completed": "2026-10-27T23:25:09Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645843,
+      "name": "verify-memory-sqlite (ui-original-review)",
+      "started": "2026-10-27T23:22:02Z",
+      "completed": "2026-10-27T23:24:40Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645868,
+      "name": "verify-memory-sqlite (ui-original-workspace-files)",
+      "started": "2026-10-27T23:27:38Z",
+      "completed": "2026-10-27T23:30:28Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645869,
+      "name": "verify-memory-sqlite (integration-memory)",
+      "started": "2026-10-27T23:17:12Z",
+      "completed": "2026-10-27T23:18:35Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645887,
+      "name": "verify-memory-sqlite (local-demo)",
+      "started": "2026-10-27T23:18:38Z",
+      "completed": "2026-10-27T23:19:56Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645909,
+      "name": "verify-memory-sqlite (compatibility)",
+      "started": "2026-10-27T23:24:43Z",
+      "completed": "2026-10-27T23:25:44Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645926,
+      "name": "verify-memory-sqlite (integration-file)",
+      "started": "2026-10-27T23:20:11Z",
+      "completed": "2026-10-27T23:24:12Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645931,
+      "name": "verify-memory-sqlite (ui-workspace-rename)",
+      "started": "2026-10-27T23:27:30Z",
+      "completed": "2026-10-27T23:29:13Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645944,
+      "name": "verify-memory-sqlite (integration-sqlite)",
+      "started": "2026-10-27T23:25:39Z",
+      "completed": "2026-10-27T23:27:26Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645945,
+      "name": "verify-memory-sqlite (ui-participant-monitor-live)",
+      "started": "2026-10-27T23:24:40Z",
+      "completed": "2026-10-27T23:26:25Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645949,
+      "name": "verify-memory-sqlite (ui-admin-workspace-access)",
+      "started": "2026-10-27T23:26:36Z",
+      "completed": "2026-10-27T23:28:33Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645951,
+      "name": "verify-memory-sqlite (ui-participant-command-completion)",
+      "started": "2026-10-27T23:24:16Z",
+      "completed": "2026-10-27T23:25:36Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645953,
+      "name": "verify-memory-sqlite (ui-admin-delete)",
+      "started": "2026-10-27T23:26:37Z",
+      "completed": "2026-10-27T23:29:44Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645967,
+      "name": "verify-memory-sqlite (ui-deletion-confirmation)",
+      "started": "2026-10-27T23:26:01Z",
+      "completed": "2026-10-27T23:27:43Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645988,
+      "name": "verify-memory-sqlite (startup-file)",
+      "started": "2026-10-27T23:27:29Z",
+      "completed": "2026-10-27T23:27:49Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527645993,
+      "name": "verify-memory-sqlite (shutdown)",
+      "started": "2026-10-27T23:27:22Z",
+      "completed": "2026-10-27T23:27:47Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527646002,
+      "name": "verify-memory-sqlite (shutdown-file)",
+      "started": "2026-10-27T23:27:00Z",
+      "completed": "2026-10-27T23:27:28Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527646004,
+      "name": "verify-memory-sqlite (ui-console-debug)",
+      "started": "2026-10-27T23:24:51Z",
+      "completed": "2026-10-27T23:26:09Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527646019,
+      "name": "verify-memory-sqlite (ui-workspace-delete)",
+      "started": "2026-10-27T23:25:12Z",
+      "completed": "2026-10-27T23:26:41Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527646031,
+      "name": "verify-memory-sqlite (ui-adaptive-runtime)",
+      "started": "2026-10-27T23:27:21Z",
+      "completed": "2026-10-27T23:28:13Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527646039,
+      "name": "verify-memory-sqlite (ui-verona-development)",
+      "started": "2026-10-27T23:27:44Z",
+      "completed": "2026-10-27T23:29:42Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527646079,
+      "name": "verify-memory-sqlite (ui-original-xml-schema)",
+      "started": "2026-10-27T23:27:20Z",
+      "completed": "2026-10-27T23:28:42Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527646083,
+      "name": "verify-memory-sqlite (startup)",
+      "started": "2026-10-27T23:26:11Z",
+      "completed": "2026-10-27T23:26:35Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527646118,
+      "name": "verify-memory-sqlite (ui-participant-native-routes)",
+      "started": "2026-10-27T23:27:29Z",
+      "completed": "2026-10-27T23:30:30Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527647848,
+      "name": "verify-memory-sqlite (ui-qualification-system-check-saved)",
+      "started": "2026-10-27T23:33:40Z",
+      "completed": "2026-10-27T23:34:51Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122527647880,
+      "name": "verify-memory-sqlite (ui-qualification-offline-shell)",
+      "started": "2026-10-27T23:33:43Z",
+      "completed": "2026-10-27T23:35:02Z",
+      "conclusion": "success"
+    },
+    {
+      "id": 122538238598,
+      "name": "CI acceptance",
+      "started": "2026-10-27T23:41:21Z",
+      "completed": "2026-10-27T23:41:24Z",
+      "conclusion": "success"
+    }
+  ],
+  "scope": "Full accepted same-code observation; global early eligibility preserves all60 records, all89instances and24Source tasks. No hosted dispatch or end-to-end timing guarantee.",
+  "baselineContextSha256": "1a48512f2a6558039ae92c71b7d4218fb1125d4477f61163a844a5b7585938a7"
+}

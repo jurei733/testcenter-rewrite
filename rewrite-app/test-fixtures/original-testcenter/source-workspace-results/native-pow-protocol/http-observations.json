@@ -1,0 +1,518 @@
+[
+  {
+    "method": "GET",
+    "path": "/version",
+    "status": 200,
+    "wireSha256": "276de21c2e994b71dd74fece42fa92b5763fd6f56141ee5b10c26db1e3b2948f",
+    "value": {
+      "version": "19.0.0"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/system/config",
+    "status": 200,
+    "wireSha256": "740e5c22eda8e5b255b357e097eca655799c2a3e5ef14a250227ff136aaffa26",
+    "value": {
+      "version": "19.0.0",
+      "customTexts": {},
+      "appConfig": {},
+      "baseUrl": "http://127.0.0.1:32768",
+      "bruteForceProtection": [
+        "login",
+        "person"
+      ],
+      "veronaPlayerApiVersionMin": 2,
+      "veronaPlayerApiVersionMax": 6,
+      "iqbStandardResponseTypeMin": 1,
+      "iqbStandardResponseTypeMax": 1,
+      "xmlSchemaVersions": {
+        "Booklet": {
+          "repo": "testcenter-booklet-xml",
+          "min": 18,
+          "max": 18
+        },
+        "Testtakers": {
+          "repo": "testcenter-testtaker-xml",
+          "min": 17,
+          "max": 18
+        },
+        "Unit": {
+          "repo": "unit-xml",
+          "min": 17,
+          "max": 17
+        },
+        "SysCheck": {
+          "repo": "testcenter-syscheck-xml",
+          "min": 18,
+          "max": 18
+        }
+      },
+      "fileServiceUri": "",
+      "broadcastingServiceUri": "",
+      "supportedBrowsers": [
+        "chrome 154",
+        "chrome 153",
+        "edge 154",
+        "edge 153",
+        "firefox 157",
+        "firefox 156",
+        "firefox 140",
+        "ios_saf 27.0",
+        "ios_saf 26.6",
+        "safari 27",
+        "safari 26.6"
+      ],
+      "passwordMinLength": 8,
+      "passwordPattern": ".*"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/admin",
+    "status": 200,
+    "wireSha256": "e430804064c1a121ba468ac0cac8cb3ab507ef9292792fe54cbb006184896eb2",
+    "value": {
+      "token": "[redacted-owned-token-3]",
+      "displayName": "super",
+      "loginName": "super",
+      "groupLabel": null,
+      "id": 1,
+      "pwSetByAdmin": false,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "workspaceAdmin": [],
+        "superAdmin": []
+      },
+      "groupToken": null,
+      "viewSettings": [],
+      "access": {
+        "workspaceAdmin": [],
+        "superAdmin": []
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/workspace",
+    "status": 201,
+    "wireSha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "value": 1
+  },
+  {
+    "method": "PATCH",
+    "path": "/user/1/workspaces",
+    "status": 200,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "2fd365a68f1d6eaecc7033ac03b95f2e54daa71edf5a98102991658e008dd3a5",
+    "value": {
+      "player.html": {
+        "info": [
+          "Verona-Version: 6.0"
+        ],
+        "warning": [
+          "Non-Standard-Filename: `owned-pow-player-6.0.html` expected.",
+          "Resource is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "c951058edcd4486b1e803bfc8610db0aff19f2e40ba5b4dd6117364e8857df7e",
+    "value": {
+      "unit.xml": {
+        "warning": [
+          "Unit is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "d69b2bc0364f160a19b50bed6a5d84414c9fb5529f3293912e54c7325cf0527f",
+    "value": {
+      "booklet.xml": {
+        "warning": [
+          "Booklet is never used"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/workspace/1/file",
+    "status": 201,
+    "wireSha256": "26cef50780ef207f98d3b60075a0b7e6851ed3d06ebe79910cf379cea4e6e121",
+    "value": {
+      "people.xml": []
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session/login",
+    "status": 400,
+    "wireSha256": "de9fc11a4d628d3cefe8e7811056ec194ae39484f818b64bc01dad4a3ba46bef",
+    "value": "Brute Force protection active. Challenge for this password must be solved to create a session"
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "058d60973ce7dd90ec4f00d4e3c94d9b3bcdcaa7264c730a9bcf63a8a0f611bb",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-4]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-5]",
+      "signature": "[redacted-owned-signature-6]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "bbaa279f55b1dca6cdd3fa64767f5f4fabce76401d17216033b8c6a51357e2f4",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "bbaa279f55b1dca6cdd3fa64767f5f4fabce76401d17216033b8c6a51357e2f4",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 403,
+    "wireSha256": "815684c007b5f5f57ed91a8cd84ed96eb10e0791c49c3ba0058f8e6ae259bead",
+    "value": "Token `[redacted-owned-token-3]` of type `admin` has wrong type - `login` required."
+  },
+  {
+    "method": "PUT",
+    "path": "/session/person",
+    "status": 400,
+    "wireSha256": "c906140d9d712f038557f6c8dac3d79a5cf5806e4f34c091dd99337490c8730d",
+    "value": "Brute Force protection active. Challenge for this code must be solved to create a session"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "bbaa279f55b1dca6cdd3fa64767f5f4fabce76401d17216033b8c6a51357e2f4",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/person/challenge",
+    "status": 200,
+    "wireSha256": "64f8e9778339478ddcf4eb8eb8a46f905507a2f314081a15753dd433ad50d562",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-9]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-10]",
+      "signature": "[redacted-owned-signature-11]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 401,
+    "wireSha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+    "value": "Auth Header not sufficient: missing"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 403,
+    "wireSha256": "815684c007b5f5f57ed91a8cd84ed96eb10e0791c49c3ba0058f8e6ae259bead",
+    "value": "Token `[redacted-owned-token-3]` of type `admin` has wrong type - `login` required."
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "1894272d52055dbde5154ce5aaeacc79d3495fd16c8f272237e931a5c7406c7a",
+    "value": {
+      "token": "[redacted-owned-token-12]",
+      "displayName": "Owned proof group/owned-native-pow/sHaReD",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "1d9a32ce42469c2673c01125307e7c1fad185f7bf9276fede166dea34561aef5",
+    "value": {
+      "token": "[redacted-owned-token-13]",
+      "displayName": "Owned proof group/owned-native-pow/sHaReD",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/session/challenge",
+    "status": 200,
+    "wireSha256": "7b135253a75b36d3945f0ca73f0417c89a9e9ed0eac65d5e8657160dedd13ac8",
+    "value": {
+      "algorithm": "SHA-256",
+      "challenge": "[redacted-owned-challenge-14]",
+      "maxNumber": 1000000,
+      "salt": "[redacted-owned-salt-15]",
+      "signature": "[redacted-owned-signature-16]"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "b64e5e43c965dcbf8bf1d37024bb4c3cd4c6f1366d74cfbba1bcd5b133d33869",
+    "value": {
+      "token": "[redacted-owned-token-17]",
+      "displayName": "Owned proof group/owned-native-pow-peer",
+      "loginName": "owned-native-pow-peer",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "18ac9e9568706e37f59617993552b7fde09886f6083c6cc598d2302d56fc269d",
+    "value": {
+      "token": "[redacted-owned-token-18]",
+      "displayName": "Owned proof group/owned-native-pow-peer/sHaReD",
+      "loginName": "owned-native-pow-peer",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [],
+      "claims": {
+        "test": [
+          {
+            "id": "ORACLE.POW.BOOK",
+            "type": "test",
+            "label": "Owned proof booklet",
+            "flags": {
+              "locked": false,
+              "running": false
+            }
+          }
+        ]
+      },
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {
+        "test": [
+          "ORACLE.POW.BOOK"
+        ]
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/session",
+    "status": 400,
+    "wireSha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+    "value": "Wrong challenge response"
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "bbaa279f55b1dca6cdd3fa64767f5f4fabce76401d17216033b8c6a51357e2f4",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/session",
+    "status": 205,
+    "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value": null
+  },
+  {
+    "method": "GET",
+    "path": "/session",
+    "status": 200,
+    "wireSha256": "bbaa279f55b1dca6cdd3fa64767f5f4fabce76401d17216033b8c6a51357e2f4",
+    "value": {
+      "token": "[redacted-owned-token-7]",
+      "displayName": "Owned proof group/owned-native-pow",
+      "loginName": "owned-native-pow",
+      "groupLabel": "Owned proof group",
+      "id": null,
+      "pwSetByAdmin": null,
+      "customTexts": {},
+      "flags": [
+        "codeRequired"
+      ],
+      "claims": {},
+      "groupToken": "[redacted-owned-groupToken-8]",
+      "viewSettings": [],
+      "access": {}
+    }
+  }
+]

@@ -24,11 +24,13 @@ export type ParticipantSaveOutboxLogBatch = {
 };
 
 export type ParticipantSaveOutboxEntry = {
-  version: typeof OUTBOX_VERSION;
+  version: 1 | 2;
   deliveryId: string;
   testRunId: string;
   unitKey: string;
   response: string;
+  /** No Player response changed; deliver logs without creating an answer or clock. */
+  logOnly?: true;
   status: "running" | "paused";
   logs: ParticipantSaveOutboxLogBatch[];
   queuedAt: string;
@@ -43,15 +45,17 @@ export function createParticipantSaveOutboxEntry(input: {
   testRunId: string;
   unitKey: string;
   response: string;
+  logOnly?: true;
   status: "running" | "paused";
   logs: ParticipantSaveOutboxLogBatch[];
 }): ParticipantSaveOutboxEntry {
   return {
-    version: OUTBOX_VERSION,
+    version: input.logOnly ? 2 : OUTBOX_VERSION,
     deliveryId: createDeliveryId(),
     testRunId: input.testRunId,
     unitKey: input.unitKey,
     response: input.response,
+    ...(input.logOnly ? { logOnly: true as const } : {}),
     status: input.status,
     logs: input.logs,
     queuedAt: new Date().toISOString()
@@ -246,12 +250,13 @@ function isParticipantSaveOutboxEntry(
   }
   const entry = value as Partial<ParticipantSaveOutboxEntry>;
   return (
-    entry.version === OUTBOX_VERSION &&
+    (entry.version === OUTBOX_VERSION && entry.logOnly === undefined || entry.version === 2 && entry.logOnly === true) &&
     typeof entry.deliveryId === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(entry.deliveryId) &&
     isBoundedIdentifier(entry.testRunId) &&
     isBoundedIdentifier(entry.unitKey) &&
     typeof entry.response === "string" &&
+    (entry.logOnly === undefined || entry.logOnly === true) &&
     entry.response.length <= MAX_STORED_RESPONSE_CHARS &&
     (entry.status === "running" || entry.status === "paused") &&
     typeof entry.queuedAt === "string" &&
@@ -284,6 +289,9 @@ function isParticipantSaveOutboxLogs(
       typeof entry === "object" &&
       entry !== null &&
       typeof entry.key === "string" &&
+      (entry.clientEntryId === undefined ||
+        (typeof entry.clientEntryId === "string" &&
+          /^[A-Za-z0-9][A-Za-z0-9._:-]{0,209}$/.test(entry.clientEntryId))) &&
       entry.key.length > 0 &&
       entry.key.length <= 200 &&
       (entry.content === undefined ||

@@ -1,0 +1,58 @@
+{
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "scope": "Source frontend on owned API/player fixtures; effects follow successful ACK completion, not guaranteed issuance FIFO",
+  "cases": {
+    "queued-pause-resume": {
+      "acknowledgedCommandIds": [
+        1,
+        2
+      ],
+      "acknowledgementCompletionOrder": [
+        1,
+        2
+      ],
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR",
+        "PAUSED",
+        "RUNNING"
+      ],
+      "commandEffects": [
+        "pause",
+        "resume"
+      ],
+      "iframeCount": 1,
+      "cardCount": 0,
+      "dialogRetained": true,
+      "oldPlayerFrameRetired": true,
+      "commandPollCount": 2
+    },
+    "queued-pause-resume-reversed-acks": {
+      "acknowledgedCommandIds": [
+        1,
+        2
+      ],
+      "acknowledgementCompletionOrder": [
+        2,
+        1
+      ],
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR",
+        "RUNNING",
+        "PAUSED"
+      ],
+      "commandEffects": [
+        "resume",
+        "pause"
+      ],
+      "iframeCount": 0,
+      "cardCount": 1,
+      "dialogRetained": true,
+      "oldPlayerFrameRetired": true,
+      "commandPollCount": 2
+    }
+  }
+}

@@ -25,6 +25,14 @@ const record = (suffix = "a") => ({
   }
 });
 const response = status => ({ status, ok: status >= 200 && status < 300 });
+test("log-only background packets omit answers and clocks and use the version rejected by old workers", async () => {
+  const value = record("logs"); value.entry.version = 2; value.entry.logOnly = true;
+  value.entry.logs = [{ unitKey: null, originalUnitId: null, entries: [{ key: "CONTROLLER", content: "ERROR", timeStamp: 1 }] }];
+  const f = fixture([value]); await f.run(async () => response(200));
+  assert.equal(f.sent.length, 1); const body = JSON.parse(f.sent[0].init.body);
+  assert.equal(Object.hasOwn(body, "unitResponse"), false); assert.equal(Object.hasOwn(body, "responseTimestamp"), false);
+  assert.equal(body.responseOnly, true); assert.deepEqual(body.logs, value.entry.logs);
+});
 const fixture = (records = [record()]) => {
   const pending = new Map(records.map(item => [item.key, structuredClone(item)]));
   const sent = [];
@@ -52,8 +60,24 @@ test("background saves retain exact responses and IDs across authentication and 
     assert.equal(sent[0].url, "https://testcenter.example/api/v1/participant/test-runs/run-a/save-progress");
     assert.deepEqual(JSON.parse(sent[0].init.body), {
       deliveryId: "delivery-a", responseUnitKey: "unit-a", status: "running",
+      responseOnly: true,
+      responseTimestamp: Date.parse(original[0].entry.queuedAt),
       unitResponse: original[0].entry.response, logs: []
     });
+  }
+});
+
+test("legacy background records without a valid capture time retain their exact answer and retry identity", async () => {
+  for (const queuedAt of [undefined, "invalid-date"]) {
+    const item = record(); item.entry.queuedAt = queuedAt;
+    const { pending, sent, run } = fixture([item]);
+    await assert.rejects(run(async () => response(503)), /remain queued/);
+    await run(async () => response(200));
+    assert.equal(pending.size, 0);
+    assert.equal(sent[0].init.body, sent[1].init.body);
+    const body = JSON.parse(sent[1].init.body);
+    assert.equal(Object.hasOwn(body, "responseTimestamp"), false);
+    assert.equal(body.unitResponse, item.entry.response); assert.equal(body.deliveryId, item.entry.deliveryId);
   }
 });
 
@@ -65,6 +89,27 @@ test("background saves retain network failures and continue independently with o
   }), /remain queued/);
   assert.deepEqual([...pending.keys()], ["run-a:unit-a"]);
   await run(async () => response(204));
+  assert.equal(pending.size, 0);
+});
+
+test("background retries preserve stable log identities when a newer answer replaces an in-flight packet", async () => {
+  const item = record();
+  item.entry.logs = [{unitKey: null, originalUnitId: null, entries: [
+    {clientEntryId: "stable-error", key: "CONTROLLERERROR", content: "ERROR Ω", timeStamp: 1_791_411_000_000}
+  ]}];
+  const {pending, sent, run} = fixture([item]);
+  await assert.rejects(run(async () => {
+    const replacement = structuredClone(pending.get(item.key));
+    replacement.entry.deliveryId = "replacement-delivery";
+    replacement.entry.response = "latest exact answer\n ä🙂 ";
+    pending.set(item.key, replacement);
+    return response(503);
+  }), /remain queued/);
+  await run(async () => response(200));
+  const bodies = sent.map(request => JSON.parse(request.init.body));
+  assert.notEqual(bodies[0].deliveryId, bodies[1].deliveryId);
+  assert.deepEqual(bodies[0].logs, bodies[1].logs);
+  assert.equal(bodies[1].unitResponse, "latest exact answer\n ä🙂 ");
   assert.equal(pending.size, 0);
 });
 

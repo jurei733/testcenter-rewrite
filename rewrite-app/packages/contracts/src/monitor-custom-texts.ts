@@ -51,10 +51,6 @@ export const originalMonitorCustomTextDefaults = {
   gm_timeleft_tooltip: "Verbleibende Zeit: %s von %s Minute(n)",
   gm_timeup_tooltip: "Zeit abgelaufen",
   gm_timemax_tooltip: "Zeitgesteuerter Block: %s Minute(n)",
-  gm_booklet_error_missing_id: "Kein Testheft zugeordnet!",
-  gm_booklet_error_missing_file: "Kein Zugriff auf Testheft-Datei!",
-  gm_booklet_error_xml: "Konnte Testheft-Datei nicht lesen!",
-  gm_booklet_error_general: "Fehler beim Zugriff auf Testheft-Datei!",
   gm_control_goto_tooltip: "Bitte Block auswählen",
   gm_multiple_booklet_species_warning:
     " - Die verwendeten Booklets sind zu unterschiedlich, um gemeinsam gesteuert zu werden.",
@@ -65,6 +61,10 @@ export const originalMonitorCustomTextDefaults = {
 } as const;
 
 export type MonitorCustomTextKey = keyof typeof originalMonitorCustomTextDefaults;
+// Original templates and generated filter labels also read keys that have no
+// catalog default. Their absence must remain empty until the caller's fallback.
+export type MonitorRuntimeCustomTextKey = MonitorCustomTextKey | "gm_add_custom_filter"
+  | `gm_col_${string}` | `gm_filter_target_${string}` | `gm_filter_type_${string}`;
 
 export const originalMonitorCustomTextKeys = Object.freeze(
   Object.keys(originalMonitorCustomTextDefaults) as MonitorCustomTextKey[]
@@ -78,11 +78,17 @@ export const mergeMonitorCustomTextScopes = (
   ...(loginCustomTexts ?? {})
 });
 
+export const resolveMonitorCustomTextValue = (
+  customTexts: Readonly<Record<string, string>> | null | undefined,
+  key: MonitorRuntimeCustomTextKey
+): string => customTexts?.[key] ?? (Object.hasOwn(originalMonitorCustomTextDefaults, key)
+  ? originalMonitorCustomTextDefaults[key as MonitorCustomTextKey] : "");
+
 export const resolveMonitorCustomText = (
   customTexts: Readonly<Record<string, string>> | null | undefined,
-  key: MonitorCustomTextKey,
-  fallback: string = originalMonitorCustomTextDefaults[key]
-): string => customTexts?.[key]?.trim() || fallback;
+  key: MonitorRuntimeCustomTextKey,
+  fallback: string = key === "gm_add_custom_filter" ? "Eigenen Filter hinzufügen" : resolveMonitorCustomTextValue(undefined, key)
+): string => resolveMonitorCustomTextValue(customTexts, key) || fallback;
 
 export const formatMonitorCustomText = (
   customTexts: Readonly<Record<string, string>> | null | undefined,

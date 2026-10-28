@@ -1,6 +1,8 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp } from "node:fs/promises";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -11,7 +13,10 @@ import { chromium } from "playwright";
 // particular it never resets a caller-provided SQLite file or uses port 4311.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
-const root = await mkdtemp(join(tmpdir(), "testcenter-original-system-check-saved-"));
+const welcomeReference = await loadOriginalVisualReference("original-system-check-welcome");
+const scratch = await mkdtemp(join(tmpdir(), "testcenter-original-system-check-saved-"));
+const root = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, "system-check-saved") : scratch;
+await mkdir(root, {recursive:true});
 process.stdout.write(`owned_artifacts=${root}\n`);
 const port = await new Promise((done, reject) => {
   const listener = createServer();
@@ -26,7 +31,7 @@ const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn(process.execPath, [resolve("apps/api/dist/apps/api/src/index.js")], {
   cwd: frontendRoot,
   env: { ...process.env, PORT: String(port), FIRST_SLICE_STORE: "sqlite",
-    FIRST_SLICE_SQLITE_FILE: join(root, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_SQLITE_FILE: join(scratch, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", REQUIRE_LOGIN_PASSWORD: "false" },
   stdio: ["ignore", "ignore", "inherit"]
 });
@@ -60,16 +65,42 @@ try {
   assert.equal(imported.importJob.status, "completed");
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  assertOriginalVisualBrowser(browser, welcomeReference);
   for (const [theme, closeAction] of [["Primar", "cancel"], ["Sekundar", "confirm"], ["Erwachsene", "escape"]]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
+    await page.bringToFront();
+    const capture = async name => {
+      await page.bringToFront();
+      await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+      try {
+        await page.screenshot({path:join(root, name + ".png"), fullPage:false});
+      } catch (error) {
+        try {
+          const state = await page.evaluate(() => ({visibility:document.visibilityState,focus:document.hasFocus(),
+            viewport:{width:innerWidth,height:innerHeight,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,scale:visualViewport?.scale},
+            welcome:document.querySelector("#originalSystemCheckWelcome")?.getBoundingClientRect().toJSON(),
+            nextDisabled:document.querySelector("#syscheck-next-step")?.disabled}));
+          await writeFile(join(root,name + "-capture-failure.json"),JSON.stringify({error:String(error),...state},null,2));
+          console.error(`system_check_capture_failure=${JSON.stringify(state)}`);
+        } catch (diagnosticError) {
+          console.error(`Systemcheck capture diagnostics unavailable: ${String(diagnosticError)}`);
+        }
+        throw error;
+      }
+    };
     const errors = [];
     page.on("pageerror", error => errors.push(String(error)));
     page.on("console", message => { if (message.type() === "error" && /NG\d{4}/u.test(message.text())) errors.push(message.text()); });
     await page.goto(`${baseUrl}/app/system-check?ui=original&tenantKey=ack-tenant&workspaceKey=ack-workspace&checkId=ACK.SAMPLE`, { waitUntil: "networkidle" });
     await page.locator("#originalSystemCheckWelcome").waitFor();
+    await page.locator("#syscheck-next-step:enabled").waitFor();
     await page.evaluate(() => document.fonts.ready);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden",
+      "A fresh Original Systemcheck must load its window/route styles without visiting login first.");
+    assert.equal(await page.locator(".system-check-navigation").count(), 0,
+      "Original navigation is owned by its header and report controls.");
     // Values verified against the unmodified 19.0 frontend, not a screenshot
     // of this adaptation. Scope the assertions to the matched welcome state.
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
@@ -96,21 +127,9 @@ try {
           titleCentered: Math.abs(titleBounds.x + titleBounds.width / 2 - toolbar.x - toolbar.width / 2) < .01
             && Math.abs(titleBounds.y + titleBounds.height / 2 - toolbar.y - toolbar.height / 2) < .01 };
       });
-      const { logoSize, ...exactAppearance } = appearance;
-      const expectedLogo = width < 600 ? [92.8671875, 40] : [111.4375, 48];
-      // Chromium quantizes proportional image widths differently on Linux
-      // and macOS (one 1/128px half-step). Retain the rendered-reference
-      // dimensions with a single 1/64px layout-unit tolerance, not a pixel.
-      assert.ok(Math.abs(logoSize[0] - expectedLogo[0]) <= 1 / 64,
-        `Original logo width: ${logoSize[0]} instead of ${expectedLogo[0]}`);
-      assert.equal(logoSize[1], expectedLogo[1]);
-      assert.deepEqual(exactAppearance, { width, color: "rgb(25, 28, 29)",
-        backgrounds: ["rgb(255, 255, 255)", "rgb(255, 255, 255)"], disabled: true,
-        opacity: "1", iconSize: [24, 24], tableSizing: "content-box",
-        topbarHeight: width < 600 ? 56 : 64,
-        titleTypography: ['"Nunito Sans"', "22px", "28px"], titleCentered: true });
+      assert.deepEqual(appearance, welcomeReference.measurements[`${theme}-${screen}`]);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-      await page.screenshot({ path: join(root, `${theme}-welcome-${screen}.png`), fullPage: true });
+      await capture(`${theme}-welcome-${screen}`);
     }
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.locator("#syscheck-next-step").click();
@@ -139,12 +158,12 @@ try {
     assert.equal(await dialog.getByRole("button", { name: labels[0], exact: true }).evaluate(element => element === document.activeElement), true);
     await page.keyboard.press("Shift+Tab");
     assert.equal(await dialog.getByRole("button", { name: labels[1], exact: true }).evaluate(element => element === document.activeElement), true);
-    await page.screenshot({ path: join(root, `${theme}-desktop.png`), fullPage: true });
+    await capture(`${theme}-desktop`);
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     const bounds = await dialog.boundingBox();
     assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390 && bounds.y >= 0 && bounds.y + bounds.height <= 844);
-    await page.screenshot({ path: join(root, `${theme}-mobile.png`), fullPage: true });
+    await capture(`${theme}-mobile`);
     if (closeAction === "escape") await page.keyboard.press("Escape");
     else await page.locator(closeAction === "cancel" ? "#globalConfirmationCancelButton" : "#globalConfirmationConfirmButton").click();
     await page.waitForURL(url => url.pathname === "/app/home");
@@ -165,7 +184,7 @@ try {
   if (server.exitCode === null) {
     const stopped = new Promise(done => server.once("exit", done));
     server.kill("SIGTERM");
-    await Promise.race([stopped, delay(5_000)]);
+    await raceWithSmokeDeadline(stopped, 5_000, () => undefined);
     if (server.exitCode === null) { server.kill("SIGKILL"); await stopped; }
   }
   process.stdout.write("owned_api=shutdown\n");

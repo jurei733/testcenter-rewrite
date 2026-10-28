@@ -38,7 +38,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 let browser, activePage;
 const metrics = {}, toastMetrics = {}, errors = [], unknown = [];
 try {
-  browser = await chromium.launch();
+  browser = await chromium.launch({ headless: process.env.UI_SMOKE_HEADFUL !== "true" });
   for (const theme of ['Primar', 'Sekundar', 'Erwachsene']) {
     for (const state of ['fresh', 'mixed', 'long', 'review']) {
       for (const [screen, width, height] of [['desktop',1280,720],['mobile',390,844]]) {
@@ -90,6 +90,7 @@ try {
           .every(img => img.complete && img.naturalWidth > 0));
         await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
         const id = `${theme}-${state}-${screen}`;
+        await page.screenshot({animations: "disabled", path:join(artifacts,id+'.png')});
         metrics[id] = await starter.evaluate(element => {
           const rect = node => { const r=node.getBoundingClientRect();
             return {x:r.x,y:r.y,width:r.width,height:r.height}; };
@@ -113,12 +114,12 @@ try {
                 padding:[style.paddingTop,style.paddingRight,style.paddingBottom,style.paddingLeft],gap:style.gap};
             })};
         });
-        await page.screenshot({path:join(artifacts,id+'.png')});
         if (state === 'review') {
           const download = starter.locator('[data-cy="review-download"]');
           const toast = page.locator('[data-cy="toast-container"] .toast');
           const captureToast = async phase => {
             await page.evaluate(() => document.fonts.ready);
+            await page.screenshot({animations: "disabled", path:join(artifacts,`${id}-toast-${phase}.png`)});
             toastMetrics[`${id}-${phase}`] = await page.locator('[data-cy="toast-container"]').evaluate(stack => {
               const rect = node => {const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}};
               const style = node => {const s=getComputedStyle(node);return {font:s.font,color:s.color,
@@ -130,7 +131,6 @@ try {
                 action:{value:item.querySelector('button').textContent.trim(),box:rect(item.querySelector('button')),
                   style:style(item.querySelector('button'))}}))};
             });
-            await page.screenshot({path:join(artifacts,`${id}-toast-${phase}.png`)});
           };
           await download.click();
           await toast.filter({hasText:'Keine Kommentare verfügbar.'}).waitFor();
@@ -154,7 +154,7 @@ try {
   console.log(JSON.stringify({result:'rendered',states:Object.keys(metrics).length,
     scope:'Unmodified current Source frontend with owned claims; not backend, persistence or full pixel identity'}));
 } catch (error) {
-  if (activePage && !activePage.isClosed()) await activePage.screenshot({path:join(artifacts,'failure.png')});
+  if (activePage && !activePage.isClosed()) await activePage.screenshot({animations: "disabled", path:join(artifacts,'failure.png')});
   await writeFile(join(artifacts,'failure.json'),JSON.stringify({error:String(error),metrics,errors,unknown},null,2));
   throw error;
 } finally { await browser?.close(); await new Promise(done=>server.close(done)); }

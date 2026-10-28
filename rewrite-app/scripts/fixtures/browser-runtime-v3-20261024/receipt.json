@@ -1,0 +1,1150 @@
+{
+  "qualification": "actual-production-composite-isolated",
+  "fullOriginalParity": false,
+  "runId": 40034252270,
+  "probe": {
+    "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+    "tree": "952f7875850ddd83bb02c52ce5597c7ee8287235",
+    "codeTree": "183d3f87507045580731c19124a8355f8684aaca",
+    "workflowBlob": "f2a79082e5f9180f360c7495c63fb06ab4aad7d1"
+  },
+  "artifacts": [
+    {
+      "identity": "8-attempt-1",
+      "artifact": 12536781322,
+      "sha256": "e21c40ec7c2195d04715330a73042c227d355d0206e5cac4f48be4ebc8271b4e",
+      "members": 18
+    },
+    {
+      "identity": "2-attempt-1",
+      "artifact": 12536781090,
+      "sha256": "49b840b1ef6cdb680b7e4e21f07de6451367ace0e802f2b038892ed3492608fa",
+      "members": 18
+    },
+    {
+      "identity": "producer",
+      "artifact": 12536735601,
+      "sha256": "d2283a314a8266830f34210a533ae43dae754174d57a679e69d8c9fc42972d95",
+      "members": 18
+    },
+    {
+      "identity": "3-attempt-1",
+      "artifact": 12536706215,
+      "sha256": "34d6c765402959b81161d860c943f1fa9427b84b1d00bfd5fd27e65599e4eaf8",
+      "members": 18
+    },
+    {
+      "identity": "4-attempt-1",
+      "artifact": 12536591792,
+      "sha256": "d32b5502de3bcc147d61d7cef306096968bc8cdc8237109e9157359f6b00a6e3",
+      "members": 18
+    },
+    {
+      "identity": "5-attempt-1",
+      "artifact": 12536301824,
+      "sha256": "027c5df2332eb2b14d4dfd819a295cfbd23e1c5aed0fd5eb282bd863ea1b1ac8",
+      "members": 18
+    },
+    {
+      "identity": "6-attempt-1",
+      "artifact": 12536063387,
+      "sha256": "9d3cb8f4983fa3fc2dddd94b890c620539011cea2c8c920317fe820f99478ed1",
+      "members": 18
+    },
+    {
+      "identity": "4-attempt-2",
+      "artifact": 12535858806,
+      "sha256": "67a91a4e7c85da36e538b584bb633e9417b9344f2489c94cbeb6daf45f3d655d",
+      "members": 18
+    },
+    {
+      "identity": "7-attempt-1",
+      "artifact": 12535753605,
+      "sha256": "8126cba43096cbad1c4e004b00f5e9beb769c4fc0b6f5a3a41cb245d66135b1b",
+      "members": 18
+    },
+    {
+      "identity": "1-attempt-1",
+      "artifact": 12535469192,
+      "sha256": "d31c981be4de37836d3720bf5b811a7d4de68890d06dd9de34f9ea2628991f63",
+      "members": 18
+    }
+  ],
+  "packageArtifact": {
+    "id": 12535783284,
+    "bytes": 26149777,
+    "sha256": "0723b39f720bcbe25445e5a47ba740202d6484696c604a093b9a40ef2d4ff72a"
+  },
+  "jobs": [
+    {
+      "id": 120689721318,
+      "name": "Actual native material producer",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120690168426,
+      "name": "Actual offline v3 consumer 3",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120690168461,
+      "name": "Actual offline v3 consumer 6",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120690168501,
+      "name": "Actual offline v3 consumer 2",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120690168515,
+      "name": "Actual offline v3 consumer 5",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120690168528,
+      "name": "Actual offline v3 consumer 1",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120690168532,
+      "name": "Actual offline v3 consumer 8",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120690168547,
+      "name": "Actual offline v3 consumer 7",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120690168579,
+      "name": "Actual offline v3 consumer 4",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "events": [
+    {
+      "job": 120689721318,
+      "name": "Actual native material producer",
+      "events": [
+        {
+          "mode": "pack",
+          "phase": "base_verified",
+          "elapsedMs": 220,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261012.334.1",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "pack",
+          "phase": "apt_update",
+          "elapsedMs": 244
+        },
+        {
+          "mode": "pack",
+          "phase": "apt_download",
+          "elapsedMs": 7292,
+          "requested": 33
+        },
+        {
+          "mode": "pack",
+          "phase": "native_apt_oracle",
+          "elapsedMs": 13614,
+          "downloadMs": 6189,
+          "packages": 17
+        },
+        {
+          "mode": "pack",
+          "elapsedMs": 39264,
+          "packages": 17,
+          "bytes": 25937806,
+          "downloadMs": 6189,
+          "aptInstallMs": 9457,
+          "materialCaptureMs": 16067
+        }
+      ]
+    },
+    {
+      "job": 120690168426,
+      "name": "Actual offline v3 consumer 3",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 227,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261012.334.1",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 354,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "1"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 20986,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261012.334.1",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 20986,
+          "offlineInstallMs": 20632,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    },
+    {
+      "job": 120690168461,
+      "name": "Actual offline v3 consumer 6",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 402,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261023.334.3",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 520,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "1"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 36822,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261023.334.3",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 36822,
+          "offlineInstallMs": 36302,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    },
+    {
+      "job": 120690168501,
+      "name": "Actual offline v3 consumer 2",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 141,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261012.334.1",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 292,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "1"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 21644,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261012.334.1",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 21645,
+          "offlineInstallMs": 21353,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    },
+    {
+      "job": 120690168515,
+      "name": "Actual offline v3 consumer 5",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 291,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261012.334.1",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 439,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "1"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 34264,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261012.334.1",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 34264,
+          "offlineInstallMs": 33825,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    },
+    {
+      "job": 120690168528,
+      "name": "Actual offline v3 consumer 1",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 267,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261012.334.1",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 413,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "1"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 27560,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261012.334.1",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 27560,
+          "offlineInstallMs": 27147,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    },
+    {
+      "job": 120690168532,
+      "name": "Actual offline v3 consumer 8",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 225,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261012.334.1",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 365,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "1"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 21638,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261012.334.1",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 21638,
+          "offlineInstallMs": 21273,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    },
+    {
+      "job": 120690168547,
+      "name": "Actual offline v3 consumer 7",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 160,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261012.334.1",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 289,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "1"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 20272,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261012.334.1",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 20272,
+          "offlineInstallMs": 19983,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    },
+    {
+      "job": 120690168579,
+      "name": "Actual offline v3 consumer 4",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 404,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261023.334.3",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 518,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "1"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 46625,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261023.334.3",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 46625,
+          "offlineInstallMs": 46107,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    },
+    {
+      "job": 120691974419,
+      "name": "Actual offline v3 consumer 4, attempt 2",
+      "events": [
+        {
+          "mode": "restore",
+          "phase": "base_verified",
+          "elapsedMs": 244,
+          "inventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+          "imageVersion": "20261012.334.1",
+          "producerImageVersion": "20261012.334.1",
+          "format": 3
+        },
+        {
+          "mode": "restore",
+          "phase": "offline_install",
+          "elapsedMs": 368,
+          "packages": 17,
+          "bytes": 25937806,
+          "producerRunAttempt": "1",
+          "consumerRunAttempt": "2"
+        },
+        {
+          "mode": "restore",
+          "phase": "material_verified",
+          "elapsedMs": 25330,
+          "producerImageVersion": "20261012.334.1",
+          "consumerImageVersion": "20261012.334.1",
+          "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195"
+        },
+        {
+          "mode": "restore",
+          "elapsedMs": 25330,
+          "offlineInstallMs": 24962,
+          "packages": 17,
+          "bytes": 25937806,
+          "inventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272"
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "desktop-empty",
+      "width": 1366,
+      "height": 900,
+      "pixelSha256": "fd86364dfd862be0b732a31be264abb6aabc04a094e6123253972896c22869b0",
+      "pngSha256": "cca874f3e7c6ac2b53f571605a4e1470eacf5e0cbdcfcb73ebb14cff9299c0b8",
+      "observedMatchingFiles": 20,
+      "independentlyDecoded": true,
+      "reusedCanonicalPng": "../browser-material-cohorts-20261023/desktop-empty.png"
+    },
+    {
+      "name": "desktop-input",
+      "width": 1366,
+      "height": 900,
+      "pixelSha256": "8a84c7b5e84e54f36a18ab2a97b85a57cc5ec79ff99c026fefc9ba60f2e090ad",
+      "pngSha256": "c1023a35792748c290a456d66f234b2879670ab9ab65db0ad6e40a8a69140f1d",
+      "observedMatchingFiles": 20,
+      "independentlyDecoded": true,
+      "reusedCanonicalPng": "../browser-material-cohorts-20261023/desktop-input.png"
+    },
+    {
+      "name": "mobile-empty",
+      "width": 390,
+      "height": 844,
+      "pixelSha256": "375df6af3cedc81717ff5065be614d222b29301b5e0629ed2b23ee47729c2675",
+      "pngSha256": "e287c8e4428510367b813c03d2d44246dd34f8a849b13f11e27bb382c9e899bf",
+      "observedMatchingFiles": 20,
+      "independentlyDecoded": true,
+      "reusedCanonicalPng": "../browser-material-cohorts-20261023/mobile-empty.png"
+    },
+    {
+      "name": "mobile-input",
+      "width": 390,
+      "height": 844,
+      "pixelSha256": "5925f43b80571c9f53ec31211b6ea56cbd39b9f9ae5190be48477208b700f846",
+      "pngSha256": "bfe2a0bd26c99657a0c53b64595a49d5471c266845c0ac373e3e1de87489fcd6",
+      "observedMatchingFiles": 20,
+      "independentlyDecoded": true,
+      "reusedCanonicalPng": "../browser-material-cohorts-20261023/mobile-input.png"
+    }
+  ],
+  "pngFilesCompared": 80,
+  "nativeArchiveBytesVerified": 25937806,
+  "supervisionPassed": 10,
+  "observations": [
+    {
+      "identity": "producer",
+      "job": 120689721318,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261012.334.1",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "88d68dd498d9a9b8724645d0e40cc718439677a67c81efd09be7478914576739",
+      "elapsedMs": 39264
+    },
+    {
+      "identity": "1-attempt-1",
+      "job": 120690168528,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261012.334.1",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "88d68dd498d9a9b8724645d0e40cc718439677a67c81efd09be7478914576739",
+      "elapsedMs": 27560
+    },
+    {
+      "identity": "2-attempt-1",
+      "job": 120690168501,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261012.334.1",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "88d68dd498d9a9b8724645d0e40cc718439677a67c81efd09be7478914576739",
+      "elapsedMs": 21645
+    },
+    {
+      "identity": "3-attempt-1",
+      "job": 120690168426,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261012.334.1",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "88d68dd498d9a9b8724645d0e40cc718439677a67c81efd09be7478914576739",
+      "elapsedMs": 20986
+    },
+    {
+      "identity": "4-attempt-1",
+      "job": 120690168579,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261023.334.3",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "3a0114491650158f006aa46430b45426beb7dd2c9fabc11aadd65fcf29cc2974",
+      "elapsedMs": 46625
+    },
+    {
+      "identity": "5-attempt-1",
+      "job": 120690168515,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261012.334.1",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "88d68dd498d9a9b8724645d0e40cc718439677a67c81efd09be7478914576739",
+      "elapsedMs": 34264
+    },
+    {
+      "identity": "6-attempt-1",
+      "job": 120690168461,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261023.334.3",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "3a0114491650158f006aa46430b45426beb7dd2c9fabc11aadd65fcf29cc2974",
+      "elapsedMs": 36822
+    },
+    {
+      "identity": "7-attempt-1",
+      "job": 120690168547,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261012.334.1",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "88d68dd498d9a9b8724645d0e40cc718439677a67c81efd09be7478914576739",
+      "elapsedMs": 20272
+    },
+    {
+      "identity": "8-attempt-1",
+      "job": 120690168532,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "1",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261012.334.1",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "88d68dd498d9a9b8724645d0e40cc718439677a67c81efd09be7478914576739",
+      "elapsedMs": 21638
+    },
+    {
+      "identity": "4-attempt-2",
+      "job": 120691974419,
+      "context": {
+        "commit": "0ac0566e4494f71c6069da7dfc75f2c98dd1679a",
+        "runId": "40034252270",
+        "runAttempt": "2",
+        "imageOS": "ubuntu24",
+        "imageVersion": "20261012.334.1",
+        "osSha256": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+        "platform": "linux",
+        "arch": "x64",
+        "nodeMajor": "22",
+        "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+        "nativeDepsSha256": "124889d54d65f5f40f9789f3d8ac1fb47595bba58c334ef406428e127398b2d4",
+        "playwrightVersion": "1.59.1",
+        "requested": [
+          "fonts-freefont-ttf",
+          "fonts-ipafont-gothic",
+          "fonts-liberation",
+          "fonts-noto-color-emoji",
+          "fonts-tlwg-loma-otf",
+          "fonts-unifont",
+          "fonts-wqy-zenhei",
+          "libasound2t64",
+          "libatk-bridge2.0-0t64",
+          "libatk1.0-0t64",
+          "libatspi2.0-0t64",
+          "libcairo2",
+          "libcups2t64",
+          "libdbus-1-3",
+          "libdrm2",
+          "libfontconfig1",
+          "libfreetype6",
+          "libgbm1",
+          "libglib2.0-0t64",
+          "libnspr4",
+          "libnss3",
+          "libpango-1.0-0",
+          "libx11-6",
+          "libxcb1",
+          "libxcomposite1",
+          "libxdamage1",
+          "libxext6",
+          "libxfixes3",
+          "libxkbcommon0",
+          "libxrandr2",
+          "xfonts-cyrillic",
+          "xfonts-scalable",
+          "xvfb"
+        ]
+      },
+      "profileSha256": "cd4a4ee0e51d77c181f067304e0add757fdb1cde72d37fb947542d4ebe065b81",
+      "elapsedMs": 25330
+    }
+  ],
+  "materialSha256": "00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195",
+  "nativePackageCount": 17,
+  "independentDebianControlMetadataVerified": true,
+  "partialRerun": {
+    "producerAttempt": 1,
+    "consumerAttempt": 2,
+    "job": 120691974419,
+    "conclusion": "success",
+    "reusedArtifact": 12535783284
+  },
+  "files": {
+    "opposite-consumer-profile.json": "3a0114491650158f006aa46430b45426beb7dd2c9fabc11aadd65fcf29cc2974",
+    "producer-manifest.json": "a50669be5887d6237551fa8b61f568816df06ec0306f48c727b76b2083adfc74",
+    "rerun-consumer-profile.json": "cd4a4ee0e51d77c181f067304e0add757fdb1cde72d37fb947542d4ebe065b81"
+  }
+}

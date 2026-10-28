@@ -1,0 +1,52 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "testMode": false,
+  "transport": "unchanged production Apache HTTP; actual ALTCHA; no SQL seeds",
+  "runId": 40181968246,
+  "jobId": 121134715826,
+  "branch": "codex/source-native-pow-20261025",
+  "head": "ffa67c0c015a041f8103de723f5a1ead8b8f11a9",
+  "tree": "77789338c74f839d327e96dbe12cff8951f92dfd",
+  "artifact": {
+    "id": 12593679219,
+    "bytes": 4711,
+    "sha256": "6dfc32dfcd191360675a1ef2758532e22ac09bb218e6ecb6402e736803d851ba"
+  },
+  "files": {
+    "http-observations.json": "421b27e1a57b93ba81283066097928cb3c93185c279ea6699d31a6e57bb9d581",
+    "image-id.txt": "c67e56ba756e2f13f575306473a5432a28f44f60c4c1079b8ef374bb62dc9cb4",
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
+    "receipt.json": "e4080016a466c0dff28eb1d530ef20fc4f80ddf0b67b9ee9c04907871b2a641a"
+  },
+  "probeFiles": {
+    ".github/probes/source-native-pow-oracle.mjs": "c487405dd2ff0ac1a8d8b81e1e86b116a9190ac943b6f90f3d6baa55859570c7",
+    ".github/probes/source-native-pow.compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    ".github/workflows/source-native-pow.yml": "82ccafdb040568f848979b79e581a1ef822a9017782857bb2f505b09d0908c7f"
+  },
+  "sourceFiles": {
+    "backend/routes.php": "8ecafc8e25edaf2cd0453c180a23be8a8d0568f048000eb033d7772af1b3a213",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/middleware/RequireToken.class.php": "f2d19714051837e46c07adec45bc1c52205cc9a282b37441a248bf9916f3c35a",
+    "backend/src/helper/SystemConfig.class.php": "2f97c265453d34d1d7be465afd2b58ac2422f60fbdcf7e970352b60bc23e957d",
+    "backend/src/helper/Token.class.php": "d57516492d6f68fecfb070d3a9fd81edb245bd7c365c389c419504bcbaa87cf9",
+    "backend/src/data-collection/AccessSet.class.php": "e76d5c03c642a8d178c583766ffc66b27355c3606bb34add287e55ccb6cdca6c",
+    "backend/composer.lock": "47c7dda51f6d27fbbc93aaedc99d364b9eeb299d80f92d68226b0218a436b708"
+  },
+  "checks": 16,
+  "httpObservations": 32,
+  "protectedScopes": [
+    "login",
+    "person"
+  ],
+  "redaction": "Requests, passwords and bearer headers are never recorded. Response tokens and complete salt/challenge/signature values are replaced with stable aliases. Known private values in errors are replaced too. Per-response wire SHA256 is retained; this proves public structure and relationships without generated secret equality.",
+  "observedSecuritySemantics": {
+    "challengeMaxNumber": 1000000,
+    "saltCarriesCredentialParameters": true,
+    "saltExpiryParameter": false,
+    "loginSolutionReplay": "HTTP200; same stable Login token",
+    "personSolutionReplay": "HTTP200; rotates person token",
+    "personSolutionCrossLogin": "HTTP200 under a second authorized Login; resolves that peer identity"
+  },
+  "acceptanceBoundary": "Reference evidence for native HTTP/ALTCHA work only. It does not prove a Rewrite native route, native challenge handling or full parity. Existing Rewrite TTL, one-use, input binding and key-rotation checks remain required."
+}

@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:18.4
+    environment:
+      POSTGRES_DB: source_oracle
+      POSTGRES_USER: source_oracle
+      POSTGRES_PASSWORD: owned-source-database
+    healthcheck:
+      test: [CMD, pg_isready, -U, source_oracle, -d, source_oracle, -h, 127.0.0.1]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  redis:
+    image: redis:8.0-bookworm
+    command: [redis-server, --requirepass, owned-source-redis, --save, '', --appendonly, 'no']
+    healthcheck:
+      test: [CMD, redis-cli, -a, owned-source-redis, ping]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  init:
+    image: ${SOURCE_BACKEND_IMAGE:?exact source image required}
+    entrypoint: /initialize_only.sh
+    environment: &source_environment
+      DB_DATABASE: source_oracle
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      DB_USER: source_oracle
+      DB_PASSWORD: owned-source-database
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: owned-source-redis
+      REDIS_CACHE_FILES: 'false'
+      PASSWORD_SALT: owned-source-password-salt
+      PASSWORD_MIN_LENGTH: '8'
+      PASSWORD_PATTERN: '.*'
+      ADMIN_INIT_PASSWORD: owned-source-super-secret
+      SERVER_KEY: owned-source-server-key-not-a-deployment-secret
+      BRUTE_FORCE_PROTECTION: 'login person'
+      REQUIRE_LOGIN_PASSWORD: 'false'
+      BROADCASTER_ENABLED: 'false'
+      FILE_SERVER_ENABLED: 'false'
+      XML_SCHEMA_VALIDATION: 'true'
+      ALLOW_TEST_MODE: 'false'
+      NO_SAMPLE_DATA: 'yes'
+    volumes:
+      - source_data:/var/www/testcenter/data
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  backend:
+    image: ${SOURCE_BACKEND_IMAGE:?exact source image required}
+    environment: *source_environment
+    ports: ['127.0.0.1::8080']
+    volumes:
+      - source_data:/var/www/testcenter/data
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+volumes:
+  source_data:

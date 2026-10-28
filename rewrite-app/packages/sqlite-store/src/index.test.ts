@@ -401,6 +401,7 @@ test("SQLite preserves whole-test locks and monitor pauses through every run loo
     completedAt: null
   };
 
+  await repository.saveParticipantSession({tenantId:testRun.tenantId,workspaceId:testRun.workspaceId,participantSessionId:testRun.participantSessionId,contentReleaseId:testRun.contentReleaseId,loginKey:'owned-lock',groupKey:'owned-lock',status:'launched',createdAt:testRun.createdAt});
   await repository.saveTestRun(testRun);
 
   assert.equal((await repository.getTestRunById(testRun.testRunId))?.locked, true);
@@ -474,10 +475,16 @@ test("SQLite persists participant view settings and asset assignments across rep
   };
 
   try {
-    await createSqliteFirstSliceRepository(databasePath).saveParticipantRosterEntry(
-      rosterEntry,
-      null
-    );
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    for (const originalName of Object.values(rosterEntry.assetAssignments ?? {})) {
+      await repository.saveApplicationAsset({
+        applicationAssetId: `asset:${originalName}`, originalName,
+        mediaType: originalName.endsWith(".webp") ? "image/webp" : "image/png",
+        dataBase64: "aW1hZ2U=", byteLength: 5,
+        createdAt: rosterEntry.importedAt, updatedAt: rosterEntry.importedAt
+      });
+    }
+    await repository.saveParticipantRosterEntry(rosterEntry, null);
     assert.deepEqual(
       await createSqliteFirstSliceRepository(
         databasePath
@@ -710,6 +717,7 @@ test("SQLite adds current defaults to legacy application settings", async () => 
       INSERT INTO schema_migrations (version, name, applied_at)
       VALUES (39, 'add_attachment_files', '2026-08-08T20:00:00.000Z');
       CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
+      CREATE TABLE participant_sessions (participant_session_id TEXT PRIMARY KEY, tenant_id TEXT, workspace_id TEXT, content_release_id TEXT NOT NULL);
       CREATE TABLE participant_roster_entries (
         participant_roster_entry_id TEXT PRIMARY KEY
       );
@@ -799,6 +807,7 @@ test("SQLite upgrades legacy admin roles to read-write access", async () => {
       INSERT INTO schema_migrations (version, name, applied_at)
       VALUES (36, 'add_test_run_lock', '2026-08-03T00:00:00.000Z');
       CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
+      CREATE TABLE participant_sessions (participant_session_id TEXT PRIMARY KEY, tenant_id TEXT, workspace_id TEXT, content_release_id TEXT NOT NULL);
       CREATE TABLE participant_roster_entries (
         participant_roster_entry_id TEXT PRIMARY KEY
       );

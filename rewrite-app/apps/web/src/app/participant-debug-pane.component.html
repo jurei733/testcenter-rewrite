@@ -1,0 +1,115 @@
+<div class="tabs" participantDebugDrag data-debug-tabs>
+  @for (tab of windows; track tab) {
+    <div role="button" tabindex="0" (click)="toggleWindow(tab)" (keydown.enter)="toggleWindow(tab)"
+      (keydown.space)="$event.preventDefault(); toggleWindow(tab)" [class.active]="activeWindows.includes(tab)"
+      [attr.aria-pressed]="activeWindows.includes(tab)" [attr.data-debug-tab]="tab">{{ tab }}</div>
+  }
+</div>
+@if (error()) { <div class="tab tab-main" role="alert" participantDebugDrag>{{ error() }}</div> }
+@for (tab of windows; track tab) {
+  @if (activeWindows.includes(tab)) {
+    <div class="tab" [class]="'tab tab-' + (tab === 'tools' ? 'system' : tab)" participantDebugDrag [attr.data-debug-window]="tab">
+      <h1>
+        @switch (tab) {
+          @case ('main') { Main } @case ('config') { Booklet-Config } @case ('testmode') { Test-Mode }
+          @case ('booklet') { Booklet } @case ('unit') { Current Unit } @case ('customtexts') { Customtexts }
+          @case ('variables') { Tracked Variables } @case ('states') { Booklet States }
+          @case ('system') { System-Status } @case ('tools') { Tools }
+        }
+        <button class="close" type="button" [attr.aria-label]="'Close ' + tab" (click)="closeWindow(tab)">
+          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41l-6.3 6.3-1.42-1.42L9.17 12l-6.3-6.29 1.42-1.42 6.3 6.3 6.3-6.3z" fill="currentColor"/></svg>
+        </button>
+      </h1>
+      @switch (tab) {
+        @case ('main') {
+          <div><b>STATUS:</b> {{ status }}</div>
+          <div><b>TIMER:</b><ul>@for (timer of timers; track timer[0]) { <li><b>{{ timer[0] }}</b>: {{ timerText(timer[1]) }}</li> }</ul></div>
+          <div><b>MODE:</b> {{ executionMode.mode.toUpperCase() }}</div><div><b>FOCUS:</b> {{ focus() }}</div>
+          <div><b>BS:</b> {{ connection }}</div>@if (state) { <div><b>USER:</b>{{ state.participantRosterEntry?.displayName ?? state.participantSession.loginKey }}</div> }
+        }
+        @case ('config') { @for (row of config; track row[0]) { <div><b>{{ row[0] }}: </b>{{ row[1] }}</div> } }
+        @case ('testmode') { @for (row of mode; track row[0]) { <div><b>{{ row[0] }}: </b>{{ row[1] }}</div> } }
+        @case ('booklet') { @if (snapshot()) { <ng-container [ngTemplateOutlet]="treeTemplate" [ngTemplateOutletContext]="{item: tree}" /> } }
+        @case ('unit') { @if (currentUnit; as unit) { <ng-container [ngTemplateOutlet]="unitTemplate" [ngTemplateOutletContext]="{item: unit, single: true}" /> } }
+        @case ('customtexts') {
+          <input type="text" class="mat-mdc-input-element" [(ngModel)]="searchCustomText" placeholder="insert custom text token" aria-label="Custom text token"
+            role="combobox" aria-autocomplete="list" autocomplete="off" aria-controls="participant-debug-customtext-options"
+            [attr.aria-expanded]="customTextOptionsOpen" [attr.aria-activedescendant]="customTextOptionsOpen && customTextOptionIndex >= 0 ? 'participant-debug-customtext-' + customTextOptionIndex : null"
+            (focus)="openCustomTextOptions($event)" (click)="openCustomTextOptions($event)" (blur)="customTextOptionsOpen = false" (keydown)="customTextKeydown($event)">
+          <div><b>{{ selectedCustomText }}</b></div>
+        }
+        @case ('variables') {
+          <table><thead><tr><td>ID</td><td>status</td><td>value</td><td>code</td><td>score</td></tr></thead>
+            @for (unit of snapshot()?.variables ?? []; track unit.unitKey) {
+              @if (unit.variables.length) {
+                <thead><tr><td colspan="5">{{ unit.unitKey }}</td></tr></thead>
+                <tbody>@for (variable of unit.variables; track variable.id) {
+                  <tr><td>{{ variable.id }}{{ !unit.baseVariableKeys.includes(variable.id) ? ' *' : '' }}</td><td>{{ variable.status }}</td>
+                    <td [matTooltip]="valueText(variable.value)">{{ valueText(variable.value, true) }}</td><td>{{ variable.code }}</td><td>{{ variable.score }}</td></tr>
+                }</tbody>
+              }
+            }
+          </table>
+        }
+        @case ('states') {
+          <table>@for (bookletState of snapshot()?.states ?? []; track bookletState.stateKey) {
+            <thead><tr><td colspan="2">{{ bookletState.stateKey }} ({{ stateLabel(bookletState.stateKey) }})</td></tr></thead>
+            <tbody>@for (option of bookletState.options; track option.optionKey) {
+              <tr [class.current]="selectedOption(bookletState.stateKey) === option.optionKey">
+                <td>{{ option.optionKey }} ({{ optionLabel(bookletState.stateKey, option.optionKey) }})
+                  @if (option.optionKey === bookletState.defaultOptionKey) { <span class="badge" matTooltip="default value">D</span> }
+                  @if (automaticBadge(bookletState.stateKey, option.optionKey)) { <span class="badge" matTooltip="would be automatically selected">A</span> }
+                </td>
+                <td>@for (condition of option.conditions; track $index) {
+                  <div class="condition" [class.satisfied]="$index < option.firstUnsatisfiedCondition || option.firstUnsatisfiedCondition < 0">{{ conditionText(condition.condition) }}</div>
+                }</td>
+              </tr>
+            }</tbody>
+          }</table>
+        }
+        @case ('system') {
+          <div><b>broadcastingService (SSE/HTTP): </b>{{ connection }}</div>
+          <div><b>cacheService (local booklet): </b>{{ view.bookletLoadedUnitCount }}/{{ snapshot()?.booklet?.unitEntries?.length ?? 0 }} Units</div>
+          <div><b>fileService (selected snapshot): </b>{{ snapshot() ? 'loaded' : 'not loaded' }}</div>
+          <div><b>API: </b>{{ apiStatus() }}</div><div role="status">{{ systemError() }}</div>
+          <button class="btn" type="button" (click)="refreshSystem()">Refresh</button>
+        }
+        @case ('tools') {
+          <h2>Test Condition</h2><p>Insert condition like '&lt;If&gt;&lt;Score of="03" from="D22S013"/&gt;&lt;Is lowerThan="627.5"/&gt;&lt;/If&gt;'</p>
+          <textarea [(ngModel)]="testingCondition" (ngModelChange)="evaluateTestingCondition()" aria-label="Test Condition" style="min-width:400px;width:100%;height:300px"></textarea>
+          <ul>@for (result of testingConditionResults; track $index) { <li><pre>{{ result }}</pre></li> }</ul>
+        }
+      }
+    </div>
+  }
+}
+@if (customTextOptionsOpen && activeWindows.includes('customtexts')) {
+  <div id="participant-debug-customtext-options" class="debug-customtext-options" role="listbox" aria-label="Custom text tokens"
+    [style.top.px]="customTextOptionsPosition.top" [style.left.px]="customTextOptionsPosition.left" [style.width.px]="customTextOptionsPosition.width">
+    @for (key of customTextKeys; track key; let index = $index) {
+      <div role="option" [id]="'participant-debug-customtext-' + index" [attr.aria-selected]="index === customTextOptionIndex" [class.active]="index === customTextOptionIndex"
+        (pointerdown)="$event.preventDefault()" (click)="selectCustomText(key)">{{ key }}</div>
+    }
+  </div>
+}
+<ng-template #treeTemplate let-node="item">
+  {{ node.id || '&lt;units&gt;' }}
+  @for (badge of badges(node.testlet); track badge.label) { <span class="badge" [class.active]="badge.active" [matTooltip]="badge.title">{{ badge.label }}</span> }
+  <button class="more-btn" type="button" [attr.aria-label]="'Toggle Testlet ' + node.id" (click)="toggleMore(node.id + '@@@@@@TESTLET')">{{ openPanes.has(node.id + '@@@@@@TESTLET') ? '−' : '+' }}</button>
+  @if (openPanes.has(node.id + '@@@@@@TESTLET')) {
+    <table>@for (prop of testletProperties(node); track prop[0]) { <tr><td>{{ prop[0] }}</td><td>{{ prop[1] }}</td></tr> }</table>
+  }
+  @for (child of node.children; track child.id) {
+    <div class="testlet"><ng-container [ngTemplateOutlet]="child.unit ? unitTemplate : treeTemplate" [ngTemplateOutletContext]="{item: child.unit ?? child}" /></div>
+  }
+</ng-template>
+<ng-template #unitTemplate let-unit="item" let-single="single">
+  <div class="unit" [class.current]="unit.unitKey === run.currentUnitKey">
+    <span class="title"><b>{{ unitTitle(unit) }}</b>
+      @if (!single) { <button class="more-btn" type="button" [attr.aria-label]="'Toggle Unit ' + unit.unitKey" (click)="toggleMore(unit.unitKey)">{{ openPanes.has(unit.unitKey) ? '−' : '+' }}</button> }
+    </span>
+    @if (single || openPanes.has(unit.unitKey)) {
+      <table>@for (prop of unitProperties(unit); track prop[0]) { <tr><td>{{ prop[0] }}</td><td>{{ prop[1] }}</td></tr> }</table>
+    }
+  </div>
+</ng-template>

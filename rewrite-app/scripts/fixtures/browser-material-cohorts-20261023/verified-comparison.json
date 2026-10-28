@@ -1,0 +1,125 @@
+{
+  "success": true,
+  "qualification": "diagnostic-only",
+  "productionAdmission": false,
+  "runId": 40030001971,
+  "probeCommit": "3d8cb50d1ab677c849404a05e5ce064ab135401b",
+  "observations": [
+    {
+      "sample": 1,
+      "imageVersion": "20261012.334.1",
+      "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+      "profileSha256": "a9b121441ad7bcf917a8e75dba83b42ea6e1a4deed76c716602bfbb1902fe3df",
+      "nativeManifestSha256": "83753bb2604d983cf3a09dc724c8a1f6a175567965a03944572ea69a94a8ec42",
+      "files": 591,
+      "bytes": 933512684
+    },
+    {
+      "sample": 2,
+      "imageVersion": "20261012.334.1",
+      "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+      "profileSha256": "a9b121441ad7bcf917a8e75dba83b42ea6e1a4deed76c716602bfbb1902fe3df",
+      "nativeManifestSha256": "87ff37aefe17fc9bf83e0c13490a4a2a506d18189a0acf87bf839264709db269",
+      "files": 591,
+      "bytes": 933512684
+    },
+    {
+      "sample": 3,
+      "imageVersion": "20261012.334.1",
+      "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+      "profileSha256": "a9b121441ad7bcf917a8e75dba83b42ea6e1a4deed76c716602bfbb1902fe3df",
+      "nativeManifestSha256": "621521fa09c4482f08caa70e9c0b5ffb95599961ac70e03346f42006a0ee7653",
+      "files": 591,
+      "bytes": 933512684
+    },
+    {
+      "sample": 4,
+      "imageVersion": "20261012.334.1",
+      "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+      "profileSha256": "a9b121441ad7bcf917a8e75dba83b42ea6e1a4deed76c716602bfbb1902fe3df",
+      "nativeManifestSha256": "6bc439681058507f507418ef85d2203c42a24418c1c537c2ff8a7f20855144a2",
+      "files": 591,
+      "bytes": 933512684
+    },
+    {
+      "sample": 5,
+      "imageVersion": "20261023.334.3",
+      "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+      "profileSha256": "f740c203b48dc2d45ec710d2672299da2382ede820925e1618c6810933445b3a",
+      "nativeManifestSha256": "6aff03f22c66003072caa2e2266db6a5acde3460afc82797d569659affafa2a6",
+      "files": 591,
+      "bytes": 933512684
+    },
+    {
+      "sample": 6,
+      "imageVersion": "20261012.334.1",
+      "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+      "profileSha256": "a9b121441ad7bcf917a8e75dba83b42ea6e1a4deed76c716602bfbb1902fe3df",
+      "nativeManifestSha256": "9fde47bed92f46ccbcf50e4cee58f970e7ad760083a3814dc2bb138c379b3ee8",
+      "files": 591,
+      "bytes": 933512684
+    },
+    {
+      "sample": 7,
+      "imageVersion": "20261012.334.1",
+      "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+      "profileSha256": "a9b121441ad7bcf917a8e75dba83b42ea6e1a4deed76c716602bfbb1902fe3df",
+      "nativeManifestSha256": "01622c81a1dcfea8bc29570413ed29ddb2a878fca7fb8a95e73864453e8698fd",
+      "files": 591,
+      "bytes": 933512684
+    },
+    {
+      "sample": 8,
+      "imageVersion": "20261012.334.1",
+      "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+      "profileSha256": "a9b121441ad7bcf917a8e75dba83b42ea6e1a4deed76c716602bfbb1902fe3df",
+      "nativeManifestSha256": "daaa42731eceecc32fde96ab59121d19dd37dd158defe5f5e0dae8e7c51c5124",
+      "files": 591,
+      "bytes": 933512684
+    }
+  ],
+  "views": [
+    {
+      "name": "desktop-empty",
+      "width": 1366,
+      "height": 900,
+      "pixelSha256": "fd86364dfd862be0b732a31be264abb6aabc04a094e6123253972896c22869b0",
+      "pngSha256": "cca874f3e7c6ac2b53f571605a4e1470eacf5e0cbdcfcb73ebb14cff9299c0b8",
+      "observedMatchingFiles": 16,
+      "independentlyDecoded": true
+    },
+    {
+      "name": "desktop-input",
+      "width": 1366,
+      "height": 900,
+      "pixelSha256": "8a84c7b5e84e54f36a18ab2a97b85a57cc5ec79ff99c026fefc9ba60f2e090ad",
+      "pngSha256": "c1023a35792748c290a456d66f234b2879670ab9ab65db0ad6e40a8a69140f1d",
+      "observedMatchingFiles": 16,
+      "independentlyDecoded": true
+    },
+    {
+      "name": "mobile-empty",
+      "width": 390,
+      "height": 844,
+      "pixelSha256": "375df6af3cedc81717ff5065be614d222b29301b5e0629ed2b23ee47729c2675",
+      "pngSha256": "e287c8e4428510367b813c03d2d44246dd34f8a849b13f11e27bb382c9e899bf",
+      "observedMatchingFiles": 16,
+      "independentlyDecoded": true
+    },
+    {
+      "name": "mobile-input",
+      "width": 390,
+      "height": 844,
+      "pixelSha256": "5925f43b80571c9f53ec31211b6ea56cbd39b9f9ae5190be48477208b700f846",
+      "pngSha256": "bfe2a0bd26c99657a0c53b64595a49d5471c266845c0ac373e3e1de87489fcd6",
+      "observedMatchingFiles": 16,
+      "independentlyDecoded": true
+    }
+  ],
+  "materialSha256": "3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77",
+  "beforeInventorySha256": "b8dbaf77b903aa329875c53b29d2673613f92533e1e8907ff1580d70a5367002",
+  "afterInventorySha256": "946f1d1c10fb4b27375e665f10122deab8ea5d47f51bc65a51f3ddfc84c04272",
+  "nativePackageCount": 17,
+  "pngFilesCompared": 64,
+  "allNativePackageBytesAndIdentitiesEqual": true
+}

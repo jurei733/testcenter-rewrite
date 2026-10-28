@@ -1,0 +1,61 @@
+name: Pinned Original native group deletion Oracle
+on:
+  push:
+    branches: [codex/source-native-group-deletion-20261025]
+permissions:
+  contents: read
+concurrency:
+  group: source-workspace-oracle-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: source-oracle-${{ github.run_id }}-${{ github.run_attempt }}
+      SOURCE_BACKEND_IMAGE: source-oracle:${{ github.sha }}
+      SOURCE_ORACLE_ARTIFACT_DIR: source-oracle-public
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: iqb-berlin/testcenter
+          ref: eedae41840cbe90e5547c0211da818bdf620f5aa
+          path: original-reference
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+      - name: Verify exact unchanged Source and build its production Apache image
+        run: |
+          test "$(git -C original-reference rev-parse HEAD)" = eedae41840cbe90e5547c0211da818bdf620f5aa
+          git -C original-reference diff --exit-code
+          docker build --target prod --file original-reference/backend/Dockerfile --tag "$SOURCE_BACKEND_IMAGE" original-reference
+          mkdir -p "$SOURCE_ORACLE_ARTIFACT_DIR"
+          docker image inspect "$SOURCE_BACKEND_IMAGE" --format '{{.Id}}' > "$SOURCE_ORACLE_ARTIFACT_DIR/image-id.txt"
+          docker run --rm --entrypoint php "$SOURCE_BACKEND_IMAGE" -r 'echo json_encode(["php"=>PHP_VERSION,"sapi"=>PHP_SAPI,"extensions"=>get_loaded_extensions()]),PHP_EOL;' > "$SOURCE_ORACLE_ARTIFACT_DIR/php-runtime.json"
+      - name: Initialize isolated production database and start actual Apache
+        run: |
+          docker compose --file .github/probes/source-native-group-deletion.compose.yml up --detach --wait --wait-timeout 120 postgres redis
+          docker compose --file .github/probes/source-native-group-deletion.compose.yml run --rm init
+          docker compose --file .github/probes/source-native-group-deletion.compose.yml up --detach backend
+          address=$(docker compose --file .github/probes/source-native-group-deletion.compose.yml port backend 8080)
+          echo "SOURCE_ORACLE_URL=http://$address" >> "$GITHUB_ENV"
+      - name: Qualify native group cascades, revocation, moved identities and RO boundaries through HTTP
+        run: node .github/probes/source-native-group-deletion-oracle.mjs
+      - name: Verify Source stayed unchanged
+        if: always()
+        run: git -C original-reference diff --exit-code
+      - name: Retain public Oracle receipts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: source-workspace-oracle-${{ github.run_attempt }}
+          path: source-oracle-public/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retire only this Oracle's owned containers and volumes
+        if: always()
+        run: docker compose --file .github/probes/source-native-group-deletion.compose.yml down --volumes --remove-orphans

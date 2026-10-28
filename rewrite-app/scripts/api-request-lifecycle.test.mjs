@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
 import { createServer, request } from "node:http";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import test from "node:test";
@@ -96,3 +97,77 @@ test("shutdown also waits for work registered while an earlier handler is draini
   second.resolve(); await two; await draining;
   assert.deepEqual(writes, ["one", "two"]);
 });
+
+const actualStream = name => {
+  let source;
+  const find = node => {
+    if (ts.isVariableDeclaration(node) && node.name.getText(ast) === name) source = node.initializer.getText(ast);
+    ts.forEachChild(node, find);
+  };
+  find(ast); assert.ok(source, name); return source;
+};
+// Control presentation and interval scheduling; execute the actual stream and shutdown code.
+const { createEventStreams } = await load(`export const createEventStreams = driver => {
+  const setInterval = callback => { driver.poll = callback; return { unref() {} }; }, clearInterval = () => {};
+  const randomUUID = () => 'owned-connection', canStreamParticipantRun = () => true;
+  const participantCurrentStateRevision = () => 'unchanged', monitorOpenRunsRevision = () => 'unchanged';
+  const securityHeaders = {}, sendError = () => { throw Error('Unexpected stream rejection'); };
+  const writeParticipantEvent = () => {}, writeMonitorEvent = () => {};
+  const PARTICIPANT_EVENT_STREAM_SCHEMA_VERSION = 1, MONITOR_EVENT_STREAM_SCHEMA_VERSION = 1;
+  const PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS = 1000, PARTICIPANT_EVENT_STREAM_HEARTBEAT_INTERVAL_MS = 15000;
+  const MONITOR_EVENT_STREAM_POLL_INTERVAL_MS = 1000, MONITOR_EVENT_STREAM_HEARTBEAT_INTERVAL_MS = 15000;
+  return { participant: ${actualStream('streamParticipantEvents')}, monitor: ${actualStream('streamMonitorEvents')} };
+};`);
+class LifecycleResponse extends EventEmitter {
+  writableEnded = false;
+  writeHead() {} flushHeaders() {} write() { return true; }
+  end() { this.writableEnded = true; this.emit('close'); }
+}
+for (const kind of ['participant-close', 'participant-poll', 'monitor-poll']) {
+  test(`production shutdown drains ${kind} SSE work before closing storage`, async () => {
+    const entered = deferred(), release = deferred(), done = deferred(), lifecycle = createRequestLifecycle();
+    const driver = {}, response = new LifecycleResponse();
+    let storageClosed = false, completedWhileOpen = false, calls = 0;
+    const complete = async () => { entered.resolve(); await release.promise; completedWhileOpen = !storageClosed; done.resolve(); };
+    const state = { testRun: { testRunId: 'owned-run', status: 'running' }, participantSession: { status: 'launched' } };
+    const input = { request: new EventEmitter(), response, requestLifecycle: lifecycle,
+      participantSessionId: 'owned-session', testRunId: 'owned-run', tenantKey: 'owned-tenant', workspaceKey: 'owned-workspace',
+      validateAccess: async () => {}, participantRuntime: {
+        getCurrentRunState: async () => { if (kind === 'participant-poll' && ++calls > 1) await complete(); return state; },
+        listPendingCommands: async () => [],
+        updateConnection: async ({ action }) => { if (kind === 'participant-close' && action === 'close') await complete(); return {}; }
+      }, monitorRead: { listOpenRuns: async () => { if (++calls > 1) await complete(); return []; } } };
+    const stream = createEventStreams(driver);
+    await (kind === 'monitor-poll' ? stream.monitor(input) : stream.participant(input));
+    if (kind !== 'participant-close') { driver.poll(); await entered.promise; }
+    response.emit('close'); if (kind === 'participant-close') await entered.promise;
+    const stopping = createShutdown(undefined, Promise.resolve(), { shutdown: async () => { storageClosed = true; } }, lifecycle)();
+    await nextTurn(); const closedBeforeRelease = storageClosed;
+    release.resolve(); await done.promise; await stopping; await nextTurn();
+    assert.equal(closedBeforeRelease, false, 'A closed SSE socket must not close storage underneath its pending work.');
+    assert.equal(completedWhileOpen, true); assert.equal(storageClosed, true);
+  });
+}
+
+for (const kind of ['participant', 'monitor']) {
+  test(`an initially disconnected ${kind} SSE stream cannot retain a lease or start polling`, async () => {
+    const entered = deferred(), release = deferred(), lifecycle = createRequestLifecycle(), driver = {};
+    const response = new LifecycleResponse(); let closes = 0;
+    const state = { testRun: { testRunId: 'owned-run', status: 'running' }, participantSession: { status: 'launched' } };
+    const input = { request: new EventEmitter(), response, requestLifecycle: lifecycle,
+      participantSessionId: 'owned-session', testRunId: 'owned-run', tenantKey: 'owned-tenant', workspaceKey: 'owned-workspace',
+      validateAccess: async () => {}, participantRuntime: {
+        getCurrentRunState: async () => state, listPendingCommands: async () => [],
+        updateConnection: async ({ action }) => {
+          if (action === 'open') { entered.resolve(); await release.promise; }
+          else closes++;
+          return {};
+        }
+      }, monitorRead: { listOpenRuns: async () => { entered.resolve(); await release.promise; return []; } } };
+    const streams = createEventStreams(driver), starting = streams[kind](input);
+    await entered.promise; response.destroyed = true; response.emit('close'); release.resolve();
+    await starting; await lifecycle.drain();
+    assert.equal(driver.poll, undefined, 'A stream that lost its response during initial loading cannot start a poller.');
+    assert.equal(closes, kind === 'participant' ? 1 : 0);
+  });
+}

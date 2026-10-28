@@ -1,3 +1,4 @@
+import { resolveSystemCheckCustomText, type SystemCheckPresentationTextKey } from "@testcenter-rewrite-app/contracts/system-check-custom-texts";
 import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component, inject } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
@@ -426,7 +427,7 @@ const readSystemCheckUnitResponse = (
           </section>
         </article>
 
-        <div class="actions system-check-navigation" *ngIf="interfaceMode.mode() !== 'original' || step !== 'report'">
+        <div class="actions system-check-navigation" *ngIf="interfaceMode.mode() !== 'original'">
           <button id="systemCheckBackButton" class="ghost" type="button" *ngIf="interfaceMode.mode() !== 'original'" [disabled]="stepIndex === 0" (click)="previousStep()">Back</button>
           <button id="systemCheckNextButton" class="primary" type="button" *ngIf="step !== 'report' && interfaceMode.mode() !== 'original'" [disabled]="nextButtonDisabled" (click)="nextStep()">Next</button>
           <button class="ghost" type="button" (click)="chooseAnother()">Choose Another Check</button>
@@ -1164,10 +1165,11 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
     }
   }
 
-  customText(key: string, fallback: string): string {
-    return (
-      this.systemCheck?.customTexts[key]?.trim() ||
-      this.applicationSettings.settings().customTexts[key]?.trim() ||
+  customText(key: SystemCheckPresentationTextKey, fallback: string): string {
+    return resolveSystemCheckCustomText(
+      this.applicationSettings.settings().customTexts,
+      this.systemCheck?.customTexts,
+      key,
       fallback
     );
   }

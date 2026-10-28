@@ -11,6 +11,7 @@ import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 import iconv from "iconv-lite";
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName } from "pdf-lib";
 import { CodingSchemeFactory } from "@iqb/responses";
+import { Pool } from "pg";
 import { CodingScheme } from "@iqbspecs/coding-scheme";
 import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
 import {
@@ -29,17 +30,21 @@ import {
   type GetContentReleaseResponse,
   type GetSourcePackageResponse,
   type CreateProofOfWorkChallengeResponse,
-  type ProofOfWorkSolution
+  type ProofOfWorkSolution,
+  type ParticipantSignInResponse,
+  type ParticipantRuntimeStateResponse
 } from "@testcenter-rewrite-app/contracts";
+import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
 import { createFileFirstSliceRepository } from "@testcenter-rewrite-app/file-store";
 import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
 import { createPostgresFirstSliceStorage } from "@testcenter-rewrite-app/postgres-store";
 import { createFirstSliceServices, type FirstSliceRepository } from "@testcenter-rewrite-app/application";
-import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
+import type { MonitorRunCommandResult, ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 
 import { createProductionApiServer } from "./index.js";
 import { ProofOfWorkManager } from "./proof-of-work.js";
+import { localDemoSourcePackage } from "./local-demo-bootstrap.js";
 
 let server: Awaited<ReturnType<typeof createProductionApiServer>>;
 
@@ -54,6 +59,12 @@ const readBrotliBase64Fixture = (fixturePath: string): string =>
   brotliDecompressSync(
     Buffer.from(readFileSync(fixturePath, "utf8"), "base64")
   ).toString("utf8");
+
+const encodeUtf7XmlFixture = (xml: string): Buffer => {
+  if (!xml.startsWith("<?xml")) xml = '<?xml version="1.0" encoding="UTF-7"?>' + xml;
+  const end = xml.indexOf("?>") + 2;
+  return Buffer.concat([Buffer.from(xml.slice(0, end), "ascii"), iconv.encode(xml.slice(end), "utf7")]);
+};
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -537,6 +548,34 @@ const requestJson = async <T>(
   }
 ): Promise<JsonResponse<T>> => requestJsonAt<T>(baseUrl, path, init);
 
+// Effect-oriented workflows explicitly deliver the issued intent through the
+// real participant ACK and application routes. Issuance-only behavior is covered
+// separately by participant-command-api.test.mjs.
+const issueMonitorCommandAndExecuteAt = async <T>(
+  rootUrl: string, path: string, init?: Parameters<typeof requestJsonAt>[2]
+): Promise<JsonResponse<T>> => {
+  const issued = await requestJsonAt<{ command?: MonitorRunCommandResult; commands?: MonitorRunCommandResult[] }>(rootUrl, path, init);
+  if (issued.status !== 200) return issued as unknown as JsonResponse<T>;
+  for (const command of issued.body.commands ?? (issued.body.command ? [issued.body.command] : [])) {
+    if (!["pause", "resume", "goto", "complete", "complete_and_lock"].includes(command.commandType)) continue;
+    const sessionId = command.participantSession.participantSessionId;
+    const testRunId = command.testRun.testRunId;
+    const acknowledged = await requestJsonAt(rootUrl, resolveRoutePath(productionApiRoutes.participant.acknowledgeCommand, {
+      participantSessionId: sessionId, commandId: command.commandId
+    }), { method: "PATCH", body: { testRunId } });
+    assert.equal(acknowledged.status, 200, "The real participant must receive the issued command.");
+    const applied = await requestJsonAt<{ application: { testRun: TestRun; participantSession: ParticipantSession } }>(
+      rootUrl, resolveRoutePath(participantCommandExecutionRoute, { participantSessionId: sessionId, commandId: command.commandId }),
+      { method: "POST", body: { testRunId, controllerStatus: command.previousStatus === "paused" ? "PAUSED" : "RUNNING" } });
+    assert.equal(applied.status, 200, "The received command must execute in its authorized Run.");
+    command.testRun = applied.body.application.testRun;
+    command.participantSession = applied.body.application.participantSession;
+  }
+  return issued as unknown as JsonResponse<T>;
+};
+const issueMonitorCommandAndExecute = <T>(path: string, init?: Parameters<typeof requestJsonAt>[2]): Promise<JsonResponse<T>> =>
+  issueMonitorCommandAndExecuteAt<T>(baseUrl, path, init);
+
 const completeRequiredAdminPasswordChangeAt = async (
   rootUrl: string,
   sessionToken: string,
@@ -704,6 +743,8 @@ const assertSecurityHeaders = (response: Response): void => {
   );
 };
 
+const isolatedFileDirectories = new WeakMap<Awaited<ReturnType<typeof createProductionApiServer>>, string>();
+
 const closeServer = async (
   targetServer: Awaited<ReturnType<typeof createProductionApiServer>>
 ): Promise<void> => {
@@ -716,6 +757,11 @@ const closeServer = async (
       resolve();
     });
   });
+  const directory = isolatedFileDirectories.get(targetServer);
+  if (directory) {
+    rmSync(directory, { recursive: true, force: true });
+    isolatedFileDirectories.delete(targetServer);
+  }
 };
 
 const createIsolatedServer = async (
@@ -725,6 +771,12 @@ const createIsolatedServer = async (
   baseUrl: string;
 }> => {
   environment = { FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", ...environment };
+  let ownedFileDirectory: string | undefined;
+  if ((environment.FIRST_SLICE_STORE ?? process.env.FIRST_SLICE_STORE) === "file" &&
+    !Object.hasOwn(environment, "FIRST_SLICE_FILE")) {
+    ownedFileDirectory = mkdtempSync(join(tmpdir(), "testcenter-api-isolated-file-"));
+    environment = { ...environment, FIRST_SLICE_FILE: join(ownedFileDirectory, "owned.json") };
+  }
   const previousEnvironment = new Map(
     Object.keys(environment).map(key => [key, process.env[key]])
   );
@@ -738,10 +790,14 @@ const createIsolatedServer = async (
       isolatedServer.listen(0, "127.0.0.1", () => resolve());
     });
     const address = isolatedServer.address() as AddressInfo;
+    if (ownedFileDirectory) isolatedFileDirectories.set(isolatedServer, ownedFileDirectory);
     return {
       server: isolatedServer,
       baseUrl: `http://127.0.0.1:${address.port}`
     };
+  } catch (error) {
+    if (ownedFileDirectory) rmSync(ownedFileDirectory, { recursive: true, force: true });
+    throw error;
   } finally {
     for (const [key, value] of previousEnvironment) {
       if (value == null) {
@@ -974,6 +1030,84 @@ test("Original 19 schema policy is runtime-local and invalid/offline configurati
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+test("Original CustomTexts survive strict HTTP import, participant delivery and durable reopen", async () => {
+  const reference = JSON.parse(readFileSync(resolve(process.cwd(),
+    "test-fixtures/original-testcenter/current-roster-custom-text-reference.json"), "utf8")) as {
+    cases: Array<{ name: string; xml: string; expected: Record<string, string> }>;
+  };
+  const directory = mkdtempSync(join(tmpdir(), "original-custom-text-api-"));
+  const environment = {
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE || "memory",
+    FIRST_SLICE_FILE: join(directory, "store.json"), FIRST_SLICE_SQLITE_FILE: join(directory, "store.sqlite"),
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false", FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_XML_SCHEMA_PROFILE: "original-19", FIRST_SLICE_XML_SCHEMA_DOWNLOAD: "false",
+    REQUIRE_LOGIN_PASSWORD: "false"
+  };
+  let isolated = await createIsolatedServer(environment);
+  const tenantKey = `custom-text-${randomUUID()}`;
+  const stored: Array<{ path: string; expected: Record<string, string> }> = [];
+  const post = <T = any>(path: string, body: unknown) => requestJsonAt<T>(isolated.baseUrl, path, { method: "POST", body });
+  try {
+    const config = await requestJsonAt<GetRuntimeConfigResponse>(isolated.baseUrl, productionApiRoutes.system.getRuntimeConfig);
+    assert.equal(config.body.runtimeConfig.xmlSchema.profile, "original-19");
+    assert.equal(config.body.runtimeConfig.xmlSchema.validatedByXsd, true);
+    assert.equal((await post("/api/v1/platform/tenants", { tenantKey, displayName: tenantKey })).status, 201);
+    for (const item of reference.cases) {
+      const workspaceKey = item.name;
+      assert.equal((await post(`/api/v1/tenants/${tenantKey}/workspaces`, { workspaceKey, displayName: workspaceKey })).status, 201);
+      const path = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+      const imported = await post(`${path}/participant-roster`, { rosterText: item.xml.replace("<Testtakers>", '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/>').replace('<Group id="g">', '<Group id="g" label="Original custom text">') });
+      if (item.name === "self-closing-section") {
+        // Native XSD requires one CustomText when the section exists. The
+        // lower-level SimpleXML extraction oracle does not weaken that guard.
+        assert.equal(imported.status, 400);
+        assert.equal(imported.body.error, "participant_roster_xml_invalid");
+        continue;
+      }
+      assert.equal(imported.status, 201, `${item.name}: ${JSON.stringify(imported.body)}`);
+      assert.deepEqual(imported.body.items.map((entry: { loginKey: string }) => entry.loginKey), ["p"]);
+      assert.deepEqual(imported.body.operationalLoginCandidates.map((entry: { loginKey: string }) => entry.loginKey), ["m"]);
+      assert.deepEqual(imported.body.items[0].customTexts, item.expected);
+      assert.deepEqual(imported.body.operationalLoginCandidates[0].customTexts, item.expected);
+      const source = JSON.parse(localDemoSourcePackage.sourceDocument!);
+      source.bookletEntries = [{ ...source.bookletEntries[0], bookletKey: "B" }];
+      const uploaded = await post(`${path}/source-packages`, { fileName: "custom-text-runtime.json", mediaType: "application/json", contentStructure: source });
+      assert.equal(uploaded.status, 201);
+      const staged = await post(`${path}/import-jobs`, { sourcePackageId: uploaded.body.sourcePackage.sourcePackageId });
+      assert.equal(staged.body.importJob.status, "completed", JSON.stringify(staged.body.importJob.diagnostics));
+      assert.equal((await post(`${path}/content-releases/${staged.body.stagedContentRelease.contentReleaseId}/activate`, {})).status, 200);
+      const identity = await post<ParticipantSignInResponse>("/api/v1/participant/auth/sign-in", { tenantKey, workspaceKey, loginKey: "p" });
+      assert.equal(identity.status, 200);
+      assert.deepEqual(identity.body.participantRosterEntry?.customTexts, item.expected);
+      const resumed = await requestJsonAt<any>(isolated.baseUrl,
+        `/api/v1/participant/sessions/${identity.body.participantSession.participantSessionId}/resume`, {
+          method: "POST", headers: { authorization: `Bearer ${identity.body.sessionToken}` }, body: { bookletKey: "B" }
+        });
+      assert.equal(resumed.status, 200);
+      const runtime = await requestJsonAt<ParticipantRuntimeStateResponse>(isolated.baseUrl,
+        `/api/v1/participant/sessions/${identity.body.participantSession.participantSessionId}/runtime-state`, {
+          headers: { authorization: `Bearer ${identity.body.sessionToken}` }
+        });
+      assert.equal(runtime.status, 200);
+      assert.deepEqual(runtime.body.runtimeState.participantRosterEntry?.customTexts, item.expected);
+      stored.push({ path, expected: item.expected });
+    }
+    assert.equal(stored.length, reference.cases.filter(item => item.name !== "self-closing-section").length);
+    if (environment.FIRST_SLICE_STORE !== "memory") {
+      await closeServer(isolated.server);
+      isolated = await createIsolatedServer(environment);
+      for (const item of stored) {
+        const roster = await requestJsonAt<any>(isolated.baseUrl, `${item.path}/participant-roster`);
+        assert.equal(roster.status, 200);
+        assert.deepEqual(roster.body.items[0].customTexts, item.expected);
+      }
+    }
+  } finally {
+    await closeServer(isolated.server);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("participant access credentials rotate and revoke without changing sessions or saved answers", async () => {
   const storeKind = process.env.FIRST_SLICE_STORE ?? "memory";
   const directory = mkdtempSync(join(tmpdir(), "participant-access-credentials-"));
@@ -1005,6 +1139,7 @@ test("participant access credentials rotate and revoke without changing sessions
     loginKey: "credential-login", groupKey: "credential-group", executionMode: "run-hot-return",
     status: "launched", participantCode: null, validUntil: null, createdAt: stamp
   };
+  assert.ok(typeof session.contentReleaseId === 'string');
   const run: TestRun = {
     testRunId: randomUUID(), participantSessionId: session.participantSessionId, tenantId, workspaceId,
     contentReleaseId: session.contentReleaseId, bookletKey: "credential-booklet", status: "running",
@@ -3284,7 +3419,8 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(updatedAdminCustomTexts.status, 200);
   assert.deepEqual(updatedAdminCustomTexts.body.adminUser.customTexts, {
     gm_headline: "Updated workspace headline",
-    gm_control_pause: "Hold workspace tests"
+    gm_control_pause: "Hold workspace tests",
+    empty_value: "   "
   });
 
   const accessWindowRestoredSignIn = await requestJson<{
@@ -3301,7 +3437,8 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(accessWindowRestoredSignIn.status, 200);
   assert.deepEqual(accessWindowRestoredSignIn.body.adminUser.customTexts, {
     gm_headline: "Updated workspace headline",
-    gm_control_pause: "Hold workspace tests"
+    gm_control_pause: "Hold workspace tests",
+    empty_value: "   "
   });
 
   const selfDisable = await requestJson<{ error: string }>(
@@ -3577,9 +3714,9 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       item.eventType === "admin_user_updated" &&
       item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
       item.details["previousCustomTextCount"] === 0 &&
-      item.details["nextCustomTextCount"] === 2 &&
+      item.details["nextCustomTextCount"] === 3 &&
       Array.isArray(item.details["changedCustomTextKeys"]) &&
-      item.details["changedCustomTextKeys"].length === 2
+      item.details["changedCustomTextKeys"].length === 3
   );
   assert.ok(adminCustomTextsUpdateAuditEvent);
   assert.deepEqual(
@@ -3588,7 +3725,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
         "changedCustomTextKeys"
       ] as string[])
     ].sort(),
-    ["gm_control_pause", "gm_headline"]
+    ["empty_value", "gm_control_pause", "gm_headline"]
   );
   assert.equal(
     JSON.stringify(adminCustomTextsUpdateAuditEvent.details).includes(
@@ -4484,7 +4621,7 @@ test("platform application settings are public, durable, validated, and audited"
     configuredAccessibilityNotice
   );
   assert.deepEqual(updatedSettings.body.applicationSettings.customTexts, {
-    login_subtitle: "Global test selection",
+    login_subtitle: "  Global test selection  ",
     login_testResumeButtonLabel: "Begin"
   });
   assert.deepEqual(updatedSettings.body.applicationSettings.assetAssignments, {
@@ -4636,6 +4773,31 @@ test("platform application settings are public, durable, validated, and audited"
     }
   );
   assert.equal(deletedGlobalAsset.status, 200);
+
+  // Uploaded names are valid Unicode. HTTP headers require an ASCII fallback
+  // and RFC 5987 encoding; raw non-Latin-1 names previously produced HTTP 500.
+  for (const originalName of ["Bild Ω 中文 🙂.png", "Bild ä.png", "Bild \"(')*.png"]) {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const uploaded = await requestJson<{applicationAsset: {applicationAssetId: string}}>(
+      "/api/v1/admin/application-assets", {method: "POST", headers: {authorization},
+        body: {originalName, mediaType: "image/png", dataBase64: bytes.toString("base64")}});
+    assert.equal(uploaded.status, 201);
+    const id = uploaded.body.applicationAsset.applicationAssetId;
+    for (const query of [
+      "originalName=" + encodeURIComponent(originalName), "applicationAssetId=" + encodeURIComponent(id)
+    ]) {
+      const download = await fetch(`${baseUrl}/api/v1/system/application-assets?${query}`);
+      assert.equal(download.status, 200);
+      assert.equal(download.headers.get("content-type"), "image/png");
+      const disposition = download.headers.get("content-disposition") ?? "";
+      assert.match(disposition, /^inline; filename="[\x20-\x21\x23-\x5b\x5d-\x7e]+"; filename\*=UTF-8''[^\s]+$/);
+      assert.equal(decodeURIComponent(disposition.split("filename*=UTF-8''")[1]!), originalName);
+      assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
+    }
+    const deleted = await requestJson(`/api/v1/admin/application-assets?applicationAssetId=${encodeURIComponent(id)}`,
+      {method: "DELETE", headers: {authorization}});
+    assert.equal(deleted.status, 200);
+  }
 });
 
 test("participant custom texts retain global-login-booklet precedence inputs", async () => {
@@ -4850,6 +5012,99 @@ test("participant custom texts retain global-login-booklet precedence inputs", a
   assert.equal(resetSettings.status, 200);
 });
 
+for (const sourceKind of ["typed JSON", "manifest JSON", "Booklet XML", "SysCheck XML"] as const) {
+  test(`content custom-text values survive ${sourceKind} intake and durable reopen`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), "content-text-values-"));
+    const environment = {
+      FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE || "memory",
+      FIRST_SLICE_FILE: join(directory, "store.json"), FIRST_SLICE_SQLITE_FILE: join(directory, "store.sqlite"),
+      FIRST_SLICE_BOOTSTRAP_DEMO: "false", FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+      FIRST_SLICE_XML_SCHEMA_PROFILE: "original-19", FIRST_SLICE_XML_SCHEMA_DOWNLOAD: "false"
+    };
+    let isolated = await createIsolatedServer(environment);
+    const workspace = `/api/v1/tenants/content-text-${randomUUID()}/workspaces/owned`;
+    const post = (path: string, body: unknown) => requestJsonAt<any>(isolated.baseUrl, path, { method: "POST", body });
+    const reference = JSON.parse(readFileSync(resolve(originalTestcenterCorpusRoot, "current-content-text-reference.json"), "utf8"));
+    assert.equal(reference.originalCommit, "eedae41840cbe90e5547c0211da818bdf620f5aa");
+    for (const file of reference.files) assert.equal(createHash("sha256").update(file.source).digest("hex"), file.sha256);
+    const customTexts = reference.values;
+    assert.deepEqual(reference.nativeWitness.booklet.values, customTexts);
+    assert.deepEqual(reference.nativeWitness.syscheck.values, customTexts);
+    const xmlTexts = reference.customTextXml;
+    const structure = { bookletEntries: [{ bookletKey: "OWN.TEXT", displayLabel: "Owned text", customTexts,
+      unitEntries: [{ unitKey: "OWN.UNIT", displayLabel: "Owned unit", prompt: "Owned prompt" }] }],
+      systemCheckEntries: [{ checkId: "OWN.CHECK", displayLabel: "Owned check", skipNetwork: true, customTexts, questions: [] }] };
+    const xml = sourceKind === "Booklet XML"
+      ? '<Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0"><Metadata><Id>OWN.TEXT</Id><Label>Owned text</Label></Metadata><CustomTexts>' + xmlTexts + '</CustomTexts><Units><Unit id="OWN.UNIT" label="Owned unit"/></Units></Booklet>'
+      : '<SysCheck xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-syscheck-xml/18.0"><Metadata><Id>OWN.CHECK</Id><Label>Owned check</Label></Metadata><Config skipnetwork="true">' + xmlTexts + '</Config></SysCheck>';
+    try {
+      assert.equal((await post("/api/v1/platform/tenants", { tenantKey: workspace.split("/")[4], displayName: "Owned text" })).status, 201);
+      assert.equal((await post(workspace.substring(0, workspace.lastIndexOf("/")), { workspaceKey: "owned", displayName: "Owned text" })).status, 201);
+      const config = await requestJsonAt<GetRuntimeConfigResponse>(isolated.baseUrl, productionApiRoutes.system.getRuntimeConfig);
+      assert.equal(config.body.runtimeConfig.xmlSchema.validatedByXsd, true);
+      if (sourceKind === "Booklet XML") {
+        const player = JSON.parse(localDemoSourcePackage.sourceDocument!).playerEntries[0];
+        assert.equal((await post(workspace + "/source-packages", { fileName: "Player.html", mediaType: "text/html", sourceDocument: player.html })).status, 201);
+        const unit = await post(workspace + "/source-packages", { fileName: "Unit.xml", mediaType: "application/xml",
+          sourceDocument: '<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/unit-xml/17.6"><Metadata><Id>OWN.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="testcenter-demo-player@1.0">Owned prompt</Definition></Unit>' });
+        assert.equal(unit.status, 201, JSON.stringify(unit.body));
+      }
+      const upload = await post(workspace + "/source-packages", {
+        fileName: sourceKind.endsWith("XML") ? "owned.xml" : "owned.json",
+        mediaType: sourceKind.endsWith("XML") ? "application/xml" : "application/json",
+        ...(sourceKind === "typed JSON" ? { contentStructure: structure } :
+          { sourceDocument: sourceKind === "manifest JSON" ? JSON.stringify(structure) : xml })
+      });
+      assert.equal(upload.status, 201, JSON.stringify(upload.body));
+      const imported = await post(workspace + "/import-jobs", { sourcePackageId: upload.body.sourcePackage.sourcePackageId });
+      assert.equal(imported.status, 201, JSON.stringify(imported.body));
+      assert.equal(imported.body.importJob.status, "completed", JSON.stringify(imported.body.importJob));
+      const release = imported.body.stagedContentRelease;
+      const snapshotTexts = (snapshot: any) => sourceKind === "typed JSON"
+        ? [snapshot.bookletEntries[0]?.customTexts, snapshot.systemCheckEntries[0]?.customTexts]
+        : [snapshot.bookletEntries[0]?.customTexts];
+      const assertTexts = async (snapshot?: any) => {
+        if (sourceKind === "SysCheck XML") {
+          const configurations = await requestJsonAt<any>(isolated.baseUrl, workspace + "/system-checks");
+          assert.equal(configurations.status, 200);
+          assert.deepEqual(configurations.body.items[0]?.customTexts, customTexts);
+        } else {
+          assert.ok(snapshot, JSON.stringify(imported.body.importJob));
+          for (const values of snapshotTexts(snapshot)) assert.deepEqual(values, customTexts);
+        }
+      };
+      await assertTexts(release?.runtimeSnapshot);
+      if (sourceKind === "Booklet XML") {
+        for (const [manifest, code] of [
+          ['<manifest><resources></manifest>', "source_document_xml_malformed"],
+          ['<!DOCTYPE manifest><manifest/>', "source_document_xml_doctype_unsupported"],
+          ['<Other><manifest/></Other>', "testcenter_xml_root_invalid"],
+          ['<Booklet><!-- <manifest> --><Metadata><Id>DECOY</Id><Label>Decoy</Label></Metadata><Units><Unit id="U" label="U"/></Units></Booklet>', "testcenter_xml_schema_reference_missing"]
+        ] as const) {
+          const rejectedSource = await post(workspace + "/source-packages", { fileName: `invalid-manifest-${randomUUID()}.zip`, mediaType: "application/zip",
+            sourceDocument: "data:application/zip;base64," + createZipBase64([{ fileName: "imsmanifest.xml", content: manifest }]) });
+          assert.equal(rejectedSource.status, 201);
+          const rejected = await post(workspace + "/import-jobs", { sourcePackageId: rejectedSource.body.sourcePackage.sourcePackageId });
+          assert.equal(rejected.status, 201);
+          assert.equal(rejected.body.importJob.status, "failed");
+          assert.equal(rejected.body.stagedContentRelease, null);
+          assert.ok(rejected.body.importJob.diagnostics.some((item: { code: string }) => item.code === code), JSON.stringify(rejected.body.importJob));
+        }
+        const standalone = await post(workspace + "/source-packages", { fileName: "standalone.xml", mediaType: "application/xml", sourceDocument: '<manifest><resources/></manifest>' });
+        const rejected = await post(workspace + "/import-jobs", { sourcePackageId: standalone.body.sourcePackage.sourcePackageId });
+        assert.equal(rejected.body.importJob.status, "failed");
+        assert.ok(rejected.body.importJob.diagnostics.some((item: { code: string }) => item.code === "testcenter_xml_root_invalid"));
+      }
+      if (environment.FIRST_SLICE_STORE !== "memory") {
+        await closeServer(isolated.server); isolated = await createIsolatedServer(environment);
+        const reopened = sourceKind === "SysCheck XML" ? null : await requestJsonAt<GetContentReleaseResponse>(isolated.baseUrl, workspace + "/content-releases/" + release.contentReleaseId);
+        if (reopened) assert.equal(reopened.status, 200);
+        await assertTexts(reopened?.body.contentReleaseDetail.contentRelease.runtimeSnapshot);
+      }
+    } finally { await closeServer(isolated.server); rmSync(directory, { recursive: true, force: true }); }
+  });
+}
+
 test("attachment manager retains typed BaseVariable requests and enforces capture scope", async () => {
   const tenantKey = "attachment-tenant";
   const workspaceKey = "attachment-workspace";
@@ -5048,7 +5303,9 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
           {
             loginKey: "attachment-a",
             groupKey: "group-a",
+            groupLabel: "Attachment Group A",
             bookletKey,
+            booklets: [{ id: bookletKey, codes: "suffix-a" }],
             displayName: "Attachment Alpha"
           },
           {
@@ -5071,7 +5328,8 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
       "/api/v1/participant/starter:launch",
       {
         method: "POST",
-        body: { tenantKey, workspaceKey, loginKey, groupKey, bookletKey }
+        body: { tenantKey, workspaceKey, loginKey, groupKey, bookletKey,
+          ...(loginKey === "attachment-a" ? { participantCode: "suffix-a" } : {}) }
       }
     );
     assert.equal(launch.status, 200);
@@ -5089,6 +5347,8 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
       attachmentId: string;
       groupKey: string;
       loginKey: string;
+      participantCode: string | null;
+      groupLabel: string;
       variableId: string;
       attachmentType: string;
       dataType: string;
@@ -5099,6 +5359,10 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
   });
   assert.equal(inventory.status, 200);
   assert.equal(inventory.body.items.length, 12);
+  assert.ok(inventory.body.items.filter(item => item.groupKey === "group-a")
+    .every(item => item.participantCode === "suffix-a" && item.groupLabel === "Attachment Group A"));
+  assert.ok(inventory.body.items.filter(item => item.groupKey === "group-b")
+    .every(item => item.participantCode === null && item.groupLabel === "group-b"));
   assert.deepEqual(
     inventory.body.items
       .filter(item => item.groupKey === "group-a")
@@ -5259,6 +5523,13 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
   );
   assert.equal(singlePagePdf.getPageCount(), 1);
   assert.match(singlePagePdf.getTitle() ?? "", /^Attachment Alpha \| att-/);
+  const originalCodeResponse = await fetch(
+    `${baseUrl}${attachmentPath}/page.pdf?layout=original&labelTemplate=${encodeURIComponent("%GROUP%|%LOGIN%|%CODE%|%CODE%")}`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(originalCodeResponse.status, 200);
+  assert.equal((await PDFDocument.load(await originalCodeResponse.arrayBuffer())).getTitle(),
+    "group-a|attachment-a|suffix-a|suffix-a");
   for (const path of [attachmentPagesPath, `${attachmentPath}/page.pdf`]) {
     const originalResponse = await fetch(`${baseUrl}${path}?layout=original`, {
       headers: { authorization: groupAuthorization }
@@ -7089,7 +7360,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     assert.equal(rejectedOverviewByGroupMonitor.status, 403);
     assert.equal(rejectedOverviewByGroupMonitor.body.error, "admin_role_required");
 
-    const rejectedUnknownRunByGroupMonitor = await requestJsonAt<{
+    const rejectedUnknownRunByGroupMonitor = await issueMonitorCommandAndExecuteAt<{
       error: string;
     }>(
       isolated.baseUrl,
@@ -8230,6 +8501,68 @@ test("production transport and secret-file bootstrap stay configurable, idempote
   }
 });
 
+test("custom-text values remain exact through protected settings, account creation, update, sign-in and reopen", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "exact-custom-text-api-"));
+  const environment = {
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE || "memory",
+    FIRST_SLICE_FILE: join(directory, "store.json"), FIRST_SLICE_SQLITE_FILE: join(directory, "store.sqlite"),
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false", FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", FIRST_SLICE_PROOF_OF_WORK_SCOPES: ""
+  };
+  let isolated = await createIsolatedServer(environment);
+  let token = "", previousGlobal: Record<string, string> | null = null;
+  const request = <T = any>(path: string, method = "GET", body?: unknown) => requestJsonAt<T>(isolated.baseUrl, path,
+    { method, headers: token ? { authorization: `Bearer ${token}` } : {}, body });
+  try {
+    let root = await request<AdminSignInResponse>("/api/v1/admin/auth/sign-in", "POST", { username: "integration.admin", password: "integration-secret" });
+    if (root.status === 401) {
+      assert.equal((await request("/api/v1/admin/auth/bootstrap", "POST", { username: "integration.admin", password: "integration-secret" })).status, 201);
+      root = await request<AdminSignInResponse>("/api/v1/admin/auth/sign-in", "POST", { username: "integration.admin", password: "integration-secret" });
+    }
+    assert.equal(root.status, 200); token = root.body.sessionToken;
+    previousGlobal = (await request("/api/v1/system/application-settings")).body.applicationSettings.customTexts;
+    const global = { gm_headline: "  Global headline\n", gm_control_pause: "", login_subtitle: " \t " };
+    const globalUpdate = await request("/api/v1/admin/application-settings", "PATCH", { customTexts: global });
+    assert.equal(globalUpdate.status, 200); assert.deepEqual(globalUpdate.body.applicationSettings.customTexts, global);
+    assert.deepEqual((await request("/api/v1/system/application-settings")).body.applicationSettings.customTexts, global);
+    const stamp = randomUUID(), tenantKey = `exact-text-${stamp}`, workspaceKey = "owned";
+    assert.equal((await request("/api/v1/platform/tenants", "POST", { tenantKey, displayName: tenantKey })).status, 201);
+    assert.equal((await request(`/api/v1/tenants/${tenantKey}/workspaces`, "POST", { workspaceKey, displayName: workspaceKey })).status, 201);
+    assert.equal((await request(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, "POST", {
+      rosterText: [{ loginKey: "p", groupKey: "g", bookletKey: "B", mode: "run-hot-return" }]
+    })).status, 201);
+    const customTexts = { gm_headline: "", gm_control_pause: "  Local pause\n ", gm_menu_filter: " \t " };
+    const username = `exact-text-${stamp}`;
+    const created = await request<CreateAdminUserResponse>("/api/v1/admin/users", "POST", {
+      username, displayName: "Exact text monitor", password: "exact-text-password", confirmationPassword: "integration-secret", customTexts,
+      roleAssignments: [{ role: "group_monitor", tenantKey, workspaceKey, groupKey: "g" }]
+    });
+    assert.equal(created.status, 201); assert.deepEqual(created.body.adminUser.customTexts, customTexts);
+    const signIn = () => request<AdminSignInResponse>("/api/v1/admin/auth/sign-in", "POST", { username, password: "exact-text-password" });
+    assert.deepEqual((await signIn()).body.adminUser.customTexts, customTexts);
+    const updatedTexts = { ...customTexts, gm_headline: "\t ", gm_control_pause: "", login_subtitle: "  Authored  " };
+    const updated = await request(`/api/v1/admin/users/${created.body.adminUser.adminUserId}`, "PATCH", {
+      customTexts: updatedTexts, confirmationPassword: "integration-secret"
+    });
+    assert.equal(updated.status, 200); assert.deepEqual(updated.body.adminUser.customTexts, updatedTexts);
+    for (const [path, code, body] of [
+      ["/api/v1/admin/application-settings", "application_custom_texts_too_large", { customTexts: { gm_headline: " ".repeat(10001) } }],
+      [`/api/v1/admin/users/${created.body.adminUser.adminUserId}`, "admin_custom_texts_too_large", { customTexts: { gm_headline: " ".repeat(10001) }, confirmationPassword: "integration-secret" }]
+    ] as const) {
+      const oversized = await request(path, "PATCH", body); assert.equal(oversized.status, 400); assert.equal(oversized.body.error, code);
+    }
+    assert.deepEqual((await signIn()).body.adminUser.customTexts, updatedTexts);
+    assert.deepEqual((await request("/api/v1/system/application-settings")).body.applicationSettings.customTexts, global);
+    if (environment.FIRST_SLICE_STORE !== "memory") {
+      await closeServer(isolated.server); isolated = await createIsolatedServer(environment);
+      assert.deepEqual((await signIn()).body.adminUser.customTexts, updatedTexts);
+      assert.deepEqual((await request("/api/v1/system/application-settings")).body.applicationSettings.customTexts, global);
+    }
+  } finally {
+    if (previousGlobal) await request("/api/v1/admin/application-settings", "PATCH", { customTexts: previousGlobal });
+    await closeServer(isolated.server); rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("runtime port and shutdown drain settings are validated and exposed", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
@@ -8392,6 +8725,110 @@ test("runtime port and shutdown drain settings are validated and exposed", async
       }),
     /FIRST_SLICE_PROOF_OF_WORK_TTL_MS must be between 1000 and 600000/
   );
+});
+
+test("replacement answer deliveries retain stable logs exactly once on the configured integration store", async () => {
+  const tenantKey = "integration-log-replacement";
+  const workspaceKey = "log-replacement";
+  const scope = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  assert.equal((await requestJson("/api/v1/platform/tenants", {
+    method: "POST", body: {tenantKey, displayName: tenantKey}
+  })).status, 201);
+  assert.equal((await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST", body: {workspaceKey, displayName: workspaceKey}
+  })).status, 201);
+  await uploadMinimalOriginalUnitDependencies(tenantKey, workspaceKey, ["UNIT.LOG"]);
+  const source = await requestJson<{sourcePackage: {sourcePackageId: string}}>(`${scope}/source-packages`, {
+    method: "POST", body: {
+      fileName: "log-replacement.xml", mediaType: "application/xml",
+      sourceDocument: '<Booklet><Metadata><Id>LOG.BOOKLET</Id><Label>Log replacement</Label></Metadata><Units><Unit id="UNIT.LOG" /></Units></Booklet>'
+    }
+  });
+  assert.equal(source.status, 201);
+  const imported = await requestJson<{stagedContentRelease: {contentReleaseId: string}}>(`${scope}/import-jobs`, {
+    method: "POST", body: {sourcePackageId: source.body.sourcePackage.sourcePackageId}
+  });
+  assert.equal(imported.status, 201);
+  assert.ok(imported.body.stagedContentRelease);
+  assert.equal((await requestJson(`${scope}/content-releases/${imported.body.stagedContentRelease.contentReleaseId}/activate`, {
+    method: "POST", body: {}
+  })).status, 200);
+  assert.equal((await requestJson(`${scope}/participant-roster`, {
+    method: "POST", body: {rosterText: "loginKey,groupKey,bookletKey,executionMode\nlog-owner,log-group,LOG.BOOKLET,run-hot-return\nlog-other,log-group,LOG.BOOKLET,run-hot-return"}
+  })).status, 201);
+  const start = async (loginKey: string) => {
+    const signedIn = await requestJson<{sessionToken: string; participantSession: {participantSessionId: string}}>(
+      "/api/v1/participant/auth/sign-in", {method: "POST", body: {tenantKey, workspaceKey, loginKey}}
+    );
+    assert.equal(signedIn.status, 200);
+    const resumed = await requestJson<{testRun: TestRun}>(
+      `/api/v1/participant/sessions/${signedIn.body.participantSession.participantSessionId}/resume`,
+      {method: "POST", body: {bookletKey: "LOG.BOOKLET"}}
+    );
+    assert.equal(resumed.status, 200);
+    return {testRunId: resumed.body.testRun.testRunId, sessionToken: signedIn.body.sessionToken};
+  };
+  const owner = await start("log-owner");
+  const path = `/api/v1/participant/test-runs/${owner.testRunId}/save-progress`;
+  const event = {key: "REPLACEMENT_EVENT", content: "same event Ω", timeStamp: 1_791_411_000_000};
+  const oldLogs = [
+    {unitKey: "UNIT.LOG", originalUnitId: "UNIT.LOG", entries: [{...event}]},
+    {unitKey: null, originalUnitId: null, entries: [{...event}]}
+  ];
+  const save = (deliveryId: string, unitResponse: string, logs: unknown) => requestJson<{testRun: TestRun; error?: string}>(path, {
+    method: "POST", body: {deliveryId, responseUnitKey: "UNIT.LOG", status: "running", unitResponse, logs}
+  });
+  assert.equal((await save("legacy-packet", "older answer", oldLogs)).status, 200);
+  // These identifiers match legacy server IDs even after batch reorder. Two
+  // distinct new events keep separate rows despite identical time/content.
+  const replacementLogs = [
+    {...oldLogs[1]!, entries: [{...event, clientEntryId: "legacy-packet:log:1"}]},
+    {...oldLogs[0]!, entries: [{...event, clientEntryId: "legacy-packet:log:0"}]},
+    {unitKey: null, originalUnitId: null, entries: [
+      {...event, clientEntryId: "new-event-a"}, {...event, clientEntryId: "new-event-b"}
+    ]}
+  ];
+  const latestResponse = "latest exact answer\n ä🙂 \u0000 ";
+  const saved = await save("new-packet", latestResponse, replacementLogs);
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.testRun.unitResponses["UNIT.LOG"], latestResponse);
+  assert.equal((await save("another-retry-packet", latestResponse, replacementLogs)).status, 200);
+  const readLogs = (testRunId: string) => requestJson<{items: Array<{testLog: {
+    participantTestLogId: string; unitKey: string | null; logContent: string
+  }}>}>(`${scope}/test-logs?testRunId=${testRunId}&logKey=REPLACEMENT_EVENT&limit=100`);
+  const logs = await readLogs(owner.testRunId);
+  assert.equal(logs.status, 200);
+  assert.equal(logs.body.items.length, 4);
+  assert.deepEqual(logs.body.items.map(item => item.testLog.participantTestLogId).sort(), [
+    `delivery:${owner.testRunId}:legacy-packet:log:0`, `delivery:${owner.testRunId}:legacy-packet:log:1`,
+    `delivery:${owner.testRunId}:new-event-a`, `delivery:${owner.testRunId}:new-event-b`
+  ].sort());
+  assert.equal(logs.body.items.filter(item => item.testLog.unitKey === "UNIT.LOG").length, 1);
+  for (const clientEntryId of [null, 12, "", "has space", "x".repeat(211)]) {
+    const invalid = await save("invalid-entry-id", "must never overwrite the answer", [{
+      unitKey: null, originalUnitId: null, entries: [{...event, clientEntryId}]
+    }]);
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.error, "participant_test_log_entry_id_invalid");
+  }
+  const other = await start("log-other");
+  const otherPath = `/api/v1/participant/test-runs/${other.testRunId}/save-progress`;
+  const denied = await requestJson<{error: string}>(otherPath, {
+    method: "POST", headers: {authorization: `Bearer ${owner.sessionToken}`},
+    body: {deliveryId: "other-run-packet", responseUnitKey: "UNIT.LOG", status: "running", unitResponse: "unauthorized", logs: replacementLogs}
+  });
+  assert.equal(denied.status, 401);
+  assert.equal(denied.body.error, "participant_session_invalid");
+  assert.equal((await requestJson(otherPath, {
+    method: "POST", body: {deliveryId: "other-run-packet", responseUnitKey: "UNIT.LOG", status: "running", unitResponse: "other exact answer", logs: replacementLogs}
+  })).status, 200);
+  assert.equal((await readLogs(other.testRunId)).body.items.length, 4, "Entry identities remain scoped to the authorized Run.");
+  assert.deepEqual((await readLogs(owner.testRunId)).body.items, logs.body.items, "Rejected IDs and another Run must leave the original log rows unchanged.");
+  const preserved = await requestJson<{currentRunState: {testRun: TestRun}}>(
+    `/api/v1/participant/sessions/${saved.body.testRun.participantSessionId}/current-state`
+  );
+  assert.equal(preserved.status, 200);
+  assert.equal(preserved.body.currentRunState.testRun.unitResponses["UNIT.LOG"], latestResponse);
 });
 
 test("local demo bootstrap seeds a directly usable app state", async () => {
@@ -10459,20 +10896,17 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       lastChangeAt: "checked-separately"
     });
 
-    const rejectedResultArchive = await requestJsonAt<{ error: string }>(
-      isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/original-results.zip",
+    const allResultArchiveResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/original-results.zip`,
       {
         headers: {
           authorization: `Bearer ${signIn.body.sessionToken}`
         }
       }
     );
-    assert.equal(rejectedResultArchive.status, 400);
-    assert.equal(
-      rejectedResultArchive.body.error,
-      "result_archive_group_required"
-    );
+    assert.equal(allResultArchiveResponse.status, 200);
+    const allResultArchive = readStoredZipTextEntries(Buffer.from(await allResultArchiveResponse.arrayBuffer()));
+    assert.deepEqual(JSON.parse(allResultArchive.get("manifest.json") ?? "{}").groupKeys, ["group:student-demo"]);
 
     const resultArchiveResponse = await fetch(
       `${isolated.baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/original-results.zip?groupKey=group%3Amissing&groupKey=group%3Astudent-demo`,
@@ -10495,6 +10929,9 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const resultArchiveEntries = readStoredZipTextEntries(
       Buffer.from(await resultArchiveResponse.arrayBuffer())
     );
+    for (const name of ["responses.json", "logs.json", "reviews.json", "responses.csv", "logs.csv", "reviews.csv"]) {
+      assert.equal(allResultArchive.get(name), resultArchiveEntries.get(name), `Unfiltered ${name} must cover all existing groups.`);
+    }
     assert.deepEqual([...resultArchiveEntries.keys()], [
       "manifest.json",
       "responses.json",
@@ -11258,7 +11695,7 @@ test("local demo bootstrap preserves customized roster state across durable rest
   }
 });
 
-test("monitor command endpoint pauses, resumes, and atomically completes and locks a run", async () => {
+test("received monitor commands pause, resume, and return a locked Run to the starter", async () => {
   const requestedStore = process.env.FIRST_SLICE_STORE;
   const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
     ? requestedStore
@@ -11324,7 +11761,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(resumed.body.testRun.bookletKey, "booklet:demo");
 
     const commandPath = `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/${resumed.body.testRun.testRunId}/commands`;
-    const pauseCommand = await requestJsonAt<{
+    const pauseCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandId: string;
         commandType: string;
@@ -11394,6 +11831,11 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       false
     );
 
+    const testLogsBeforePausedStarterReturn = await requestJsonAt<{
+      items: Array<{ testLog: { logKey: string; logContent: string } }>;
+    }>(isolated.baseUrl, "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/test-logs", {headers: {authorization}});
+    assert.equal(testLogsBeforePausedStarterReturn.status, 200);
+
     const returnToStarterDuringMonitorPause = await requestJsonAt<{
       testRun: { status: string; pauseSource?: string };
       runtimeState: {
@@ -11440,8 +11882,10 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
           item.testLog.logKey === "CONTROLLER" &&
           item.testLog.logContent === "TERMINATED_PAUSED"
       ),
-      true
+      false
     );
+    assert.deepEqual(testLogsAfterPausedStarterReturn.body.items, testLogsBeforePausedStarterReturn.body.items,
+      "Source's visible pause status page leaves without termination or another test-state write.");
 
     const participantResumeDuringMonitorPause = await requestJsonAt<{
       error: string;
@@ -11562,7 +12006,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(openRunsByOtherSpecies.status, 200);
     assert.equal(openRunsByOtherSpecies.body.items.length, 0);
 
-    const unlockNavigationCommand = await requestJsonAt<{
+    const unlockNavigationCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11588,7 +12032,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       true
     );
 
-    const lockNavigationCommand = await requestJsonAt<{
+    const lockNavigationCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11614,7 +12058,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       false
     );
 
-    const lockTestCommand = await requestJsonAt<{
+    const lockTestCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousLocked: boolean;
@@ -11674,7 +12118,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       true
     );
 
-    const unlockTestCommand = await requestJsonAt<{
+    const unlockTestCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousLocked: boolean;
@@ -11694,7 +12138,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(unlockTestCommand.body.command.testRun.status, "paused");
     assert.equal(unlockTestCommand.body.command.testRun.locked, false);
 
-    const resumeCommand = await requestJsonAt<{
+    const resumeCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11715,7 +12159,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(resumeCommand.body.command.testRun.status, "running");
     assert.equal(resumeCommand.body.command.testRun.pauseSource, undefined);
 
-    const missingTimeTarget = await requestJsonAt<{ error: string }>(
+    const missingTimeTarget = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11730,7 +12174,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_time_target_unit_required"
     );
 
-    const invalidTime = await requestJsonAt<{ error: string }>(
+    const invalidTime = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11749,7 +12193,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_time_remaining_seconds_invalid"
     );
 
-    const nonTimedTarget = await requestJsonAt<{ error: string }>(
+    const nonTimedTarget = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11765,7 +12209,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(nonTimedTarget.status, 400);
     assert.equal(nonTimedTarget.body.error, "monitor_time_target_not_timed");
 
-    const nonTimedGotoRestoration = await requestJsonAt<{ error: string }>(
+    const nonTimedGotoRestoration = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11784,7 +12228,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_goto_time_target_not_timed"
     );
 
-    const missingGotoTarget = await requestJsonAt<{ error: string }>(
+    const missingGotoTarget = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11802,7 +12246,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_goto_target_unit_required"
     );
 
-    const invalidGotoTarget = await requestJsonAt<{ error: string }>(
+    const invalidGotoTarget = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11821,7 +12265,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_goto_target_unit_invalid"
     );
 
-    const gotoCommand = await requestJsonAt<{
+    const gotoCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11845,7 +12289,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "unit-finish"
     );
 
-    const completeCommand = await requestJsonAt<{
+    const completeCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11869,11 +12313,11 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(completeCommand.status, 200);
     assert.equal(completeCommand.body.command.commandType, "complete_and_lock");
     assert.equal(completeCommand.body.command.previousStatus, "running");
-    assert.equal(completeCommand.body.command.testRun.status, "completed");
+    assert.equal(completeCommand.body.command.testRun.status, "paused");
     assert.equal(completeCommand.body.command.testRun.locked, true);
-    assert.equal(completeCommand.body.command.testRun.currentUnitKey, null);
-    assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
-    assert.equal(completeCommand.body.command.participantSession.status, "closed");
+    assert.equal(completeCommand.body.command.testRun.currentUnitKey, "unit-finish");
+    assert.equal(completeCommand.body.command.testRun.completedAt, null);
+    assert.equal(completeCommand.body.command.participantSession.status, "signed_in");
 
     const originalMonitorCommandLogs = await requestJsonAt<{
       items: Array<{
@@ -11915,7 +12359,19 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       )
     );
 
-    const repeatCommand = await requestJsonAt<{ error: string }>(
+    const lockedResume = await requestJsonAt<{ error: string }>(isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" });
+    assert.equal(lockedResume.status, 423);
+    assert.equal(lockedResume.body.error, "test_run_locked");
+
+    // Final completion is a separate participant operation. Its closed-Run
+    // guard still rejects subsequently issued monitor commands.
+    assert.equal((await issueMonitorCommandAndExecuteAt(isolated.baseUrl, commandPath,
+      { method: "POST", headers: { authorization }, body: { commandType: "unlock_test" } })).status, 200);
+    assert.equal((await requestJsonAt(isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/complete`, { method: "POST" })).status, 200);
+    const repeatCommand = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11975,11 +12431,12 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=8",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=20",
       { headers: { authorization } }
     );
 
     assert.equal(commandActivity.status, 200);
+    assert.equal(commandActivity.body.items.shift()?.activityEvent.details.commandType, "unlock_test");
     assert.equal(commandActivity.body.items.length, 8);
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.commandType),
@@ -12003,13 +12460,9 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       resumed.body.testRun.testRunId
     );
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousStatus, "running");
-    assert.equal(commandActivity.body.items[0]?.activityEvent.details.nextStatus, "completed");
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.nextStatus, "running");
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousLocked, false);
-    assert.equal(commandActivity.body.items[0]?.activityEvent.details.locked, true);
-    assert.match(
-      String(commandActivity.body.items[0]?.activityEvent.details.completedAt ?? ""),
-      ISO_DATE_REGEX
-    );
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.locked, false);
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.loginKey, "student-demo");
     assert.equal(
       commandActivity.body.items[0]?.activityEvent.details.participantSessionId,
@@ -12210,7 +12663,7 @@ test("participant event stream publishes session snapshots and monitor changes",
     };
     assert.equal(await connection(), "WEBSOCKET");
 
-    const pause = await requestJsonAt<{
+    const pause = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(
       isolated.baseUrl,
@@ -12245,7 +12698,7 @@ test("participant event stream publishes session snapshots and monitor changes",
     assert.equal(connectionLogs.status, 200);
     assert.ok(connectionLogs.body.includes('"0";"""CONNECTION"" : LOST"'));
     assert.ok(connectionLogs.body.includes('"0";"""CONNECTION"" : POLLING"'));
-    const completed = await requestJsonAt(isolated.baseUrl,
+    const completed = await issueMonitorCommandAndExecuteAt(isolated.baseUrl,
       `${openRunsPath}/${snapshot.testRunId}/commands`, {
         method: "POST", body: { commandType: "complete", actorId: "participant-stream-test" }
       });
@@ -12404,7 +12857,7 @@ test("monitor event stream publishes authenticated snapshots and run changes", a
     assert.match(snapshot.revision, /^[a-f0-9]{64}$/);
     assert.equal(snapshot.openRunCount, 1);
 
-    const pause = await requestJsonAt<{
+    const pause = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(
       isolated.baseUrl,
@@ -16817,6 +17270,20 @@ test("original Testcenter compatibility corpus imports representative booklets",
       bytes: iconv.encode(iso885916BookletXml, "iso-8859-16"),
       displayLabel: "Preț 12 €"
     },
+    ...["utf-8", "utf-16le", "utf-16be"].map(encoding => ({
+      fileName: `authored-replacement-character-${encoding}-booklet.xml`,
+      bytes: iconv.encode(validBookletXml
+        .replace(/encoding=["']utf-8["']/i, `encoding="${encoding}"`)
+        .replace("<Label>Sample booklet</Label>", "<Label>Authored � retained</Label>"), encoding),
+      displayLabel: "Authored � retained"
+    })),
+    ...["UTF-7", "UTF7", "UTF_7", "unicode-1-1-utf-7"].map(encoding => {
+      const xml = validBookletXml.replace(/encoding=["']utf-8["']/i, `encoding="${encoding}"`)
+        .replace("<Label>Sample booklet</Label>", "<Label>Ä + 日本 😀 �</Label>");
+      return { fileName: `utf7-${encoding}-original-booklet.xml`,
+        bytes: encodeUtf7XmlFixture(xml),
+        displayLabel: "Ä + 日本 😀 �" };
+    }),
     ...registeredLatinEncodingBooklets,
     {
       fileName: "cp850-original-booklet.xml",
@@ -16975,10 +17442,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     /encoding=["']utf-8["']/i,
     'encoding="base64"'
   );
-  const unsafeUtf7EncodingXml = validBookletXml.replace(
+  const invalidUtf7EncodingXml = validBookletXml.replace(
     /encoding=["']utf-8["']/i,
     'encoding="UTF-7"'
-  );
+  ).replace("<Label>Sample booklet</Label>", "<Label>+AOQ/-</Label>");
   const ibm037EncodingMismatchXml = validBookletXml.replace(
     /encoding=["']utf-8["']/i,
     'encoding="UTF-8"'
@@ -17036,6 +17503,17 @@ test("original Testcenter compatibility corpus imports representative booklets",
     value => iconv.encode(value, "shift_jis")
   );
   const invalidEncodingByteCases = [
+    ...[
+      { encoding: "IBM857", bytes: [0xd5, 0xe7, 0xf2] },
+      { encoding: "IBM864", bytes: [0x9b, 0x9c, 0x9f, 0xa6, 0xa7, 0xff] },
+      { encoding: "IBM869", bytes: [0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x87, 0x93, 0x94] }
+    ].flatMap(({ encoding, bytes }) => bytes.map(byte => ({
+      fileName: `invalid-${encoding.toLowerCase()}-${byte.toString(16)}-booklet.xml`,
+      bytes: invalidEncodedBookletBytes(
+        validBookletXml.replace(/encoding=["']utf-8["']/i, `encoding="${encoding}"`),
+        "Sample booklet", Buffer.from([byte]), value => iconv.encode(value, encoding)
+      )
+    }))),
     {
       fileName: "invalid-utf-8-original-booklet.xml",
       bytes: invalidUtf8BookletBytes
@@ -17090,10 +17568,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       fileName: "utf-7-encoding-original-booklet.xml",
       sourceDocument: `data:application/xml;base64,${Buffer.from(
-        unsafeUtf7EncodingXml,
+        invalidUtf7EncodingXml,
         "utf8"
       ).toString("base64")}`,
-      diagnosticCode: "source_document_xml_encoding_unsupported"
+      diagnosticCode: "source_document_xml_encoding_invalid_bytes"
     },
     {
       fileName: "ibm037-declared-utf-8-original-booklet.xml",
@@ -23700,7 +24178,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
   }
 });
 
-test("original Testcenter compatibility corpus executes the current 51-account Booklet Config package", async () => {
+test("original Testcenter compatibility corpus executes the current 56-account Booklet Config package", async () => {
   type BookletFixture = {
     fixture: string;
     bookletKey: string;
@@ -23729,8 +24207,8 @@ test("original Testcenter compatibility corpus executes the current 51-account B
     };
   };
   type RuntimePolicy = {
-    navigation: { browserNavigation: string };
-    display: { fullscreenPrompt: boolean };
+    navigation: { browserNavigation: string; unitLabel: string };
+    display: { fullscreenPrompt: boolean; toolbarUnitLabel: string; headerContent: string };
   };
 
   const corpus = JSON.parse(
@@ -23788,7 +24266,9 @@ test("original Testcenter compatibility corpus executes the current 51-account B
   const isolatedEnvironment: Record<string, string> = {
     FIRST_SLICE_STORE: isolatedStore,
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
-    FIRST_SLICE_BOOTSTRAP_DEMO: "false"
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false",
+    FIRST_SLICE_XML_SCHEMA_PROFILE: "original-19",
+    FIRST_SLICE_XML_SCHEMA_DOWNLOAD: "false"
   };
   if (isolatedStore === "file") {
     isolatedEnvironment.FIRST_SLICE_FILE = `${
@@ -23803,6 +24283,11 @@ test("original Testcenter compatibility corpus executes the current 51-account B
   const isolated = await createIsolatedServer(isolatedEnvironment);
 
   try {
+    const configuration = await requestJsonAt<{
+      runtimeConfig: { xmlSchema: { profile: string; validatedByXsd: boolean } };
+    }>(isolated.baseUrl, productionApiRoutes.system.getRuntimeConfig);
+    assert.equal(configuration.body.runtimeConfig.xmlSchema.profile, "original-19");
+    assert.equal(configuration.body.runtimeConfig.xmlSchema.validatedByXsd, true);
     const tenantKey = "integration-tenant-current-original-booklet-config";
     const workspaceKey = "integration-workspace-current-original-booklet-config";
     assert.equal(
@@ -23828,26 +24313,9 @@ test("original Testcenter compatibility corpus executes the current 51-account B
       201
     );
 
-    const manifestResources = [
-      ...bookletDocuments.map(
-        booklet =>
-          `<resource identifier="${booklet.bookletKey}" href="${booklet.fileName}" />`
-      ),
-      ...unitDocuments.map(
-        unit => `<resource identifier="${unit.unitKey}" href="${unit.fileName}" />`
-      ),
-      `<resource identifier="${expectation.player.playerKey}" href="${playerFileName}" />`
-    ].join("\n");
+    // Current Original workspace ZIP: byte-exact Booklets/Units/Player,
+    // without an extra IMS migration manifest requiring compatibility mode.
     const zipPayload = createZipBase64([
-      {
-        fileName: "export/imsmanifest.xml",
-        content: `
-          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
-            <resources>${manifestResources}</resources>
-          </manifest>
-        `,
-        compressionMethod: 8
-      },
       ...bookletDocuments.map(booklet => ({
         fileName: `export/${booklet.fileName}`,
         content: booklet.content,
@@ -23906,7 +24374,7 @@ test("original Testcenter compatibility corpus executes the current 51-account B
             bookletEntries: Array<{
               bookletKey: string;
               policy: RuntimePolicy;
-              unitEntries: Array<{ unitKey: string; playerKey?: string }>;
+              unitEntries: Array<{ unitKey: string; playerKey?: string; shortLabel?: string }>;
             }>;
             playerEntries?: Array<{ playerKey: string; html: string }>;
           };
@@ -23918,7 +24386,7 @@ test("original Testcenter compatibility corpus executes the current 51-account B
     );
     const runtimeSnapshot =
       release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
-    assert.equal(runtimeSnapshot.bookletEntries.length, 51);
+    assert.equal(runtimeSnapshot.bookletEntries.length, 56);
     assert.deepEqual(
       new Set(runtimeSnapshot.bookletEntries.map(booklet => booklet.bookletKey)),
       new Set(expectation.bookletKeys)
@@ -23966,6 +24434,26 @@ test("original Testcenter compatibility corpus executes the current 51-account B
       )?.policy.navigation.browserNavigation,
       "prevent"
     );
+    const labelCases: Array<{
+      suffix: number; toolbar?: string; navigation?: string; header?: string;
+      shortLabels: Array<string | undefined>;
+    }> = [
+      { suffix: 40, toolbar: "label", shortLabels: ["1", "2"] },
+      { suffix: 41, toolbar: "hidden", shortLabels: ["1", "2"] },
+      { suffix: 52, toolbar: "label_short", shortLabels: ["A1", "A2"] },
+      { suffix: 53, toolbar: "label_short", shortLabels: [undefined, "A2"] },
+      { suffix: 54, navigation: "label_short", shortLabels: ["A1", "A2"] },
+      { suffix: 55, header: "unit_short", shortLabels: ["A1", "A2"] },
+      { suffix: 56, header: "unit_short", shortLabels: [undefined, "A2"] }
+    ];
+    for (const labelCase of labelCases) {
+      const booklet = runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === `Cy-Bklt_BkltConfig-${labelCase.suffix}`);
+      assert.ok(booklet);
+      assert.deepEqual(booklet.unitEntries.map(unit => unit.shortLabel), labelCase.shortLabels);
+      if (labelCase.toolbar) assert.equal(booklet.policy.display.toolbarUnitLabel, labelCase.toolbar);
+      if (labelCase.navigation) assert.equal(booklet.policy.navigation.unitLabel, labelCase.navigation);
+      if (labelCase.header) assert.equal(booklet.policy.display.headerContent, labelCase.header);
+    }
     assert.deepEqual(runtimeSnapshot.playerEntries, [
       { playerKey: expectation.player.playerKey, html: playerDocument }
     ]);
@@ -24020,7 +24508,7 @@ test("original Testcenter compatibility corpus executes the current 51-account B
       assert.deepEqual(participant.validationWarnings, []);
     }
 
-    for (const suffix of [1, 27, 51]) {
+    for (const suffix of [1, 27, 51, 52, 53, 54, 55, 56]) {
       const loginKey = `${expectation.roster.loginPrefix}${suffix}`;
       const bookletKey = `Cy-Bklt_BkltConfig-${suffix}`;
       const signIn = await requestJsonAt<{
@@ -25294,7 +25782,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       rejectedOtherGroupQuery.body.error,
       "monitor_group_access_required"
     );
-    const rejectedOutsiderCommand = await requestJsonAt<{ error: string }>(
+    const rejectedOutsiderCommand = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${outsiderRun.body.testRun.testRunId}/commands`,
       {
@@ -25310,7 +25798,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
     );
 
     const commandPath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`;
-    const pause = await requestJsonAt<{
+    const pause = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25319,7 +25807,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
     });
     assert.equal(pause.status, 200);
     assert.equal(pause.body.command.testRun.status, "paused");
-    const resume = await requestJsonAt<{
+    const resume = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25327,7 +25815,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       body: { commandType: "resume", actorId: "GM-1" }
     });
     assert.equal(resume.body.command.testRun.status, "running");
-    const goTo = await requestJsonAt<{
+    const goTo = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string; currentUnitKey: string | null } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25356,7 +25844,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       "Aufgabenblock 1"
     );
 
-    const lock = await requestJsonAt<{
+    const lock = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string; locked?: boolean } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25374,7 +25862,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
     );
     assert.equal(lockedRuntime.body.runtimeState.runtimeStatus, "locked");
     assert.equal(lockedRuntime.body.runtimeState.availableAction, "none");
-    const unlock = await requestJsonAt<{
+    const unlock = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string; locked?: boolean } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25407,7 +25895,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       participantSessionId
     );
 
-    const finishAll = await requestJsonAt<{
+    const finishAll = await issueMonitorCommandAndExecuteAt<{
       requestedCount: number;
       succeededCount: number;
       failedCount: number;
@@ -25432,7 +25920,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
     assert.equal(finishAll.body.succeededCount, 1);
     assert.equal(finishAll.body.failedCount, 0);
     assert.equal(finishAll.body.commands[0]?.testRun.testRunId, testRunId);
-    assert.equal(finishAll.body.commands[0]?.testRun.status, "completed");
+    assert.equal(finishAll.body.commands[0]?.testRun.status, "paused");
     assert.equal(finishAll.body.commands[0]?.testRun.locked, true);
 
     const outsiderAfterFinish = await requestJsonAt<{
@@ -32701,7 +33189,8 @@ test("original Testcenter compatibility corpus isolates invalid ZIP members and 
         runtimeSnapshot: {
           bookletEntries: Array<{
             bookletKey: string;
-            unitEntries: Array<{ unitKey: string }>;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; unitDefinition?: string }>;
           }>;
         };
       } | null;
@@ -32908,95 +33397,103 @@ test("original Testcenter compatibility corpus isolates invalid ZIP members and 
       "utf8"
     )
   ]);
-  const invalidBytesResult = await importArchive(
-    "integration-workspace-partial-zip-invalid-bytes",
-    "invalid-byte-sibling-graph.zip",
-    [
-      {
-        fileName: "invalid_bytes_testtakers.xml",
-        content: validRoster(
-          "BOOKLET.PARTIAL-INVALID-BYTES",
-          "group-partial-invalid-bytes",
-          "login-partial-invalid-bytes"
-        )
-      },
-      {
-        fileName: "invalid_bytes_booklet.xml",
-        content: validBooklet(
-          "BOOKLET.PARTIAL-INVALID-BYTES",
-          "UNIT.PARTIAL-INVALID-BYTES",
-          "Invalid Byte Graph"
-        )
-      },
-      { fileName: "invalid_bytes_unit.xml", content: invalidUtf8UnitBytes },
-      {
-        fileName: "valid_sibling_testtakers.xml",
-        content: validRoster(
-          "BOOKLET.PARTIAL-VALID-BYTES",
-          "group-partial-valid-bytes",
-          "login-partial-valid-bytes"
-        )
-      },
-      {
-        fileName: "valid_sibling_booklet.xml",
-        content: validBooklet(
-          "BOOKLET.PARTIAL-VALID-BYTES",
-          "UNIT.PARTIAL-VALID-BYTES",
-          "Valid Byte Sibling"
-        )
-      },
-      {
-        fileName: "valid_sibling_unit.xml",
-        content: validUnit(
-          "UNIT.PARTIAL-VALID-BYTES",
-          "Valid Byte Sibling Unit"
-        )
-      }
-    ]
-  );
-  assert.equal(invalidBytesResult.status, 201);
-  assert.equal(invalidBytesResult.body.importJob.status, "completed");
-  assert.deepEqual(
-    invalidBytesResult.body.importJob.diagnostics.map(diagnostic => [
-      diagnostic.severity,
-      diagnostic.code
-    ]),
-    [
-      ["warning", "source_document_xml_encoding_invalid_bytes"],
-      ["warning", "source_document_booklet_unit_missing"],
-      ["warning", "source_document_testtakers_booklet_missing"]
-    ]
-  );
-  assert.deepEqual(
-    invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries.map(
-      booklet => ({
-        bookletKey: booklet.bookletKey,
-        unitKeys: booklet.unitEntries.map(unit => unit.unitKey)
-      })
-    ),
-    [
-      {
-        bookletKey: "BOOKLET.PARTIAL-VALID-BYTES",
-        unitKeys: ["UNIT.PARTIAL-VALID-BYTES"]
-      }
-    ]
-  );
-  assert.deepEqual(invalidBytesResult.body.participantRosterImport, {
-    importedCount: 1,
-    updatedCount: 0,
-    sourceFileNames: ["valid_sibling_testtakers.xml"],
-    operationalLoginCandidateCount: 0
-  });
-  assert.deepEqual(
-    await acceptedPathsFor(
-      "integration-workspace-partial-zip-invalid-bytes"
-    ),
-    [
-      "valid_sibling_testtakers.xml",
-      "valid_sibling_booklet.xml",
-      "valid_sibling_unit.xml"
-    ]
-  );
+  for (const encoding of ["utf8", "utf7"] as const) {
+    const workspace = "integration-workspace-partial-zip-invalid-bytes-" + encoding;
+    const encodeSibling = (xml: string): string | Buffer => encoding === "utf7" ? encodeUtf7XmlFixture(xml) : xml;
+    const invalidBytesResult = await importArchive(
+      workspace,
+      "invalid-byte-sibling-graph.zip",
+      [
+        {
+          fileName: "invalid_bytes_testtakers.xml",
+          content: validRoster(
+            "BOOKLET.PARTIAL-INVALID-BYTES",
+            "group-partial-invalid-bytes-" + encoding,
+            "login-partial-invalid-bytes-" + encoding
+          )
+        },
+        {
+          fileName: "invalid_bytes_booklet.xml",
+          content: validBooklet(
+            "BOOKLET.PARTIAL-INVALID-BYTES",
+            "UNIT.PARTIAL-INVALID-BYTES",
+            "Invalid Byte Graph"
+          )
+        },
+        { fileName: "invalid_bytes_unit.xml", content: encoding === "utf7"
+          ? Buffer.from('<?xml version="1.0" encoding="UTF-7"?>' + validUnit("UNIT.PARTIAL-INVALID-BYTES", "+AOQ/-"), "ascii")
+          : invalidUtf8UnitBytes },
+        {
+          fileName: "valid_sibling_testtakers.xml",
+          content: encodeSibling(validRoster(
+            "BOOKLET.PARTIAL-VALID-BYTES",
+            "group-partial-valid-bytes-" + encoding,
+            "login-partial-valid-bytes-" + encoding
+          ))
+        },
+        {
+          fileName: "valid_sibling_booklet.xml",
+          content: encodeSibling(validBooklet(
+            "BOOKLET.PARTIAL-VALID-BYTES",
+            "UNIT.PARTIAL-VALID-BYTES",
+            "Valid Byte Sibling �"
+          ))
+        },
+        {
+          fileName: "valid_sibling_unit.xml",
+          content: encodeSibling(validUnit(
+            "UNIT.PARTIAL-VALID-BYTES",
+            "Valid Byte Sibling Unit �"
+          ))
+        }
+      ]
+    );
+    assert.equal(invalidBytesResult.status, 201);
+    assert.equal(invalidBytesResult.body.importJob.status, "completed");
+    assert.deepEqual(
+      invalidBytesResult.body.importJob.diagnostics.map(diagnostic => [
+        diagnostic.severity,
+        diagnostic.code
+      ]),
+      [
+        ["warning", "source_document_xml_encoding_invalid_bytes"],
+        ["warning", "source_document_booklet_unit_missing"],
+        ["warning", "source_document_testtakers_booklet_missing"]
+      ]
+    );
+    assert.deepEqual(
+      invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries.map(
+        booklet => ({
+          bookletKey: booklet.bookletKey,
+          unitKeys: booklet.unitEntries.map(unit => unit.unitKey)
+        })
+      ),
+      [
+        {
+          bookletKey: "BOOKLET.PARTIAL-VALID-BYTES",
+          unitKeys: ["UNIT.PARTIAL-VALID-BYTES"]
+        }
+      ]
+    );
+    assert.deepEqual(invalidBytesResult.body.participantRosterImport, {
+      importedCount: 1,
+      updatedCount: 0,
+      sourceFileNames: ["valid_sibling_testtakers.xml"],
+      operationalLoginCandidateCount: 0
+    });
+    assert.equal(invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]?.displayLabel, "Valid Byte Sibling �");
+    assert.equal(invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]?.unitEntries[0]?.unitDefinition, "Valid Byte Sibling Unit � content");
+    assert.deepEqual(
+      await acceptedPathsFor(
+        workspace
+      ),
+      [
+        "valid_sibling_testtakers.xml",
+        "valid_sibling_booklet.xml",
+        "valid_sibling_unit.xml"
+      ]
+    );
+  }
 });
 
 test("original Testcenter code-gated testlets require a durable run unlock", async () => {
@@ -33315,7 +33812,7 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     { method: "POST", body: { bookletKey } }
   );
   assert.equal(monitorRun.body.testRun.currentUnitKey, null);
-  const monitorUnlock = await requestJson<{
+  const monitorUnlock = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       testRun: {
@@ -33536,7 +34033,7 @@ test("original Testcenter root restrictions govern the complete booklet", async 
     "testlet_time_leave_forbidden"
   ]);
 
-  const shortenedTimer = await requestJson<{
+  const shortenedTimer = await issueMonitorCommandAndExecute<{
     command: { testRun: { testletTimers?: Record<string, {
       durationSeconds: number; status: string; expiresAt: string | null;
     }> } };
@@ -34097,7 +34594,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "testlet_time_closed"
   ]);
 
-  const monitorUnlock = await requestJson<{
+  const monitorUnlock = await issueMonitorCommandAndExecute<{
     command: {
       testRun: {
         monitorNavigationUnlocked?: boolean;
@@ -34132,7 +34629,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "testlet_time_closed"
   ]);
 
-  const restoredTimer = await requestJson<{
+  const restoredTimer = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       previousStatus: string;
@@ -34219,7 +34716,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "expired"
   );
 
-  const monitorReopenedTimer = await requestJson<{
+  const monitorReopenedTimer = await issueMonitorCommandAndExecute<{
     command: {
       testRun: {
         currentUnitKey: string | null;
@@ -34274,7 +34771,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     ISO_DATE_REGEX
   );
 
-  const batchReopenedTimer = await requestJson<{
+  const batchReopenedTimer = await issueMonitorCommandAndExecute<{
     succeededCount: number;
     failedCount: number;
     commands: Array<{
@@ -34322,6 +34819,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   const monitorActivity = await requestJson<{
     items: Array<{
       activityEvent: {
+        eventType: string;
         details: {
           commandType?: string;
           targetUnitKey?: string | null;
@@ -34334,7 +34832,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       };
     }>;
   }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=monitor_run_command_issued&limit=10`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?limit=100`
   );
   const setTimeActivity = monitorActivity.body.items.find(
     item => item.activityEvent.details.commandType === "set_testlet_time"
@@ -34342,6 +34840,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   const gotoRestorationActivity = monitorActivity.body.items.find(
     item =>
       item.activityEvent.details.commandType === "goto" &&
+      item.activityEvent.eventType === "monitor_run_command_executed" &&
       item.activityEvent.details.remainingSeconds === 10
   );
   assert.ok(gotoRestorationActivity);
@@ -34876,7 +35375,7 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
     "testlet_leave_locked"
   ]);
 
-  const monitorGoto = await requestJson<{
+  const monitorGoto = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       actorId: string | null;
@@ -34913,7 +35412,7 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
     "UNIT.LOCK.1",
     "UNIT.LOCK.2"
   ]);
-  const monitorUnlock = await requestJson<{
+  const monitorUnlock = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       testRun: {
@@ -35223,7 +35722,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   assert.equal(hiddenJump.body.error, "booklet_navigation_denied");
   assert.deepEqual(hiddenJump.body.details?.deniedReasons, ["adaptive_unit_hidden"]);
 
-  const hiddenMonitorGoto = await requestJson<{ error: string }>(
+  const hiddenMonitorGoto = await issueMonitorCommandAndExecute<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
     {
       method: "POST",
@@ -41158,9 +41657,14 @@ test("original BookletConfig compiles into enforced participant navigation polic
   });
   assert.equal(lateFirstSave.status, 200);
   assert.equal(lateFirstSave.body.testRun.currentUnitKey, secondUnitKey);
+  // Original State::applyPatch retains fields absent from a later patch.
+  // Updating the current page must preserve the previously reported parameters.
   assert.equal(
     lateFirstSave.body.testRun.unitResponses[firstUnitKey],
-    lateFirstResponse
+    unitResponse("complete", "complete", "page-4", [
+      { key: "avatar", value: "green" },
+      { key: "difficulty", value: "high" }
+    ])
   );
   assert.equal(
     (await save(secondUnitKey, unitResponse("some", "none", "page-1"))).status,
@@ -41287,7 +41791,7 @@ test("returning to the starter applies lock_test_on_termination before exposing 
     "test_run_locked"
   );
 
-  const unlock = await requestJson<{
+  const unlock = await issueMonitorCommandAndExecute<{
     command: { testRun: { locked?: boolean; status: string } };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
@@ -41702,7 +42206,7 @@ test("original Testlet completeness restrictions override BookletConfig by dimen
     "presentation_incomplete",
     "response_incomplete"
   ]);
-  const monitorUnlock = await requestJson<{
+  const monitorUnlock = await issueMonitorCommandAndExecute<{
     command: { testRun: { monitorNavigationUnlocked?: boolean } };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
@@ -41718,7 +42222,7 @@ test("original Testlet completeness restrictions override BookletConfig by dimen
     (await save(globalSecondUnitKey, response("some", "none"))).status,
     200
   );
-  const monitorLock = await requestJson<{
+  const monitorLock = await issueMonitorCommandAndExecute<{
     command: { testRun: { monitorNavigationUnlocked?: boolean } };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
@@ -44219,7 +44723,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${review.testRunId}`
   );
   assert.deepEqual(reviewOpenRuns.body.items, []);
-  const rejectedReviewCommand = await requestJson<{ error: string }>(
+  const rejectedReviewCommand = await issueMonitorCommandAndExecute<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${review.testRunId}/commands`,
     { method: "POST", body: { commandType: "pause", actorId: "mode-monitor" } }
   );
@@ -44411,7 +44915,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     trialOpenRuns.body.items.map(item => [item.testRunId, item.executionMode]),
     [[trial.testRunId, "run-trial"]]
   );
-  const rejectedTrialCommand = await requestJson<{ error: string }>(
+  const rejectedTrialCommand = await issueMonitorCommandAndExecute<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${trial.testRunId}/commands`,
     { method: "POST", body: { commandType: "pause", actorId: "mode-monitor" } }
   );
@@ -44681,6 +45185,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       status: string;
       currentUnitKey: string | null;
       completedAt: string | null;
+      lockedUnitKeys?: string[];
     };
     runtimeState: {
       runtimeStatus: string;
@@ -44702,6 +45207,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     hotReturnRun.body.testRun.currentUnitKey
   );
   assert.equal(hotReturnStarter.body.testRun.completedAt, null);
+  assert.ok(hotReturnStarter.body.testRun.lockedUnitKeys?.includes("UNIT.INTRO"));
   assert.equal(hotReturnStarter.body.runtimeState.runtimeStatus, "in_progress");
   assert.equal(hotReturnStarter.body.runtimeState.availableAction, "resume");
   assert.deepEqual(
@@ -44722,7 +45228,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(resumedHotReturn.body.testRun.status, "running");
   assert.equal(
     resumedHotReturn.body.testRun.currentUnitKey,
-    hotReturnRun.body.testRun.currentUnitKey
+    "UNIT.PROTECTED"
   );
   const unlockedHotReturn = await requestJson<{
     testRun: { currentUnitKey: string | null };
@@ -44731,7 +45237,11 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     { method: "POST", body: { code: "mode-code" } }
   );
   assert.equal(unlockedHotReturn.status, 200);
-  assert.equal(unlockedHotReturn.body.testRun.currentUnitKey, "UNIT.INTRO");
+  // Returning to Starter left the introductory leave-once Unit locked.
+  // Original's UnitActivateGuard resumes at the next accessible code-entry Unit;
+  // unlocking that block must retain the resumed position.
+  assert.equal(hotReturnRun.body.testRun.currentUnitKey, "UNIT.INTRO");
+  assert.equal(unlockedHotReturn.body.testRun.currentUnitKey, resumedHotReturn.body.testRun.currentUnitKey);
   const hotReturnAtProtected = await requestJson<{
     testRun: { currentUnitKey: string | null };
   }>(
@@ -46296,6 +46806,89 @@ test("study monitor counts saved roster participants before sign-in", async () =
   );
 });
 
+test("protected monitor booklet details include every assigned booklet before a run exists and scope Unit counts to that booklet", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "owned-monitor-detail-"));
+  const schema = "owned_monitor_detail_" + randomUUID().replaceAll("-", "");
+  let isolated: Awaited<ReturnType<typeof createIsolatedServer>> | undefined;
+  let pool: Pool | undefined, created = false;
+  try {
+    let postgresUrl: string | undefined;
+    if (process.env.FIRST_SLICE_STORE === "postgres") {
+      pool = new Pool({connectionString: process.env.FIRST_SLICE_POSTGRES_URL});
+      await pool.query(`CREATE SCHEMA "${schema}"`); created = true;
+      const url = new URL(process.env.FIRST_SLICE_POSTGRES_URL!);
+      url.searchParams.set("options", "-c search_path=" + schema); postgresUrl = url.toString();
+    }
+    isolated = await createIsolatedServer({
+      FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+      FIRST_SLICE_FILE: join(directory, "owned.json"), FIRST_SLICE_SQLITE_FILE: join(directory, "owned.sqlite"),
+      ...(postgresUrl ? {FIRST_SLICE_POSTGRES_URL: postgresUrl} : {})
+    });
+    const ownedBaseUrl = isolated.baseUrl;
+    const signedIn = await requestJsonAt<AdminSignInResponse>(ownedBaseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST", body: {username: "demo-admin", password: "demo-admin-password"}
+    });
+    assert.equal(signedIn.status, 200);
+    const headers = {authorization: `Bearer ${signedIn.body.sessionToken}`};
+    const post = (path: string, body: unknown, participantToken?: string) => requestJsonAt<any>(ownedBaseUrl, path, {
+      method: "POST", headers: participantToken ? {authorization: `Bearer ${participantToken}`} : headers, body
+    });
+    const workspaceKey = `owned-monitor-assignments-${randomUUID()}`;
+    assert.equal((await post("/api/v1/tenants/demo-tenant/workspaces", {workspaceKey, displayName: "Owned monitor assignments"})).status, 201);
+    const scope = `/api/v1/tenants/demo-tenant/workspaces/${workspaceKey}`;
+    const source = await post(scope + "/source-packages", {fileName: "owned-monitor.json", mediaType: "application/json", contentStructure: {
+      bookletEntries: [
+        {bookletKey: "OWN.A", displayLabel: "First booklet", unitEntries: [
+          {unitKey: "SHARED", displayLabel: "Shared Unit"}, {unitKey: "ONLY.A", displayLabel: "Only first"}]},
+        {bookletKey: "OWN.B", displayLabel: "Additional booklet", unitEntries: [
+          {unitKey: "SHARED", displayLabel: "Shared Unit"}, {unitKey: "ONLY.B", displayLabel: "Only additional"}]},
+        {bookletKey: "UNASSIGNED", displayLabel: "Unassigned", unitEntries: [{unitKey: "OTHER", displayLabel: "Other"}]}
+      ]
+    }});
+    assert.equal(source.status, 201);
+    const imported = await post(scope + "/import-jobs", {sourcePackageId: source.body.sourcePackage.sourcePackageId});
+    assert.equal(imported.body.importJob.status, "completed");
+    assert.equal((await post(scope + `/content-releases/${imported.body.stagedContentRelease.contentReleaseId}/activate`, {})).status, 200);
+    const roster = await post(scope + "/participant-roster", {rosterText: JSON.stringify({metadata: {}, groups: [{id: "owned", label: "Owned group", logins: [
+      {name: "owned-multi", mode: "run-hot-return", booklets: [{id: "OWN.A"}, {id: "OWN.B", state: "variant:one"}, {id: "OWN.B", state: "variant:two"}]},
+      {name: "owned-first-only", mode: "run-hot-return", booklets: [{id: "OWN.A"}]},
+      {name: "owned-primary-b", mode: "run-hot-return", booklets: [{id: "OWN.B"}]},
+      {name: "owned-preview", mode: "run-review", booklets: [{id: "OWN.B"}]}
+    ]}]})});
+    assert.equal(roster.status, 201, JSON.stringify(roster.body));
+    const detailPath = scope + "/study-monitor/booklets/OWN.B";
+    assert.equal((await requestJsonAt(ownedBaseUrl, detailPath)).status, 401);
+    const read = (path: string) => requestJsonAt<any>(ownedBaseUrl, path, {headers});
+    const detail = await read(detailPath), summary = await read(scope + "/study-monitor/summary");
+    assert.equal(detail.status, 200);
+    const before = detail.body.studyMonitorBooklet;
+    const progress = summary.body.studyMonitorSummary.bookletProgress.find((row: {bookletKey: string}) => row.bookletKey === "OWN.B");
+    assert.equal(before.expectedParticipantCount, progress.expectedParticipantCount);
+    assert.equal(before.expectedParticipantCount, 2); assert.equal(before.rosterEntryCount, 2);
+    assert.equal(before.notStartedCount, 2); assert.equal(before.participantSessionCount, 0); assert.equal(before.testRunCount, 0);
+    assert.deepEqual(before.rosterEntries.map((row: {loginKey: string}) => row.loginKey), ["owned-multi", "owned-primary-b"]);
+    assert.deepEqual(before.unitProgress.map((row: {unitKey: string; rosterExpectedCount: number; missingResponseCount: number}) =>
+      [row.unitKey, row.rosterExpectedCount, row.missingResponseCount]), [["ONLY.B", 2, 2], ["SHARED", 2, 2]]);
+    assert.equal((await read(scope + "/study-monitor/booklets/UNASSIGNED")).status, 404);
+    const identity = await post("/api/v1/participant/auth/sign-in", {tenantKey: "demo-tenant", workspaceKey, loginKey: "owned-multi"});
+    assert.equal(identity.status, 200);
+    const launched = await post("/api/v1/participant/starter:launch", {participantSessionId: identity.body.participantSession.participantSessionId,
+      bookletKey: "OWN.B#variant:one"}, identity.body.sessionToken);
+    assert.equal(launched.status, 200);
+    const after = (await read(detailPath)).body.studyMonitorBooklet;
+    assert.equal(after.expectedParticipantCount, 2); assert.equal(after.rosterEntryCount, 2);
+    assert.equal(after.notStartedCount, 1); assert.equal(after.participantSessionCount, 1); assert.equal(after.testRunCount, 1);
+    assert.deepEqual(after.unitProgress.map((row: {unitKey: string; expectedRunCount: number; rosterExpectedCount: number}) =>
+      [row.unitKey, row.expectedRunCount, row.rosterExpectedCount]), [["ONLY.B", 2, 1], ["SHARED", 2, 1]]);
+  } finally {
+    try {if (isolated) await closeServer(isolated.server);}
+    finally {
+      try {if (created) await pool!.query(`DROP SCHEMA "${schema}" CASCADE`);}
+      finally {try {await pool?.end();} finally {rmSync(directory, {recursive: true, force: true});}}
+    }
+  }
+});
+
 test("participant session launch can target a specific booklet", async () => {
   const tenantKey = "integration-tenant-booklet-launch";
   const workspaceKey = "integration-workspace-booklet-launch";
@@ -46526,7 +47119,7 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(unassignedWhileOpen.status, 403);
   assert.equal(unassignedWhileOpen.body.error, "booklet_not_assigned");
   const alphaCommandPath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${earlierAlphaRun.testRunId}/commands`;
-  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "pause" } })).status, 200);
+  assert.equal((await issueMonitorCommandAndExecute(alphaCommandPath, { method: "POST", body: { commandType: "pause" } })).status, 200);
   const monitorPausedAlpha = await requestJson<{ testRun: { status: string; pauseSource: string; unitResponses: Record<string, string> } }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
     { method: "POST", body: { bookletKey: "booklet:alpha" } });
@@ -46534,7 +47127,7 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(monitorPausedAlpha.body.testRun.status, "paused");
   assert.equal(monitorPausedAlpha.body.testRun.pauseSource, "monitor");
   assert.deepEqual(monitorPausedAlpha.body.testRun.unitResponses, { "unit-alpha-1": "Independent alpha: β  " });
-  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "lock_test" } })).status, 200);
+  assert.equal((await issueMonitorCommandAndExecute(alphaCommandPath, { method: "POST", body: { commandType: "lock_test" } })).status, 200);
   const lockedAlphaEntry = await requestJson<{ error: string }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
     { method: "POST", body: { bookletKey: "booklet:alpha" } });
@@ -46554,8 +47147,8 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(blockedSiblingState.body.runtimeState.runtimeStatus, "locked");
   assert.equal(blockedSiblingState.body.runtimeState.availableAction, "none",
     "Completing another Booklet cannot make a locked sibling resumable.");
-  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "unlock_test" } })).status, 200);
-  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "resume" } })).status, 200);
+  assert.equal((await issueMonitorCommandAndExecute(alphaCommandPath, { method: "POST", body: { commandType: "unlock_test" } })).status, 200);
+  assert.equal((await issueMonitorCommandAndExecute(alphaCommandPath, { method: "POST", body: { commandType: "resume" } })).status, 200);
 
   const betweenBooklets = await requestJson<{
     runtimeState: {
@@ -46567,7 +47160,8 @@ test("participant session launch can target a specific booklet", async () => {
   }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/runtime-state`
   );
-  assert.equal(betweenBooklets.body.runtimeState.participantSession.status, "signed_in");
+  assert.equal(betweenBooklets.body.runtimeState.participantSession.status, "launched",
+    "An executed remote Resume reactivates the parent after another Booklet ended.");
   assert.equal(betweenBooklets.body.runtimeState.runtimeStatus, "in_progress");
   assert.equal(betweenBooklets.body.runtimeState.availableAction, "resume");
   assert.deepEqual(
@@ -47019,7 +47613,7 @@ test("activation guard returns blocking open-run details", async () => {
   );
 });
 
-test("activation guard clears after monitor completes blocking run", async () => {
+test("activation guard remains after monitor termination and clears after participant completion", async () => {
   const tenantKey = "integration-tenant-activation-monitor";
   const workspaceKey = "integration-workspace-activation-monitor";
 
@@ -47117,7 +47711,7 @@ test("activation guard clears after monitor completes blocking run", async () =>
     resumed.body.testRun.testRunId
   );
 
-  const completeCommand = await requestJson<{
+  const completeCommand = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       testRun: { status: string; completedAt: string | null };
@@ -47136,9 +47730,14 @@ test("activation guard clears after monitor completes blocking run", async () =>
 
   assert.equal(completeCommand.status, 200);
   assert.equal(completeCommand.body.command.commandType, "complete");
-  assert.equal(completeCommand.body.command.testRun.status, "completed");
-  assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
-  assert.equal(completeCommand.body.command.participantSession.status, "closed");
+  assert.equal(completeCommand.body.command.testRun.status, "paused");
+  assert.equal(completeCommand.body.command.testRun.completedAt, null);
+  assert.equal(completeCommand.body.command.participantSession.status, "signed_in");
+
+  const terminatedReadiness = await requestJson<{ activationReadiness: { canActivate: boolean } }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondReleaseId}/activation-readiness`);
+  assert.equal(terminatedReadiness.body.activationReadiness.canActivate, false, "A resumable Run still protects its content release.");
+  assert.equal((await requestJson(`/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/complete`, { method: "POST" })).status, 200);
 
   const clearReadiness = await requestJson<{
     activationReadiness: {
@@ -48269,7 +48868,7 @@ test("participant access windows enforce Original Testcenter timing semantics", 
       { method: "POST" }
     );
     assert.equal(launched.status, 200);
-    const completed = await requestJsonAt<{
+    const completed = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(
       isolated.baseUrl,
@@ -48280,7 +48879,7 @@ test("participant access windows enforce Original Testcenter timing semantics", 
       }
     );
     assert.equal(completed.status, 200);
-    assert.equal(completed.body.command.testRun.status, "completed");
+    assert.equal(completed.body.command.testRun.status, "paused");
 
     const secondRelativeSignIn = await requestJsonAt<{
       participantSession: {
@@ -48296,7 +48895,7 @@ test("participant access windows enforce Original Testcenter timing semantics", 
       }
     });
     assert.equal(secondRelativeSignIn.status, 200);
-    assert.notEqual(
+    assert.equal(
       secondRelativeSignIn.body.participantSession.participantSessionId,
       relativeSignIn.body.participantSession.participantSessionId
     );
@@ -48975,9 +49574,20 @@ test("monitor bulk commands report per-run successes and failures", async () => 
   });
 
   try {
+    // Implicit bulk scopes must use a private workspace: Source termination
+    // intentionally leaves earlier tests' Runs resumable in a shared database.
+    const tenantKey = `owned-bulk-${randomUUID()}`, workspaceKey = "owned-bulk";
+    const workspacePath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+    assert.equal((await requestJsonAt(isolated.baseUrl, "/api/v1/platform/tenants", { method: "POST", body: { tenantKey, displayName: "Owned bulk fixture" } })).status, 201);
+    assert.equal((await requestJsonAt(isolated.baseUrl, `/api/v1/tenants/${tenantKey}/workspaces`, { method: "POST", body: { workspaceKey, displayName: "Owned bulk fixture" } })).status, 201);
+    const source = await requestJsonAt<{ sourcePackage: { sourcePackageId: string } }>(isolated.baseUrl, workspacePath + "/source-packages", { method: "POST", body: { fileName: "owned-bulk.json", mediaType: "application/json", contentStructure: { bookletEntries: [{ bookletKey: "booklet:demo", displayLabel: "Owned bulk", unitEntries: [{ unitKey: "owned-bulk-unit", displayLabel: "Owned unit", content: "Owned bulk fixture" }] }] } } });
+    assert.equal(source.status, 201);
+    const imported = await requestJsonAt<{ stagedContentRelease: { contentReleaseId: string } }>(isolated.baseUrl, workspacePath + "/import-jobs", { method: "POST", body: { sourcePackageId: source.body.sourcePackage.sourcePackageId } });
+    assert.equal(imported.status, 201);
+    assert.equal((await requestJsonAt(isolated.baseUrl, workspacePath + `/content-releases/${imported.body.stagedContentRelease.contentReleaseId}/activate`, { method: "POST", body: {} })).status, 200);
     const rosterImport = await requestJsonAt<{ updatedCount: number }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      `${workspacePath}/participant-roster`,
       {
         method: "POST",
         body: {
@@ -48998,8 +49608,8 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
         method: "POST",
         body: {
-          tenantKey: "demo-tenant",
-          workspaceKey: "demo-workspace",
+          tenantKey: tenantKey,
+          workspaceKey: workspaceKey,
           loginKey
         }
       });
@@ -49015,9 +49625,9 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       runIds.push(resumed.body.testRun.testRunId);
     }
 
-    const invalidBulk = await requestJsonAt<{ error: string }>(
+    const invalidBulk = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: { commandType: "pause", testRunIds: [] }
@@ -49026,7 +49636,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(invalidBulk.status, 400);
     assert.equal(invalidBulk.body.error, "monitor_bulk_test_run_ids_invalid");
 
-    const paused = await requestJsonAt<{
+    const paused = await issueMonitorCommandAndExecuteAt<{
       requestedCount: number;
       succeededCount: number;
       failedCount: number;
@@ -49042,7 +49652,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49072,13 +49682,13 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(paused.body.failures[0]?.statusCode, 404);
     assert.equal(paused.body.failures[0]?.error, "test_run_not_found");
 
-    const resumed = await requestJsonAt<{
+    const resumed = await issueMonitorCommandAndExecuteAt<{
       succeededCount: number;
       failedCount: number;
       commands: Array<{ testRun: { status: string } }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49102,7 +49712,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=10"
+      `${workspacePath}/activity-events?eventType=monitor_run_command_issued&limit=10`
     );
     assert.equal(commandHistory.status, 200);
     const bulkCommandHistory = commandHistory.body.items.filter(
@@ -49116,11 +49726,11 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       [...runIds, ...runIds].sort()
     );
 
-    const lockBeforeFinish = await requestJsonAt<{
+    const lockBeforeFinish = await issueMonitorCommandAndExecuteAt<{
       commands: Array<{ testRun: { locked: boolean } }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49132,9 +49742,9 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(lockBeforeFinish.status, 200);
     assert.equal(lockBeforeFinish.body.commands[0]?.testRun.locked, true);
 
-    const invalidFinishScope = await requestJsonAt<{ error: string }>(
+    const invalidFinishScope = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49146,7 +49756,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(invalidFinishScope.status, 400);
     assert.equal(invalidFinishScope.body.error, "monitor_bulk_scope_invalid");
 
-    const finished = await requestJsonAt<{
+    const finished = await issueMonitorCommandAndExecuteAt<{
       requestedCount: number;
       succeededCount: number;
       failedCount: number;
@@ -49156,7 +49766,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49172,16 +49782,16 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(finished.body.failedCount, 0);
     assert.equal(finished.body.commands[0]?.commandType, "complete_and_lock");
     assert.equal(finished.body.commands[0]?.testRun.testRunId, runIds[1]);
-    assert.equal(finished.body.commands[0]?.testRun.status, "completed");
+    assert.equal(finished.body.commands[0]?.testRun.status, "paused");
     assert.equal(finished.body.commands[0]?.testRun.locked, true);
 
-    const finishedAgain = await requestJsonAt<{
+    const finishedAgain = await issueMonitorCommandAndExecuteAt<{
       requestedCount: number;
       succeededCount: number;
       failedCount: number;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {

@@ -1,3 +1,4 @@
+import { originalSystemCheckCustomTextDefaults } from "@testcenter-rewrite-app/contracts/system-check-custom-texts";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -10,15 +11,22 @@ import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
 import QRCode from "qrcode";
+import { originalParticipantCustomTextDefaults, parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
+import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+import { drainSmokeResponse } from "./drain-smoke-response.mjs";
+import { observeOriginalSample } from "./original-sample-diagnostics.mjs";
+import { waitForOriginalSampleResource } from "./original-sample-readiness.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
 import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
   assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
 import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 import { runParticipantUnitLabelSmoke } from "./participant-unit-label-smoke.mjs";
+import { runCurrentOriginalBookletConfigSmoke } from "./current-original-booklet-config-smoke.mjs";
 import { setWorkspaceAutoRefreshEnabled } from "./workspace-auto-refresh-smoke.mjs";
 import { createAttachmentQrCameraVideo } from "./attachment-camera-fixture.mjs";
+import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -29,6 +37,7 @@ const headful = ["1", "true", "yes", "on"].includes(
   String(process.env.UI_SMOKE_HEADFUL ?? "").toLowerCase()
 );
 const artifactDirectory = process.env.UI_SMOKE_ARTIFACT_DIR?.trim();
+const failureArtifactDirectory = process.env.UI_SMOKE_FAILURE_ARTIFACT_DIR?.trim() || artifactDirectory;
 const frontendRoot = process.env.UI_SMOKE_FRONTEND_ROOT?.trim();
 const attachmentQrCameraFile = process.env.UI_SMOKE_ATTACHMENT_QR_CAMERA_FILE?.trim();
 const verifyAttachmentVisibility = process.env.UI_SMOKE_VERIFY_ATTACHMENT_VISIBILITY === "true";
@@ -211,6 +220,15 @@ const sendSmokeJson = async (url, { method = "POST", body } = {}) => {
   return response;
 };
 
+const sendSmokeJsonAndDrain = async (url, options) => {
+  const response = await sendSmokeJson(url, options);
+  try {
+    await drainSmokeResponse(response);
+  } catch (cause) {
+    throw new Error(`Smoke fixture ${options?.method ?? "POST"} ${new URL(url).pathname} body drain failed`, { cause });
+  }
+};
+
 const solveSmokeProofOfWork = challenge => {
   for (let number = 0; number <= challenge.maxNumber; number += 1) {
     if (
@@ -386,7 +404,7 @@ const port = process.env.FIRST_SLICE_UI_PORT
 
 const child = spawn(process.execPath, [serverEntry], {
   cwd: frontendRoot ? resolve(frontendRoot) : undefined,
-  stdio: "inherit",
+  stdio: ["inherit", "pipe", "pipe"],
   env: {
     ...process.env,
     PORT: String(port),
@@ -397,8 +415,17 @@ const child = spawn(process.execPath, [serverEntry], {
   }
 });
 
+const serverFailureGate = createServerRequestFailureGate();
+const childClosed = new Promise(resolveClosed => child.once("close", resolveClosed));
+for (const [input, output] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+  serverFailureGate.observeStream(input);
+  input.pipe(output, { end: false });
+}
+
 let browser;
 let page;
+let originalSampleTrace;
+let successMessage = "";
 
 try {
   await pollJson(`http://127.0.0.1:${port}/readyz`);
@@ -419,6 +446,17 @@ try {
     ["clipboard-read", "clipboard-write", "camera"],
     { origin: baseUrl }
   );
+  await context.addInitScript(() => {
+    if (window !== window.top) return;
+    const events = []; window.__ownedNavigationEvents = events;
+    for (const type of ["pointerdown", "pointerup", "click"]) window.addEventListener(type, event => {
+      const target = event.target instanceof Element ? event.target.closest("[data-view-nav]") : null;
+      if (!target) return;
+      events.push({ type, view: target.getAttribute("data-view-nav"), trusted: event.isTrusted,
+        at: performance.now(), focused: document.hasFocus(), visibility: document.visibilityState });
+      if (events.length > 64) events.shift();
+    }, true);
+  });
   page = await context.newPage();
   const tenantKey = `ui-tenant-${Date.now()}`;
   const workspaceKey = `ui-workspace-${Date.now()}`;
@@ -446,10 +484,8 @@ try {
     }
     assert.equal(participantOperatorCredentialLeakCount, 0,
       "Participant browser requests must not carry the signed-in operator credential.");
-
-    process.stdout.write(
-      `UI smoke stopped after requested step=${step} for store=${store} at ${baseUrl}/app\n`
-    );
+    serverFailureGate.assertHealthy();
+    successMessage = `UI smoke stopped after requested step=${step} for store=${store} at ${baseUrl}/app\n`;
     throw new UiSmokeEarlyExit(step);
   };
   const observePageRequests = observedPage => {
@@ -930,8 +966,11 @@ try {
   };
   const restorePlatformAdminSession = async () => {
     logStep("restore-platform-admin-session-start");
-    await page.goto(`${baseUrl}/app/ops`, { waitUntil: "domcontentloaded" });
-    await page.waitForURL(/\/app\/ops$/);
+    // This helper exercises the existing Rewrite operator controls. Original
+    // administration has its own real-login/API gate and can be selected by
+    // preceding participant journeys in this same browser context.
+    await page.goto(`${baseUrl}/app/ops?ui=rewrite`, { waitUntil: "domcontentloaded" });
+    await page.waitForURL(url => url.pathname === "/app/ops" && url.searchParams.get("ui") === "rewrite");
     await waitForRouteTarget("#operatorAccessCard");
     const signOutButton = page.locator("#adminSignOutButton");
     if (await signOutButton.isVisible().catch(() => false)) {
@@ -1094,7 +1133,8 @@ try {
     loginKey,
     participantSessionId,
     testRunId,
-    transition
+    transition,
+    effectsDeferred = false
   }) => {
     const [previousStatus, nextStatus] = transition.split(" -> ");
     await pollJsonWithPredicate(
@@ -1113,6 +1153,7 @@ try {
             details?.commandType === commandType &&
             details?.previousStatus === previousStatus &&
             details?.nextStatus === nextStatus &&
+            Boolean(details?.effectsDeferred) === effectsDeferred &&
             details?.participantSessionId === participantSessionId &&
             details?.loginKey === loginKey &&
             details?.groupKey === groupKey &&
@@ -1305,7 +1346,7 @@ try {
     });
     await offlineShellPage
       .locator("#participantCustomLoginSubtitle")
-      .filter({ hasText: "Start or Resume Test" })
+      .filter({ hasText: originalParticipantCustomTextDefaults.login_subtitle })
       .waitFor();
     if (await offlineShellPage.evaluate(() => navigator.onLine)) {
       await offlineShellPage.evaluate(() => {
@@ -1584,11 +1625,11 @@ try {
   } finally {
     await accessWindowContext.close();
   }
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/admin/users/${scheduledAdminPayload.adminUser.adminUserId}`,
     { method: "DELETE", body: { confirmationPassword: adminPassword } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/admin/users/${expiredAdminPayload.adminUser.adminUserId}`,
     { method: "DELETE", body: { confirmationPassword: adminPassword } }
   );
@@ -1838,13 +1879,13 @@ try {
   const customTextWorkspaceKey = "ui-custom-text-workspace";
   const customTextBookletKey = "BOOKLET.UI-CUSTOM-TEXT";
   const customTextUnitKey = "UNIT.UI-CUSTOM-TEXT";
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: customTextTenantKey,
       displayName: "UI Custom Text Tenant"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces`,
     {
       body: {
@@ -1887,11 +1928,11 @@ try {
     }
   );
   const customTextImportPayload = await customTextImportResponse.json();
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces/${customTextWorkspaceKey}/content-releases/${customTextImportPayload.stagedContentRelease.contentReleaseId}/activate`,
     { body: { activatedByActorId: "ui-custom-text-smoke" } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces/${customTextWorkspaceKey}/participant-roster`,
     {
       body: {
@@ -1907,7 +1948,7 @@ try {
 
   const brandedParticipantPage = await context.newPage();
   await brandedParticipantPage.goto(`${baseUrl}/app/participant`, {
-    waitUntil: "networkidle"
+    waitUntil: "domcontentloaded"
   });
   await brandedParticipantPage.waitForFunction(
     expected => {
@@ -2017,7 +2058,7 @@ try {
   await brandedParticipantPage.waitForURL(/\/app\/participant$/);
   await brandedParticipantPage
     .locator("#participantRouteStartOrResumeButton")
-    .filter({ hasText: "UI Global Resume" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_starterStartTestButtonLabel })
     .waitFor();
   await brandedParticipantPage
     .locator("#participantTenantKey")
@@ -2099,7 +2140,7 @@ try {
   });
   const fallbackParticipantPage = await context.newPage();
   await fallbackParticipantPage.goto(`${baseUrl}/app/participant`, {
-    waitUntil: "networkidle"
+    waitUntil: "domcontentloaded"
   });
   await fallbackParticipantPage.waitForFunction(() => {
     const image = document.querySelector("#participantLoginIllustration");
@@ -2423,13 +2464,13 @@ try {
         })
       })
     );
-    await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
       body: {
         tenantKey: systemCheckTenantKey,
         displayName: "UI System Check Tenant"
       }
     });
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces`,
       {
         body: {
@@ -2490,7 +2531,7 @@ try {
         )
       }
     ]) {
-      await sendSmokeJson(
+      await sendSmokeJsonAndDrain(
         `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`,
         { body: dependency }
       );
@@ -2607,8 +2648,26 @@ try {
         body: { sourcePackageId: headerOnlySource.sourcePackage.sourcePackageId }
       });
     assert.equal((await headerOnlyImportResponse.json()).importJob.status, "completed");
+    // Install before the owned check document and any Player frame exist.
+    // A late init script cannot observe a start already sent to a reused frame.
+    await page.addInitScript(() => {
+      window.addEventListener("message", event => {
+        if (event.data?.type === "vopStartCommand") {
+          window.__systemCheckLogPolicy = event.data.playerConfig?.logPolicy;
+          window.__systemCheckPlayerSessionId = event.data.sessionId;
+        }
+      });
+    });
     await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
     const originalChoices = page.locator(`#originalSystemCheckStarter button[data-tenant-key='${systemCheckTenantKey}'][data-workspace-key='${systemCheckWorkspaceKey}']`);
+    const returnToOriginalSystemCheckSelection = async () => {
+      // Source returns through its native home logo and Systemcheck entry.
+      // It offers no Rewrite "Choose Another Check" row in the check body.
+      await page.locator("#participantApplicationLogoButton").click();
+      await page.waitForURL(url => url.pathname === "/app/home");
+      await page.locator("#startSystemCheck").click();
+      await originalChoices.first().waitFor();
+    };
     await originalChoices.first().waitFor();
     assert.equal(await originalChoices.count(), 4);
     assert.equal(await page.locator("#systemCheckTenantKey").count(), 0);
@@ -2693,7 +2752,7 @@ try {
     await page.locator("#syscheck-previous-step").click();
     await page.reload({ waitUntil: "networkidle" });
     await page.locator("#originalSystemCheckWelcome").waitFor();
-    await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+    await returnToOriginalSystemCheckSelection();
     await originalChoices.first().waitFor();
     await page.waitForURL(url => !url.searchParams.has("checkId"));
     const networkPageErrors = [];
@@ -2748,7 +2807,8 @@ try {
           await page.locator("#participantApplicationLogoButton").click();
           await page.waitForURL(url => url.pathname === "/app/home");
         } else {
-          await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+          if (interfaceName === "original") await returnToOriginalSystemCheckSelection();
+          else await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
           const choice = interfaceName === "original"
             ? page.locator(`#originalSystemCheckStarter button[data-system-check-id='${noSaveSystemCheckId}']`)
             : page.locator(`[data-system-check-id='${noSaveSystemCheckId}']`);
@@ -2765,7 +2825,8 @@ try {
           await page.locator(interfaceName === "original" ? "#syscheck-next-step" : "#systemCheckNextButton").click();
           assert.equal(await page.getByRole("textbox", { name: /Assigned device/ }).inputValue(), "",
             "The new check has its own clean answers, not late state from the cancelled check");
-          await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+          if (interfaceName === "original") await returnToOriginalSystemCheckSelection();
+          else await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
         }
       } finally {
         clearTimeout(interceptionTimeout);
@@ -2827,14 +2888,6 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-network-mobile.png"), fullPage: true });
     await page.setViewportSize(choiceViewport);
-    await page.addInitScript(() => {
-      window.addEventListener("message", event => {
-        if (event.data?.type === "vopStartCommand") {
-          window.__systemCheckLogPolicy = event.data.playerConfig?.logPolicy;
-          window.__systemCheckPlayerSessionId = event.data.sessionId;
-        }
-      });
-    });
     await page.locator("#syscheck-next-step").click();
     const originalUnit = page.locator("#originalSystemCheckUnit");
     await originalUnit.waitFor();
@@ -3331,7 +3384,7 @@ try {
       delete window.navigator.mozConnection;
     });
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     await page
       .locator("#participantVeronaPlayerVersion")
       .filter({ hasText: "API 6.0" })
@@ -3476,7 +3529,7 @@ try {
       .filter({ hasText: "Measurement complete after" })
       .waitFor({ timeout: 45_000 });
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await page.locator("#systemCheckNextButton").click();
@@ -3684,7 +3737,7 @@ try {
       0
     );
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     await page
       .locator("#participantVeronaPlayerVersion")
       .filter({ hasText: "API 6.0" })
@@ -3725,7 +3778,7 @@ try {
     );
     await page.getByRole("heading", { name: "System-Check-2" }).waitFor();
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     const resumedSecondSystemCheckPlayerFrame = page.frameLocator(
       "#participantVeronaPlayerFrame"
     );
@@ -3765,7 +3818,7 @@ try {
     );
     await page.getByRole("heading", { name: "System-Check-2" }).waitFor();
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await page.locator("#systemCheckNextButton").click();
@@ -3976,7 +4029,7 @@ try {
     logStep("workspace-delete");
     const disposableWorkspaceKey = `ui-delete-${Date.now()}`;
     const disposableWorkspaceDisplayName = "Disposable Workspace";
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces`,
       {
         body: {
@@ -3985,7 +4038,7 @@ try {
         }
       }
     );
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${disposableWorkspaceKey}/source-packages`,
       {
         body: {
@@ -7421,19 +7474,19 @@ try {
   const ambiguousParticipantWorkspaceKey = `ui-ambiguous-workspace-${Date.now()}`;
   const ambiguousParticipantTenantA = `ui-ambiguous-tenant-a-${Date.now()}`;
   const ambiguousParticipantTenantB = `ui-ambiguous-tenant-b-${Date.now()}`;
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: ambiguousParticipantTenantA,
       displayName: "UI Ambiguous Tenant A"
     }
   });
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: ambiguousParticipantTenantB,
       displayName: "UI Ambiguous Tenant B"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${ambiguousParticipantTenantA}/workspaces`,
     {
       body: {
@@ -7442,7 +7495,7 @@ try {
       }
     }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${ambiguousParticipantTenantB}/workspaces`,
     {
       body: {
@@ -7554,7 +7607,7 @@ try {
   const legacyShortLinkLoginKey = "student-legacy-short-link";
   const participantEntrySignInGroupKey = "group:participant-entry-sign-in";
   const participantEntrySignInDisplayName = "Student Entry Sign In";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -7611,10 +7664,10 @@ try {
   );
   await legacyShortLinkPage.waitForFunction(
     () =>
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "signed_in" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "" &&
       document.querySelector("#participantRouteEntry") != null,
     undefined,
     { timeout: 15_000 }
@@ -7699,12 +7752,22 @@ try {
   );
   const originalSignInContext = await browser.newContext();
   participantHttpActor.observeContext(originalSignInContext);
+  let originalSignInPage, originalSignInPhase = 'fresh-original-entry';
+  const originalSignInHttp = [];
   try {
-    const originalSignInPage = await originalSignInContext.newPage();
+    originalSignInPage = await originalSignInContext.newPage();
+    originalSignInPage.on('response', response => {
+      const path = new URL(response.url()).pathname;
+      if (!path.startsWith('/api/v1/')) return;
+      originalSignInHttp.push({path, method: response.request().method(), status: response.status()});
+      if (originalSignInHttp.length > 100) originalSignInHttp.shift();
+    });
     await originalSignInPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({
       ui: "original", tenantKey, workspaceKey
     })}`, { waitUntil: "networkidle" });
-    await originalSignInPage.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+    await originalSignInPage.locator("#originalLoginName").waitFor();
+    assert.equal(await originalSignInPage.evaluate(() => document.activeElement.tagName), "BODY",
+      "Original fresh entry must preserve Source's unfocused name step");
     await originalSignInPage.locator("#originalApplicationFooter").waitFor();
     assert.deepEqual(await originalSignInPage.locator("#originalApplicationFooter nav a").allTextContents(),
       ["Barrierefreiheit", "Datenschutz", "Impressum"]);
@@ -7712,6 +7775,7 @@ try {
     await originalSignInPage.locator(".login-submit [matButtonIcon] svg").waitFor();
     await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
     await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
+    originalSignInPhase = 'signed-in-run-projection';
     await originalSignInPage.waitForFunction(
       ([sessionId, runId]) =>
         !document.querySelector("#originalParticipantLogin") &&
@@ -7721,9 +7785,11 @@ try {
     );
     // The optional layout must preserve the same durable run when returning
     // to its numbered Starter card and resuming from that card.
+    originalSignInPhase = 'first-logo-return-confirmation';
     await originalSignInPage.locator("#participantApplicationLogoButton").click();
     await originalSignInPage.locator("#participantConfirmationContinueButton").waitFor();
     await originalSignInPage.locator("#participantConfirmationStayButton").click();
+    await originalSignInPage.locator("#participantConfirmationBackdrop").waitFor({state:"detached"});
     assert.equal(await originalSignInPage.locator("#originalParticipantStarter").count(), 0);
     await originalSignInPage.locator("#participantApplicationLogoButton").click();
     await originalSignInPage.locator("#participantConfirmationContinueButton").click();
@@ -7743,6 +7809,7 @@ try {
     await originalSignInPage.locator("#originalParticipantAccountLogin").waitFor({ state: "detached" });
     assert.equal(await originalSignInPage.locator("#originalParticipantAccountButton").evaluate(el => el === document.activeElement), true);
     const originalResumeCard = originalSignInPage.locator("#originalParticipantStarter mat-card[data-booklet-status='in_progress']");
+    originalSignInPhase = 'original-starter-card-resume';
     assert.equal(await originalResumeCard.count(), 1);
     await originalResumeCard.getByRole("button").click();
     await originalSignInPage.waitForFunction(
@@ -7753,6 +7820,7 @@ try {
         document.querySelector("#participantRouteStatus")?.textContent?.trim() === "running",
       [participantEntrySignInSessionId, participantEntryStartedRunId]
     );
+    originalSignInPhase = 'resumed-logo-return-confirmation';
     await originalSignInPage.locator("#participantApplicationLogoButton").click();
     await originalSignInPage.locator("#participantConfirmationContinueButton").click();
     await originalSignInPage.locator("#originalParticipantStarter").waitFor();
@@ -7761,6 +7829,7 @@ try {
       return state.sessions?.find(([id]) => id === sessionId)?.[1];
     }, participantEntrySignInSessionId);
     assert.match(originalCredentialBeforeLogout, /^[A-Za-z0-9_-]{43}$/u);
+    originalSignInPhase = 'guarded-original-logout';
     const originalStateBeforeLogout = await (await fetch(
       `${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
       { headers: { authorization: `Bearer ${originalCredentialBeforeLogout}` } }
@@ -7779,11 +7848,14 @@ try {
     await originalSignInPage.locator("#originalParticipantLogoutConfirmButton").click();
     await logoutCompleted;
     await originalSignInPage.locator("#originalParticipantLogin").waitFor();
-    await originalSignInPage.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+    await originalSignInPage.locator("#originalLoginName").waitFor();
+    assert.notEqual(await originalSignInPage.evaluate(() => document.activeElement.id), "originalLoginName",
+      "Original logout must not force focus onto the name step");
     assert.equal(new URL(originalSignInPage.url()).searchParams.has("participantSessionId"), false);
     assert.equal((await fetch(`${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
       { headers: { authorization: `Bearer ${originalCredentialBeforeLogout}` } })).status, 401);
     await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
+    originalSignInPhase = 'original-reentry-preserves-the-same-run';
     await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
     await originalSignInPage.waitForFunction(expectedRunId =>
       document.querySelector("#participantRouteRunId")?.textContent?.trim() === expectedRunId,
@@ -7794,6 +7866,20 @@ try {
     assert.equal(restoredOriginalState.currentRunState.testRun.testRunId, participantEntryStartedRunId);
     assert.deepEqual(restoredOriginalState.currentRunState.testRun.unitResponses,
       originalStateBeforeLogout.currentRunState.testRun.unitResponses);
+  } catch (error) {
+    // The main page is a different, now rotated-out controller. Preserve the
+    // actual failing Original document before closing its independent context.
+    if (artifactDirectory && originalSignInPage && !originalSignInPage.isClosed()) {
+      const body = await originalSignInPage.locator('body').innerText({timeout: 2000}).catch(() => '');
+      await Promise.allSettled([
+        originalSignInPage.screenshot({path: resolve(artifactDirectory, 'original-entry-failure.png'), fullPage: true, timeout: 5000}),
+        writeFile(resolve(artifactDirectory, 'original-entry-failure.json'), JSON.stringify({
+          error: String(error), phase: originalSignInPhase, url: originalSignInPage.url(),
+          http: originalSignInHttp, body: body.slice(0, 20000)
+        }, null, 2))
+      ]);
+    }
+    throw error;
   } finally {
     await originalSignInContext.close();
   }
@@ -7904,10 +7990,10 @@ try {
   await waitForNotBusy("participant-return-to-starter");
   await page.waitForFunction(
     () =>
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "signed_in" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "" &&
       document.querySelector("#participantRouteEntry") != null,
     undefined,
     { timeout: 30_000 }
@@ -7941,7 +8027,7 @@ try {
 
   logStep("participant-entry-review-comments");
   const participantReviewLoginKey = "student-entry-review";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -7981,10 +8067,10 @@ try {
   });
   await page.waitForFunction(
     () =>
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "signed_in" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "" &&
       document.querySelector("#participantRouteEntry") != null,
     undefined,
     { timeout: 15_000 }
@@ -8151,7 +8237,7 @@ try {
   const protectedParticipantGroupKey = "group:participant-entry-protected";
   const protectedParticipantDisplayName = "Student Entry Protected";
   const protectedParticipantPassword = "entry-protected-secret";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -8171,8 +8257,8 @@ try {
   await page.waitForFunction(
     () =>
       document.querySelector("#participantRouteSessionId")?.value === "" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet",
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "",
     undefined,
     { timeout: 15_000 }
   );
@@ -8266,7 +8352,7 @@ try {
   logStep("participant-entry-second-code");
   const codedParticipantLoginKey = "student-entry-coded";
   const codedParticipantGroupKey = "group:participant-entry-coded";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -8532,7 +8618,7 @@ try {
   const participantRouteUnitResponse = "Prefilled participant route response";
   const participantRouteNextUnitResponse = "Second unit participant response";
   const participantRouteDisplayName = "Student Participant Route";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -8790,7 +8876,7 @@ try {
     .waitFor();
   await page
     .locator("#participantRouteDraftDetail")
-    .filter({ hasText: "Complete Test saves this draft" })
+    .filter({ hasText: "Finishing the test saves this draft" })
     .waitFor();
   logStep("participant-route-unit-previous");
   await clickAction("Previous Unit");
@@ -8890,7 +8976,7 @@ try {
   );
   await page
     .locator("#participantRouteDraftDetail")
-    .filter({ hasText: "Complete Test saves this draft before closing" })
+    .filter({ hasText: "Finishing the test saves this draft before closing" })
     .waitFor();
   await page
     .locator("#participantRouteCompletionReadinessLabel")
@@ -8899,10 +8985,10 @@ try {
   await page
     .locator("#participantRouteCompletionReadinessDetail")
     .filter({
-      hasText: "All units will be answered after Complete Test saves the current draft."
+      hasText: "All units will be answered after finishing saves the current draft."
     })
     .waitFor();
-  await clickAction("Complete Test");
+  await clickAction(originalParticipantCustomTextDefaults.login_testEndButtonLabel);
   await page.locator("#participantRouteEntry").waitFor();
   const returnedAfterEnd = await (
     await fetch(`${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`)
@@ -9033,10 +9119,8 @@ try {
   await page.waitForFunction(
     ([expectedTenantKey, expectedWorkspaceKey, expectedLoginKey]) =>
       document.querySelector("#participantRouteSessionId")?.value === "" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-        "idle" &&
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "" &&
       document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "idle" &&
       document.querySelector("#participantRouteSessionLink") == null &&
@@ -9109,6 +9193,7 @@ try {
       <script>
         let sessionId = "";
         let currentPage = "page-1";
+        window.__ownedVeronaInputEvents = [];
         const sendState = (includeLog = true) => {
           const answer = document.querySelector("#playerAnswer").value;
           parent.postMessage({
@@ -9172,7 +9257,12 @@ try {
           currentPage = String(event.data.playerState?.currentPage || event.data.playerConfig?.startPage || "page-1");
           document.querySelector("#playerCurrentPage").textContent = currentPage;
           document.querySelector("#playerAnswer").value = event.data.unitState?.dataParts?.answer || "";
-          document.querySelector("#playerAnswer").addEventListener("input", () => sendState(true));
+          document.querySelector("#playerAnswer").addEventListener("input", event => {
+            window.__ownedVeronaInputEvents.push({ timeStamp: Date.now(), inputType: event.inputType,
+              isTrusted: event.isTrusted, data: event.data, answer: event.target.value });
+            window.__ownedVeronaInputEvents = window.__ownedVeronaInputEvents.slice(-32);
+            sendState(true);
+          });
           parent.postMessage({
             type: "vopStateChangedNotification",
             sessionId,
@@ -9426,11 +9516,11 @@ try {
   const veronaContentReleaseId =
     veronaImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(veronaContentReleaseId, "Verona smoke import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${veronaContentReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -9515,27 +9605,33 @@ try {
   await outdatedBrowserContext.close();
   const isVeronaResourceResponse = response =>
     /\/resources\/\.access\/r1\.[A-Za-z0-9_-]{43}\/sample_resource_package\/file\.text$/u.test(new URL(response.url()).pathname);
+  // These waits are awaited below. Observe rejections now so an earlier gate
+  // failure can close the owned browser/API without a masking unhandled error.
   const veronaResourceResponsePromise = page.waitForResponse(
     response =>
       isVeronaResourceResponse(response) &&
       !response.request().headers()["range"]
   );
+  void veronaResourceResponsePromise.catch(() => undefined);
   const veronaRangeResponsePromise = page.waitForResponse(
     response =>
       isVeronaResourceResponse(response) &&
       response.request().headers()["range"] === "bytes=5-19"
   );
+  void veronaRangeResponsePromise.catch(() => undefined);
   const veronaMultiRangeResponsePromise = page.waitForResponse(
     response =>
       isVeronaResourceResponse(response) &&
       response.request().headers()["range"] === "bytes=0-3,10-15"
   );
+  void veronaMultiRangeResponsePromise.catch(() => undefined);
   const lazyBookletPreloadPattern = url => matchesParticipantRunRequest(url, {
     baseUrl, endpoint: "current-state", includeBookletAssets: true
   });
   const lazyBookletPreloadStarted = page.waitForRequest(
     request => lazyBookletPreloadPattern(request.url())
   );
+  void lazyBookletPreloadStarted.catch(() => undefined);
   let releaseLazyBookletPreload;
   const lazyBookletPreloadRelease = new Promise(resolve => {
     releaseLazyBookletPreload = resolve;
@@ -9554,6 +9650,7 @@ try {
       lazyBookletPreloadCompleted = true;
       return response;
     });
+  void lazyBookletPreloadResponsePromise.catch(() => undefined);
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -9712,7 +9809,7 @@ try {
   await timerStartedMessage.waitFor();
   assert.match(
     (await timerStartedMessage.innerText()).trim(),
-    /^Project timer started: \d+:\d{2}$/
+    /^Project timer started: \d+ min$/
   );
   await page
     .locator("#participantRouteTestletTimerLeave")
@@ -10231,12 +10328,11 @@ try {
       }
     }
   );
-  assert.equal(
-    await page.evaluate(() =>
-      localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1")
-    ),
-    null,
-    "A confirmed retry should remove the durable Verona outbox entry."
+  // Reload can enqueue a new real FOCUS log after the recovered answer is
+  // confirmed. Require the entire outbox to drain, including that later log.
+  await page.waitForFunction(() =>
+    localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1") === null,
+    undefined, { timeout: 15_000 }
   );
   const recoveredVeronaLogs = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
@@ -10623,15 +10719,15 @@ try {
   await page
     .locator("#participantRouteNavigationNotice")
     .filter({ hasText: "In an enforced test, this action would be blocked." })
-    .filter({ hasText: "Complete the required response" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgNavigationDeniedText_responsesIncomplete })
     .waitFor();
   await page
     .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave task?" })
+    .filter({ hasText: originalParticipantCustomTextDefaults["booklet_warningLeaveTitle-unit"] })
     .waitFor();
   await page
     .locator("#participantConfirmationMessage")
-    .filter({ hasText: "cannot be opened again" })
+    .filter({ hasText: originalParticipantCustomTextDefaults["booklet_warningLeaveTextPrompt-unit"] })
     .waitFor();
   await page.waitForTimeout(250);
   await page.locator("#participantConfirmationContinueButton").click();
@@ -10782,6 +10878,11 @@ try {
   assert.equal(simulationCompleteResponse.status(), 200);
 
   logStep("participant-merged-return-confirmation");
+  const mergedReturnLaunchPromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/participant/starter:launch")
+  );
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -10793,6 +10894,24 @@ try {
   );
   const mergedReturnFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await mergedReturnFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  await mergedReturnFrame
+    .locator("#playerDefinition")
+    .filter({ hasText: "Smoke unit definition" })
+    .waitFor({ timeout: 15_000 });
+  const mergedReturnLaunch = await (await mergedReturnLaunchPromise).json();
+  const mergedReturnSessionId = mergedReturnLaunch.participantSession.participantSessionId;
+  const mergedReturnStateUrl = `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(mergedReturnSessionId)}/current-state`;
+  const mergedReturnAnswer = "Merged timer return keeps this exact answer Ω";
+  await mergedReturnFrame.locator("#playerAnswer").fill(mergedReturnAnswer);
+  const mergedReturnBefore = (
+    await pollJsonWithPredicate(mergedReturnStateUrl, payload =>
+      payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey]?.includes(
+        mergedReturnAnswer
+      )
+    )
+  ).currentRunState;
+  assert.deepEqual(mergedReturnBefore.testRun.lockedUnitKeys, []);
+  assert.deepEqual(mergedReturnBefore.testRun.lockedTestletKeys, []);
   await page
     .locator("#participantRouteTestletTimer")
     .filter({ hasText: "Merged return block" })
@@ -10825,6 +10944,22 @@ try {
     .filter({ hasText: "running" })
     .waitFor();
 
+  const mergedReturnCancelled = (
+    await pollJsonWithPredicate(
+      mergedReturnStateUrl,
+      payload =>
+        payload?.currentRunState?.testRun?.testRunId ===
+        mergedReturnBefore.testRun.testRunId
+    )
+  ).currentRunState;
+  assert.equal(mergedReturnCancelled.testRun.status, "running");
+  assert.deepEqual(
+    mergedReturnCancelled.testRun.unitResponses,
+    mergedReturnBefore.testRun.unitResponses
+  );
+  assert.deepEqual(mergedReturnCancelled.testRun.lockedUnitKeys, []);
+  assert.deepEqual(mergedReturnCancelled.testRun.lockedTestletKeys, []);
+
   await page.locator("#participantApplicationLogoButton").click();
   await page
     .locator("#participantConfirmationTitle")
@@ -10851,8 +10986,11 @@ try {
   await page.locator("#participantConfirmationContinueButton").click();
   const mergedReturnRequest = await mergedReturnRequestPromise;
   assert.deepEqual(mergedReturnRequest.postDataJSON(), {
+    currentUnitKey: veronaUnitKey,
+    expectedStatus: "running",
     confirmTestletTimeLeave: true,
-    confirmTestletLeaveLock: true
+    // The pinned Source ends its leave-check chain at the timed confirmation.
+    confirmTestletLeaveLock: false
   });
   const mergedReturnResponse = await mergedReturnResponsePromise;
   assert.equal(mergedReturnResponse.status(), 200);
@@ -10864,9 +11002,12 @@ try {
     ]?.status,
     "cancelled"
   );
-  assert.deepEqual(mergedReturnPayload.testRun?.lockedUnitKeys, [
-    veronaUnitKey
-  ]);
+  assert.deepEqual(
+    mergedReturnPayload.testRun?.unitResponses,
+    mergedReturnBefore.testRun.unitResponses
+  );
+  assert.deepEqual(mergedReturnPayload.testRun?.lockedUnitKeys, []);
+  assert.deepEqual(mergedReturnPayload.testRun?.lockedTestletKeys, []);
   await page.locator("#participantRouteEntry").waitFor({ timeout: 15_000 });
   await page.waitForTimeout(250);
   assert.equal(
@@ -11052,11 +11193,11 @@ try {
     originalAdaptiveReleaseId,
     "Original adaptive browser smoke import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${originalAdaptiveReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -11299,13 +11440,39 @@ try {
     ];
   const originalAdaptiveBeginnerUnitKey = "beginner-unit";
   const originalAdaptiveBonusUnitKey = "bonus-unit";
-  const currentUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n`;
-  const otherUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n `;
-  const thirdUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n  `;
+  // A timestamped envelope with unchanged field clocks is a duplicate, not a
+  // new answer merely because outer JSON whitespace differs. Capture distinct
+  // data with current per-Unit clocks through the production Player boundary.
+  let recoveryRun = originalAdaptiveStateForOutbox.currentRunState.testRun;
+  const captureRecoveryResponse = (baseResponse, run, unitKey, marker) => mergeCapturedVeronaUnitResponse(baseResponse, {
+    unitState: { ...parseVeronaUnitResponse(baseResponse).unitState,
+      dataParts: { ...parseVeronaUnitResponse(baseResponse).unitState.dataParts, ownedRecovery: marker } },
+    captureTimestamp: Date.now(),
+    storedFieldTimestamps: run.unitResponseFieldTimestamps?.[unitKey]
+  });
+  const recoveryResponse = (unitKey, marker) => captureRecoveryResponse(originalAdaptiveBaseResponse, recoveryRun, unitKey, marker);
+  const matchesRecovery = (actual, expected) => matchesVeronaSavedResponse(actual, expected, true);
+  const currentUnitOutboxResponse = recoveryResponse(originalAdaptiveUnitKey, "current Ω");
+  const otherUnitOutboxResponse = recoveryResponse(originalAdaptiveBeginnerUnitKey, "other Ω");
+  const thirdUnitOutboxResponse = recoveryResponse(originalAdaptiveBonusUnitKey, "third Ω");
   const multiUnitSaveOrder = [];
+  const multiUnitPacketWrites = [];
   const observedMultiUnitResponses = new Set();
   const recordMultiUnitSaveOrder = request => {
     const requestBody = request.postDataJSON();
+    if (
+      request.method() === "POST" && request.url().endsWith(
+        `/participant/test-runs/${originalAdaptiveTestRunId}/save-progress`
+      )
+    ) {
+      multiUnitPacketWrites.push({
+        deliveryId: requestBody?.deliveryId,
+        unitKey: requestBody?.responseUnitKey ?? requestBody?.currentUnitKey,
+        responseLength: requestBody?.unitResponse?.length,
+        responseSuffix: requestBody?.unitResponse?.slice(-12),
+        logKeys: requestBody?.logs?.flatMap(batch => batch.entries?.map(entry => entry.key) ?? [])
+      });
+    }
     if (
       request.method() === "POST" &&
       request.url().endsWith(
@@ -11384,19 +11551,35 @@ try {
       thirdResponse: thirdUnitOutboxResponse
     }
   );
-  await pollJsonWithPredicate(
+  try {
+    await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
     payload =>
-      payload?.currentRunState?.testRun?.unitResponses?.[
+      matchesRecovery(payload?.currentRunState?.testRun?.unitResponses?.[
         originalAdaptiveUnitKey
-      ] === currentUnitOutboxResponse &&
+      ], currentUnitOutboxResponse) &&
       payload.currentRunState.testRun.unitResponses?.[
         originalAdaptiveBeginnerUnitKey
       ] === otherUnitOutboxResponse &&
       payload.currentRunState.testRun.unitResponses?.[
         originalAdaptiveBonusUnitKey
       ] === thirdUnitOutboxResponse
-  );
+    );
+  } catch (error) {
+    const outboxMetadata = await page.evaluate(() => {
+      const raw = localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1");
+      return raw ? JSON.parse(raw).entries.map(entry => ({
+        testRunId: entry.testRunId,
+        unitKey: entry.unitKey,
+        deliveryId: entry.deliveryId,
+        responseLength: entry.response.length,
+        responseSuffix: entry.response.slice(-12),
+        logKeys: entry.logs.flatMap(batch => batch.entries.map(log => log.key))
+      })) : [];
+    });
+    console.log(`multi_unit_save_diagnostic=${JSON.stringify({writes:multiUnitPacketWrites,outboxMetadata})}`);
+    throw error;
+  }
   await page.waitForFunction(
     storageKey => localStorage.getItem(storageKey) === null,
     "testcenter-rewrite:participant-save-outbox:v1"
@@ -11413,9 +11596,10 @@ try {
   );
 
   logStep("participant-multi-unit-background-sync");
-  const backgroundCurrentResponse = `${originalAdaptiveBaseResponse}\n   `;
-  const backgroundOtherResponse = `${originalAdaptiveBaseResponse}\n    `;
-  const backgroundThirdResponse = `${originalAdaptiveBaseResponse}\n     `;
+  recoveryRun = (await pollJson(`${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`)).currentRunState.testRun;
+  const backgroundCurrentResponse = recoveryResponse(originalAdaptiveUnitKey, "background current Ω");
+  const backgroundOtherResponse = recoveryResponse(originalAdaptiveBeginnerUnitKey, "background other Ω");
+  const backgroundThirdResponse = recoveryResponse(originalAdaptiveBonusUnitKey, "background third Ω");
   await page.evaluate(
     ({
       storageKey,
@@ -11506,9 +11690,9 @@ try {
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
     payload =>
-      payload?.currentRunState?.testRun?.unitResponses?.[
+      matchesRecovery(payload?.currentRunState?.testRun?.unitResponses?.[
         originalAdaptiveUnitKey
-      ] === backgroundCurrentResponse &&
+      ], backgroundCurrentResponse) &&
       payload.currentRunState.testRun.unitResponses?.[
         originalAdaptiveBeginnerUnitKey
       ] === backgroundOtherResponse &&
@@ -11612,13 +11796,13 @@ try {
       content: legacyPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: legacyPlayerTenantKey,
       displayName: "Official Verona 3 Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${legacyPlayerTenantKey}/workspaces`,
     {
       body: {
@@ -11662,11 +11846,11 @@ try {
   const legacyPlayerReleaseId =
     legacyPlayerImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(legacyPlayerReleaseId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${legacyPlayerWorkspaceApiUrl}/content-releases/${legacyPlayerReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${legacyPlayerWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${legacyPlayerWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -11944,13 +12128,13 @@ try {
         content: protocolPlayerDocument
       }
     ]);
-    await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
       body: {
         tenantKey: protocolTenantKey,
         displayName: `Official Verona ${apiMajor} Player`
       }
     });
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/tenants/${protocolTenantKey}/workspaces`,
       {
         body: {
@@ -12007,11 +12191,11 @@ try {
     const protocolReleaseId =
       protocolImportPayload.stagedContentRelease?.contentReleaseId;
     assert.ok(protocolReleaseId);
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${protocolWorkspaceApiUrl}/content-releases/${protocolReleaseId}/activate`,
       { body: {} }
     );
-    await sendSmokeJson(`${protocolWorkspaceApiUrl}/participant-roster`, {
+    await sendSmokeJsonAndDrain(`${protocolWorkspaceApiUrl}/participant-roster`, {
       body: {
         rosterText: [
           {
@@ -12232,13 +12416,13 @@ try {
       content: abiPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: abiTenantKey,
       displayName: "Official ABI Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${abiTenantKey}/workspaces`,
     {
       body: {
@@ -12277,11 +12461,11 @@ try {
   );
   const abiReleaseId = abiImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(abiReleaseId, "Official ABI import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${abiWorkspaceApiUrl}/content-releases/${abiReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${abiWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${abiWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -12435,13 +12619,13 @@ try {
       content: currentAbiPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentAbiTenantKey,
       displayName: "Current Official ABI Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentAbiTenantKey}/workspaces`,
     {
       body: {
@@ -12482,11 +12666,11 @@ try {
   const currentAbiReleaseId =
     currentAbiImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(currentAbiReleaseId, "Current ABI import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentAbiWorkspaceApiUrl}/content-releases/${currentAbiReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentAbiWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentAbiWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -12657,10 +12841,10 @@ try {
       content: evaPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: { tenantKey: evaTenantKey, displayName: "Official EVA Player" }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${evaTenantKey}/workspaces`,
     {
       body: {
@@ -12700,11 +12884,11 @@ try {
   assert.deepEqual(evaImportPayload.importJob.diagnostics, []);
   const evaReleaseId = evaImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(evaReleaseId, "Official EVA import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${evaWorkspaceApiUrl}/content-releases/${evaReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${evaWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${evaWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -12849,13 +13033,13 @@ try {
       content: danPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: danTenantKey,
       displayName: "Official DAN Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${danTenantKey}/workspaces`,
     {
       body: {
@@ -12894,11 +13078,11 @@ try {
   );
   const danReleaseId = danImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(danReleaseId, "Official DAN import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${danWorkspaceApiUrl}/content-releases/${danReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${danWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${danWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -13061,13 +13245,13 @@ try {
       content: currentDanPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentDanTenantKey,
       displayName: "Current Official DAN Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentDanTenantKey}/workspaces`,
     {
       body: {
@@ -13108,11 +13292,11 @@ try {
   const currentDanReleaseId =
     currentDanImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(currentDanReleaseId, "Current DAN import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentDanWorkspaceApiUrl}/content-releases/${currentDanReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentDanWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentDanWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -13290,13 +13474,13 @@ try {
       content: historicalDanPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: historicalDanTenantKey,
       displayName: "Historical DAN Testbed"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${historicalDanTenantKey}/workspaces`,
     {
       body: {
@@ -13349,11 +13533,11 @@ try {
     historicalDanReleaseId,
     "Historical DAN import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${historicalDanWorkspaceApiUrl}/content-releases/${historicalDanReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${historicalDanWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${historicalDanWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -13546,13 +13730,13 @@ try {
       content: starsPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: starsTenantKey,
       displayName: "Official STARS Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${starsTenantKey}/workspaces`,
     {
       body: {
@@ -13591,11 +13775,11 @@ try {
   );
   const starsReleaseId = starsImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(starsReleaseId, "Official STARS import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${starsWorkspaceApiUrl}/content-releases/${starsReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${starsWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${starsWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: starsRosterDocument
     }
@@ -13615,7 +13799,7 @@ try {
   const starsParticipantSessionId =
     starsSignInPayload.participantSession.participantSessionId;
   assert.ok(starsParticipantSessionId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/resume`,
     { body: { bookletKey: starsBookletKey } }
   );
@@ -13735,12 +13919,12 @@ try {
   const starsUnitKeys = Array.from({ length: 28 }, (_, index) =>
     String(index + 1)
   );
-  const starsForegroundResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 1)}`
-    ])
-  );
+  const captureStarsResponses = async (participantSessionId, phase) => {
+    const run = (await pollJson(`${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`)).currentRunState.testRun;
+    return Object.fromEntries(starsUnitKeys.map(unitKey => [unitKey,
+      captureRecoveryResponse(starsBaseResponse, run, unitKey, `${phase}:${unitKey} Ω`)]));
+  };
+  const starsForegroundResponses = await captureStarsResponses(starsParticipantSessionId, "foreground");
   const starsForegroundResponseUnits = new Map(
     Object.entries(starsForegroundResponses).map(([unitKey, response]) => [
       response,
@@ -13809,8 +13993,9 @@ try {
     payload =>
       starsUnitKeys.every(
         unitKey =>
-          payload?.currentRunState?.testRun?.unitResponses?.[unitKey] ===
-          starsForegroundResponses[unitKey]
+          (unitKey === "2"
+            ? matchesRecovery(payload?.currentRunState?.testRun?.unitResponses?.[unitKey], starsForegroundResponses[unitKey])
+            : payload?.currentRunState?.testRun?.unitResponses?.[unitKey] === starsForegroundResponses[unitKey])
       ),
     30_000
   );
@@ -13849,7 +14034,7 @@ try {
   const parallelStarsParticipantSessionId =
     parallelStarsSignInPayload.participantSession.participantSessionId;
   assert.ok(parallelStarsParticipantSessionId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/sessions/${parallelStarsParticipantSessionId}/resume`,
     { body: { bookletKey: starsBookletKey } }
   );
@@ -13861,48 +14046,12 @@ try {
   );
   const parallelStarsTestRunId =
     parallelStarsState.currentRunState.testRun.testRunId;
-  const starsReloadResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 51)}`
-    ])
-  );
-  const matchesStarsReloadResponse = (unitKey, response) => {
-    const expected = starsReloadResponses[unitKey];
-    if (response === expected) {
-      return true;
-    }
-    if (unitKey !== "2" || typeof response !== "string") {
-      return false;
-    }
-    try {
-      return JSON.stringify(JSON.parse(response)) ===
-        JSON.stringify(JSON.parse(expected));
-    } catch {
-      return false;
-    }
-  };
-  const parallelStarsReloadResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 151)}`
-    ])
-  );
-  const matchesParallelStarsReloadResponse = (unitKey, response) => {
-    const expected = parallelStarsReloadResponses[unitKey];
-    if (response === expected) {
-      return true;
-    }
-    if (unitKey !== "1" || typeof response !== "string") {
-      return false;
-    }
-    try {
-      return JSON.stringify(JSON.parse(response)) ===
-        JSON.stringify(JSON.parse(expected));
-    } catch {
-      return false;
-    }
-  };
+  const starsReloadResponses = await captureStarsResponses(starsParticipantSessionId, "reload");
+  const matchesStarsReloadResponse = (unitKey, response) => response === starsReloadResponses[unitKey] ||
+    unitKey === "2" && matchesRecovery(response, starsReloadResponses[unitKey]);
+  const parallelStarsReloadResponses = await captureStarsResponses(parallelStarsParticipantSessionId, "parallel-reload");
+  const matchesParallelStarsReloadResponse = (unitKey, response) => response === parallelStarsReloadResponses[unitKey] ||
+    unitKey === "1" && matchesRecovery(response, parallelStarsReloadResponses[unitKey]);
   const starsSaveProgressUrl =
     `${baseUrl}/api/v1/participant/test-runs/${starsTestRunId}/save-progress`;
   const parallelStarsSaveProgressUrl =
@@ -13991,10 +14140,13 @@ try {
       starsUnitKeys,
       `Hard reload must retain the complete isolated run ${testRunId}.`
     );
-    assert.ok(
-      restoredRunEntries.every(entry =>
-        responseMatches(entry.unitKey, entry.response)
-      ),
+    assert.deepEqual(
+      restoredRunEntries.filter(entry => !responseMatches(entry.unitKey, entry.response)).map(entry => ({
+        unitKey: entry.unitKey,
+        actual: JSON.parse(entry.response),
+        expected: JSON.parse((testRunId === starsTestRunId ? starsReloadResponses : parallelStarsReloadResponses)[entry.unitKey])
+      })),
+      [],
       `Hard reload must preserve the responses for run ${testRunId}.`
     );
   }
@@ -14161,12 +14313,7 @@ try {
   );
 
   logStep("participant-original-stars-28-unit-background-sync");
-  const starsBackgroundResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 101)}`
-    ])
-  );
+  const starsBackgroundResponses = await captureStarsResponses(starsParticipantSessionId, "background");
   await page.evaluate(
     ({ storageKey, testRunId, responses }) => {
       const queuedAt = Date.now();
@@ -14229,11 +14376,9 @@ try {
     payload =>
       starsUnitKeys.every(
         unitKey =>
-          matchesVeronaSavedResponse(
-            payload?.currentRunState?.testRun?.unitResponses?.[unitKey],
-            starsBackgroundResponses[unitKey],
-            unitKey === "2"
-          )
+          (unitKey === "2"
+            ? matchesRecovery(payload?.currentRunState?.testRun?.unitResponses?.[unitKey], starsBackgroundResponses[unitKey])
+            : payload?.currentRunState?.testRun?.unitResponses?.[unitKey] === starsBackgroundResponses[unitKey])
       ),
     45_000
   );
@@ -14267,27 +14412,32 @@ try {
 
   stopAfter("participant-original-stars-28-unit-background-sync");
   logStep("participant-original-stars-browser-process-crash-recovery");
-  const starsRendererCrashResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 301)}`
-    ])
-  );
-  const matchesStarsRendererCrashResponse = (unitKey, response) => {
-    const expected = starsRendererCrashResponses[unitKey];
-    if (response === expected) {
-      return true;
-    }
-    if (unitKey !== "2" || typeof response !== "string") {
-      return false;
-    }
-    try {
-      return JSON.stringify(JSON.parse(response)) ===
-        JSON.stringify(JSON.parse(expected));
-    } catch {
-      return false;
-    }
+  const starsCrashObservations = [];
+  const observeStarsCrashSaves = (observedPage, owner) => {
+    const listener = request => {
+      if (request.method() !== "POST" || request.url() !== starsSaveProgressUrl) return;
+      const packet = request.postDataJSON();
+      if (packet?.responseUnitKey !== "2" || starsCrashObservations.length >= 100) return;
+      const response = parseVeronaUnitResponse(packet.unitResponse);
+      const marker = response?.unitState?.dataParts?.ownedRecovery;
+      let captureClock = null;
+      try {
+        const clock = JSON.parse(packet.unitResponse)?.fieldTimestamps?.dataParts?.ownedRecovery;
+        if (Number.isSafeInteger(clock) && clock >= 0) captureClock = clock;
+      } catch {}
+      starsCrashObservations.push({ owner, at: Date.now(),
+        phase: typeof marker === "string" && marker.startsWith("browser-crash:") ? "crash" :
+          typeof marker === "string" && marker.startsWith("background:") ? "background" : "other",
+        exactExpected: packet.unitResponse === starsRendererCrashResponses?.["2"],
+        captureClock });
+    };
+    observedPage.on("request", listener); return () => observedPage.off("request", listener);
   };
+  const stopOriginalCrashObservation = observeStarsCrashSaves(page, "original-page");
+  const stopCrashObservations = [stopOriginalCrashObservation];
+  let starsRendererCrashResponses;
+  const matchesStarsRendererCrashResponse = (unitKey, response) => response === starsRendererCrashResponses[unitKey] ||
+    unitKey === "2" && matchesRecovery(response, starsRendererCrashResponses[unitKey]);
   const browserCrashProfileDirectory = await mkdtemp(
     resolve(".data/ui-smoke-stars-browser-crash-")
   );
@@ -14309,12 +14459,43 @@ try {
     const crashingStarsPage =
       crashingStarsContext.pages()[0] ??
       (await crashingStarsContext.newPage());
+    stopCrashObservations.push(observeStarsCrashSaves(crashingStarsPage, "crashing-page"));
+    const initialCrashRun = (await pollJson(`${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`)).currentRunState.testRun;
+    const initialCrashResponse = initialCrashRun.unitResponses["2"];
+    const initialCrashClock = JSON.parse(initialCrashResponse).fieldTimestamps?.dataParts?.ownedRecovery;
+    assert.ok(Number.isSafeInteger(initialCrashClock));
+    // STARS reports its restored state after rendering. That genuine capture
+    // owns its own delayed outbox write; wait for its acknowledged transaction
+    // before inserting the later offline crash fixture.
+    const initialCrashSave = crashingStarsPage.waitForResponse(response => {
+      if (response.request().method() !== "POST" || response.url() !== starsSaveProgressUrl) return false;
+      const packet = response.request().postDataJSON();
+      if (packet?.responseUnitKey !== "2" || typeof packet.unitResponse !== "string") return false;
+      try {
+        return JSON.parse(packet.unitResponse).fieldTimestamps?.dataParts?.ownedRecovery > initialCrashClock &&
+          matchesRecovery(packet.unitResponse, initialCrashResponse);
+      } catch { return false; }
+    }, { timeout: 30_000 });
+    void initialCrashSave.catch(() => {});
     await participantHttpActor.goto(crashingStarsPage,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         starsParticipantSessionId
       )}`,
       { waitUntil: "domcontentloaded" }
     );
+    // The crash fixture represents input after this real Player has restored
+    // its selected answer. DOMContentLoaded alone precedes Start and the
+    // Player's initial state notification, which can replace a seeded outbox.
+    await crashingStarsPage.locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
+      .waitFor({ timeout: 30_000 });
+    const crashRestoredChoice = crashingStarsPage.frameLocator("#participantVeronaPlayerFrame")
+      .locator('[data-cy="button-1"] input');
+    await crashRestoredChoice.waitFor({ state: "attached", timeout: 30_000 });
+    assert.equal(await crashRestoredChoice.isChecked(), true);
+    const initialCrashAcknowledgement = await initialCrashSave;
+    assert.equal(initialCrashAcknowledgement.status(), 200);
+    await initialCrashAcknowledgement.finished();
     await crashingStarsPage.evaluate(async () => {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(
@@ -14322,6 +14503,7 @@ try {
       );
     });
     await crashingStarsContext.setOffline(true);
+    starsRendererCrashResponses = await captureStarsResponses(starsParticipantSessionId, "browser-crash");
     await crashingStarsPage.evaluate(
       ({ storageKey, crashMarkerKey, testRunId, currentUnitKey, responses }) => {
         const queuedAt = Date.now();
@@ -14374,6 +14556,13 @@ try {
     // that observed persistence window before terminating the complete
     // process; the interruption itself must still run without pagehide.
     await delay(6_000);
+    const crashJournal = await crashingStarsPage.evaluate(storageKey => JSON.parse(localStorage.getItem(storageKey) ?? "null"),
+      "testcenter-rewrite:participant-save-outbox:v1");
+    assert.equal(crashJournal?.entries?.length, starsUnitKeys.length);
+    assert.deepEqual(starsUnitKeys.filter(unitKey => {
+      const entry = crashJournal.entries.find(entry => entry.testRunId === starsTestRunId && entry.unitKey === unitKey);
+      return !entry || !matchesStarsRendererCrashResponse(unitKey, entry.response);
+    }), [], "All 28 expected answers must still be secured immediately before the real process crash.");
     const crashingStarsBrowser = crashingStarsContext.browser();
     assert.ok(crashingStarsBrowser);
     const browserDisconnected = new Promise((resolvePromise, reject) => {
@@ -14409,6 +14598,7 @@ try {
     const recoveredStarsPage =
       recoveredStarsContext.pages()[0] ??
       (await recoveredStarsContext.newPage());
+    stopCrashObservations.push(observeStarsCrashSaves(recoveredStarsPage, "recovered-page"));
     await participantHttpActor.goto(recoveredStarsPage,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         starsParticipantSessionId
@@ -14447,6 +14637,8 @@ try {
       { timeout: 30_000 }
     );
   } finally {
+    for (const stop of stopCrashObservations) stop();
+    console.log(`stars_crash_save_owners=${JSON.stringify(starsCrashObservations)}`);
     await recoveredStarsContext?.close().catch(() => undefined);
     if (!starsBrowserCrashed) {
       await crashingStarsContext?.close().catch(() => undefined);
@@ -14459,27 +14651,9 @@ try {
   stopAfter("participant-original-stars-browser-process-crash-recovery");
 
   logStep("participant-original-stars-mid-drain-hard-reload");
-  const starsMidDrainResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 251)}`
-    ])
-  );
-  const matchesStarsMidDrainResponse = (unitKey, response) => {
-    const expected = starsMidDrainResponses[unitKey];
-    if (response === expected) {
-      return true;
-    }
-    if (unitKey !== "2" || typeof response !== "string") {
-      return false;
-    }
-    try {
-      return JSON.stringify(JSON.parse(response)) ===
-        JSON.stringify(JSON.parse(expected));
-    } catch {
-      return false;
-    }
-  };
+  const starsMidDrainResponses = await captureStarsResponses(starsParticipantSessionId, "mid-drain");
+  const matchesStarsMidDrainResponse = (unitKey, response) => response === starsMidDrainResponses[unitKey] ||
+    unitKey === "2" && matchesRecovery(response, starsMidDrainResponses[unitKey]);
   await page.evaluate(async () => {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map(registration => registration.unregister()));
@@ -14847,13 +15021,13 @@ try {
       content: currentStarsPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentStarsTenantKey,
       displayName: "Official STARS 0.7.2 Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentStarsTenantKey}/workspaces`,
     {
       body: {
@@ -14894,11 +15068,11 @@ try {
   const currentStarsReleaseId =
     currentStarsImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(currentStarsReleaseId, "Official STARS 0.7.2 should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentStarsWorkspaceApiUrl}/content-releases/${currentStarsReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentStarsWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentStarsWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -15078,13 +15252,13 @@ try {
       content: speedtestPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: speedtestTenantKey,
       displayName: "Official Speedtest Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${speedtestTenantKey}/workspaces`,
     {
       body: {
@@ -15129,11 +15303,11 @@ try {
     speedtestReleaseId,
     "Official Speedtest import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${speedtestWorkspaceApiUrl}/content-releases/${speedtestReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${speedtestWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${speedtestWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -15365,13 +15539,13 @@ try {
       content: currentSpeedtestPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentSpeedtestTenantKey,
       displayName: "Current Official Speedtest Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentSpeedtestTenantKey}/workspaces`,
     {
       body: {
@@ -15418,11 +15592,11 @@ try {
     currentSpeedtestReleaseId,
     "Current official Speedtest import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentSpeedtestWorkspaceApiUrl}/content-releases/${currentSpeedtestReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentSpeedtestWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentSpeedtestWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -15701,13 +15875,13 @@ try {
       content: currentOriginalSpeedPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentOriginalSpeedTenantKey,
       displayName: "Current Original Speedtest"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentOriginalSpeedTenantKey}/workspaces`,
     {
       body: {
@@ -15755,11 +15929,11 @@ try {
     currentOriginalSpeedReleaseId,
     "Current Original Speedtest import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentOriginalSpeedWorkspaceApiUrl}/content-releases/${currentOriginalSpeedReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentOriginalSpeedWorkspaceApiUrl}/participant-roster`,
     { body: { rosterText: currentOriginalSpeedRosterDocument } }
   );
@@ -15783,7 +15957,7 @@ try {
   );
   const currentOriginalSpeedParticipantSessionId =
     currentOriginalSpeedSignInPayload.participantSession.participantSessionId;
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/resume`,
     { body: { bookletKey: currentOriginalSpeedPackage.booklet.bookletKey } }
   );
@@ -15922,7 +16096,7 @@ try {
     }
     await page
       .locator("#participantConfirmationTitle")
-      .filter({ hasText: "Leave timed block?" })
+      .filter({ hasText: originalParticipantCustomTextDefaults.booklet_warningLeaveTimerBlockTitle })
       .waitFor({ timeout: 30_000 });
     await page.locator("#participantConfirmationContinueButton").click();
     await page
@@ -16009,7 +16183,20 @@ try {
               renderConfig(message.playerConfig);
             }
           });
-          document.querySelector("#sharedParameterPublish").addEventListener("click", () => {
+          window.ownedSharedParameterClicks = [];
+          window.ownedSharedParameterInputs = [];
+          for (const type of ["pointerdown", "pointerup", "pointercancel", "click"]) {
+            document.addEventListener(type, event => {
+              if (window.ownedSharedParameterInputs.length < 32) {
+                window.ownedSharedParameterInputs.push({
+                  type, trusted: event.isTrusted, target: event.target?.id ?? "",
+                  definition: activeDefinition, time: performance.now()
+                });
+              }
+            }, true);
+          }
+          document.querySelector("#sharedParameterPublish").addEventListener("click", event => {
+            window.ownedSharedParameterClicks.push({trusted:event.isTrusted,definition:activeDefinition});
             const firstUnit = activeDefinition === "publish-blue";
             parent.postMessage({
               type: "vopStateChangedNotification",
@@ -16096,13 +16283,13 @@ try {
       content: sharedParameterPlayerHtml
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: sharedParameterTenantKey,
       displayName: "Shared Parameters"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${sharedParameterTenantKey}/workspaces`,
     {
       body: {
@@ -16147,11 +16334,11 @@ try {
   const sharedParameterReleaseId =
     sharedParameterImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(sharedParameterReleaseId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${sharedParameterWorkspaceApiUrl}/content-releases/${sharedParameterReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${sharedParameterWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${sharedParameterWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -16186,7 +16373,27 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(sharedParameterSessionId);
-  await sharedParameterFrame.locator("#sharedParameterPublish").click();
+  const publishOwnedSharedParameters = async definition => {
+    // Start can render inside the frame before Angular removes the parent's
+    // loading/inert surface. Input must wait for that actual interaction gate.
+    await page.locator("app-verona-player-host .verona-player-content:not([inert])").waitFor();
+    await page.bringToFront();
+    await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+    const button=sharedParameterFrame.locator("#sharedParameterPublish");
+    await button.click();
+    const snapshot=await button.evaluate(element=>({
+      clicks:element.ownerDocument.defaultView.ownedSharedParameterClicks,
+      inputs:element.ownerDocument.defaultView.ownedSharedParameterInputs,
+      definition:element.ownerDocument.querySelector("#sharedParameterDefinition")?.textContent,
+      frameTimeOrigin:element.ownerDocument.defaultView.performance.timeOrigin
+    }));
+    const witness=snapshot.clicks;
+    assert.equal(witness.filter(event=>event.definition===definition).length,1,
+      "Publish must receive exactly one actual native click in the current Player. Native input snapshot: "+JSON.stringify(snapshot));
+    assert.deepEqual(witness.at(-1),{trusted:true,definition});
+    console.log(`shared_parameter_native_input=${definition}:trusted-once`);
+  };
+  await publishOwnedSharedParameters("publish-blue");
   await sharedParameterFrame
     .locator("#sharedParameterConfig")
     .filter({ hasText: '"avatar","value":"blue"' })
@@ -16207,11 +16414,16 @@ try {
     .filter({ hasText: sharedParameterSecondUnitKey })
     .waitFor({ timeout: 30_000 });
   sharedParameterFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  // The route label can advance while the previous iframe still exposes the
+  // same inherited language. Wait for the actual second Verona definition
+  // before publishing, so the click cannot run the first unit's handler again.
+  await sharedParameterFrame.locator("#sharedParameterDefinition")
+    .filter({ hasText: "publish-red" }).waitFor({ timeout: 30_000 });
   await sharedParameterFrame
     .locator("#sharedParameterConfig")
     .filter({ hasText: '"language","value":"de"' })
     .waitFor({ timeout: 30_000 });
-  await sharedParameterFrame.locator("#sharedParameterPublish").click();
+  await publishOwnedSharedParameters("publish-red");
   await sharedParameterFrame
     .locator("#sharedParameterConfig")
     .filter({ hasText: '"tool","value":"calculator"' })
@@ -16382,13 +16594,13 @@ try {
       content: lottieAvatarPackage
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: lottieTenantKey,
       displayName: "Official Lottie Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${lottieTenantKey}/workspaces`,
     {
       body: {
@@ -16440,11 +16652,11 @@ try {
   const lottieReleaseId =
     lottieImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(lottieReleaseId, "Official Lottie import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${lottieWorkspaceApiUrl}/content-releases/${lottieReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${lottieWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${lottieWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -16683,13 +16895,13 @@ try {
       content: currentAspectPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentAspectTenantKey,
       displayName: "Current Official Aspect Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentAspectTenantKey}/workspaces`,
     {
       body: {
@@ -16735,11 +16947,11 @@ try {
     currentAspectReleaseId,
     "Current Aspect import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentAspectWorkspaceApiUrl}/content-releases/${currentAspectReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentAspectWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentAspectWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -16946,13 +17158,13 @@ try {
       content: ibResourcePackage
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: ibTenantKey,
       displayName: "Official IB ItemBuilder Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${ibTenantKey}/workspaces`,
     {
       body: {
@@ -16993,11 +17205,11 @@ try {
   );
   const ibReleaseId = ibImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(ibReleaseId, "Official IB import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${ibWorkspaceApiUrl}/content-releases/${ibReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${ibWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${ibWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -17205,7 +17417,7 @@ try {
   const aspectReleaseId =
     aspectImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(aspectReleaseId, "Original Aspect import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${aspectReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
@@ -17411,13 +17623,13 @@ try {
   const originalSampleResponse = "Saved from the original external HTML unit";
   const originalSampleResourceContent =
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: originalSampleTenantKey,
       displayName: "UI Original Sample Package Tenant"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${originalSampleTenantKey}/workspaces`,
     {
       body: {
@@ -17523,7 +17735,7 @@ try {
   const originalSampleReleaseId =
     originalSampleImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(originalSampleReleaseId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${originalSampleWorkspaceApiUrl}` +
       `/content-releases/${originalSampleReleaseId}/activate`,
     { body: { forceActivation: true } }
@@ -17543,6 +17755,7 @@ try {
     )?.validationWarnings,
     []
   );
+  originalSampleTrace = await observeOriginalSample(page);
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey: originalSampleTenantKey,
@@ -17570,6 +17783,7 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(originalSampleParticipantSessionId);
+  await waitForOriginalSampleResource(originalSampleFrame, originalSampleResourceContent);
   await fillVeronaAnswerAndWaitForHost(
     originalSampleFrame,
     'input[name="required-text-field"]',
@@ -17630,18 +17844,20 @@ try {
       .inputValue(),
     originalSampleResponse
   );
+  if (artifactDirectory) await originalSampleTrace.write(resolve(artifactDirectory,"original-sample"));
+  originalSampleTrace.stop();originalSampleTrace=undefined;
   stopAfter("participant-verona-player");
 
   logStep("participant-original-booklet-config");
   const bookletConfigTenantKey = `${tenantKey}-booklet-config`;
   const bookletConfigWorkspaceKey = `${workspaceKey}-booklet-config`;
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: bookletConfigTenantKey,
       displayName: "UI Original Booklet Config Tenant"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces`,
     {
       body: {
@@ -17803,7 +18019,7 @@ try {
       bookletConfigImportPayload.importJob?.diagnostics ?? []
     )}`
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/content-releases/${bookletConfigReleaseId}/activate`,
     { body: {} }
   );
@@ -17848,7 +18064,7 @@ try {
     const participantSessionId =
       signInPayload.participantSession?.participantSessionId;
     assert.ok(participantSessionId, `${loginKey} should create a session.`);
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/resume`,
       { body: { bookletKey } }
     );
@@ -17994,7 +18210,7 @@ try {
     await configOneBrowser.playerFrame.locator("#end-unit").isEnabled(),
     true
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`,
     {
       body: {
@@ -18402,7 +18618,7 @@ try {
     .waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteTimerLifecycleMessage")
-    .filter({ hasText: "ended" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimeOver })
     .waitFor();
 
   await openOriginalBookletConfig(
@@ -18496,7 +18712,7 @@ try {
   stopAfter("optional-original-player-navigation");
 
   logStep("optional-original-player-surface");
-  await sendSmokeJson(`${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`, {
     body: { rosterText: [
       "loginKey,groupKey,bookletKey,displayName,pw,executionMode",
       "original-surface-review,original-surface,Cy-Bklt_BkltConfig-34,Original Surface,123,run-review"
@@ -18568,13 +18784,13 @@ try {
   logStep("participant-original-test-controller");
   const testControllerTenantKey = `${tenantKey}-test-controller`;
   const testControllerWorkspaceKey = `${workspaceKey}-test-controller`;
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: testControllerTenantKey,
       displayName: "UI Original Test Controller Tenant"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces`,
     {
       body: {
@@ -18703,7 +18919,7 @@ try {
       testControllerImportPayload.importJob?.diagnostics ?? []
     )}`
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/content-releases/${testControllerReleaseId}/activate`,
     { body: {} }
   );
@@ -18804,7 +19020,7 @@ try {
       testRunId: resumePayload.testRun?.testRunId
     };
   };
-  const completeOriginalControllerUnit = async frame => {
+  const checkOriginalControllerRadio = async frame => {
     // Complete a real viewport render of the opaque frame before native input.
     // Chrome can target its owner when check() combines an off-screen scroll
     // and immediate radio click. Keep the checked-state assertion unchanged.
@@ -18813,6 +19029,9 @@ try {
     await frame
       .locator('[data-cy="TestController-radio1-Aufg1"]')
       .check();
+  };
+  const completeOriginalControllerUnit = async frame => {
+    await checkOriginalControllerRadio(frame);
     await frame.locator("#next-page").click();
     await frame
       .getByText("Presentation complete", { exact: true })
@@ -19001,7 +19220,7 @@ try {
     await page.locator("#participantRouteTestletTimer").waitFor();
     await page
       .locator("#participantRouteTimerLifecycleMessage")
-      .filter({ hasText: "started" })
+      .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimerStarted })
       .waitFor();
     await pollJsonWithPredicate(
       `${baseUrl}/api/v1/participant/sessions/${controller.participantSessionId}/current-state`,
@@ -19043,12 +19262,10 @@ try {
     .waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteTimerLifecycleMessage")
-    .filter({ hasText: "started" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimerStarted })
     .waitFor();
   await page.locator("#participantVeronaPlayerStatus").filter({ hasText: /^running$/ }).waitFor();
-  await demoController.frame
-    .locator('[data-cy="TestController-radio1-Aufg1"]')
-    .check();
+  await checkOriginalControllerRadio(demoController.frame);
   await page.locator("#participantRouteNextUnitButton").click();
   await page
     .locator("#participantRouteUnitKey")
@@ -19132,9 +19349,7 @@ try {
     .filter({ hasText: "CY-Unit.Sample-101" })
     .waitFor({ timeout: 15_000 });
   await page.locator("#participantRouteTestletTimerValue").waitFor();
-  await reviewController.frame
-    .locator('[data-cy="TestController-radio1-Aufg1"]')
-    .check();
+  await checkOriginalControllerRadio(reviewController.frame);
   await page.locator("#participantRouteReviewReviewer").fill("tobias");
   await page
     .locator("#participantRouteReviewPriority")
@@ -19319,6 +19534,10 @@ try {
   await protectedControllerFrame
     .getByText(/Testung Controller: Aufgabe1:/)
     .waitFor({ timeout: 15_000 });
+  // Apply the same viewport render barrier as completeOriginalControllerUnit,
+  // without advancing this buffered-answer scenario to the following page.
+  await page.locator("#participantVeronaPlayerFrame").scrollIntoViewIfNeeded();
+  await page.locator("#participantVeronaPlayerFrame").screenshot();
   await protectedControllerFrame
     .locator('[data-cy="TestController-radio1-Aufg1"]')
     .check();
@@ -19429,9 +19648,7 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
     .waitFor({ timeout: 15_000 });
-  await hotRestartController.frame
-    .locator('[data-cy="TestController-radio1-Aufg1"]')
-    .check();
+  await checkOriginalControllerRadio(hotRestartController.frame);
   await page.locator("#participantRouteNextUnitButton").click();
   await page
     .locator("#participantRouteUnitKey")
@@ -19565,9 +19782,7 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
     .waitFor({ state: "attached" });
-  await completionControllerFrame
-    .locator('[data-cy="TestController-radio1-Aufg1"]')
-    .check();
+  await checkOriginalControllerRadio(completionControllerFrame);
   assert.equal(
     await page.locator("#participantRouteNextUnitButton").isDisabled(),
     false
@@ -19668,7 +19883,7 @@ try {
     .click();
   await page
     .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave timed block?" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_warningLeaveTimerBlockTitle })
     .waitFor();
   const hotReturnDialogStateBeforeResponse = await sendSmokeJson(
     `${baseUrl}/api/v1/participant/sessions/${hotReturnTimedController.participantSessionId}/current-state`,
@@ -19808,7 +20023,7 @@ try {
   );
   await page
     .locator("#participantRouteTimerLifecycleMessage")
-    .filter({ hasText: "ended" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimeOver })
     .waitFor({ timeout: 20_000 });
   await page
     .locator("#participantRouteUnitKey")
@@ -19899,7 +20114,7 @@ try {
   await confirmLeaveTarget.click();
   await page
     .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave timed block?" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_warningLeaveTimerBlockTitle })
     .waitFor();
   await page.locator("#participantConfirmationStayButton").click();
   await page
@@ -19914,7 +20129,7 @@ try {
     .waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteTimerLifecycleMessage")
-    .filter({ hasText: "cancelled" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimerCancelled })
     .waitFor();
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${confirmLeaveController.participantSessionId}/current-state`,
@@ -20012,7 +20227,7 @@ try {
   await confirmedUnitLockTarget.click();
   await page
     .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave task?" })
+    .filter({ hasText: originalParticipantCustomTextDefaults["booklet_warningLeaveTitle-unit"] })
     .waitFor();
   await page.locator("#participantConfirmationStayButton").click();
   await page
@@ -20115,10 +20330,16 @@ try {
   await restorePlatformAdminSession();
   logStep("participant-current-unit-labels");
   await runParticipantUnitLabelSmoke({ browser, baseUrl,
+    caseConcurrency: headful ? 1 : 2,
     tenantKey: `${tenantKey}-unit-labels`, workspaceKey: `${workspaceKey}-unit-labels`,
     sendJson: sendSmokeJson, createZip: createStoredZipBuffer,
     unitDocument: testControllerUnitDocuments.find(document => document.unitKey === "CY-Unit.Sample-101").content,
     playerDocument: testControllerPlayerDocument, operatorToken: smokeAdminSessionToken
+  });
+  await runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
+    caseConcurrency: headful ? 1 : 2,
+    tenantKey: `${tenantKey}-current-booklet-config`, workspaceKey: `${workspaceKey}-current-booklet-config`,
+    sendJson: sendSmokeJson, createZip: createStoredZipBuffer, operatorToken: smokeAdminSessionToken
   });
   stopAfter("participant-current-unit-labels");
 
@@ -20228,7 +20449,7 @@ try {
   const monitorEventBeforeExternalSave = await page
     .locator("#monitorConnectionDetail")
     .textContent();
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/test-runs/${aspectStateBeforeMonitorPush.currentRunState.testRun.testRunId}/save-progress`,
     {
       body: {
@@ -20699,7 +20920,7 @@ try {
     .waitFor();
   await page
     .locator("#systemCheckIntroText")
-    .filter({ hasText: "This check verifies whether the current device is ready" })
+    .filter({ hasText: originalSystemCheckCustomTextDefaults.syscheck_intro })
     .waitFor();
   await page
     .locator(".system-check-facts")
@@ -21083,7 +21304,7 @@ try {
   await expectInputValue("#bookletKey", participantRouteBookletKey);
   stopAfter("activation-roster-warning-cards");
   logStep("reactivate-starter-release");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${starterContentReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
@@ -21254,7 +21475,7 @@ try {
   logStep("participant-start");
   const participantLoginKey = "student-ui";
   const participantBookletKey = "booklet:starter";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -21710,7 +21931,8 @@ try {
     loginKey: participantLoginKey,
     participantSessionId,
     testRunId: pausedTestRunId,
-    transition: "paused -> running"
+    transition: "paused -> paused",
+    effectsDeferred: true
   });
   logStep("monitor-pause-run");
   const monitorEventBeforePause = await page
@@ -21742,7 +21964,6 @@ try {
   await liveParticipantPage
     .locator("#participantRouteStatus", { hasText: "paused" })
     .waitFor({ timeout: 15_000 });
-  await liveParticipantPage.close();
   stopAfter("participant-monitor-live-sync");
   await page.waitForFunction(
     previousEvent => {
@@ -21763,7 +21984,8 @@ try {
     loginKey: participantLoginKey,
     participantSessionId,
     testRunId: pausedTestRunId,
-    transition: "running -> paused"
+    transition: "running -> running",
+    effectsDeferred: true
   });
   await fillAndCommit("#monitorCommandHistoryRunFilter", "missing-monitor-run");
   await fillAndCommit("#monitorCommandHistoryLimit", "1");
@@ -21789,7 +22011,8 @@ try {
     loginKey: participantLoginKey,
     participantSessionId,
     testRunId: pausedTestRunId,
-    transition: "running -> paused"
+    transition: "running -> running",
+    effectsDeferred: true
   });
   await expectMonitorCommandHistoryCard({
     actorId: expectedMonitorActorId,
@@ -21799,7 +22022,8 @@ try {
     loginKey: participantLoginKey,
     participantSessionId,
     testRunId: pausedTestRunId,
-    transition: "paused -> running"
+    transition: "paused -> paused",
+    effectsDeferred: true
   });
   logStep("monitor-set-testlet-time");
   await fillAndCommit("#monitorTimeSeconds", "1800");
@@ -21912,6 +22136,9 @@ try {
   const bulkPausePayload = await bulkPauseResponse.json();
   assert.equal(bulkPausePayload.succeededCount, 1);
   assert.equal(bulkPausePayload.failedCount, 0);
+  assert.equal(bulkPausePayload.commands[0]?.testRun?.testRunId, pausedTestRunId);
+  assert.equal(bulkPausePayload.commands[0]?.previousStatus, "running");
+  assert.equal(bulkPausePayload.commands[0]?.testRun?.status, "running");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload => payload?.currentRunState?.testRun?.status === "paused"
@@ -21987,7 +22214,8 @@ try {
   assert.equal(bulkResumePayload.succeededCount, 1);
   assert.equal(bulkResumePayload.failedCount, 0);
   assert.equal(bulkResumePayload.commands[0]?.testRun?.testRunId, pausedTestRunId);
-  assert.equal(bulkResumePayload.commands[0]?.testRun?.status, "running");
+  assert.equal(bulkResumePayload.commands[0]?.previousStatus, "paused");
+  assert.equal(bulkResumePayload.commands[0]?.testRun?.status, "paused");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload => payload?.currentRunState?.testRun?.status === "running"
@@ -22138,7 +22366,8 @@ try {
     .filter({ hasText: "UI Hidden Sessions" })
     .filter({ hasText: "UI Pending Sessions: —" })
     .filter({ hasText: "UI Locked Sessions: —" })
-    .filter({ hasText: "Current participant — UI Candidate UI Contains UI Excluding student-ui" })
+    // The column override does not configure the separate filter-target key.
+    .filter({ hasText: "Current participant — personLabel UI Contains UI Excluding student-ui" })
     .waitFor();
   assert.equal(
     await page.locator("#monitorPendingFilterButton").getAttribute("aria-pressed"),
@@ -22159,7 +22388,7 @@ try {
   await importedMonitorFilterButton.click();
   await page
     .locator("#monitorProfilePresentation")
-    .filter({ hasText: "Current participant — UI Candidate UI Contains UI Excluding student-ui: —" })
+    .filter({ hasText: "Current participant — personLabel UI Contains UI Excluding student-ui: —" })
     .waitFor();
   await page.locator("#monitorResetRuntimeFiltersButton").click();
   await page.waitForFunction(
@@ -23154,9 +23383,11 @@ try {
     "A cohort go-to must resolve the selected block to each run's own first visible unit."
   );
   await page.unroute(monitorBatchCommandsRoute);
-  if (await page.locator("#clearMonitorBatchSelectionButton").isEnabled()) {
-    await page.locator("#clearMonitorBatchSelectionButton").click();
-  }
+  // Successful batch commands remove their accepted runs asynchronously. Assert
+  // that postcondition instead of racing a redundant Clear Selection click.
+  await page.locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" }).waitFor();
+  assert.equal(await page.locator("#clearMonitorBatchSelectionButton").isDisabled(), true);
   while (monitorSpeciesRouteOperations.size > 0) {
     await Promise.all([...monitorSpeciesRouteOperations]);
   }
@@ -23191,10 +23422,10 @@ try {
     "Booklet-error presentation needs one real scoped run."
   );
   const monitorBookletErrors = [
-    ["missing-id", "UI No Booklet Assigned"],
-    ["missing-file", "UI Missing Booklet File"],
-    ["xml", "UI Broken Booklet XML"],
-    ["general", "UI Booklet Access Error"]
+    ["missing-id", "Fehler beim Lesen der Testheft-Datei: Kein Testheft zugeordnet."],
+    ["missing-file", "Fehler beim Lesen der Testheft-Datei: Datei nicht gefunden."],
+    ["xml", "Fehler beim Lesen der Testheft-Datei: Invalides XML-Format."],
+    ["general", "Fehler beim Lesen der Testheft-Datei."]
   ];
   const monitorBookletErrorRouteOperations = new Set();
   let monitorBookletErrorPresentationActive = true;
@@ -23239,6 +23470,9 @@ try {
   for (const [, expectedCopy] of monitorBookletErrors) {
     await scopedOpenRuns.getByText(expectedCopy, { exact: true }).waitFor();
   }
+  assert.doesNotMatch(await scopedOpenRuns.innerText(),
+    /UI No Booklet Assigned|UI Missing Booklet File|UI Broken Booklet XML|UI Booklet Access Error/,
+    "Removed Original custom-text keys cannot replace fixed booklet diagnostics.");
   assert.equal(
     await scopedOpenRuns.getByRole("button", { name: "Add to Batch" }).count(),
     0,
@@ -24199,8 +24433,19 @@ try {
   const heldOwnedRunPayload = await heldOwnedRun.json();
   assert.equal(heldOwnedRunPayload.command.testRun.testRunId,pausedTestRunId);
   assert.equal(heldOwnedRunPayload.command.testRun.participantSessionId,participantSessionId);
-  assert.equal(heldOwnedRunPayload.command.testRun.status,"paused");
-  const heldOwnedRunTimer = heldOwnedRunPayload.command.testRun.testletTimers["testlet:timed-paused"];
+  assert.equal(heldOwnedRunPayload.command.testRun.status,"running");
+  const heldOwnedRunStateAfterPause = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state?testRunId=${pausedTestRunId}`,
+    payload => payload?.currentRunState?.testRun?.testRunId === pausedTestRunId &&
+      payload.currentRunState.testRun.status === "paused" &&
+      payload.currentRunState.testRun.testletTimers?.["testlet:timed-paused"]?.status === "paused"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=monitor_run_command_executed&subjectType=test_run&subjectId=${pausedTestRunId}&limit=25`,
+    payload => payload?.items?.some(item => item.activityEvent?.details?.commandId === heldOwnedRunPayload.command.commandId &&
+      item.activityEvent.details.commandType === "pause" && item.activityEvent.details.nextStatus === "paused")
+  );
+  const heldOwnedRunTimer = heldOwnedRunStateAfterPause.currentRunState.testRun.testletTimers["testlet:timed-paused"];
   assert.equal(heldOwnedRunTimer.status,"paused");
   assert.equal(heldOwnedRunTimer.durationSeconds,120);
   assert.ok(heldOwnedRunTimer.remainingSeconds>0);
@@ -25172,9 +25417,12 @@ try {
   assert.deepEqual(heldOwnedRunState.testRun.testletTimers["testlet:timed-paused"],heldOwnedRunTimer);
   await waitForNotBusy("hold-owned-result-run-before-deletion");
   logStep("refresh-monitor-command-target");
+  // Keep the real browser-v1 receiver for the entire preceding command chain.
+  // The isolated target below uses an explicit authenticated HTTP receiver.
+  await liveParticipantPage.close();
   const monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
   const monitorCommandGroupKey = `${participantGroupKey}-monitor-command`;
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -25203,7 +25451,33 @@ try {
   ).json();
   participantSessionId = refreshedMonitorTarget.participantSession.participantSessionId;
   pausedTestRunId = refreshedMonitorTarget.testRun.testRunId;
-  await sendSmokeJson(
+  const receiveIsolatedMonitorCommand = async (responsePromise, commandType) => {
+    const response = await responsePromise;
+    assert.equal(response.status(), 200);
+    const { command } = await response.json();
+    assert.equal(command.commandType, commandType);
+    assert.equal(command.testRun.testRunId, pausedTestRunId);
+    assert.equal(command.testRun.status, "running");
+    const commandsUrl = `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/commands`;
+    const pending = await (await sendSmokeJson(`${commandsUrl}?testRunId=${encodeURIComponent(pausedTestRunId)}`, { method: "GET" })).json();
+    assert.ok(pending.commands.some(item => item.commandId === command.commandId && item.effectsDeferred === true));
+    await sendSmokeJsonAndDrain(`${commandsUrl}/${command.commandId}/acknowledgement`, { method: "PATCH", body: { testRunId: pausedTestRunId } });
+    const acknowledged = (await (await sendSmokeJson(`${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`, { method: "GET" })).json()).currentRunState.testRun;
+    assert.equal(acknowledged.status, command.testRun.status);
+    assert.equal(acknowledged.currentUnitKey, command.testRun.currentUnitKey);
+    assert.equal(acknowledged.locked, command.testRun.locked);
+    const { application } = await (await sendSmokeJson(`${commandsUrl}/${command.commandId}/application`, {
+      body: { testRunId: pausedTestRunId, controllerStatus: "RUNNING" }
+    })).json();
+    assert.equal(application.command.commandId, command.commandId);
+    assert.equal(application.command.commandType, commandType);
+    assert.equal(application.applied, true);
+    return application;
+  };
+  const waitForIsolatedMonitorCommand = () => page.waitForResponse(response =>
+    response.request().method() === "POST" && new URL(response.url()).pathname ===
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${pausedTestRunId}/commands`);
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/test-runs/${encodeURIComponent(
       pausedTestRunId
     )}/save-progress`,
@@ -25236,10 +25510,12 @@ try {
   await fillAndCommitUntilValue("#testRunId", pausedTestRunId);
   logStep("monitor-goto-unit");
   await fillAndCommitUntilValue("#monitorTargetUnitKey", "unit-1");
+  const isolatedGotoResponse = waitForIsolatedMonitorCommand();
   await clickSelectorAction(
     "Monitor Go To Unit",
     "#runtimeMonitorGotoButton"
   );
+  await receiveIsolatedMonitorCommand(isolatedGotoResponse, "goto");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
@@ -25248,7 +25524,9 @@ try {
   );
   await expectInputValue("#monitorTargetUnitKey", "unit-1");
   logStep("monitor-complete-run");
+  const isolatedTerminationResponse = waitForIsolatedMonitorCommand();
   await clickAction("Monitor Complete");
+  await receiveIsolatedMonitorCommand(isolatedTerminationResponse, "complete_and_lock");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
@@ -25259,7 +25537,10 @@ try {
       payload.currentRunState != null &&
       typeof payload.currentRunState.testRun === "object" &&
       payload.currentRunState.testRun != null &&
-      payload.currentRunState.testRun.status === "completed"
+      payload.currentRunState.testRun.status === "paused" &&
+      payload.currentRunState.testRun.locked === true &&
+      payload.currentRunState.testRun.completedAt === null &&
+      payload.currentRunState.testRun.controllerEntry?.active === false
   );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/runtime-state`,
@@ -25269,8 +25550,9 @@ try {
       "runtimeState" in payload &&
       typeof payload.runtimeState === "object" &&
       payload.runtimeState != null &&
-      payload.runtimeState.runtimeStatus === "completed" &&
-      payload.runtimeState.latestTestRun?.status === "completed"
+      payload.runtimeState.runtimeStatus === "locked" &&
+      payload.runtimeState.availableAction === "none" &&
+      payload.runtimeState.latestTestRun?.status === "paused"
   );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs`,
@@ -25278,7 +25560,7 @@ try {
       typeof payload === "object" &&
       payload != null &&
       Array.isArray(payload.items) &&
-      payload.items.every(item => item?.testRunId !== pausedTestRunId)
+      payload.items.some(item => item?.testRunId === pausedTestRunId && item.status === "paused" && item.locked === true)
   );
   await clickAction("Refresh Runtime Reads");
   await pollJsonWithPredicate(
@@ -25290,8 +25572,9 @@ try {
           item.activityEvent.subjectId === pausedTestRunId &&
           item.activityEvent.details?.commandType === "complete_and_lock" &&
           item.activityEvent.details?.previousStatus === "running" &&
-          item.activityEvent.details?.nextStatus === "completed" &&
-          item.activityEvent.details?.locked === true &&
+          item.activityEvent.details?.nextStatus === "running" &&
+          item.activityEvent.details?.effectsDeferred === true &&
+          item.activityEvent.details?.locked === false &&
           item.activityEvent.details?.participantSessionId === participantSessionId &&
           item.activityEvent.details?.loginKey === monitorCommandLoginKey &&
           item.activityEvent.details?.groupKey === monitorCommandGroupKey &&
@@ -25364,7 +25647,7 @@ try {
     logStep("attachment-manager");
     const attachmentWorkspaceKey = `${workspaceKey}-attachments`;
     const attachmentBookletKey = "booklet:attachment-smoke";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces`,
     {
       body: {
@@ -25419,11 +25702,11 @@ try {
       }
     )
   ).json();
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${attachmentWorkspaceKey}/content-releases/${attachmentImport.stagedContentRelease.contentReleaseId}/activate`,
     { body: { activatedByActorId: "ui-attachment-smoke" } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${attachmentWorkspaceKey}/participant-roster`,
     {
       body: {
@@ -25438,7 +25721,7 @@ try {
       }
     }
   );
-  await sendSmokeJson(`${baseUrl}/api/v1/participant/starter:launch`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/participant/starter:launch`, {
     body: {
       tenantKey,
       workspaceKey: attachmentWorkspaceKey,
@@ -25577,9 +25860,8 @@ try {
     .filter({ hasText: "participant-photo" });
   await clickVisibleAttachmentRow(captureImageAttachmentRow);
   await attachmentManager
-    .locator(".attachment-side")
+    .locator('.attachment-side[data-attachment-type="capture-image"]')
     .filter({ hasText: "participant-photo" })
-    .filter({ hasText: "capture-image" })
     .waitFor();
   assert.equal(
     await attachmentManager.locator(".attachment-layout").evaluate(element =>
@@ -25599,7 +25881,9 @@ try {
   )?.trim();
   assert.match(selectedAttachmentCode ?? "", /^att-/);
   if (attachmentQrCameraFile) {
-    await writeFile(resolve(attachmentQrCameraFile), createAttachmentQrCameraVideo(selectedAttachmentCode), { flag: "wx" });
+    await writeFile(resolve(attachmentQrCameraFile), createAttachmentQrCameraVideo(selectedAttachmentCode, {
+      position: process.env.UI_SMOKE_ATTACHMENT_CAMERA_FACING === "front" ? "printed-front" : "printed"
+    }), { flag: "wx" });
   }
   await fillAndCommit(
     "#attachmentLabelTemplate",
@@ -25798,6 +26082,46 @@ try {
     .filter({ hasText: "participant-photo" })
     .waitFor();
   if (!attachmentQrCameraFile) {
+    // Delay only the callback of this canvas's actual native PNG encoding.
+    // Reset through the visible control while that real frame is pending;
+    // no pixels, decoder results or application methods are synthesized.
+    await page.evaluate(() => {
+      const canvas = document.querySelector("#attachmentCaptureCard canvas");
+      const nativeToBlob = canvas.toBlob;
+      window.ownedAttachmentEncoding = { ready: false, released: false };
+      canvas.toBlob = function (callback, ...args) {
+        nativeToBlob.call(this, blob => {
+          window.ownedAttachmentEncoding.ready = true;
+          window.ownedAttachmentEncoding.release = () => {
+            canvas.toBlob = nativeToBlob;
+            callback(blob);
+            window.ownedAttachmentEncoding.released = true;
+          };
+        }, ...args);
+      };
+    });
+    await attachmentCapture.locator("#captureAttachmentFrameButton").click();
+    await page.waitForFunction(() => window.ownedAttachmentEncoding?.ready === true);
+    await attachmentCapture.locator("#resetAttachmentCaptureButton").click();
+    await page.evaluate(async () => {
+      window.ownedAttachmentEncoding.release();
+      await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+    });
+    assert.equal(await attachmentCapture.locator("#attachmentCaptureTarget").count(), 0);
+    assert.equal(await attachmentCapture.locator("#attachmentCapturePreview").count(), 0,
+      "The real pending camera frame must not return after native reset");
+    assert.equal(await attachmentCapture.locator("#attachmentCaptureStatus").textContent(),
+      "Scan a QR code or enter an attachment code to begin.");
+    logStep("attachment-pending-native-encoding-reset-isolated");
+    const relookup = page.waitForResponse(response => response.request().method() === "GET" &&
+      response.url().endsWith(`/attachments/${selectedAttachmentCode}`));
+    await attachmentCapture.locator("#attachmentQrImageInput").setInputFiles({
+      name: "attachment-code-after-reset.png", mimeType: "image/png",
+      buffer: await QRCode.toBuffer(selectedAttachmentCode, { type: "png", margin: 4, width: 512 })
+    });
+    assert.equal((await relookup).status(), 200);
+    await page.waitForFunction(() => document.querySelector("#attachmentQrImageInput")?.disabled === false);
+    await attachmentCapture.locator("#attachmentCaptureTarget").filter({ hasText: "Attachment Smoke Participant" }).waitFor();
     await attachmentCapture.locator("#captureAttachmentFrameButton").click();
   }
   await attachmentCapture.locator("#attachmentCapturePreview").waitFor();
@@ -25820,20 +26144,48 @@ try {
     const geometry = await attachmentCapture.evaluate(card => {
       const heading = card.querySelector(".section-heading").getBoundingClientRect();
       const introduction = card.querySelector(".capture-intro").getBoundingClientRect();
+      const preview = card.querySelector("#attachmentCapturePreview").closest("section").getBoundingClientRect();
+      const controls = card.querySelector(".capture-controls").getBoundingClientRect();
       return { headingBottom: heading.bottom, introductionTop: introduction.top,
-        scrollWidth: card.scrollWidth, clientWidth: card.clientWidth };
+        scrollWidth: card.scrollWidth, clientWidth: card.clientWidth,
+        preview: preview.toJSON(), controls: controls.toJSON(),
+        cameraVisible: card.querySelector(".camera-shell").getClientRects().length > 0,
+        qrInputVisible: card.querySelector("#attachmentQrImageInput") != null };
     });
     assert.ok(geometry.introductionTop >= geometry.headingBottom,
       `Capture status badge must not overlap the introduction at ${width}px.`);
     assert.ok(geometry.scrollWidth <= geometry.clientWidth,
       `Capture controls must fit their card at ${width}px.`);
+    assert.equal(geometry.cameraVisible, false, "Confirmation replaces the camera with its captured page.");
+    assert.equal(geometry.qrInputVisible, false, "Confirming a photo must not expose another live QR target selector.");
+    assert.ok(width > 820 ? geometry.controls.right <= geometry.preview.left : geometry.preview.bottom <= geometry.controls.top,
+      `Expected desktop controls beside the preview and mobile controls after it at ${width}px.`);
   }
   if (captureViewport) await page.setViewportSize(captureViewport);
+  if (!attachmentQrCameraFile) {
+    logStep("attachment-retake-clears-target-and-restarts-camera");
+    await attachmentCapture.locator("#retakeAttachmentCaptureButton").click();
+    await page.waitForFunction(() => !document.querySelector("#attachmentCapturePreview") &&
+      !document.querySelector("#attachmentCaptureTarget") &&
+      document.querySelector("#attachmentCaptureCode")?.value === "" &&
+      document.querySelector("#attachmentCaptureVideo")?.srcObject instanceof MediaStream);
+    await attachmentCapture.locator("#attachmentQrImageInput").setInputFiles({
+      name: "attachment-code-after-new-capture.png", mimeType: "image/png",
+      buffer: await QRCode.toBuffer(selectedAttachmentCode, { type: "png", margin: 4, width: 512 })
+    });
+    await attachmentCapture.locator("#attachmentCaptureTarget").filter({ hasText: "Attachment Smoke Participant" }).waitFor();
+    await attachmentCapture.locator("#captureAttachmentFrameButton").click();
+    await attachmentCapture.locator("#attachmentCapturePreview").waitFor();
+    await page.waitForFunction(() => document.querySelector("#attachmentCaptureVideo")?.srcObject === null);
+  }
   await attachmentCapture.locator("#uploadCapturedAttachmentButton").click();
   await attachmentCapture
-    .locator("#attachmentCaptureStatus")
+    .locator("#attachmentCaptureUploadStatus")
     .filter({ hasText: "Attachment uploaded for Attachment Smoke Participant" })
     .waitFor();
+  if (!attachmentQrCameraFile) await page.waitForFunction(() => !document.querySelector("#attachmentCapturePreview") &&
+    !document.querySelector("#attachmentCaptureTarget") &&
+    document.querySelector("#attachmentCaptureVideo")?.srcObject instanceof MediaStream);
   await attachmentCapture
     .getByRole("link", { name: "Back to Attachment Manager" })
     .click();
@@ -26073,14 +26425,45 @@ try {
 
   assert.equal(participantOperatorCredentialLeakCount, 0,
     "Participant browser requests must not carry the signed-in operator credential.");
-  process.stdout.write(
-    `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`
-  );
+  serverFailureGate.assertHealthy();
+  successMessage = `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`;
 } catch (error) {
   if (!(error instanceof UiSmokeEarlyExit)) {
+    process.stderr.write(`UI smoke failure at ${page?.url() ?? "unopened page"}: ${String(error?.stack ?? error)}\n`);
+    if(originalSampleTrace){
+      try{
+        const directory=resolve(artifactDirectory??await mkdtemp(resolve(tmpdir(),"original-sample-failure-")),"original-sample");
+        await originalSampleTrace.write(directory);
+        await page.locator("#participantVeronaPlayerFrame").screenshot({path:resolve(directory,"player.png"),timeout:2000});
+      }catch(diagnosticError){process.stderr.write(`Original sample diagnostic unavailable: ${String(diagnosticError)}\n`);}
+      finally{originalSampleTrace.stop();}
+    }
+    if (page && !page.isClosed()) {
+      const inputEvents = await Promise.all(page.frames().map(frame => frame.locator("html").evaluate(() =>
+        window.__ownedVeronaInputEvents ?? null, undefined, { timeout: 1_000 }).catch(() => null)));
+      process.stderr.write(`Owned Verona input events: ${JSON.stringify(inputEvents.filter(Boolean))}\n`);
+    }
     if (page && !page.isClosed()) {
       try {
-        const failureDirectory = await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
+        const failureDirectory = failureArtifactDirectory ?? await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
+        await mkdir(failureDirectory, { recursive: true });
+        let navigation;
+        try {
+          navigation = await page.locator("html").evaluate(() => ({
+            path: location.pathname, focused: document.hasFocus(), visibility: document.visibilityState,
+            activeElement: { id: document.activeElement?.id, tag: document.activeElement?.tagName },
+            events: window.__ownedNavigationEvents ?? [],
+            links: [...document.querySelectorAll("[data-view-nav]")].map(element => {
+              const box = element.getBoundingClientRect(), style = getComputedStyle(element);
+              return { view: element.getAttribute("data-view-nav"), href: element.getAttribute("href")?.split("?")[0],
+                x: box.x, y: box.y, width: box.width, height: box.height,
+                display: style.display, visibility: style.visibility, pointerEvents: style.pointerEvents };
+            })
+          }), undefined, { timeout: 2_000 });
+        } catch (captureError) { navigation = { unavailable: String(captureError).split("\nCall log:")[0] }; }
+        await writeFile(resolve(failureDirectory, "failure.json"), JSON.stringify({
+          error: String(error?.message ?? error).split("\nCall log:")[0], navigation
+        }, null, 2) + "\n");
         await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true });
         process.stderr.write(`UI smoke failure screenshot: ${failureDirectory}/failure.png\n`);
       } catch (captureError) {
@@ -26104,5 +26487,8 @@ try {
   await browser?.close().catch(() => undefined);
   process.stdout.write("ui_smoke_step=teardown-server\n");
   await stopChild(child);
+  await childClosed;
+  if (successMessage) serverFailureGate.assertHealthy();
   process.stdout.write("ui_smoke_step=teardown-complete\n");
 }
+process.stdout.write(successMessage);

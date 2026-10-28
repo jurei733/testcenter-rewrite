@@ -1,3 +1,4 @@
+import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { CommonModule } from "@angular/common";
 import {
   ChangeDetectorRef,
@@ -19,16 +20,15 @@ import type {
 
 import {
   isSupportedVeronaPlayerApiVersion,
-  mergeVeronaUnitResponse,
   normalizeVeronaStateLogEntries,
-  parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
+  serializeVeronaUnitResponse,
+  parseVeronaIncomingNotification,
   prepareVeronaUnitStateForPlayer,
   projectVeronaPageState,
   projectVeronaUnitStateLogs,
   resolveVeronaPlayerApiVersion,
   resolveVeronaNavigationRequest,
-  serializeVeronaUnitResponse,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN,
   type VeronaNavigationDeniedNotification,
@@ -41,7 +41,7 @@ import {
   type VeronaSharedParameter,
   type VeronaStartCommand
 } from "@testcenter-rewrite-app/contracts";
-import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
+import type { ParticipantResponseFieldTimestamps, ParticipantTestLogEntryInput, TestRun } from "@testcenter-rewrite-app/domain";
 import { OriginalPlayerNavigationComponent } from "./original-player-navigation.component";
 
 const controllerRecoveryStorageKey =
@@ -66,6 +66,10 @@ export type VeronaControllerError = {
   testRunId: string;
   unitKey: string;
   message: string;
+  title?: string;
+  description?: string;
+  timestamp?: number;
+  details?: string;
 };
 
 type RetiredVeronaFrame = {
@@ -73,6 +77,7 @@ type RetiredVeronaFrame = {
   testRunId: string;
   unitKey: string;
   latestResponse: string;
+  responseTimestamps?: ParticipantResponseFieldTimestamps;
 };
 
 @Component({
@@ -139,7 +144,8 @@ type RetiredVeronaFrame = {
         <p id="participantVeronaPlayerLoadingStatus">{{ loadingStatusLabel }}</p>
       </section>
       <div class="verona-player-content">
-        <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
+        <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"
+          [attr.inert]="status === 'running' || status === 'ready' ? null : ''"></div>
         <ng-content select="[original-player-sidebar]" />
       </div>
       <ng-content select="[original-system-check-page-controls]" />
@@ -221,7 +227,7 @@ type RetiredVeronaFrame = {
         </button>
       </nav>
       <section
-        *ngIf="errorMessage"
+        *ngIf="errorMessage && !originalUi"
         class="verona-player-error"
         id="participantVeronaPlayerError"
         role="alert"
@@ -262,6 +268,8 @@ export class VeronaPlayerHostComponent
 
   @Input({ required: true }) playerHtml = "";
   @Input({ required: true }) playerKey = "";
+  @Input() commandReloadSequence = 0;
+  @Input() unitViewPending = false;
   @Input({ required: true }) testRunId = "";
   @Input({ required: true }) unitKey = "";
   @Input({ required: true }) unitTitle = "";
@@ -269,6 +277,7 @@ export class VeronaPlayerHostComponent
   @Input() unitDefinitionType = "";
   @Input() resourceBasePath = "";
   @Input() savedResponse = "";
+  @Input() responseClocks: TestRun["unitResponseFieldTimestamps"];
   @Input() sharedParameters: VeronaSharedParameter[] = [];
   @Input() unitNumber = 1;
   @Input() unitCount = 1;
@@ -348,6 +357,7 @@ export class VeronaPlayerHostComponent
   private controllerErrorLoggedForFrame = false;
   private controllerRecoveryTestRunId: string | null = null;
   private latestResponse = "";
+  private frameResponseTimestamps?: ParticipantResponseFieldTimestamps;
   private frameTestRunId = "";
   private frameUnitKey = "";
   private frameSessionId = "";
@@ -468,9 +478,14 @@ export class VeronaPlayerHostComponent
     if (!this.viewReady) {
       return;
     }
+    if (changes["responseClocks"] && this.frameTestRunId === this.testRunId && this.frameUnitKey === this.unitKey) {
+      this.frameResponseTimestamps = this.readScopedResponseTimestamps();
+    }
     if (
       changes["playerHtml"] ||
       changes["playerKey"] ||
+      changes["commandReloadSequence"] ||
+      changes["unitViewPending"] ||
       changes["testRunId"] ||
       changes["unitKey"] ||
       changes["unitDefinition"] ||
@@ -563,9 +578,11 @@ export class VeronaPlayerHostComponent
             entries: logEntries
           });
         }
-        this.latestResponse = mergeVeronaUnitResponse(this.latestResponse, {
+        this.latestResponse = mergeCapturedVeronaUnitResponse(this.latestResponse, {
           unitState: notification.unitState,
-          playerState: notification.playerState
+          playerState: notification.playerState,
+          captureTimestamp: Date.now(),
+          storedFieldTimestamps: this.frameResponseTimestamps
         });
         this.responseChange.emit(this.latestResponse);
         this.responseUpdate.emit({
@@ -619,6 +636,7 @@ export class VeronaPlayerHostComponent
     this.frameTestRunId = this.testRunId;
     this.frameUnitKey = this.unitKey;
     this.frameSessionId = this.sessionId;
+    this.frameResponseTimestamps = this.readScopedResponseTimestamps();
     this.status = "loading";
     this.loadingPhase = "pending";
     this.apiVersionLabel = "Waiting for player";
@@ -630,6 +648,9 @@ export class VeronaPlayerHostComponent
     this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
       ? this.savedResponse
       : serializeVeronaUnitResponse({});
+    // Retain the host's message listener for reports already queued by the retired frame,
+    // but do not start the former Unit while the selected Unit is still loading.
+    if (this.unitViewPending) return;
     this.mountFrameRequest = globalThis.window?.requestAnimationFrame(() => {
       this.mountFrameRequest = null;
       this.beginPlayerFrameLoad();
@@ -703,12 +724,18 @@ export class VeronaPlayerHostComponent
     );
     const apiVersion = apiResolution.version;
     if (!apiVersion) {
-      this.fail("The player ready notification does not declare a Verona API version.");
+      this.fail(
+        "The player ready notification does not declare a Verona API version.",
+        "Player did not report its Verona version (apiVersion or metadata.specVersion)",
+        "Unbekannte Verona-Version"
+      );
       return;
     }
     if (!isSupportedVeronaPlayerApiVersion(apiVersion)) {
       this.fail(
-        `Player uses Verona ${apiVersion}; supported major versions are ${SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN}–${SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX}.`
+        `Player uses Verona ${apiVersion}; supported major versions are ${SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN}–${SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX}.`,
+        `Player uses Verona ${apiVersion}, but this testcenter only support \n              ${SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN} to ${SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX}`,
+        "Unpassende Verona-Version"
       );
       return;
     }
@@ -935,7 +962,8 @@ export class VeronaPlayerHostComponent
     this.persistHostLog(entry);
     this.fail(
       [code, message].filter(Boolean).join(": ") ||
-        "The player reported a runtime error."
+        "The player reported a runtime error.",
+      message
     );
   }
 
@@ -966,7 +994,8 @@ export class VeronaPlayerHostComponent
         sessionId: this.frameSessionId,
         testRunId: this.frameTestRunId,
         unitKey: this.frameUnitKey,
-        latestResponse: this.latestResponse
+        latestResponse: this.latestResponse,
+        responseTimestamps: this.frameResponseTimestamps
       });
       globalThis.window?.setTimeout(() => {
         this.retiredFrames.delete(source);
@@ -974,6 +1003,11 @@ export class VeronaPlayerHostComponent
     }
     frame?.remove();
     this.frame = null;
+  }
+
+  private readScopedResponseTimestamps(): ParticipantResponseFieldTimestamps | undefined {
+    return this.responseClocks && Object.hasOwn(this.responseClocks, this.unitKey)
+      ? structuredClone(this.responseClocks[this.unitKey]) : undefined;
   }
 
   private handleRetiredFrameNotification(
@@ -1029,9 +1063,11 @@ export class VeronaPlayerHostComponent
         entries: logEntries
       });
     }
-    frame.latestResponse = mergeVeronaUnitResponse(frame.latestResponse, {
+    frame.latestResponse = mergeCapturedVeronaUnitResponse(frame.latestResponse, {
       unitState: notification.unitState,
-      playerState: notification.playerState
+      playerState: notification.playerState,
+      captureTimestamp: Date.now(),
+      storedFieldTimestamps: frame.responseTimestamps
     });
     this.responseUpdate.emit({
       testRunId: frame.testRunId,
@@ -1061,13 +1097,15 @@ export class VeronaPlayerHostComponent
         : "runtime-error";
     const message =
       typeof messageValue === "string"
-        ? messageValue.trim().slice(0, 32_768)
+        ? messageValue.slice(0, 32_768)
         : "";
     return {
       code,
       message,
       entry: {
-        key: `Runtime Error: ${code}`,
+        key: `Runtime Error: ${typeof codeValue === "string"
+          ? codeValue.slice(0, 180)
+          : codeValue === undefined ? "undefined" : code}`,
         timeStamp: Date.now(),
         content: message
       }
@@ -1101,7 +1139,7 @@ export class VeronaPlayerHostComponent
     }, 500);
   }
 
-  private fail(message: string): void {
+  private fail(message: string, description = message, title?: string): void {
     this.clearReadyTimeout();
     this.clearScheduledFrames();
     this.status = "error";
@@ -1126,7 +1164,11 @@ export class VeronaPlayerHostComponent
       this.controllerError.emit({
         testRunId: this.frameTestRunId,
         unitKey: this.frameUnitKey,
-        message
+        message,
+        title,
+        description,
+        timestamp: Date.now(),
+        details: new Error(message).stack
       });
     }
   }

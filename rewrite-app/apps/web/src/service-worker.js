@@ -141,12 +141,13 @@ const isParticipantSaveEntry = entry => {
   const boundedIdentifier = value =>
     typeof value === "string" && value.length > 0 && value.length <= 500;
   return (
-    entry.version === 1 &&
+    (entry.version === 1 && entry.logOnly === undefined || entry.version === 2 && entry.logOnly === true) &&
     typeof entry.deliveryId === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(entry.deliveryId) &&
     boundedIdentifier(entry.testRunId) &&
     boundedIdentifier(entry.unitKey) &&
     typeof entry.response === "string" &&
+    (entry.logOnly === undefined || entry.logOnly === true) &&
     entry.response.length <= 4_000_000 &&
     (entry.status === "running" || entry.status === "paused") &&
     Array.isArray(entry.logs) &&
@@ -247,9 +248,11 @@ const drainParticipantBackgroundSaves = async ({
           },
           body: JSON.stringify({
             deliveryId: entry.deliveryId,
+            responseOnly: true,
+            ...(!entry.logOnly && Number.isFinite(Date.parse(entry.queuedAt)) ? { responseTimestamp: Date.parse(entry.queuedAt) } : {}),
             responseUnitKey: entry.unitKey,
             status: entry.status,
-            unitResponse: entry.response,
+            ...(entry.logOnly ? {} : { unitResponse: entry.response }),
             logs: entry.logs
           })
         }
@@ -281,7 +284,7 @@ self.addEventListener("message", event => {
   }
 
   if (
-    message.type === PARTICIPANT_SAVE_UPSERT_MESSAGE &&
+    (message.type === PARTICIPANT_SAVE_UPSERT_MESSAGE || message.type === "testcenter-participant-save-outbox-upsert-v2") &&
     isParticipantSaveEntry(message.entry)
   ) {
     event.waitUntil(

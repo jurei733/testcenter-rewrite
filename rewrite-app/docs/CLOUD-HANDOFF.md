@@ -1,5 +1,1783 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Explicit GET for the shared Booklet corpus adapter (2026-10-19)
+
+Published `cb530787` CI completes with 24 successful and 14 failed jobs. All
+14 failures are the same test-helper integration error: release detail was read
+without an explicit method, so the main smoke's default-POST adapter sent POST
+to a GET-only route and received 404. Earlier standalone acceptance used an
+implicit GET default and could not detect this mismatch. Production routing
+and authorization remain correct.
+
+The helper now explicitly requests GET. A default-POST adapter regression fails
+before this change and passes afterward. The strict, authenticated, complete
+20-case Angular/SQLite fixture is also rerun through that same default-POST
+contract and passes all cases. Main CI coverage remains mandatory; the adapter
+fix does not weaken the API or bypass the failing corpus stage. The prior
+native-route correction passes its complete participant-console CI job.
+
+This correction and the subsequent local runtime changes require a fresh full
+workflow. The preceding run is recorded as failed, not as full qualification.
+
+### Original roster XML text and structural content (2026-10-19)
+
+A self-closing `CustomText` previously consumed its next sibling and lost that
+sibling's key. XML comments and CDATA could also be interpreted as real Login
+markup; a commented-out participant was imported as an active roster entry.
+Custom-text extraction now walks XML tokens, preserves empty/authored text,
+normalizes literal XML line endings and decodes named/numeric references once.
+The structural roster view removes comments/processing instructions and escapes
+CDATA as literal text, while custom texts retain their original character data.
+Participant and operational-login parsing use the same prepared structure.
+
+The actual pinned Original `XMLFileTesttakers::getCustomTexts` body executes on
+PHP 8.3.35 / libxml 2.9.14 with native SimpleXML. Its 14 fixtures yield 28 paired
+participant/operator checks. They cover empty/self-closing fields, following
+siblings, CDATA/markup, comments, instructions, references, whitespace, zero,
+prototype-like keys, hidden Login examples and actual CDATA Booklet IDs. All
+153 compiled contract tests pass. Three new structural checks fail before the
+preparation fix and pass afterward; the earlier regex fails 16 of the first
+18 native text comparisons.
+
+Strict Original-19/native-XSD HTTP gates pass on Memory/File/SQLite: 13 valid
+rosters per store retain exact text through import, operational candidates,
+participant sign-in and resumed runtime reads. File/SQLite reopen retains all
+13 maps. An empty CustomTexts section still fails its unchanged XSD requirement
+for at least one child. HTTP fixtures add the required schema reference,
+Metadata and Group label; the extraction oracle alone does not prove XSD validity.
+All 167 Memory HTTP tests and 1,145 current frontend checks pass. Initial bundle
+size stays 469.75 kB under the unchanged 470 kB error cap.
+
+This qualifies roster parsing and participant delivery, not all later operator
+account normalizers or full custom-text/production acceptance. Formal status
+remains 30 complete / 19 partial. New-head full remote qualification is pending.
+
+### Current fixed monitor Booklet diagnostics (2026-10-19)
+
+Current Original `eedae418` / change `cc3fd9bc6` removes the four
+`gm_booklet_error_*` custom-text keys and renders fixed diagnostics for
+missing IDs/files, malformed XML and general Booklet access failures. The
+Rewrite still advertised 58 monitor keys and let stored legacy overrides
+replace those messages. Its catalog now exactly matches all 54 current
+`gm_*` keys and defaults; the four error states use the current fixed copy.
+Existing stored unknown overrides remain data but cannot alter these labels.
+
+The complete actual Original catalog JSON and monitor template are pinned with
+source hashes. Six source-reference checks pass, including every catalog key/
+default and all four template messages. Four compiled catalog tests and all
+1,144 frontend checks pass. A production Angular/SQLite browser witness with
+real operator login and persisted legacy overrides fails against the preceding
+built UI and passes all four corrected labels; only the four malformed monitor
+rows are controlled response fixtures derived from a real scoped Run. Broken
+rows remain unavailable for batch commands. This does not claim native
+corrupt-package acceptance or a complete live Original UI comparison.
+
+The production Initial total is 469.75 kB under the unchanged 470 kB error cap.
+This section records local qualification at `1f15b6cb`; subsequent publication
+and workflow results are tracked in the newer entries above.
+Full parity remains 30 complete / 19 partial; production acceptance stays open.
+
+### Bounded browser-fixture credential capture (2026-10-19)
+
+The authenticated browser fixture's HTTP actor awaited all pending browser
+JSON captures repeatedly until none remained. A regression witness shows that
+an unrelated response arriving after an API call started can extend that call's
+credential barrier. A continuous stream can therefore starve fixture API work.
+The new test fails on the preceding helper and passes with a snapshot of the
+captures already in flight when the call starts.
+
+A body that does not finish now fails the fixture after 30 seconds with only
+its pathname in the diagnostic. It does not issue a fallback request, expose
+query credentials or change production authentication. Late completion still
+learns the real issued credential for subsequent calls. All five focused tests
+and all 1,138 frontend checks pass with zero failures/skips/cancellations.
+The preceding `ui-ops` job ultimately passes; the credential-starvation witness
+is an independent fixture defect, not a confirmed cause of a remote failure.
+The complete `3eb48b8a` workflow finishes with 37 successful jobs and one failed
+native-route fixture. No job was canceled: a cancellation request made during
+the final status transition was rejected because the workflow had completed.
+Complete new-head CI remains necessary.
+
+### Native route smoke save ownership (2026-10-19)
+
+PR CI `39170753534` at `3eb48b8a` fails in the native-route browser fixture:
+the second Unit answer is absent after Goto and route reentry. The former
+fixture waits for any `save-progress` reply, even though startup/focus logs use
+the same endpoint. A real-browser witness satisfies that gate with a log-only
+packet before any answer input. This proves the fixture cannot establish the
+claimed closed-answer precondition; it does not alone identify every cause of
+the remote missing answer.
+
+The held reply now belongs to `first-2` and the exact trusted answer. A preceding
+real focus explicitly exercises an unrelated save and proves it does not open
+the gate. All seven local production-bundle/SQLite browser checks pass, retaining
+exact answer/clock preservation, Goto-before-reply, canceled route continuations,
+terminal preparation and replacement-Run isolation. Runtime behavior and final
+answer assertions are unchanged. Complete remote confirmation is pending.
+
+### Current Original Booklet Config corpus refresh (2026-10-19)
+
+Live Original `eedae418` has 56 Booklet Config cases rather than the pinned 51.
+The refreshed current package retains older fixtures and combines eleven
+current overrides with 45 byte-unchanged Booklets. Five current Unit documents,
+the same real Player and the complete 56-account roster give 63 independently
+Git-verified source files. Cases 40/41 use modern toolbar keys; 52–56 cover
+short toolbar/navigation/header labels and authored fallback omissions.
+
+125 contract checks and strict Original-19/native-XSD HTTP gates pass across
+Memory/File/SQLite, staging every Booklet without diagnostics and exercising
+24 real participant sign-ins/resumes. A generated IMS migration manifest is
+deliberately absent from this Original workspace package; its earlier strict
+root rejection is retained rather than bypassed through compatibility mode.
+The five exact new Booklets now pass 20 production Angular/SQLite browser
+cases across both interfaces and desktop/mobile. Real password login, full/
+short/fallback labels, original buffer defaults, trusted radio input, repeated
+Unit navigation and same-Run native checked-state restoration pass without
+operator-token leaks or page errors. The main browser suite executes these
+alongside the earlier 32 synthetic native-label cases. Audit other current-source
+schema/config drift next. Keep formal 30/19, physical acceptance, production
+boundaries and the presentation intact. The existing `3eb48b8a` PR CI is complete (37 successful jobs, one native-route
+fixture failure). Publish these local commits and require a fresh complete gate.
+
+### Auxiliary entry routing and complete Angular native visibility (2026-10-19)
+
+A direct camera/legal/privacy/accessibility entry could be overwritten by home
+navigation while Router.url was still its initial `/`. The shell now derives
+entry-root status from the actual pathname. Eight production-method regressions
+fail before the correction and all 19 pass after; 1,136 frontend tests and the
+469.99 kB production build pass without changing budgets.
+
+The independent native visibility proof now also runs the complete built
+Angular application, real operator authentication and actual Start camera UI.
+Native minimization hides the document, ends the old stream and clears video;
+restoration starts a distinct stream. Raw CDP reads only DOM/stream/native
+state; there is no injected capture host, Angular-state or visibility mock.
+The own browser/API close successfully. Synthetic media qualifies full Angular
+window pause/resume; physical front/rear hardware acceptance remains open.
+
+`820bf4e2` PR CI completes 38/38 successfully with 2,639 unit/frontend checks
+and full SQLite/PostgreSQL browser coverage. Qualify the next combined head
+independently; keep formal 30/19 and the protected presentation unchanged.
+
+### Native camera component visibility witness (2026-10-19)
+
+An independent raw-Chrome/public-CDP probe now executes actual capture methods,
+scanner and shipped QR worker without SDK focus emulation or visibility mocks.
+CUA minimization yields a minimized native window, `document.hidden=true`,
+inactive camera, cleared video stream and ended old tracks. Native restoration
+yields a normal visible window and active distinct new stream; the old tracks
+stay ended. The owned browser exits cleanly. Preserve the successful states,
+events and source/worker hashes alongside earlier failed probes. This is an
+owned synthetic-camera component harness; the later complete Angular witness
+above additionally passes. Physical hardware remains open and formal 30/19 stays unchanged.
+
+### Current correction: strict declared UTF-7 XML (2026-10-19)
+
+The prior runtime rejects a valid declared UTF-7 Booklet. PHP 8.3.35/libxml
+2.9.14 in isolated official Debian Bookworm accepts the exact `Ä + 日本` label
+and the current Booklet XSD; cached Alpine PHP rejects the encoding entirely.
+These are runtime/schema witnesses rather than complete Original app runs.
+The new XML-only decoder accepts four confirmed aliases, validates shift bits,
+UTF-16 and direct characters, and preserves authored U+FFFD. MIME-only charset,
+embedded declarations in JSON, transport codecs, BOM mismatch and decoded
+DOCTYPE cannot bypass existing boundaries. Bare `+`/`+!` remain explicit
+RFC-invalid rejections despite Debian libxml dropping their shift marker.
+
+1,617 backend checks pass; the unchanged frontend from the locally qualified
+camera revision has 1,117 passing tests. 205 focused four-store checks include
+owned PostgreSQL 16, strict XSD and durable reopen. Six HTTP corpus/mixed-ZIP
+cases pass across Memory/File/SQLite, preserving valid UTF-7 siblings while
+quarantining the invalid Unit and dependent files. The owned PostgreSQL
+container has been stopped and removed. Keep whole-head CI qualification
+separate and retain formal 30 complete / 19 partial plus production boundaries.
+
+### Current correction: camera confirmation and next-page reset (2026-10-18)
+
+Capture confirmation now replaces the camera/QR controls with its photo;
+desktop actions sit beside it and mobile actions follow it. Manual frame and
+device-file capture stop scanning before review. New capture resets photo and
+target and starts scanning, and successful upload does the same while retaining
+a separate three-second success notice. Failed upload still retains exact
+retry data. Destruction cancels the notice timer and stale capture callbacks
+cannot stop a replacement camera. All 112 focused and 1,117 frontend checks
+pass; built image/manual, rear/front flows pass 62/60/60 steps and worker closure.
+The build remains 469.99 kB. Keep whole-head CI qualification separate.
+
+The `820bf4e2` PR workflow now finishes 38/38 successfully; its full
+image/rear/front attachment job passes. Only its redundant push workflow was cancelled to free capacity; the
+complete PR gate remains required. The later raw-Chrome component witness now
+qualifies actual native minimize/stop and restore/resume; earlier SDK/startup
+attempts remain failed. Complete Angular synthetic-media visibility now additionally passes;
+physical-camera acceptance remains open. Preserve formal 30/19, production boundaries and the presentation.
+
+### Current correction: printed camera page and QR region (2026-10-18)
+
+`7178a463` is fully green in both GitHub workflows (38 jobs each): 2,629
+unit/frontend, 1,732 PostgreSQL-16, full SQLite/PostgreSQL browser and monitor
+review. A separate local full attempt fails at step 309 with SQLite code 14
+during low disk; a later read-only database quick check passes. Do not turn
+that failed local run into a pass or infer the exact cause solely from code 14.
+Closed owned test databases were removed with open-file checks; logs, reference
+database, current database and protected presentation are retained.
+
+The next correction unifies A4 preview/capture and the Original's padded printed
+QR region, including front-camera preview mirroring. Captures use positive
+dimensions and readable pixels; the Original negative-width draw method's
+reversed/transparent results are recorded separately instead of reproduced.
+Live workers cannot select a QR outside the page region, while saved-image
+fallback remains. All 107 focused and 1,117 frontend tests pass, and native
+Chromium gates both facing cases, QR decoding from the actual encoded photo,
+outside-region rejection and 1280/390 px geometry. Built Angular rear and front
+flows pass 60 steps each. Build stays 469.99 kB. Image/manual flow also passes 61 steps, including error/inversion recovery and
+late-encoding isolation. Qualify new-head complete CI separately; CI now also
+runs the full front flow.
+Physical hidden-window acceptance, complete capture layout and overall formal
+parity/production remain open. Preserve the source/proof revision boundaries.
+
+### Current correction: parser completion versus body consumption (2026-10-18)
+
+`d333c94b` PR and push each finish 37/38 green. PR passes full SQLite browser,
+monitor-review and PostgreSQL tests; its PostgreSQL browser still reports two
+incoming body resets after `bodyComplete: true`. A real socket witness proves
+that complete HTTP parsing can precede application consumption and then abort.
+It fails against the prior reader. The boundary now requires an aborted request,
+an incoming-iterator `ECONNRESET` and `!readableEnded`; parser `complete` is not
+the consumption boundary. Completed consumption and downstream failures remain
+fatal. Both incomplete and complete-but-unread real production API cases pass,
+including exact metrics and no partial body/application validation.
+
+All 26 focused checks and 2,629 complete unit/frontend tests pass. Inspect the
+new head's full CI independently. The separate push's monitor-review timeout
+waiting for the transient timer-ended notice does not reproduce in the same
+revision's successful PR monitor-review or complete SQLite browser job. Its log
+is retained; do not alter timer semantics or lower assertions without evidence.
+Keep the protected presentation unchanged. Full parity/production remains open.
+
+### Current correction: client aborts and request metrics (2026-10-18)
+
+A real incomplete client upload reproduces the PostgreSQL browser gate's
+`ECONNRESET` internal-failure log. Only the incoming body iterator can now mark
+a proven aborted/incomplete reset as cancellation. Other stream failures and
+all downstream/storage failures remain fatal. Finish/close metrics settle once;
+JSON/Prometheus expose aborted responses without leaking resource capabilities.
+Pending handler lifetime still governs storage shutdown. The failure gate is
+unchanged. All 23 focused cases, 2,626 unit/frontend, 166 Memory HTTP and 43
+loading/overlap checks pass; production output remains 469.99 kB.
+
+`06db6347` finishes 37/38 green, including 1,732 PostgreSQL-16 tests and the
+complete PostgreSQL browser. Its remaining console fixture tries to fulfil an
+old cancelled loading read. The probe recognizes only explicit `net::ERR_ABORTED`
+for its successful held read after accepted Resume, then requires a real current
+view and exact state/log preservation. Unexpected route errors stay fatal.
+Inspect latest-head full CI separately. The local timeout during a verified
+901-second host sleep is retained; its complete rerun has no failures/skips/
+cancellations. Keep failed logs, the draft PR and protected presentation.
+Full parity/production acceptance remains open (30/19).
+
+### Current correction: authored XML characters (2026-10-17)
+
+The complete `09497d51` SQLite browser checkpoint passes all 548 steps. Its
+monitor auto-next, asynchronous Pause/application, isolated Goto/Terminate,
+attachment lifecycle and exact group-result deletion are qualified locally.
+Inspect current GitHub jobs independently before claiming complete remote CI.
+
+The next XML correction distinguishes authored U+FFFD from undefined legacy
+bytes. Native libxml accepts correctly encoded U+FFFD; xmldom's exact heuristic
+warning previously rejected it. Byte validation now rejects undefined IBM857/
+864/869 bytes explicitly; only that nonfatal parser warning is ignored by XML
+validation and dependency/Unit readers. Other warnings/errors, malformed UTF,
+DOCTYPE and strict XSD checks remain enforced. All 72 compiled three-store
+tests and all 96 tests with owned PostgreSQL 14.24 pass, including strict
+Original-19 import and durable reopen. The owned server is stopped.
+
+All 2,620 unit/frontend checks and 498 full HTTP checks (166 each on Memory,
+File and SQLite) pass, including 21 new encoded cases and the valid U+FFFD
+sibling in a damaged ZIP graph. File/SQLite run sequentially after the parallel
+attempt exhausts host disk; failed logs remain. The production audit finds zero
+vulnerabilities. Inspect new-head GitHub PostgreSQL-16 and browser qualification.
+The previous `09497d51` push ends 37/38 green; only its PostgreSQL browser gate
+fails at the final server-health check on a client-aborted log upload. Investigate
+request cancellation/metrics while retaining fatal internal/storage failures.
+Do not promote the preceding full browser run to proof
+for this new backend. Keep draft PR #6, the current neutral branch and protected
+presentation. Full parity/production readiness remains open (30/19).
+
+### Current correction: monitor next-block selection (2026-10-17)
+
+The full browser run with the Player input guard passes all STARS phases,
+official families, the Original controller package, 32 label cases and bulk
+Pause/Resume. It then finds the monitor auto-next bug: a Goto dispatch receipt
+still reports the previous Unit. The facade now advances from its requested
+single target or the first accepted batch Run's actual variant target. This
+matches current Original `selectNextBlock`, which advances its selected block.
+Six actual-method tests pass; the unchanged previous facade fails three of them.
+All 1,109 frontend tests and the 469.99 kB production build pass. Combined with
+unchanged backend qualification, the unit/frontend count is 2,548.
+
+The loading probe also records completion only after fulfilling its HTTP reply;
+all 43 groups pass again. Qualify the latest monitor correction in the complete
+browser suite and current-head CI. The preceding full attempt stopped at the
+monitor target assertion; it is not a complete pass. Keep the active branch,
+draft PR #6 and protected presentation. Formal parity remains 30/19 and open.
+
+Exact published `34d00de4` passes 2,548 unit/frontend and 1,636 PostgreSQL-16
+CI tests. The local full browser passes auto-next and stops later at the own
+result Run's Pause receipt. The fixture now waits for that command's execution
+activity and durable paused timer before capturing its deletion baseline.
+The offline-recovery gate also waits for complete outbox drainage, including a
+new real FOCUS log emitted after the recovered answer's acknowledgement. All
+33 focused command/credential/selection checks pass. Inspect the running full
+attempt and fresh head CI separately; keep both earlier failure logs.
+
+### Latest continuation: Player readiness and monitor receipt gates (2026-10-17)
+
+The production Player host blocks input and overlays the iframe while loading;
+the local Demo field stays disabled until its Start session and restoration.
+The Debug smoke now holds Ready explicitly and proves native click/typing cannot
+reach an enabled early control, then checks normal use after Start. Its rapid
+Pause case waits for the old restored answer, never for the new answer's save.
+All 16 groups and all 2,542 freshly rerun unit/frontend tests pass. The production
+bundle remains 469.99 kB under the unchanged 470 kB cap.
+
+Published `26bc0965` has 24 passing/14 failing CI jobs. Every failed log is
+downloaded: thirteen share the immutable monitor-issued status expectation,
+one the Player startup window. The browser fixture checks dispatch snapshots
+separately from actual applied state, including bulk Pause/Resume, and keeps its
+real receiver alive through the chain. The isolated target has an explicit
+authenticated HTTP receiver that checks unchanged state at issuance/ACK and
+then applies the actual command. A focused real SQLite/HTTP run executes that
+same helper and passes Goto/Terminate, retained answers/clocks, locked runtime,
+open monitor row and immutable issued history. The terminal held-read probe
+also requires its exact application before asserting the committed Run; route
+errors remain fatal and primary diagnostics precede teardown.
+Full browser/overlap qualification is running;
+inspect final process/log outcomes before reporting it green or restarting it.
+Keep the existing branch/draft PR #6, failed evidence and protected artifacts.
+Formal parity and production acceptance remain open (30 complete/19 partial).
+
+### Current continuation: participant CI corrections and unfiltered reports (2026-10-17)
+
+Continue on `testcenter-production-readiness` and the existing draft
+[PR #6](https://github.com/jurei733/testcenter-rewrite/pull/6). Report checkpoint
+`51efd249` follows the current Original's omitted-filter/all-groups behavior;
+explicit empty service selections remain empty. Its 15 Memory/File/SQLite tests
+and three focused HTTP scenarios pass. The additional owned PostgreSQL 14.24
+run passes five more report cases (20 total across four stores) and stops its
+server afterwards. Published runtime `2d9c6c0d` also passes all 1,636 PostgreSQL-16
+CI tests without failures/skips/cancellations, including this new suite.
+
+The participant correction retains the native Pause/Goto input-capture interval,
+keeps their HTTP drainage independent, disables locked/completed Starter
+assignments and removes the Rewrite Starter's orphan response editor. Direct-link
+shared-state initialization runs after the current Angular check, requests the
+zoneless render and cancels after route destruction. The development Player gate
+passes both interfaces including the formerly failing Original-header `NG0100`.
+See the current [parity evidence](./PARITY.md#participant-input-capture-locked-starter-and-direct-entry-rendering-2026-10-17).
+
+All 2,542 local unit/frontend tests pass, including 1,103 frontend tests, plus the
+48-case Original differential. The production build is 469.99 kB with the same
+470 kB hard cap. The 43 loading/overlap, 15 Debug and five deletion-dialog groups
+plus the live monitor lifecycle pass in production Chromium/SQLite. Overlap
+probes wait for their exact command application/acknowledgement before retiring
+routes; a pending Debug phase alone is not evidence of a committed command.
+The full browser suite is running. The subsequent eight downloaded CI failures
+all reach the same 28-Unit STARS recovery fixture. Its six recovery phases now
+use distinct captured response data and current Run/Unit clocks. Inactive packets
+remain byte-exact; an active Player can re-report any restored part, so all its
+field clocks may advance while values/types stay exact. Direct matcher checks
+retain rejection of older clocks, missing/different/wrongly typed values and
+nonnumeric clocks. Failure diagnostics retain the original error and bounded
+input events from the owned synthetic Player. Qualify this fixture correction
+locally and inspect new remote CI against its exact head: the old
+`d07446f4` runs failed at five shared browser sites and cannot qualify this head.
+Keep all earlier failed-attempt evidence. Earlier PostgreSQL/container results
+belong to their stated revisions; do not substitute them for fresh CI.
+
+The response matcher is shared with the Unit-label gate. Capture clocks may
+advance only as valid nondecreasing integers; every other field/type and raw
+dataPart string remains exact, and inactive packets remain byte-exact. Three
+additional matcher unit tests pass. All 32 focused label cases pass with trusted
+Player input, native checked-state, navigation/reload and exact Run identity.
+The complete browser suite is still running; inspect its final result separately.
+
+The Original reference remains `eedae41840cbe90e5547c0211da818bdf620f5aa`.
+Continue the remaining partial areas against current source and real packages
+after the correction is qualified. Full parity/production readiness remains open
+(30 complete/19 partial). Preserve untracked
+`docs/testcenter-thread-migration-process.pptx` and all user databases/packages.
+
+### Historical continuation: held termination and save ownership (2026-10-15)
+
+Continue on `testcenter-production-readiness`. The current correction preserves
+the earlier terminal handler's own lock/Starter navigation after a later
+Pause/Resume without restoring the older controller/data projection. Concrete
+save-request barriers survive outbox/view acknowledgement and preserve each
+handler's closed-buffer ownership. The 48-case Original differential and all
+43 focused production-browser groups pass; all 2,518 unit/frontend tests pass.
+The production build stays 469.99 kB under the unchanged 470 kB gate.
+
+The fresh 1,616 PostgreSQL, 498 HTTP and 61 compatibility tests also pass without
+skips/cancellations; PostgreSQL doctor/preflight/startup and the zero-vulnerability
+production dependency audit pass. The broader browser gates pass all 22 timer,
+15 Debug, nine actual Original Worker, five old-context-API and two lost-completion-
+reply cases. Six native-route and ten crash/copied-tab groups also pass; the
+focused total is 112. The crash probe retains both prepared and unprepared
+terminal intents and restores a real crashed Chromium tab without replaying the
+former owner's journal. The timer smoke's former
+native-Pause saved-answer wait contradicted the actual Original reference; the
+revised gate requires Pause to complete independently while retaining the same
+timer/data checks, Terminate saved-event wait and legacy FIFO assertions.
+The route gate separately proves independent Goto completion and cancellation of
+Terminate during its own buffer wait. Keep failed-attempt evidence. Verify the
+published branch/PR and current remote CI live; no current release/deployment
+evidence is established by older image checks.
+
+Current Original `eedae41840cbe90e5547c0211da818bdf620f5aa` has unchanged hashes
+for all five completion-reference sources and a new unfiltered-report fix.
+That report behavior is covered by the 2026-10-17 checkpoint above. Continue the remaining partial areas
+against current source and real packages. Full parity/production readiness is
+still open (30 complete/19 partial); do not promote the focused fix to completion.
+Preserve untracked `docs/testcenter-thread-migration-process.pptx` and local data.
+See [current evidence in PARITY](./PARITY.md#independent-terminal-continuation-and-closed-save-buffers-2026-10-15).
+
+### Atomic fresh participant Run initialization (2026-10-11)
+
+Local application checkpoint `613e2323e17c` resolves the reserved-Run/initial-log
+gap. Actual fresh launch/resume creates the Run, activates its current parent and
+persists initial timer/state logs and audit together in all four stores. Failed
+writes leave no partial Run or artifacts; retry creates one complete Run and
+concurrent losers reuse it. Timers start inside the parent reservation lock.
+Current closure, expiry, code and execution mode are checked there. Existing
+Runs remain unchanged; historically incomplete initial artifacts are not repaired.
+SQLite/PostgreSQL schemas remain 63/57; File proof covers one repository owner.
+
+Local validation passed 1,587 unit/state, 1,157 PostgreSQL, 498 HTTP and 61
+compatibility tests without skips, all 147 browser reference/state cases, three
+PostgreSQL container variants, SQLite runtime and 254 read-only image tests as
+node. The web build remains 469.88 kB under the unchanged 470 kB hard gate.
+All 24 existing containers, every mount field, 85 volumes and the protected
+presentation retain their identities/hashes; the owned archive was removed safely.
+
+Browser harness checkpoint `66e1389d1171` closes an observation race where the
+route held the real focus-bearing packet before the request waiter was registered.
+The check waits for its actual failure and subscribes before connectivity changes;
+exact delivery/answer/reload assertions and timeouts remain intact. Eight cases
+passed three consecutive runs, including four clock-skew cases each. The image
+was built from the application checkpoint before this test-script-only correction.
+Failed-attempt logs, route/client diagnosis and screenshots remain in the evidence.
+
+Full parity and production readiness remain open. Next implement the pinned
+Original root debug command and persistent pane, then audit command lifetime
+across replacement controllers. Remaining Source acceptance, mixed-version
+rollout, remote CI, release and deployment proof remain open. Nothing was pushed
+or deployed. Previous sections below preserve historical checkpoint evidence.
+See [the evidence and limits in PARITY](./PARITY.md#atomic-fresh-participant-run-initialization-2026-10-11).
+
+### Scoped Player clocks and response-only deliveries (2026-10-11)
+
+Local application checkpoint `e6587f2e626c` resolves the stored-clock bootstrap
+and delayed-answer control gaps. The selected Run supplies immutable Unit clock
+snapshots to active and retired Player frames; fresh captures advance beyond a
+legacy server clock without carrying the opaque barrier in the packet. Foreground
+and worker outbox requests explicitly use response-only transport, preserving
+current navigation, status, pause source and timer state. Existing legacy receipts
+remain acknowledgeable, and non-saving modes retain no answer data or clocks.
+
+Validation passed 1,549 unit/state, 1,104 PostgreSQL, 498 HTTP and 61 compatibility
+tests without skips, all 147 browser reference/state cases including four actual
+clock-skew cases, three PostgreSQL container variants, SQLite runtime and 216
+read-only image tests as node. The web build remains 469.88 kB under the unchanged
+470 kB gate. All 24 existing containers, mount configurations, 85 volumes and the
+protected presentation remain intact. The owned build archive was removed safely.
+
+Production readiness remains open. The actual launch service leaves a reserved
+Run when its first initial-log write fails; retry does not recover those logs.
+Combine fresh reservation, parent activation, initial logs and audit in one store
+write. Remaining Source acceptance, root command lifetime/debug, mixed-version
+rollout and remote CI/release/deployment proof also remain open.
+See [the evidence and limits in PARITY](./PARITY.md#scoped-player-clocks-and-response-only-deliveries-2026-10-11).
+
+### Durable participant deliveries and response field ordering (2026-10-11)
+
+Local application checkpoint `8ae5c5253e10` adds immutable scoped delivery receipts
+and independently ordered response fields in all four stores. SQLite/PostgreSQL
+schemas are now 63/57. Repeated accepted deliveries cannot replay older answers
+or controls; new captured answer fields use strictly newer timestamps and retain
+absent values. Foreground and worker retries preserve their capture metadata.
+
+Validation passed 1,522 unit/state, 1,078 PostgreSQL, 498 HTTP and 61 compatibility
+tests, all 143 browser reference/state cases, and the clean-archive PostgreSQL/
+SQLite runtime checks plus 196 read-only image tests as node. The web build stays
+469.88 kB under the unchanged 470 kB gate. All 24 existing containers, 85 volumes,
+mount configurations and the protected presentation remain intact; build cache
+cleanup freed 2.861 GB and container starts completed successfully.
+
+Production readiness remains open: bootstrap Player clocks from stored scoped
+clocks for legacy answers, keep first delayed answer deliveries from resetting
+controls, and combine fresh Run creation with its initial artifacts. Remaining
+Source acceptance and remote CI/release/deployment proof also remain open.
+See [the full evidence and limits in PARITY](./PARITY.md#durable-participant-deliveries-and-response-field-ordering-2026-10-11).
+
+### Atomic runtime transitions and monitor intent persistence (2026-10-11)
+
+Local application checkpoint `225f0ff29ed7` extends the transaction used for
+progress and timers to adaptive choices, code gates, direct resume, existing-Run
+session reentry, starter preparation/return, completion and monitor commands.
+The remaining ten application runtime `saveTestRun` calls have been removed.
+Decisions use the current scoped Run and parent inside the store write boundary;
+Run changes, test logs, activity and completion/activation parent status commit
+together. Existing-Run reentry now activates its controller in that same write.
+
+Monitor command intent is part of the projection. Deferred Source commands queue
+the intent and issued-command audit together; native controls commit their Run
+effect, queued intent and audit together. Memory remains synchronous, File
+publishes detached maps only after persistence, SQLite uses BEGIN IMMEDIATE and
+PostgreSQL locks parent before Run on one client. Schema versions remain 62/56.
+File evidence covers one repository owner; SQL evidence also exercises independent
+writers. Mode behavior, monitor-pause protection, transient non-saving packets,
+starter confirmation ordering and the non-saving completion response are retained.
+
+The required mutation suite now has 114 tests across Memory/File/SQLite and 158
+when PostgreSQL is enabled. New cases interleave answers, locks, access expiry,
+current-unit/status changes and sibling completion after the initial read; fault
+injection verifies complete rollback after Run, log, command, audit and final
+parent writes. Local validation passed 1,431 unit/state tests, 982 full PostgreSQL
+tests and 166 HTTP tests per Memory/File/SQLite store (498 total), without skips.
+The production web build passes at 469.88 kB under the existing 470 kB hard gate;
+the 450 kB warning and four style warnings remain.
+
+A clean archive of the application commit passed PostgreSQL standard/demo/
+production-boundary and SQLite runtime checks, plus 125 tests inside the read-only
+image `testcenter-rewrite-app:completeness-225f0ff29ed7` as user node. Its image ID
+is `sha256:b8b059760d06158cb36beddd6dc2cdab6656a501859b0cddcb12b65851e80f09`.
+All 24 existing containers, 85 volumes and their mount configurations
+were preserved; the owned archive was removed after unlinking its node_modules
+symlink. The protected presentation still hashes to
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+
+Chromium passed two received-termination/error/reentry variants, four real
+input/offline/retry/reload variants, 36 player-exit reference states and all 57
+completeness/pixel-reference cases, plus all 44 paused-exit reference states
+(143 browser state cases total).
+An initial mobile retry request timeout and a six-border-pixel, one-color-level
+capture difference were retained as failed-attempt evidence; the isolated reruns
+passed without changing application code or Source reference fixtures.
+
+Full parity and production readiness remain open. An owned Memory probe confirms
+that replaying a previously accepted older delivery overwrites a newer same-unit
+answer. Pinned Source `ee2ab9ab64bd91209ef8534bbe6005838024e46d` rejects older
+response timestamps in TestDAO; durable scoped delivery receipts and response
+version ordering are the next priority. Fresh Run creation/reservation plus its
+initial artifacts still needs a combined boundary. Other Source acceptance,
+command lifetime/debug and remote release/deployment proof remain outstanding.
+The live GitHub CI snapshot is green for older commit `143dc3e73ae8`; it does not
+cover this local application checkpoint.
+
+### Atomic participant progress and timer persistence (2026-10-11)
+
+Local application checkpoint `7037c86870cc` adds `mutateParticipantRun` to all
+four stores. Progress merges answers and shared parameters, evaluates navigation,
+locks and monitor-pause state, and projects timers from the current scoped Run
+inside the storage write boundary. The resulting Run, test logs, activity and
+any timer-completion parent status commit together. The projection performs no
+asynchronous repository access. Memory projects synchronously, File publishes
+its detached maps after persistence, SQLite uses BEGIN IMMEDIATE, and PostgreSQL
+locks the parent before the Run on one client. Schema versions remain 62/56.
+
+Current-state reads now calculate missing booklet-state snapshots inside the
+same timer transaction. Shared timer persistence also reads the current Run
+rather than writing the caller's old snapshot. Existing immutable Run identity
+and parent fields are preserved; no-op projections do not write. Source behavior
+was checked against the pinned controller/DAO at
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. That DAO explicitly notes a whole-test
+laststate race; the reference establishes behavior, not an atomicity guarantee.
+
+New required tests reproduce two independent service queues saving different
+answers, a monitor pause applied after a progress request's initial read,
+concurrent lock/expiry changes, and a current-state query overlapping a save.
+They check timer completion against current sibling Runs, scope denials,
+immutable fields and detached results. File persistence failure leaves cached
+state unchanged; SQL failures after Run/log writes or during the completion
+parent update roll back every artifact. A separate SQLite worker and independent
+PostgreSQL connections prove that a blocked mutation reads the writer's committed
+answer and preserves it. The new suite runs in both required local/PG gates.
+
+All 1,345 unit/state cases (80 + 177 + 520 + 568), 863 complete real-PostgreSQL
+integration cases and 166 HTTP integration cases each for Memory, File and
+SQLite pass without failures or skips. Core and production web builds pass at
+469.88 kB under the unchanged 470 kB error budget; existing bundle/style warnings
+remain. Both received-termination/ERROR-dialog/re-entry browser cases pass, as do
+four native offline/save/retry/reload cases in the Original and rewrite shells
+at widths 1280/390, preserving exact answers, the selected Run and foreign-session
+isolation. These are rewrite-host checks, not a new live Original backend run.
+
+Five clean-image checks pass: PostgreSQL standard/demo/production boundaries,
+SQLite startup, and 39 command-API/Run-mutation cases inside the read-only image.
+Image `testcenter-rewrite-app:completeness-7037c86870cc` runs as node and has ID
+`sha256:4b058272e5456a2746faebd34854d10f9d81d97fec2a62431a18ad1de597abcf`.
+The tracked build archive is removed. All 24 pre-existing container IDs and
+85 volumes, host dependencies and the protected presentation are preserved.
+This checkpoint is local and unpushed.
+
+Full parity and production readiness remain unproven. Other whole-Run mutation
+paths still need the same atomic treatment, including resume, starter return,
+completion and direct monitor operations. Delivery replay/order and ACKs arriving
+after replacement-controller activation, the Source debug command, the full
+Original acceptance corpus, remote CI/release/deployment and live production
+proof remain open. The preceding checkpoints below are historical evidence.
+
+### Atomic participant controller activation (2026-10-11)
+
+Local application checkpoint `73b60bf81b8b` replaces the preceding checkpoint's
+separate session read/write during launch and re-entry with
+`activateParticipantController`. The repository reads the current parent and
+selected Run inside its write boundary, validates tenant/workspace/session/Run
+and content-release scope, checks closed/expired parent and locked/completed
+Run states, and changes only the parent's status. It preserves all current
+session fields and every Run field. A repeated eligible activation is read-only.
+Memory uses a synchronous decision, File publishes its detached session map only
+after persistence, SQLite uses BEGIN IMMEDIATE, and PostgreSQL locks the parent
+before the Run on the same client. Schema versions remain 62/56.
+
+New required tests cover scope denials, expiry and pause semantics, detached and
+idempotent results, File persistence failure/cache recovery, and SQL rollback.
+Independent SQLite workers hold writes while activation starts; separate
+PostgreSQL pools demonstrably wait on parent/Run row locks. A concurrent close
+or lock survives and activation rejects it without restoring a stale parent.
+These tests run in the local unit gate and full PostgreSQL gate.
+
+All 1,317 local unit/state tests (80 + 177 + 492 + 568) and the complete
+824-case PostgreSQL integration pass without skips. Core and production web
+builds pass at 469.88 kB under the unchanged 470 kB error budget. Both regular
+and replacement-dialog browser termination/re-entry cases pass again, including
+the same saved Run, restored SSE and unapplied acknowledged follow-up command.
+The earlier eight command-overlap browser cases belong to checkpoint
+`876192634bf8` below. Five new clean-image checks pass, including 11 real command
+API tests inside the read-only image. Image
+`testcenter-rewrite-app:completeness-73b60bf81b8b` has USER node and ID
+`sha256:0ba767ebcd2dde32aeb3569c85047344f3ed4bd291854c44bf0df3c441a223ab`.
+The tracked build archive is removed. All 24 original container IDs, 85 volumes,
+the host dependencies and protected presentation digest are preserved. About
+9.45 GiB are free; the initial warning and four style warnings remain.
+
+Full parity and production readiness remain open: protect stale progress and
+current-state writes across API servers; resolve cross-controller late ACK and
+integrated multi-command ordering; implement debug; complete the Original corpus
+and full-page/device acceptance. This operation protects controller activation,
+not the entire launch/resume/logging transaction. Remote CI, release, deployment
+and live production remain unverified. These checkpoints are local and unpushed.
+
+### Historical command delivery after controller termination (2026-10-11, 876192634bf8)
+
+Local application checkpoint `876192634bf8` corrects the preceding checkpoint's
+redelivery of acknowledged deferred commands. Pinned Source
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d` filters `executed = false` in
+`TestDAO::getCommands`; its ACK sets that flag before browser dispatch. Memory,
+File, SQLite and PostgreSQL now deliver only commands with a null ACK. The
+receiver rejects previously acknowledged records. An application failure can
+still retry its accepted receipt within the current controller, and application
+receipts remain durable and idempotent. A new controller does not consume old
+ACKed intents or invent an execution timestamp for a discarded effect.
+SQLite schema 62 and PostgreSQL schema 56 restore the corresponding partial
+index without rewriting answers or command history. Both fresh stores and
+failed/retried upgrades from the preceding index versions are covered.
+
+Real browser verification also found and fixed two re-entry defects. A terminated
+controller now records `view=starter` in its synchronized Router address,
+so the retained error dialog's reload remains on the starter. Re-entering an
+existing Run activates the current participant session, allowing its SSE stream
+to reopen; launch rereads the parent before changing its status. The replacement
+error dialog now has an opaque white background when its optional surface
+variable is absent, with actual computed styles and a screenshot inspected.
+
+Eight actual Chromium cases pass with regular and replacement error dialogs:
+received pause/resume/terminate after ERROR, and an unreceived terminate that
+stays inert until explicit reload. Received termination logs ERROR → TERMINATED,
+retains the dialog over the starter, preserves the exact saved response and last
+unit, and permits explicit re-entry into the same Run with a live connection.
+A second resume whose ACK was held behind termination remains acknowledged but
+unapplied after re-entry; it is absent from delivery and command-executed logs.
+These browser cases are part of the required runtime-error smoke runner.
+
+All 1,298 local unit/state tests (80 + 177 + 473 + 568), the complete 797-case
+PostgreSQL integration and core/production web builds pass without skips.
+The initial web bundle is 469.88 kB below the unchanged 470 kB error budget.
+Five clean-image checks pass: PostgreSQL standard/demo/production boundaries,
+SQLite startup, and 11 command API tests within the read-only image, including
+the restored SSE connection. Image
+`testcenter-rewrite-app:completeness-876192634bf8` has USER node, schema 62/56
+and ID `sha256:6aa149bb68377a37c40501cc07b7268783eeb0e57faa90ce10372ac3eefa190c`.
+The tracked build archive is removed safely; the protected presentation, all
+24 original container IDs and 85 volume names are intact. About 10.07 GiB are
+free. The 450 kB warning and four style warnings remain.
+
+Full parity and production readiness remain open. Next verify ACK arrivals after
+a replacement controller is already open and multiple simultaneous command
+completions in real Source/Native browsers; protect session activation and
+progress/current-state writes across API servers; implement debug; complete the
+Original acceptance corpus and full-page/device checks. Remote CI, release,
+deployment and live production are unverified. This checkpoint is local and has
+not been pushed. The preceding sections document their historical revisions.
+
+### Historical deferred participant command dispatch (2026-10-11, db4ecc666bc8)
+
+Local application checkpoint `db4ecc666bc8` connects the atomic storage
+foundation to the authenticated participant application API and real browser.
+Issuing or acknowledging pause, resume, goto, complete or complete_and_lock
+stores an intent/receipt without applying its Run, timer or controller effect.
+Successful dispatch uses the stored command and latest Run under the repository
+lock. The API ignores forged command type, target and execution timestamps.
+The deep contract route is
+`POST /api/v1/participant/sessions/:participantSessionId/commands/:commandId/application`.
+Legacy intents retain their already-applied effects; their application is a
+receipt-only operation. Direct Native lock/navigation/time extensions retain
+existing behavior. The Source debug command is still missing.
+
+New deferred commands remain pending after ACK until their execution receipt is
+stored. SQLite schema 61 and PostgreSQL schema 55 update that pending index.
+The receiver preserves ACK completion order through asynchronous application,
+retries transient failures before its successor, and aborts view projection on
+route cleanup. Application replies must match the exact accepted receipt and
+Run/session scope. A duplicate receipt can restore an interrupted local view
+without replaying its durable effect.
+
+Source termination is resumable: complete returns to the starter, preserves the
+last unit and saved answers, interrupts timers, and leaves the session signed_in;
+complete_and_lock additionally locks the Run. The explicit participant complete
+operation remains final. SSE refuses a session at the starter. Starter cleanup
+also clears the serialized state fallback so rendering cannot resurrect the old
+Run. Legacy optional assignment identities survive command normalization under
+the immutable parent guard. A terminated resumable Run still blocks release
+activation until explicitly completed.
+
+Current checks pass core compilation and the production web build (469.88 kB,
+unchanged 470 kB error limit), 1293 unit/state tests (80+177+469+567) and 791 full
+PostgreSQL integration tests, with no failures or skips. Eight actual Chromium
+cases pass with normal and fallback dialogs: received pause/resume after ERROR,
+and unreceived pause/terminate after ERROR followed by explicit reload. The
+received cases verify Source ERROR-to-PAUSED/RUNNING controller log order;
+unreceived intents stay inert. Terminal reload/re-entry resumes the same saved
+Run. All eight owned API processes stop and every stored browser receipt has a
+server execution timestamp and execution sequence 1. The receiver/API order
+checks do not substitute for a multi-command browser comparison.
+
+Five clean-image checks pass: PostgreSQL standard/demo/production-secret
+boundaries, SQLite startup, and 11 real command API tests inside the read-only
+image. Image `testcenter-rewrite-app:completeness-db4ecc666bc8` uses USER node,
+SQLite schema 61 and PostgreSQL schema 55; its ID is
+`sha256:83f2023bb2a8db2d1525b5301c1a5503d94b9f5a33a5de184eb29c67875cc4b9`.
+The tracked build archive is removed without following the host dependency
+symlink. All 24 pre-existing container IDs, 85 volumes and the protected
+presentation digest remain unchanged. The recovered host has about 10 GiB free.
+The 450 kB initial warning and four style warnings remain unresolved.
+
+Full parity and production acceptance remain open. Next, retire ACKed but
+unexecuted intents when the Source root terminates, including late ACK/re-entry
+races; prove queued terminate with its retained ERROR dialog and real browser
+multi-ACK order; protect stale progress/current-state writes across API servers;
+implement debug; finish the Original acceptance corpus, full-page/device and
+fallback visual checks. Remote CI, release, deployment and production proof are
+unverified. This checkpoint is local and has not been pushed.
+
+
+### Historical atomic application foundation (2026-10-11, 6ef2057f7fb5)
+
+Application checkpoint `6ef2057f7fb5` commits the storage infrastructure below.
+The repository now commits an acknowledged command's Run effect, execution
+receipt, participant logs, workspace activity and optional session status in
+one operation. Memory uses a synchronous detached transform, File publishes
+its cache only after persistence, SQLite uses BEGIN IMMEDIATE and PostgreSQL
+locks the parent session before the Run. SQLite schema 60 and PostgreSQL schema
+54 add a unique execution-order index. Older ACK records remain valid.
+
+The first application receives a server execution timestamp and a per-Run
+execution sequence. Retries do not execute the transform again or replace newer
+saved answers. The transform reads the latest stored Run under the same lock;
+immutable parent fields and foreign or duplicate log identities are rejected.
+Failures in any associated SQL write roll back the entire operation. File
+persistence failure leaves both cached and durable state unchanged for retry.
+
+Fresh checks pass typecheck, the production web build (469.85 kB, unchanged
+470 kB error budget), all 1269 unit/state checks and 787 full PostgreSQL
+integration checks. The 56 targeted local command checks include real SQLite
+writer processes, restart/retry, injected write failures and failed/retried
+legacy migrations. PostgreSQL additionally covers independent pools and the
+same transactional failures. Owned PostgreSQL resources are removed; exact
+inventory retains 24 pre-existing containers and 85 volumes.
+
+All four clean-image checks pass for this application commit: PostgreSQL
+standard/demo/production-secret boundaries on schema 54 and SQLite on schema 60.
+Image `testcenter-rewrite-app:completeness-6ef2057f7fb5` has USER node and ID
+`sha256:4be48633796c9968efc0fda8ed21f91680b4fc97619d37d773fb2d762ef82675`.
+The tracked build archive is removed after the checks, with the protected
+presentation excluded and all pre-existing container and volume IDs preserved.
+
+Four fresh browser checks at the same application commit also pass received
+pause/resume with native and fallback dialogs, actual iframe lifecycle and saved
+answers retained; all four owned API processes shut down. These verify the
+existing transport and do not prove deferred command application or Source
+PAUSED/ERROR log-order parity.
+
+Pinned Source backend revision `ee2ab9ab64bd91209ef8534bbe6005838024e46d`
+confirms the separation: MonitorController.putCommand stores and broadcasts;
+TestDAO.setCommandExecuted only updates the receipt flag. Neither operation
+applies a controller effect. Native must apply it following successful browser
+dispatch, rather than treating the transport ACK as the effect itself.
+
+This is repository infrastructure. Monitor issuance and the participant browser
+still use the previous immediate canonical effect, so the confirmed PAUSED/ERROR
+log-order mismatch remains open. Storage order tests use pinned Source fixtures
+and do not prove integrated browser effect order. The next step is to connect
+application through the participant API and move command effects to successful
+browser dispatch, including terminal save drain. Cross-server stale progress
+writes, complete Original acceptance, devices, remote CI, release and deployment
+remain unproven. This checkpoint is local and has not been pushed.
+
+### Scoped command transport and same-status resume (2026-10-11)
+
+Application checkpoint `357eba0ffd84` connects nonterminal monitor commands
+with independent IDs to authenticated selected-Run command listing and ACK
+routes. SSE carries pending records; polling uses the same scoped collection.
+The server derives tenant/workspace ownership and the first receipt timestamp.
+An ACK changes receipt metadata without changing the Run or its saved answers.
+
+The browser validates records and receipts before dispatch, suppresses duplicate
+ACKs, spaces ACK starts by one second and dispatches in successful ACK completion
+order. ERROR cuts new delivery while preserving accepted requests and scheduled
+ACKs; route/session cleanup cancels both. Pending receipts also suppress opaque
+SSE state refreshes, including the interval after the server persists an ACK
+but before its held browser response arrives. The receiver loads lazily through
+a contract subpath; the production initial bundle is 469.85 kB under the unchanged
+470 kB error budget. Existing warning budgets remain exceeded.
+
+Fresh checks pass typecheck, the production web build, 1237 unit/state checks
+and 741 full PostgreSQL integration checks, including the new real command API
+proof in a private schema. All 21 runtime browser cases across 16 variants pass,
+including native/fallback same-status resume, accepted pause and old save replies.
+Resume replaces the actual errored iframe, restores the saved answer, retains
+the dialog and matches the pinned Source post-ERROR logs `ERROR, RUNNING`.
+Read-only storage inspection confirms the exact persisted command receipts.
+These are owned API/player fixtures, not a complete Original backend or device
+acceptance proof.
+
+All four fresh-image checks pass: PostgreSQL standard, demo and production-secret
+boundaries plus SQLite. The image `testcenter-rewrite-app:completeness-357eba0ffd84`
+has USER node and ID `sha256:6598630b62a1fe6a41507bf19c1041b016649ecf9f1449ba8a69b6773c6062f8`. Its build uses an archived tracked checkout;
+the protected presentation is excluded. Owned test resources are removed and
+exact inventory retains 24 existing containers and 85 volumes. About 8 GiB are
+free after builds; the preceding targeted cleanup reclaimed about 5 GiB.
+
+Confirmed remaining gaps: monitor issuance still changes canonical state before
+browser execution, and its Run mutation and command insertion are separate writes.
+In the held-pause test, Native persists `PAUSED` before `ERROR`; Source instead
+records `ERROR, PAUSED` at browser execution. Pause DOM/receipt checks pass while
+this log-order mismatch remains open. Integrated multi-command effects in ACK
+completion order, terminal command delivery and termination/save-drain equivalence
+still require work. All eight complete Original UI acceptance rows, real devices,
+current-checkpoint remote CI, release, deployment and production proof remain
+open. This is a local checkpoint; nothing was pushed.
+
+### Late save receipts and accepted control state (2026-10-11)
+
+Application checkpoint `ef83639c4597` acknowledges successful durable Player saves
+without projecting their Run snapshot into an errored controller, another
+selected Run, or a state that has advanced through an applied refresh since
+the request started. Receipt processing still removes the exact delivered
+outbox entry and drains following packets. Unchanged active Runs retain their
+ordinary save-state synchronization. Backend authorization, completion and
+monitor write guards are unchanged.
+
+A real-browser negative probe on the prior build reproduces a late paused
+save receipt removing the ERROR Frame. A second probe uses only copied static
+assets from the verified owned 92e0d0eaa776 image: an old running receipt
+temporarily recreates the Player after an already accepted pause. The reference
+container was never started and was removed immediately after extraction.
+The corrected native and failed-lazy-load dialogs preserve the ERROR Frame or
+the accepted paused state, retain exactly one runtime error/controller ERROR,
+acknowledge the outbox, and preserve the exact incomplete response on reload.
+A DOM observer rejects transient Player resurrection hidden by a later pause.
+Read-only SQLite inspection confirms exact runtime-error text and one controller
+ERROR for each of the four owned native/fallback cases.
+Four new actual-method tests also cover ERROR, a newer state, Run switching
+and normal successful receipt handling.
+
+All 1192 unit/state checks pass (533 frontend). Typecheck and the subsequent
+production build pass; initial size remains 469.41 kB under the unchanged
+470 kB error budget, with existing warning budgets unchanged.
+Fresh production browser checks pass the existing 17 runtime cases, the two
+new accepted-pause/old-receipt cases with native/fallback dialogs, all 56
+runtime contracts and the complete Verona/official-player recovery flow.
+The late-save pair was additionally repeated with exact persisted error text
+and controller log checks. The other browser groups from 92e0d0eaa776 remain
+retained evidence; this checkpoint does not claim eight fresh browser groups.
+API/store code is unchanged from bceb17b4db38; 166 memory/file/SQLite and 702
+PostgreSQL integration checks remain retained evidence, not new API runs.
+
+Fresh-image Docker passes standard/demo/production-secret PostgreSQL (schema
+52) and standalone SQLite (schema 58). Image `testcenter-rewrite-app:completeness-ef83639c4597`
+has USER node and revision ef83639c4597; ID `sha256:9a8b1aadc32f7bdda1f3b0718afb84008b3102555710c6392709d3348180a24f`.
+All owned runtime resources are removed. Exact inventory preserves 24 existing
+containers, 85 volumes and the protected presentation hash. Approximately 5.2 GiB are free.
+
+Ordered/same-status command delivery, Source termination equivalence and all
+eight complete Original UI acceptance rows remain open. Nothing was pushed;
+current-checkpoint remote CI, real devices, release, deployment and overall
+production readiness remain unverified.
+
+### ERROR and accepted monitor pause overlap (2026-10-10)
+
+Application checkpoint `92e0d0eaa776` cuts new participant channel delivery and
+ordinary status refreshes on a validated ERROR from the selected running Unit.
+Already accepted channel refreshes may finish. A pre-error accepted pause moves
+the controller to PAUSED, removes the Player and reopens the channel, while
+keeping the error dialog until reload. Ordinary late status responses and API failures
+cannot replace or clear the errored Run; route/session cleanup still invalidates
+in-flight responses and discards queued refreshes.
+
+Pinned Source frontend ee2ab9ab64bd91209ef8534bbe6005838024e46d passes four
+owned Primar/desktop fixtures: pending pause/terminate are ignored after ERROR,
+queued pause executes and reopens command reception, and queued terminate
+returns to Starter. A maintained recorder validates the four complete probes.
+These are Source frontend/stub observations, not Source backend state proof.
+Pinned backend MonitorController.putCommand stores and broadcasts a command;
+TestDAO.getCommands reads unexecuted commands in timestamp order, and
+patchCommandExecuted marks the selected test/command as acknowledged.
+The current Rewrite monitor API applies canonical Run changes immediately.
+Native canonical completion is not claimed equivalent to Source terminate.
+
+The old production build reproduces the late-monitor-pause regression.
+The corrected production replay passes 15 runtime cases, including native and
+failed-lazy-load dialogs for late and already received pause. It verifies
+retained dialog, reopened channel, exact incomplete answer/progress and reload.
+All 1188 unit/state tests pass (529 frontend), including 11 new ERROR reception
+cases. Typecheck and the subsequent production build pass with unchanged
+469.41 kB initial size and 470 kB error budget; existing warnings remain.
+Fresh browser replay also passes 56 runtime contract cases, 22 Player-version
+cases, 44 pause, 43 exit, 32 header cases, Systemcheck and the complete
+Verona/official-player recovery sequence.
+
+API/store code is unchanged from bceb17b4db38. Its 166 memory/file/SQLite
+and 702 PostgreSQL checks are retained evidence, not fresh API reruns.
+Fresh-image Docker passes standard/demo/production-secret PostgreSQL (schema
+52) and standalone SQLite (schema 58). Image `testcenter-rewrite-app:completeness-92e0d0eaa776`
+has USER node, revision 92e0d0eaa776 and ID `sha256:334a95f30170f76fea2d8b7b6e800c8f99f4e8a9e7ba29bebf98a90778640a9d`.
+Owned runtime resources are removed; exact inventory preserves 24 containers,
+85 volumes and the protected presentation hash. Approximately 6 GiB are free.
+
+Same-status/ordered command delivery, control-state reconciliation from late
+save responses, Source termination equivalence and all eight full Original UI
+acceptance rows remain open. Nothing was pushed.
+Published main 143dc3e73ae8 has successful GitHub Actions run 38000558022;
+that run does not validate this unpublished application checkpoint.
+Remote CI, real devices, release, deployment and overall production readiness
+remain unverified.
+
+### Exact runtime error text and custom help (2026-10-10)
+
+Application checkpoint `0e5c90b47fb5` preserves runtime message whitespace in
+descriptions and logs, and keeps the Original log key for a missing code.
+The guarded fallback now preserves empty descriptions, renders allowed rich
+HTML through Angular sanitization, and displays multiline help with pre-wrap.
+Existing diagnostic bounds and secret redaction remain in force.
+
+The unchanged pinned Source frontend passes 28 cases: six known codes, an
+unknown code, defensive missing code, empty/rich whitespace messages, and
+application/login/booklet help across three themes and desktop/mobile.
+Missing code is defensive behavior, not a valid optional protocol field.
+A maintained recorder rejects incomplete Source probes. Source fixtures use
+owned API/player stubs; they do not prove Source backend authorization or
+persistence. Both probes neutralize the pointer before measuring dialogs.
+An initial hover-shadow mismatch is retained as test-harness evidence.
+
+All 56 Rewrite contract cases pass with native and failed-lazy-load dialogs:
+exact description HTML/text, exact stored messages and keys, first-dialog
+retention, one controller ERROR, focus trapping, and exact answer/progress/Run
+recovery. Collapsed native dialog inset pixel comparison covers 28 cases
+(maximum RMS 0.01357 on 0-255 RGB); outer shadows, underlying
+page, expanded metadata and fallback geometry are outside that pixel scope.
+The gate is included in ci:browser:quick. Negative unit/browser probes reproduce
+the whitespace loss before the fix.
+
+All 1177 unit/state checks pass (518 frontend). Typecheck and the subsequent
+production rebuild pass; initial size stays 469.41 kB below the unchanged
+470 kB error limit. Existing 450 kB/style warnings remain. Final production
+browser replay passes runtime 11, versions 22, pause 44, exits 43, headers 32,
+Systemcheck and the complete Verona/official-player recovery flow.
+API/store code is unchanged from bceb17b4db38; its 166 memory/file/SQLite
+and 702 PostgreSQL checks are retained evidence, not repeated API runs.
+
+Fresh-image Compose passes standard/demo/production-secret PostgreSQL (schema
+52), and standalone SQLite passes schema 58. Image `testcenter-rewrite-app:completeness-0e5c90b47fb5`
+has USER node, revision 0e5c90b47fb5 and ID `sha256:3dac41aeffa4c89d4fa3c8a322e9b96a978922385b7149ee0eff6b021573ec1b`.
+Owned resources are removed; exact inventory preserves 24 containers,
+85 volumes and the protected presentation hash. Approximately 6.8 GiB are free.
+
+Overlapping monitor commands and all eight full Original UI acceptance rows
+remain open. Nothing was pushed; remote CI, real devices, release, deployment
+and overall production readiness remain unverified.
+
+### Durable replacement logs and recovered retry (2026-10-10)
+
+Application checkpoint `bceb17b4db38` resolves the previous multi-unit answer
+outbox recovery failure. Restoration now protects only the actual packet in
+transit; a retry during the final status refresh can restore new work. A focus
+log takes the durable answer rather than an older runtime draft.
+
+Replacement answer packets retain unacknowledged logs with stable entry IDs.
+The optional, validated `clientEntryId` remains scoped to the authenticated Run;
+legacy callers retain the existing delivery/index IDs, and upgrading an old
+outbox reproduces those IDs exactly even after batch reorder. No store migration
+is required. Two new headful cases hold an old log-bearing request while a newer
+answer replaces it, then let the old request either succeed or return 503.
+Both preserve the latest exact answer and store each error log exactly once.
+Negative state probes also reproduce the lost retry and stale focus-answer bugs
+before their fixes.
+
+All 1168 unit/state checks pass, including 509 frontend-state checks. All 166
+API checks pass separately on memory, file and SQLite, and all 702 PostgreSQL
+integration checks pass. The new configured-store API case verifies legacy ID
+upgrade, reordered batches, distinct identical events, rejected IDs without
+answer mutation, and participant/Run authorization. The worker regression keeps
+the same log ID through an in-flight replacement and retry.
+
+The final production browser replay passes all 11 runtime-error cases, 22 version
+error cases, 44 pause cases, 43 exit cases (37 Original, 6 Rewrite), 32 header
+cases, the broad Systemcheck flow and the complete Verona/official-player flow.
+The latter includes three-Unit recovery plus STARS 28-Unit, parallel Run,
+mid-drain reload, process crash, background sync and capacity checks. The initial
+production bundle remains 469.41 kB under the unchanged 470 kB error limit;
+450 kB and component-style warnings remain. Typecheck passes; its development
+output was replaced by a fresh production build before the final browser replay.
+
+Current-image PostgreSQL Compose passes standard, demo and production-secret
+modes (schema 52), and standalone SQLite Docker passes (schema 58). Image
+`testcenter-rewrite-app:completeness-bceb17b4db38`, ID `sha256:f09ebe09d48b1fb657f629863c0a7efc9c64971a3809d4644f97320c68de32dd`, has USER node, revision
+bceb17b4db38 and timestamp 2026-10-10T18:57:05.043Z.
+All owned container resources are removed. Exact comparison preserves all 24
+preexisting container IDs, 85 volume names and the protected presentation SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`. Approximately 7.5 GiB are free.
+
+The first file-store replay hit an HTTP timeout during a verified 902-second
+macOS Maintenance Sleep (20:57:34 to 21:12:36 local time). Its complete replay
+with process-scoped sleep prevention passes 166/166; the failed trace is retained.
+Pinned Original master is freshly verified at
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. Source frontend fixtures do not prove
+Source backend authorization/persistence. Custom help, further notification and
+command overlap cases, and all eight full Original UI acceptance rows remain
+open. Nothing was pushed; remote CI, real devices, release, deployment and
+overall production readiness remain unverified.
+
+### Version-specific errors and acknowledged log delivery (2026-10-10)
+
+Application checkpoint `392692085f19` shows the pinned Original's titles and
+expanded descriptions for missing and unsupported Verona Player versions,
+including the actual failed-lazy-module fallback. Supported startup and the
+existing legacy module-version correction are retained. The production initial
+bundle remains 469.41 kB under the unchanged 470 kB error limit; the existing
+450 kB and component-style warnings remain.
+
+Twelve new unmodified Source frontend cases cover both version errors across
+Primar, Sekundar and Erwachsene on desktop/mobile. The owned Rewrite cases begin
+with a previously saved exact response/progress packet and retain it through
+rejected startup and reload, without leave locks or timer cancellation. The new
+mandatory quick-browser wrapper passes all 22 headful cases: 12 native states,
+2 failed lazy-module downloads, 2 delayed saves, 2 failed saves with recovery,
+2 delayed error-log deliveries after the answer was already saved, and 2 failed
+such log deliveries with recovery. All 1158 unit/state checks pass, including
+499 frontend-state checks. The existing nine runtime-error cases and all 44
+pause cases also pass against this checkpoint. All 43 exit cases (37 Original,
+6 Rewrite), 32 header cases and the broad Systemcheck flow pass. The broad
+Verona regression fails in its later multi-unit answer outbox recovery check; that failure
+is retained and remains unresolved at this checkpoint.
+
+Two negative browser probes confirmed actual storage defects. Refresh could
+acknowledge a log-bearing packet merely because its answer text already matched
+the server; error logs emitted after a delivered answer could instead use a
+detached HTTP write which reload did not await. Controller/focus logs now use
+the durable answer outbox. Restoration skips an active drain and requires a
+matching saved status plus an answer-only packet before inferring delivery;
+a foreground answer write likewise cannot acknowledge queued logs or a different
+status. Eight added save-drain tests and the delayed/failed browser cases prove
+these narrow corrections.
+
+All twelve closed-dialog interiors are pixel-identical after a 28-pixel inset.
+Zero whole dialog rectangles are identical; no full-viewport or expanded-report
+screenshot identity is claimed. A separate new unit probe confirms the next
+open gap: replacing a same-Unit packet during its failed in-flight delivery can
+lose the older packet's unacknowledged logs. That concurrent replacement is not
+covered by the completed version/error cases. Custom help, further error and
+command overlap cases, and all eight full Original UI acceptance rows remain open.
+
+Current-image PostgreSQL Compose passes in standard, demo and production-secret
+modes (schema 52), and standalone SQLite Docker passes (schema 58). Image
+`testcenter-rewrite-app:completeness-392692085f19`, ID
+`sha256:72421ecb598f4601da35681bd81d1b0b4db62ad0bd4536805f43d29549c7493b`,
+has USER node, revision 392692085f19 and declared timestamp
+2026-10-10T18:28:20.222Z. Owned containers/volumes are removed; exact comparison
+preserves all 24 preexisting container IDs and 85 volume names, plus the protected
+presentation SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 9.1 GiB are free after these runs.
+
+API/application/store code remains unchanged from checkpoint 9d9ec5754879 and
+its recorded 165 SQLite API/701 PostgreSQL integration checks; these full suites
+were not replayed for this frontend checkpoint. Remote Original master is freshly
+verified at `ee2ab9ab64bd91209ef8534bbe6005838024e46d`. The Source references use
+owned API fixtures and do not prove its backend authorization/persistence.
+Nothing was pushed; remote CI, real devices, release and deployment are unverified.
+
+### Runtime-error dialog and durable reload (2026-10-10)
+
+Application checkpoint `d026e3f7c63f` retains the running Original Player behind
+its native Material error dialog. It reproduces the help text, Fehlerdetails,
+focus, non-dismissible backdrop/Escape behavior and reload action. The fixed
+Source SVG and fixed en-US/local-zone date output are rendered directly, while
+the native dialog and expansion panel remain deferred. The first implementation
+failed the unchanged 470 kB initial budget; the final production build is
+469.41 kB. The 450 kB and component-style warnings remain; no limit was raised.
+
+Six unmodified Source frontend references and six owned SQLite browser cases
+cover Primar, Sekundar and Erwachsene on desktop/mobile, incomplete responses,
+and forbidden timed-block exits. A repeated error from the same callback leaves
+one dialog and one CONTROLLER=ERROR, while preserving both runtime-error logs.
+The reference and Rewrite share only an owned synthetic Player; the Source
+frontend stays unchanged. The new mandatory quick-browser gate also proves a
+failed lazy-module download, a delayed save, and failed saves followed by recovery.
+These nine headful cases pass. The 44 pause cases, 43 normal exits (37 Original,
+6 Rewrite), 32 header cases and the broad system-check browser flow also pass.
+The broad Verona flow passes after updating its stale merged-timer exit
+expectation: the timed confirmation suppresses the later leave-lock check, with
+current-unit/status guards present. Cancel and accepted return preserve the exact
+stored answer packet and leave unit/testlet locks empty. The new answer setup
+waits for vopStart's rendered unit definition before typing.
+Reload waits for the durable outbox, preserves
+exact response/progress packets and the selected authorized Run, and fences
+context changes while awaiting storage and Router navigation. All 1140 current
+unit/state checks pass, including 481 frontend-state checks.
+
+The six closed-dialog interiors are pixel-identical after a 28-pixel inset.
+Zero complete dialog rectangles or full viewports are claimed identical: the
+rounded corners expose different backgrounds (574 changed rectangle pixels on
+desktop, 362–364 on mobile; maximum channel difference 155). Expanded diagnostic
+content is functionally checked, without claiming complete screenshot identity.
+Custom help variants, other startup/error categories and overlapping commands
+remain open, as do all eight full Original UI acceptance rows.
+
+The new image passes PostgreSQL Compose in standard, demo and production-secret
+modes (schema 52), plus standalone SQLite Docker (schema 58). Image
+`testcenter-rewrite-app:completeness-d026e3f7c63f` has ID
+`sha256:fcd2cd7ed3fea049c3d9798e84ec78034a198dad0c4700baac01c3bdf1ea5da8`,
+USER node, revision d026e3f7c63f and declared timestamp
+2026-10-10T17:23:04.421Z. Owned containers/volumes are removed. Exact inventory
+comparison preserves all 24 preexisting container IDs and 85 volume names; the
+protected presentation remains SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 9.9 GiB remain free after the runs (8.7 GiB during them).
+
+The API/application/store implementation is unchanged from checkpoint
+9d9ec5754879 and its recorded 165 SQLite API/701 PostgreSQL integration checks;
+those full suites were not replayed for this frontend change. Source master is
+freshly verified at `ee2ab9ab64bd91209ef8534bbe6005838024e46d`. The Source references
+use owned API fixtures and do not prove Source backend authorization/persistence.
+Nothing was pushed. Remote CI, real-device acceptance, release and deployment
+are still unverified.
+
+### Native pause container and startup budget (2026-10-10)
+
+Application checkpoint `85e8e9e86fe8` uses the pinned Original's native
+Material sidenav container/content, closed end drawer and white content surface
+for the pause card. This clips the upper card shadow at the content boundary.
+The first drawer build exceeded the unchanged 470 kB startup limit by 694 bytes.
+Migrating the root template's conditional rendering to Angular control flow
+removes its static NgIf dependency and lowers the production initial bundle to
+469.02 kB. The existing 450 kB warning and component-style warnings remain;
+no budget was increased.
+
+Eight sequential headful browser suites pass against owned SQLite APIs: all 44
+pause cases, 32 header cases, participant login/second-code cases, admin login
+with and without its proof-of-work challenge, offline shell/central bug reporting,
+global warning and raw-response settings, and required/voluntary password changes.
+All 469 frontend state tests also pass. The API/application/store implementation
+is unchanged from the preceding 9d9ec5754879 checkpoint and its recorded
+1128 unit/state, 165 SQLite API and 701 PostgreSQL integration checks.
+
+The new application image passes PostgreSQL Compose in standard, demo and
+production-secret modes, plus standalone SQLite Docker. The image is
+`testcenter-rewrite-app:completeness-85e8e9e86fe8`, with ID
+`sha256:127a8503e58a17a4fd77db5b53751b81e80a47bc416cc1855f1e1c86b045299e`,
+USER node and revision 85e8e9e86fe8. Its declared build timestamp is
+2026-10-10T16:34:04.899Z. Owned test containers/volumes are removed. Exact comparison
+preserves all 24 preexisting container IDs and 85 volume names, and the protected
+presentation SHA-256 remains
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 11 GiB remain available after the runs.
+
+A new full-PNG comparison of the 44 pause cases measures at most 0.13965% changed
+pixels. The remaining differences are the header shadow and three card-edge
+pixels; the maximum channel difference is 5. Zero full viewports are pixel-identical.
+This improves the former upper-shadow overlap but does not close full-page UI
+acceptance, remote CI, real-device, release or deployment proof.
+
+The next confirmed gap is the Original runtime-error surface. Six unmodified
+Source frontend cases (three themes, desktop/mobile, Hot Return with incomplete
+presentation/response and a forbidden timed-block exit) pass in
+`scripts/reference-original-runtime-error.mjs`. The Source retains its iframe,
+focuses a native non-dismissible dialog, shows the default custom technical-help
+text and expandable Fehlerdetails, and offers Schließen und neu laden. Escape and
+backdrop clicks retain the dialog. Each case logs one Runtime Error: runtime-error
+and one CONTROLLER=ERROR, then reloads through the same participant route and
+sends a connection-lost beacon. Portable presentation expectations are saved in
+`scripts/fixtures/original-runtime-error.json`. These are frontend references on
+owned API/player fixtures, not Source backend authorization or persistence proof.
+The Rewrite's retained-player/native-error-dialog implementation and broader
+error, custom-text and overlapping-command acceptance remain open. The pinned
+Source revision remains `ee2ab9ab64bd91209ef8534bbe6005838024e46d`, freshly verified
+against remote master. All eight full Original UI acceptance rows remain open.
+
+### Paused starter exits (2026-10-10)
+
+Application checkpoint `9d9ec5754879` matches the pinned Original pause-status
+exit. A visible pause leaves for Starter without a termination question, another
+CONTROLLER write, changed response packets, timer cancellation or leave locks.
+The interrupted timer and monitor pause remain intact. A forced silent pause
+keeps only the ordinary end-test confirmation. Staying makes no mutation;
+approval records `TERMINATED_PAUSED` and, if configured, locks the whole test.
+Source's `patchLock` writes the separate `BOOKLETLOCKEDbyTESTEE` event and locked
+flag, preserving the controller state; the Rewrite now does that for paused exits.
+
+The lazy Original pause surface uses Source's native raised card, booklet title,
+login and mode labels, custom pause text and retained unit toolbar. The paused
+toolbar has Source's natural height and hides interrupted time. In all captured
+cases card/toolbar/title/paragraph geometry agrees within 0.6 px; fonts, colors,
+spacing, borders and shadows agree exactly. The shared participant controller
+continues to own the Run and the ordinary interface keeps its existing surface.
+
+Unmodified Source `ee2ab9ab64bd91209ef8534bbe6005838024e46d` passes 42 frontend
+cases: Hot Return across three themes and desktop/mobile, Hot Restart in Primar
+at desktop, three timer leave policies, and visible/silent pause. Two more
+Source cases prove the configured termination lock. The matching 44 authenticated
+Rewrite browser cases use its real SQLite API, owned operator pause commands and
+trusted synthetic Verona input. Anonymous/foreign sessions, stale units/status,
+exact saved packets, interrupted timers and absent leave locks are checked.
+The 36 advisory, 57 completeness/visible-button and 43 normal-exit regression
+cases also pass to owned API shutdown: 180 successful browser cases in total.
+An extra PNG audit finds 44 exact card-body crops but zero exact full viewports;
+small differences remain at the header/toolbar and upper-card shadow overlap.
+Full pixel parity is therefore still open despite matching measured geometry
+and computed styles.
+Source frontend fixtures do not prove Source backend authorization; the pinned
+PHP controller/DAO and TestLog sources independently establish the lock event.
+This does not close the full Player UI row or untested navigation/custom-text
+and hidden-header combinations.
+
+Optional `expectedStatus` fences stale HTTP confirmations. Run, current unit,
+view and status are also checked after lazy loading, autosave, draft saving,
+preparation, confirmation and the response. A refresh observing this action's
+exact server result before HTTP completes is accepted; a newer remote pause
+cannot be erased by the old response. The production methods are exercised in
+frontend state tests, alongside native browser flow checks.
+
+All 1,128 unit/state tests pass (469 frontend), all 165 SQLite API tests and all
+701 PostgreSQL integration tests pass. PostgreSQL uses a fresh owned container
+and volume, removed afterwards. The new 44-case browser gate is mandatory in
+`ci:browser:quick`; the initial bundle stays at 469.99 kB under the unchanged
+470-kB limit. Existing budget warnings remain visible.
+
+Fresh standard/demo/production-secret PostgreSQL Compose checks (schema 52) and
+standalone SQLite Docker (schema 58) pass for application `9d9ec5754879`. Image
+`testcenter-rewrite-app:completeness-9d9ec5754879` is
+`sha256:c7190455bac4b65f100c8d304fd89582be76c9fe1fe6d3be4987f081c75f728d`,
+uses `node`, and declares build time `2026-10-10T15:36:01.071Z`. All owned test
+resources are removed. Exact inventories retain all 24 existing containers and
+85 volumes, and the protected PPTX checksum is unchanged. Lossless compression
+of one additional closed owned test database saves 106,082,263 bytes, with a
+verified SHA-256 round trip. After the current image build, 11 GiB remain free.
+
+Keep the negative evidence: 24 pre-correction memory-store pause cases failed
+with forced-completeness denial. The first Source probe looked for literal
+"Testpause" although Source resolves its default custom text. The first own card
+used that fallback and had the wrong width. Reusing the same paused participant
+across viewports then blocked a fixture's next Player load; each browser case now
+uses its own workspace. The old API expectation of a termination during visible
+pause caused the first SQLite/PostgreSQL replay to fail. Its replacement checks
+unchanged complete test-log lists against the observed Source behavior; corrected
+full replays pass. Failure logs and closed database evidence remain available.
+
+All eight full Original UI rows, physical-device acceptance, current remote CI,
+release and deployment acceptance remain open. Next establish Source's actual
+Shell/error and overlapping-action behavior, then widen Player/Review acceptance.
+
+### Starter exit advisory order (2026-10-10)
+
+Application checkpoint `f74f3f8512a1` follows Source's order of completeness,
+timer and leave-lock checks. In Demo/Review/Trial, an allowed timer is cancelled;
+other non-enforced timers are interrupted before a later confirmation opens.
+Cancelling that confirmation keeps the Run and current unit active, without
+restarting its timer, changing saved packets or applying a leave lock. A repeated
+attempt repeats the completeness notice but not the timer notice. Non-confirmed
+lock notices appear immediately; confirmed lock notices appear only after consent.
+A forced timed confirmation short-circuits the later leave-lock check.
+
+The preparation endpoint authorizes the participant's selected Run and current
+unit. Its effects come from stored execution policy; it cannot bypass forced
+completeness/time rules or persist preview packets. Saving modes use stored
+responses for completeness. Old foreground actions are fenced by Run, unit and
+view at lazy loading, autosave, draft save, preparation, confirmation and response.
+The optional current-unit guard on the final return request also rejects stale
+HTTP confirmations while retaining compatibility for existing API callers.
+
+Unmodified Source `ee2ab9ab` passes 36 owned frontend cases: three preview modes,
+three timer leave policies, unit/testlet locks and both confirmation settings.
+Their captured copy and notice order match all 36 authenticated Rewrite browser
+cases with the real SQLite API and trusted synthetic Verona input. The browser
+also checks anonymous/foreign-session rejection, stale units, unchanged packets
+and no implicit locks after staying. A separate forced-time Source probe records
+zero remaining time and termination without an additional unit leave-lock write.
+These fixtures do not prove Source backend authorization or full Player UI parity.
+
+All 1,031 local unit/state tests pass, including 444 frontend tests. All 165
+SQLite API and 605 PostgreSQL integration tests pass; PostgreSQL used a fresh
+owned container and volume, both removed after verification. The production
+initial bundle remains 469.99 kB under the unchanged 470-kB limit. The new browser
+gate is mandatory in `ci:browser:quick`.
+
+Keep the negative evidence: the first preparation implementation let status
+reads automatically resume an interrupted timer. A persisted interruption bound
+to the loaded unit fixes that; status/save, repetition and explicit resume are
+tested across all four stores. Native lifecycle copy initially used a UI timer
+projection without its identity/duration fields; the compiler caught it and the
+implementation now retains the actual current-state timer.
+
+Fresh isolated PostgreSQL Compose checks (standard/demo/production-secret,
+schema 52) and standalone SQLite Docker (schema 58) pass for application commit
+`f74f3f8512a1`. Image `testcenter-rewrite-app:completeness-f74f3f8512a1` has ID
+`sha256:c0304bf4c57342bafb8c69c8db21e54f273f14be2b0f8b35fbe1613d06033274`,
+revision `f74f3f8512a1`, user `node` and declared timestamp
+`2026-10-10T14:31:03.202Z`. All owned resources have been removed. Exact inventory
+checks retain all 24 pre-existing containers and 85 volumes; the protected PPTX
+checksum is unchanged. After the new image build, host availability is 12 GiB.
+The 57-case completeness/visible-button and separate 43-case normal-exit
+regressions both pass through owned API shutdown. Together with the new 36-case
+advisory matrix, this checkpoint has 136 successful browser cases. The later
+test-only refinement loads the pinned fixture before spawning its API and checks
+Source's actual `UNITS_LOCKED_AFTER_LEAVE` / `TESTLETS_LOCKED_AFTER_LEAVE` keys;
+all 36 captured advisory traces plus the forced-time trace have neither key.
+All eight full Original UI rows, physical-device acceptance, current remote CI,
+release and deployment acceptance remain open. Next compare paused exits and
+Shell/error/busy races, then widen Player and Review acceptance.
+
+### Completeness before starter exit (2026-10-10)
+
+A forced logo exit now checks the current unit's completeness before timed-block
+or leave-lock decisions. Direct return-to-starter requests cannot skip that check
+with confirmation flags. The API resolves the nearest testlet/root policy and
+projects it with the current unit; the frontend uses the newest local Player
+report instead of an older API packet. A denial leaves saved responses, locks,
+timer expiry and the running Run unchanged. Non-saving modes evaluate transient
+reports without persisting them. Monitor navigation overrides keep the separate
+forbidden-timer restriction.
+
+Unmodified Source ee2ab9ab confirms the ordering in 54 presentation/response/both
+cases and 18 legacy Verona 2 cases, across three themes, desktop/mobile and three
+leave policies. Two additional fresh-Player probes distinguish an absent response
+status from explicit incomplete progress. Source requires exactly `complete` for
+presentation; `complete-and-valid` is accepted for responses. The controller,
+Verona interfaces, InfoDialog and close SVG match their pinned Git blobs. These
+frontend probes use owned API/Player fixtures; they do not prove Source backend
+authorization or whole-page parity.
+
+The Original UI presents the native information dialog with one close button.
+The shared UI also offers only a close action. A malformed positive result cannot
+approve a denied exit. Run/view fences cover lazy loading, autosave settling,
+draft saving and the eventual HTTP response, so an obsolete exit cannot clear a
+replacement view or stop its event stream. The lazy policy and direct contracts
+subpath keep the unchanged 470-kB initial limit; the production build is 469.99 kB.
+
+Local checks pass all 868 unit/state tests (including 419 frontend tests and 47
+exit-method tests), 165 SQLite API integration tests and 421 PostgreSQL integration
+tests against a fresh owned container. The mandatory 57-case browser gate uses
+trusted Verona input, direct authenticated/anonymous/foreign-session HTTP calls,
+exact stored packets, timer/lock precedence, native focus/close behavior and
+Source dialog copy/geometry. Its visible close-button comparison uses real
+locator screenshots from all 72 Source cases, including fractional positions;
+off-screen transparent whole-page crops are not accepted as icon evidence.
+The final 57-case visible-button replay and the separate 43-case normal-exit
+regression both pass through owned API shutdown. The original animation timeout
+remains recorded; its precise cause is not established by the successful retry.
+
+Keep the negative evidence: the old API returned HTTP 200 for a forced incomplete
+exit; the initial implementation invented an absent response status and failed
+an existing execution-mode case. Explicit MatIconRegistry wiring and a contracts
+barrel re-export exceeded the initial bundle budget. The inline SVG first sat
+four pixels too low on desktop; Source's inline baseline/automatic icon height
+fixes it. A generic close-button hash failed for a differently sized response
+dialog; reference hashes are now captured separately for every state. A normal
+exit replay timed out while waiting for animations; its retry brings the owned
+page forward and preserves animation diagnostics on any repeated failure.
+
+### Current container and storage checkpoint (2026-10-10)
+
+Application tree ca54c32603bd passes fresh isolated standard, demo and
+production-secret PostgreSQL Compose runs at schema 52, plus the same image's
+standalone SQLite Docker runtime at schema 58. The local image is
+`testcenter-rewrite-app:completeness-ca54c32603bd`, revision ca54c32603bd, user
+`node`, image ID `sha256:09e3106f02f5f59b57718f7390c67038606b7d8374400cdb63ab2762d7407b54`.
+Its declared build timestamp is 2026-10-10T13:44:39.382Z. All owned projects have
+removed their containers and volumes after verification. The earlier a0f479d6
+image also passed these four container executions.
+
+Docker recovered from a stopped engine after a bounded Desktop restart. Two
+completed owned SQLite artifacts were losslessly compressed and checksum-verified,
+saving 212,118,099 bytes. A further 1.269 GB of unused Docker build cache was removed after the current
+builds. Exact inventories retain all 24 pre-existing containers and 85 volumes;
+the protected PPTX checksum is unchanged. The final measured host availability is 13 GiB. Complete Original UI rows, physical-device acceptance, remote CI,
+release and deployment acceptance remain open. Continue with unforced timer/lock
+advisory ordering on exit and the remaining Shell/error/busy and wider Player/
+Review matrices; the visible-button and normal-exit replays are now closed.
+
+
+### Earlier f099540e container checkpoint (2026-10-10)
+
+The application tree f099540e now has a fresh local Docker image, three successful
+isolated PostgreSQL Compose runs (standard/demo/production secret), a successful
+SQLite Docker runtime gate at schema 58, and 233 passing host-API integration
+tests against an owned PostgreSQL container. Every owned test container/volume
+was removed; exact inventories preserve all pre-existing 24 containers/85 volumes
+and the protected PPTX. Further unused build-cache cleanup freed 439.4 MB; the
+last measured host availability is 8.6 GiB. See the current container section in
+PARITY.md for proof scope. Complete Original UI and deployment acceptance remain
+open. That previously pending exit contract is implemented and validated in the current
+completeness checkpoint above.
+
+### Original in-player logo exit and hidden header (2026-10-10)
+
+The optional Original Player now opens the native Material confirmation used by
+unmodified Source ee2ab9ab. A saved exit asks "Sicher, dass du den Test beenden
+möchtest?" without an extra saved-progress paragraph. A timed-block or leave-lock
+warning is folded into that one question. Source's restriction labels reverse
+the native result: "Hier bleiben" stays, "Trotzdem weiter" continues. Primar fills
+the first native false-result button; Sekundar/Erwachsene retain outlined order.
+A forced forbidden timer reports the Source toast and never opens a dialog.
+The shared Rewrite labels/renderer and server restrictions remain in use.
+
+Source's hidden header has a 48px positioned logo wrapper and an inline native
+link, whose measured hit rectangle differs from the image. Both visible and
+hidden header geometry now follow that actual DOM. Replacing an open dialog uses
+Material-generated IDs and keeps the original live focus trigger; destruction
+unsubscribes before closing. Weak focus references do not retain detached views.
+The parent rejects old overlay results, and the exit action fences its awaited
+confirmation against a changed Run or view lifecycle.
+
+The read-only Source helper covers 36 combinations: three themes, desktop/mobile,
+visible/hidden header, and plain/confirm/forbidden exit. Its API and synthetic
+Player fixtures establish frontend behavior, not Source backend authorization.
+The actual logo/image and 24 native dialog geometry/style/copy measurements are
+pinned in scripts/fixtures/original-player-exit.json. Caller revision metadata
+must still be verified against the unmodified Source build externally. Reproduce
+with ORIGINAL_PLAYER_REFERENCE_ROOT, ORIGINAL_PLAYER_REFERENCE_COMMIT and a fresh
+absolute UI_SMOKE_ARTIFACT_DIR, then reference:ui:original-player-exit:built.
+
+The new mandatory ci:browser:quick gate owns its real SQLite API and credentials.
+Its 36 Original cases check trusted Verona answers and exact stored packets,
+modified activation, native focus trap/Escape/backdrop/stay, one confirmed exit,
+cancelled timer state, and an actual forbidden-return 409. It also checks native
+dialog replacement, a deliberately missing lazy bundle's guarded fallback, and
+six shared Rewrite cases. Only the injected missing-bundle case models no Service
+Worker in its owned top frame; the normal matrix keeps production Worker behavior
+and the opaque Verona sandbox. Actual request failures stay fatal through child/stream
+shutdown. The 24 production-method tests exercise scoped timer/lock copy, reversed
+results, destroyed/replaced overlays, live focus ownership and changed Run/view
+fences; the complete frontend suite has 396 tests. Production build/typecheck
+retain the 470-kB initial limit (469.99 kB). The existing 24-state protected Review
+workflow and native header/read-only Starter gate also pass. The final 43-case
+exit gate succeeds through owned API shutdown. The settled broader participant
+entry/leave/resume/logout slice has 1,283 requests, zero actual API failures/5xx,
+and orderly shutdown at participant-entry-start-after-sign-in. This is a bounded
+local replay; it does not replace the complete browser/Compose matrix.
+
+Keep the negative observations. The initial Source forbidden check accidentally
+read the older timer snackbar instead of the current toast stack; the final
+helper waits for the exact denial text. The first own check exposed inherited
+logo fonts/inline hit geometry. Dialog replacement exposed a real detached-focus
+regression and one comparison captured the replacement's intermediate animation;
+the final gate waits for settled animation. The shared single-booklet login
+already starts its Player; the test must not click a disappearing Starter button.
+The first bundle-failure injection was satisfied by the Worker cache and did not
+block a request. Playwright's Worker-block shim then threw in the opaque iframe;
+the final injection models absent Worker support only in the owned top frame and
+requires an actually blocked bundle. The shared fallback passes an explicit
+request context and rejects obsolete results. The broad native cancellation flow
+now waits for Material dismissal before opening its next confirmation.
+A broad smoke initially reused demo bootstrap credentials with a different first-
+admin password; repeat on a fresh owned, non-demo database. Complete PNGs retain
+Player/notification/background differences, so no complete Original UI row,
+physical hardware, remote CI, new container image, deployment or production
+acceptance is closed here. The protected PPTX and user stores are preserved.
+This checkpoint is local and unpublished; continue remaining whole Player/Shell,
+error/busy and production acceptance.
+
+## Native logo and read-only Starter continuation (2026-10-10)
+
+The optional Original header now uses the Source's native logo link, label,
+image alt text and settled Material tooltip. Primary/Enter activation on login
+clears the form and returns to blank entry; Ctrl/Meta activation clears both
+the originating and newly opened login tab, as independently observed on Source.
+On the authenticated Starter, Source cancels modified activation; the Rewrite
+preserves that behavior. Copy/open-link destinations retain only UI, workspace
+scope and session ID, never credentials or a selected Run. The normal in-player
+logo still uses the existing leave confirmation and server restrictions.
+
+A separately opened Starter uses the authorized runtime-state GET. It never
+loads player state, resumes/resets a Run, drains another tab's pending save
+outbox or emits player-load logs. The view clears its cached player presentation
+only after authorization and the lifecycle fence; existing non-saving re-entry
+semantics stay separate. Both fresh and running sessions are covered in
+run-hot-return, run-demo, run-review and run-simulation. Anonymous and foreign
+session links remain denied. Pending own authentication also prevents a logo
+reset from clearing its credentials. The default Rewrite button remains shared
+with the lazy Original failure fallback.
+
+All 48 complete initial/native-focus/Caps-Lock/rejection RGBA pairs and all
+12 complete settled-tooltip pairs match unmodified Source ee2ab9ab byte-for-byte
+across three themes and four widths. The Source helper separately passes twelve
+participant-login, twelve admin-login and twelve Starter header cases; API
+fixtures establish frontend behavior only. The own real SQLite header gate
+covers 24 participant/admin entry cases and eight authorized Starter cases,
+including native modified activation, no Run mutation, unchanged stored answers
+and pending save outbox, and anonymous/foreign-session rejection. It is part of
+ci:browser:quick and observes actual API failures through child/stream shutdown.
+The protected admin gate additionally passes its 24 real challenges, HTTPS,
+access-window and failed-asset/chunk cases. The 372-test frontend suite (including
+66 entry/protection cases), typecheck and unchanged 470-kB production limit pass;
+the initial bundle is 469.99 kB. The bounded normal entry/leave/resume/logout
+flow has 1,201 requests with zero actual API failures/5xx and orderly shutdown.
+
+Keep the negative observations: native href is #/r/login, tooltip surfaces do
+not have the assumed named role, and intermediate animation geometry differs
+from settled geometry. Loading an empty style host as a flex child initially
+moved the logo; the final hidden style host restores all full-page comparisons.
+An overlapping rebuild invalidated a previously loaded chunk in one broad
+browser run; the repeat used stable assets and passed. The first fresh-session
+snapshot incorrectly expected current-state GET success; a fresh session has
+no Run. The final Starter reads runtime-state directly, also avoiding player
+save/log side effects. No complete Original UI row, physical camera/keyboard,
+remote CI, new Docker image, deployment or production acceptance is claimed.
+Earlier complete Compose/full-browser evidence belongs to the preceding tree.
+The protected PPTX and user data are preserved. This checkpoint is local and
+unpublished; continue with remaining Shell/error/busy, hidden-header/timer and
+whole-flow Original acceptance.
+
+## Participant alert and native form reset continuation (2026-10-10)
+
+On `testcenter-production-readiness`, Original participant errors/Caps Lock now
+use the current Source's alert geometry, inherited text color, error/warning
+SVGs and native icon shrinking. Rejected login resets the submitted/touched
+template form as well as clearing credentials, eliminating the premature red
+name field. Text uses interpolation and authorization/secret clearing remain
+shared. Twenty-four full-page RGBA error/warning pairs and all notice geometry
+are exact against unmodified `ee2ab9ab`; the paragraph baseline fails all 24.
+The intermediate no-form-reset images remain as negative evidence.
+
+Participant HTTPS notices have twelve exact geometry comparisons and eleven
+exact full-page pairs; retain one Primar/1280 pair with 25 differing text pixels.
+Admin HTTPS Source fixtures are separately measured. The portable Source helper
+passes twelve normal focus/alert cases plus twelve real-insecure participant
+and twelve admin cases, with no unknown requests/page errors. Add
+`ORIGINAL_LOGIN_REFERENCE_INSECURE=true` for HTTPS notices and
+`ORIGINAL_LOGIN_REFERENCE_ENTRY=admin` for the admin mode, with separate owned
+artifact directories and externally verified Source/build revision.
+
+Protected/headful SQLite participant gates pass both scope configurations, all
+24 login cases, 38 real participant proof challenges, password authorization,
+name reload and second-code blocking. The admin gate passes twelve cases, six
+Original HTTPS comparisons, 24 real browser proof challenges, access windows
+and asset/chunk recovery. Twenty-six actual method tests, typecheck and the
+469.44-kB production build pass. Keep the initial failed assumptions: fixed 24px
+icons, literal false instead of Material's unset empty-required `aria-invalid`,
+and absolute coordinates after native focus scrolling. Gates retain exact
+notice-local geometry, 24px field gap, pristine/untouched/unsubmitted state and
+strict no-request blocking. Source itself probes the fixture name once;
+Rewrite's stronger zero-request protection remains. No complete UI row, physical
+hardware, remote CI, deployment or production acceptance is claimed. Earlier
+full browser/Compose proofs belong to the preceding tree. Continue with actual
+Source logo-link/navigation semantics and remaining error/busy states; preserve
+the protected PPTX and user data. No publication occurred.
+
+## Native participant entry focus continuation (2026-10-10)
+
+On `testcenter-production-readiness`, Original participant entry now uses
+Source's native first-password autofocus and no repeated name-focus effect.
+The baseline differs in 24/36 actual focus states; the corrected tree matches
+all 72 states across three themes and four widths. Back retains the name;
+invalid credentials clear it without forcing focus. Native keyboard order is
+logo/welcome scroll/name, observed independently on unmodified Source. Source
+logo remains a link versus Rewrite's button; do not call the entire entry row
+closed. Six desktop/mobile initial full-page RGBA pairs match without manual
+focus normalization. Retain the wider matrix's 113-pixel Primar/600px difference
+and exact fresh repeat; they do not establish deterministic full-page identity.
+
+The portable `reference:ui:original-login-focus:built` passes twelve current
+Source cases with owned rejected-login fixtures, no unknown API paths and no
+page errors. Its revision field is a caller assertion; verify Source/build
+externally before running. Protected real Rewrite login passes twelve cases,
+38 real proof challenges, saved/explicit names, HTTPS blocking and second code.
+The main bounded entry/logout/re-entry flow passes same Run/answers, revoked
+old token and strict API/shutdown checks: 1,161 requests, zero actual failures,
+owned port 60107 closed. Seventeen protection-method tests, typecheck and
+469.44-kB production build pass. The preceding complete browser/Compose results
+belong to the earlier tree, not a new whole-tree replay. Preserve the negative
+short-secret startup and initially wrong Tab-assumption logs; both were fixed
+without weakening the 32-character secret or any gate. No publication, remote
+CI, full Original UI, physical hardware or production acceptance is claimed.
+
+## Recovered storage and container execution (2026-10-10)
+
+The user authorized freeing space to resume container tests. Docker's actual
+host log confirms `init.log` write `ENOSPC`. Host availability increased from
+about 1.8 GiB to 12 GiB by clearing verified unused npm/Angular/Nx/Docker build
+and dangling-image caches; it remains about 10–11 GiB after rebuilding. Existing
+user data, 24 unrelated containers, 85 volumes and the protected PPTX remain.
+Only the aborted own project's four containers were removed. Its volume and
+the real failure logs remain. Root-owned/unverifiable caches were not forced.
+After its regular restart timed out, the unresponsive verified Docker processes
+were stopped and Desktop restarted; the Docker API now responds normally.
+
+Fresh own standard, demo and production-secret Compose projects pass PostgreSQL
+schema 52, build metadata, runtime preflight, non-root execution and the existing
+production bootstrap/authentication assertions. Their synthetic generated
+volumes are normally cleaned up. That freshly built production image also
+passes the standalone SQLite Docker runtime gate at schema 58.
+Separately, all 233 PostgreSQL integration tests pass without skips/cancellations
+on a labelled own tmpfs database, and
+its container is stopped. Keep the earlier masked SQLite cause unresolved;
+confirmed Docker `ENOSPC` does not establish that lost exception. The older
+failed Compose gate below is historical and now has a successful fresh replay.
+These are local checks; no new remote CI, deployment or production proof exists.
+
+The complete protected/headful SQLite browser replay now passes its strict
+server-failure gate through teardown, with 12,911 completed requests and zero
+actual failures/5xx. It passes the formerly failing IB stage, normal Attachment
+capture/upload/preview/deletion, six observed QR-worker releases and exact
+47/47 group-result log deletion. Its own API port 57894 is closed. No owned test
+container/process remains; the final inventory still has the same 24 unrelated
+containers and 85 preserved volumes. The successful own DB/log/screenshots and
+the earlier failure evidence remain. Do not replace these local proofs with a
+claim of full Original UI, physical hardware, remote CI or production acceptance.
+
+## Original entry overflow continuation (2026-10-10)
+
+Continue on `testcenter-production-readiness`; `cb8d0066` records the SQLite
+failure-cause and strict browser-server gate correction below. Participant and
+admin login now retain the current Source's footer overflow outside AppRoot,
+with window clipping scoped to html/body. Twelve unmasked full-page RGBA pairs
+match the byte-verified Source `ee2ab9ab`, across both surfaces, three themes
+and desktop/mobile, in equivalent pristine focused name states. Initial
+participant focus remains different. Both protected/headful production login
+gates pass their four-width matrix and actual navigation/error/recovery cases;
+the actual-text overflow assertion fails the admin baseline. Starter has no
+Source footer and is unchanged. Build remains 469.44 kB under the 470-kB limit.
+Retain the baseline screenshots and negative guard log; this is bounded entry
+proof, not full Original UI acceptance.
+
+## SQLite failure handling continuation (2026-10-10)
+
+Local checkpoints `3e337dfa` and `894042eb` preserve capture ownership and
+neutral participant entry. Continue on `testcenter-production-readiness`.
+The subsequent store correction preserves the primary failure in all ten
+transaction catch paths when SQLite has already rolled back; unexpected
+rollback errors retain both causes. Seven real-store cases include bounded
+`SQLITE_FULL`, true SQL rollback, atomic retry, migration, challenge consumption
+and busy COMMIT. Baseline: four failures out of five, no cancellations. Current:
+668 unit/frontend and 165 SQLite API cases pass. The protected real HTTP
+negative check confirms generic 500, original private cause in logs, no rejected
+data and one exact log after idempotent retry.
+
+The full UI harness now checks its own structured API output for failed
+requests/5xx at full/early completion and after shutdown, with streams drained
+before the success message. Its six helper cases pass. The former browser log
+correctly fails this stricter gate. Keep the original incident's primary storage
+cause unresolved; do not infer disk-full or Docker causation from its masked
+error. The complete stricter headful/protected SQLite UI run fails at the
+IB-family stage with a test-log POST 500 (`unable to open database file`), then
+actual log-output `ENOSPC`. Its owned API port 54778 is closed and no matching
+API/browser processes remain. Keep the failure database/log; this is no clean
+complete browser run. Three completed own synthetic DBs now have byte-exact
+SHA-256-verified gzip archives in chat work, recovering about 261 MiB without
+removing the diagnostics. The separate bounded protected/headful SQLite
+attachment flow passes normal capture/upload/preview/deletion, releases six
+workers and completes the strict early-exit/shutdown gate with zero API failed
+requests/5xx. Docker production Compose remains open at the actual overlay2
+I/O failure. Avoid another full corpus/container replay until stable host
+storage headroom is established; do not reset/prune unrelated resources.
+
+## Neutral entry, fresh Source and local container boundaries (2026-10-10)
+
+The initial runtime login/group now start empty instead of synthetic
+`student-ui`/`group:student-ui`. The protected production login gate passes fresh
+blank/disabled entry in both interfaces, twelve saved/explicit-link cases with
+native reload and zero sign-in requests, all three themes, real password login,
+second-code and existing four-width geometry checks. All 361 frontend-state
+cases, typecheck and the 469.44-kB production build pass. Defaults alone change;
+saved participant inputs and explicit entry parameters still hydrate normally.
+
+Fresh Source `ee2ab9ab` builds from frontend/common/definitions, with all 398
+tracked blobs verified byte-exact, including symlinks. Its own equal frontend
+fixtures and the own protected Rewrite SQLite API have zero page errors and
+unknown requests. The same pristine-focused-name desktop state matches all
+pixels in Primar/Sekundar/Erwachsene. Preserve the separate initial-focus and
+mobile 847/844px height differences; no full UI row is closed. Earlier prototype
+captures had unequal touched state, and its first ARIA assertion incorrectly
+expected Source's absent valid-state attribute to be the string `false`.
+Neither negative prototype is product evidence. Current unmodified Source's
+camera reference still fails twelve initial/native-reload/re-entry states with
+`video.nativeElement`, zero streams/lookups and diagnostic exit 2.
+
+Own image `testcenter-rewrite-app:production-readiness-20261010` builds and
+passes standalone non-root SQLite runtime smoke, schema 58, with local metadata
+`local-3e337dfa-neutral-entry`. The own production Compose attempt
+`testcenter-readiness-20261010-prod` uses ports 54839/54840 and fails in Docker
+`overlay2` with actual `input/output error`. Its cleanup cannot remove the own
+API container, and the daemon subsequently reports that Desktop cannot start.
+Preserve the real log, and inspect/clean only that owned project after Docker
+recovers. Do not prune unrelated images/volumes, reset Desktop or claim a
+passing Compose gate. Only the verified chat-owned Source build caches were
+removed; its source, built browser assets and evidence remain available. The
+full own protected SQLite browser run completes its assertions, including
+47/47 group deletion and six attachment workers. Its server log nevertheless
+contains one test-log POST 500 (`cannot rollback - no transaction is active`).
+Do not treat its exit 0 as clean runtime acceptance. Investigate the primary
+SQLite error, which the unconditional rollback currently masks; the original
+failure's cause is not established by the Docker failure or low disk space.
+
+## Local attachment ownership correction (2026-10-10)
+
+Continue from current main `143dc3e73ae83f379de4b2fe38edef25c7286a4a` on the
+local neutral branch `testcenter-production-readiness`. Fresh main workflow
+`38000558022` completes 37/37; it is baseline evidence, not CI for this change.
+The correction binds native camera encoding, QR lookup and uploads to the
+scope, target, stream/photo and operation that started them. Reset/retake/target
+replacement expire old results; old upload bytes cannot start a request after
+scope changes, and old results cannot clear newer busy state. Manual/saved-QR
+target replacement clears the old photo; live QR capture retains its new frame.
+
+Initial 32 actual-method baseline cases reproduce 27 failures without cancelled
+tests. The unmodified production build also fails the protected native browser
+reset case with the actual encoded PNG callback delayed. Corrected production
+assets pass that full protected headful SQLite Attachment slice, six released
+workers and 1280/390px checks, plus the separate generated live-camera sequence.
+All 54 lifecycle regressions, 601 existing regular checks, 61 compatibility cases
+and 165 SQLite API cases pass. Typecheck/build pass with unchanged 469.46-kB
+initial output under the 470-kB limit; both fresh audits report zero findings.
+Evidence belongs to the owning local chat's `work/attachment-*`, `work/build.log`,
+`work/unit-all.log`, `work/compatibility.log` and `work/integration-sqlite.log`.
+
+No publication or deployment is authorized by this checkpoint. Preserve the
+untracked migration presentation (SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`).
+Continue remaining Original full-page comparisons, camera/printed-page work and
+production/recovery acceptance. Do not convert local passing focused tests or
+the historical Source camera failure into full parity or production proof.
+
 ## Latest Quick CI evidence retention (2026-10-09)
 
 Head `6221bbdd` Push `37986888156` finishes with 36 successful jobs and one

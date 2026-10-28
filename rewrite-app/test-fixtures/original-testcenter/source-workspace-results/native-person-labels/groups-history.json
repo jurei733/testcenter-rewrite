@@ -1,0 +1,2759 @@
+[
+  {
+    "afterCheck": "native no-code sign-in directly establishes the real person and both Booklet assignments",
+    "value": []
+  },
+  {
+    "afterCheck": "creating a Test without opening its Booklet creates no result row or stateful Test-Session",
+    "value": []
+  },
+  {
+    "afterCheck": "creating a Test without opening its Booklet creates no result row or stateful Test-Session",
+    "value": []
+  },
+  {
+    "afterCheck": "creating a Test without opening its Booklet creates no result row or stateful Test-Session",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803879
+      }
+    ]
+  },
+  {
+    "afterCheck": "opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803879
+      }
+    ]
+  },
+  {
+    "afterCheck": "opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803881
+      }
+    ]
+  },
+  {
+    "afterCheck": "opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803882
+      }
+    ]
+  },
+  {
+    "afterCheck": "opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803883
+      }
+    ]
+  },
+  {
+    "afterCheck": "opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803883
+      }
+    ]
+  },
+  {
+    "afterCheck": "locking and same-value relocking advance Test time without nonempty Test state or Unit rows",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803883
+      }
+    ]
+  },
+  {
+    "afterCheck": "locking and same-value relocking advance Test time without nonempty Test state or Unit rows",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803883
+      }
+    ]
+  },
+  {
+    "afterCheck": "a definition read does not create a saved Unit; pre-initialization logs are rejected without a Unit row",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803883
+      }
+    ]
+  },
+  {
+    "afterCheck": "a definition read does not create a saved Unit; pre-initialization logs are rejected without a Unit row",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803883
+      }
+    ]
+  },
+  {
+    "afterCheck": "a persisted state-and-log Unit counts without answers or a stateful Test-Session",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803884
+      }
+    ]
+  },
+  {
+    "afterCheck": "stateful Test-Session listing and opened-Booklet result listing have different inclusion rules",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 3,
+        "numUnitsAvg": 1.5,
+        "lastChange": 1792803884
+      }
+    ]
+  },
+  {
+    "afterCheck": "group statistics aggregate saved Unit rows across Booklets including log-only Units",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 3,
+        "numUnitsAvg": 1.5,
+        "lastChange": 1792803884
+      }
+    ]
+  },
+  {
+    "afterCheck": "group statistics aggregate saved Unit rows across Booklets including log-only Units",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 2,
+        "numUnitsMin": 1,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 3,
+        "numUnitsAvg": 1.5,
+        "lastChange": 1792803884
+      }
+    ]
+  },
+  {
+    "afterCheck": "RO selected-Test deletion returns 403 without changing results or Test-Session listing",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      }
+    ]
+  },
+  {
+    "afterCheck": "RO selected-Test deletion returns 403 without changing results or Test-Session listing",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      }
+    ]
+  },
+  {
+    "afterCheck": "selected-Test deletion retains the same person token, unrelated Booklet answer and assignment; relaunch creates a new empty Test",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      }
+    ]
+  },
+  {
+    "afterCheck": "actual selected reviews-enhanced CSV and JSON contracts",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      }
+    ]
+  },
+  {
+    "afterCheck": "actual selected reviews-enhanced CSV and JSON contracts",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      }
+    ]
+  },
+  {
+    "afterCheck": "deleting a Unit review retains the saved unanswered Unit, its response export and group counts",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      }
+    ]
+  },
+  {
+    "afterCheck": "deleting a Unit review retains the saved unanswered Unit, its response export and group counts",
+    "value": [
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "Before code",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      }
+    ]
+  },
+  {
+    "afterCheck": "credential login freezes group label before person code; later roster import does not rewrite the snapshot",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "Before code",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      }
+    ]
+  },
+  {
+    "afterCheck": "production german2_ci merges case and Unicode composition, retains first group label and distinguishes accents",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      }
+    ]
+  },
+  {
+    "afterCheck": "production german2_ci merges case and Unicode composition, retains first group label and distinguishes accents",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "whole-group result deletion removes the snapshot and next login captures the current authored label",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native XML group label preserves pad",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native XML group label preserves white",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native empty XML group label fails login before password validation and captures no snapshot",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native XML group label preserves entities",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native XML group label preserves numeric",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native XML group label preserves literal",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native XML group label preserves greater",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native XML group label preserves once",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native XML group label preserves once",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.MONITOR-FIRST",
+        "groupLabel": "  Monitor first Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "native monitor credential login captures the group before any participant person exists",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.IDENTITY",
+        "groupLabel": "  Identity original Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.MONITOR-FIRST",
+        "groupLabel": "  Monitor first Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "Test listing retains its first stored Booklet label after live file replacement while new Tests use the current label",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.IDENTITY",
+        "groupLabel": "  Identity original Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.MONITOR-FIRST",
+        "groupLabel": "  Monitor first Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.NEW-LABEL",
+        "groupLabel": "New label group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "Test listing retains its first stored Booklet label after live file replacement while new Tests use the current label",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "oracle.identity",
+        "groupLabel": "  Identity original Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.MONITOR-FIRST",
+        "groupLabel": "  Monitor first Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.NEW-LABEL",
+        "groupLabel": "New label group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "case-equivalent group reentry updates result group spelling but Test listing retains snapshot spelling",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "oracle.identity",
+        "groupLabel": "  Identity original Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.MONITOR-FIRST",
+        "groupLabel": "  Monitor first Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.NEW-LABEL",
+        "groupLabel": "New label group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "case-equivalent group reentry updates result group spelling but Test listing retains snapshot spelling",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.MONITOR-FIRST",
+        "groupLabel": "  Monitor first Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.MOVED",
+        "groupLabel": "  Moved current Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803891
+      },
+      {
+        "groupName": "ORACLE.NEW-LABEL",
+        "groupLabel": "New label group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "successful reentry moves existing person Tests to the current Login group without recreating person or Test",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.MONITOR-FIRST",
+        "groupLabel": "  Monitor first Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.MOVED",
+        "groupLabel": "  Moved current Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803891
+      },
+      {
+        "groupName": "ORACLE.NEW-LABEL",
+        "groupLabel": "New label group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  },
+  {
+    "afterCheck": "deleting a former group snapshot retains the person and Test already moved to another group",
+    "value": [
+      {
+        "groupName": "ORACLE.COLL.Cafe",
+        "groupLabel": "Accent distinct",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.COLL.Café",
+        "groupLabel": "Case first",
+        "bookletsStarted": 3,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803886
+      },
+      {
+        "groupName": "ORACLE.GROUP",
+        "groupLabel": "Owned source group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 2,
+        "numUnitsMax": 2,
+        "numUnitsTotal": 2,
+        "numUnitsAvg": 2,
+        "lastChange": 1792803884
+      },
+      {
+        "groupName": "ORACLE.LABEL.EMPTY",
+        "groupLabel": "  Recovered empty Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ENTITIES",
+        "groupLabel": "A & B \"Q\" 'S' <tag>",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.GREATER",
+        "groupLabel": "  A > B <C>  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.LITERAL",
+        "groupLabel": "A B C D E",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.NUMERIC",
+        "groupLabel": "A\nB\tC\rD 🚀",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803888
+      },
+      {
+        "groupName": "ORACLE.LABEL.ONCE",
+        "groupLabel": "&lt; &#10; &amp;",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.LABEL.PAD",
+        "groupLabel": "  Padded Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.LABEL.WHITE",
+        "groupLabel": "   ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      },
+      {
+        "groupName": "ORACLE.MONITOR-FIRST",
+        "groupLabel": "  Monitor first Ω  ",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803889
+      },
+      {
+        "groupName": "ORACLE.NEW-LABEL",
+        "groupLabel": "New label group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803890
+      },
+      {
+        "groupName": "ORACLE.REVIEWS",
+        "groupLabel": "Owned review group",
+        "bookletsStarted": 1,
+        "numUnitsMin": 1,
+        "numUnitsMax": 1,
+        "numUnitsTotal": 1,
+        "numUnitsAvg": 1,
+        "lastChange": 1792803885
+      },
+      {
+        "groupName": "ORACLE.SNAPSHOT",
+        "groupLabel": "After roster import",
+        "bookletsStarted": 1,
+        "numUnitsMin": 0,
+        "numUnitsMax": 0,
+        "numUnitsTotal": 0,
+        "numUnitsAvg": 0,
+        "lastChange": 1792803887
+      }
+    ]
+  }
+]

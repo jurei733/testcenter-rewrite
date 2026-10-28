@@ -10,7 +10,7 @@ import { hasMeaningfulVeronaResponse, parseVeronaUnitResponse, serializeVeronaUn
 const source = readFileSync(new URL("../apps/web/src/app/participant-view.facade.ts", import.meta.url), "utf8");
 const ast = ts.createSourceFile("participant-view.facade.ts", source, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
-const methods = ["player", "goToPreviousUnit", "goToNextUnit", "effectiveNavigationDeniedReasons", "canRequestUnitNavigation"].map(name => {
+const methods = ["isControllerTimerInterrupted", "player", "goToPreviousUnit", "goToNextUnit", "effectiveNavigationDeniedReasons", "canRequestUnitNavigation"].map(name => {
   const member = declaration?.members.find(node => (ts.isMethodDeclaration(node) || ts.isGetAccessorDeclaration(node)) && node.name.getText(ast) === name);
   assert.ok(member, `The production ${name} method must exist.`);
   return member.getText(ast);

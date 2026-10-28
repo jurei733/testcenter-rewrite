@@ -1,0 +1,409 @@
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
+import { chromium } from "playwright";
+import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
+import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
+import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
+import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
+
+// Actual production bundles, authenticated SQLite API and trusted Verona input.
+// Source formatter/parser/config contracts are verified separately against pinned excerpts.
+const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
+await access(join(root, "dist/apps/web/browser/index.html"));
+const scratch = await mkdtemp(join(tmpdir(), "testcenter-participant-debug-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, "participant-debug") : scratch;
+await mkdir(artifacts, {recursive: true});
+console.log(`owned_artifacts=${artifacts}`);
+const file = join(scratch, "owned.sqlite"), gate = createServerRequestFailureGate();
+const module = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
+const server = spawn(process.execPath, ["--input-type=module", "-e", `
+ import { createProductionApiServer } from ${JSON.stringify(module)};
+ const server=await createProductionApiServer();
+ server.listen(0,'127.0.0.1',()=>process.send({port:server.address().port}));
+ process.once('SIGTERM',()=>server.close(()=>process.exit(0)));
+`], { cwd: root, env: { ...process.env, FIRST_SLICE_STORE: "sqlite", FIRST_SLICE_SQLITE_FILE: file,
+  FIRST_SLICE_BOOTSTRAP_DEMO: "true", FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", FIRST_SLICE_PROOF_OF_WORK_SCOPES: "",
+  FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", REQUIRE_LOGIN_PASSWORD: "false" }, stdio: ["ignore", "pipe", "pipe", "ipc"] });
+gate.observeStream(server.stdout); gate.observeStream(server.stderr);
+const closed = new Promise(done => server.once("close", done));
+const errors = [], checks = [], requests = [], nativeRequests = [], progressRequests = [];
+let browser, page, releaseSnapshot, releasePauseCompletion;
+const poll = async (predicate, message) => {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) { if (await predicate()) return; await delay(100); }
+  throw Error(message);
+};
+try {
+  const port = await new Promise((done, reject) => {
+    const timer = setTimeout(() => reject(Error("Owned API startup timed out")), 20_000);
+    server.once("message", ({ port }) => { clearTimeout(timer); done(port); });
+    server.once("error", error => { clearTimeout(timer); reject(error); });
+    server.once("exit", () => { clearTimeout(timer); reject(Error("Owned API exited before startup")); });
+  });
+  const base = `http://127.0.0.1:${port}`;
+  const api = async (path, body, token, method = body === undefined ? "GET" : "POST") => {
+    const response = await fetch(base + path, { method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(body === undefined ? {} : { "content-type": "application/json" }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    assert.ok(response.ok, `${method} ${path}: ${response.status} ${await response.clone().text()}`); return response.json();
+  };
+  const operator = (await api("/api/v1/admin/auth/sign-in", { username: "demo-admin", password: "demo-admin-password" })).sessionToken;
+  const workspaceKey = "owned-debug", workspace = `/api/v1/tenants/demo-tenant/workspaces/${workspaceKey}`;
+  await api("/api/v1/tenants/demo-tenant/workspaces", { workspaceKey, displayName: "Owned debug browser" }, operator);
+  const content = JSON.parse(localDemoSourcePackage.sourceDocument);
+  const immediateReady = `setTimeout(() => parent.postMessage({
+          type: "vopReadyNotification",
+          metadata: { specVersion: "6.0" }
+        }, "*"), 0);`;
+  assert.ok(content.playerEntries[0].html.includes(immediateReady), "Owned readiness gate must replace the real Demo Ready notification");
+  // Keep the real Player startup metadata and protocol, changing only the owned response fixture.
+  content.playerEntries[0].html = content.playerEntries[0].html
+    .replace(immediateReady, `const ready = () => parent.postMessage({type:"vopReadyNotification",metadata:{specVersion:"6.0"}},"*");
+        addEventListener("message", event => {
+          if (event.source !== parent || event.data?.type !== "ownedDebugReleaseReady") return;
+          ready();
+        });
+        parent.postMessage({type:"ownedDebugReadyRequested"},"*");`)
+    .replace('dataParts: { answer: answer.value },', 'unitStateDataType: "iqb-standard@1.0", dataParts: { answer: JSON.stringify([{id:"x",status:"CODING_COMPLETE",value:answer.value,code:Number(answer.value),score:Number(answer.value)}]) },')
+    .replace('answer.value = String(event.data.unitState?.dataParts?.answer || "");', 'try { answer.value = JSON.parse(event.data.unitState?.dataParts?.answer || "[]")[0]?.value || ""; } catch { answer.value = ""; }')
+    .replace('<textarea id="demoPlayerAnswer"', '<button id="ownedDebugError">Owned runtime error</button><textarea id="demoPlayerAnswer"')
+    .replace('answer.addEventListener("input", () => {', 'document.querySelector("#ownedDebugError").addEventListener("click",()=>parent.postMessage({type:"vopRuntimeErrorNotification",sessionId,code:"owned-debug-error",message:"Owned debug error"},"*")); answer.addEventListener("input", () => {');
+  const unit = content.bookletEntries[0].unitEntries[0];
+  content.bookletEntries = [{ bookletKey: "first", displayLabel: "First debug booklet", customTexts: { owned_token: "Booklet override Ω" },
+    config: { toolbar_show_unit_list: "FALSE", toolbar_show_reload_button: "FALSE", toolbar_show_fullscreen_button: "FALSE", lock_test_on_termination: "OFF" },
+    testletEntries: [{ testletKey: "timed", displayLabel: "Timed", parentTestletKey: null, restrictions: { timeMax: { minutes: 5, leave: "none" } } },
+      { testletKey: "private-gate", displayLabel: "Private gate", parentTestletKey: "timed", restrictions: { codeToEnter: { code: "OWNED_PRIVATE_CODE_Ω", prompt: "Owned prompt" } } },
+      { testletKey: "private-child", displayLabel: "Private child", parentTestletKey: "private-gate", restrictions: {} }],
+    unitEntries: [{ ...unit, unitKey: "first-unit", originalUnitId: "original-first", displayLabel: "First unit", testletPath: ["timed"] },
+      { ...unit, unitKey: "next-unit", displayLabel: "Next unit", testletPath: ["timed", "private-gate", "private-child"] }],
+    stateEntries: [{ stateKey: "level", displayLabel: "Level", options: [
+      { optionKey: "high", displayLabel: "High", conditions: [{ source: { type: "Score", unitKey: "first-unit", variableKey: "x", defaultValue: "0" }, expression: { type: "greaterThan", value: "1" } }] },
+      { optionKey: "base", displayLabel: "Base", conditions: [] }] }] },
+    { bookletKey: "second", displayLabel: "Second debug booklet", unitEntries: [{ ...unit, unitKey: "second-unit", displayLabel: "Second only unit", unitDefinition: "Second private definition", originalUnitId: "original-second" }] }];
+  const source = await api(workspace + "/source-packages", { fileName: "debug.json", mediaType: "application/json", contentStructure: content }, operator);
+  const imported = await api(workspace + "/import-jobs", { sourcePackageId: source.sourcePackage.sourcePackageId }, operator);
+  await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-debug-browser" }, operator);
+  await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="debug-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
+  browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
+  page = await context.newPage();
+  const commandApplications = new Map();
+  const commandCompletions = new Map();
+  const loadCompleteAcknowledgements = new Map();
+  page.on("response", response => {
+    const pathname = new URL(response.url()).pathname;
+    const match = pathname.match(/^\/api\/v1\/participant\/sessions\/[^/]+\/commands\/([^/]+)\/application$/);
+    if (match && response.request().method() === "POST") commandApplications.set(match[1], response);
+    if (/^\/api\/v1\/participant\/sessions\/[^/]+\/command-completions$/.test(pathname) && response.request().method() === "POST") {
+      const packet = response.request().postDataJSON();
+      if (packet?.command?.kind === "remote") commandCompletions.set(packet.command.commandId, response);
+    }
+    const load = pathname.match(/^\/api\/v1\/participant\/test-runs\/([^/]+)\/test-logs$/);
+    if (load && response.request().method() === "POST" && response.ok() &&
+      response.request().postDataJSON()?.logs?.some(batch => batch.entries?.some(entry => entry.key === "LOADCOMPLETE"))) {
+      loadCompleteAcknowledgements.set(load[1], response);
+    }
+  });
+  // The real Player sandbox has an opaque origin, so only its parent owns
+  // this test-only readiness flag; subsequent frames/reloads release normally.
+  await page.addInitScript(() => {
+    if (window.parent !== window) return;
+    addEventListener("message", event => {
+      if (event.data?.type === "ownedDebugReadyRequested" && sessionStorage.getItem("owned-debug-ready-released")) {
+        event.source.postMessage({ type: "ownedDebugReleaseReady" }, "*");
+      }
+    });
+  });
+  page.on("pageerror", error => errors.push(String(error)));
+  page.on("request", request => { const url = new URL(request.url()); if (url.pathname.endsWith("/debug-state")) requests.push({ method: request.method(), run: url.searchParams.get("testRunId") }); });
+  page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/native-commands")) nativeRequests.push(JSON.parse(request.postData())); });
+  page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/save-progress")) progressRequests.push(JSON.parse(request.postData())); });
+  await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
+  await page.locator("#originalLoginName").fill("debug-person");
+  const signedIn = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/participant/auth/sign-in" && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Weiter", exact: true }).click(); const identity = await (await signedIn).json();
+  const currentPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/current-state`;
+  let readinessVerified = false;
+  const start = async key => {
+    await page.locator(`#originalParticipantStarter mat-card[data-booklet-key="${key}"] button`).click();
+    const answer = page.frameLocator("iframe").locator("#demoPlayerAnswer");
+    await answer.waitFor();
+    if (!readinessVerified) {
+      await page.locator("#participantVeronaPlayerLoading").waitFor();
+      assert.equal(await answer.isDisabled(), true, "Demo input must wait for a Start session");
+      assert.equal(await page.locator("#participantVeronaFrameHost").getAttribute("inert"), "");
+      // A third-party Player may expose enabled controls before Ready. The
+      // host must still prevent trusted input until it sends Start.
+      await answer.evaluate(element => { element.disabled = false; });
+      await assert.rejects(answer.click({ timeout: 500 }), /Timeout/);
+      await page.keyboard.type("premature answer");
+      assert.equal(await answer.inputValue(), "");
+      await answer.evaluate(element => { element.disabled = true; });
+      await page.evaluate(() => {
+        sessionStorage.setItem("owned-debug-ready-released", "yes");
+        document.querySelector("iframe").contentWindow.postMessage({ type: "ownedDebugReleaseReady" }, "*");
+      });
+      await poll(async () => await answer.isEnabled(), "Demo input was not enabled after Start");
+      assert.equal(await page.locator("#participantVeronaFrameHost").getAttribute("inert"), null);
+      assert.equal(await page.locator("#participantVeronaPlayerLoading").count(), 0);
+      checks.push("player-ready-gates-trusted-input-before-start");
+      console.log("participant_debug=player-ready-gates-trusted-input-before-start:passed");
+      readinessVerified = true;
+    }
+    await page.waitForFunction(() => typeof window.tc?.debug === "function");
+  };
+  await start("first");
+  const run = (await api(currentPath, undefined, identity.sessionToken)).currentRunState.testRun;
+  const repository = createSqliteFirstSliceRepository(file);
+  const durable = async () => ({ run: await repository.getTestRunById(run.testRunId), parent: await repository.getParticipantSessionById(identity.participantSession.participantSessionId) });
+  const windowPane = key => page.locator(`[data-debug-window="${key}"]`), tabs = page.locator("[data-debug-tabs]");
+  const debug = async args => page.evaluate(args => window.tc.debug(args), args);
+  const mark = name => { checks.push(name); console.log(`participant_debug=${name}:passed`); };
+  assert.equal(await tabs.count(), 0); assert.deepEqual(requests, []); mark("production-disabled-until-command");
+  await debug([]); await tabs.waitFor(); await windowPane("main").waitFor();
+  assert.equal(await page.locator("[data-debug-tab]").count(), 10); await poll(() => Promise.resolve(requests.length === 1), "Selected snapshot was not requested");
+  const diagnostic = await api(`/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/debug-state?testRunId=${run.testRunId}`, undefined, identity.sessionToken);
+  assert.ok(!JSON.stringify(diagnostic).includes("OWNED_PRIVATE_CODE_Ω"));
+  const main = windowPane("main"); assert.match(await main.innerText(), /MODE:\s*RUN-HOT-RETURN/);
+  const beforeDrag = await main.boundingBox(); await main.locator("h1").hover({ position: { x: 8, y: 8 } });
+  await page.mouse.down(); await page.mouse.move(beforeDrag.x + 108, beforeDrag.y + 58); await page.mouse.up();
+  const afterDrag = await main.boundingBox(); assert.ok(afterDrag.x > beforeDrag.x + 50 && afterDrag.y > beforeDrag.y + 25); mark("ten-tabs-and-native-drag");
+  await page.getByRole("button", { name: "Close main", exact: true }).click();
+  for (const key of ["config", "testmode", "booklet", "unit", "customtexts", "variables", "states", "system", "tools"]) {
+    await page.locator(`[data-debug-tab="${key}"]`).click(); await windowPane(key).waitFor();
+    if (key === "config") assert.match(await windowPane(key).innerText(), /toolbar_show_unit_list:.*FALSE/);
+    if (key === "testmode") assert.match(await windowPane(key).innerText(), /modeId:.*RUN-HOT-RETURN/);
+    if (key === "booklet") {
+      await poll(async () => (await windowPane(key).innerText()).includes("first-unit"), "Booklet snapshot not projected");
+      await windowPane(key).getByRole("button", { name: "Toggle Testlet timed", exact: true }).click();
+      await poll(async () => /restrictions.timeMax/.test(await windowPane(key).innerText()), "Expanded Testlet did not render");
+      await windowPane(key).getByRole("button", { name: "Toggle Testlet private-gate", exact: true }).click();
+      await poll(async () => /Owned prompt/.test(await windowPane(key).innerText()), "Expanded code gate did not render");
+      await windowPane(key).getByRole("button", { name: "Toggle Testlet private-child", exact: true }).click();
+      await poll(async () => ((await windowPane(key).innerText()).match(/BY code THROUGH private-gate/g) ?? []).length === 2,
+        "Own and inherited code-lock origins did not render");
+      assert.match(await windowPane(key).innerText(), /locks.show/); assert.match(await windowPane(key).innerText(), /locks.afterLeave/);
+      assert.ok(!(await windowPane(key).innerText()).includes("OWNED_PRIVATE_CODE_Ω"));
+    }
+    if (key === "unit") assert.match(await windowPane(key).innerText(), /original-first/);
+    if (key === "customtexts") {
+      const input = windowPane(key).getByRole("combobox"); await input.fill("owned_token"); await input.press("Escape"); await poll(async () => /Booklet override Ω/.test(await windowPane(key).innerText()), "Selected custom text did not render");
+      await input.click(); await page.getByRole("listbox", { name: "Custom text tokens" }).waitFor();
+      const firstOption = await page.getByRole("option").first().innerText(); await input.press("ArrowDown"); await input.press("Enter"); await poll(async () => await input.inputValue() === firstOption, "Keyboard selection did not reach the input");
+      await input.fill("toString"); await input.press("Escape"); assert.ok(!(await windowPane(key).innerText()).includes("native code"));
+    }
+    if (key === "system") { await windowPane(key).getByRole("button", { name: "Refresh", exact: true }).click(); await poll(async () => /API:\s*ok/.test(await windowPane(key).innerText()), "Actual API health check failed"); }
+    if (key === "tools") { const input = windowPane(key).getByRole("textbox", { name: "Test Condition" }); await input.fill('<If><Score of="x" from="first-unit"/><Is equal="0"/></If>'); await poll(async () => (await windowPane(key).innerText()).includes("Satisfied"), "Condition did not evaluate"); await input.fill('<If><Value/></If>'); await poll(async () => /Missing field: 'Is'/.test(await windowPane(key).innerText()), "Condition parse error did not render"); await input.fill('<If><Value of="<img src=x onerror=alert(1)>"/></If>'); assert.equal(await windowPane(key).locator("img").count(), 0); }
+    await page.screenshot({ path: join(artifacts, `debug-${key}.png`), fullPage: true });
+    await page.getByRole("button", { name: `Close ${key}`, exact: true }).click();
+  }
+  await poll(async () => await page.locator("[data-debug-window]").count() === 0, "Closed windows did not render"); assert.equal(await page.evaluate(() => localStorage.getItem("tc-debug")), "[]"); mark("all-ten-windows-config-tools-customtexts");
+  await page.locator('[data-debug-tab="variables"]').click();
+  const frame = page.frameLocator("iframe"); await frame.locator("#demoPlayerAnswer").fill("2");
+  await poll(async () => (await windowPane("variables").innerText()).includes("CODING_COMPLETE"), "Tracked variables not projected from trusted Player input");
+  const storedValue = async () => JSON.parse(parseVeronaUnitResponse((await durable()).run.unitResponses["first-unit"])?.unitState.dataParts?.answer ?? "[]")[0]?.value;
+  await poll(async () => await storedValue() === "2", "Actual SQLite response missing");
+  const count = requests.length; await context.setOffline(true); await frame.locator("#demoPlayerAnswer").fill("3");
+  await poll(async () => /"3"/.test(await windowPane("variables").innerText()), "Offline local capture missing in Variables");
+  assert.equal(requests.length, count); await context.setOffline(false);
+  await poll(async () => await storedValue() === "3", "Offline capture was not delivered after reconnect");
+  mark("tracked-variables-offline-local-capture");
+  const waitForDebugLog = content => page.waitForResponse(response => {
+    if (new URL(response.url()).pathname !== `/api/v1/participant/test-runs/${run.testRunId}/test-logs` || response.request().method() !== "POST") return false;
+    return response.request().postDataJSON()?.logs?.some(log => log.entries?.some(entry => entry.key === "command executed" && entry.content === content));
+  });
+  const previousOffLogged = waitForDebugLog("debug off");
+  await debug(["off"]); await tabs.waitFor({ state: "detached" }); assert.equal(await page.evaluate(() => localStorage.getItem("tc-debug")), null);
+  assert.equal((await previousOffLogged).status(), 200);
+  const issue = async (type, args) => (await api(workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: type, ...(args ? { debugArguments: args } : {}) }, operator)).command;
+  const issueApplied = async (type, args, beforeCompletion) => {
+    const command = await issue(type, args);
+    await poll(() => Promise.resolve(commandApplications.has(command.commandId)), `Missing ${type} application receipt`);
+    const response = commandApplications.get(command.commandId); assert.equal(response.status(), 200);
+    const { application } = await response.json();
+    assert.equal(application.command.commandId, command.commandId);
+    assert.ok(application.command.executedAt); assert.ok(application.command.executionSequence > 0);
+    await beforeCompletion?.(command);
+    // browser-v1 records command execution in a separate transaction after
+    // the client continuation. The application receipt cannot settle its log.
+    await poll(() => Promise.resolve(commandCompletions.has(command.commandId)), `Missing ${type} completion receipt`);
+    const completionResponse = commandCompletions.get(command.commandId);
+    assert.equal(completionResponse.status(), 200);
+    const { completion } = await completionResponse.json();
+    assert.equal(completion.command.kind, "remote"); assert.equal(completion.command.commandId, command.commandId);
+    assert.equal(completion.testRunId, run.testRunId);
+    return command;
+  };
+  // Visible state may precede the durable execution log. Snapshot only after
+  // both exact remote commands have committed their completion receipts.
+  await issueApplied("debug", ["on"]); await tabs.waitFor(); mark("remote-debug-through-real-receiver");
+  // Hold the real, separate completion before its database transaction. This
+  // makes the former application-only barrier fail deterministically.
+  let pauseCompletionHeld = false;
+  const pauseCompletionGate = new Promise(done => { releasePauseCompletion = done; });
+  const holdPauseCompletion = async route => {
+    const packet = route.request().postDataJSON();
+    if (packet?.testRunId !== run.testRunId || packet?.command?.kind !== "remote") return route.continue();
+    pauseCompletionHeld = true; await pauseCompletionGate; await route.continue();
+  };
+  await page.route("**/command-completions", holdPauseCompletion);
+  await issueApplied("pause", undefined, async command => {
+    await poll(() => Promise.resolve(pauseCompletionHeld), "Pause completion did not reach its held transaction");
+    assert.equal(commandCompletions.has(command.commandId), false);
+    assert.equal((await durable()).run.status, "paused");
+    const pendingLogs = await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId);
+    assert.equal(pendingLogs.filter(log => log.testRunId === run.testRunId && log.logKey === "command executed" && log.logContent === "pause").length, 0);
+    releasePauseCompletion();
+  });
+  await page.unroute("**/command-completions", holdPauseCompletion); releasePauseCompletion = null;
+  mark("remote-application-does-not-settle-held-completion-log");
+  await poll(async () => (await durable()).run.status === "paused", "Real monitor pause missing");
+  await poll(async () => /STATUS:\s*PAUSED/.test(await windowPane("main").innerText()), "Pane did not show PAUSED");
+  const paused = await durable(); const logPath = workspace + `/test-logs?testRunId=${run.testRunId}&logKey=command%20executed`;
+  const prior = (await api(logPath, undefined, operator)).items.map(item => item.testLog);
+  const logged = waitForDebugLog("debug off Paused exact Ω");
+  await debug(["off", "Paused exact Ω"]); assert.equal((await logged).status(), 200); await tabs.waitFor({ state: "detached" });
+  const logs = (await api(logPath, undefined, operator)).items.map(item => item.testLog);
+  assert.equal(logs.length, prior.length + 1); assert.equal(logs.filter(log => log.logContent === "debug off Paused exact Ω").length, 1);
+  assert.deepEqual(await durable(), paused); mark("paused-console-log-preserves-run-parent-and-timer");
+  const clockProbe = await page.evaluate(async () => {
+    const originalNow = Date.now, invokedAt = originalNow(), label = "Owned fulfilled clock Ω";
+    try {
+      Date.now = () => invokedAt;
+      window.tc.debug(["off", label]);
+      const immediate = Object.keys(localStorage).filter(key => key.startsWith("testcenter-rewrite:participant-debug-log:v1:"))
+        .map(key => JSON.parse(localStorage.getItem(key))).filter(entry => entry.args?.[1] === label);
+      const preference = localStorage.getItem("tc-debug");
+      Date.now = () => invokedAt + 25;
+      await Promise.resolve();
+      const completed = Object.keys(localStorage).filter(key => key.startsWith("testcenter-rewrite:participant-debug-log:v1:"))
+        .map(key => JSON.parse(localStorage.getItem(key))).filter(entry => entry.args?.[1] === label);
+      return { invokedAt, immediate, preference, completed };
+    } finally { Date.now = originalNow; }
+  });
+  assert.deepEqual(clockProbe.immediate, []); assert.equal(clockProbe.preference, null);
+  assert.equal(clockProbe.completed.length, 1); assert.equal(clockProbe.completed[0].timestamp, clockProbe.invokedAt + 25);
+  assert.equal(clockProbe.completed[0].scope.testRunId, run.testRunId);
+  await poll(async () => (await api(logPath, undefined, operator)).items.some(item => item.testLog.logContent === "debug off Owned fulfilled clock Ω"), "The completed native Debug log was not saved");
+  const clockLogs = (await api(logPath, undefined, operator)).items.map(item => item.testLog).filter(log => log.logContent === "debug off Owned fulfilled clock Ω");
+  assert.equal(clockLogs.length, 1); assert.equal(clockLogs[0].timestamp, clockProbe.invokedAt + 25);
+  assert.deepEqual(await durable(), paused); mark("native-debug-timestamp-follows-fulfilled-handler-microtask");
+  await issue("resume"); await poll(async () => (await durable()).run.status === "running", "Monitor resume missing");
+  const native = async (keyword, args = []) => page.evaluate(({ keyword, args }) => window.tc[keyword](args), { keyword, args });
+  // A visible iframe can still precede its Start command. Wait for the old
+  // answer to be restored, then Pause immediately after new input, without
+  // waiting for that new answer's save acknowledgement.
+  await poll(async () => await page.frameLocator("iframe").locator("#demoPlayerAnswer").inputValue() === "3", "Resumed Player did not finish its restored state before trusted input");
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").fill("4");
+  await native("pause"); await poll(async () => (await durable()).run.status === "paused", "Native pause missing");
+  await poll(async () => await storedValue() === "4", "Native pause did not drain the trusted Player capture");
+  await native("resume"); await poll(async () => (await durable()).run.status === "running", "Native resume missing");
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  await native("goto", ["2"]); await poll(async () => (await durable()).run.currentUnitKey === "next-unit", "Native numeric goto missing");
+  await native("goto", ["id", "first-unit"]); await poll(async () => (await durable()).run.currentUnitKey === "first-unit", "Native alias goto missing");
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  assert.equal(await storedValue(), "4");
+  assert.deepEqual(nativeRequests.slice(0, 4).map(request => request.keyword), ["pause", "resume", "goto", "goto"]);
+  assert.deepEqual(await repository.listPendingParticipantRunCommands(run), []);
+  mark("native-pause-resume-goto-drain-selected-player");
+  await native("pause"); await poll(async () => (await durable()).run.status === "paused", "Entry-guard pause missing");
+  await page.locator("iframe").waitFor({ state: "detached" });
+  const guardPaused = (await durable()).run;
+  await repository.saveTestRun({ ...guardPaused, lockedUnitKeys: ["first-unit"] });
+  await native("resume");
+  await poll(async () => (await durable()).run.currentUnitKey === "next-unit", "Native resume did not redirect the locked current Unit");
+  // The first Unit below the inherited code lock is accessible to the guard,
+  // but Original's Unit host cannot mount its Player before code release.
+  await page.locator("#participantRouteTestletUnlockCode").waitFor();
+  assert.equal(await page.locator("iframe").count(), 0);
+  const codeEntry = (await durable()).run;
+  assert.equal(codeEntry.unlockedTestletKeys?.includes("private-gate") ?? false, false);
+  await page.locator("#participantRouteTestletUnlockCode").fill("OWNED_PRIVATE_CODE_Ω");
+  await page.locator("#participantRouteTestletUnlockButton").click();
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  const guardResumed = (await durable()).run;
+  assert.equal(guardResumed.currentUnitKey, "next-unit");
+  assert.ok(guardResumed.unlockedTestletKeys?.includes("private-gate"));
+  assert.deepEqual(guardResumed.lockedUnitKeys, ["first-unit"]);
+  assert.deepEqual(guardResumed.unitResponses, guardPaused.unitResponses);
+  assert.deepEqual(guardResumed.unitResponseFieldTimestamps, guardPaused.unitResponseFieldTimestamps);
+  assert.deepEqual(await repository.listPendingParticipantRunCommands(run), []);
+  mark("native-resume-entry-guard-retains-locks-and-answers");
+  await native("goto", ["id", "first-unit"]);
+  await poll(async () => (await durable()).run.currentUnitKey === "first-unit", "Entry-guard reentry missing");
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  await native("terminate"); await page.locator("#originalParticipantStarter mat-card").first().waitFor();
+  const terminated = await durable(); assert.equal(terminated.run.locked, false); assert.equal(terminated.run.status, "paused"); assert.equal(terminated.run.completedAt, null);
+  await start("first"); assert.equal((await api(currentPath, undefined, identity.sessionToken)).currentRunState.testRun.testRunId, run.testRunId);
+  assert.equal(await storedValue(), "4"); mark("native-termination-starter-and-exact-reentry");
+  await debug([]); await tabs.waitFor(); await page.reload({ waitUntil: "networkidle" });
+  await page.waitForFunction(() => typeof window.tc?.debug === "function"); assert.equal(await tabs.count(), 0); assert.equal(await page.evaluate(() => localStorage.getItem("tc-debug")), '["main"]'); mark("production-reload-does-not-restore-window");
+  // A late response from the former selected Run must not enter the new pane.
+  const firstResponses = (await durable()).run.unitResponses;
+  await debug(["off"]); await tabs.waitFor({ state: "detached" });
+  let held = false, snapshotReady = false, snapshotDone;
+  const snapshotFinished = new Promise(done => { snapshotDone = done; });
+  const snapshotGate = new Promise(done => { releaseSnapshot = done; });
+  const snapshotRoute = async route => {
+    if (new URL(route.request().url()).searchParams.get("testRunId") !== run.testRunId || held) return route.continue();
+    held = true; const response = await route.fetch(); snapshotReady = true; await snapshotGate;
+    try { await route.fulfill({ response }); } catch {} // The former pane aborts its own request on destruction.
+    finally { snapshotDone(); }
+  };
+  await page.route("**/debug-state?*", snapshotRoute);
+  await debug([]); await tabs.waitFor();
+  await poll(() => snapshotReady, "Owned old snapshot was not intercepted");
+  await page.locator("#participantApplicationLogoButton").click();
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page.locator("#originalParticipantStarter mat-card").first().waitFor();
+  await start("second"); assert.equal(await tabs.count(), 0);
+  await debug([]); await tabs.waitFor(); await page.locator('[data-debug-tab="unit"]').click();
+  await poll(async () => (await windowPane("unit").innerText()).includes("original-second"), "Second selected Unit did not load");
+  releaseSnapshot(); releaseSnapshot = null;
+  await snapshotFinished;
+  await page.unroute("**/debug-state?*", snapshotRoute);
+  assert.ok(!(await windowPane("unit").innerText()).includes("original-first"));
+  assert.deepEqual((await durable()).run.unitResponses, firstResponses);
+  mark("late-former-run-snapshot-cannot-enter-selected-booklet");
+  const second = (await api(currentPath, undefined, identity.sessionToken)).currentRunState.testRun;
+  assert.equal(second.bookletKey, "second"); assert.notEqual(second.testRunId, run.testRunId);
+  const errorDurable = async () => ({ run: await repository.getTestRunById(second.testRunId), parent: await repository.getParticipantSessionById(identity.participantSession.participantSessionId) });
+  await poll(() => loadCompleteAcknowledgements.has(second.testRunId), "The second Player's actual load-complete write was not acknowledged");
+  await loadCompleteAcknowledgements.get(second.testRunId).finished();
+  const errorSave = page.waitForResponse(response => response.request().method() === "POST" &&
+    new URL(response.url()).pathname === `/api/v1/participant/test-runs/${second.testRunId}/save-progress` &&
+    response.request().postDataJSON()?.logs?.some(batch => batch.entries?.some(entry => entry.key === "CONTROLLER" && entry.content === "ERROR")));
+  void errorSave.catch(() => {});
+  await page.frameLocator("iframe").locator("#ownedDebugError").click(); await page.locator("mat-dialog-container, #participantRuntimeErrorFallback").waitFor();
+  await poll(async () => /STATUS:\s*ERROR/.test(await windowPane("main").innerText()), "Debug status did not show ERROR");
+  const errorAcknowledgement = await errorSave; assert.equal(errorAcknowledgement.status(), 200); await errorAcknowledgement.finished();
+  await page.waitForFunction(() => document.querySelector("#participantVeronaSaveStatus")?.textContent.trim() === "saved");
+  const errored = await errorDurable(); await debug(["off"]); await tabs.waitFor({ state: "detached" }); await debug([]); await tabs.waitFor();
+  assert.deepEqual(await errorDurable(), errored); mark("console-debug-remains-pure-after-controller-error");
+  await page.screenshot({ path: join(artifacts, "debug-error.png"), fullPage: true });
+  await page.locator("iframe").evaluate(frame => frame.setAttribute("data-owned-errored-frame", "true"));
+  await native("resume");
+  await poll(async () => !await page.locator("mat-dialog-container, #participantRuntimeErrorFallback").count() &&
+    await page.locator("iframe").getAttribute("data-owned-errored-frame") !== "true", "Native resume did not replace the errored Player");
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  assert.deepEqual((await errorDurable()).run.unitResponses, errored.run.unitResponses); mark("native-resume-after-controller-error");
+  await native("terminate", ["lock"]); await page.locator("#originalParticipantStarter mat-card").first().waitFor();
+  const locked = await errorDurable(); assert.equal(locked.run.locked, true); assert.equal(locked.run.completedAt, null); assert.deepEqual(locked.run.unitResponses, errored.run.unitResponses);
+  assert.deepEqual((await durable()).run.unitResponses, firstResponses); mark("native-lock-termination-preserves-other-booklet");
+  assert.deepEqual(errors, []);
+} catch (error) {
+  await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => {});
+  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, requests, nativeRequests, progressRequests, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
+  throw error;
+} finally {
+  releaseSnapshot?.(); releasePauseCompletion?.();
+  await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests, nativeRequests, progressRequests }, null, 2));
+  await browser?.close();
+  if (server.exitCode === null) { server.kill("SIGTERM"); await raceWithSmokeDeadline(closed, 5_000, () => undefined); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
+  await closed; gate.assertHealthy(); console.log("owned_api=shutdown");
+}

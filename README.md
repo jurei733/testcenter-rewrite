@@ -39,6 +39,12 @@ The current spike exit boundary is captured in:
 
 ## Verification
 
+The CI build-reuse, fast-feedback and complete-acceptance boundaries are
+documented in [`rewrite-app/docs/CI.md`](rewrite-app/docs/CI.md).
+
+Attachment request ownership and regression evidence are documented in
+[`rewrite-app/docs/ATTACHMENT-LIFECYCLE.md`](rewrite-app/docs/ATTACHMENT-LIFECYCLE.md).
+
 Use Node.js 22 LTS for the production app workspace. The Docker image and GitHub Actions workflow both run Node 22, and the repository includes `.node-version` and `.nvmrc` for local version managers.
 
 Run inside `rewrite-spike/`:

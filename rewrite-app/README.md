@@ -1,5 +1,19 @@
 # Testcenter Rewrite App
 
+The Original workspace now exposes the implemented **Dateien** and
+**Systemcheck Berichte** tabs. Reports show complete counts and OS/browser
+versions, select multiple Checks, download their complete CSV, and confirm
+selected deletion. Following the Original, read-only users can open the same
+confirmation; the protected API rejects deletion with 403 and preserves the
+report table/selection for export. Requests,
+confirmations and downloads belong to the exact signed-in workspace; changing
+tabs drops report selection. `?tab=syscheck` restores the report tab on reload.
+The two other Original tabs, results/answers and individual test deletion, are
+still missing. The current two-tab surface is not complete four-tab or visual
+parity. Run `npm run smoke:ui:original-system-check-reports` for the real protected
+SQLite/browser journey, or `npm run test:system-check-reports` for fresh-core
+all-store export/statistics tests. See `docs/ORIGINAL-UI-PARITY.md` for scope.
+
 The source-backed implementation priorities and current original-product gaps are
 tracked in [`docs/PARITY.md`](./docs/PARITY.md).
 
@@ -333,6 +347,39 @@ It is intentionally separate from `rewrite-spike/`:
 - `rewrite-spike/` proves architecture and semantics
 - `rewrite-app/` is where production-oriented code starts
 
+### Protected standalone workspace files
+
+In authenticated **Original** mode, Content now opens the native grouped file
+view, with its own workspace header, upload report, byte-preserving downloads,
+selection/dependency highlighting and guarded partial deletion. The workspace
+name and RW/RO role come from the actual protected scope. Scope changes/logout
+invalidate pending actions; missing view code shows an explicit Reload action.
+The full four-tab shell, the other native workspace pages, complete upload/
+validation behavior, ZIP extraction and automatic activation remain open.
+Run `npm run smoke:ui:original-workspace-files` for the complete owned browser
+journey, or select `verify/ui-original-workspace-files` through
+`npm run ci:focus -- --list`. For focused Original result export work,
+`npm run test:original-results` freshly builds the core and runs archive, Test opening/state-clock, group snapshot,
+authenticated HTTP and Source-fixture regressions without an Angular build.
+These same cases remain mandatory in the complete unit/PostgreSQL gates. Group snapshots now preserve the first
+validated credential-login label independently of later roster imports across all
+four stores; see [lifecycle and migration details](docs/ORIGINAL-RESULT-GROUPS.md). This is functional qualification, not a full-page
+Original pixel-match claim.
+
+
+`POST /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files` accepts
+`{fileName, mediaType, sourceDocument}` for a loose file (string content or a
+byte-preserving data URL). Names are basenames, up to 120 UTF-8 bytes. Files are
+stored under their Source type folder; uploading the same typed basename uses
+identity/version-checked replacement and preserves history. Independent Units
+and resources return `importJob: null`; other typed XML follows real import and
+returns any **staged** release. Activate it through the existing activation API.
+ZIP member extraction and the Original upload UI remain open.
+`GET .../files/:sourcePackageId/download` returns exact current/historical bytes
+with the authored basename. Both endpoints require workspace access, and writes
+require write access. See [Original parity notes](docs/ORIGINAL-UI-PARITY.md) for
+validation evidence and remaining gaps.
+
 ## Phase 1 Vertical Slice
 
 The first production slice is intentionally narrow:
@@ -543,6 +590,12 @@ npm run build
 npm run start:api
 ```
 
+`npm run typecheck` checks the core projects and Angular's strict templates and
+injection types without emitting a frontend. The complete CI development build
+remains available as `npm run typecheck:ci`, writing to
+`dist/typecheck-development` so it cannot replace `dist/apps/web` during browser
+checks. The production build remains a required CI gate.
+
 For a durable one-command local app start, run:
 
 ```bash
@@ -582,6 +635,25 @@ For the local production-like verification path, run:
 ```bash
 npm run ci
 ```
+
+For focused iteration, list or select complete existing suites:
+
+```bash
+npm run ci:focus -- --list
+npm run ci:focus -- --plan participant-auth original-results
+npm run ci:focus -- participant-auth
+npm run ci:focus -- original-results
+npm run ci:focus -- system-check-reports
+```
+
+These service suites freshly build only the TypeScript core. Browser selections
+still build the complete production app. With an owned PostgreSQL test database,
+set `FIRST_SLICE_STORE=postgres` and `FIRST_SLICE_POSTGRES_URL` to include its
+cases. The separate **Rewrite focused services (not acceptance)** Actions
+workflow supplies PostgreSQL and also runs the complete lock audit and CI policy.
+It becomes manually dispatchable once present on the default branch. Actual
+Linux service jobs currently take 60–83 seconds; see [CI measurements](docs/CI.md).
+Focused feedback does not replace complete acceptance.
 
 For a quicker pre-push signal that builds once, reuses built artifacts, includes the SQLite runtime preflight, and stops the browser flow after the content import/activation read model, run:
 
@@ -710,8 +782,49 @@ releases live in `first-slice.json.objects/`, so participant and monitor writes
 do not repeatedly serialize every imported Player, definition, and resource.
 Include both paths in backups or moves. `db:migrate:file` externalizes legacy
 single-file state explicitly; the first normal write performs the same migration
-automatically. Core and entity files are replaced atomically, and readiness
-fails when a manifest-referenced sidecar is missing.
+automatically. It also promotes the older version-one sidecar manifest to version
+three. Package and release files now have content-hash names and are never
+overwritten; one atomic main-manifest replacement publishes the entire mutation.
+Failed writes preserve the committed manifest, selected entity files and live
+cache. Reopening rejects missing or changed selected files rather than treating
+them as an empty store. Readiness checks actual write-and-rename capability in
+the manifest and collection directories and fails when a selected sidecar is
+missing.
+
+The File adapter remains a single-process writer for local development. Keep
+prior versions of live entities in backups: they remain available to readers of
+an earlier manifest. Guarded aggregate deletion drops the manifest references
+and prunes every stored version of the deleted entities; active readers and
+cleanup failures defer pruning to the next successful mutation. Before upgrading
+an existing File store, stop all old access and back up the manifest together
+with its objects directory. Older binaries cannot read the version-three
+sidecar manifest; rollback requires
+restoring the complete pre-upgrade backup with the old binary. The public
+migration result's `formatVersion: 1` describes the enclosing state document;
+the nested sidecar manifest version is now 3. Both older version-one and
+version-two sidecar stores are read and promoted on migration.
+
+Version three coordinates maintenance with participating readers and writers.
+The API keeps a writer registration until shutdown; direct repository operations
+register while reading or mutating. Registrations contain process/namespace
+identity in unique `.actors/` filenames. Maintenance refuses active accesses,
+unknown markers and another process namespace; it removes only unique markers
+whose owning process is verified dead in the same namespace. These are local
+cooperative guards, not a distributed locking service. Stop the API before
+compaction. Access metadata and unpublished `.pending.*.tmp` files are ephemeral;
+exclude them from offline backups/moves and transfer the committed manifest and
+object files. Preserve uncertain namespace metadata for operator investigation.
+
+After building, preview with `FIRST_SLICE_FILE=... npm run db:compact:file:built`.
+Use `FIRST_SLICE_FILE=... npm run db:compact:file:built -- --apply` to remove the
+listed unselected versions. The command validates the current selected objects,
+retains unrelated/malformed files and collection-directory symlinks, and never
+changes manifest bytes. Pending files are reclaimed only when both their store
+and process namespace match and their owning process is dead. Tests kill an
+owned writer before sidecar publication, before the manifest switch and after it;
+reopen retains respectively the old, old and new committed data. These SIGKILL
+checks do not prove power-loss durability; that and broader operating acceptance
+remain open.
 
 For relational local persistence, run:
 
@@ -1118,6 +1231,15 @@ The added read side now makes the first slice inspectable:
 - together with the root `alias` and `subforms` cases, the compatibility corpus now pins the complete official `@iqb/responses` 3.6.0 `test/coding` tree: 34 scheme variants and all 70 byte-exact inputs/outcomes. Base aliases route by their external identifiers; ordered repeated-ID subform responses reach the IQB coder with their `subform` markers intact, while `BASE_NO_VALUE` remains omitted and the adaptive Testcenter read model deliberately applies its original ID-only last-write selection after coding. The unchanged multi-subform Player envelope, final coded status/value/code/score route, and persistence are gated across memory, file, and SQLite
 - the complete original Aspect source graph now includes both byte-exact `.vomd` files named by Unit `Metadata/Reference`, in addition to its booklet, three Units, three Voud definitions, and Player. Loose-file import resolves all ten files into one audited immutable package and preserves the metadata documents byte-for-byte in the downloadable snapshot; a partial chain with a missing metadata reference fails with a stable diagnostic instead of silently dropping editor provenance. The complete graph and failure path are gated across memory, file, and SQLite
 - the pinned original `SysCheck.xml` and byte-exact official `CY_SysCheck_2.xml` import as first-class system-check definitions without producing empty content releases. Multiple checks remain independently selectable in one workspace; the browser gate proves the measured-network and configured-`skipnetwork` paths, required-field feedback, every original questionnaire control, two resolved Verona runs, save-key reports, statistics, and check-isolated cleanup. Separately uploaded SysCheck, Unit, IQB coding-scheme, and Verona files resolve transitively into audited immutable packages; their Unit definition and Player stay attached to each check, and a packaged missing Unit is rejected with a stable diagnostic. `/system-check` is a lazy direct-entry Angular flow for browser/device capture, configured repeated upload/download throughput against original-compatible `/speed-test/random-package` endpoints, application latency and connection hints, original threshold ratings, per-check `syscheck_*` custom texts, Original report cancellation, and report persistence. Matching the Original welcome check, a cache-disabled public server-time contract compares the browser clock and IANA timezone with the configured participant timezone; deviations of at least 60 seconds and timezone mismatches are highlighted and retained in the saved environment report, while an unavailable check remains visible as a warning. The Original 800 × 600 minimum screen resolution is evaluated and highlighted in the same report. The Original's UAParser-based CPU architecture, device model/type/vendor, browser and major version, operating system and version, cookie/language/core values, and available browser-plugin names are captured with the upstream report labels and stable IDs, sorted by label, persisted, and included in both report detail and semicolon CSV export. Scoped operators can list/filter reports, export original-style semicolon CSV columns, inspect per-check operating-system/browser/overall-rating distributions and individual report values, and delete selected report sets only after typing the workspace key; deletion is store-scoped and audited across memory, file, and SQLite. Creating the first dedicated system-check account removes anonymous key-based entry instance-wide; after its mandatory password rotation, the protected browser flow auto-selects a single assigned check, validates required questions, hides the report-title and save-key inputs, and proves that the saved report title is forced to the login name
+
+Systemcheck report exports now include every selected report; they do not inherit
+the report list's 100-row default. Use repeated `checkId` parameters for a union,
+for example `exports/system-check-reports.csv?checkId=CHECK.A&checkId=CHECK.B`.
+The same selection works with JSON, content negotiation, lists and statistics.
+Explicit export limits remain available (1–500); omitted export limits include
+all selected records. Lists remain paged. `npm run test:system-check-reports`
+builds the core and runs the focused store/HTTP regression suite.
+
 - destructive Angular actions no longer depend on browser-native `confirm` or `prompt` UI. Workspace/content/result/system-check exact-value gates and ordinary monitor/admin confirmations share a labelled in-app alert dialog with safe initial focus, focus trapping/restoration, Escape cancellation, preserved multiline/custom monitor copy, and a disabled destructive action until the exact workspace/group/file value is entered. Participant review deletion reuses the Player confirmation surface. Production SQLite/Chromium gates prove wrong-text rejection, cancellation without a request, focus restoration, exact acceptance, and the representative content, monitor, system-check, review, and admin paths
 - every Angular feature route (Start, Workspace, Content, Runtime, Participant, System Check, and Ops) is emitted as an independent production chunk. The root shell now hydrates only shared browser/session state; feature refresh, monitor streaming, and Workspace/Content/Runtime/Ops services are resolved on demand instead of forming one shared eager feature chunk. Global error capture and confirmation state remain immediately available, while their standalone dialog surfaces load only on first use. The current production initial bundle is 448.35 kB raw and 114.33 kB estimated transfer, down from the 563.85-kB eager-feature baseline, with tightened 450-kB warning and 470-kB error budgets guarding regressions. Direct links and guarded navigation still load each complete flow. Browser smoke executes the booklet-requested fullscreen enter/exit path, verifies the configured header, and crosses the lazy start, workspace, content, runtime, participant, system-check, and admin surfaces
 - the production Angular shell now ships an installable same-origin web manifest and a scope-limited Service Worker. After one successful online visit, `/app/participant` can be opened or reloaded with the network disabled from versioned cached HTML, hashed bundles, lazy Participant chunks, styles, manifest, and icon; an accessible banner makes clear that sign-in and content loading still require connectivity. API routes, Participant current-state, Player definitions, and resources are never cached. Pending Player responses are instead copied into a bounded IndexedDB queue only after a failed save or when the Participant view closes; the Service Worker delivers them through the normal idempotent API immediately or with Background Sync, then the next Participant load reconciles and clears the local draft. Authored response-buffer timings therefore remain intact while closing the app no longer strands the newest response in page-only storage. The server keeps HTML and the Service Worker revalidating while serving content-hashed JavaScript/CSS as immutable, and dedicated Chromium smoke coverage proves both an offline navigation response and closed-view response delivery
@@ -1162,7 +1284,7 @@ blocks and durable continuation through the final instruction alias.
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists non-secret form context locally, exposes guided flows for admin bootstrap/sign-in, admin-session reads, admin user management with selectable role-assignment cards and filtered admin-user/audit reads plus admin-user/audit CSV export, tenant/workspace directory selection and CSV export, workspace bootstrap, workspace overview CSV export, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, filtered source-package/import-job/content-release CSV export, runtime with a non-persisted participant-password field, persisted participant roster import/listing/export with validation warnings and local parse preview, a participant launchpad for roster/link/session handoff, participant route session re-entry and local leave/reset, participant-entry API-error guidance for ambiguous workspace and launch issues, CSV/XML/JSON entry-link preview/download, filtered content reads, filtered participant-session/response/review reads and CSV exports, participant test-log inspection plus original-style CSV export, selected-group Original-compatible result archives containing response/log/review CSV and JSON reports, filtered workspace activity reads plus a separate audit CSV export, study-monitor booklet/unit/run progress, monitor status/group/booklet/unit cards that seed participant-matrix filters, a monitor review queue with focused response/review handoff, direct Runtime handoff from monitor run, run-detail review, and unit-detail run cards plus Runtime preparation from monitor detail roster cards, and study-monitor summary/matrix/run-detail CSV export, surfaces operational summaries plus an activity feed, switches authenticated study/group monitors into a reduced role-aware console that performs only monitor-authorized reads, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, tenant/workspace directory export, workspace overview export, file-backed manifest loading, source-package/import-job/content-release CSV export, CSV/XML/JSON participant roster entry-link generation/export, participant launchpad state, typed group-result archive and deletion flows, study-monitor booklet/unit/run progress/export, admin-session reads, admin-user/audit CSV export, response/review/test-log/activity CSV export, operator timeline/session/content/runtime filters, open-run selection filter sync, group-monitor UI isolation, activation-blocking runtime handoff, run-detail review handoff, and unit-detail review handoff
+- the shell persists non-secret form context locally, exposes guided flows for admin bootstrap/sign-in, admin-session reads, admin user management with selectable role-assignment cards and filtered admin-user/audit reads plus admin-user/audit CSV export, tenant/workspace directory selection and CSV export, workspace bootstrap, workspace overview CSV export, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, filtered source-package/import-job/content-release CSV export, runtime with a non-persisted participant-password field, persisted participant roster import/listing/export with validation warnings and local parse preview, a participant launchpad for roster/link/session handoff, participant route session re-entry and local leave/reset, participant-entry API-error guidance for ambiguous workspace and launch issues, CSV/XML/JSON entry-link preview/download, filtered content reads, filtered participant-session/response/review reads and CSV exports, participant test-log inspection plus original-style CSV export, Original-compatible result archives containing response/log/review CSV and JSON reports (repeated `groupKey` query values select groups; omitting that filter exports every group in the authorized workspace), filtered workspace activity reads plus a separate audit CSV export, study-monitor booklet/unit/run progress, monitor status/group/booklet/unit cards that seed participant-matrix filters, a monitor review queue with focused response/review handoff, direct Runtime handoff from monitor run, run-detail review, and unit-detail run cards plus Runtime preparation from monitor detail roster cards, and study-monitor summary/matrix/run-detail CSV export, surfaces operational summaries plus an activity feed, switches authenticated study/group monitors into a reduced role-aware console that performs only monitor-authorized reads, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, tenant/workspace directory export, workspace overview export, file-backed manifest loading, source-package/import-job/content-release CSV export, CSV/XML/JSON participant roster entry-link generation/export, participant launchpad state, typed group-result archive and deletion flows, study-monitor booklet/unit/run progress/export, admin-session reads, admin-user/audit CSV export, response/review/test-log/activity CSV export, operator timeline/session/content/runtime filters, open-run selection filter sync, group-monitor UI isolation, activation-blocking runtime handoff, run-detail review handoff, and unit-detail review handoff
 - participant-matrix retrieval now keeps a 200-row server window independent from the operator's visible-card limit, so totals and hidden-row counts remain correct beyond 25 rows; detailed response cards always expose both session and test-run identity, including when a roster display name is present
 
 ## Participant HTTP access

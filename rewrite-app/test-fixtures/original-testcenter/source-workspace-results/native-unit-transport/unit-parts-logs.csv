@@ -1,0 +1,8 @@
+﻿"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"timestamp";"logentry"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"FIRST.PERSISTED.ID";"1792929600010";"PRESENTATION_PROGRESS = some"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"FIRST.PERSISTED.ID";"1792929600020";"RESPONSE_PROGRESS = none"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"FIRST.PERSISTED.ID";"1792929600030";"CUSTOM_Ω =   Exact Ä/β
+"";  "
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"FIRST.PERSISTED.ID";"1792929600011";"PRESENTATION_PROGRESS = complete"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"FIRST.PERSISTED.ID";"1792929600019";"RESPONSE_PROGRESS = stale response state"
+"ORACLE.DELETE.MAIN";"owned-delete-main";"Shared";"ORACLE.POW.BOOK";"OWNED.UNIT.ALIAS";"FIRST.PERSISTED.ID";"1792929600029";"CUSTOM_Ω = stale custom state"

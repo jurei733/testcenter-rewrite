@@ -42,10 +42,11 @@ const applyAttachmentLabelTemplate = (
     "%UNIT%": attachment.unitKey,
     "%VAR%": attachment.variableId,
     "%LOGIN%": attachment.loginKey,
-    "%CODE%": attachment.attachmentId
+    "%CODE%": originalLayout ? attachment.participantCode ?? "" : attachment.attachmentId
   };
   return Object.entries(replacements).reduce(
-    (label, [placeholder, value]) => label.replaceAll(placeholder, value),
+    // PHP str_replace inserts values literally, including JavaScript $ tokens.
+    (label, [placeholder, value]) => label.replaceAll(placeholder, () => value),
     originalLayout ? labelTemplate ?? DEFAULT_LABEL_TEMPLATE
       : labelTemplate?.trim() || DEFAULT_LABEL_TEMPLATE
   );
@@ -161,7 +162,9 @@ export const createAttachmentPagesPdf = async (input: {
           input.labelTemplate,
           originalLayout
         )
-      : `Attachment QR pages - ${input.attachments.length} requests`
+      : originalLayout
+        ? [...new Set(input.attachments.map(attachment => attachment.groupLabel ?? attachment.groupKey))].join(", ")
+        : `Attachment QR pages - ${input.attachments.length} requests`
   );
   pdf.setSubject("Printable QR handoff pages for participant attachments");
   const regularFont = await pdf.embedFont(StandardFonts.Helvetica);

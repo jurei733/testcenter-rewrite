@@ -1,0 +1,1304 @@
+[
+  {
+    "label": "normal",
+    "body": "{\"keyword\":\"edge.normal\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[40]}",
+    "targetTestId": 40,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 6,
+          "keyword": "edge.normal",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 5,
+    "sequenceAfter": 7,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "keyword-missing",
+    "body": "{\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[43]}",
+    "targetTestId": 43,
+    "produced": {
+      "status": 400,
+      "reason": "Bad Request",
+      "value": "Required body-parameter is missing: `keyword`",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 8,
+    "sequenceAfter": 9,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "keyword-null",
+    "body": "{\"keyword\":null,\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[46]}",
+    "targetTestId": 46,
+    "produced": {
+      "status": 400,
+      "reason": "Bad Request",
+      "value": "Required body-parameter is missing: `keyword`",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 10,
+    "sequenceAfter": 11,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "keyword-number",
+    "body": "{\"keyword\":7,\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[49]}",
+    "targetTestId": 49,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 12,
+    "sequenceAfter": 13,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "keyword-false",
+    "body": "{\"keyword\":false,\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[52]}",
+    "targetTestId": 52,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 14,
+    "sequenceAfter": 15,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "keyword-array",
+    "body": "{\"keyword\":[],\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[55]}",
+    "targetTestId": 55,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 16,
+    "sequenceAfter": 17,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "keyword-object",
+    "body": "{\"keyword\":{},\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[58]}",
+    "targetTestId": 58,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 18,
+    "sequenceAfter": 19,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "keyword-empty",
+    "body": "{\"keyword\":\"\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[61]}",
+    "targetTestId": 61,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 21,
+          "keyword": "",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 20,
+    "sequenceAfter": 22,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "keyword-zero",
+    "body": "{\"keyword\":\"0\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[64]}",
+    "targetTestId": 64,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 24,
+          "keyword": "0",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 23,
+    "sequenceAfter": 25,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "keyword-ascii50",
+    "body": "{\"keyword\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[67]}",
+    "targetTestId": 67,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 27,
+          "keyword": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 26,
+    "sequenceAfter": 28,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "keyword-ascii51",
+    "body": "{\"keyword\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[70]}",
+    "targetTestId": 70,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 29,
+    "sequenceAfter": 31,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "keyword-unicode50",
+    "body": "{\"keyword\":\"ΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩ\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[73]}",
+    "targetTestId": 73,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 33,
+          "keyword": "ΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩ",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 32,
+    "sequenceAfter": 34,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "keyword-unicode51",
+    "body": "{\"keyword\":\"ΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩ\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[76]}",
+    "targetTestId": 76,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 35,
+    "sequenceAfter": 37,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "keyword-nul",
+    "body": "{\"keyword\":\"before\\u0000after\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[79]}",
+    "targetTestId": 79,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 39,
+          "keyword": "before",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 38,
+    "sequenceAfter": 40,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "arguments-missing",
+    "body": "{\"keyword\":\"edge.arguments-missing\",\"timestamp\":1793158900,\"testIds\":[82]}",
+    "targetTestId": 82,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 42,
+          "keyword": "edge.arguments-missing",
+          "arguments": [],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 41,
+    "sequenceAfter": 43,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "arguments-null",
+    "body": "{\"keyword\":\"edge.arguments-null\",\"arguments\":null,\"timestamp\":1793158900,\"testIds\":[85]}",
+    "targetTestId": 85,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 45,
+          "keyword": "edge.arguments-null",
+          "arguments": [],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 44,
+    "sequenceAfter": 46,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "arguments-string",
+    "body": "{\"keyword\":\"edge.arguments-string\",\"arguments\":\"abc\",\"timestamp\":1793158900,\"testIds\":[88]}",
+    "targetTestId": 88,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 47,
+    "sequenceAfter": 48,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "arguments-false",
+    "body": "{\"keyword\":\"edge.arguments-false\",\"arguments\":false,\"timestamp\":1793158900,\"testIds\":[91]}",
+    "targetTestId": 91,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 49,
+    "sequenceAfter": 50,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "arguments-object",
+    "body": "{\"keyword\":\"edge.arguments-object\",\"arguments\":{},\"timestamp\":1793158900,\"testIds\":[94]}",
+    "targetTestId": 94,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 51,
+    "sequenceAfter": 52,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "arguments-empty",
+    "body": "{\"keyword\":\"edge.arguments-empty\",\"arguments\":[],\"timestamp\":1793158900,\"testIds\":[97]}",
+    "targetTestId": 97,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 54,
+          "keyword": "edge.arguments-empty",
+          "arguments": [],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 53,
+    "sequenceAfter": 55,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "arguments-nested-array",
+    "body": "{\"keyword\":\"edge.arguments-nested-array\",\"arguments\":[[1,2]],\"timestamp\":1793158900,\"testIds\":[100]}",
+    "targetTestId": 100,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 57,
+          "keyword": "edge.arguments-nested-array",
+          "arguments": [
+            "Array"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 56,
+    "sequenceAfter": 58,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "arguments-nested-object",
+    "body": "{\"keyword\":\"edge.arguments-nested-object\",\"arguments\":[{\"x\":1}],\"timestamp\":1793158900,\"testIds\":[103]}",
+    "targetTestId": 103,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 59,
+    "sequenceAfter": 60,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "arguments-nul",
+    "body": "{\"keyword\":\"edge.arguments-nul\",\"arguments\":[\"before\\u0000after\"],\"timestamp\":1793158900,\"testIds\":[106]}",
+    "targetTestId": 106,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 61,
+    "sequenceAfter": 63,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "arguments-php-float-strings",
+    "body": "{\"keyword\":\"edge.arguments-php-float-strings\",\"arguments\":[-0.0,1e-7,1e-6,1e-5,1e20,1e21,1e22,1.2345678901234567,100000000000001,5e-324,1.7976931348623157e308,9007199254740993,9223372036854775807,9223372036854775808],\"timestamp\":1793158900,\"testIds\":[109]}",
+    "targetTestId": 109,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 65,
+          "keyword": "edge.arguments-php-float-strings",
+          "arguments": [
+            "-0",
+            "1.0E-7",
+            "1.0E-6",
+            "1.0E-5",
+            "1.0E+20",
+            "1.0E+21",
+            "1.0E+22",
+            "1.2345678901235",
+            "100000000000001",
+            "4.9406564584125E-324",
+            "1.7976931348623E+308",
+            "9007199254740993",
+            "9223372036854775807",
+            "9.2233720368548E+18"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 64,
+    "sequenceAfter": 66,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-missing",
+    "body": "{\"keyword\":\"edge.timestamp-missing\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"testIds\":[112]}",
+    "targetTestId": 112,
+    "produced": {
+      "status": 400,
+      "reason": "Bad Request",
+      "value": "Required body-parameter is missing: `timestamp`",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 67,
+    "sequenceAfter": 68,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "timestamp-null",
+    "body": "{\"keyword\":\"edge.timestamp-null\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":null,\"testIds\":[115]}",
+    "targetTestId": 115,
+    "produced": {
+      "status": 400,
+      "reason": "Bad Request",
+      "value": "Required body-parameter is missing: `timestamp`",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 69,
+    "sequenceAfter": 70,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "timestamp-zero",
+    "body": "{\"keyword\":\"edge.timestamp-zero\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":0,\"testIds\":[118]}",
+    "targetTestId": 118,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 71,
+    "sequenceAfter": 73,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-negative",
+    "body": "{\"keyword\":\"edge.timestamp-negative\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":-1,\"testIds\":[121]}",
+    "targetTestId": 121,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 74,
+    "sequenceAfter": 76,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-true",
+    "body": "{\"keyword\":\"edge.timestamp-true\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":true,\"testIds\":[124]}",
+    "targetTestId": 124,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 78,
+          "keyword": "edge.timestamp-true",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 77,
+    "sequenceAfter": 79,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-false",
+    "body": "{\"keyword\":\"edge.timestamp-false\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":false,\"testIds\":[127]}",
+    "targetTestId": 127,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 80,
+    "sequenceAfter": 82,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-numeric-string",
+    "body": "{\"keyword\":\"edge.timestamp-numeric-string\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":\"1793158900\",\"testIds\":[130]}",
+    "targetTestId": 130,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 84,
+          "keyword": "edge.timestamp-numeric-string",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 83,
+    "sequenceAfter": 85,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-garbage",
+    "body": "{\"keyword\":\"edge.timestamp-garbage\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":\"not-a-clock\",\"testIds\":[133]}",
+    "targetTestId": 133,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 86,
+    "sequenceAfter": 88,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-empty-array",
+    "body": "{\"keyword\":\"edge.timestamp-empty-array\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":[],\"testIds\":[136]}",
+    "targetTestId": 136,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 89,
+    "sequenceAfter": 91,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-nonempty-array",
+    "body": "{\"keyword\":\"edge.timestamp-nonempty-array\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":[1],\"testIds\":[139]}",
+    "targetTestId": 139,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 93,
+          "keyword": "edge.timestamp-nonempty-array",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 92,
+    "sequenceAfter": 94,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-object",
+    "body": "{\"keyword\":\"edge.timestamp-object\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":{},\"testIds\":[142]}",
+    "targetTestId": 142,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 96,
+          "keyword": "edge.timestamp-object",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 95,
+    "sequenceAfter": 97,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-fraction",
+    "body": "{\"keyword\":\"edge.timestamp-fraction\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900.75,\"testIds\":[145]}",
+    "targetTestId": 145,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 99,
+          "keyword": "edge.timestamp-fraction",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 98,
+    "sequenceAfter": 100,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-milliseconds-as-seconds",
+    "body": "{\"keyword\":\"edge.timestamp-milliseconds-as-seconds\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158800000,\"testIds\":[148]}",
+    "targetTestId": 148,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "sequenceBefore": 101,
+    "sequenceAfter": 103,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "timestamp-int64-overflow",
+    "body": "{\"keyword\":\"edge.timestamp-int64-overflow\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":9223372036854775808,\"testIds\":[151]}",
+    "targetTestId": 151,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 104,
+    "sequenceAfter": 106,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "testIds-missing",
+    "body": "{\"keyword\":\"edge.testIds-missing\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900}",
+    "targetTestId": 154,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 107,
+    "sequenceAfter": 108,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-empty",
+    "body": "{\"keyword\":\"edge.testIds-empty\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[]}",
+    "targetTestId": 157,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 109,
+    "sequenceAfter": 110,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-null",
+    "body": "{\"keyword\":\"edge.testIds-null\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":null}",
+    "targetTestId": 160,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 111,
+    "sequenceAfter": 112,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-string",
+    "body": "{\"keyword\":\"edge.testIds-string\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":\"abc\"}",
+    "targetTestId": 163,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 113,
+    "sequenceAfter": 114,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-false",
+    "body": "{\"keyword\":\"edge.testIds-false\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":false}",
+    "targetTestId": 166,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 115,
+    "sequenceAfter": 116,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-object",
+    "body": "{\"keyword\":\"edge.testIds-object\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":{}}",
+    "targetTestId": 169,
+    "produced": {
+      "status": 500,
+      "reason": "Internal Server Error",
+      "value": "Internal error.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 117,
+    "sequenceAfter": 118,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-unknown",
+    "body": "{\"keyword\":\"edge.testIds-unknown\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[9223372036854775807]}",
+    "targetTestId": 172,
+    "produced": {
+      "status": 404,
+      "reason": "404 Not Found",
+      "value": "Test `9223372036854775807` not found. `edge.testIds-unknown` not committed.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 119,
+    "sequenceAfter": 120,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-zero",
+    "body": "{\"keyword\":\"edge.testIds-zero\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[0]}",
+    "targetTestId": 175,
+    "produced": {
+      "status": 404,
+      "reason": "404 Not Found",
+      "value": "Test `0` not found. `edge.testIds-zero` not committed.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 121,
+    "sequenceAfter": 122,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-null-item",
+    "body": "{\"keyword\":\"edge.testIds-null-item\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[null]}",
+    "targetTestId": 178,
+    "produced": {
+      "status": 404,
+      "reason": "404 Not Found",
+      "value": "Test `0` not found. `edge.testIds-null-item` not committed.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 123,
+    "sequenceAfter": 124,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-false-item",
+    "body": "{\"keyword\":\"edge.testIds-false-item\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[false]}",
+    "targetTestId": 181,
+    "produced": {
+      "status": 404,
+      "reason": "404 Not Found",
+      "value": "Test `0` not found. `edge.testIds-false-item` not committed.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 125,
+    "sequenceAfter": 126,
+    "sequenceDelta": 1
+  },
+  {
+    "label": "testIds-duplicate",
+    "body": "{\"keyword\":\"edge.testIds-duplicate\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[184,184]}",
+    "targetTestId": 184,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 128,
+          "keyword": "edge.testIds-duplicate",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 127,
+    "sequenceAfter": 129,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "testIds-numeric-string",
+    "body": "{\"keyword\":\"edge.testIds-numeric-string\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[\"000187\"]}",
+    "targetTestId": 187,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 131,
+          "keyword": "edge.testIds-numeric-string",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 130,
+    "sequenceAfter": 132,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "testIds-fraction",
+    "body": "{\"keyword\":\"edge.testIds-fraction\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[190.9]}",
+    "targetTestId": 190,
+    "produced": {
+      "status": 201,
+      "reason": "Created",
+      "value": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [
+        {
+          "id": 134,
+          "keyword": "edge.testIds-fraction",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158900
+        }
+      ],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 133,
+    "sequenceAfter": 135,
+    "sequenceDelta": 2
+  },
+  {
+    "label": "testIds-mixed-unknown",
+    "body": "{\"keyword\":\"edge.testIds-mixed-unknown\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[193,9223372036854775807]}",
+    "targetTestId": 193,
+    "produced": {
+      "status": 404,
+      "reason": "404 Not Found",
+      "value": "Test `9223372036854775807` not found. `edge.testIds-mixed-unknown` not committed.",
+      "contentType": "text/html;charset=UTF-8"
+    },
+    "polled": {
+      "status": 200,
+      "reason": "OK",
+      "value": [],
+      "contentType": "application/json"
+    },
+    "sequenceBefore": 136,
+    "sequenceAfter": 137,
+    "sequenceDelta": 1
+  }
+]

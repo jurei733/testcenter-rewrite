@@ -1,3 +1,5 @@
+export type { WorkspaceFileRelationship, WorkspaceFileReference, WorkspaceCatalogDependency,
+  WorkspaceCatalogFile, WorkspaceFileCatalog } from './workspace-file-catalog.js';
 export type TenantStatus = "active" | "suspended";
 export type WorkspaceStatus = "active" | "archived";
 export type AdminUserStatus = "active" | "disabled";
@@ -216,7 +218,8 @@ export type MonitorRunCommandType =
   | "unlock_test"
   | "unlock_navigation"
   | "lock_navigation"
-  | "set_testlet_time";
+  | "set_testlet_time"
+  | "debug";
 export const monitorRunCommandTypes = [
   "pause",
   "resume",
@@ -227,7 +230,8 @@ export const monitorRunCommandTypes = [
   "unlock_test",
   "unlock_navigation",
   "lock_navigation",
-  "set_testlet_time"
+  "set_testlet_time",
+  "debug"
 ] as const satisfies readonly MonitorRunCommandType[];
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",
@@ -272,6 +276,8 @@ export type WorkspaceActivityEventType =
   | "test_run_locked"
   | "test_run_completed"
   | "monitor_run_command_issued"
+  | "monitor_run_command_executed"
+  | "participant_command_executed"
   | "group_results_deleted"
   | "review_created"
   | "review_updated"
@@ -305,6 +311,8 @@ export const workspaceActivityEventTypes = [
   "test_run_locked",
   "test_run_completed",
   "monitor_run_command_issued",
+  "monitor_run_command_executed",
+  "participant_command_executed",
   "group_results_deleted",
   "review_created",
   "review_updated",
@@ -380,6 +388,8 @@ export type ParticipantRosterEntry = {
   groupKey: string;
   /** Authored Original Testtakers Group/@label; the key remains the stable scope. */
   groupLabel?: string | null;
+  /** Server-recorded provenance; only validated Original Testtakers XML sets this. */
+  originalLoginIdentity?: true;
   bookletKey: string | null;
   bookletKeys?: string[];
   bookletStatePresets?: Record<string, Record<string, string>>;
@@ -571,6 +581,7 @@ export type OperationalLoginMigrationCandidate = {
   profileIds: string[];
   monitorProfiles: MonitorViewProfile[];
   monitorBookletVisibility: MonitorBookletVisibility;
+  viewSettings?: ParticipantViewSettings;
   customTexts: Record<string, string>;
   /** Original application asset filenames keyed by the Testtakers slot name. */
   assetAssignments?: Record<string, string>;
@@ -834,10 +845,20 @@ export type ContentReleaseSummary = Omit<ContentRelease, "runtimeSnapshot"> & {
 };
 
 export type ContentReleaseRuntimeSnapshot = {
+  /** Fixed origin for live Source-file resolution; the stored artifact stays immutable. */
+  workspaceFilePublication?: {revision:string;sourcePackageId:string};
   bookletEntries: ContentReleaseBookletEntry[];
   playerEntries?: ContentReleasePlayerEntry[];
   resourceEntries?: ContentReleaseResourceEntry[];
   systemCheckEntries?: SourcePackageSystemCheckEntry[];
+};
+
+export type WorkspaceFileAvailability = {
+  status: 'available' | 'not_ready' | 'conflict' | 'failed';
+  revision: string;
+  contentReleaseId: string | null;
+  importJobId: string | null;
+  diagnostics: ImportJobDiagnostic[];
 };
 
 export type SystemCheckChoice = {
@@ -908,6 +929,9 @@ export type SystemCheckReportStatistics = {
   latestReportAt: string;
   operatingSystems: SystemCheckReportBreakdown[];
   browsers: SystemCheckReportBreakdown[];
+  /** Original report overview: exact environment labels, name + space + version. */
+  operatingSystemVersions: SystemCheckReportBreakdown[];
+  browserVersions: SystemCheckReportBreakdown[];
   overallRatings: SystemCheckReportBreakdown[];
 };
 
@@ -932,6 +956,8 @@ export type ContentReleaseResourceEntry = {
 export type ContentReleaseBookletEntry = {
   bookletKey: string;
   displayLabel: string;
+  /** Raw physical XML label when canonical display normalization differs. */
+  originalBookletLabel?: string;
   customTexts?: Record<string, string>;
   policy?: BookletRuntimePolicy;
   rootRestrictions?: BookletRootRestrictions;
@@ -1064,6 +1090,8 @@ export type WorkspaceAttachment = {
   testRunId: string;
   groupKey: string;
   loginKey: string;
+  participantCode?: string | null;
+  groupLabel?: string | null;
   personLabel: string;
   bookletKey: string;
   testLabel: string;
@@ -1076,18 +1104,78 @@ export type WorkspaceAttachment = {
   lastModified: number | null;
 };
 
+/** Original login_session_groups snapshot; independent of imported rosters and person sessions. */
+export type OriginalParticipantGroup = {
+  tenantId: string;
+  workspaceId: string;
+  groupKey: string;
+  groupLabel: string;
+  createdAt: string;
+  lastModifiedAt: string;
+};
+
+/** Mutable Source login_sessions association; separate from the frozen group label. */
+export type OriginalLoginBinding = {
+  tenantId: string;
+  workspaceId: string;
+  loginKey: string;
+  groupKey: string;
+  groupSnapshotKey: string;
+  createdAt: string;
+  lastAuthenticatedAt: string;
+};
+
 export type ParticipantSession = {
   participantSessionId: string;
   tenantId: string;
   workspaceId: string;
-  contentReleaseId: string;
+  /** Native people need no content until their first Test is created. Canonical sessions always bind at sign-in. */
+  contentReleaseId: string | null;
   loginKey: string;
   groupKey: string;
+  /** First captured native login identity; absent for canonical/unknown legacy sessions. */
+  originalLoginKey?: string;
+  /** First server-generated Original person suffix; absent means unknown legacy history. */
+  originalNameSuffix?: string;
+  /** Current native operational role; never a canonical participant execution mode. */
+  originalOperationalMode?: OperationalLoginMigrationCandidate['loginMode'];
   participantCode?: string | null;
   executionMode?: ParticipantExecutionMode;
   status: ParticipantSessionStatus;
   validUntil?: string | null;
   createdAt: string;
+};
+
+/** Capture timestamps for individual Verona fields, matching Source patch ordering. */
+export type ParticipantResponseFieldTimestamps = {
+  unitState?: Record<string, number>;
+  dataParts?: Record<string, number>;
+  playerState?: Record<string, number>;
+  opaque?: number;
+};
+
+export type ParticipantProgressDelivery = {
+  testRunId: string;
+  participantSessionId: string;
+  tenantId: string;
+  workspaceId: string;
+  contentReleaseId: string;
+  deliveryId: string;
+  payloadSha256: string;
+  acceptedAt: string;
+};
+
+/** Original's first Test identity and opened/state evidence are independent of Run.updatedAt.
+ * Missing fields on legacy rows mean unknown; null is an observed absent write. */
+export type OriginalTestResultState = {
+  /** Native Test identity captured on creation, independent of later live-file edits. */
+  bookletName?: string;
+  bookletLabel?: string;
+  lastOpenedAt?: string | null;
+  lastTestStateAt?: string | null;
+  /** Source tests.timestamp_server also advances on lock/open without nonempty state. */
+  lastTestModifiedAt?: string | null;
+  hasTestState?: boolean;
 };
 
 export type TestRun = {
@@ -1105,14 +1193,28 @@ export type TestRun = {
   /** Participant-selected state options that take precedence over automatic evaluation. */
   bookletStateOverrides?: Record<string, string>;
   status: TestRunStatus;
+  /** Server-owned entry/termination evidence for this exact Run, independent of its parent session. */
+  controllerEntry?: { active: boolean; revision: number };
+  /** Server-owned Original result inclusion and test-wide timestamp evidence. */
+  originalResultState?: OriginalTestResultState;
+  /** Exact native saved Test state; undefined means historical state is unknown. */
+  originalTestState?: Record<string, unknown>;
+  /** Optional for legacy rows; orders committed projections of this Run. */
+  stateRevision?: number;
+  /** Server-owned high-water marks for state effects from each controller document. */
+  controllerDispatches?: Record<string, number>;
   /** Identifies who may release a paused run; omitted for non-paused runs. */
   pauseSource?: TestRunPauseSource;
   /** Whole-test lock from the original monitor protocol; independent of progress status. */
   locked?: boolean;
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
+  unitResponseFieldTimestamps?: Record<string, ParticipantResponseFieldTimestamps>;
+  /** Server-owned response type captured when each data part was accepted; legacy parts remain unknown. */
+  unitResponsePartTypes?: Record<string, Record<string, string>>;
   /** Original test-wide Verona 6 Player-to-Player communication state. */
   sharedParameters?: Array<{ key: string; value: string }>;
+  sharedParameterTimestamps?: Record<string, number>;
   unlockedTestletKeys?: string[];
   monitorNavigationUnlocked?: boolean;
   testletTimers?: Record<string, TestletTimerState>;
@@ -1136,8 +1238,39 @@ export type ParticipantTestLog = {
   timestamp: number;
   /** Original's server-generated connection logs carry client epoch 0. */
   originalTimestamp?: 0;
+  /** Exact native int64 client clock when the JS numeric projection loses precision. */
+  originalClientTimestamp?: string;
   recordedAt: string;
 };
+
+export const originalTestLogIdPrefix = 'original-test-log:';
+/** Native state logs also carry pre-encoded PHP content, while remaining state events. */
+export const originalTestStateLogIdPrefix = 'original-test-state:';
+
+/** SQL stores the full int64. The numeric projection matches a JS client;
+ * its original decimal is retained for lossless native JSON/CSV and backups. */
+export function readParticipantTestLogTimestamp(raw: unknown): Pick<ParticipantTestLog,'timestamp'|'originalClientTimestamp'> {
+  const numeric = Number(raw);
+  // Existing canonical SQLite records can carry fractional numeric clocks.
+  // Preserve their previous numeric projection; native log parsing is strict.
+  if (!Number.isInteger(numeric) || !Number.isFinite(numeric)) return {timestamp:numeric};
+  const text = typeof raw === 'bigint' ? raw.toString() : typeof raw === 'number' && Number.isInteger(raw) && Number.isFinite(raw) ? BigInt(raw).toString() : String(raw);
+  if (text.length > 20 || !/^(?:0|-?[1-9][0-9]*)$/.test(text)) throw new TypeError('Invalid log timestamp.');
+  const value = BigInt(text);
+  if (value < -9223372036854775808n || value > 9223372036854775807n) throw new TypeError('Log timestamp exceeds int64.');
+  const timestamp = Number(value);
+  return {timestamp,...(Number.isSafeInteger(timestamp) ? {} : {originalClientTimestamp:text})};
+}
+export function exactParticipantTestLogTimestamp(log: Pick<ParticipantTestLog,'timestamp'|'originalClientTimestamp'>): string {
+  if (log.originalClientTimestamp === undefined) return String(log.timestamp);
+  const value = readParticipantTestLogTimestamp(log.originalClientTimestamp);
+  if (value.timestamp !== log.timestamp || (!Number.isSafeInteger(log.timestamp) && log.originalClientTimestamp === undefined)) throw new TypeError('The exact native log timestamp is missing or inconsistent.');
+  return log.originalClientTimestamp ?? String(log.timestamp);
+}
+export function compareParticipantTestLogTimestamps(left: Pick<ParticipantTestLog,'timestamp'|'originalClientTimestamp'>, right: Pick<ParticipantTestLog,'timestamp'|'originalClientTimestamp'>): number {
+  if (left.originalClientTimestamp === undefined && right.originalClientTimestamp === undefined || !Number.isInteger(left.timestamp) || !Number.isInteger(right.timestamp)) return left.timestamp-right.timestamp;
+  const a=BigInt(exactParticipantTestLogTimestamp(left)),b=BigInt(exactParticipantTestLogTimestamp(right));return a < b ? -1 : a > b ? 1 : 0;
+}
 
 export const selectLatestParticipantTestStateLogs = (
   testLogs: ParticipantTestLog[],
@@ -1146,7 +1279,7 @@ export const selectLatestParticipantTestStateLogs = (
   const allowedLogKeys = new Set(logKeys);
   const latestLogs = new Map<string, ParticipantTestLog>();
   for (const testLog of testLogs) {
-    if (testLog.unitKey !== null || !allowedLogKeys.has(testLog.logKey)) {
+    if (testLog.participantTestLogId.startsWith(originalTestLogIdPrefix) || testLog.unitKey !== null || !allowedLogKeys.has(testLog.logKey)) {
       continue;
     }
     const stateKey = `${testLog.testRunId}\u0000${testLog.logKey}`;
@@ -1166,6 +1299,8 @@ export const selectLatestParticipantTestStateLogs = (
 };
 
 export type ParticipantTestLogEntryInput = {
+  // Stable across replacement answer packets; older callers may omit this.
+  clientEntryId?: string;
   key: string;
   content?: string;
   timeStamp: number;
@@ -1195,6 +1330,17 @@ export type TestletTimerState = {
   expiresAt: string | null;
   updatedAt: string;
   endedAt: string | null;
+  // Advisory exit preparation stops the timer while this unit stays loaded.
+  // A later unit load or explicit Run resume may start it again.
+  interruptedAtUnitKey?: string;
+  legacyPreparation?: {
+    scope: { testRunId: string; participantSessionId: string; tenantId: string; workspaceId: string; contentReleaseId: string; bookletKey: string; assignmentKey: string };
+    deliveryId: string;
+    payloadSha256: string;
+    unitKey: string;
+    before: { startedAt: string; expiresAt: string };
+    after: { startedAt: string; expiresAt: string; updatedAt: string; remainingSeconds: number; durationSeconds: number };
+  };
 };
 
 export type MonitorTestletTimer = TestletTimerState & {
@@ -1295,12 +1441,92 @@ export type OpenMonitorRun = {
 export type MonitorRunCommandResult = {
   commandId: string;
   commandType: MonitorRunCommandType;
+  debugArguments?: string[];
   actorId: string | null;
   issuedAt: string;
   previousStatus: TestRunStatus;
   previousLocked: boolean;
   testRun: TestRun;
   participantSession: ParticipantSession;
+};
+
+export type ParticipantRunCommandScope = {
+  tenantId: string;
+  workspaceId: string;
+  participantSessionId: string;
+  testRunId: string;
+};
+
+export type ParticipantRunCommandInput = ParticipantRunCommandScope & {
+  commandId: string;
+  commandType: MonitorRunCommandType;
+  /** Original debug command arguments; the first argument "off" disables it. */
+  debugArguments?: string[];
+  targetUnitKey: string | null;
+  remainingSeconds: number | null;
+  actorId: string | null;
+  issuedAt: string;
+  /** New controller commands apply only after successful browser dispatch. */
+  effectsDeferred?: true;
+};
+
+/** Durable delivery intent. ACK ends delivery without mutating answers or Run state. */
+export type ParticipantRunCommand = ParticipantRunCommandInput & {
+  /** Browser-completed logs are separate from the accepted state effect. */
+  commandCompletion?: "browser-v1";
+  commandCompletionContent?: string;
+  /** Durable result of the Original's already-TERMINATED early return. */
+  terminationNoop?: true;
+  sequence: number;
+  acknowledgedAt: string | null;
+  /** Absent on legacy records; ACK and application are separate operations. */
+  executedAt?: string | null;
+  executionSequence?: number | null;
+};
+
+export type ParticipantRunCommandApplicationInput = ParticipantRunCommandScope & {
+  commandId: string;
+  executedAt: string;
+};
+
+export type ParticipantRunCommandApplicationContext = {
+  testRun: TestRun;
+  command: ParticipantRunCommand;
+  participantSession: ParticipantSession;
+  /** All session Runs for termination; otherwise only the selected Run. */
+  testRuns: TestRun[];
+};
+
+export type ParticipantControllerDispatch = { controllerId: string; sequence: number };
+
+export type ParticipantRunCommandEffect = {
+  commandCompletion?: "browser-v1";
+  commandCompletionContent?: string;
+  terminationNoop?: true;
+  controllerDispatch?: ParticipantControllerDispatch;
+  superseded?: true;
+  testRun: TestRun;
+  /** Applied under the Run lock; response-only mutations cannot replace entry evidence. */
+  controllerEntryActive?: boolean;
+  /** Server timestamps only; never taken from a participant packet's clock. */
+  originalResultOpenedAt?: string;
+  originalResultTestStateAt?: string;
+  originalResultModifiedAt?: string;
+  /** Trusted native state write, independent of frontend saveResponses mode. */
+  originalTestState?: Record<string, unknown>;
+  testLogs: ParticipantTestLog[];
+  activityEvents: WorkspaceActivityEvent[];
+  participantSession?: ParticipantSession;
+};
+
+export type ParticipantRunCommandApplicationResult = {
+  terminalContinuation?: true;
+  controllerDispatch?: ParticipantControllerDispatch;
+  superseded?: true;
+  command: ParticipantRunCommand;
+  testRun: TestRun;
+  participantSession: ParticipantSession;
+  applied: boolean;
 };
 
 export type ParticipantRuntimeStateStatus =
@@ -1363,6 +1589,12 @@ export type ParticipantCurrentRunState = {
   };
   currentUnit: {
     unitKey: string | null;
+    /** Aggregate parent locks used by Original's forced deactivation guard. */
+    parentLocked?: boolean;
+    // Resolved nearest testlet/root restrictions for decisions using a newer
+    // local Player report than the last API state. Optional for older servers.
+    completenessPolicy?: Pick<BookletRuntimePolicy["navigation"],
+      "requirePresentationComplete" | "requireResponseComplete">;
     displayLabel: string | null;
     description?: string | null;
     content?: string | null;
@@ -1445,6 +1677,18 @@ export type ParticipantCurrentRunState = {
   availableActions: Array<
     "save_progress" | "resume" | "complete" | "review" | "change_state_options"
   >;
+};
+
+export type ParticipantDebugSnapshot = {
+  scope: ParticipantRunCommandScope & { contentReleaseId: string; bookletKey: string };
+  booklet: ContentReleaseBookletEntry;
+  variables: Array<{ unitKey: string; baseVariableKeys: string[];
+    variables: Array<{ id: string; status: string; value: unknown; code?: number; score?: number }> }>;
+  states: Array<{ stateKey: string; defaultOptionKey: string | null;
+    options: Array<{ optionKey: string; firstUnsatisfiedCondition: number;
+      conditions: Array<{ condition: BookletStateCondition; satisfied: boolean }> }> }>;
+  adaptiveStates: ParticipantCurrentRunState["adaptiveStates"];
+  conditionResults: boolean[] | null;
 };
 
 export type WorkspaceOverview = {
@@ -1910,6 +2154,18 @@ export type WorkspaceGroupResultSummary = {
   reviewCount: number;
   testLogCount: number;
   lastChangeAt: string;
+};
+
+/** Source Unit storage, separate from canonical controller projections. */
+export type OriginalNativeUnit = Pick<TestRun,
+  'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId'> & {
+  unitName: string;
+  originalUnitId: string;
+  /** A canonical write touched this Unit without native clock provenance. */
+  unknownHistory?: true;
+  state: Record<string, string>;
+  stateClocks: Record<string, number>;
+  parts: Array<{id: string; content: string | null; ts: number; responseType: string}>;
 };
 
 export type WorkspaceReview = {

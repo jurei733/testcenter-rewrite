@@ -1,3 +1,5 @@
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -31,7 +33,7 @@ let browser;
 const errors = [];
 const metrics = {};
 const toastMetrics = {};
-const toastReference = JSON.parse(await readFile(new URL("./fixtures/original-starter-review-toasts.json", import.meta.url),"utf8"));
+const toastReference = await loadOriginalVisualReference("original-starter-review-toasts");
 assert.equal(toastReference.referenceRevision,"ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 assert.equal(Object.keys(toastReference.states).length,18);
 const closeEnough = (actual, expected, name) =>
@@ -115,6 +117,7 @@ try {
   }
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  assertOriginalVisualBrowser(browser, toastReference);
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
     for (const [state, fixture] of Object.entries(fixtures)) {
@@ -291,7 +294,7 @@ try {
           const resume = root.getByRole("button", { name: actionTexts.booklet_starterContinueTestButtonLabel, exact: true });
           await resume.click();
           await root.getByRole("button", { name: "Bitte warten …", exact: true }).waitFor();
-          await Promise.race([requestSeen, delay(10_000).then(() => { throw new Error("Starter resume did not reach the owned boundary."); })]);
+          await raceWithSmokeDeadline(requestSeen, 10_000, () => { throw new Error("Starter resume did not reach the owned boundary."); });
           assert.deepEqual(await root.locator("mat-card button").evaluateAll(buttons => buttons.map(button => button.disabled)), [true, true, true]);
           await page.keyboard.press("Enter");
           assert.equal(requested, 1, "A pending starter submit must not issue a duplicate request.");

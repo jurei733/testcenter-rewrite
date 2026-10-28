@@ -19,7 +19,7 @@ import { PasswordConfirmationDialogComponent } from "./password-confirmation-dia
         [formGroup]="form" (ngSubmit)="submit()" (keydown)="handleKeydown($event)" [attr.aria-busy]="busy()">
         <h1 mat-dialog-title id="globalConfirmationTitle">{{ copy.title }}</h1>
         <mat-dialog-content id="globalConfirmationMessage">
-          <p>{{ copy.message }}</p>
+          @if (copy.message) { <p>{{ copy.message }}</p> }
           <div><p>Bitte geben Sie zur Sicherheit Ihr eigenes Kennwort noch einmal ein.</p></div>
           <p>
             <mat-form-field>

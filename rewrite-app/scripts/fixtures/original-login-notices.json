@@ -1,0 +1,1134 @@
+{
+  "referenceCommit": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "scope": "Unmodified Source frontend; notice-local coordinates in three themes and four viewports; owned login fixtures, no Source backend proof",
+  "measurements": {
+    "Primar-desktop": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 17.859375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Primar-mobile": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 192,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0,
+          "y": 9.5,
+          "width": 21.8359375,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 190.2109375,
+          "height": 66.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 9.703125,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 192,
+          "height": 131,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0,
+          "y": 52.5,
+          "width": 4.6484375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Primar-toolbar-small": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 16.3203125,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 88,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 31.0,
+          "width": 7.75,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Primar-toolbar-large": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 16.3515625,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 88,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 31.0,
+          "width": 7.765625,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Sekundar-desktop": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 17.859375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Sekundar-mobile": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 192,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0,
+          "y": 9.5,
+          "width": 21.8359375,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 190.2109375,
+          "height": 66.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 9.703125,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 192,
+          "height": 131,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0,
+          "y": 52.5,
+          "width": 4.6484375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Sekundar-toolbar-small": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 16.3203125,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 88,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 31.0,
+          "width": 7.75,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Sekundar-toolbar-large": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 16.3515625,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 88,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 31.0,
+          "width": 7.765625,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Erwachsene-desktop": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 728.1015625,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 17.859375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Erwachsene-mobile": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 192,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0,
+          "y": 9.5,
+          "width": 21.8359375,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 190.2109375,
+          "height": 66.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 9.703125,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 192,
+          "height": 131,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0,
+          "y": 52.5,
+          "width": 4.6484375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Erwachsene-toolbar-small": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 16.3203125,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 317.65625,
+          "height": 88,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 31.0,
+          "width": 7.75,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    },
+    "Erwachsene-toolbar-large": {
+      "capsLock": {
+        "text": "Feststelltaste ist aktiviert!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 26.109375,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 0.109375,
+          "width": 24,
+          "height": 24,
+          "color": "rgb(218, 165, 32)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "invalidCredentials": {
+        "text": "Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 45,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 9.5,
+          "width": 16.3515625,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsParticipant": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 318.2578125,
+          "height": 88,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "block"
+        },
+        "icon": {
+          "x": 0.0,
+          "y": 31.0,
+          "width": 7.765625,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      },
+      "httpsAdmin": {
+        "text": "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.",
+        "host": {
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 64.5,
+          "color": "rgb(25, 28, 29)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px",
+          "display": "inline"
+        },
+        "icon": {
+          "x": 0,
+          "y": 20.25,
+          "width": 8.84375,
+          "height": 24,
+          "color": "rgb(130, 19, 36)",
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "margin": "0px 3.2px 0px 0px",
+          "display": "block"
+        }
+      }
+    }
+  }
+}

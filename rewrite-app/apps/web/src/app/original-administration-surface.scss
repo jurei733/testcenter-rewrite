@@ -1,0 +1,36 @@
+// The authenticated Original root owns the window. This lazy stylesheet is
+// activated only by that view; the Rewrite layout and public entries retain
+// their existing geometry and overflow contracts.
+:root[data-interface-mode='original']:has(#originalSystemAdministration),
+:root[data-interface-mode='original'] body:has(#originalSystemAdministration) {
+  height:100%; overflow:hidden;
+}
+:root[data-interface-mode='original'] body:has(#originalSystemAdministration) {
+  background:white; color-scheme:light;
+}
+:root[data-interface-mode='original'] .page:has(#originalSystemAdministration) {
+  display:flex; flex-direction:column; height:100dvh; min-height:0;
+  max-width:none; padding:0; overflow:visible;
+}
+:root[data-interface-mode='original'] .home-stage:has(#originalSystemAdministration),
+:root[data-interface-mode='original'] app-ops-view:has(#originalSystemAdministration) {
+  display:flex; flex:1; flex-direction:column; min-height:0; overflow:visible;
+}
+:root[data-interface-mode='original'] #originalSystemAdministration {
+  // These Source Material containers use content-box. Keep their text ink
+  // bounds instead of inheriting the Rewrite's universal border-box reset.
+  .mat-mdc-tab-header-pagination-chevron,
+  .mdc-tab__text-label, .mdc-tab__content {
+    box-sizing:content-box;
+  }
+}
+:root[data-interface-mode='original'] .original-administration-account-menu {
+  width:330px; padding:12px;
+  font:16px 'Nunito Sans',sans-serif;
+  .heading { display:flex; align-items:center; font-size:22px; }
+  .heading button { margin-left:auto; border-radius:12px; border:1px solid; }
+  .heading button .mat-mdc-button-persistent-ripple { border-radius:inherit; }
+  dt { margin-top:12px; font-weight:700; }
+  dd { margin-top:4px; margin-inline-start:0; }
+  .logout-button { margin-top:12px; border:1px solid var(--secondary); }
+}

@@ -1,0 +1,17 @@
+:root[data-interface-mode='original']:has(#originalWorkspaceFileFrame),
+:root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame) { height:100%; overflow:hidden; }
+:root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame) { background:white; color-scheme:light; }
+:root[data-interface-mode='original'] .page:has(#originalWorkspaceFileFrame) {
+ display:flex; flex-direction:column; height:100dvh; min-height:0; max-width:none; padding:0; overflow:visible;
+}
+:root[data-interface-mode='original'] .home-stage:has(#originalWorkspaceFileFrame),
+:root[data-interface-mode='original'] app-content-view:has(#originalWorkspaceFileFrame) {
+ display:flex; flex:1; flex-direction:column; min-height:0; overflow:visible;
+}
+:root[data-interface-mode='original'] .original-workspace-account-menu {
+ width:330px; padding:12px; font:16px 'Nunito Sans',sans-serif;
+ .heading { display:flex; align-items:center; font-size:22px; }
+ .heading button { margin-left:auto; border-radius:12px; border:1px solid; }
+ dt { margin-top:12px; font-weight:700; } dd { margin-top:4px; margin-inline-start:0; }
+ .logout-button { margin-top:12px; border:1px solid var(--secondary); }
+}

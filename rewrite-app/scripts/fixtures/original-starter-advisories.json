@@ -1,0 +1,997 @@
+{
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "sourceCases": 36,
+  "scope": "Unmodified Source frontend on owned API/player fixtures; no Source backend authorization proof",
+  "cases": {
+    "run-demo-allowed-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-demo-allowed-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-demo-allowed-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-demo-allowed-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-demo-confirm-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-demo-confirm-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-demo-confirm-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-demo-confirm-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-demo-forbidden-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-demo-forbidden-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-demo-forbidden-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-demo-forbidden-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-review-allowed-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-review-allowed-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-review-allowed-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-review-allowed-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-review-confirm-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-review-confirm-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-review-confirm-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-review-confirm-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-review-forbidden-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-review-forbidden-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabe verlassen?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-review-forbidden-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-review-forbidden-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Aufgabenbereich verlassen?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-trial-allowed-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-trial-allowed-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-trial-allowed-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-trial-allowed-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-trial-confirm-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "unit würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "unit würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-trial-confirm-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-trial-confirm-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "testlet würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "testlet würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-trial-confirm-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-trial-forbidden-unit-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "unit würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "unit würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-trial-forbidden-unit-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "unit würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    },
+    "run-trial-forbidden-testlet-false": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "testlet würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": ""
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "testlet würde im Testmodus nun gesperrt werden.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      }
+    },
+    "run-trial-forbidden-testlet-true": {
+      "left": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "testlet würde im Testmodus nun gesperrt werden."
+        ]
+      },
+      "beforeConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "stayed": {
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        ]
+      },
+      "secondConsent": {
+        "dialog": {
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "message": "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+        },
+        "notices": [
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+          "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.",
+          "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet."
+        ]
+      }
+    }
+  }
+}

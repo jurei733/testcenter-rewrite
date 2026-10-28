@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import {
   checkFileFirstSliceReadiness,
+  compactFileFirstSliceStorage,
   migrateFileFirstSliceStorage
 } from "../packages/file-store/dist/packages/file-store/src/index.js";
 import {
@@ -259,9 +260,16 @@ if (command === "doctor") {
   await runDoctor();
 } else if (command === "migrate") {
   await runMigrate();
+} else if (command === "compact") {
+  const config = resolveStorageConfig();
+  if (config.kind !== "file") throw new Error("Compaction is supported only for the File store.");
+  const options = process.argv.slice(3);
+  if (options.some(option => option !== "--apply")) throw new Error("Use 'compact' to preview or 'compact --apply' to remove unselected versions.");
+  const result = await compactFileFirstSliceStorage(config.location, { apply: options.includes("--apply") });
+  process.stdout.write(JSON.stringify({ store: "file", location: redactStorageLocation(config.location), ...result }, null, 2) + "\n");
 } else {
   process.stderr.write(
-    `Unknown storage-admin command '${command}'. Use 'doctor' or 'migrate'.\n`
+    `Unknown storage-admin command '${command}'. Use 'doctor', 'migrate' or 'compact'.\n`
   );
   process.exit(1);
 }

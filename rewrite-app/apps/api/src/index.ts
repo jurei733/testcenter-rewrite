@@ -1,3 +1,13 @@
+import {handleOriginalTestHttp, originalTestCreationPath,originalTestRouteLabel,originalResourceLogPath} from './original-test-http.js';
+import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
+import {OriginalSessionProof} from './original-session-proof.js';
+import {handleOriginalSessionHttp, originalSessionRoutes} from './original-session-http.js';
+import { participantCommandExecutionRoute, type ExecuteParticipantRunCommandRequest } from "@testcenter-rewrite-app/contracts/participant-run-command";
+import type { GetWorkspaceFileCatalogResponse } from '@testcenter-rewrite-app/contracts';
+import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
+import { participantNativeCommandRoute, participantCommandCompletionRoute, type ParticipantCommandCompletionRequest, participantControllerContextRoute, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { participantControllerTimerInterruptionRoute, type ParticipantControllerTimerInterruptionRequest } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
@@ -19,7 +29,8 @@ import {
   type FirstSliceError,
   type FirstSliceRepository,
   type FirstSliceServices,
-  firstSliceUseCases
+  firstSliceUseCases,
+  canStreamParticipantRun
 } from "@testcenter-rewrite-app/application";
 import {
   BUG_REPORT_MAX_REPORT_LENGTH,
@@ -148,6 +159,10 @@ import {
   type RetrySourcePackageImportRequest,
   type RetrySourcePackageImportResponse,
   type ReplaceSourcePackageRequest,
+  type UploadWorkspaceFileRequest,
+  type UploadWorkspaceFileResponse,
+  type ReplaceWorkspaceFileRequest,
+  type ReplaceWorkspaceFileResponse,
   type ReplaceSourcePackageResponse,
   type ReviewResponse,
   type RuntimeOperationalEvent,
@@ -173,11 +188,13 @@ import {
   type UpdateAdminUserRequest,
   type UpdateAdminUserResponse,
   type UpdateApplicationSettingsRequest,
+  type PatchOriginalApplicationSettingsRequest,
   type UpdateApplicationSettingsResponse,
   type UploadApplicationAssetRequest,
   type UploadApplicationAssetResponse,
   type ListApplicationAssetsResponse,
   type DeleteApplicationAssetResponse,
+  type DeleteApplicationAssetRequest,
   type UploadAttachmentFileRequest,
   type UploadAttachmentFileResponse,
   type UpdateParticipantReviewRequest,
@@ -231,8 +248,7 @@ import {
   firstProductionSliceCapabilities
 } from "@testcenter-rewrite-app/domain";
 import {
-  checkFileFirstSliceReadiness,
-  createFileFirstSliceRepository
+  createFileFirstSliceStorage
 } from "@testcenter-rewrite-app/file-store";
 import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
 import {
@@ -240,12 +256,12 @@ import {
   POSTGRES_FIRST_SLICE_SCHEMA_VERSION
 } from "@testcenter-rewrite-app/postgres-store";
 import {
-  checkSqliteFirstSliceReadiness,
-  createSqliteFirstSliceRepository,
+  createSqliteFirstSliceStorage,
   SQLITE_FIRST_SLICE_SCHEMA_VERSION
 } from "@testcenter-rewrite-app/sqlite-store";
 
 import { createAttachmentPagesPdf } from "./attachment-pages-pdf.js";
+import { runtimeErrorDetails } from "./runtime-error-details.js";
 
 type RuntimeStoreKind = "memory" | "file" | "sqlite" | "postgres";
 
@@ -549,13 +565,14 @@ const createRepositoryFromEnvironment = async () => {
     const filePath =
       process.env.FIRST_SLICE_FILE ??
       fileURLToPath(new URL("../../../../.data/first-slice.json", import.meta.url));
+    const storage = await createFileFirstSliceStorage(filePath);
     return {
       kind: "file" as const,
-      repository: createFileFirstSliceRepository(filePath),
+      repository: storage.repository,
       location: filePath,
       schemaVersion: null,
-      readinessCheck: () => checkFileFirstSliceReadiness(filePath),
-      shutdown: async () => undefined
+      readinessCheck: storage.readinessCheck,
+      shutdown: storage.shutdown
     };
   }
 
@@ -565,13 +582,14 @@ const createRepositoryFromEnvironment = async () => {
       fileURLToPath(
         new URL("../../../../.data/first-slice.sqlite", import.meta.url)
       );
+    const storage = createSqliteFirstSliceStorage(filePath);
     return {
       kind: "sqlite" as const,
-      repository: createSqliteFirstSliceRepository(filePath),
+      repository: storage.repository,
       location: filePath,
       schemaVersion: SQLITE_FIRST_SLICE_SCHEMA_VERSION,
-      readinessCheck: () => checkSqliteFirstSliceReadiness(filePath),
-      shutdown: async () => undefined
+      readinessCheck: storage.readinessCheck,
+      shutdown: storage.shutdown
     };
   }
 
@@ -802,6 +820,10 @@ const createApiRuntime = async () => {
     currentSecret: proofOfWorkCurrentSecret,
     previousSecret: proofOfWorkPreviousSecret
   });
+  const originalSessionProof = new OriginalSessionProof(repository, {
+    enabledScopes: proofOfWorkEnabledScopes, maxNumber: proofOfWorkMaxNumber, ttlMs: proofOfWorkTtlMs,
+    currentSecret: proofOfWorkCurrentSecret, previousSecret: proofOfWorkPreviousSecret, maxJsonBodyBytes
+  });
   const services = createFirstSliceServices({
     repository,
     adminLoginMaxFailures,
@@ -815,36 +837,42 @@ const createApiRuntime = async () => {
     originalXmlSchemaValidator
   });
 
-  if (bootstrapAdmin && (await repository.listAdminUsers()).length === 0) {
-    try {
-      await services.adminAuth.bootstrapAdminUser(bootstrapAdmin);
-    } catch (error) {
-      // A second production replica may win the clean-store bootstrap race.
-      // Treat the configured operation as complete only after re-reading the
-      // exact account and its platform role from the shared store; otherwise
-      // preserve the original startup failure, including partial writes.
-      const concurrentlyBootstrappedAdmin =
-        await repository.getAdminUserByUsername(
-          bootstrapAdmin.username.trim().toLowerCase()
-        );
-      const concurrentlyBootstrappedRoles = concurrentlyBootstrappedAdmin
-        ? await repository.listAdminRoleAssignmentsByUserId(
-            concurrentlyBootstrappedAdmin.adminUserId
+  try {
+    if (bootstrapAdmin && (await repository.listAdminUsers()).length === 0) {
+      try {
+        await services.adminAuth.bootstrapAdminUser(bootstrapAdmin);
+      } catch (error) {
+        // A second production replica may win the clean-store bootstrap race.
+        // Treat the configured operation as complete only after re-reading the
+        // exact account and its platform role from the shared store; otherwise
+        // preserve the original startup failure, including partial writes.
+        const concurrentlyBootstrappedAdmin =
+          await repository.getAdminUserByUsername(
+            bootstrapAdmin.username.trim().toLowerCase()
+          );
+        const concurrentlyBootstrappedRoles = concurrentlyBootstrappedAdmin
+          ? await repository.listAdminRoleAssignmentsByUserId(
+              concurrentlyBootstrappedAdmin.adminUserId
+            )
+          : [];
+        if (
+          !concurrentlyBootstrappedAdmin ||
+          !concurrentlyBootstrappedRoles.some(
+            roleAssignment => roleAssignment.role === "platform_admin"
           )
-        : [];
-      if (
-        !concurrentlyBootstrappedAdmin ||
-        !concurrentlyBootstrappedRoles.some(
-          roleAssignment => roleAssignment.role === "platform_admin"
-        )
-      ) {
-        throw error;
+        ) {
+          throw error;
+        }
       }
     }
-  }
 
-  if (demoBootstrapEnabled) {
-    await bootstrapLocalDemoState({ repository, services });
+    if (demoBootstrapEnabled) {
+      await bootstrapLocalDemoState({ repository, services });
+    }
+
+  } catch (error) {
+    await repositoryConfig.shutdown();
+    throw error;
   }
 
   let presenceSweep: Promise<void> | null = null;
@@ -973,6 +1001,7 @@ const createApiRuntime = async () => {
     repository,
     requestLifecycle,
     proofOfWork,
+    originalSessionProof,
     services,
     metrics: createRuntimeMetrics(),
     recentOperationalEvents: [] as RuntimeOperationalEvent[],
@@ -1165,6 +1194,7 @@ type RuntimeMetrics = {
   activeRequests: number;
   totalRequests: number;
   completedRequests: number;
+  abortedRequests: number;
   requestCountsByMethod: Record<string, number>;
   requestCountsByRoute: Record<string, number>;
   responseCountsByStatusCode: Record<string, number>;
@@ -1193,6 +1223,7 @@ const createRuntimeMetrics = (): RuntimeMetrics => ({
   activeRequests: 0,
   totalRequests: 0,
   completedRequests: 0,
+  abortedRequests: 0,
   requestCountsByMethod: {},
   requestCountsByRoute: {},
   responseCountsByStatusCode: {},
@@ -1320,6 +1351,9 @@ const renderPrometheusMetrics = (
     "# HELP rewrite_app_completed_requests Total completed HTTP requests.",
     "# TYPE rewrite_app_completed_requests counter",
     `rewrite_app_completed_requests ${metrics.completedRequests}`,
+    "# HELP rewrite_app_aborted_requests Total HTTP responses closed before completion.",
+    "# TYPE rewrite_app_aborted_requests counter",
+    `rewrite_app_aborted_requests ${metrics.abortedRequests}`,
     "# HELP rewrite_app_process_resident_memory_bytes Resident process memory in bytes.",
     "# TYPE rewrite_app_process_resident_memory_bytes gauge",
     `rewrite_app_process_resident_memory_bytes ${memory.rssBytes}`,
@@ -1450,10 +1484,13 @@ const sendCsv = (
   endResponse(response, text);
 };
 
-const buildAttachmentContentDisposition = (filename: string): string => {
-  const normalizedFileName = basename(filename)
-    .replace(/[\u0000-\u001f\u007f/\\]/g, "_")
-    .trim() || "download";
+const buildAttachmentContentDisposition = (
+  filename: string,
+  preserveWhitespace = false,
+  disposition: "attachment" | "inline" = "attachment"
+): string => {
+  const safeFileName = basename(filename).replace(/[\u0000-\u001f\u007f/\\]/g, "_");
+  const normalizedFileName = (preserveWhitespace ? safeFileName : safeFileName.trim()) || "download";
   const asciiFallback = normalizedFileName
     .normalize("NFKD")
     .replace(/[^\x20-\x7e]/g, "_")
@@ -1462,7 +1499,7 @@ const buildAttachmentContentDisposition = (filename: string): string => {
     /['()*]/g,
     character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
   );
-  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFileName}`;
+  return `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encodedFileName}`;
 };
 
 const sendAsset = (
@@ -1996,6 +2033,30 @@ class RequestBodyTooLargeError extends Error {
   }
 }
 
+class ClientRequestAbortedError extends Error {
+  constructor(cause: unknown) {
+    super("The client closed an HTTP upload before body consumption finished.", { cause });
+    this.name = "ClientRequestAbortedError";
+  }
+}
+
+// Classify only a reset from the incoming body stream. A downstream database
+// reset remains an internal failure, even if the client also disconnected.
+const readRequestChunks = async function* (request: IncomingMessage) {
+  try {
+    yield* request;
+  } catch (error) {
+    // complete describes HTTP parsing, not whether the application consumed
+    // the buffered body. A client can disconnect during asynchronous auth
+    // after all bytes arrived but before the body reader emits end.
+    if (request.aborted && !request.readableEnded && typeof error === "object" && error !== null &&
+        "code" in error && error.code === "ECONNRESET") {
+      throw new ClientRequestAbortedError(error);
+    }
+    throw error;
+  }
+};
+
 class InvalidMultipartBodyError extends Error {
   constructor(message: string) {
     super(message);
@@ -2024,7 +2085,7 @@ const readRequestBuffer = async (
 
   const chunks: Buffer[] = [];
   let totalBytes = 0;
-  for await (const chunk of request) {
+  for await (const chunk of readRequestChunks(request)) {
     const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     totalBytes += buffer.byteLength;
     if (totalBytes > maxBytes) {
@@ -2126,7 +2187,9 @@ const readMultipartAttachmentUpload = async (
 
 const readJsonBody = async <T>(
   request: IncomingMessage,
-  maxJsonBodyBytes: number
+  maxJsonBodyBytes: number,
+  allowEmpty = false,
+  decode?: (payload: Uint8Array) => unknown
 ): Promise<T> => {
   const contentLengthHeader = request.headers["content-length"];
   const contentLength =
@@ -2140,7 +2203,7 @@ const readJsonBody = async <T>(
   const chunks: Buffer[] = [];
   let totalBytes = 0;
 
-  for await (const chunk of request) {
+  for await (const chunk of readRequestChunks(request)) {
     const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     totalBytes += buffer.byteLength;
     if (totalBytes > maxJsonBodyBytes) {
@@ -2149,8 +2212,9 @@ const readJsonBody = async <T>(
     chunks.push(buffer);
   }
 
-  const payload = Buffer.concat(chunks).toString("utf8");
-  return JSON.parse(payload) as T;
+  const bytes = Buffer.concat(chunks);
+  if (allowEmpty && bytes.length === 0) return undefined as T;
+  return (decode ? decode(bytes) : JSON.parse(bytes.toString("utf8"))) as T;
 };
 
 const readOptionalJsonBody = async <T>(
@@ -2172,7 +2236,7 @@ const readOptionalJsonBody = async <T>(
   const chunks: Buffer[] = [];
   let totalBytes = 0;
 
-  for await (const chunk of request) {
+  for await (const chunk of readRequestChunks(request)) {
     const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     totalBytes += buffer.byteLength;
     if (totalBytes > maxJsonBodyBytes) {
@@ -2202,7 +2266,7 @@ const readRequestBodyByteLength = async (
   }
 
   let totalBytes = 0;
-  for await (const chunk of request) {
+  for await (const chunk of readRequestChunks(request)) {
     totalBytes += Buffer.byteLength(chunk);
     if (totalBytes > maxBytes) {
       throw new RequestBodyTooLargeError(maxBytes);
@@ -2327,6 +2391,9 @@ const sourcePackageAssemblyPattern = createRoutePattern(
 const sourcePackageListPattern = createRoutePattern(
   productionApiRoutes.workspace.listSourcePackages
 );
+const workspaceFileCatalogPattern = createRoutePattern(productionApiRoutes.workspace.getWorkspaceFileCatalog);
+const workspaceFileDownloadPattern = createRoutePattern(productionApiRoutes.workspace.downloadWorkspaceFile);
+const workspaceFileReplacementPattern = createRoutePattern(productionApiRoutes.workspace.replaceWorkspaceFile);
 const sourcePackageDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getSourcePackage
 );
@@ -2411,6 +2478,7 @@ const detailedResponsesPattern = createRoutePattern(
 const groupResultsPattern = createRoutePattern(
   productionApiRoutes.workspace.listGroupResults
 );
+const originalGroupResultsPattern = createRoutePattern(productionApiRoutes.workspace.listOriginalGroupResults);
 const reviewListPattern = createRoutePattern(
   productionApiRoutes.workspace.listReviews
 );
@@ -2474,12 +2542,20 @@ const runtimeStatePattern = createRoutePattern(
 const currentRunStatePattern = createRoutePattern(
   productionApiRoutes.participant.getCurrentRunState
 );
+const participantDebugStatePattern = createRoutePattern(participantDebugStateRoute);
+const participantNativeCommandPattern = createRoutePattern(participantNativeCommandRoute);
+const participantCommandCompletionPattern = createRoutePattern(participantCommandCompletionRoute);
+const participantControllerContextPattern = createRoutePattern(participantControllerContextRoute);
+const participantControllerTimerInterruptionPattern = createRoutePattern(participantControllerTimerInterruptionRoute);
 const participantEventStreamPattern = createRoutePattern(
   productionApiRoutes.participant.eventStream
 );
 const participantEventAcknowledgementPattern = createRoutePattern(
   productionApiRoutes.participant.acknowledgeEventStream
 );
+const participantRunCommandsPattern = createRoutePattern(productionApiRoutes.participant.listPendingCommands);
+const participantRunCommandAcknowledgementPattern = createRoutePattern(productionApiRoutes.participant.acknowledgeCommand);
+const participantRunCommandApplicationPattern = createRoutePattern(participantCommandExecutionRoute);
 const participantResourcePattern =
   /^\/api\/v1\/participant\/sessions\/(?<participantSessionId>[^/]+)\/resources\/(?<resourcePath>.+)$/;
 const saveProgressPattern = createRoutePattern(
@@ -2512,6 +2588,7 @@ const resumeSessionPattern = createRoutePattern(
 const resumeRunPattern = createRoutePattern(
   productionApiRoutes.participant.resumeRun
 );
+const prepareStarterExitPattern = createRoutePattern(participantStarterExitPreparationRoute);
 const returnToStarterPattern = createRoutePattern(
   productionApiRoutes.participant.returnToStarter
 );
@@ -2521,9 +2598,15 @@ const completeRunPattern = createRoutePattern(
 const participantSignOutPattern = createRoutePattern(productionApiRoutes.participant.signOut);
 const participantResourcePathByRequest = new WeakMap<IncomingMessage, string>();
 const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
+  ["GET", participantControllerContextPattern],
+  ["POST", participantNativeCommandPattern],
+  ["POST", participantCommandCompletionPattern],
+  ["GET", participantDebugStatePattern], ["POST", participantDebugStatePattern],
   ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
   ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
   ["POST", participantEventAcknowledgementPattern],
+  ["GET", participantRunCommandsPattern], ["PATCH", participantRunCommandAcknowledgementPattern], ["POST", participantRunCommandApplicationPattern],
+  ["POST", participantControllerTimerInterruptionPattern],
   ["GET", participantReviewCsvExportPattern], ["GET", participantReviewExportPattern],
   ["POST", resumeSessionPattern], ["DELETE", participantSignOutPattern],
   ["POST", saveProgressPattern], ["POST", saveTestLogsPattern],
@@ -2531,7 +2614,7 @@ const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantReviewListPattern], ["POST", participantReviewListPattern],
   ["PATCH", participantReviewDetailPattern], ["DELETE", participantReviewDetailPattern],
   ["POST", unlockTestletPattern], ["POST", resumeRunPattern],
-  ["POST", returnToStarterPattern], ["POST", completeRunPattern]
+  ["POST", prepareStarterExitPattern], ["POST", returnToStarterPattern], ["POST", completeRunPattern]
 ];
 
 const authorizeParticipantRoute = async (
@@ -2600,6 +2683,10 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", sourcePackageCreatePattern],
   ["POST", sourcePackageAssemblyPattern],
   ["GET", sourcePackageListPattern],
+  ["GET", workspaceFileCatalogPattern],
+  ["POST", workspaceFileCatalogPattern],
+  ["GET", workspaceFileDownloadPattern],
+  ["POST", workspaceFileReplacementPattern],
   ["GET", sourcePackageDetailPattern],
   ["GET", sourcePackageDownloadPattern],
   ["GET", sourcePackageDeletionReadinessPattern],
@@ -2625,6 +2712,8 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", openRunsCsvExportPattern],
   ["GET", detailedResponsesPattern],
   ["GET", groupResultsPattern],
+  ["GET", originalGroupResultsPattern],
+  ["DELETE", originalGroupResultsPattern],
   ["DELETE", groupResultsPattern],
   ["GET", reviewListPattern],
   ["POST", reviewListPattern],
@@ -3240,6 +3329,9 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /system-check";
   }
 
+  const originalLabel=originalTestRouteLabel(method,pathname);if(originalLabel)return originalLabel;
+  if (originalSessionRoutes.get(pathname)?.includes(method)) return `${method} ${pathname}`;
+
   if (method === "GET" && pathname === "/healthz") {
     return "GET /healthz";
   }
@@ -3388,6 +3480,9 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
   ) {
     return `PATCH ${productionApiRoutes.admin.updateApplicationSettings}`;
   }
+  if (method === "PATCH" && pathname === productionApiRoutes.admin.patchOriginalApplicationSettings) {
+    return `PATCH ${productionApiRoutes.admin.patchOriginalApplicationSettings}`;
+  }
 
   if (
     ["GET", "POST", "DELETE"].includes(method) &&
@@ -3509,6 +3604,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.assembleSourcePackages
     ],
     ["GET", sourcePackageListPattern, productionApiRoutes.workspace.listSourcePackages],
+    ["GET", workspaceFileCatalogPattern, productionApiRoutes.workspace.getWorkspaceFileCatalog],
+    ["POST", workspaceFileCatalogPattern, productionApiRoutes.workspace.uploadWorkspaceFile],
+    ["GET", workspaceFileDownloadPattern, productionApiRoutes.workspace.downloadWorkspaceFile],
+    ["POST", workspaceFileReplacementPattern, productionApiRoutes.workspace.replaceWorkspaceFile],
     ["GET", sourcePackageDetailPattern, productionApiRoutes.workspace.getSourcePackage],
     [
       "GET",
@@ -3593,6 +3692,8 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       groupResultsPattern,
       productionApiRoutes.workspace.listGroupResults
     ],
+    ["GET", originalGroupResultsPattern, productionApiRoutes.workspace.listOriginalGroupResults],
+    ["DELETE", originalGroupResultsPattern, productionApiRoutes.workspace.deleteOriginalGroupResults],
     [
       "DELETE",
       groupResultsPattern,
@@ -3738,8 +3839,17 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", systemCheckReportExportPattern, productionApiRoutes.workspace.exportSystemCheckReports],
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
+    ["GET", participantControllerContextPattern, participantControllerContextRoute],
+    ["GET", participantDebugStatePattern, participantDebugStateRoute],
+    ["POST", participantDebugStatePattern, participantDebugStateRoute],
     ["GET", participantEventStreamPattern, productionApiRoutes.participant.eventStream],
     ["POST", participantEventAcknowledgementPattern, productionApiRoutes.participant.acknowledgeEventStream],
+    ["GET", participantRunCommandsPattern, productionApiRoutes.participant.listPendingCommands],
+    ["PATCH", participantRunCommandAcknowledgementPattern, productionApiRoutes.participant.acknowledgeCommand],
+    ["POST", participantRunCommandApplicationPattern, participantCommandExecutionRoute],
+    ["POST", participantNativeCommandPattern, participantNativeCommandRoute],
+    ["POST", participantCommandCompletionPattern, participantCommandCompletionRoute],
+    ["POST", participantControllerTimerInterruptionPattern, participantControllerTimerInterruptionRoute],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
@@ -3768,6 +3878,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       returnToStarterPattern,
       productionApiRoutes.participant.returnToStarter
     ],
+    ["POST", prepareStarterExitPattern, participantStarterExitPreparationRoute],
     ["POST", completeRunPattern, productionApiRoutes.participant.completeRun],
     ["GET", monitorOpenRunsPattern, productionApiRoutes.monitor.openRuns],
     ["GET", monitorEventStreamPattern, productionApiRoutes.monitor.eventStream],
@@ -3801,6 +3912,22 @@ const decodeRouteGroup = (value: string | undefined): string | null =>
 
 const readOptionalQueryValue = (url: URL, key: string): string | undefined =>
   url.searchParams.get(key)?.trim() || undefined;
+
+const parseSystemCheckReportQuery = (
+  url: URL,
+  response: ServerResponse
+): { ok: true; checkId?: string; checkIds?: string[] } | { ok: false } => {
+  const supplied = url.searchParams.getAll("checkId");
+  const checkIds = [...new Set(supplied.map(value => value.trim()).filter(Boolean))];
+  // Preserve the historical single blank filter, but never let an explicit
+  // multi-selection of blank IDs turn into a workspace-wide export.
+  if (supplied.length > 1 && checkIds.length === 0) {
+    sendError(response, 400, "system_check_report_check_ids_invalid",
+      "A selected system-check filter must contain a nonempty check ID.");
+    return { ok: false };
+  }
+  return checkIds.length > 1 ? { ok: true, checkIds } : { ok: true, checkId: checkIds[0] };
+};
 
 const parseGroupKeyQuery = (
   url: URL,
@@ -4212,11 +4339,12 @@ const PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS = 1_000;
 const PARTICIPANT_EVENT_STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
 
 const participantCurrentStateRevision = (
-  currentRunState: ParticipantCurrentRunStateResponse["currentRunState"]
+  currentRunState: ParticipantCurrentRunStateResponse["currentRunState"],
+  commands: Awaited<ReturnType<FirstSliceServices["participantRuntime"]["listPendingCommands"]>> = []
 ): string =>
   createHash("sha256")
     .update(
-      JSON.stringify(currentRunState.testRun, (key, value) =>
+      JSON.stringify({ testRun: currentRunState.testRun, commands }, (key, value) =>
         key === "remainingSeconds" ? undefined : value
       )
     )
@@ -4233,6 +4361,7 @@ const writeParticipantEvent = (
 
 const streamParticipantEvents = async (input: {
   request: IncomingMessage;
+  requestLifecycle: ReturnType<typeof createRequestLifecycle>;
   response: ServerResponse;
   participantRuntime: FirstSliceServices["participantRuntime"];
   participantSessionId: string;
@@ -4245,23 +4374,26 @@ const streamParticipantEvents = async (input: {
     testRunId: input.testRunId
   });
   let testRunId = initialState.testRun.testRunId;
+  let commands = await input.participantRuntime.listPendingCommands({
+    participantSessionId: input.participantSessionId, testRunId
+  });
   const connectionId = randomUUID();
   const register = () => input.participantRuntime.updateConnection({
     participantSessionId: input.participantSessionId, testRunId, action: "open", connectionId
   });
-  if (!await register()) {
+  if (!canStreamParticipantRun(initialState.testRun, initialState.participantSession) || !await register()) {
     sendError(input.response, 409, "participant_connection_unavailable",
       "A live connection is unavailable for this run. Refresh the participant state.");
     return;
   }
-  let revision = participantCurrentStateRevision(initialState);
+  let revision = participantCurrentStateRevision(initialState, commands);
   let sequence = 0;
   let lastEventAt = Date.now();
   let polling = false;
   let closed = false;
   let pollHandle: NodeJS.Timeout | null = null;
 
-  const stop = (): void => {
+  const stop = input.requestLifecycle.wrap(async (): Promise<void> => {
     if (closed) {
       return;
     }
@@ -4270,10 +4402,10 @@ const streamParticipantEvents = async (input: {
       clearInterval(pollHandle);
       pollHandle = null;
     }
-    void input.participantRuntime.updateConnection({
+    await input.participantRuntime.updateConnection({
       participantSessionId: input.participantSessionId, testRunId, action: "close", connectionId
     }).catch(() => undefined);
-  };
+  });
   const publish = (
     eventType: ParticipantEventStreamEvent["eventType"]
   ): void => {
@@ -4287,10 +4419,15 @@ const streamParticipantEvents = async (input: {
       testRunId,
       emittedAt: new Date(lastEventAt).toISOString(),
       revision,
-      connectionId
+      connectionId,
+      commands
     });
   };
 
+  if (input.response.destroyed || input.response.writableEnded || input.request.aborted) {
+    await stop();
+    return;
+  }
   input.request.once("close", stop);
   input.response.once("close", stop);
   input.response.writeHead(200, {
@@ -4304,12 +4441,12 @@ const streamParticipantEvents = async (input: {
   input.response.write("retry: 3000\n\n");
   publish("snapshot");
 
-  pollHandle = setInterval(() => {
+  pollHandle = setInterval(input.requestLifecycle.wrap(async () => {
     if (closed || polling) {
       return;
     }
     polling = true;
-    void input.validateAccess()
+    await input.validateAccess()
       .then(() => input.participantRuntime.getCurrentRunState({
         participantSessionId: input.participantSessionId,
         testRunId: input.testRunId
@@ -4318,7 +4455,16 @@ const streamParticipantEvents = async (input: {
         if (closed) {
           return;
         }
-        const nextRevision = participantCurrentStateRevision(currentState);
+        if (!canStreamParticipantRun(currentState.testRun, currentState.participantSession)) {
+          stop();
+          if (!input.response.writableEnded) input.response.end();
+          return;
+        }
+        commands = await input.participantRuntime.listPendingCommands({
+          participantSessionId: input.participantSessionId, testRunId: currentState.testRun.testRunId
+        });
+        if (closed) return;
+        const nextRevision = participantCurrentStateRevision(currentState, commands);
         if (nextRevision !== revision) {
           if (testRunId !== currentState.testRun.testRunId) {
             await input.participantRuntime.updateConnection({
@@ -4354,7 +4500,7 @@ const streamParticipantEvents = async (input: {
       .finally(() => {
         polling = false;
       });
-  }, PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS);
+  }), PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS);
   pollHandle.unref();
 };
 
@@ -4381,6 +4527,7 @@ const writeMonitorEvent = (
 
 const streamMonitorEvents = async (input: {
   request: IncomingMessage;
+  requestLifecycle: ReturnType<typeof createRequestLifecycle>;
   response: ServerResponse;
   monitorRead: FirstSliceServices["monitorRead"];
   tenantKey: string;
@@ -4430,6 +4577,10 @@ const streamMonitorEvents = async (input: {
     });
   };
 
+  if (input.response.destroyed || input.response.writableEnded || input.request.aborted) {
+    stop();
+    return;
+  }
   input.request.once("close", stop);
   input.response.once("close", stop);
   input.response.writeHead(200, {
@@ -4443,12 +4594,12 @@ const streamMonitorEvents = async (input: {
   input.response.write("retry: 3000\n\n");
   publish("snapshot");
 
-  pollHandle = setInterval(() => {
+  pollHandle = setInterval(input.requestLifecycle.wrap(async () => {
     if (closed || polling) {
       return;
     }
     polling = true;
-    void (async () => {
+    await (async () => {
       await input.validateAccess?.();
       return input.monitorRead.listOpenRuns({
         tenantKey: input.tenantKey,
@@ -4484,7 +4635,7 @@ const streamMonitorEvents = async (input: {
       .finally(() => {
         polling = false;
       });
-  }, MONITOR_EVENT_STREAM_POLL_INTERVAL_MS);
+  }), MONITOR_EVENT_STREAM_POLL_INTERVAL_MS);
   pollHandle.unref();
 };
 
@@ -4517,25 +4668,36 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     incrementCounter(metrics.requestCountsByMethod, method);
     incrementCounter(metrics.requestCountsByRoute, routeLabel);
 
-    response.once("finish", () => {
+    let responseOutcomeRecorded = false;
+    const recordResponseOutcome = (aborted: boolean): void => {
+      if (responseOutcomeRecorded) return;
+      responseOutcomeRecorded = true;
       const durationMs = Number(process.hrtime.bigint() - requestStartedAt) / 1_000_000;
       metrics.activeRequests -= 1;
+      const context = {
+        requestId, method, route: routeLabel,
+        // Resource suffixes contain capabilities, including encoded spellings.
+        path: originalResourceLogPath(requestPathname) ?? originalTestRouteLabel('',requestPathname)?.trimStart() ?? (participantResourcePattern.test(requestPathname)
+          ? requestPathname.replace(/(\/resources\/).*/u, "$1:resourcePath") : requestPathname),
+        durationMs: Number(durationMs.toFixed(3)), storageKind: runtime.repositoryConfig.kind
+      };
+      if (aborted) {
+        metrics.abortedRequests += 1;
+        recordRuntimeOperationalEvent(runtime, "info", "http_request_aborted", {
+          ...context, bodyComplete: request.complete
+        });
+        return;
+      }
       metrics.completedRequests += 1;
       incrementCounter(metrics.responseCountsByStatusCode, response.statusCode);
       recordRouteLatency(metrics, routeLabel, durationMs);
       recordRuntimeOperationalEvent(runtime, "info", "http_request_completed", {
-        requestId,
-        method,
-        route: routeLabel,
-        // Resource URLs carry a purpose-limited capability. Redact the entire
-        // suffix, including percent-encoded spellings, before operational logs.
-        path: participantResourcePattern.test(requestPathname)
-          ? requestPathname.replace(/(\/resources\/).*/u, "$1:resourcePath")
-          : requestPathname,
-        statusCode: response.statusCode,
-        durationMs: Number(durationMs.toFixed(3)),
-        storageKind: runtime.repositoryConfig.kind
+        ...context, statusCode: response.statusCode
       });
+    };
+    response.once("finish", () => recordResponseOutcome(false));
+    response.once("close", () => {
+      if (!response.writableFinished) recordResponseOutcome(true);
     });
 
     if (!request.url || !request.method) {
@@ -4696,7 +4858,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             route: routeLabel,
             path: request.url ?? null,
             storageKind: runtime.repositoryConfig.kind,
-            cause: error instanceof Error ? error.message : String(error)
+            cause: error instanceof Error ? error.message : String(error),
+            error: runtimeErrorDetails(error)
           });
           sendError(
             response,
@@ -4725,7 +4888,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             lifecycle: runtime.lifecycle,
             activeRequests: metrics.activeRequests,
             totalRequests: metrics.totalRequests,
-            completedRequests: metrics.completedRequests
+            completedRequests: metrics.completedRequests,
+            abortedRequests: metrics.abortedRequests
           },
           memory,
           storage: {
@@ -4762,7 +4926,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             lifecycle: runtime.lifecycle,
             activeRequests: metrics.activeRequests,
             totalRequests: metrics.totalRequests,
-            completedRequests: metrics.completedRequests
+            completedRequests: metrics.completedRequests,
+            abortedRequests: metrics.abortedRequests
           },
           memory,
           storage: {
@@ -4812,6 +4977,21 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         return;
       }
+
+      if (await handleOriginalTestHttp({request, pathname, services,
+        reason: text => {response.statusMessage=text;},
+        readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),
+        send: (status, value) => sendJson(response, status, value),
+        raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
+        binary:(bytes,contentType)=>{response.writeHead(200,{...securityHeaders,"content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}
+      })) return;
+
+      if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,
+        readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),
+        send: (status, value) => {
+          if (status === 205) { response.writeHead(205, securityHeaders); response.end(); }
+          else sendJson(response, status, value);
+        }})) return;
 
       if (
         request.method === "POST" &&
@@ -4944,7 +5124,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           Buffer.from(applicationAsset.dataBase64, "base64"),
           {
             "cache-control": "public, max-age=300",
-            "content-disposition": `inline; filename="${applicationAsset.originalName.replace(/["\\\r\n]/g, "_")}"`
+            "content-disposition": buildAttachmentContentDisposition(
+              applicationAsset.originalName, false, "inline"
+            )
           }
         );
         return;
@@ -5020,16 +5202,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
       if (
         request.method === "PATCH" &&
-        pathname === productionApiRoutes.admin.updateApplicationSettings
+        (pathname === productionApiRoutes.admin.updateApplicationSettings ||
+         pathname === productionApiRoutes.admin.patchOriginalApplicationSettings)
       ) {
         const sessionToken = requireBearerToken(request, response);
         if (!sessionToken) {
           return;
         }
-        const body =
-          await readApplicationSettingsRequestJsonBody<UpdateApplicationSettingsRequest>();
-        const applicationSettings =
-          await services.applicationSettings.updateApplicationSettings({
+        const originalPatch = pathname === productionApiRoutes.admin.patchOriginalApplicationSettings;
+        const body = await readApplicationSettingsRequestJsonBody<PatchOriginalApplicationSettingsRequest>();
+        const fields = {
             sessionToken,
             appTitle: body.appTitle,
             mainLogo: body.mainLogo,
@@ -5042,7 +5224,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             assetAssignments: body.assetAssignments,
             globalWarningText: body.globalWarningText,
             globalWarningExpiresAt: body.globalWarningExpiresAt
-          });
+          };
+        const applicationSettings = originalPatch
+          ? await services.applicationSettings.patchOriginalApplicationSettings(fields)
+          : await services.applicationSettings.updateApplicationSettings({...fields,appTitle:(body as UpdateApplicationSettingsRequest).appTitle});
         sendJson<UpdateApplicationSettingsResponse>(response, 200, {
           applicationSettings
         });
@@ -5093,10 +5278,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
+        const deletion = await readOptionalRequestJsonBody<DeleteApplicationAssetRequest>();
         const { dataBase64: _dataBase64, ...applicationAsset } =
           await services.applicationSettings.deleteApplicationAsset({
             sessionToken,
-            applicationAssetId
+            applicationAssetId,
+            cascadeAssignments:deletion?.cascadeAssignments
           });
         sendJson<DeleteApplicationAssetResponse>(response, 200, {
           applicationAsset
@@ -6502,11 +6689,57 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const workspaceFileCatalogMatch = workspaceFileCatalogPattern.exec(pathname);
+      if (request.method === 'GET' && workspaceFileCatalogMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceFileCatalogMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(workspaceFileCatalogMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(response, 400, 'invalid_workspace_scope', 'tenantKey and workspaceKey are required.'); return;
+        }
+        const catalog = await services.workspaceAdminRead.getWorkspaceFileCatalog({tenantKey, workspaceKey});
+        sendJson<GetWorkspaceFileCatalogResponse>(response, 200, catalog); return;
+      }
+      if (request.method === 'POST' && workspaceFileCatalogMatch?.groups) {
+        const tenantKey=decodeRouteGroup(workspaceFileCatalogMatch.groups.tenantKey);
+        const workspaceKey=decodeRouteGroup(workspaceFileCatalogMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(response,400,'invalid_workspace_scope','tenantKey and workspaceKey are required.'); return;
+        }
+        const body=await readSourcePackageRequestJsonBody<UploadWorkspaceFileRequest>();
+        if (!body || typeof body!=='object' || Array.isArray(body) || Object.hasOwn(body,'contentStructure') ||
+            typeof body.fileName!=='string' || typeof body.mediaType!=='string' || typeof body.sourceDocument!=='string') {
+          sendError(response,400,'workspace_file_upload_payload_invalid',
+            'A workspace file upload requires fileName, mediaType and string sourceDocument; contentStructure is not accepted.'); return;
+        }
+        const result=await services.contentIntake.uploadWorkspaceFile({tenantKey,workspaceKey,
+          fileName:body.fileName,mediaType:body.mediaType,sourceDocument:body.sourceDocument});
+        sendJson<UploadWorkspaceFileResponse>(response,201,result); return;
+      }
+      const workspaceFileReplacementMatch = workspaceFileReplacementPattern.exec(pathname);
+      if (request.method === 'POST' && workspaceFileReplacementMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceFileReplacementMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(workspaceFileReplacementMatch.groups.workspaceKey);
+        const sourcePackageId = decodeRouteGroup(workspaceFileReplacementMatch.groups.sourcePackageId);
+        if (!tenantKey || !workspaceKey || !sourcePackageId) {
+          sendError(response, 400, 'invalid_workspace_scope', 'tenantKey, workspaceKey and sourcePackageId are required.'); return;
+        }
+        const body = await readSourcePackageRequestJsonBody<ReplaceWorkspaceFileRequest>();
+        if (!body || typeof body !== 'object' || Array.isArray(body) ||
+            Object.hasOwn(body, 'fileName') || Object.hasOwn(body, 'contentStructure') ||
+            typeof body.mediaType !== 'string' || body.sourceDocument == null) {
+          sendError(response, 400, 'workspace_file_replacement_payload_invalid',
+            'A workspace file replacement requires sourceDocument and retains the existing filename; contentStructure is not accepted.'); return;
+        }
+        const result = await services.contentIntake.replaceWorkspaceFile({tenantKey, workspaceKey, sourcePackageId,
+          mediaType: body.mediaType, sourceDocument: body.sourceDocument});
+        sendJson<ReplaceWorkspaceFileResponse>(response, 201, result); return;
+      }
       const sourcePackageCreateMatch = sourcePackageCreatePattern.exec(pathname);
       const sourcePackageAssemblyMatch = sourcePackageAssemblyPattern.exec(pathname);
       const sourcePackageListMatch = sourcePackageListPattern.exec(pathname);
       const sourcePackageDetailMatch = sourcePackageDetailPattern.exec(pathname);
-      const sourcePackageDownloadMatch = sourcePackageDownloadPattern.exec(pathname);
+      const workspaceFileDownloadMatch = workspaceFileDownloadPattern.exec(pathname);
+      const sourcePackageDownloadMatch = workspaceFileDownloadMatch ?? sourcePackageDownloadPattern.exec(pathname);
       const sourcePackageDeletionReadinessMatch =
         sourcePackageDeletionReadinessPattern.exec(pathname);
       const sourcePackageDeleteMatch = sourcePackageDeletePattern.exec(pathname);
@@ -6604,7 +6837,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         const body = Buffer.from(download.dataBase64, "base64");
         sendAsset(response, 200, download.mediaType, body, {
-          "content-disposition": buildAttachmentContentDisposition(download.fileName),
+          "content-disposition": buildAttachmentContentDisposition(workspaceFileDownloadMatch
+            ? download.fileName.split(/[\\/]/).at(-1) ?? download.fileName : download.fileName,
+            Boolean(workspaceFileDownloadMatch)),
           "cache-control": "private, no-store",
           "content-length": String(body.byteLength)
         });
@@ -7376,6 +7611,26 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const originalGroups = originalGroupResultsPattern.exec(pathname);
+      if (request.method === "GET" && originalGroups?.groups) {
+        const tenantKey = decodeRouteGroup(originalGroups.groups.tenantKey), workspaceKey = decodeRouteGroup(originalGroups.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {sendError(response, 400, 'invalid_workspace_scope', 'tenantKey and workspaceKey are required.'); return;}
+        response.setHeader('cache-control', 'private, no-store');
+        const raw = url.searchParams.get('groups');
+        const items = await services.originalGroupResults.list({tenantKey, workspaceKey, groups: raw ? raw.split(',') : []});
+        sendJson<OriginalGroupResult[]>(response, 200, items); return;
+      }
+
+      if (request.method === "DELETE" && originalGroups?.groups) {
+        const tenantKey = decodeRouteGroup(originalGroups.groups.tenantKey), workspaceKey = decodeRouteGroup(originalGroups.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {sendError(response, 400, 'invalid_workspace_scope', 'tenantKey and workspaceKey are required.'); return;}
+        const body = await readRequestJsonBody<unknown>();
+        const groups = body && typeof body === 'object' && !Array.isArray(body) && 'groups' in body ? body.groups : undefined;
+        if (!Array.isArray(groups) || !groups.every(group => typeof group === 'string')) {sendError(response, 400, 'original_result_groups_invalid', 'Group names must be strings.'); return;}
+        await services.originalGroupResults.delete({tenantKey, workspaceKey, groups});
+        response.setHeader('cache-control', 'private, no-store'); response.statusCode = 200; response.end(); return;
+      }
+
       if (request.method === "GET" && groupResultsMatch?.groups) {
         const tenantKey = decodeRouteGroup(groupResultsMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(
@@ -7822,7 +8077,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             workspaceKey,
             groupKeys:
               groupFilter.groupKeys ??
-              (groupFilter.groupKey ? [groupFilter.groupKey] : [])
+              (groupFilter.groupKey ? [groupFilter.groupKey] : undefined)
           });
         sendAsset(response, 200, archive.mediaType, archive.body, {
           "cache-control": "private, no-store",
@@ -8284,7 +8539,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        const checkId = url.searchParams.get("checkId")?.trim() || undefined;
+        const selectedChecks = parseSystemCheckReportQuery(url, response);
+        if (!selectedChecks.ok) return;
         const limitValue = url.searchParams.get("limit")?.trim();
         const limit = limitValue ? Number.parseInt(limitValue, 10) : undefined;
         if (
@@ -8306,7 +8562,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             await services.workspaceAdminRead.exportSystemCheckReportsCsv({
               tenantKey,
               workspaceKey,
-              checkId,
+              checkId: selectedChecks.checkId,
+              checkIds: selectedChecks.checkIds,
               limit
             });
           sendCsv(
@@ -8322,7 +8579,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             await services.workspaceAdminRead.exportSystemCheckReportsJson({
               tenantKey,
               workspaceKey,
-              checkId,
+              checkId: selectedChecks.checkId,
+              checkIds: selectedChecks.checkIds,
               limit
             });
           sendAsset(
@@ -8343,7 +8601,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await services.workspaceAdminRead.listSystemCheckReports({
             tenantKey,
             workspaceKey,
-            checkId,
+            checkId: selectedChecks.checkId,
+            checkIds: selectedChecks.checkIds,
             limit
           });
         sendJson<ListSystemCheckReportsResponse>(response, 200, { items });
@@ -8366,12 +8625,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        const checkId = url.searchParams.get("checkId")?.trim() || undefined;
+        const selectedChecks = parseSystemCheckReportQuery(url, response);
+        if (!selectedChecks.ok) return;
         const items =
           await services.workspaceAdminRead.getSystemCheckReportStatistics({
             tenantKey,
             workspaceKey,
-            checkId
+            checkId: selectedChecks.checkId,
+            checkIds: selectedChecks.checkIds
           });
         sendJson<GetSystemCheckReportStatisticsResponse>(response, 200, { items });
         return;
@@ -8467,6 +8728,53 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const participantRunCommandsMatch = participantRunCommandsPattern.exec(pathname);
+      const participantRunCommandAcknowledgementMatch = participantRunCommandAcknowledgementPattern.exec(pathname);
+      const participantRunCommandApplicationMatch = participantRunCommandApplicationPattern.exec(pathname);
+      if (request.method === "GET" && participantRunCommandsMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantRunCommandsMatch.groups.participantSessionId);
+        const testRunId = url.searchParams.get("testRunId");
+        if (!participantSessionId?.trim() || !testRunId?.trim()) {
+          sendError(response, 400, "participant_command_scope_required", "A participant session and selected Run are required.");
+          return;
+        }
+        const commands = await services.participantRuntime.listPendingCommands({ participantSessionId, testRunId });
+        sendJson(response, 200, { commands });
+        return;
+      }
+      if (request.method === "PATCH" && participantRunCommandAcknowledgementMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantRunCommandAcknowledgementMatch.groups.participantSessionId);
+        const commandId = decodeRouteGroup(participantRunCommandAcknowledgementMatch.groups.commandId);
+        const body = await readRequestJsonBody<{ testRunId?: unknown }>();
+        if (!participantSessionId?.trim() || !commandId?.trim() || typeof body?.testRunId !== "string" || !body.testRunId.trim()) {
+          sendError(response, 400, "participant_command_scope_required", "A participant session, selected Run and command are required.");
+          return;
+        }
+        const command = await services.participantRuntime.acknowledgeCommand({ participantSessionId, commandId, testRunId: body.testRunId });
+        sendJson(response, 200, { command });
+        return;
+      }
+      if (request.method === "POST" && participantRunCommandApplicationMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.participantSessionId);
+        const commandId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.commandId);
+        const body = await readRequestJsonBody<{ testRunId?: unknown; controllerStatus?: unknown; controllerDispatch?: ExecuteParticipantRunCommandRequest["controllerDispatch"]; commandCompletion?: ExecuteParticipantRunCommandRequest["commandCompletion"]; terminationNoop?: unknown }>();
+        if (!participantSessionId?.trim() || !commandId?.trim() || typeof body?.testRunId !== "string" || !body.testRunId.trim()) {
+          sendError(response, 400, "participant_command_scope_required", "A participant session, selected Run and command are required.");
+          return;
+        }
+        if (body.controllerStatus !== undefined && typeof body.controllerStatus !== "string") {
+          sendError(response, 400, "participant_command_controller_status_invalid", "The observed controller status is invalid.");
+          return;
+        }
+        if (body.terminationNoop !== undefined && body.terminationNoop !== true) {
+          sendError(response, 400, "participant_command_controller_status_invalid", "The terminal early-return flag is invalid.");
+          return;
+        }
+        const application = await services.participantRuntime.executeCommand({ participantSessionId, commandId,
+          testRunId: body.testRunId, controllerStatus: body.controllerStatus, controllerDispatch: body.controllerDispatch, terminationNoop: body.terminationNoop, commandCompletion: body.commandCompletion });
+        sendJson(response, 200, { application });
+        return;
+      }
       const currentRunStateMatch = currentRunStatePattern.exec(pathname);
       const participantEventAcknowledgementMatch = participantEventAcknowledgementPattern.exec(pathname);
       if (request.method === "POST" && participantEventAcknowledgementMatch?.groups) {
@@ -8506,6 +8814,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         await streamParticipantEvents({
           request,
           response,
+          requestLifecycle: runtime.requestLifecycle,
           participantRuntime: services.participantRuntime,
           participantSessionId,
           testRunId: url.searchParams.get("testRunId") ?? undefined,
@@ -8516,6 +8825,71 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const participantControllerContextMatch = participantControllerContextPattern.exec(pathname);
+      if (request.method === "GET" && participantControllerContextMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantControllerContextMatch.groups.participantSessionId);
+        if (!participantSessionId) { sendError(response, 400, "participant_session_invalid", "A participant session is required."); return; }
+        const controllerContext = await services.participantRuntime.getControllerContext({ participantSessionId,
+          testRunId: url.searchParams.get("testRunId") ?? undefined });
+        response.setHeader("cache-control", "private, no-store");
+        sendJson<{ controllerContext: ParticipantControllerContext }>(response, 200, { controllerContext });
+        return;
+      }
+      const participantControllerTimerInterruptionMatch = participantControllerTimerInterruptionPattern.exec(pathname);
+      if (request.method === "POST" && participantControllerTimerInterruptionMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantControllerTimerInterruptionMatch.groups.participantSessionId);
+        const body = await readJsonBody<ParticipantControllerTimerInterruptionRequest>(request, runtime.config.maxJsonBodyBytes);
+        if (!participantSessionId || !body || typeof body !== "object" || Array.isArray(body)) {
+          sendError(response, 400, "participant_controller_timer_interruption_invalid", "An explicit participant session and timer interruption are required.");
+          return;
+        }
+        const interruption = await services.participantRuntime.interruptControllerTimer({ ...body, participantSessionId });
+        sendJson(response, 200, { interruption });
+        return;
+      }
+      const participantCommandCompletionMatch = participantCommandCompletionPattern.exec(pathname);
+      if (request.method === "POST" && participantCommandCompletionMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantCommandCompletionMatch.groups.participantSessionId);
+        const body = await readJsonBody<ParticipantCommandCompletionRequest>(request, runtime.config.maxJsonBodyBytes + 4096);
+        if (!participantSessionId || !body || typeof body !== "object" || Array.isArray(body)) {
+          sendError(response, 400, "participant_command_completion_invalid", "A scoped completion is required."); return;
+        }
+        const completion = await services.participantRuntime.completeCommand({ ...body, participantSessionId });
+        sendJson(response, 200, { completion }); return;
+      }
+      const participantNativeCommandMatch = participantNativeCommandPattern.exec(pathname);
+      if (request.method === "POST" && participantNativeCommandMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantNativeCommandMatch.groups.participantSessionId);
+        const body = await readJsonBody<ParticipantNativeCommandRequest>(request, runtime.config.maxJsonBodyBytes);
+        if (!participantSessionId || !body || typeof body !== "object" || Array.isArray(body) || typeof body.testRunId !== "string" || !body.testRunId.trim()) {
+          sendError(response, 400, "participant_native_command_invalid", "An explicit participant session, selected Run and command are required.");
+          return;
+        }
+        const application = await services.participantRuntime.executeNativeCommand({ participantSessionId, testRunId: body.testRunId,
+          contentReleaseId: body.contentReleaseId, bookletKey: body.bookletKey,
+          deliveryId: body.deliveryId, keyword: body.keyword, arguments: body.arguments, controllerStatus: body.controllerStatus, timeStamp: body.timeStamp,
+          controllerDispatch: body.controllerDispatch, terminationNoop: body.terminationNoop, commandCompletion: body.commandCompletion });
+        sendJson<ParticipantNativeCommandResponse>(response, 200, { application });
+        return;
+      }
+      const participantDebugStateMatch = participantDebugStatePattern.exec(pathname);
+      if ((request.method === "GET" || request.method === "POST") && participantDebugStateMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantDebugStateMatch.groups.participantSessionId);
+        const testRunId = url.searchParams.get("testRunId");
+        if (!participantSessionId || !testRunId?.trim()) {
+          sendError(response, 400, "participant_debug_scope_required", "An explicit participant session and selected Run are required.");
+          return;
+        }
+        const body = request.method === "POST" ? await readJsonBody<ParticipantDebugStateRequest>(request, runtime.config.maxJsonBodyBytes) : {};
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+          sendError(response, 400, "participant_debug_request_invalid", "A debug request must be an object.");
+          return;
+        }
+        const debugState = await services.participantRuntime.getDebugState({ participantSessionId, testRunId,
+          unitResponses: body.unitResponses, conditionXml: body.conditionXml });
+        sendJson<ParticipantDebugStateResponse>(response, 200, { debugState });
+        return;
+      }
       if (request.method === "GET" && currentRunStateMatch?.groups) {
         const participantSessionId = decodeRouteGroup(
           currentRunStateMatch.groups.participantSessionId
@@ -8671,6 +9045,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         pathname === productionApiRoutes.participant.launch
       ) {
         const body = await readRequestJsonBody<ParticipantLaunchRequest>();
+        if (body.controllerLifecycle !== undefined && body.controllerLifecycle !== "browser-v1") {
+          sendError(response, 400, "participant_controller_lifecycle_invalid", "Unsupported controller lifecycle.");
+          return;
+        }
         if (
           body.participantSessionId !== undefined &&
           body.participantSessionId !== null
@@ -8686,7 +9064,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           });
           const testRun = await services.participantRuntime.launch({
             participantSessionId: body.participantSessionId,
-            bookletKey: body.bookletKey
+            bookletKey: body.bookletKey,
+            controllerLifecycle: body.controllerLifecycle
           });
           const runtimeState = await services.participantRuntime.getRuntimeState({
             participantSessionId: testRun.participantSessionId
@@ -8723,7 +9102,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         const testRun = await services.participantRuntime.resumeSession({
           participantSessionId: participantSession.participantSessionId,
-          bookletKey: body.bookletKey
+          bookletKey: body.bookletKey,
+          controllerLifecycle: body.controllerLifecycle
         });
         const runtimeState = await services.participantRuntime.getRuntimeState({
           participantSessionId: testRun.participantSessionId
@@ -8775,7 +9155,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<ResumeParticipantSessionRequest>();
         const testRun = await services.participantRuntime.resumeSession({
           participantSessionId,
-          bookletKey: body?.bookletKey
+          bookletKey: body?.bookletKey,
+          controllerLifecycle: body?.controllerLifecycle
         });
         sendJson<ResumeParticipantSessionResponse>(response, 200, { testRun });
         return;
@@ -8794,6 +9175,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const testRun = await services.participantRuntime.saveProgress({
           testRunId,
           deliveryId: body.deliveryId,
+          responseTimestamp: body.responseTimestamp,
+          responseOnly: body.responseOnly,
           currentUnitKey: body.currentUnitKey,
           responseUnitKey: body.responseUnitKey,
           transientUnitResponses: body.transientUnitResponses,
@@ -9026,6 +9409,20 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const preparationMatch = prepareStarterExitPattern.exec(pathname);
+      if (request.method === "POST" && preparationMatch?.groups) {
+        const testRunId = decodeRouteGroup(preparationMatch.groups.testRunId);
+        if (!testRunId) { sendError(response, 400, "invalid_test_run_id", "testRunId is required."); return; }
+        const body = await readOptionalRequestJsonBody<PrepareParticipantStarterExitRequest>();
+        const prepared = await services.participantRuntime.prepareStarterExit({
+          testRunId, currentUnitKey: body?.currentUnitKey ?? "",
+          responseUnitKey: body?.responseUnitKey, unitResponse: body?.unitResponse,
+          transientUnitResponses: body?.transientUnitResponses
+        });
+        sendJson<PrepareParticipantStarterExitResponse>(response, 200, prepared);
+        return;
+      }
+
       const returnToStarterMatch = returnToStarterPattern.exec(pathname);
       if (request.method === "POST" && returnToStarterMatch?.groups) {
         const testRunId = decodeRouteGroup(
@@ -9040,6 +9437,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<ReturnTestRunToStarterRequest>();
         const testRun = await services.participantRuntime.returnToStarter({
           testRunId,
+          expectedStatus: body?.expectedStatus,
+          currentUnitKey: body?.currentUnitKey,
           responseUnitKey: body?.responseUnitKey,
           unitResponse: body?.unitResponse,
           transientUnitResponses: body?.transientUnitResponses,
@@ -9068,6 +9467,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<CompleteTestRunRequest>();
         const testRun = await services.participantRuntime.completeRun({
           testRunId,
+          responseTimestamp: body?.responseTimestamp,
           responseUnitKey: body?.responseUnitKey,
           unitResponse: body?.unitResponse,
           transientUnitResponses: body?.transientUnitResponses,
@@ -9101,6 +9501,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         await streamMonitorEvents({
           request,
           response,
+          requestLifecycle: runtime.requestLifecycle,
           monitorRead: services.monitorRead,
           tenantKey,
           workspaceKey,
@@ -9299,6 +9700,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             workspaceKey,
             testRunIds: normalizedTestRunIds,
             commandType: body.commandType,
+            debugArguments: body.debugArguments,
             actorId:
               operatorAdminUserIdByRequest.get(request) ?? body.actorId,
             targetUnitKey: body.targetUnitKey,
@@ -9356,6 +9758,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey,
           testRunId,
           commandType: body.commandType,
+          debugArguments: body.debugArguments,
           actorId: operatorAdminUserIdByRequest.get(request) ?? body.actorId,
           targetUnitKey: body.targetUnitKey,
           remainingSeconds: body.remainingSeconds
@@ -9399,6 +9802,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       metrics.errorCounts.routeNotFound += 1;
       sendError(response, 404, "route_not_found", `No route matches '${pathname}'.`);
     } catch (error) {
+      if (error instanceof ClientRequestAbortedError) {
+        // The close listener records the transport outcome exactly once.
+        return;
+      }
       if (isFirstSliceError(error)) {
         metrics.errorCounts.firstSlice += 1;
         if (
@@ -9459,13 +9866,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         route: routeLabel,
         path: request.url ?? null,
         storageKind: runtime.repositoryConfig.kind,
-        error:
-          error instanceof Error
-            ? {
-                name: error.name,
-                message: error.message
-              }
-            : { message: String(error) }
+        error: runtimeErrorDetails(error)
       });
       sendError(
         response,
@@ -9491,8 +9892,22 @@ export const createProductionApiServer = async () =>
     const runtime = await createApiRuntime();
     const server = createServer(createRequestHandler(runtime));
     applyHttpServerTimeouts(server, runtime);
+    let shutdownPromise: Promise<void> | undefined;
+    const shutdownRuntime = () => shutdownPromise ??= runtime.shutdown();
     server.once("close", () => {
-      void runtime.shutdown();
+      void shutdownRuntime().catch(error => {
+        recordRuntimeOperationalEvent(runtime, "error", "storage_shutdown_failed", {
+          storageKind: runtime.repositoryConfig.kind,
+          error: runtimeErrorDetails(error)
+        });
+      });
+    });
+    const close = server.close.bind(server);
+    server.close = callback => close(error => {
+      void shutdownRuntime().then(() => callback?.(error), failure => {
+        if (callback) callback(error ?? failure as Error);
+        else server.emit("error", failure);
+      });
     });
     return server;
   };

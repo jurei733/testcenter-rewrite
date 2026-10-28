@@ -2122,9 +2122,66 @@
   ],
   "currentOriginalBookletConfigPackage": {
     "sourceRepository": "https://github.com/iqb-berlin/testcenter",
-    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
     "sourceDirectory": "sampledata/system-test/booklet-config",
-    "bookletKeys": ["Cy-Bklt_BkltConfig-1","Cy-Bklt_BkltConfig-2","Cy-Bklt_BkltConfig-3","Cy-Bklt_BkltConfig-4","Cy-Bklt_BkltConfig-5","Cy-Bklt_BkltConfig-6","Cy-Bklt_BkltConfig-7","Cy-Bklt_BkltConfig-8","Cy-Bklt_BkltConfig-9","Cy-Bklt_BkltConfig-10","Cy-Bklt_BkltConfig-11","Cy-Bklt_BkltConfig-12","Cy-Bklt_BkltConfig-13","Cy-Bklt_BkltConfig-14","Cy-Bklt_BkltConfig-15","Cy-Bklt_BkltConfig-16","Cy-Bklt_BkltConfig-17","Cy-Bklt_BkltConfig-18","Cy-Bklt_BkltConfig-19","Cy-Bklt_BkltConfig-20","Cy-Bklt_BkltConfig-21","Cy-Bklt_BkltConfig-22","Cy-Bklt_BkltConfig-23","Cy-Bklt_BkltConfig-24","Cy-Bklt_BkltConfig-25","Cy-Bklt_BkltConfig-26","Cy-Bklt_BkltConfig-27","Cy-Bklt_BkltConfig-28","Cy-Bklt_BkltConfig-29","Cy-Bklt_BkltConfig-30","Cy-Bklt_BkltConfig-31","Cy-Bklt_BkltConfig-32","Cy-Bklt_BkltConfig-33","Cy-Bklt_BkltConfig-34","Cy-Bklt_BkltConfig-35","Cy-Bklt_BkltConfig-36","Cy-Bklt_BkltConfig-37","Cy-Bklt_BkltConfig-38","Cy-Bklt_BkltConfig-39","Cy-Bklt_BkltConfig-40","Cy-Bklt_BkltConfig-41","Cy-Bklt_BkltConfig-42","Cy-Bklt_BkltConfig-43","Cy-Bklt_BkltConfig-44","Cy-Bklt_BkltConfig-45","Cy-Bklt_BkltConfig-46","Cy-Bklt_BkltConfig-47","Cy-Bklt_BkltConfig-48","Cy-Bklt_BkltConfig-49","Cy-Bklt_BkltConfig-50","Cy-Bklt_BkltConfig-51"],
+    "bookletKeys": [
+      "Cy-Bklt_BkltConfig-1",
+      "Cy-Bklt_BkltConfig-2",
+      "Cy-Bklt_BkltConfig-3",
+      "Cy-Bklt_BkltConfig-4",
+      "Cy-Bklt_BkltConfig-5",
+      "Cy-Bklt_BkltConfig-6",
+      "Cy-Bklt_BkltConfig-7",
+      "Cy-Bklt_BkltConfig-8",
+      "Cy-Bklt_BkltConfig-9",
+      "Cy-Bklt_BkltConfig-10",
+      "Cy-Bklt_BkltConfig-11",
+      "Cy-Bklt_BkltConfig-12",
+      "Cy-Bklt_BkltConfig-13",
+      "Cy-Bklt_BkltConfig-14",
+      "Cy-Bklt_BkltConfig-15",
+      "Cy-Bklt_BkltConfig-16",
+      "Cy-Bklt_BkltConfig-17",
+      "Cy-Bklt_BkltConfig-18",
+      "Cy-Bklt_BkltConfig-19",
+      "Cy-Bklt_BkltConfig-20",
+      "Cy-Bklt_BkltConfig-21",
+      "Cy-Bklt_BkltConfig-22",
+      "Cy-Bklt_BkltConfig-23",
+      "Cy-Bklt_BkltConfig-24",
+      "Cy-Bklt_BkltConfig-25",
+      "Cy-Bklt_BkltConfig-26",
+      "Cy-Bklt_BkltConfig-27",
+      "Cy-Bklt_BkltConfig-28",
+      "Cy-Bklt_BkltConfig-29",
+      "Cy-Bklt_BkltConfig-30",
+      "Cy-Bklt_BkltConfig-31",
+      "Cy-Bklt_BkltConfig-32",
+      "Cy-Bklt_BkltConfig-33",
+      "Cy-Bklt_BkltConfig-34",
+      "Cy-Bklt_BkltConfig-35",
+      "Cy-Bklt_BkltConfig-36",
+      "Cy-Bklt_BkltConfig-37",
+      "Cy-Bklt_BkltConfig-38",
+      "Cy-Bklt_BkltConfig-39",
+      "Cy-Bklt_BkltConfig-40",
+      "Cy-Bklt_BkltConfig-41",
+      "Cy-Bklt_BkltConfig-42",
+      "Cy-Bklt_BkltConfig-43",
+      "Cy-Bklt_BkltConfig-44",
+      "Cy-Bklt_BkltConfig-45",
+      "Cy-Bklt_BkltConfig-46",
+      "Cy-Bklt_BkltConfig-47",
+      "Cy-Bklt_BkltConfig-48",
+      "Cy-Bklt_BkltConfig-49",
+      "Cy-Bklt_BkltConfig-50",
+      "Cy-Bklt_BkltConfig-51",
+      "Cy-Bklt_BkltConfig-52",
+      "Cy-Bklt_BkltConfig-53",
+      "Cy-Bklt_BkltConfig-54",
+      "Cy-Bklt_BkltConfig-55",
+      "Cy-Bklt_BkltConfig-56"
+    ],
     "currentBookletOverrides": [
       {
         "fixture": "booklets/system-test/current-CY_Bklt_BkltConfig_1.xml.base64",
@@ -2153,14 +2210,83 @@
         "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_4.xml",
         "sha256": "6e2c7425ae545963dd30506a825ef11a9924b1d0cad360e68b0b6949f8610f26",
         "bookletKey": "Cy-Bklt_BkltConfig-4"
+      },
+      {
+        "fixture": "booklets/system-test/latest-CY_Bklt_BkltConfig_40.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_40.xml",
+        "sha256": "5bedd0549bbc37d61dc3b8b8fbfec53f85da0a04ec79157b9437d85eeb357542",
+        "bookletKey": "Cy-Bklt_BkltConfig-40"
+      },
+      {
+        "fixture": "booklets/system-test/latest-CY_Bklt_BkltConfig_41.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_41.xml",
+        "sha256": "9d54e6aa641bfc116c5719838695f020fb8a90b27f6289170ee8c22064a29970",
+        "bookletKey": "Cy-Bklt_BkltConfig-41"
+      },
+      {
+        "fixture": "booklets/system-test/latest-CY_Bklt_BkltConfig_52.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_52.xml",
+        "sha256": "9bbd1bacd4e5e544461f525944bffb0f3f229aac36f44776ac0aaf5592405f1b",
+        "bookletKey": "Cy-Bklt_BkltConfig-52"
+      },
+      {
+        "fixture": "booklets/system-test/latest-CY_Bklt_BkltConfig_53.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_53.xml",
+        "sha256": "5488c92723f7cff952f2272fd63d7876931b1078e4fa37f4ae0ccccaab491d95",
+        "bookletKey": "Cy-Bklt_BkltConfig-53"
+      },
+      {
+        "fixture": "booklets/system-test/latest-CY_Bklt_BkltConfig_54.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_54.xml",
+        "sha256": "d4b91ac2eadab2022588c42c5b518a5d621139f93e67945470713a7fa196e6e2",
+        "bookletKey": "Cy-Bklt_BkltConfig-54"
+      },
+      {
+        "fixture": "booklets/system-test/latest-CY_Bklt_BkltConfig_55.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_55.xml",
+        "sha256": "6f61f85f459695269808131801181ba1fbe7d7c652fcc15c928ad5cfefeaf4d0",
+        "bookletKey": "Cy-Bklt_BkltConfig-55"
+      },
+      {
+        "fixture": "booklets/system-test/latest-CY_Bklt_BkltConfig_56.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_56.xml",
+        "sha256": "53b5018204510ea5ad4291ef2d4bb5981317b1dc7ab09a7b9e26be87df5a2aa8",
+        "bookletKey": "Cy-Bklt_BkltConfig-56"
       }
     ],
     "units": [
-      ["units/current-CY_Unit100.xml.base64", "CY-Unit.Sample-100", "8cd9a2a092c1e968596b0610a38b4e9a49a5a7a42d922022eb64208a5cf4653e"],
-      ["units/current-CY_Unit101.xml.base64", "CY-Unit.Sample-101", "5891107c96588bcaf03cb98a4a1cfe3380640554697dc093d4caeeabcf841f86"],
-      ["units/current-CY_Unit102.xml.base64", "CY-Unit.Sample-102", "d430be2cda979b549eca9807628f5a8ef5e21f340153a3604c4d55374cf6621e"],
-      ["units/current-CY_Unit103.xml.base64", "CY-Unit.Sample-103", "bcc2a35f365a7f69d7e6e081d4f5e9a23076be1f6fd7820dcdeef8fc89ef445b"],
-      ["units/current-CY_Unit104.xml.base64", "CY-Unit.Sample-104", "ed54fb762137a772d130b10b3b5ac43db05f03e4a0e884389ebd4ef8b4b9f85c"]
+      [
+        "units/latest-CY_Unit100.xml.base64",
+        "CY-Unit.Sample-100",
+        "85558460aa93799f4e5247eaee29fc8695b40cca447f927cb0e37988122cd81e"
+      ],
+      [
+        "units/latest-CY_Unit101.xml.base64",
+        "CY-Unit.Sample-101",
+        "63f0a73d0a2f62298c211268d923b2cb93a6068b4be6d2d11095b53eae7509d6"
+      ],
+      [
+        "units/latest-CY_Unit102.xml.base64",
+        "CY-Unit.Sample-102",
+        "800d3f8b34b0d891486a0f6f832f363172df1c4f1b8b93beacae43d72d5bb1ef"
+      ],
+      [
+        "units/latest-CY_Unit103.xml.base64",
+        "CY-Unit.Sample-103",
+        "3b7e407112098910e08fa960bf7119a69f2fcc2a8b4d01859047fa8848b7e7c9"
+      ],
+      [
+        "units/latest-CY_Unit104.xml.base64",
+        "CY-Unit.Sample-104",
+        "771d5f454670c9bfcc02fd7f3a23b2a13e1286122b68ac5b6801db0c6e2e83da"
+      ]
     ],
     "player": {
       "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
@@ -2170,12 +2296,12 @@
       "playerKey": "verona-player-simple-6.0"
     },
     "roster": {
-      "fixture": "rosters/current-CY_Logins_BkltConfig.xml.base64",
+      "fixture": "rosters/latest-CY_Logins_BkltConfig.xml.base64",
       "encoding": "base64",
       "sourcePath": "sampledata/system-test/booklet-config/CY_Logins_BkltConfig.xml",
-      "sha256": "940f23538c61cfaba0f00788068a03a4f6c0e45b85b192740e118d42c0e9c900",
+      "sha256": "053abae6982ee600ed22d0ca226754a2203e8092b015edb7831dca7725023732",
       "groupKey": "bklt-config",
-      "participantCount": 51,
+      "participantCount": 56,
       "loginPrefix": "Bklt_Config-",
       "password": "123",
       "executionMode": "run-hot-restart"

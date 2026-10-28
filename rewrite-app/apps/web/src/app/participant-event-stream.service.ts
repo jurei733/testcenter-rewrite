@@ -1,4 +1,5 @@
 import { Injectable, inject, signal } from "@angular/core";
+import type { ParticipantCommandChannel, ParticipantCommandExecution } from "./participant-command-receiver";
 
 import {
   parseParticipantEventStreamEvent,
@@ -43,6 +44,10 @@ export class ParticipantEventStreamService {
   private refresh: ParticipantRefresh | null = null;
   private connectionModeChange: ParticipantConnectionModeChange | null = null;
   private lastReportedConnectionMode: "WEBSOCKET" | "POLLING" | null = null;
+  private commandReceiver: ParticipantCommandChannel | null = null;
+  private commandReceiverReady: Promise<ParticipantCommandChannel | null> | null = null;
+  private commandLifecycle = 0;
+  private executeCommand: ParticipantCommandExecution | null = null;
   private readonly connectionStateValue =
     signal<ParticipantEventStreamConnectionState>({
       status: "idle",
@@ -55,7 +60,8 @@ export class ParticipantEventStreamService {
     participantSessionId: string,
     refresh: ParticipantRefresh,
     connectionModeChange: ParticipantConnectionModeChange | null = null,
-    testRunId = ""
+    testRunId = "",
+    executeCommand: ParticipantCommandExecution | null = null
   ): void {
     const normalizedParticipantSessionId = participantSessionId.trim();
     const normalizedTestRunId = testRunId.trim();
@@ -66,6 +72,7 @@ export class ParticipantEventStreamService {
 
     this.refresh = refresh;
     this.connectionModeChange = connectionModeChange;
+    this.executeCommand = executeCommand;
     if (
       this.activeParticipantSessionId === normalizedParticipantSessionId &&
       this.activeTestRunId === normalizedTestRunId &&
@@ -74,6 +81,9 @@ export class ParticipantEventStreamService {
       return;
     }
 
+    if (this.activeParticipantSessionId !== normalizedParticipantSessionId || this.activeTestRunId !== normalizedTestRunId) {
+      this.resetCommands();
+    }
     this.stopConnection();
     this.lastReportedConnectionMode = null;
     this.activeParticipantSessionId = normalizedParticipantSessionId;
@@ -96,6 +106,8 @@ export class ParticipantEventStreamService {
 
   stop(): void {
     this.stopConnection();
+    this.resetCommands();
+    this.executeCommand = null;
     this.activeParticipantSessionId = "";
     this.activeTestRunId = "";
     this.refresh = null;
@@ -105,10 +117,18 @@ export class ParticipantEventStreamService {
     this.setConnectionState("idle", "Live participant updates are inactive.");
   }
 
+  suspend(): void {
+    // ERROR cuts new channel delivery. Refreshes already accepted from the
+    // channel still finish; route/session cleanup uses stop() to discard them.
+    this.stopConnection();
+    this.setConnectionState("idle", "Live participant updates are inactive.");
+  }
+
   private stopConnection(): void {
     this.generation += 1;
     this.abortController?.abort();
     this.abortController = null;
+    this.commandReceiver?.stopReception();
     if (this.connectHandle != null) {
       globalThis.window?.clearTimeout(this.connectHandle);
       this.connectHandle = null;
@@ -139,6 +159,8 @@ export class ParticipantEventStreamService {
       );
     }
     try {
+      await this.prepareCommands();
+      if (input.generation !== this.generation) return;
       const sessionToken = readParticipantSessionCredential(input.participantSessionId);
       const response = await fetch(
         withSelectedParticipantRun(resolveRoutePath(productionApiRoutes.participant.eventStream, {
@@ -191,7 +213,9 @@ export class ParticipantEventStreamService {
           ? "The network is unavailable. Live updates reconnect automatically when the device is online."
           : "Live updates are temporarily unavailable. Reconnecting automatically; queued answers keep their retry protection."
       );
-      this.queueRefresh();
+      void this.pollCommands(input.generation).catch(() => undefined).then(() => {
+        if (input.generation === this.generation && !this.commandReceiver?.hasOutstanding()) this.queueRefresh();
+      });
       this.connectHandle = globalThis.window?.setTimeout(() => {
         this.connectHandle = null;
         void this.connect({ ...input, reconnecting: true });
@@ -256,14 +280,49 @@ export class ParticipantEventStreamService {
       return false;
     }
     acknowledge(event);
+    if (event.commands) this.commandReceiver?.accept(event.commands);
     this.setConnectionState(
       "live",
       `Live participant updates are connected; ${event.eventType} #${event.sequence}.`
     );
-    if (event.eventType === "snapshot" || event.eventType === "change") {
+    if ((event.eventType === "snapshot" || event.eventType === "change") &&
+        !event.commands?.length && !this.commandReceiver?.hasOutstanding()) {
       this.queueRefresh();
     }
     return true;
+  }
+
+  private resetCommands(): void {
+    this.commandLifecycle += 1;
+    this.commandReceiver?.stop();
+    this.commandReceiver = null;
+    this.commandReceiverReady = null;
+  }
+
+  private prepareCommands(): Promise<ParticipantCommandChannel | null> {
+    if (!this.executeCommand || !this.activeTestRunId) return Promise.resolve(null);
+    if (this.commandReceiverReady) return this.commandReceiverReady;
+    const lifecycle = this.commandLifecycle;
+    const participantSessionId = this.activeParticipantSessionId;
+    const testRunId = this.activeTestRunId;
+    this.commandReceiverReady = import("./participant-command-receiver").then(module => {
+      if (lifecycle !== this.commandLifecycle) return null;
+      this.commandReceiver = module.createParticipantCommandChannel({ participantSessionId, testRunId,
+        execute: (command, signal, allocate) => this.executeCommand?.(command, signal, allocate),
+        readCredential: () => readParticipantSessionCredential(participantSessionId)
+      });
+      return this.commandReceiver;
+    }).catch(error => {
+      if (lifecycle === this.commandLifecycle) this.commandReceiverReady = null;
+      throw error;
+    });
+    return this.commandReceiverReady;
+  }
+
+  private async pollCommands(generation: number): Promise<void> {
+    const receiver = await this.prepareCommands();
+    if (!receiver || generation !== this.generation) return;
+    await receiver.poll(() => generation === this.generation);
   }
 
   private queueRefresh(): void {

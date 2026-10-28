@@ -1,0 +1,13 @@
+﻿"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"timestamp";"logentry"
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:int64-max";"";"";"9223372036854775807";"int64 maximum"
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:default-message";"";"";"0";""
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:null-message";"";"";"1";""
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:empty-message";"";"";"2";""
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:unicode-message";"";"";"3";"Owned Ω/β; 
+ 😀"
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:nul-message";"";"";"4";"owned"
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:int64-min";"";"";"-9223372036854775808";"int64 minimum"
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:repeat";"";"";"42";"repeated raw key"
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:repeat";"";"";"42";"repeated raw key"
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:opened";"";"";"1";"ownedLockState : ""preserved"""
+"ORACLE.TEST.LOCK";"owned-native-test-lock";"Shared";"ORACLE.POW.BOOK#lock:opened";"";"";"99";"opened lock"

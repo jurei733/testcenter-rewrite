@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,12 +25,13 @@ import {
 const largeEntityFilePath = (
   filePath: string,
   collectionName: "source-packages" | "content-releases",
-  entityId: string
+  entityId: string,
+  entity: unknown
 ): string =>
   join(
     `${filePath}.objects`,
     collectionName,
-    `${encodeURIComponent(entityId)}.json`
+    `${encodeURIComponent(entityId)}.${createHash("sha256").update(JSON.stringify(entity)).digest("hex")}.json`
   );
 
 const createLargeEntityFixture = () => {
@@ -230,12 +232,14 @@ describe("createFileFirstSliceRepository", () => {
     const sourcePackagePath = largeEntityFilePath(
       filePath,
       "source-packages",
-      sourcePackage.sourcePackageId
+      sourcePackage.sourcePackageId,
+      sourcePackage
     );
     const contentReleasePath = largeEntityFilePath(
       filePath,
       "content-releases",
-      contentRelease.contentReleaseId
+      contentRelease.contentReleaseId,
+      contentRelease
     );
 
     try {
@@ -255,16 +259,17 @@ describe("createFileFirstSliceRepository", () => {
       assert.deepEqual(coreDocument.sourcePackages, {});
       assert.deepEqual(coreDocument.contentReleases, {});
       assert.deepEqual(coreDocument.externalizedCollections, {
-        version: 1,
+        version: 3,
         sourcePackageIds: [sourcePackage.sourcePackageId],
-        contentReleaseIds: [contentRelease.contentReleaseId]
+        contentReleaseIds: [contentRelease.contentReleaseId],
+        sourcePackageHashes: { [sourcePackage.sourcePackageId]: createHash("sha256").update(JSON.stringify(sourcePackage)).digest("hex") },
+        contentReleaseHashes: { [contentRelease.contentReleaseId]: createHash("sha256").update(JSON.stringify(contentRelease)).digest("hex") }
       });
       assert.equal((await stat(filePath)).size < 100_000, true);
 
       const sourceSidecar = await readFile(sourcePackagePath, "utf8");
       const releaseSidecar = await readFile(contentReleasePath, "utf8");
-      await writeFile(sourcePackagePath, `${sourceSidecar}\n`, "utf8");
-      await writeFile(contentReleasePath, `${releaseSidecar}\n`, "utf8");
+      const sourceStat = await stat(sourcePackagePath), releaseStat = await stat(contentReleasePath);
       await repository.saveApplicationSettings({
         appTitle: "Large package portal",
         mainLogo: "app-icon.svg",
@@ -280,8 +285,10 @@ describe("createFileFirstSliceRepository", () => {
         updatedAt: "2026-08-10T00:02:00.000Z",
         updatedByAdminUserId: null
       });
-      assert.equal((await readFile(sourcePackagePath, "utf8")).endsWith("\n"), true);
-      assert.equal((await readFile(contentReleasePath, "utf8")).endsWith("\n"), true);
+      assert.equal(await readFile(sourcePackagePath, "utf8"), sourceSidecar);
+      assert.equal(await readFile(contentReleasePath, "utf8"), releaseSidecar);
+      assert.equal((await stat(sourcePackagePath)).mtimeMs, sourceStat.mtimeMs);
+      assert.equal((await stat(contentReleasePath)).mtimeMs, releaseStat.mtimeMs);
 
       const restarted = createFileFirstSliceRepository(filePath);
       assert.deepEqual(
@@ -343,7 +350,7 @@ describe("createFileFirstSliceRepository", () => {
       };
       assert.deepEqual(migratedCore.sourcePackages, {});
       assert.deepEqual(migratedCore.contentReleases, {});
-      assert.equal(migratedCore.externalizedCollections?.version, 1);
+      assert.equal(migratedCore.externalizedCollections?.version, 3);
 
       const restarted = createFileFirstSliceRepository(filePath);
       assert.deepEqual(
@@ -372,12 +379,14 @@ describe("createFileFirstSliceRepository", () => {
     const sourcePackagePath = largeEntityFilePath(
       filePath,
       "source-packages",
-      sourcePackage.sourcePackageId
+      sourcePackage.sourcePackageId,
+      sourcePackage
     );
     const contentReleasePath = largeEntityFilePath(
       filePath,
       "content-releases",
-      contentRelease.contentReleaseId
+      contentRelease.contentReleaseId,
+      contentRelease
     );
 
     try {
@@ -394,6 +403,13 @@ describe("createFileFirstSliceRepository", () => {
         diagnostics: []
       });
       await repository.saveContentRelease(contentRelease);
+      const replacedSource = { ...sourcePackage, fileName: "updated-original-package.zip" };
+      const replacedRelease = { ...contentRelease, releaseLabel: "Updated release" };
+      await repository.saveSourcePackage(replacedSource);
+      await repository.saveContentRelease(replacedRelease);
+      const replacedSourcePath = largeEntityFilePath(filePath, "source-packages", replacedSource.sourcePackageId, replacedSource);
+      const replacedReleasePath = largeEntityFilePath(filePath, "content-releases", replacedRelease.contentReleaseId, replacedRelease);
+      for (const path of [sourcePackagePath, contentReleasePath, replacedSourcePath, replacedReleasePath]) await stat(path);
       assert.equal(
         await repository.deleteSourcePackageAggregate({
           tenantId: sourcePackage.tenantId,
@@ -403,7 +419,7 @@ describe("createFileFirstSliceRepository", () => {
           expectedContentReleaseIds: [contentRelease.contentReleaseId],
           expectedWorkspaceSourcePackageReferenceRevision:
             createWorkspaceSourcePackageReferenceRevision({
-              sourcePackages: [sourcePackage],
+              sourcePackages: [replacedSource],
               activityEvents: []
             })
         }),
@@ -411,6 +427,8 @@ describe("createFileFirstSliceRepository", () => {
       );
       await assert.rejects(() => stat(sourcePackagePath), { code: "ENOENT" });
       await assert.rejects(() => stat(contentReleasePath), { code: "ENOENT" });
+      await assert.rejects(() => stat(replacedSourcePath), { code: "ENOENT" });
+      await assert.rejects(() => stat(replacedReleasePath), { code: "ENOENT" });
 
       const restarted = createFileFirstSliceRepository(filePath);
       assert.equal(

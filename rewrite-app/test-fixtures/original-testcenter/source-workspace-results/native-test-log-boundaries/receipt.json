@@ -1,0 +1,1070 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "transport": "unchanged production Apache HTTP; actual ALTCHA; no SQL seeds",
+  "testMode": false,
+  "checks": [
+    {
+      "name": "actual production Apache requires both native Login and person challenges"
+    },
+    {
+      "name": "owned XSD-validated fixture enters only through protected admin HTTP"
+    },
+    {
+      "name": "configured Login protection refuses direct password authentication"
+    },
+    {
+      "name": "actual native Login challenge is solved without replacing the production verifier",
+      "challenge": {
+        "keys": [
+          "algorithm",
+          "challenge",
+          "maxNumber",
+          "salt",
+          "signature"
+        ],
+        "algorithm": "SHA-256",
+        "maxnumber": 1000000,
+        "saltParameterNames": [
+          "loginType",
+          "name",
+          "password"
+        ],
+        "hasExpiryParameter": false
+      }
+    },
+    {
+      "name": "invalid signature and wrong work cannot authenticate through the native solution route"
+    },
+    {
+      "name": "a valid Login solution returns the coded Login AccessSet rather than a person"
+    },
+    {
+      "name": "Login-solution replay behavior is measured without assuming one-use semantics",
+      "status": 200,
+      "sameLoginToken": true
+    },
+    {
+      "name": "native person challenges require a Login bearer before issuing work"
+    },
+    {
+      "name": "configured person protection refuses direct code entry while Login metadata remains readable"
+    },
+    {
+      "name": "actual native person challenge retains its observed signed parameter shape",
+      "challenge": {
+        "keys": [
+          "algorithm",
+          "challenge",
+          "maxNumber",
+          "salt",
+          "signature"
+        ],
+        "algorithm": "SHA-256",
+        "maxnumber": 1000000,
+        "saltParameterNames": [
+          "code"
+        ],
+        "hasExpiryParameter": false
+      }
+    },
+    {
+      "name": "a person solution still requires the correct Login bearer and valid work"
+    },
+    {
+      "name": "a valid person solution returns exact raw code display and assigned Test claims without opening a Test"
+    },
+    {
+      "name": "person-solution replay and bearer rotation are observed separately",
+      "status": 200,
+      "rotatedPersonToken": true
+    },
+    {
+      "name": "person-solution binding to a different authorized Login is measured explicitly",
+      "status": 200,
+      "peerIdentity": "owned-native-pow-peer"
+    },
+    {
+      "name": "a signed person challenge cannot be used with modified salt parameters"
+    },
+    {
+      "name": "proof-based person entry and Login logout preserve the original first-factor capability"
+    },
+    {
+      "name": "native groups contain actual opened Tests, Unit state, answers, reviews and logs before deletion"
+    },
+    {
+      "name": "deleting an obsolete group snapshot preserves the Login, person and Test already rebound elsewhere"
+    },
+    {
+      "name": "read-only, anonymous and participant deletion is denied; an unknown group is a successful no-op"
+    },
+    {
+      "name": "case-equivalent whole-group deletion returns an empty HTTP200 and revokes every selected Login and person while preserving other groups and authored files"
+    },
+    {
+      "name": "new native authentication recreates fresh Login, group and person capabilities without reviving deleted Tests or old bearers"
+    },
+    {
+      "name": "native response requires an initialized Unit; state creates an owned alias independently of Booklet membership and records its first original ID and person suffix"
+    },
+    {
+      "name": "response parts retain independent client clocks and response types across partial writes, equal/stale rejection and the omitted-type default",
+      "parts": [
+        {
+          "id": "part-a",
+          "content": "  Exact part Ω/β\n\"; \\ kept  ",
+          "ts": 1792929600010,
+          "responseType": "first/Ω"
+        },
+        {
+          "id": "part-c",
+          "content": "new c",
+          "ts": 1792929600010,
+          "responseType": "third/γ"
+        },
+        {
+          "id": "part-default",
+          "content": "default type",
+          "ts": 1792929600040,
+          "responseType": "unknown"
+        },
+        {
+          "id": "part-z",
+          "content": "new z",
+          "ts": 1792929600020,
+          "responseType": "second/β"
+        }
+      ]
+    },
+    {
+      "name": "Unit field clocks and response clocks stay independent while the original Unit ID remains the first stored value",
+      "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+      "originalUnitId": "FIRST.PERSISTED.ID"
+    },
+    {
+      "name": "real PHP review categories retain numeric first spelling, strict selected membership, empty tokens and distinct overflowing integer strings",
+      "categoryNames": [
+        "category_",
+        "category_1",
+        "category_02",
+        "category_10",
+        "category_9223372036854775807",
+        "category_9223372036854775808",
+        "category_9223372036854775809"
+      ]
+    },
+    {
+      "name": "enhanced report labels resolve the current physical Booklet alias and raw XML labels without rewriting stored Unit identity",
+      "bookletlabel": "  Current Booklet Ω\n  ",
+      "unitlabel": "  Alias current Ω  "
+    },
+    {
+      "name": "all four native report variants retain original JSON and CSV bytes; unknown groups return zero bytes in both formats",
+      "reports": [
+        {
+          "file": "unit-parts-responses.json",
+          "bytes": 725,
+          "sha256": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-responses.csv",
+          "bytes": 768,
+          "sha256": "4cd713b969ca86fb9680fe25cd3013fbfded9b679233873d7f86331f46ba1df9",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-logs.json",
+          "bytes": 1542,
+          "sha256": "f5f140b330a5cd33ec34b3e87924d52dc189f60bb5d7cda733588d562c4a40f4",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-logs.csv",
+          "bytes": 1045,
+          "sha256": "cb21f0d3a73a3a8b7780fffe0334cc4d2ee9a6bf64603a181a91d1df4f3cec09",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-reviews-legacy.json",
+          "bytes": 2710,
+          "sha256": "a03d71edf2915f6f3fc8fb00161e6d2d43870d568ba6d292d59e6daa8f61672e",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-reviews-legacy.csv",
+          "bytes": 1428,
+          "sha256": "1c230e08cebdb6b85209615e17b9e0ef4fa21fae405ceb9fc3b0fff1966f8197",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-reviews-enhanced.json",
+          "bytes": 3310,
+          "sha256": "517997f77cf2d5973691658777c75d79f4fd772fc815876831077a3048a5e12f",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-reviews-enhanced.csv",
+          "bytes": 2041,
+          "sha256": "606989e0f570b29705f2516418eb4331718913b15ab5e94a3e75099ac4de4c2e",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native result downloads permit the owned read-only administrator and reject anonymous or participant capabilities"
+    },
+    {
+      "name": "native Test PUT accepts a real workspace Booklet outside current assignments, returns raw decimal201 and leaves it unopened",
+      "testId": 6,
+      "bookletName": "ORACLE.UNASSIGNED.BOOK",
+      "body": "6",
+      "contentType": "text/html; charset=UTF-8",
+      "loginDenied": 403,
+      "adminDenied": 403
+    },
+    {
+      "name": "native Test PUT reuses case-equivalent and whitespace-normalized names while canonicalizing duplicate preset keys in first-key order",
+      "testId": 6,
+      "presetId": 8,
+      "presetInput": "ORACLE.UNASSIGNED.BOOK#b:second;a:first;b:last",
+      "presetCanonical": "ORACLE.UNASSIGNED.BOOK#b:last;a:first"
+    },
+    {
+      "name": "native Test PUT retains the first raw physical Booklet label and rejects a locked unopened Test before opening",
+      "testId": 6,
+      "firstLabel": "  Unassigned first Ω\n  ",
+      "replacementLabel": "Replacement unassigned Ω",
+      "status": 423
+    },
+    {
+      "name": "native numeric Test GET enforces person ownership and opens an unassigned Test only once with current XML and canonical preset state",
+      "testId": 8,
+      "firstStart": true,
+      "secondStart": false,
+      "mode": "run-review",
+      "laststate": [],
+      "presetBookletStates": {
+        "b": "last",
+        "a": "first"
+      },
+      "xmlSha256": "d9d7a5fc60cad4d59e412a0fbccf15ecb5bea5e9fad6004b89d7996c1434844d"
+    },
+    {
+      "name": "native Test PUT resolves an already owned raw name before physical-file lookup but a normalization miss and new person require the current file",
+      "testId": 9,
+      "removedBooklet": "ORACLE.GONE.BOOK",
+      "retainedStatus": 201,
+      "whitespaceStatus": 404,
+      "newPersonStatus": 404
+    },
+    {
+      "name": "native Test GET resolves physical Unit resource relationships and group files preserve exact bytes and private cache headers",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "workspaceId": 1,
+      "resourceBytes": 431,
+      "resourceSha256": "102df5b4d604b698be7021df5825b720068d630fef6f1595111bf20220dd7ced",
+      "contentType": "text/html;charset=UTF-8",
+      "sourceHeader": "backend",
+      "cacheControl": "private"
+    },
+    {
+      "name": "native resource and Test reads enforce group-kind workspace containment and ownership before returning missing-test details",
+      "personAsGroup": 403,
+      "foreignWorkspace": 403,
+      "nonResource": 403,
+      "traversal": 404,
+      "nonpositiveTest": 400,
+      "unknownPositiveTest": 403
+    },
+    {
+      "name": "native Test state preserves scalar and array types but PHP-encodes object content; null required content is rejected without mutation",
+      "state": {
+        "ownedArray": [
+          1,
+          "Ω/x",
+          {
+            "inner": "nested/Ω"
+          }
+        ],
+        "ownedEmpty": "",
+        "ownedFalse": false,
+        "ownedChoice": "newest in batch",
+        "ownedNumber": 42,
+        "ownedObject": "{\"b\":\"\\u03a9\\/x\",\"a\":1}"
+      },
+      "nullStatus": 400,
+      "mode": "run-review",
+      "zeroOnlyState": []
+    },
+    {
+      "name": "native Test state clocks reset across batches while equal and zero entries keep within-batch first-writer semantics",
+      "firstBatch": "newest in batch",
+      "laterLowerClock": "older positive in later batch",
+      "equalBatch": "first equal in next batch",
+      "finalState": {
+        "ownedArray": [
+          1,
+          "Ω/x",
+          {
+            "inner": "nested/Ω"
+          }
+        ],
+        "ownedEmpty": "",
+        "ownedFalse": false,
+        "ownedChoice": "first equal in next batch",
+        "ownedNumber": 42,
+        "ownedObject": "{\"b\":\"\\u03a9\\/x\",\"a\":1}"
+      }
+    },
+    {
+      "name": "native Unit GET returns five fields from the current physical Unit without creating a saved Unit or opening its Test",
+      "empty": {
+        "state": {},
+        "dataParts": {},
+        "unitResponseType": "",
+        "definition": "Owned definition",
+        "definitionType": "owned-pow-player-6.0"
+      },
+      "contentType": "application/json",
+      "foreignDenied": 403,
+      "loginDenied": 403,
+      "missingPhysical": 404
+    },
+    {
+      "name": "native Unit state retains clocks across both body formats and keeps the first stored physical identity",
+      "state": {
+        "choice": "newest",
+        "second": "legacy array"
+      },
+      "firstOriginalUnitId": "FIRST.NATIVE.ID",
+      "bodyFormats": [
+        "newState object",
+        "legacy array"
+      ]
+    },
+    {
+      "name": "native Unit GET restores independent accepted data parts and Source final-row response type",
+      "dataParts": {
+        "a": "Exact Ω/x",
+        "z": "new z",
+        "c": "new c",
+        "zero": "zero first insert"
+      },
+      "unitResponseType": "unknown",
+      "state": {
+        "choice": "newest",
+        "second": "legacy array"
+      }
+    },
+    {
+      "name": "native Unit reads and writes stay independent of Test lock while a PHP-falsy zero alias falls back to the physical Unit name",
+      "lockedGet": 200,
+      "lockedState": 200,
+      "lockedResponse": 201,
+      "zeroAliasState": {}
+    },
+    {
+      "name": "native Testlog authorizes person ownership before body parsing and accepts canonical leading-zero Test identities",
+      "missing": 401,
+      "login": 403,
+      "admin": 403,
+      "foreign": 403,
+      "foreignMalformed": 403,
+      "zero": 400,
+      "unknown": 403,
+      "leadingZeros": 201
+    },
+    {
+      "name": "native Testlog defaults missing and null content to empty JSON strings without opening or changing its Test",
+      "status": 201,
+      "bodyBytes": 0,
+      "contentType": "text/html; charset=UTF-8",
+      "entries": [
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 0,
+          "logentry": "missing : \"\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1,
+          "logentry": "null : \"\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 2,
+          "logentry": "empty : \"\""
+        }
+      ],
+      "firstStart": true,
+      "laststate": []
+    },
+    {
+      "name": "native Testlog preserves typed PHP JSON bytes including numeric-zero falsiness and independent client timestamps",
+      "input": [
+        {
+          "key": "typed-0",
+          "content": "Exact Ω/β\n\"; 😀",
+          "timeStamp": 10
+        },
+        {
+          "key": "typed-1",
+          "content": 0,
+          "timeStamp": 11
+        },
+        {
+          "key": "typed-2",
+          "content": 42,
+          "timeStamp": 12
+        },
+        {
+          "key": "typed-3",
+          "content": 1.5,
+          "timeStamp": 13
+        },
+        {
+          "key": "typed-4",
+          "content": false,
+          "timeStamp": 14
+        },
+        {
+          "key": "typed-5",
+          "content": true,
+          "timeStamp": 15
+        },
+        {
+          "key": "typed-6",
+          "content": [
+            1,
+            "Ω/x",
+            {
+              "nested": "ä/y"
+            }
+          ],
+          "timeStamp": 16
+        },
+        {
+          "key": "typed-7",
+          "content": {
+            "b": "Ω/x",
+            "a": 1
+          },
+          "timeStamp": 17
+        }
+      ],
+      "entries": [
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 10,
+          "logentry": "typed-0 : \"Exact \\u03a9\\/\\u03b2\\n\\\"; \\ud83d\\ude00\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 11,
+          "logentry": "typed-1"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 12,
+          "logentry": "typed-2 : 42"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 13,
+          "logentry": "typed-3 : 1.5"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 14,
+          "logentry": "typed-4 : false"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 15,
+          "logentry": "typed-5 : true"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 16,
+          "logentry": "typed-6 : [1,\"\\u03a9\\/x\",{\"nested\":\"\\u00e4\\/y\"}]"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 17,
+          "logentry": "typed-7 : {\"b\":\"\\u03a9\\/x\",\"a\":1}"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog validates every batch row before inserting and records the actual malformed-JSON server-error boundary",
+      "missingFields": 400,
+      "nonArray": 400,
+      "malformedJson": 500,
+      "wrongMethod": 405,
+      "batchRowsAfterRejection": 11
+    },
+    {
+      "name": "native Testlog appends repeated packets twice while an empty batch leaves both logs and Test timestamps unchanged",
+      "duplicateEntries": [
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 99,
+          "logentry": "duplicate : \"same packet \\u03a9\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 99,
+          "logentry": "duplicate : \"same packet \\u03a9\""
+        }
+      ],
+      "emptyStatus": 201,
+      "rows": 13
+    },
+    {
+      "name": "native Testlog append remains authorized independently of Test lock and does not advance the locked Test",
+      "status": 201
+    },
+    {
+      "name": "actual protected native Testlog reports retain complete JSON and CSV bytes with typed defaults duplicate packets and lock-independent appends",
+      "files": [
+        {
+          "file": "testlog-append.json",
+          "bytes": 3200,
+          "sha256": "dd6577dc5944737a7c82a26e1a8f401ec40a99a394320f6752104bbda58815b4",
+          "contentType": "application/json"
+        },
+        {
+          "file": "testlog-append.csv",
+          "bytes": 1838,
+          "sha256": "423093c56e5a362605c5474bacadea205bd6aa1cb0ad040e2fb83dc38f9efe93",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production codec records escaped NUL and line-separator content without opening or modifying a Test",
+      "input": [
+        {
+          "key": "NUL string",
+          "content": "a\u0000b",
+          "timeStamp": 1792929601100
+        },
+        {
+          "key": "NUL object",
+          "content": {
+            "zero\u0000key": "a\u0000b",
+            "empty": []
+          },
+          "timeStamp": 1792929601101
+        },
+        {
+          "key": "line separators",
+          "content": "left middle right",
+          "timeStamp": 1792929601102
+        }
+      ],
+      "entries": [
+        {
+          "groupname": "ORACLE.TESTLOG.CODEC",
+          "loginname": "owned-native-testlog-codec",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#codec:raw",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1792929601100,
+          "logentry": "NUL string : \"a\\u0000b\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG.CODEC",
+          "loginname": "owned-native-testlog-codec",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#codec:raw",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1792929601101,
+          "logentry": "NUL object : {\"zero\\u0000key\":\"a\\u0000b\",\"empty\":[]}"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG.CODEC",
+          "loginname": "owned-native-testlog-codec",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#codec:raw",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1792929601102,
+          "logentry": "line separators : \"left\\u2028middle\\u2029right\""
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production codec records strict scalar-field and raw float-token error boundaries with no appended rows",
+      "cases": [
+        {
+          "label": "numeric key",
+          "input": [
+            {
+              "key": 7,
+              "content": "owned",
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":7,\"content\":\"owned\",\"timeStamp\":100}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "boolean key",
+          "input": [
+            {
+              "key": true,
+              "content": "owned",
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":true,\"content\":\"owned\",\"timeStamp\":100}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "array key",
+          "input": [
+            {
+              "key": [],
+              "content": "owned",
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":[],\"content\":\"owned\",\"timeStamp\":100}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "object key",
+          "input": [
+            {
+              "key": {},
+              "content": "owned",
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":{},\"content\":\"owned\",\"timeStamp\":100}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "string timestamp",
+          "input": [
+            {
+              "key": "owned invalid stamp",
+              "timeStamp": "100"
+            }
+          ],
+          "literal": "[{\"key\":\"owned invalid stamp\",\"timeStamp\":\"100\"}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "boolean timestamp",
+          "input": [
+            {
+              "key": "owned invalid stamp",
+              "timeStamp": true
+            }
+          ],
+          "literal": "[{\"key\":\"owned invalid stamp\",\"timeStamp\":true}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "float-token timestamp",
+          "input": [
+            {
+              "key": "owned float stamp",
+              "timeStamp": 1
+            }
+          ],
+          "literal": "[{\"key\":\"owned float stamp\",\"timeStamp\":1.0}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "null timestamp",
+          "input": [
+            {
+              "key": "owned null stamp",
+              "timeStamp": null
+            }
+          ],
+          "literal": "[{\"key\":\"owned null stamp\",\"timeStamp\":null}]",
+          "status": 400,
+          "value": "Required body-parameter is missing: `timeStamp`",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "null key",
+          "input": [
+            {
+              "key": null,
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":null,\"timeStamp\":100}]",
+          "status": 400,
+          "value": "Required body-parameter is missing: `key`",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "scalar row",
+          "input": [
+            42
+          ],
+          "literal": "[42]",
+          "status": 400,
+          "value": "Required body-parameter is missing: `key`",
+          "contentType": "text/html;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production codec records raw negative-zero exponent and int64 JSON number representations with complete report bytes",
+      "numbers": [
+        {
+          "literal": "0",
+          "entry": "raw-number-0"
+        },
+        {
+          "literal": "-0.0",
+          "entry": "raw-number-1 : -0"
+        },
+        {
+          "literal": "1.0",
+          "entry": "raw-number-2 : 1"
+        },
+        {
+          "literal": "1e-7",
+          "entry": "raw-number-3 : 1.0e-7"
+        },
+        {
+          "literal": "1e-5",
+          "entry": "raw-number-4 : 1.0e-5"
+        },
+        {
+          "literal": "1e17",
+          "entry": "raw-number-5 : 1.0e+17"
+        },
+        {
+          "literal": "1e20",
+          "entry": "raw-number-6 : 1.0e+20"
+        },
+        {
+          "literal": "100000000000000000",
+          "entry": "raw-number-7 : 100000000000000000"
+        },
+        {
+          "literal": "9007199254740993",
+          "entry": "raw-number-8 : 9007199254740993"
+        },
+        {
+          "literal": "9223372036854775807",
+          "entry": "raw-number-9 : 9223372036854775807"
+        },
+        {
+          "literal": "9223372036854775808",
+          "entry": "raw-number-10 : 9.223372036854776e+18"
+        }
+      ],
+      "files": [
+        {
+          "file": "testlog-codec.json",
+          "bytes": 3344,
+          "sha256": "ae0ecfb2bdd1e3d19b73b0b900683a0897d1bbcf3988e5299cce0d3d7b1ab7c5",
+          "contentType": "application/json"
+        },
+        {
+          "file": "testlog-codec.csv",
+          "bytes": 2092,
+          "sha256": "e2eda4e6be6c3c5ce2202b560cc8f5cdb4c65f9d1209521754c60856a0b7f7cd",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production boundaries retain raw int64 timestamps object ordering NUL keys and exact decoder depth outcomes",
+      "boundaries": [
+        {
+          "label": "embedded NUL log key",
+          "literal": "[{\"key\":\"owned\\u0000suffix\",\"content\":\"tail content\",\"timeStamp\":1792929601300}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "owned"
+            }
+          ]
+        },
+        {
+          "label": "numeric object property order",
+          "literal": "[{\"key\":\"object order\",\"content\":{\"2\":\"second\",\"1\":\"first\",\"02\":\"zero\"},\"timeStamp\":1792929601301}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "object order : {\"2\":\"second\",\"1\":\"first\",\"02\":\"zero\"}"
+            }
+          ]
+        },
+        {
+          "label": "duplicate object property order",
+          "literal": "[{\"key\":\"duplicate order\",\"content\":{\"b\":1,\"a\":2,\"b\":3},\"timeStamp\":1792929601302}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "duplicate order : {\"b\":3,\"a\":2}"
+            }
+          ]
+        },
+        {
+          "label": "invalid leading NUL object property",
+          "literal": "[{\"key\":\"nul property\",\"content\":{\"\\u0000invalid\":1},\"timeStamp\":1792929601303}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        },
+        {
+          "label": "non-finite decoded content",
+          "literal": "[{\"key\":\"overflow content\",\"content\":1e400,\"timeStamp\":1792929601304}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        },
+        {
+          "label": "exact client timestamp 9007199254740991",
+          "literal": "[{\"key\":\"wide timestamp 0\",\"content\":\"exact\",\"timeStamp\":9007199254740991}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "wide timestamp 0 : \"exact\""
+            }
+          ]
+        },
+        {
+          "label": "exact client timestamp 9007199254740993",
+          "literal": "[{\"key\":\"wide timestamp 1\",\"content\":\"exact\",\"timeStamp\":9007199254740993}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "wide timestamp 1 : \"exact\""
+            }
+          ]
+        },
+        {
+          "label": "exact client timestamp 9223372036854775807",
+          "literal": "[{\"key\":\"wide timestamp 2\",\"content\":\"exact\",\"timeStamp\":9223372036854775807}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "wide timestamp 2 : \"exact\""
+            }
+          ]
+        },
+        {
+          "label": "exact client timestamp -9223372036854775808",
+          "literal": "[{\"key\":\"wide timestamp 3\",\"content\":\"exact\",\"timeStamp\":-9223372036854775808}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "wide timestamp 3 : \"exact\""
+            }
+          ]
+        },
+        {
+          "label": "nested content depth 508",
+          "literal": "[{\"key\":\"depth 508\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "depth 508 : [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+            }
+          ]
+        },
+        {
+          "label": "nested content depth 509",
+          "literal": "[{\"key\":\"depth 509\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "depth 509 : [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+            }
+          ]
+        },
+        {
+          "label": "nested content depth 510",
+          "literal": "[{\"key\":\"depth 510\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        },
+        {
+          "label": "nested content depth 511",
+          "literal": "[{\"key\":\"depth 511\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        },
+        {
+          "label": "nested content depth 512",
+          "literal": "[{\"key\":\"depth 512\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        }
+      ],
+      "files": [
+        {
+          "file": "testlog-codec-boundaries.json",
+          "bytes": 7530,
+          "sha256": "a7076a0efa94b89816a8b74f721c8a97c47a2c0bef00615b46063888ea40f461",
+          "contentType": "application/json"
+        },
+        {
+          "file": "testlog-codec-boundaries.csv",
+          "bytes": 5414,
+          "sha256": "e15f52f1921d2016e4170df0cce880fc6b31094899f5fe9bd3d83f397198e5d8",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    }
+  ],
+  "sourceFiles": {
+    "backend/routes.php": "8ecafc8e25edaf2cd0453c180a23be8a8d0568f048000eb033d7772af1b3a213",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/middleware/RequireToken.class.php": "f2d19714051837e46c07adec45bc1c52205cc9a282b37441a248bf9916f3c35a",
+    "backend/src/helper/SystemConfig.class.php": "2f97c265453d34d1d7be465afd2b58ac2422f60fbdcf7e970352b60bc23e957d",
+    "backend/src/helper/Token.class.php": "d57516492d6f68fecfb070d3a9fd81edb245bd7c365c389c419504bcbaa87cf9",
+    "backend/src/data-collection/AccessSet.class.php": "e76d5c03c642a8d178c583766ffc66b27355c3606bb34add287e55ccb6cdca6c",
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/controller/WorkspaceController.class.php": "f9cb336fc05ad115d1ebfca923d48eb397ed94cd065ccbdd83c359849233a6b4",
+    "backend/composer.lock": "47c7dda51f6d27fbbc93aaedc99d364b9eeb299d80f92d68226b0218a436b708",
+    "scripts/database/full.sql": "9ac4b941ba40d75a563cbe4fb9d55075f27e46894902eb50100eb7263594ed08",
+    "backend/src/helper/CSV.class.php": "77d3e0cfca1a99e37efccb49480b68d1737ea63ead252f25d18662ebe997bb84",
+    "backend/src/helper/ReviewCSVFormatter.php": "5db29ee7680ffa8ddf01febe71a95c0d5fc580091a4f5111ba819cc37123df2e",
+    "backend/src/helper/TimeStamp.class.php": "eba4eb49ca3dbe8aa99733a55b40b9259823edb05e0f67267e946c8bcac87a7d",
+    "backend/src/workspace/Report.php": "f81129e75bfb3550205d3668fb2de1821967f20994c604cc0d41b380a13e543f",
+    "backend/src/workspace/ResponseReportOutput.php": "0c88a1742d3e321cccb4c62c6fc34ca1627faa9b9e2763227310dc2dd1187466",
+    "backend/src/workspace/LogReportOutput.php": "cfcb2fd3418195fdac8bc6b7dcfeafeb53da36745c7fa1f37194e9fbf9da8b86",
+    "backend/src/workspace/ReviewReportOutput.php": "d1f39523e236b0f2265da3a1892775f1bd5977fdc50da4c2091afab48282ba59",
+    "backend/src/data-collection/ReportFormat.php": "3fb41e925c59daf7800a132187fb324f31a20562fbadd5932e464d90ea180f94",
+    "backend/src/files/XMLFileBooklet.class.php": "95cefab11030f5aa237941311874f46b4def068bcdd009638dfaec01b151bfa1",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/data-collection/TestName.class.php": "9cc3de2c85f03ab3464cda4b2b1fa5539f4675cc86c418df068fefd6ced6922e",
+    "backend/src/middleware/IsTestOwner.class.php": "f2b8f79c3588801f0ddd057027682e2a554c791cae05cdf5242519a9b3b26316",
+    "backend/src/helper/RequestHelper.class.php": "c5aab20fff896d13afb2c969346d91c3749e40936849e6d4d51ba74e0d2ab57f",
+    "backend/src/helper/State.class.php": "62475f6edc2adda96097658c33e67e2c5a7ad534ed5addb9d9a57b638e329c91",
+    "backend/src/workspace/Workspace.class.php": "5866681acead26a9dc570e0fd50a32a963e6e8f1b4098b98f3803d3d5a378ac0",
+    "backend/src/dao/WorkspaceDAO.class.php": "74e8df283418921640d4e4ddb780ce95483f319bca974b7464a17f5d1bb341f4",
+    "backend/src/helper/FileResponse.class.php": "1896bc0a2822d324a7a424fc744ab8d296aac1220fa2ee013e5183db9524bdb2",
+    "backend/src/helper/FileExt.class.php": "6babc2ccdb0f4a05b379876cb7100629e61e456ecea05fa8f57c325a1ce27156",
+    "backend/src/helper/Folder.class.php": "d3e1d59460ab519bfa299992a5e12458d17a0ccbed8e7a8ccdcbbd4a1114b9f7",
+    "backend/src/files/XMLFileUnit.class.php": "56e42c9860d562f94d317e3c32c5a66b1cf62a9b2b378a7926df1cf5ab7ed017",
+    "backend/src/helper/FileID.class.php": "8c490045d4e1af66639e2af191502a87f6062fada54d1ef57c523a7fe806214e",
+    "backend/src/data-collection/UnitLog.php": "351139441c71cd3dd29597383f656abe7e77875873b5ce27104f9725b60449db",
+    "backend/src/data-collection/TestLog.class.php": "a7d19bd78ee744ebe26d41b3034d48b2ef80d637d7a5c560a22e875cde82574a",
+    "backend/src/helper/JSON.class.php": "bb2a79d8853f35a82c80b71ab769f857ae03d268ae1a5919dab72f14000bfeda"
+  },
+  "version": {
+    "version": "19.0.0"
+  },
+  "protectedScopes": [
+    "login",
+    "person"
+  ],
+  "success": true
+}

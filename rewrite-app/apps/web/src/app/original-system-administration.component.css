@@ -1,0 +1,25 @@
+:host { display:flex; flex-direction:column; flex:1; min-height:0; color-scheme:light; color:var(--mat-sys-on-surface); background:white; font:16px 'Nunito Sans',sans-serif; }
+app-original-overlay-styles { display:none; }
+mat-toolbar { display:flex; justify-content:space-between; position:relative; flex:0 0 auto; padding:8px 24px; background:var(--secondary); color:white; }
+mat-toolbar .side { height:100%; display:flex; align-items:center; }
+mat-toolbar .center { position:absolute; left:50%; transform:translateX(-50%); }
+mat-toolbar h1 { margin:0; font:400 22px/28px 'Nunito Sans'; letter-spacing:normal; }
+.logo a,.logo img { height:100%; }
+.logo img { width:auto; display:block; }
+.account-button { background:white; color:var(--secondary); border-radius:12px; font-family:revert; font-weight:revert; }
+#originalSystemAdministration { display:flex; flex-direction:column; flex:1; min-height:0; padding:25px; }
+/* Match the Source headings rather than inheriting the Rewrite-wide box model. */
+h2 { box-sizing:content-box; }
+mat-tab-nav-panel { overflow-y:auto; padding:5px; }
+.directory-columns { display:flex; flex-direction:row; justify-content:space-between; }
+.directory-list { display:flex; flex-direction:column; width:50%; }
+.directory-permissions { display:flex; flex-direction:column; width:40%; }
+.toolbar { display:flex; flex-direction:row; }
+.permission-heading { justify-content:space-between; }
+.mat-mdc-fab { margin:2px; font:revert; }
+.mat-column-selectCheckbox { max-width:120px!important; }
+.mat-column-selectCheckbox.mat-mdc-header-cell { white-space:nowrap; }
+button:hover { transform:none; }
+button.mat-mdc-button-base:disabled { opacity:1; }
+mat-checkbox { display:inline-block; }
+[role=alert] { color:var(--mat-sys-error); }

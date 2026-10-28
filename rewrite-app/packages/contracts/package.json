@@ -6,6 +6,22 @@
   "main": "dist/packages/contracts/src/index.js",
   "types": "dist/packages/contracts/src/index.d.ts",
   "exports": {
+    "./participant-native-command": {
+      "types": "./dist/packages/contracts/src/participant-native-command.d.ts",
+      "default": "./dist/packages/contracts/src/participant-native-command.js"
+    },
+    "./participant-run-command": {
+      "types": "./dist/packages/contracts/src/participant-run-command.d.ts",
+      "default": "./dist/packages/contracts/src/participant-run-command.js"
+    },
+    "./participant-starter-exit": {
+      "types": "./dist/packages/contracts/src/participant-starter-exit.d.ts",
+      "default": "./dist/packages/contracts/src/participant-starter-exit.js"
+    },
+    "./booklet-completeness": {
+      "types": "./dist/packages/contracts/src/booklet-completeness.d.ts",
+      "default": "./dist/packages/contracts/src/booklet-completeness.js"
+    },
     ".": {
       "types": "./dist/packages/contracts/src/index.d.ts",
       "default": "./dist/packages/contracts/src/index.js"
@@ -13,14 +29,50 @@
     "./participant-roster": {
       "types": "./dist/packages/contracts/src/participant-roster.d.ts",
       "default": "./dist/packages/contracts/src/participant-roster.js"
+    },
+    "./participant-response-capture": {
+      "types": "./dist/packages/contracts/src/participant-response-capture.d.ts",
+      "default": "./dist/packages/contracts/src/participant-response-capture.js"
+    },
+    "./participant-response-order": {
+      "types": "./dist/packages/contracts/src/participant-response-order.d.ts",
+      "default": "./dist/packages/contracts/src/participant-response-order.js"
+    },
+    "./participant-response-field-timestamps": {
+      "types": "./dist/packages/contracts/src/participant-response-field-timestamps.d.ts",
+      "default": "./dist/packages/contracts/src/participant-response-field-timestamps.js"
+    },
+    "./participant-debug": {
+      "types": "./dist/packages/contracts/src/participant-debug.d.ts",
+      "default": "./dist/packages/contracts/src/participant-debug.js"
+    },
+    "./participant-debug-runtime": {
+      "types": "./dist/packages/contracts/src/participant-debug-runtime.d.ts",
+      "default": "./dist/packages/contracts/src/participant-debug-runtime.js"
+    },
+    "./participant-debug-condition": {
+      "types": "./dist/packages/contracts/src/participant-debug-condition.d.ts",
+      "default": "./dist/packages/contracts/src/participant-debug-condition.js"
+    },
+    "./system-check-custom-texts": {
+      "types": "./dist/packages/contracts/src/system-check-custom-texts.d.ts",
+      "default": "./dist/packages/contracts/src/system-check-custom-texts.js"
+    },
+    "./original-session": {
+      "types": "./dist/packages/contracts/src/original-session.d.ts",
+      "default": "./dist/packages/contracts/src/original-session.js"
+    },
+    "./original-group-results": {
+      "types": "./dist/packages/contracts/src/original-group-results.d.ts",
+      "default": "./dist/packages/contracts/src/original-group-results.js"
     }
   },
   "dependencies": {
-    "@testcenter-rewrite-app/domain": "0.0.0"
+    "@testcenter-rewrite-app/domain": "0.0.0",
+    "@iqb/responses": "5.2.2",
+    "@iqbspecs/coding-scheme": "3.4.1"
   },
   "devDependencies": {
-    "@iqb/responses": "5.2.2",
-    "@iqbspecs/coding-scheme": "3.4.1",
     "@iqbspecs/response": "2.0.0"
   }
 }

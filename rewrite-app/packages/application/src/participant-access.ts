@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import {createOriginalSessionToken} from './original-session-token.js';
 
 import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 
@@ -33,7 +34,7 @@ export type ParticipantAccessInput = {
 
 export type ParticipantAccessPort = {
   /** Trusted login operation; never expose credential issuance by session ID alone. */
-  issueCredential(input: { participantSessionId: string }): Promise<string>;
+  issueCredential(input: { participantSessionId: string; format?: 'original' }): Promise<string>;
   authorize(input: ParticipantAccessInput): Promise<ParticipantSession>;
   /** Resource-only capability for sandboxed players, never a general bearer token. */
   issueResourceCredential(input: ParticipantAccessInput): Promise<string>;
@@ -98,9 +99,10 @@ export function createParticipantAccessService(input: {
     return { session, credential };
   };
   return {
-    async issueCredential({ participantSessionId }) {
-      await input.getAccessibleSession(participantSessionId);
-      const token = randomBytes(32).toString("base64url");
+    async issueCredential({ participantSessionId, format }) {
+      const session = await input.getAccessibleSession(participantSessionId);
+      if ((format !== undefined && format !== 'original') || (format === 'original' && session.originalLoginKey === undefined)) throw input.invalidAccess();
+      const token = format === 'original' ? createOriginalSessionToken() : randomBytes(32).toString("base64url");
       await input.repository.saveParticipantAccessCredential({
         participantSessionId,
         tokenHash: hash(token),

@@ -1,0 +1,118 @@
+{
+  "originalCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "path": "backend/src/files/XMLFileTesttakers.class.php",
+  "sha256": "20bd5e27314507982ba81f9f947b488ab86655290d8bf714c6ab7a9f8ba221f7",
+  "method": "  public function getCustomTexts(): stdClass {\n    $customTexts = [];\n    foreach ($this->getXml()->xpath('/Testtakers/CustomTexts/CustomText') as $customTextElement) {\n      $customTexts[(string) $customTextElement['key'] ?? ''] = (string) $customTextElement;\n    }\n    return (object) $customTexts;\n  }",
+  "cases": [
+    {
+      "name": "self-closing-before-paired",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"booklet_pausedmessage\"/><CustomText key=\"login_subtitle\">  NEXT &amp; value  </CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "booklet_pausedmessage": "",
+        "login_subtitle": "  NEXT & value  "
+      }
+    },
+    {
+      "name": "paired-empty-before-paired",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"booklet_pausedmessage\"></CustomText><CustomText key=\"login_subtitle\">NEXT</CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "booklet_pausedmessage": "",
+        "login_subtitle": "NEXT"
+      }
+    },
+    {
+      "name": "self-closing-last",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"login_subtitle\">NEXT</CustomText><CustomText key=\"booklet_pausedmessage\" /></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "login_subtitle": "NEXT",
+        "booklet_pausedmessage": ""
+      }
+    },
+    {
+      "name": "cdata-and-escaped-text",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"booklet_pausedmessage\"><![CDATA[ <CustomText key=\"ignored\">literal</CustomText> &amp; </CustomText> ]]>&amp;lt;</CustomText><CustomText key=\"login_subtitle\">NEXT</CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "booklet_pausedmessage": " <CustomText key=\"ignored\">literal</CustomText> &amp; </CustomText> &lt;",
+        "login_subtitle": "NEXT"
+      }
+    },
+    {
+      "name": "numeric-entities",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"login_subtitle\">&#x1F642; &#196; &#13; &amp;#196;</CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "login_subtitle": "🙂 Ä \r &#196;"
+      }
+    },
+    {
+      "name": "comments-and-processing-instructions",
+      "xml": "<Testtakers><!-- <CustomTexts><CustomText key=\"fake\">ignored</CustomText></CustomTexts> --><CustomTexts><!-- <CustomText key=\"ignored\">not a value</CustomText> --><CustomText key=\"login_subtitle\">A<!-- comment -->B<?probe ignored?>C</CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "login_subtitle": "ABC"
+      }
+    },
+    {
+      "name": "preserved-whitespace",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"booklet_pausedmessage\"> \r\n  authored\t \rtext\n </CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "booklet_pausedmessage": " \n  authored\t \ntext\n "
+      }
+    },
+    {
+      "name": "empty-and-zero",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"booklet_pausedmessage\"/><CustomText key=\"login_subtitle\">0</CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "booklet_pausedmessage": "",
+        "login_subtitle": "0"
+      }
+    },
+    {
+      "name": "numeric-key",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"login_&#x73;ubtitle\">Encoded key</CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "login_subtitle": "Encoded key"
+      }
+    },
+    {
+      "name": "prototype-like-keys",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"__proto__\">authored</CustomText><CustomText key=\"constructor\">configured</CustomText><CustomText key=\"toString\"/></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "__proto__": "authored",
+        "constructor": "configured",
+        "toString": ""
+      }
+    },
+    {
+      "name": "single-entity-decoding",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"login_subtitle\">&amp;amp; &amp;lt; &quot; &#x26;amp;</CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "login_subtitle": "&amp; &lt; \" &amp;"
+      }
+    },
+    {
+      "name": "self-closing-section",
+      "xml": "<Testtakers><CustomTexts/><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {}
+    },
+    {
+      "name": "nonstructural-logins",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"login_subtitle\"><![CDATA[<Login name=\"phantom-p\"><Booklet>B</Booklet></Login><Login name=\"phantom-m\" mode=\"monitor-group\" pw=\"pw\"/>]]></CustomText></CustomTexts><Group id=\"g\"><!-- <Login name=\"phantom-p\"><Booklet>B</Booklet></Login><Login name=\"phantom-m\" mode=\"monitor-group\" pw=\"pw\"/> --><?example <Login name=\"phantom-p\"><Booklet>B</Booklet></Login><Login name=\"phantom-m\" mode=\"monitor-group\" pw=\"pw\"/>?><Login name=\"p\" mode=\"run-hot-return\"><Booklet>B</Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "login_subtitle": "<Login name=\"phantom-p\"><Booklet>B</Booklet></Login><Login name=\"phantom-m\" mode=\"monitor-group\" pw=\"pw\"/>"
+      }
+    },
+    {
+      "name": "real-booklet-cdata",
+      "xml": "<Testtakers><CustomTexts><CustomText key=\"login_subtitle\">Heading</CustomText></CustomTexts><Group id=\"g\"><Login name=\"p\" mode=\"run-hot-return\"><Booklet><![CDATA[B]]></Booklet></Login><Login name=\"m\" mode=\"monitor-group\" pw=\"pw\"/></Group></Testtakers>",
+      "expected": {
+        "login_subtitle": "Heading"
+      }
+    }
+  ],
+  "oracle": {
+    "php": "8.3.35",
+    "libxml": "2.9.14",
+    "imageId": "sha256:cae6232b26f57e972361d70240573e2d6d7b9f08a1f4a6ef860a5ef8c202d4b7",
+    "methodSha256": "1502a581df69589a9b06ead55b1588ac3c1a6a896528f90f5e9379a747e4d2ee",
+    "boundary": "Actual Original getCustomTexts method and native SimpleXML. Storage, file-graph and XSD validation are separate."
+  }
+}

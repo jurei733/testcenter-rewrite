@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "repository": "iqb-berlin/testcenter",
+  "commit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sources": [
+    {
+      "path": "frontend/src/app/superadmin/users/users.component.ts",
+      "sha256": "22055a9151c199a7a829576b20e7d3736c8540510522be8c70b3c2718be826ca",
+      "handler": "selectPermissions(user: IdRoleData, role: string): void {\n    if (role === 'RW') {\n      user.role = (user.role === 'RW') ? 'RO' : 'RW';\n    } else if (role === 'RO') {\n      user.role = (user.role === 'RO' || user.role === 'RW') ? '' : 'RO';\n    }\n    this.pendingWorkspaceChanges = true;\n  }",
+      "reloadHandler": "updateObjectList(): void {\n    this.tableSelectionRow.clear();\n    this.bs.getUsers().subscribe(dataresponse => {\n      this.objectsDatasource = new MatTableDataSource(dataresponse);\n      this.objectsDatasource.sort = this.sort;\n    });\n  }",
+      "mutationHandler": "changeSuperadminStatus(): void {\n    const selectedRows = this.tableSelectionRow.selected;\n    if (selectedRows.length === 0) {\n      return;\n    }\n\n    const userObject = <UserData>selectedRows[0];\n    const passwdDialogRef = this.superadminPasswordDialog.open(ConfirmWithPasswordComponent, {\n      width: '600px',\n      data: { title: `Superadmin-Status ${userObject.isSuperadmin ? 'entziehen' : 'setzen'}` }\n    });\n\n    passwdDialogRef.componentInstance.passwordSubmit.subscribe(password => {\n      this.bs.setSuperUserStatus(\n        selectedRows[0].id,\n        !userObject.isSuperadmin,\n        password\n      ).subscribe({\n        next: () => {\n          passwdDialogRef.close();\n          this.messageService.showSnackbar('Status geändert');\n          this.updateObjectList();\n        },\n        error: error => {\n          // A wrong confirmation password is an expected, recoverable input mistake - show it\n          // inline in the still-open dialog instead of letting it reach the generic global error\n          // dialog.\n          if (error.code === 403) {\n            passwdDialogRef.componentInstance.errorMessage = 'Falsches Kennwort.';\n          } else {\n            throw error;\n          }\n        }\n      });\n    });\n  }"
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/workspaces.component.ts",
+      "sha256": "af17c086c3d002f37a8f40d86a8d93728d0e65fb4ac09052805f84f9e1b4f925",
+      "handler": "selectPermissions(user: IdRoleData, role: string): void {\n    if (role === 'RW') {\n      user.role = (user.role === 'RW') ? 'RO' : 'RW';\n    } else if (role === 'RO') {\n      user.role = (user.role === 'RO' || user.role === 'RW') ? '' : 'RO';\n    }\n    this.pendingUserChanges = true;\n  }",
+      "reloadHandler": "updateWorkspaceList(): void {\n    this.backendService.getWorkspaces().subscribe(dataresponse => {\n      this.workspaces = new MatTableDataSource(dataresponse);\n      this.workspaces.sort = this.sort;\n      this.tableSelectionRow.clear();\n    });\n  }",
+      "mutationHandler": "renameWorkspace(): void {\n    const selectedRows = this.tableSelectionRow.selected;\n    if (selectedRows.length === 0) return;\n    const dialogRef = this.editworkspaceDialog.open(EditworkspaceComponent, {\n      width: '600px',\n      data: selectedRows[0].name\n    });\n\n    dialogRef.afterClosed().subscribe(result => {\n      if (!result) {\n        return;\n      }\n\n      const newName = result.get('name').value;\n      if (this.workspaceNameExists(newName)) {\n        this.snackBar.open('Arbeitsbereich mit diesem namen bereits vorhanden!', 'Fehler', { duration: 1000 });\n        return;\n      }\n\n      this.backendService.renameWorkspace(selectedRows[0].id, newName)\n        .subscribe(\n          () => {\n            this.snackBar.open('Arbeitsbereich geändert', '', { duration: 1000 });\n            this.updateWorkspaceList();\n          }\n        );\n    });\n  }"
+    }
+  ]
+}

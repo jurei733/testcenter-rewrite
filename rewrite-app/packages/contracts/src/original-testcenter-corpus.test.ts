@@ -3834,7 +3834,7 @@ test("original Testcenter compatibility corpus pins the complete official Test C
   );
 });
 
-test("original Testcenter compatibility corpus pins the current 51-account Booklet Config package", () => {
+test("original Testcenter compatibility corpus pins the current 56-account Booklet Config package", () => {
   type BookletFixture = PinnedOriginalFixture & { bookletKey: string };
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
@@ -3845,7 +3845,7 @@ test("original Testcenter compatibility corpus pins the current 51-account Bookl
   const bookletConfig = corpus.currentOriginalBookletConfigPackage;
   assert.equal(
     bookletConfig.sourceCommit,
-    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+    "eedae41840cbe90e5547c0211da818bdf620f5aa"
   );
   assert.equal(
     bookletConfig.sourceDirectory,
@@ -3854,7 +3854,7 @@ test("original Testcenter compatibility corpus pins the current 51-account Bookl
   assert.deepEqual(
     bookletConfig.bookletKeys,
     Array.from(
-      { length: 51 },
+      { length: 56 },
       (_, index) => `Cy-Bklt_BkltConfig-${index + 1}`
     )
   );
@@ -3873,8 +3873,9 @@ test("original Testcenter compatibility corpus pins the current 51-account Bookl
     currentBooklets.set(booklet.bookletKey, document);
   }
   const unchangedBooklets = [...corpus.booklets, ...corpus.systemBooklets]
-    .filter(booklet => bookletConfig.bookletKeys.slice(4).includes(booklet.bookletKey));
-  assert.equal(unchangedBooklets.length, 47);
+    .filter(booklet => bookletConfig.bookletKeys.includes(booklet.bookletKey) &&
+      !currentBooklets.has(booklet.bookletKey));
+  assert.equal(unchangedBooklets.length, 45);
   for (const booklet of unchangedBooklets) {
     const document = readFileSync(resolve(corpusRoot, booklet.fixture));
     assert.equal(
@@ -3891,7 +3892,7 @@ test("original Testcenter compatibility corpus pins the current 51-account Bookl
     bookletConfig.bookletKeys
   );
 
-  const firstFour = bookletConfig.currentBookletOverrides.map(booklet =>
+  const firstFour = bookletConfig.currentBookletOverrides.slice(0, 4).map(booklet =>
     currentBooklets.get(booklet.bookletKey)?.toString("utf8")
   );
   assert.match(firstFour[0] ?? "", /<Config key="ask_for_fullscreen">OFF<\/Config>/);
@@ -3913,7 +3914,7 @@ test("original Testcenter compatibility corpus pins the current 51-account Bookl
       "base64"
     );
     assert.equal(createHash("sha256").update(unitDocument).digest("hex"), sha256);
-    assert.match(unitDocument.toString("utf8"), /unit-xml\/17\.4/);
+    assert.match(unitDocument.toString("utf8"), /unit-xml\/17\.6/);
     assert.match(
       unitDocument.toString("utf8"),
       new RegExp(`<Id>${unitKey.replaceAll(".", "\\.")}<\\/Id>`)

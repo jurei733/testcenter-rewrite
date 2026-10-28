@@ -1,4 +1,9 @@
+export type {OriginalGroupResult} from './original-group-results.js';
+export {originalSessionPaths} from './original-session.js';
+export type {OriginalAccessSet, OriginalTestAccess, OriginalWorkChallenge, OriginalWorkSolution} from './original-session.js';
+import type {WorkspaceFileAvailability} from "@testcenter-rewrite-app/domain";
 import type {
+  WorkspaceFileCatalog,
   AdminAuditEvent,
   AdminAuditEventType,
   AdminRole,
@@ -79,6 +84,11 @@ export * from "./booklet-policy.js";
 export * from "./browser-compatibility.js";
 export * from "./monitor-event-stream.js";
 export * from "./participant-event-stream.js";
+export type {
+  ListParticipantRunCommandsResponse,
+  AcknowledgeParticipantRunCommandRequest,
+  AcknowledgeParticipantRunCommandResponse
+} from "./participant-run-command.js";
 export * from "./monitor-custom-texts.js";
 export * from "./participant-custom-texts.js";
 export * from "./original-report-format.js";
@@ -133,6 +143,7 @@ export const productionApiRoutes = {
     listAuditEvents: "/api/v1/admin/audit-events",
     exportAuditEventsCsv: "/api/v1/admin/audit-events.csv",
     updateApplicationSettings: "/api/v1/admin/application-settings",
+    patchOriginalApplicationSettings: "/api/v1/admin/original-interface/application-settings",
     applicationAssets: "/api/v1/admin/application-assets"
   },
   platform: {
@@ -183,6 +194,10 @@ export const productionApiRoutes = {
     assembleSourcePackages:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-package-assemblies",
     listSourcePackages: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
+    getWorkspaceFileCatalog: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files",
+    uploadWorkspaceFile: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files",
+    downloadWorkspaceFile: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files/:sourcePackageId/download",
+    replaceWorkspaceFile: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files/:sourcePackageId/replacements",
     getSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
     downloadSourcePackage:
@@ -241,6 +256,10 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/responses/detailed",
     listGroupResults:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups",
+    listOriginalGroupResults:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-groups",
+    deleteOriginalGroupResults:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-groups",
     listReviews:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews",
     createReview:
@@ -295,6 +314,10 @@ export const productionApiRoutes = {
       "/api/v1/participant/sessions/:participantSessionId/events",
     acknowledgeEventStream:
       "/api/v1/participant/sessions/:participantSessionId/events/acknowledgements",
+    listPendingCommands:
+      "/api/v1/participant/sessions/:participantSessionId/commands",
+    acknowledgeCommand:
+      "/api/v1/participant/sessions/:participantSessionId/commands/:commandId/acknowledgement",
     getResource:
       "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",
@@ -419,6 +442,20 @@ export type SourcePackageBatchDeletionIssue = {
 
 export type ReplaceSourcePackageRequest = CreateSourcePackageRequest;
 
+export type UploadWorkspaceFileRequest = {fileName: string; mediaType: string; sourceDocument: string};
+export type UploadWorkspaceFileResponse = {
+  workspaceAvailability?: WorkspaceFileAvailability;
+  sourcePackage: SourcePackage; replacedSourcePackageId: string | null;
+  importJob: ImportJob | null; stagedContentRelease: ContentRelease | null;
+  participantRosterImport?: ReplaceSourcePackageResponse['participantRosterImport'];
+};
+
+export type ReplaceWorkspaceFileRequest = {
+  mediaType: string;
+  sourceDocument: NonNullable<CreateSourcePackageRequest['sourceDocument']>;
+};
+export type ReplaceWorkspaceFileResponse = Omit<ReplaceSourcePackageResponse, 'importJob'> & {importJob: ImportJob | null; workspaceAvailability?: WorkspaceFileAvailability};
+
 export type ActivateContentReleaseRequest = {
   activatedByActorId: string;
   forceActivation?: boolean;
@@ -502,6 +539,8 @@ export type ContentReleaseListQuery = {
 
 export type SystemCheckReportListQuery = {
   checkId?: string;
+  /** Union of selected check IDs; HTTP accepts repeated checkId parameters. */
+  checkIds?: string[];
   limit?: number;
 };
 
@@ -929,6 +968,9 @@ export type UpdateApplicationSettingsRequest = {
   globalWarningExpiresAt?: string | null;
 };
 
+/** Source editors change only supplied fields; custom text keys merge atomically. */
+export type PatchOriginalApplicationSettingsRequest = Partial<UpdateApplicationSettingsRequest>;
+
 export type UploadApplicationAssetRequest = {
   originalName: string;
   mediaType: string;
@@ -938,6 +980,8 @@ export type UploadApplicationAssetRequest = {
 export type ApplicationAssetSummary = Omit<ApplicationAsset, "dataBase64">;
 
 export type ParticipantLaunchRequest = {
+  /** Browser reports actual controller loading and ready transitions. */
+  controllerLifecycle?: "browser-v1";
   participantSessionId?: string;
   tenantKey?: string | null;
   workspaceKey?: string;
@@ -954,11 +998,16 @@ export type ImportParticipantRosterRequest = {
 };
 
 export type ResumeParticipantSessionRequest = {
+  controllerLifecycle?: "browser-v1";
   bookletKey?: string;
 };
 
 export type SaveTestRunProgressRequest = {
   deliveryId?: string;
+  /** Deliver an explicitly addressed response without changing Run controls. */
+  responseOnly?: boolean;
+  /** Capture time for legacy responses; Verona envelopes carry field clocks. */
+  responseTimestamp?: number;
   currentUnitKey?: string | null;
   /** Unit receiving `unitResponse`; defaults to `currentUnitKey` for compatibility. */
   responseUnitKey?: string | null;
@@ -1025,6 +1074,7 @@ export type UnlockParticipantTestletRequest = {
 };
 
 export type CompleteTestRunRequest = {
+  responseTimestamp?: number;
   responseUnitKey?: string | null;
   unitResponse?: string | null;
   transientUnitResponses?: Record<string, string>;
@@ -1032,7 +1082,10 @@ export type CompleteTestRunRequest = {
   confirmTestletLeaveLock?: boolean;
 };
 
-export type ReturnTestRunToStarterRequest = CompleteTestRunRequest;
+export type ReturnTestRunToStarterRequest = CompleteTestRunRequest & {
+  currentUnitKey?: string | null;
+  expectedStatus?: TestRun["status"];
+};
 
 export type CreateTenantResponse = {
   tenant: Tenant;
@@ -1163,6 +1216,7 @@ export type UploadApplicationAssetResponse = {
   applicationAsset: ApplicationAssetSummary;
 };
 
+export type DeleteApplicationAssetRequest = { cascadeAssignments?: boolean };
 export type DeleteApplicationAssetResponse = UploadApplicationAssetResponse;
 
 export type ListAttachmentsResponse = {
@@ -1282,6 +1336,7 @@ export type ReplaceSourcePackageResponse = {
   participantRosterImport?: ParticipantRosterImportSummary;
 };
 
+export type GetWorkspaceFileCatalogResponse = WorkspaceFileCatalog;
 export type ListSourcePackagesResponse = {
   items: WorkspaceSourcePackageListItem[];
   filteredCount: number;
@@ -1537,6 +1592,7 @@ export type MonitorOpenRunsQuery = {
 
 export type IssueMonitorRunCommandRequest = {
   commandType: MonitorRunCommandType;
+  debugArguments?: string[];
   actorId?: string | null;
   targetUnitKey?: string | null;
   remainingSeconds?: number | null;
@@ -1597,6 +1653,7 @@ export type GetRuntimeDiagnosticsResponse = {
     activeRequests: number;
     totalRequests: number;
     completedRequests: number;
+    abortedRequests: number;
   };
   memory: {
     rssBytes: number;

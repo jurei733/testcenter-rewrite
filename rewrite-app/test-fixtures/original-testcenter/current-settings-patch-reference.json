@@ -1,0 +1,31 @@
+{
+  "originalCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "files": [
+    {
+      "path": "backend/src/controller/SystemController.class.php",
+      "sha256": "ef72f6dc675ba3962243bcddd11a41acca0085b70969700996e6bfeba62327a9",
+      "excerpt": "  private static function updateMeta(string $category, Request $request, Response $response): Response {\n    $requestBody = JSON::decode($request->getBody()->getContents());\n\n    if (!is_object($requestBody)) {\n      return $response;\n    }\n\n    foreach ($requestBody as $key => $value) {\n      $valueAsString = (is_string($value) or is_null($value)) ? $value : json_encode($value);\n      self::adminDAO()->setMeta($category, $key, $valueAsString);\n    }\n\n    return $response;\n  }"
+    },
+    {
+      "path": "backend/src/dao/DAO.class.php",
+      "sha256": "76eea068ed1a0a4f98bfbcc78f063432b5af6ed122de8fa5b098076f500c8fe0",
+      "excerpt": "  public function setMeta(string $category, string $key, ?string $value): void {\n    $currentValue = $this->_('select value from meta where \"metaKey\" = :key', [':key' => $key]);\n\n    if (!$currentValue) {\n      $this->_(\n        'insert into meta (category, \"metaKey\", value) values (:category, :key, :value)',\n        [\n          ':key' => $key,\n          ':category' => $category,\n          ':value' => $value\n        ]\n      );\n    } else {\n      $this->_(\n        'update meta set value=:value, category=:category where \"metaKey\" = :key',\n        [\n          ':key' => $key,\n          ':category' => $category,\n          ':value' => $value\n        ]\n      );\n    }\n  }"
+    },
+    {
+      "path": "frontend/src/app/superadmin/settings/edit-custom-texts.component.ts",
+      "sha256": "890eb9a1a9d96c01fbb2801d59d44e8fa327b62d79cb0a16651d91255d3a5450",
+      "excerpt": "  saveData():void {\n    this.backendService.setCustomTexts(this.changedData)\n      .subscribe(() => {\n        if (!this.mainDataService.appConfig) {\n          throw new AppError({\n            description: '',\n            label: 'appConfig not yet loaded',\n            type: 'script'\n          });\n        }\n        this.messageService.showSnackbar('Textersetzungen gespeichert');\n        this.dataChanged = false;\n        Object.keys(this.changedData).forEach(ctKey => {\n          (this.mainDataService.appConfig as AppConfig).customTexts[ctKey] = this.changedData[ctKey];\n        });\n        this.customtextService.addCustomTexts(this.changedData);\n      });\n  }"
+    },
+    {
+      "path": "scripts/database/full.sql",
+      "sha256": "9ac4b941ba40d75a563cbe4fb9d55075f27e46894902eb50100eb7263594ed08",
+      "excerpt": "CREATE TABLE meta (\n  \"metaKey\" varchar(100) NOT NULL,\n  value     text,\n  category  varchar(30) DEFAULT NULL,\n  CONSTRAINT meta_pk UNIQUE (\"metaKey\", category)\n);"
+    }
+  ],
+  "sql": {
+    "read": "select value from meta where \"metaKey\" = :key",
+    "insert": "insert into meta (category, \"metaKey\", value) values (:category, :key, :value)",
+    "update": "update meta set value=:value, category=:category where \"metaKey\" = :key"
+  },
+  "table": "CREATE TABLE meta (\n  \"metaKey\" varchar(100) NOT NULL,\n  value     text,\n  category  varchar(30) DEFAULT NULL,\n  CONSTRAINT meta_pk UNIQUE (\"metaKey\", category)\n);"
+}

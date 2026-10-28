@@ -88,17 +88,23 @@ try {
   const imported = await api(workspace + "/import-jobs", {sourcePackageId:source.sourcePackage.sourcePackageId});
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, {activatedByActorId:"own-save-retry"});
   await api(workspace + "/participant-roster", {rosterText:["loginKey,groupKey,bookletKey,executionMode",
-    ...["original-1280","original-390","rewrite-1280","rewrite-390","foreign"].map(key=>`${key},own-group,booklet:demo,run-hot-return`)].join("\n")});
+    ...["original-1280","original-390","rewrite-1280","rewrite-390",
+      "original-1280-skew","original-390-skew","rewrite-1280-skew","rewrite-390-skew","foreign"]
+      .map(key=>`${key},own-group,booklet:demo,run-hot-return`)].join("\n")});
   const foreignIdentity = await api("/api/v1/participant/auth/sign-in", {tenantKey:"demo-tenant",workspaceKey:"owned-save-retry",loginKey:"foreign"});
   token = foreignIdentity.sessionToken;
   const foreign = await api(`/api/v1/participant/sessions/${foreignIdentity.participantSession.participantSessionId}/resume`, {bookletKey:"booklet:demo"});
   const foreignPath = `/api/v1/participant/sessions/${foreignIdentity.participantSession.participantSessionId}/current-state?testRunId=${foreign.testRun.testRunId}`;
   const foreignBefore = JSON.stringify((await api(foreignPath)).currentRunState.testRun);
   browser = await chromium.launch({headless:true});
-  for (const mode of ["original","rewrite"]) for (const width of [1280,390]) {
+  for (const clockSkewMs of [0,60_000]) for (const mode of ["original","rewrite"]) for (const width of [1280,390]) {
     // Exercise the supported foreground fallback independently of a Worker
     // racing to deliver the same packet. Existing full Worker gates stay intact.
     const context = await browser.newContext({viewport:{width,height:width===1280?720:844}});
+    await context.addInitScript(clockSkewMs=>{
+      const realNow=Date.now.bind(Date);
+      Date.now=()=>realNow()-clockSkewMs;
+    },clockSkewMs);
     await context.route(base+"/app/service-worker.js",route=>route.abort("failed"));
     await context.addInitScript(()=>{
       globalThis.ownRetryEvents=[];
@@ -110,7 +116,7 @@ try {
     page = await context.newPage();
     page.on("pageerror", error=>errors.push(String(error)));
     await page.goto(base + `/app/participant?ui=${mode}&tenantKey=demo-tenant&workspaceKey=owned-save-retry`);
-    await (mode==="original" ? page.getByLabel("Anmeldename",{exact:true}) : page.locator("#participantLoginKey")).fill(`${mode}-${width}`);
+    await (mode==="original" ? page.getByLabel("Anmeldename",{exact:true}) : page.locator("#participantLoginKey")).fill(`${mode}-${width}${clockSkewMs?"-skew":""}`);
     const signedIn = page.waitForResponse(response=>response.url().endsWith("/participant/auth/sign-in") && response.request().method()==="POST");
     await (mode==="original" ? page.getByRole("button",{name:"Weiter",exact:true}) : page.locator("#participantRouteSignInButton")).click();
     const identity = await (await signedIn).json(); token = identity.sessionToken;
@@ -119,6 +125,14 @@ try {
     const runId = own.testRun.testRunId;
     const currentPath = `/api/v1/participant/sessions/${sessionId}/current-state?testRunId=${runId}`;
     const savePath = `/api/v1/participant/test-runs/${runId}/save-progress`;
+    let legacyClock;
+    if (clockSkewMs) {
+      await api(savePath,{responseUnitKey:"unit-intro",unitResponse:"",status:"running"});
+      const baseline=(await api(currentPath)).currentRunState.testRun;
+      assert.equal(baseline.unitResponses["unit-intro"],"");
+      legacyClock=baseline.unitResponseFieldTimestamps["unit-intro"].opaque;
+      assert.ok(Number.isSafeInteger(legacyClock) && legacyClock>0);
+    }
     assert.equal((await fetch(base+foreignPath,{headers:{authorization:`Bearer ${token}`}})).status,401);
     await page.goto(base+`/app/participant?ui=${mode}&participantSessionId=${sessionId}&testRunId=${runId}`);
     const frame = page.frameLocator("#participantVeronaPlayerFrame");
@@ -139,24 +153,44 @@ try {
     });
     const requested = page.waitForRequest(request=>request.url()===base+savePath && request.method()==="POST" &&
       request.postDataJSON()?.responseUnitKey==="unit-intro", {timeout:15_000});
+    const focusedFailure = page.waitForEvent("requestfailed", {timeout:15_000, predicate: request=>{
+      if (request.url()!==base+savePath || request.method()!=="POST") return false;
+      const body=request.postDataJSON();
+      let value;
+      try { value=JSON.parse(body.unitResponse).unitState?.dataParts?.answer; } catch {}
+      return body.responseUnitKey==="unit-intro" && value===answer &&
+        body.logs?.some(batch=>batch.entries.some(entry=>entry.key==="FOCUS"));
+    }});
     await frame.locator("#demoPlayerAnswer").fill(answer);
     await requested;
     // Native focus is itself logged by the host after its debounce. Let that
     // real newer packet finish its initial failed attempt before holding a
     // retry of the final durable packet. No extra input is made afterwards.
-    await page.waitForFunction(runId=>{
+    const failedFocusPacket=(await focusedFailure).postDataJSON();
+    await page.waitForFunction(({runId,deliveryId})=>{
       const packet=JSON.parse(localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1")||"{}").entries
         ?.find(entry=>entry.testRunId===runId && entry.unitKey==="unit-intro");
-      return packet?.logs?.some(batch=>batch.entries.some(entry=>entry.key==="FOCUS")) &&
+      return packet?.deliveryId===deliveryId &&
+        packet.logs.some(batch=>batch.entries.some(entry=>entry.key==="FOCUS")) &&
         document.querySelector("#participantVeronaSaveStatus")?.textContent==="queued offline";
-    },runId,{timeout:15_000});
+    },{runId,deliveryId:failedFocusPacket.deliveryId},{timeout:15_000});
+    // Register before either connectivity transition: the real retry can
+    // reach the route while setOffline is still settling its native events.
+    const heldRequest=page.waitForRequest(request=>request.url()===base+savePath && request.method()==="POST" &&
+      request.postDataJSON()?.deliveryId===failedFocusPacket.deliveryId,{timeout:15_000});
     holdNext=true;
     await context.setOffline(true);
     await page.waitForFunction(()=>!navigator.onLine && globalThis.ownRetryEvents.some(event=>event.type==="offline" && event.trusted));
-    const heldRequest=page.waitForRequest(request=>request.url()===base+savePath && request.method()==="POST",{timeout:15_000});
     await context.setOffline(false);
     await heldRequest;
     const packet = await held;
+    assert.equal(packet.deliveryId,failedFocusPacket.deliveryId,"Retry the actual failed focus-bearing delivery");
+    assert.equal(packet.responseOnly,true,"Durable answers must use response-only transport");
+    if (clockSkewMs) {
+      assert.ok(await page.evaluate(()=>Date.now())<legacyClock,"Exercise an actual device clock behind the stored legacy response");
+      assert.ok(JSON.parse(packet.unitResponse).fieldTimestamps.dataParts.answer>legacyClock,
+        "The native input must advance the stored legacy clock despite the device clock skew");
+    }
     assert.equal(await frame.locator("#demoPlayerAnswer").evaluate(()=>globalThis.ownRetryEvents.findLast(event=>event.type==="input")?.trusted),true);
     const secondaryEnvelope = JSON.parse(packet.unitResponse);
     secondaryEnvelope.unitState.dataParts.answer = `Own secondary ${mode} ${width}\n ä🙂\u0000 whitespace  `;
@@ -195,15 +229,16 @@ try {
     assert.equal(restored.currentRunState.testRun.testRunId,runId);
     assert.equal(restored.currentRunState.testRun.unitResponses["unit-intro"],packet.unitResponse);
     assert.equal(restored.currentRunState.testRun.unitResponses["unit-practice"],secondary.response);
-    evidence.push({mode,width,foregroundFallback:true,sameSessionRun:true,nativeInput:true,nativeOfflineOnline:true,sameDeliveryRetry:true,exactAnswers:true,reload:true});
-    console.log(`native_save_retry=${mode}:${width}:same-delivery:same-session-run:exact-answer`);
+    evidence.push({mode,width,clockSkewMs,legacyClock,responseOnly:true,foregroundFallback:true,sameSessionRun:true,nativeInput:true,nativeOfflineOnline:true,sameDeliveryRetry:true,exactAnswers:true,reload:true});
+    console.log(`native_save_retry=${mode}:${width}:skew-${clockSkewMs}:same-delivery:same-session-run:exact-answer`);
     await context.close();
   }
   token=foreignIdentity.sessionToken;
   assert.equal(JSON.stringify((await api(foreignPath)).currentRunState.testRun),foreignBefore);
   assert.deepEqual(errors,[]);
   await writeFile(join(artifacts,"evidence.json"),JSON.stringify({evidence,errors},null,2));
-  console.log("native_save_retry=4:passed; foreign_session_run=unchanged");
+  assert.equal(evidence.length,8);
+  console.log("native_save_retry=8:passed; foreign_session_run=unchanged");
 } catch(error) {
   if(page && !page.isClosed()) await page.screenshot({path:join(artifacts,"failure.png"),fullPage:true});
   await writeFile(join(artifacts,"failure.json"),JSON.stringify({error:String(error),evidence,errors},null,2));

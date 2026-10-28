@@ -1,0 +1,3606 @@
+{
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "scope": "Unmodified Source frontend on owned API/player fixtures; no Source backend authorization proof",
+  "note": "Missing-code is defensive Source behavior; the protocol requires a string code. Pointer is neutral before collapsed-dialog measurements.",
+  "cases": {
+    "code-session-id-missing": {
+      "definition": {
+        "key": "code-session-id-missing",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "session-id-missing",
+        "message": "Owned session-id-missing Ω",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned session-id-missing Ω",
+      "description": {
+        "html": "Owned session-id-missing Ω",
+        "text": "Owned session-id-missing Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "code-unit-definition-missing": {
+      "definition": {
+        "key": "code-unit-definition-missing",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "unit-definition-missing",
+        "message": "Owned unit-definition-missing Ω",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned unit-definition-missing Ω",
+      "description": {
+        "html": "Owned unit-definition-missing Ω",
+        "text": "Owned unit-definition-missing Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "code-wrong-session-id": {
+      "definition": {
+        "key": "code-wrong-session-id",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "wrong-session-id",
+        "message": "Owned wrong-session-id Ω",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned wrong-session-id Ω",
+      "description": {
+        "html": "Owned wrong-session-id Ω",
+        "text": "Owned wrong-session-id Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "code-unit-definition-type-unsupported": {
+      "definition": {
+        "key": "code-unit-definition-type-unsupported",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "unit-definition-type-unsupported",
+        "message": "Owned unit-definition-type-unsupported Ω",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned unit-definition-type-unsupported Ω",
+      "description": {
+        "html": "Owned unit-definition-type-unsupported Ω",
+        "text": "Owned unit-definition-type-unsupported Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "code-unit-state-type-unsupported": {
+      "definition": {
+        "key": "code-unit-state-type-unsupported",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "unit-state-type-unsupported",
+        "message": "Owned unit-state-type-unsupported Ω",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned unit-state-type-unsupported Ω",
+      "description": {
+        "html": "Owned unit-state-type-unsupported Ω",
+        "text": "Owned unit-state-type-unsupported Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "code-runtime-error": {
+      "definition": {
+        "key": "code-runtime-error",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned runtime-error Ω",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned runtime-error Ω",
+      "description": {
+        "html": "Owned runtime-error Ω",
+        "text": "Owned runtime-error Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "unknown-code": {
+      "definition": {
+        "key": "unknown-code",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "future-error-code",
+        "message": "Owned unknown runtime Ω",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned unknown runtime Ω",
+      "description": {
+        "html": "Owned unknown runtime Ω",
+        "text": "Owned unknown runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "missing-code": {
+      "definition": {
+        "key": "missing-code",
+        "theme": "Primar",
+        "screen": "desktop",
+        "message": "Owned missing code Ω",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned missing code Ω",
+      "description": {
+        "html": "Owned missing code Ω",
+        "text": "Owned missing code Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "empty-message": {
+      "definition": {
+        "key": "empty-message",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "",
+      "description": {
+        "html": "",
+        "text": ""
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "whitespace-rich-message": {
+      "definition": {
+        "key": "whitespace-rich-message",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": " \n  <b>Owned rich error</b><br>Second line Ω  \n ",
+        "applicationCustomTexts": {},
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": " \n  <b>Owned rich error</b><br>Second line Ω  \n ",
+      "description": {
+        "html": " \n  <b>Owned rich error</b><br>Second line Ω  \n ",
+        "text": " \n  Owned rich errorSecond line Ω  \n "
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-application-Primar-desktop": {
+      "definition": {
+        "key": "help-application-Primar-desktop",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Application help Ω\nSecond application line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-application-Primar-mobile": {
+      "definition": {
+        "key": "help-application-Primar-mobile",
+        "theme": "Primar",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Application help Ω\nSecond application line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-application-Sekundar-desktop": {
+      "definition": {
+        "key": "help-application-Sekundar-desktop",
+        "theme": "Sekundar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(11, 45, 132)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Application help Ω\nSecond application line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-application-Sekundar-mobile": {
+      "definition": {
+        "key": "help-application-Sekundar-mobile",
+        "theme": "Sekundar",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(11, 45, 132)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Application help Ω\nSecond application line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-application-Erwachsene-desktop": {
+      "definition": {
+        "key": "help-application-Erwachsene-desktop",
+        "theme": "Erwachsene",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(107, 54, 154)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Application help Ω\nSecond application line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-application-Erwachsene-mobile": {
+      "definition": {
+        "key": "help-application-Erwachsene-mobile",
+        "theme": "Erwachsene",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {},
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(107, 54, 154)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Application help Ω\nSecond application line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-login-Primar-desktop": {
+      "definition": {
+        "key": "help-login-Primar-desktop",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Login help Ω\nSecond login line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-login-Primar-mobile": {
+      "definition": {
+        "key": "help-login-Primar-mobile",
+        "theme": "Primar",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Login help Ω\nSecond login line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-login-Sekundar-desktop": {
+      "definition": {
+        "key": "help-login-Sekundar-desktop",
+        "theme": "Sekundar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(11, 45, 132)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Login help Ω\nSecond login line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-login-Sekundar-mobile": {
+      "definition": {
+        "key": "help-login-Sekundar-mobile",
+        "theme": "Sekundar",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(11, 45, 132)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Login help Ω\nSecond login line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-login-Erwachsene-desktop": {
+      "definition": {
+        "key": "help-login-Erwachsene-desktop",
+        "theme": "Erwachsene",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(107, 54, 154)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Login help Ω\nSecond login line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-login-Erwachsene-mobile": {
+      "definition": {
+        "key": "help-login-Erwachsene-mobile",
+        "theme": "Erwachsene",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {}
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(107, 54, 154)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Login help Ω\nSecond login line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-booklet-Primar-desktop": {
+      "definition": {
+        "key": "help-booklet-Primar-desktop",
+        "theme": "Primar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {
+          "booklet_errormessage": "Booklet help Ω\nSecond booklet line"
+        }
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Booklet help Ω\nSecond booklet line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-booklet-Primar-mobile": {
+      "definition": {
+        "key": "help-booklet-Primar-mobile",
+        "theme": "Primar",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {
+          "booklet_errormessage": "Booklet help Ω\nSecond booklet line"
+        }
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Booklet help Ω\nSecond booklet line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-booklet-Sekundar-desktop": {
+      "definition": {
+        "key": "help-booklet-Sekundar-desktop",
+        "theme": "Sekundar",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {
+          "booklet_errormessage": "Booklet help Ω\nSecond booklet line"
+        }
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(11, 45, 132)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Booklet help Ω\nSecond booklet line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-booklet-Sekundar-mobile": {
+      "definition": {
+        "key": "help-booklet-Sekundar-mobile",
+        "theme": "Sekundar",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {
+          "booklet_errormessage": "Booklet help Ω\nSecond booklet line"
+        }
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(11, 45, 132)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Booklet help Ω\nSecond booklet line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-booklet-Erwachsene-desktop": {
+      "definition": {
+        "key": "help-booklet-Erwachsene-desktop",
+        "theme": "Erwachsene",
+        "screen": "desktop",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {
+          "booklet_errormessage": "Booklet help Ω\nSecond booklet line"
+        }
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 261,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 229.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 295.5,
+          "width": 720,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 359.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 251.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 417.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 434.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(107, 54, 154)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Booklet help Ω\nSecond booklet line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    },
+    "help-booklet-Erwachsene-mobile": {
+      "definition": {
+        "key": "help-booklet-Erwachsene-mobile",
+        "theme": "Erwachsene",
+        "screen": "mobile",
+        "code": "runtime-error",
+        "message": "Owned custom-help runtime Ω",
+        "applicationCustomTexts": {
+          "booklet_errormessage": "Application help Ω\nSecond application line"
+        },
+        "loginCustomTexts": {
+          "booklet_errormessage": "Login help Ω\nSecond login line"
+        },
+        "bookletCustomTexts": {
+          "booklet_errormessage": "Booklet help Ω\nSecond booklet line"
+        }
+      },
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 325,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 259.5,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 389.5,
+          "width": 358,
+          "height": 122,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 453.5,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 281.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 511.5,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 528.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(107, 54, 154)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Booklet help Ω\nSecond booklet line",
+      "introWhiteSpace": "pre-wrap",
+      "errorDescription": "Owned custom-help runtime Ω",
+      "description": {
+        "html": "Owned custom-help runtime Ω",
+        "text": "Owned custom-help runtime Ω"
+      },
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2,
+      "controllerErrorWriteCount": 1
+    }
+  }
+}

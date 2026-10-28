@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "repository": "iqb-berlin/testcenter",
+  "commit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "scope": "Source directory DTOs, ordering, permission controls, dialogs and narrowly owned name/role mutation fixtures; not Source backend authentication.",
+  "files": [
+    {
+      "path": "backend/src/dao/SuperAdminDAO.class.php",
+      "sha256": "9df7e3672e8fbb84a568e77ff5660737bd0f664a6de43918f78bbe727b1f8f18",
+      "excerpts": [
+        "  public function getWorkspaces(): array {\n    $workspaces = $this->_(\n      'select workspaces.id, workspaces.name, MAX(files.modification_ts) AS latest_modification_ts\n      FROM workspaces\n      LEFT JOIN files ON workspaces.id = files.workspace_id\n      GROUP BY workspaces.id, workspaces.name\n      ORDER BY workspaces.name',\n      [],\n      true\n    );\n\n    // A workspace without files has no latest modification: sqlToDisplayFormat() passes that null through.\n    return array_map(\n      function(array $workspace): array {\n        $workspace['latest_modification_ts'] = TimeStamp::sqlToDisplayFormat($workspace['latest_modification_ts']);\n        return $workspace;\n      },\n      $workspaces\n    );\n  }\n",
+        "  public function getUsers(): array {\n    return array_map(\n      function($user) {\n        $user['isSuperadmin'] = (bool) $user['isSuperadmin'];\n        return $user;\n      },\n      $this->_(\n        'select users.name, users.id, users.email, users.is_superadmin as \"isSuperadmin\" from users order by users.name',\n        [],\n        true\n      ));\n  }\n",
+        "  public function getWorkspacesByUser(int $userId): array {\n    $userRolesByWorkspace = $this->getMapWorkspaceToRoleByUser($userId);\n\n    $allWorkspaces = $this->_(\n      'select workspaces.id, workspaces.name from workspaces order by workspaces.name',\n      [],\n      true\n    );\n\n    $allWorkspacesWithUsersRole = [];\n    foreach ($allWorkspaces as $workspace) {\n      $allWorkspacesWithUsersRole[] = [\n        'id' => $workspace['id'],\n        'name' => $workspace['name'],\n        'selected' => isset($userRolesByWorkspace[$workspace['id']]),\n        'role' => $userRolesByWorkspace[$workspace['id']] ?? ''\n      ];\n    }\n\n    return $allWorkspacesWithUsersRole;\n  }\n",
+        "  public function getUsersByWorkspace(int $workspaceId): array {\n    $workspaceRolesPerUser = $this->getMapUserToRoleByWorkspace($workspaceId);\n\n    $allUsers = $this->_('select users.id, users.name from users order by users.name', [], true);\n\n    $allUsersWithTheirRolesOnWorkspace = [];\n    foreach ($allUsers as $user) {\n      $allUsersWithTheirRolesOnWorkspace[] = [\n        'id' => $user['id'],\n        'name' => $user['name'],\n        'selected' => isset($workspaceRolesPerUser[$user['id']]),\n        'role' => $workspaceRolesPerUser[$user['id']] ?? '',\n      ];\n    }\n    return $allUsersWithTheirRolesOnWorkspace;\n  }\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/backend.service.ts",
+      "sha256": "4abc1389079a53d6880a87f9e3306749b8f7017ed058e2c82b016780b7493ea7",
+      "excerpts": [
+        "  getUsers(): Observable<UserData[]> {\n    return this.http.get<UserData[]>(`${this.serverUrl}users`);\n  }",
+        "  getWorkspaces(): Observable<IdAndName[]> {\n    return this.http.get<IdAndName[]>(`${this.serverUrl}workspaces`);\n  }",
+        "  getWorkspacesByUser(userId: number): Observable<IdRoleData[]> {\n    return this.http.get<IdRoleData[]>(`${this.serverUrl}user/${userId}/workspaces`);\n  }",
+        "  getUsersByWorkspace(workspaceId: number): Observable<IdRoleData[]> {\n    return this.http.get<IdRoleData[]>(`${this.serverUrl}workspace/${workspaceId}/users`);\n  }"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/users/users.component.ts",
+      "sha256": "22055a9151c199a7a829576b20e7d3736c8540510522be8c70b3c2718be826ca",
+      "excerpts": [
+        "export class UsersComponent implements OnInit {\n  objectsDatasource: MatTableDataSource<UserData> = new MatTableDataSource<UserData>();\n  displayedColumns = ['name'];\n  tableSelectionRow = new SelectionModel<UserData>(false, []);\n  selectedUser = -1;\n  selectedUserName = '';\n\n  pendingWorkspaceChanges = false;\n  workspacelistDatasource: MatTableDataSource<IdRoleData> = new MatTableDataSource<IdRoleData>();\n  displayedWorkspaceColumns = ['selectCheckbox', 'label'];\n\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/users/users.component.html",
+      "sha256": "490d680b2b0e84438c237e347e430be0b4e7ec2281c71e4c85fd0edf41967336",
+      "excerpts": [
+        "<div class=\"flex-row\" [style.justify-content]=\"'space-between'\">\n  <div class=\"flex-column\" [style.width.%]=\"50\">\n    <div class=\"flex-row\">\n      <button\n        mat-fab\n        matTooltip=\"Administrator:in hinzufügen\"\n        matTooltipPosition=\"below\"\n        data-cy=\"add-user\"\n        (click)=\"addObject()\"\n      >\n        <mat-icon svgIcon=\"add\"></mat-icon>\n      </button>\n      <button\n        mat-fab\n        matTooltip=\"Markierte Administrator:in löschen\"\n        matTooltipPosition=\"below\"\n        data-cy=\"delete-user\"\n        [disabled]=\"!tableSelectionRow.hasValue()\"\n        (click)=\"deleteAdminUser()\"\n      >\n        <mat-icon svgIcon=\"delete\"></mat-icon>\n      </button>\n      <button\n        mat-fab\n        data-cy=\"change-password\"\n        matTooltip=\"Kennwort ändern\"\n        matTooltipPosition=\"below\"\n        [disabled]=\"!tableSelectionRow.hasValue()\"\n        (click)=\"changePassword()\"\n      >\n        <mat-icon svgIcon=\"edit\"></mat-icon>\n      </button>\n      <button\n        mat-fab\n        data-cy=\"change-superadmin\"\n        matTooltip=\"Superadmin-Status ändern\"\n        matTooltipPosition=\"below\"\n        [disabled]=\"!tableSelectionRow.hasValue()\"\n        (click)=\"changeSuperadminStatus()\"\n      >\n        <mat-icon svgIcon=\"supervisor_account\"></mat-icon>\n      </button>\n    </div>\n\n    <mat-progress-bar mode=\"indeterminate\" *ngIf=\"!objectsDatasource\"></mat-progress-bar>\n\n    <mat-table [dataSource]=\"objectsDatasource\" matSort>\n      <ng-container matColumnDef=\"name\">\n        <mat-header-cell *matHeaderCellDef mat-sort-header class=\"table-header\">Name</mat-header-cell>\n        <mat-cell *matCellDef=\"let element\"> {{element.name}} {{element.isSuperadmin ? '*' : ''}}</mat-cell>\n      </ng-container>\n\n      <mat-header-row *matHeaderRowDef=\"displayedColumns\"></mat-header-row>\n      <mat-row *matRowDef=\"let row; columns: displayedColumns;\" (click)=\"selectRow(row)\"\n               [style.background]=\"tableSelectionRow.isSelected(row) ? 'lightblue' : ''\"></mat-row>\n    </mat-table>\n  </div>\n\n  <div class=\"flex-column\" [style.width.%]=\"40\">\n    <div *ngIf=\"selectedUser < 0\">\n      <div>Zugriffsrechte für Arbeitsbereich(e):</div>\n      <div>Bitte links Administrator:in wählen</div>\n    </div>\n\n    <div *ngIf=\"selectedUser > 0\" class=\"flex-row\" [style.justify-content]=\"'space-between'\">\n      <div>Zugriffsrechte für {{ selectedUserName }}:</div>\n      <button\n        mat-fab\n        (click)=\"saveWorkspaces()\"\n        matTooltip=\"Speichern\"\n        matTooltipPosition=\"above\"\n        [disabled]=\"!pendingWorkspaceChanges\"\n        data-cy=\"save\"\n      >\n        <mat-icon svgIcon=\"save\"></mat-icon>\n      </button>\n    </div>\n\n    <mat-table [dataSource]=\"workspacelistDatasource\" matSort>\n      <ng-container matColumnDef=\"selectCheckbox\">\n        <mat-header-cell *matHeaderCellDef mat-sort-header class=\"table-header\" style=\"white-space: nowrap;\">Read | Write</mat-header-cell>\n        <mat-cell *matCellDef=\"let row\">\n          <mat-checkbox\n            [attr.data-cy]=\"'workspace-' + row.id + '-role-ro'\"\n            matTooltip=\"Nur Lesen\"\n            [checked]=\"row.role === 'RO' || row.role === 'RW'\"\n            (change)=\"selectPermissions(row, 'RO')\"\n          >\n          </mat-checkbox>\n          <mat-checkbox\n            [attr.data-cy]=\"'workspace-' + row.id + '-role-rw'\"\n            matTooltip=\"Lesen und Schreiben\"\n            [checked]=\"row.role === 'RW'\"\n            (change)=\"selectPermissions(row, 'RW')\"\n          >\n          </mat-checkbox>\n        </mat-cell>\n      </ng-container>\n\n      <ng-container matColumnDef=\"label\">\n        <mat-header-cell *matHeaderCellDef mat-sort-header class=\"table-header\">Arbeitsbereich</mat-header-cell>\n        <mat-cell *matCellDef=\"let row\"> {{row.name}} </mat-cell>\n      </ng-container>\n\n      <mat-header-row *matHeaderRowDef=\"displayedWorkspaceColumns\"></mat-header-row>\n      <mat-row *matRowDef=\"let row; columns: displayedWorkspaceColumns;\"></mat-row>\n    </mat-table>\n  </div>\n</div>\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/users/users.component.css",
+      "sha256": "0d47c20183f076e2570d66dbdea141bedfed5d738a5fafdf63beb1170b5c2343",
+      "excerpts": [
+        ".mat-mdc-fab {\n  margin: 2px;\n}\n\n.mat-column-selectCheckbox {\n  max-width: 120px !important;\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/workspaces.component.ts",
+      "sha256": "af17c086c3d002f37a8f40d86a8d93728d0e65fb4ac09052805f84f9e1b4f925",
+      "excerpts": [
+        "export class WorkspacesComponent implements OnInit {\n  workspaces: MatTableDataSource<IdAndName> = new MatTableDataSource<IdAndName>();\n  displayedColumns = ['name', 'modification_timestamp'];\n  tableSelectionRow = new SelectionModel<IdAndName>(false, []);\n  selectedWorkspaceId = 0;\n  selectedWorkspaceName = '';\n  pendingUserChanges = false;\n  userListDatasource: MatTableDataSource<IdRoleData> = new MatTableDataSource<IdRoleData>();\n  displayedUserColumns = ['selectCheckbox', 'name'];\n\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/workspaces.component.html",
+      "sha256": "6cb113448a8fff94831909d2d5ee02fe6f08915f83b30016b8f44f6d0fe1b774",
+      "excerpts": [
+        "<div class=\"flex-row\" [style.justify-content]=\"'space-between'\">\n  <div class=\"flex-column\" [style.width.%]=\"50\">\n    <div class=\"flex-row\">\n      <button\n        mat-fab\n        matTooltip=\"Arbeitsbereich hinzufügen\"\n        matTooltipPosition=\"below\"\n        data-cy=\"add-workspace\"\n        (click)=\"addObject()\"\n        >\n          <mat-icon svgIcon=\"add\"></mat-icon>\n      </button>\n      <button\n        mat-fab\n        matTooltip=\"Markierten Arbeitsbereich löschen\"\n        matTooltipPosition=\"below\"\n        data-cy=\"delete-workspace\"\n        [disabled]=\"!tableSelectionRow.hasValue()\"\n        (click)=\"deleteObject()\"\n      >\n        <mat-icon svgIcon=\"delete\"></mat-icon>\n      </button>\n      <button\n        mat-fab\n        matTooltip=\"Arbeitsbereich umbenennen\"\n        matTooltipPosition=\"below\"\n        data-cy=\"rename-workspace\"\n        [disabled]=\"!tableSelectionRow.hasValue()\"\n        (click)=\"renameWorkspace()\"\n      >\n        <mat-icon svgIcon=\"edit\"></mat-icon>\n      </button>\n    </div>\n\n    <mat-progress-bar mode=\"indeterminate\" *ngIf=\"!workspaces\"></mat-progress-bar>\n\n    <mat-table [dataSource]=\"workspaces\" matSort>\n      <ng-container matColumnDef=\"name\">\n        <mat-header-cell *matHeaderCellDef mat-sort-header class=\"table-header\">Name</mat-header-cell>\n        <mat-cell *matCellDef=\"let element\">{{element.name}}</mat-cell>\n      </ng-container>\n\n      <ng-container matColumnDef=\"modification_timestamp\">\n        <mat-header-cell *matHeaderCellDef mat-sort-header class=\"table-header\">Letztes Änderungsdatum</mat-header-cell>\n        <mat-cell *matCellDef=\"let element\">{{element.latest_modification_ts | date: 'dd.MM.yy HH:mm'}}</mat-cell>\n      </ng-container>\n\n      <mat-header-row *matHeaderRowDef=\"displayedColumns\"></mat-header-row>\n      <mat-row *matRowDef=\"let row; columns: displayedColumns;\" (click)=\"selectRow(row)\"\n        [style.background]=\"tableSelectionRow.isSelected(row) ? 'lightblue' : ''\"></mat-row>\n    </mat-table>\n  </div>\n\n  <div class=\"flex-column\" [style.width.%]=\"40\">\n    <div *ngIf=\"selectedWorkspaceId == 0\">\n      <div>Zugriffsberechtigte für Arbeitsbereich:</div>\n      <div>Bitte links einen Arbeitsbereich wählen</div>\n    </div>\n\n    <div *ngIf=\"selectedWorkspaceId > 0\" class=\"flex-row\" [style.justify-content]=\"'space-between'\">\n      <div>Zugriffsrechte für \"{{ selectedWorkspaceName }}\":</div>\n        <button mat-fab  matTooltip=\"Speichern\"\n            matTooltipPosition=\"above\" data-cy=\"save\" [disabled]=\"!pendingUserChanges\" (click)=\"saveUsers()\" >\n          <mat-icon svgIcon=\"save\"></mat-icon>\n        </button>\n    </div>\n\n    <mat-table [dataSource]=\"userListDatasource\" matSort>\n      <ng-container matColumnDef=\"selectCheckbox\">\n        <mat-header-cell *matHeaderCellDef mat-sort-header class=\"table-header\" style=\"white-space: nowrap;\">Read | Write</mat-header-cell>\n        <mat-cell *matCellDef=\"let row let i = index\">\n          <mat-checkbox [attr.data-cy]=\"'workspace-role-ro' + i\"\n                        matTooltip=\"Nur Lesen\"\n                        [checked]=\"row.role === 'RO' || row.role === 'RW'\"\n                        (change)=\"selectPermissions(row, 'RO')\">\n          </mat-checkbox>\n          <mat-checkbox [attr.data-cy]=\"'workspace-role-rw' + i\"\n                        matTooltip=\"Lesen und Schreiben\"\n                        [checked]=\"row.role === 'RW'\"\n                        (change)=\"selectPermissions(row, 'RW')\">\n          </mat-checkbox>\n        </mat-cell>\n      </ng-container>\n\n      <ng-container matColumnDef=\"name\">\n        <mat-header-cell *matHeaderCellDef mat-sort-header class=\"table-header\">Admins</mat-header-cell>\n        <mat-cell *matCellDef=\"let row\"> {{row.name}} </mat-cell>\n      </ng-container>\n\n      <mat-header-row *matHeaderRowDef=\"displayedUserColumns\"></mat-header-row>\n      <mat-row *matRowDef=\"let row; columns: displayedUserColumns;\"></mat-row>\n    </mat-table>\n  </div>\n</div>\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/workspaces.component.css",
+      "sha256": "0d47c20183f076e2570d66dbdea141bedfed5d738a5fafdf63beb1170b5c2343",
+      "excerpts": [
+        ".mat-mdc-fab {\n  margin: 2px;\n}\n\n.mat-column-selectCheckbox {\n  max-width: 120px !important;\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/editworkspace/editworkspace.component.ts",
+      "sha256": "28a2db13187acb18bf092a6efd5667eaefad7f6244cf61b201c9373823060c6b",
+      "excerpts": [
+        "import { MAT_DIALOG_DATA } from '@angular/material/dialog';\nimport { Component, Inject } from '@angular/core';\nimport { FormGroup, Validators, FormControl } from '@angular/forms';\n\n@Component({\n    templateUrl: './editworkspace.component.html',\n    styleUrls: ['./editworkspace.component.css'],\n    standalone: false\n})\nexport class EditworkspaceComponent {\n  editworkspaceform = new FormGroup({\n    name: new FormControl('', [Validators.required, Validators.minLength(3)])\n  });\n\n  constructor(\n    @Inject(MAT_DIALOG_DATA) public data: string\n  ) { }\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/editworkspace/editworkspace.component.html",
+      "sha256": "9bff725d7979d6811aae1d8e2b5ab87670a7d214c0fe0cb8dbe1dda53fb80a80",
+      "excerpts": [
+        "<form [formGroup]=\"editworkspaceform\">\n  <h1 mat-dialog-title>Arbeitsbereich \"{{data}}\" ändern</h1>\n\n  <mat-dialog-content>\n    <p>\n      <mat-form-field>\n        <input matInput formControlName=\"name\" placeholder=\"Name\" [value]=\"data\">\n      </mat-form-field>\n    </p>\n  </mat-dialog-content>\n\n  <mat-dialog-actions>\n    <button mat-raised-button type=\"submit\" [mat-dialog-close]=\"editworkspaceform\" [disabled]=\"editworkspaceform.invalid\">Speichern</button>\n    <button mat-raised-button [mat-dialog-close]=\"false\">Abbrechen</button>\n  </mat-dialog-actions>\n\n</form>\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/editworkspace/editworkspace.component.css",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "excerpts": []
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/newworkspace/newworkspace.component.ts",
+      "sha256": "a01d813ed01c83fb75aed55756015cfa9a7f06f39b3db34bf56dc127f4189a00",
+      "excerpts": [
+        "import { Component } from '@angular/core';\nimport { FormGroup, Validators, FormControl } from '@angular/forms';\n\n@Component({\n    templateUrl: './newworkspace.component.html',\n    styleUrls: ['./newworkspace.component.css'],\n    standalone: false\n})\nexport class NewworkspaceComponent {\n  newworkspaceform = new FormGroup({\n    name: new FormControl('', [Validators.required, Validators.minLength(3)])\n  });\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/newworkspace/newworkspace.component.html",
+      "sha256": "c027f52b920a15a606573ddb4dbe609acd86610d2d387262a6f582620113bd0d",
+      "excerpts": [
+        "<form [formGroup]=\"newworkspaceform\">\n  <h1 mat-dialog-title>Neuer Arbeitsbereich</h1>\n\n  <mat-dialog-content>\n    <p>\n      <mat-form-field>\n        <input matInput formControlName=\"name\" placeholder=\"Name\">\n      </mat-form-field>\n    </p>\n    <div>\n      <p>Nach dem Anlegen des Arbeitsbereiches können Sie die Zugriffsrechte zuweisen.\n      </p>\n    </div>\n  </mat-dialog-content>\n\n  <mat-dialog-actions>\n    <button mat-raised-button type=\"submit\" [mat-dialog-close]=\"newworkspaceform\" [disabled]=\"newworkspaceform.invalid\">Speichern</button>\n    <button mat-raised-button [mat-dialog-close]=\"false\">Abbrechen</button>\n  </mat-dialog-actions>\n\n</form>\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/newworkspace/newworkspace.component.css",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "excerpts": []
+    },
+    {
+      "path": "frontend/src/app/superadmin/confirm-with-password/confirm-with-password.component.ts",
+      "sha256": "34e926ff6eb8e7f30860aacaf6dcdbd85f2785ce0974bed25770b8c97029780d",
+      "excerpts": [
+        "import { MAT_DIALOG_DATA } from '@angular/material/dialog';\nimport { Component, EventEmitter, Inject } from '@angular/core';\nimport { FormGroup, Validators, FormControl } from '@angular/forms';\n\n@Component({\n    templateUrl: './confirm-with-password.component.html',\n    standalone: false\n})\n\nexport class ConfirmWithPasswordComponent {\n  passwordform = new FormGroup({\n    pw: new FormControl('', [Validators.required, Validators.minLength(7)])\n  });\n\n  errorMessage = '';\n\n  readonly passwordSubmit = new EventEmitter<string>();\n\n  // `content` and `confirmText` are optional: callers that only need a title (plus the fixed\n  // \"please re-enter your password\" wording and default \"Bestätigen\") can omit both.\n  constructor(\n    @Inject(MAT_DIALOG_DATA) public data: { title: string; content?: string; confirmText?: string }\n  ) {}\n\n  submit(): void {\n    if (this.passwordform.invalid) {\n      return;\n    }\n    this.errorMessage = '';\n    this.passwordSubmit.emit(this.passwordform.get('pw')?.value ?? '');\n  }\n\n  clearError(): void {\n    this.errorMessage = '';\n  }\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/confirm-with-password/confirm-with-password.component.html",
+      "sha256": "86934bc9775f7c7cab4ee92e01a1e9dcea22ac1ad76fa6726199ad688587c3a0",
+      "excerpts": [
+        "<form data-cy=\"dialog-change-superadmin\" [formGroup]=\"passwordform\" (ngSubmit)=\"submit()\" autocomplete=\"off\">\n  <h1 mat-dialog-title>{{data.title}}</h1>\n\n  <mat-dialog-content>\n    @if (data.content) {\n      <p>{{data.content}}</p>\n    }\n    <div>\n      <p>Bitte geben Sie zur Sicherheit Ihr eigenes Kennwort noch einmal ein.</p>\n    </div>\n    <p>\n      <mat-form-field>\n        <input data-cy=\"dialog-change-superadmin-pw\" matInput type=\"password\" formControlName=\"pw\" placeholder=\"Kennwort\" autocomplete=\"new-password\"\n               (input)=\"clearError()\">\n      </mat-form-field>\n    </p>\n    @if (errorMessage) {\n      <tc-alert data-cy=\"dialog-change-superadmin-error\" level=\"error\" [text]=\"errorMessage\"></tc-alert>\n    }\n  </mat-dialog-content>\n\n  <mat-dialog-actions>\n    <button mat-raised-button data-cy=\"pw-submit\" type=\"submit\" [disabled]=\"passwordform.invalid\">{{data.confirmText || 'Bestätigen'}}</button>\n    <button mat-raised-button [mat-dialog-close]=\"false\">Abbrechen</button>\n  </mat-dialog-actions>\n</form>\n"
+      ]
+    }
+  ]
+}

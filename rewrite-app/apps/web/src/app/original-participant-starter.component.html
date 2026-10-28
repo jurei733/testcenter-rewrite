@@ -36,9 +36,9 @@
           @if (settings.assetUrl('starterCardDone'); as doneImage) { <img class="done-image" [src]="doneImage" alt="" /> }
         }
       </mat-card>
-      <p *ngIf="!view.assignedBooklets.length" role="status">{{ view.noAssignedBookletsLabel }}</p>
     @if (problem()) { <p class="starter-problem" role="alert">{{ problem() }}</p> }
   </div>
+  <app-original-participant-notice *ngIf="!view.assignedBooklets.length" role="status" [text]="view.noAssignedBookletsLabel" />
   <div #bottomSentinel id="originalStarterBottomSentinel" class="sentinel"></div>
   @if (showScrollButton()) {
     <button type="button" class="scroll-button" aria-controls="originalStarterBottomSentinel" (click)="scrollDown()">

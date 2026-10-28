@@ -17,6 +17,26 @@ const attachment = { attachmentId:"owned-synthetic-printed-qr", groupKey:"own-gr
   unitKey:"own-unit", variableId:"own-image", attachmentType:"capture-image" };
 const mm = 72 / 25.4;
 const near = (actual, expected) => assert.ok(Math.abs(actual-expected)<1e-8, `${actual} != ${expected}`);
+
+for (const code of [undefined, null, "", "own-code", "$& $` $' $$"]) test(`Original CODE substitution is the participant suffix, never the QR identifier: ${JSON.stringify(code)}`, async () => {
+  const input = { ...attachment, participantCode: code };
+  const pdf = await PDFDocument.load(await createAttachmentPagesPdf({ attachments: [input],
+    layout: "original", labelTemplate: "%GROUP%|%TESTTAKER%|%BOOKLET%|%UNIT%|%VAR%|%LOGIN%|%CODE%|%CODE%" }));
+  assert.equal(pdf.getTitle(), `own-group|Own Person|own-booklet|own-unit|own-image|own-login|${code ?? ""}|${code ?? ""}`);
+});
+test("Original substitution inserts authored JavaScript replacement tokens literally, like PHP str_replace", async () => {
+  const value = "$& $` $' $$";
+  const pdf = await PDFDocument.load(await createAttachmentPagesPdf({ attachments: [{ ...attachment, personLabel: value }],
+    layout: "original", labelTemplate: "Before %TESTTAKER% / %TESTTAKER% After" }));
+  assert.equal(pdf.getTitle(), `Before ${value} / ${value} After`);
+});
+test("Original multi-page document title lists distinct authored group labels in source order", async () => {
+  const pdf = await PDFDocument.load(await createAttachmentPagesPdf({ layout: "original", attachments: [
+    { ...attachment, groupLabel: "Authored A" }, { ...attachment, groupKey: "other", groupLabel: "Authored B" },
+    { ...attachment, groupLabel: "Authored A" }, { ...attachment, groupLabel: "" }, { ...attachment, groupKey: "legacy" }
+  ] }));
+  assert.equal(pdf.getTitle(), "Authored A, Authored B, , legacy");
+});
 async function rendered(input) {
   const pdf = await PDFDocument.load(await createAttachmentPagesPdf(input));
   const pages = pdf.getPages();

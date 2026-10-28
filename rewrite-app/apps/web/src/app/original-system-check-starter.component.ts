@@ -5,6 +5,7 @@ import { MatButton } from "@angular/material/button";
 import { MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardSubtitle, MatCardTitle } from "@angular/material/card";
 import type { SystemCheckChoice } from "@testcenter-rewrite-app/domain";
 import { ApplicationSettingsService } from "./application-settings.service";
+import { OriginalEntrySurfaceStylesComponent } from "./original-entry-surface-styles.component";
 import { OriginalSystemCheckContentComponent } from "./original-system-check-content.component";
 import type { SystemCheckViewComponent } from "./system-check-view.component";
 
@@ -13,8 +14,9 @@ import type { SystemCheckViewComponent } from "./system-check-view.component";
 // loading and selection; this component creates no sessions or report data.
 @Component({
   selector: "app-original-system-check-starter", standalone: true,
-  imports: [NgFor, NgIf, RouterLink, MatButton, MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardSubtitle, MatCardTitle, OriginalSystemCheckContentComponent],
+  imports: [NgFor, NgIf, RouterLink, MatButton, MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardSubtitle, MatCardTitle, OriginalSystemCheckContentComponent, OriginalEntrySurfaceStylesComponent],
   template: `
+    <app-original-entry-surface-styles />
     @if (view.systemCheck) {
       <app-original-system-check-content [view]="view" />
     } @else {

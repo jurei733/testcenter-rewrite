@@ -145,7 +145,10 @@ export class AttachmentManagerService {
   ): string {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(values)) {
-      if (value?.trim()) query.set(key, value.trim());
+      // Original omits an empty label but transmits authored whitespace exactly.
+      if (key === "labelTemplate") {
+        if (value) query.set(key, value);
+      } else if (value?.trim()) query.set(key, value.trim());
     }
     const serialized = query.toString();
     return serialized ? `${route}?${serialized}` : route;
