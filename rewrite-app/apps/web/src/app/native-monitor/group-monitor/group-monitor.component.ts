@@ -13,7 +13,7 @@ import {CdkTrapFocus} from '@angular/cdk/a11y';
 import {CustomtextPipe,AlertComponent} from '../shared/shared.module';
 import {TestSessionComponent} from './test-session/test-session.component';
 import {
-  Component, inject, signal, ElementRef, type OnDestroy, type OnInit, ViewChild
+  Component, inject, signal, ElementRef, type OnDestroy, type OnInit, ViewChild, ViewContainerRef
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import type { Sort } from '@angular/material/sort';
@@ -66,6 +66,7 @@ import { MessageService } from '../shared/services/message.service';
 })
 export class GroupMonitorComponent implements OnInit, OnDestroy {
   readonly entries = new NativeMonitorEntriesView().transform;
+  private readonly filterDialogView = inject(ViewContainerRef);
   private readonly nativeText = new CustomtextPipe(inject(CustomtextService));
   readonly customtext = this.nativeText.transform.bind(this.nativeText);
   readonly connectionStatus = signal<ConnectionStatus>('initial');
@@ -429,10 +430,15 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   }
 
   private openFilterDialog(filterEntry: TestSessionFilterListEntry | undefined = undefined) {
+    const scope = this.bs.accessSignal;
+    if (scope.aborted) return;
     const data = filterEntry ? filterEntry.filter : {};
-    const dialogRef = this.addFilterDialog.open(AddFilterDialogComponent, { width: 'auto', data });
+    const dialogRef = this.addFilterDialog.open(AddFilterDialogComponent, { width: 'auto', data, viewContainerRef: this.filterDialogView });
 
-    dialogRef.afterClosed().subscribe((newFilter: TestSessionFilter) => {
+    this.subscriptions.push(dialogRef.afterClosed().pipe(
+      take(1), takeUntil(this.routeChanged$), takeUntil(fromEvent(scope, 'abort')),
+      finalize(() => dialogRef.close())
+    ).subscribe((newFilter: TestSessionFilter) => {
       if (!newFilter) return;
       this.tsm.filterOptions[newFilter.id] = {
         selected: true,
@@ -440,7 +446,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
         source: filterEntry?.source || 'custom'
       };
       this.tsm.refreshFilters();
-    });
+    }));
   }
 
   // eslint-disable-next-line class-methods-use-this

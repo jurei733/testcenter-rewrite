@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { defer, EMPTY, fromEvent, merge, Observable, of } from 'rxjs';
 import { finalize, map, shareReplay, takeUntil, tap } from 'rxjs/operators';
 import { BackendService } from '../backend.service';
+import { nativeMonitorBookletFileId } from '../../native-monitor-wire';
 import {
   isBooklet, isUnit, type Booklet, type Testlet, type BookletError, type Unit, type BookletState, type BookletStateOption
 } from '../group-monitor.interfaces';
@@ -20,6 +21,7 @@ export class BookletService extends BookletParserService<Unit, Testlet, BookletS
 
   private accessIdentity: unknown;
   getBooklet(bookletName = ''): Observable<Booklet | BookletError> {
+    bookletName = nativeMonitorBookletFileId(bookletName);
     if (this.accessIdentity !== this.bs.cacheIdentity) {
       for (const name of Object.keys(this.booklets)) delete this.booklets[name];
       this.accessIdentity = this.bs.cacheIdentity;

@@ -16,6 +16,7 @@ const cache=new Map(),bindings=new Map(),tokens=new Map();
 const token=name=>{if(!tokens.has(name))tokens.set(name,class{});return tokens.get(name);};
 const stubs=new Proxy({}, {get:(_,name)=>token(name)});
 const shared={...stubs,CustomtextService:token('CustomtextService'),CustomtextPipe:class{transform(text){return text;}},BookletParserService:class{}};
+bindings.set(core.ViewContainerRef,{owned:'monitor view'});
 const angular={...core,Component:()=>value=>value,Injectable:()=>value=>value,ViewChild:()=>()=>{},inject:key=>{assert.ok(bindings.has(key),'Missing test dependency '+String(key));return bindings.get(key);}};
 function load(relative){
  const file=resolve(root,relative);if(cache.has(file))return cache.get(file);
@@ -61,10 +62,11 @@ function componentFixture(){
  const controller=new AbortController();const backend={accessSignal:controller.signal,connectionStatus$:new rx.BehaviorSubject('initial'),getProfile(id){const stream=new rx.Subject();profiles.set(id,stream);return stream;}};
  const empty=()=>({allChecked:false,numberOfSessions:0,differentBooklets:0,differentBookletSpecies:0,pausedSessions:0,lockedSessions:0,bookletStateLabels:{}});
  const tsm={checked:[],getMaxTimeAcrossAllSessions:()=>10,testCommandGoto(selection,time,targets){gotos.push({selection,time,targets});return rx.of(true);},sessions$:new rx.BehaviorSubject([]),sessionsStats$:new rx.BehaviorSubject(empty()),checkedStats$:new rx.BehaviorSubject(empty()),commandResponses$:new rx.Subject(),checkingOptions:{enableAutoCheckAll:true},filterOptions:{},connect(group){connected.push(group);},disconnect(){},resetFilters(){this.filterOptions={quick:{selected:false,filter:{value:''}}};},refreshFilters(){},commandFinishEverything(){finishes++;return rx.of({commandType:'terminate',testIds:['1']});}};
+ const filterDialog=new rx.Subject(),filterOpen=[];let filterCloses=0;const filterOverlay={open:(component,config)=>{filterOpen.push(config);return {afterClosed:()=>filterDialog,close:()=>{filterCloses++;}};}};
  const cts={getCustomText:()=>null};bindings.set(shared.CustomtextService,cts);
- const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog})}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},{},{},{},{showConfirmDialog:()=>confirmations});
+ const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog})}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},filterOverlay,{},{},{showConfirmDialog:()=>confirmations});
  component.ngOnInit();
- return {component,params,profiles,connected,navigated,confirmations,controller,tsm,gotoDialog,gotos,get finishes(){return finishes;}};
+ return {component,params,profiles,connected,navigated,confirmations,controller,tsm,gotoDialog,gotos,filterDialog,filterOpen,get filterCloses(){return filterCloses;},get finishes(){return finishes;}};
 }
 const profile=(settings={},filters=[])=>({settings,filters,filtersEnabled:{}});
 
@@ -200,4 +202,32 @@ test('a failed immediate command reports its error without an unhandled subscrip
  const {backend,session}=transport(),snapshots=new rx.Subject();backend.observeSessionsMonitor=()=>snapshots;
  session.text=async()=>{throw Error('Owned visible failure');};bindings.set(GROUP_MONITOR_CONFIG,{checkForIdleInterval:0});
  const manager=new TestSessionManager(backend,{getBooklet:()=>rx.of({error:'general',species:null})});manager.connect('A');snapshots.next([{testId:'1',personLabel:'Owned',bookletName:'BOOK',timestamp:1,testState:{status:'running',CONNECTION:'POLLING',CONTROLLER:'RUNNING'}}]);manager.testCommandPause();await settle();assert.equal(backend.problem$.value,'Owned visible failure');manager.disconnect();assert.equal(backend.problem$.value,'');
+});
+
+// Preset names are Test identities, not physical material IDs. Keep access and
+// connection cancellation while coalescing all presets of the same material.
+test('preset material reads use the native physical file ID without dropping the Test name',async()=>{
+ const {backend,session}=transport(),requests=[];session.text=async(method,path)=>{requests.push(path);return 'owned XML';};
+ const presets=['BOOK#route:first',' B O O K #route:last','BOOK#0','BOOK'];
+ for(const name of presets)assert.equal(await rx.firstValueFrom(backend.getBooklet(name)),'owned XML');
+ assert.deepEqual(requests,presets.map(()=>'/booklet/BOOK'));
+});
+test('different native presets share one scoped material request',async()=>{
+ const material=new rx.Subject(),materialRequests=[];let reads=0;const backend={cacheIdentity:{owned:1},accessSignal:new AbortController().signal,connectionClosed$:new rx.Subject(),getBooklet:name=>{reads++;materialRequests.push(name);return material;}};
+ const service=new BookletService(backend);service.parseXml=()=>({metadata:{label:'Owned'},species:'owned'});
+ const a=rx.firstValueFrom(service.getBooklet('BOOK#route:first')),b=rx.firstValueFrom(service.getBooklet('BOOK#route:last'));
+ material.next('owned XML');const [first,second]=await Promise.all([a,b]);assert.equal(reads,1);assert.deepEqual(materialRequests,['BOOK']);assert.equal(first,second);
+ assert.equal((await rx.firstValueFrom(service.getBooklet('BOOK'))).metadata.label,'Owned');assert.equal(reads,1);
+});
+test('filter overlays receive the actual monitor view injector and save one completed filter',()=>{
+ const f=componentFixture();f.params.next({'group-name':'A'});f.component.addFilter();
+ assert.equal(f.filterOpen[0].viewContainerRef,bindings.get(core.ViewContainerRef));
+ const filter={id:'owned',label:'Owned',target:'personLabel',value:'alpha',not:false,type:'equal'};f.filterDialog.next(filter);
+ assert.deepEqual(f.tsm.filterOptions.owned,{selected:true,filter,source:'custom'});assert.equal(f.filterCloses,1);f.component.ngOnDestroy();
+});
+for(const transition of ['route','access','destroy'])test('filter completion cannot write into a retired '+transition+' context',()=>{
+ const f=componentFixture();f.params.next({'group-name':'A'});f.component.addFilter();
+ if(transition==='route')f.params.next({'group-name':'B'});else if(transition==='access')f.controller.abort();else f.component.ngOnDestroy();
+ assert.equal(f.filterDialog.observed,false);assert.equal(f.filterCloses,1);
+ f.filterDialog.next({id:'stale',label:'Stale',target:'personLabel',value:'alpha',not:false,type:'equal'});assert.equal(f.tsm.filterOptions.stale,undefined);if(transition!=='destroy')f.component.ngOnDestroy();
 });

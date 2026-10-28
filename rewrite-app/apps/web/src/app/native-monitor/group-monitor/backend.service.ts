@@ -4,7 +4,7 @@ import {catchError,exhaustMap,map,tap} from 'rxjs/operators';
 import type {BookletError,CommandResponse,Profile,TestSessionData} from './group-monitor.interfaces';
 import type {ConnectionStatus} from '../shared/shared.module';
 import {NativeMonitorSessionService} from '../native-session.service';
-import {parseNativeMonitorSnapshot,nativeMonitorSelectionBody} from '../native-monitor-wire';
+import {parseNativeMonitorSnapshot,nativeMonitorSelectionBody,nativeMonitorBookletFileId} from '../native-monitor-wire';
 @Injectable()
 export class BackendService {
  private readonly session=inject(NativeMonitorSessionService);
@@ -35,7 +35,7 @@ export class BackendService {
   }));
  }
  cutConnection(){this.connectionClosed.next();this.connectionStatus$.next('initial');this.problem$.next('');}
- getBooklet(name:string):Observable<string|BookletError>{return this.request('GET','/booklet/'+encodeURIComponent(name)).pipe(catchError(error=>of({error:error.status===404?'missing-file':'general',species:null} as BookletError)));}
+ getBooklet(name:string):Observable<string|BookletError>{return this.request('GET','/booklet/'+encodeURIComponent(nativeMonitorBookletFileId(name))).pipe(catchError(error=>of({error:error.status===404?'missing-file':'general',species:null} as BookletError)));}
  private write(path:string,ids:string[],fields:Record<string,unknown>={},method='POST'):Observable<CommandResponse>{
   return this.request(method,path,nativeMonitorSelectionBody(ids,fields),true).pipe(map(()=>({commandType:String(fields['keyword']??(path.endsWith('/unlock')?'unlock':'lock')),testIds:ids})),tap(()=>this.problem$.next('')),catchError(error=>{this.problem$.next(error instanceof Error?error.message:'Befehl fehlgeschlagen');throw error;}));
  }

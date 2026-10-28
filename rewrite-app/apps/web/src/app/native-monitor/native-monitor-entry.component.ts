@@ -37,7 +37,13 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   this.ready.set(true);
  }
  get hasChild(){return !!this.route.firstChild;}
- get allowedChild(){const group=this.route.firstChild?.snapshot.paramMap.get('group-name');return !!group&&this.session.access()?.claims.testGroupMonitor?.some(claim=>claim.id===group);}
+ get allowedChild(){
+  const params=this.route.firstChild?.snapshot.paramMap,group=params?.get('group-name'),profile=params?.get('profile-id')??'';
+  return !!group&&this.session.access()?.claims.testGroupMonitor?.some(claim=>{
+   const flags=Array.isArray(claim.flags)?{}:claim.flags;
+   return claim.id===group&&(flags.profile??'')===profile;
+  });
+ }
  async submit(){if(this.session.busy()||this.name.trim().length<3)return;this.problem.set('');
   try{const access=await this.session.login(this.name.trim(),this.passwordStep()?this.password:'');this.password='';this.passwordStep.set(false);const claims=access.claims.testGroupMonitor??[];if(claims.length===1)await this.open(claims[0]!);}
   catch(error){if(!this.passwordStep()&&error instanceof NativeMonitorHttpError&&[400,401].includes(error.status)){this.passwordStep.set(true);this.session.problem.set('');}else{this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');this.password='';}}

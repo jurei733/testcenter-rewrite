@@ -32,7 +32,7 @@
   <router-outlet />
  }@else{
   <section class="monitor-selection"><h2>Gruppenmonitor</h2>
-   @if(hasChild){<p role="alert">Für diese Gruppe liegt keine Berechtigung vor.</p>}
+   @if(hasChild){<p role="alert">Bitte eine freigegebene Gruppenmonitor-Sitzung auswählen.</p>}
    @for(claim of session.access()?.claims?.testGroupMonitor??[];track $index){<button matButton="outlined" class="monitor-claim" (click)="open(claim)" [attr.data-group]="claim.id"><strong>{{claim.label}}</strong><span>{{claimLabel(claim)}}</span></button>}
   </section>
  }

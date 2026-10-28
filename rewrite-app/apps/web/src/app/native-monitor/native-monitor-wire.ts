@@ -1,4 +1,6 @@
 import type {TestSessionChange} from './common/test-session-change.interface';
+/** Native Test names retain preset states; material reads/cache use only the physical file ID. */
+export const nativeMonitorBookletFileId=(name:string):string=>name.replace(/[ \t\n\r\v\f]/g,'').split('#',1)[0]!;
 const nativeId=(value:string):string=>{if(!/^[1-9][0-9]{0,18}$/.test(value)||BigInt(value)>9223372036854775807n)throw Error('Ungültige native Testkennung.');return value;};
 /** Source emits signed-int64 JSON integers. Modern JSON.parse source context
  * preserves their exact tokens; older engines must fail closed for unsafe IDs. */

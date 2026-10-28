@@ -50,7 +50,7 @@ export class AddFilterDialogComponent implements OnInit {
     const data=inject<TestSessionFilter>(MAT_DIALOG_DATA);
     if (data && isTestSessionFilter(data)) {
       this.originalId = data.id;
-      this.filter = data;
+      this.filter = { ...data, value: Array.isArray(data.value) ? [...data.value] : data.value };
     }
   }
 
