@@ -2362,6 +2362,7 @@ export const parseOriginalTestcenterOperationalLogins = (
         return profile ? [profile] : [];
       }),
       monitorBookletVisibility,
+      ...(Object.keys(readXmlParticipantViewSettings(content) ?? {}).length ? {viewSettings: readXmlParticipantViewSettings(content)} : {}),
       customTexts: { ...customTexts },
       ...(Object.keys(assetAssignments).length > 0
         ? { assetAssignments }

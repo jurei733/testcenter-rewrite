@@ -1,18 +1,19 @@
-import type {OriginalLoginBinding, ParticipantRosterEntry, ParticipantSession, Workspace} from '@testcenter-rewrite-app/domain';
+import type {OriginalLoginBinding, ParticipantSession, Workspace} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {ParticipantAccessPort} from './participant-access.js';
+import type {OriginalNativeLogin} from './original-operational-login.js';
 import {createOriginalSessionToken, hashOriginalSessionToken, OriginalSessionTokenCollisionError,
   type OriginalSessionToken} from './original-session-token.js';
 
 export type OriginalAuthenticationPrincipal = {
   workspace: Workspace;
-  rosterEntry: ParticipantRosterEntry;
+  rosterEntry: OriginalNativeLogin;
   binding: OriginalLoginBinding;
 };
 /** Internal authentication state. The native HTTP AccessSet serializer is a separate boundary. */
 export type OriginalAuthenticationState = {
   kind: 'login'; token: string; groupToken: string; codeRequired: boolean;
-  login: Pick<ParticipantRosterEntry, 'loginKey' | 'groupLabel' | 'customTexts' | 'viewSettings' | 'executionMode'>;
+  login: Pick<OriginalNativeLogin, 'loginKey' | 'groupLabel' | 'customTexts' | 'viewSettings' | 'executionMode' | 'originalOperationalMode'>;
 } | {
   kind: 'person'; token: string; groupToken: string; participantSession: ParticipantSession;
   /** Immediate person response uses requested code; subsequent reads use first stored spelling. */
@@ -31,7 +32,7 @@ export function createOriginalAuthentication(input: {
   authenticate: (name: string, password: string) => Promise<OriginalAuthenticationPrincipal>;
   resolve: (scope: Pick<OriginalSessionToken, 'tenantId' | 'workspaceId' | 'subjectKey'>) => Promise<OriginalAuthenticationPrincipal>;
   enter: (principal: OriginalAuthenticationPrincipal, code: string) => Promise<ParticipantSession>;
-  requiresCode: (entry: ParticipantRosterEntry) => boolean;
+  requiresCode: (entry: OriginalNativeLogin) => boolean;
   error: (status: number, code: string, message: string) => Error;
   now: () => string;
 }): OriginalAuthenticationPort {
@@ -70,7 +71,7 @@ export function createOriginalAuthentication(input: {
     codeRequired: input.requiresCode(principal.rosterEntry),
     login: {loginKey: principal.rosterEntry.loginKey, groupLabel: principal.rosterEntry.groupLabel,
       customTexts: principal.rosterEntry.customTexts, viewSettings: principal.rosterEntry.viewSettings,
-      executionMode: principal.rosterEntry.executionMode}
+      executionMode: principal.rosterEntry.executionMode, originalOperationalMode: principal.rosterEntry.originalOperationalMode}
   });
   const enter = async (principal: OriginalAuthenticationPrincipal, code: string): Promise<OriginalAuthenticationState> => {
     if (typeof code !== 'string') throw input.error(400, 'participant_code_invalid', 'The participant code is invalid.');

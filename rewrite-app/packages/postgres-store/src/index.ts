@@ -429,6 +429,7 @@ const mapParticipantSession = (row: Row | undefined): ParticipantSession | null 
         groupKey: String(row.group_key),
         ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
         ...(row.original_name_suffix === null || row.original_name_suffix === undefined ? {} : {originalNameSuffix:String(row.original_name_suffix)}),
+        ...(row.original_operational_mode == null ? {} : {originalOperationalMode: String(row.original_operational_mode) as NonNullable<ParticipantSession['originalOperationalMode']>}),
         participantCode:
           row.participant_code === null || row.participant_code === undefined
             ? null
@@ -1720,6 +1721,7 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
   ,{version: 70, name: "original_operational_login_credentials",
     sql: `ALTER TABLE operational_login_migration_candidates ADD COLUMN native_logins_json JSONB NOT NULL DEFAULT '[]';`
   }
+  ,{version: 71, name: "original_operational_person_mode", sql: `ALTER TABLE participant_sessions ADD COLUMN original_operational_mode TEXT;`}
 ];
 
 export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
@@ -3198,7 +3200,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getParticipantSessionById(participantSessionId) {
       return one(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix, original_operational_mode
          FROM participant_sessions
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -3232,7 +3234,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix, original_operational_mode
          FROM participant_sessions
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -3330,8 +3332,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         const result=resolveOriginalPerson(candidate,binding?mapOriginalLoginBinding(binding):null,people,validate),person=result.participantSession;
         const runs=(await client.query(`SELECT ${testRunProjection} FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE`,[person.tenantId,person.workspaceId,person.originalLoginKey])).rows.map(mapTestRun).filter((run):run is TestRun=>run!==null);
         projectOriginalPersonRuns(person,runs,people);
-        if(result.created)await client.query("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null]);
-        await client.query("UPDATE participant_sessions SET group_key=$1,execution_mode=$2 WHERE tenant_id=$3 AND workspace_id=$4 AND original_login_key=$5 AND (group_key IS DISTINCT FROM $1 OR execution_mode IS DISTINCT FROM $2)",[person.groupKey,person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey]);
+        if(result.created)await client.query("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix,original_operational_mode) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null,person.originalOperationalMode??null]);
+        await client.query("UPDATE participant_sessions SET group_key=$1,execution_mode=$2,original_operational_mode=$6 WHERE tenant_id=$3 AND workspace_id=$4 AND original_login_key=$5 AND (group_key IS DISTINCT FROM $1 OR execution_mode IS DISTINCT FROM $2 OR original_operational_mode IS DISTINCT FROM $6)",[person.groupKey,person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey,person.originalOperationalMode??null]);
         await client.query("UPDATE test_runs SET execution_mode=$1 WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4) AND execution_mode IS DISTINCT FROM $1",[person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey]);
         await client.query("COMMIT");return result;
       }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
@@ -3357,8 +3359,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         }
         await (client ?? pool).query(
         `INSERT INTO participant_sessions (
-          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix, original_operational_mode
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT(participant_session_id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
@@ -3371,7 +3373,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           valid_until = EXCLUDED.valid_until,
           created_at = EXCLUDED.created_at,
           original_login_key = EXCLUDED.original_login_key,
-          original_name_suffix = EXCLUDED.original_name_suffix`,
+          original_name_suffix = EXCLUDED.original_name_suffix, original_operational_mode = EXCLUDED.original_operational_mode`,
         [
           participantSession.participantSessionId,
           participantSession.tenantId,
@@ -3385,7 +3387,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantSession.validUntil ?? null,
           participantSession.createdAt,
           participantSession.originalLoginKey ?? null,
-          participantSession.originalNameSuffix ?? null
+          participantSession.originalNameSuffix ?? null,
+          participantSession.originalOperationalMode ?? null
         ]
       );
         if (native) await client!.query("COMMIT");
@@ -3436,6 +3439,10 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           updated_at = EXCLUDED.updated_at, native_logins_json = EXCLUDED.native_logins_json`,
         [tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString(), JSON.stringify(privateLogins)]
       );
+      for(const login of privateLogins){
+        await client.query('UPDATE participant_sessions SET execution_mode=NULL,original_operational_mode=$1 WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4',[login.loginMode,tenantId,workspaceId,login.loginKey]);
+        await client.query('UPDATE test_runs SET execution_mode=NULL WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) AND execution_mode IS NOT NULL',[tenantId,workspaceId,login.loginKey]);
+      }
       });
     },
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
@@ -3517,7 +3524,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         // Authorization metadata does not require decoding private responses or Test state.
         const runs=(await client.query('SELECT test_run_id,participant_session_id,tenant_id,workspace_id,execution_mode FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=$3) ORDER BY test_run_id FOR UPDATE',[entry.tenantId,entry.workspaceId,entry.loginKey])).rows.map(row=>({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),executionMode:row.execution_mode==null?undefined:row.execution_mode as TestRun['executionMode']}));
         const modes=projectOriginalLoginMode(entry,people,runs),mode=entry.executionMode??defaultParticipantExecutionMode;
-        if(modes.participantSessions.some((person,index)=>person!==people[index]))await client.query('UPDATE participant_sessions SET execution_mode=$1 WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4 AND execution_mode IS DISTINCT FROM $1',[mode,entry.tenantId,entry.workspaceId,entry.loginKey]);
+        if(modes.participantSessions.some((person,index)=>person!==people[index]))await client.query('UPDATE participant_sessions SET execution_mode=$1,original_operational_mode=NULL WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4 AND execution_mode IS DISTINCT FROM $1',[mode,entry.tenantId,entry.workspaceId,entry.loginKey]);
         if(modes.testRuns.some((run,index)=>run!==runs[index]))await client.query('UPDATE test_runs SET execution_mode=$1 WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$2 AND workspace_id=$3 AND original_login_key=$4) AND execution_mode IS DISTINCT FROM $1',[mode,entry.tenantId,entry.workspaceId,entry.loginKey]);
       }
       });

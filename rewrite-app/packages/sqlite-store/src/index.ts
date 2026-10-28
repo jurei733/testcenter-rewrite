@@ -450,6 +450,7 @@ const mapParticipantSession = (
         groupKey: String(row.group_key),
         ...(row.original_login_key === null || row.original_login_key === undefined ? {} : {originalLoginKey:String(row.original_login_key)}),
         ...(row.original_name_suffix === null || row.original_name_suffix === undefined ? {} : {originalNameSuffix:String(row.original_name_suffix)}),
+        ...(row.original_operational_mode == null ? {} : {originalOperationalMode: String(row.original_operational_mode) as NonNullable<ParticipantSession['originalOperationalMode']>}),
         participantCode:
           row.participant_code === null || row.participant_code === undefined
             ? null
@@ -1787,6 +1788,7 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
   ,{version: 76, name: "original_operational_login_credentials",
     sql: `ALTER TABLE operational_login_migration_candidates ADD COLUMN native_logins_json TEXT NOT NULL DEFAULT '[]';`
   }
+  ,{version: 77, name: "original_operational_person_mode", sql: `ALTER TABLE participant_sessions ADD COLUMN original_operational_mode TEXT;`}
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -3348,7 +3350,7 @@ export const createSqliteFirstSliceStorage = (
     async getParticipantSessionById(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix, original_operational_mode
            FROM participant_sessions
            WHERE participant_session_id = ?`
         )
@@ -3382,7 +3384,7 @@ export const createSqliteFirstSliceStorage = (
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix, original_operational_mode
            FROM participant_sessions
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -3468,8 +3470,8 @@ export const createSqliteFirstSliceStorage = (
         const result=resolveOriginalPerson(candidate,binding?mapOriginalLoginBinding(binding):null,people,validate),person=result.participantSession;
         const runs=database.prepare("SELECT * FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)").all(person.tenantId,person.workspaceId,person.originalLoginKey!).map(mapTestRun).filter((run):run is TestRun=>run!==null);
         projectOriginalPersonRuns(person,runs,people);
-        if(result.created)database.prepare("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").run(...[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null]);
-        database.prepare("UPDATE participant_sessions SET group_key=?,execution_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND (group_key IS NOT ? OR execution_mode IS NOT ?)").run(person.groupKey,person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.groupKey,person.executionMode??null);
+        if(result.created)database.prepare("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix,original_operational_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(...[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null,person.originalOperationalMode??null]);
+        database.prepare("UPDATE participant_sessions SET group_key=?,execution_mode=?,original_operational_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND (group_key IS NOT ? OR execution_mode IS NOT ? OR original_operational_mode IS NOT ?)").run(person.groupKey,person.executionMode??null,person.originalOperationalMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.groupKey,person.executionMode??null,person.originalOperationalMode??null);
         database.prepare("UPDATE test_runs SET execution_mode=? WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT ?").run(person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.executionMode??null);
         database.exec("COMMIT");return result;
       }catch(error){return rollbackAfterFailure(database,error);}
@@ -3495,8 +3497,8 @@ export const createSqliteFirstSliceStorage = (
         database
         .prepare(
           `INSERT INTO participant_sessions (
-            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, execution_mode, status, valid_until, created_at, original_login_key, original_name_suffix, original_operational_mode
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(participant_session_id) DO UPDATE SET
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
@@ -3509,7 +3511,7 @@ export const createSqliteFirstSliceStorage = (
             valid_until = excluded.valid_until,
             created_at = excluded.created_at,
             original_login_key = excluded.original_login_key,
-            original_name_suffix = excluded.original_name_suffix`
+            original_name_suffix = excluded.original_name_suffix, original_operational_mode = excluded.original_operational_mode`
         )
         .run(
           participantSession.participantSessionId,
@@ -3524,7 +3526,8 @@ export const createSqliteFirstSliceStorage = (
           participantSession.validUntil ?? null,
           participantSession.createdAt,
           participantSession.originalLoginKey ?? null,
-          participantSession.originalNameSuffix ?? null
+          participantSession.originalNameSuffix ?? null,
+          participantSession.originalOperationalMode ?? null
         );
         if (native) database.exec("COMMIT");
       } catch (error) { if (native) return rollbackAfterFailure(database,error); throw error; }
@@ -3587,6 +3590,10 @@ export const createSqliteFirstSliceStorage = (
             updated_at = excluded.updated_at, native_logins_json = excluded.native_logins_json`
         )
         .run(tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString(), JSON.stringify(privateLogins));
+      for(const login of privateLogins){
+        database.prepare('UPDATE participant_sessions SET execution_mode=NULL,original_operational_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=?').run(login.loginMode,tenantId,workspaceId,login.loginKey);
+        database.prepare('UPDATE test_runs SET execution_mode=NULL WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT NULL').run(tenantId,workspaceId,login.loginKey);
+      }
       });
     },
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
@@ -3671,7 +3678,7 @@ export const createSqliteFirstSliceStorage = (
         // Authorization metadata does not require decoding private responses or Test state.
         const runs=database.prepare('SELECT test_run_id,participant_session_id,tenant_id,workspace_id,execution_mode FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)').all(entry.tenantId,entry.workspaceId,entry.loginKey).map(row=>({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),executionMode:row.execution_mode==null?undefined:row.execution_mode as TestRun['executionMode']}));
         const modes=projectOriginalLoginMode(entry,people,runs),mode=entry.executionMode??defaultParticipantExecutionMode;
-        if(modes.participantSessions.some((person,index)=>person!==people[index]))database.prepare('UPDATE participant_sessions SET execution_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND execution_mode IS NOT ?').run(mode,entry.tenantId,entry.workspaceId,entry.loginKey,mode);
+        if(modes.participantSessions.some((person,index)=>person!==people[index]))database.prepare('UPDATE participant_sessions SET execution_mode=?,original_operational_mode=NULL WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND execution_mode IS NOT ?').run(mode,entry.tenantId,entry.workspaceId,entry.loginKey,mode);
         if(modes.testRuns.some((run,index)=>run!==runs[index]))database.prepare('UPDATE test_runs SET execution_mode=? WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT ?').run(mode,entry.tenantId,entry.workspaceId,entry.loginKey,mode);
       }
       });

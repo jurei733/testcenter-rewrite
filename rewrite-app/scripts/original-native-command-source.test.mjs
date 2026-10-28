@@ -4,8 +4,8 @@ import {createHash} from 'node:crypto';
 import test from 'node:test';
 import ts from 'typescript';
 
-// Production Source evidence only: native monitor-person and command adapters
-// remain implementation work. These checks must not imply Rewrite adoption.
+// Immutable production Source evidence only. Native monitor adoption is tested
+// separately in original-monitor-auth.test.mjs; command adapters remain open.
 const root=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-command/',import.meta.url);
 const read=name=>readFile(new URL(name,root),'utf8');
 const manifest=JSON.parse(await read('manifest.json')),receipt=JSON.parse(await read('receipt.json'));

@@ -24,7 +24,7 @@ function orderedName(input:string):{name:string;fileId:string;states:Map<string,
   return {fileId, name: fileId + (states.size ? '#' + [...states].map(([key, value]) => `${key}:${value}`).join(';') : ''), states};
 }
 export function parseOriginalTestName(input:string):{name:string;fileId:string;states:Record<string,string>}{const parsed=orderedName(input);return{...parsed,states:Object.fromEntries(parsed.states)};}
-export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>};
+export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode|NonNullable<ParticipantSession['originalOperationalMode']>;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>};
 export function formatOriginalTestReadJson(value:OriginalTestRead):string{
  const resources=Object.entries(value.resources);
  const resourceJson=originalPhpMap(resources);
@@ -60,14 +60,14 @@ export function createOriginalTestPort(input: {
     async read({token,testNumber:raw}){
       const{person,run,testNumber}=await owned(token,raw);unlocked(run,testNumber);
       const identity=run.originalResultState;if(typeof identity?.bookletName!=='string'||identity.lastOpenedAt===undefined)throw unavailable();savedState(run);
-      const entry=(await input.repository.listParticipantRosterEntriesByWorkspace(person.tenantId,person.workspaceId)).find(row=>row.originalLoginIdentity===true&&row.loginKey===person.originalLoginKey);if(!entry)throw new FirstSliceError(410,'original_login_gone','The Original login is no longer available.');
+      const entry=(await input.repository.listParticipantRosterEntriesByWorkspace(person.tenantId,person.workspaceId)).find(row=>row.originalLoginIdentity===true&&row.loginKey===person.originalLoginKey);if(!entry&&person.originalOperationalMode===undefined)throw new FirstSliceError(410,'original_login_gone','The Original login is no longer available.');
       const workspaceId=await input.repository.getOrCreateOriginalWorkspaceNumber(person),fileId=orderedName(identity.bookletName).fileId;
       let files:OriginalBookletFiles;try{files=await input.readBooklet(person,fileId);}catch(error){if(error instanceof FirstSliceError&&error.statusCode===404)throw new FirstSliceError(404,'original_booklet_unavailable',`No Booklet with id \`${fileId}\` found on workspace \`${workspaceId}\`!`);throw error;}
       const result=await input.repository.mutateParticipantRun(run,context=>{unlocked(context.testRun,testNumber);savedState(context.testRun);
         if(context.testRun.originalResultState?.lastOpenedAt===undefined)throw unavailable();if(context.testRun.originalResultState.lastOpenedAt!==null)return null;
         const timestamp=input.now();return{testRun:{...context.testRun,updatedAt:timestamp},testLogs:[],activityEvents:[],originalResultOpenedAt:timestamp};});
       if(!result)throw forbidden(raw);
-      return{...files,workspaceId,mode:entry.executionMode??defaultParticipantExecutionMode,laststate:savedState(result.testRun),firstStart:result.applied,presetBookletStates:orderedName(identity.bookletName).states};
+      return{...files,workspaceId,mode:person.originalOperationalMode??entry?.executionMode??defaultParticipantExecutionMode,laststate:savedState(result.testRun),firstStart:result.applied,presetBookletStates:orderedName(identity.bookletName).states};
     },
     async patchState({token,testNumber:raw,patch}){
       const{run}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch);

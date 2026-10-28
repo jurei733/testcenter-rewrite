@@ -54,7 +54,7 @@ for(const kind of kinds)test(`${kind}: private native operational identities sur
    const version=kind==='sqlite'?76:70;
    const columns=async()=>kind==='sqlite'?control.prepare('PRAGMA table_info(operational_login_migration_candidates)').all().map(row=>row.name):(await control.query("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='operational_login_migration_candidates'")).rows.map(row=>row.column_name);
    try{
-    await exec(`ALTER TABLE operational_login_migration_candidates DROP COLUMN native_logins_json; DELETE FROM schema_migrations WHERE version>=${version}`);
+    await exec(`ALTER TABLE participant_sessions DROP COLUMN original_operational_mode; ALTER TABLE operational_login_migration_candidates DROP COLUMN native_logins_json; DELETE FROM schema_migrations WHERE version>=${version}`);
     await exec(kind==='sqlite'?`CREATE TRIGGER owned_ops_upgrade_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned operational upgrade failure'); END`:`CREATE FUNCTION owned_ops_upgrade_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned operational upgrade failure'; END $$; CREATE TRIGGER owned_ops_upgrade_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_ops_upgrade_failure()`);
     await assert.rejects(open(),/owned operational upgrade failure/);assert.equal((await columns()).includes('native_logins_json'),false);
     await exec(kind==='sqlite'?'DROP TRIGGER owned_ops_upgrade_failure':'DROP TRIGGER owned_ops_upgrade_failure ON schema_migrations; DROP FUNCTION owned_ops_upgrade_failure()');
@@ -73,7 +73,7 @@ for(const kind of kinds)test(`${kind}: private native operational identities sur
     assert.deepEqual(await privateRows(),before);assert.deepEqual(await publicRows(),candidates);
    }
    assert.throws(()=>prepareOriginalOperationalLogins(candidates,[{...before[0],passwordHash:null}]),TypeError);
-   await assert.rejects(repository.replaceOperationalLoginMigrationCandidatesByWorkspace(...ids,candidates.map(row=>({...row,assetAssignments:{logo:'owned-missing.png'}})),before));
+   await assert.rejects(repository.replaceOperationalLoginMigrationCandidatesByWorkspace(...ids,candidates.map(row=>({...row,assetAssignments:{logo:'owned-missing.png'}})),before.map(row=>row.passwordHash?{...row,passwordHash:'scrypt$'+'a'.repeat(32)+'$'+'b'.repeat(128)}:row)));
    assert.deepEqual(await privateRows(),before);assert.deepEqual(await publicRows(),candidates);
    const poisoned=prepareOriginalOperationalLogins(candidates,[{...before[0],password:'must not persist'}]);assert.equal('password'in poisoned[0],false);
   });

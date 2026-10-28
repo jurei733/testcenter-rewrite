@@ -1,4 +1,4 @@
-import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
+import {prepareOriginalOperationalLogins,projectOriginalOperationalModes} from '@testcenter-rewrite-app/application';
 import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
@@ -865,10 +865,13 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const privateLogins = prepareOriginalOperationalLogins(candidates, nativeLogins);
       if(privateLogins.length && !Array.from(state.workspacesByScope.values()).some(w=>w.tenantId===tenantId&&w.workspaceId===workspaceId))throw new Error('Native operational workspace no longer exists.');
       for (const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Array.from(state.applicationAssets.values()));
+      const modes=projectOriginalOperationalModes({tenantId,workspaceId},privateLogins,Array.from(state.participantSessions.values()),Array.from(state.testRuns.values()));
       state.operationalLoginMigrationCandidates.set(
         `${tenantId}::${workspaceId}`,
         candidates
       );
+      for(const person of modes.participantSessions)state.participantSessions.set(person.participantSessionId,person);
+      for(const run of modes.testRuns)state.testRuns.set(run.testRunId,run);
       state.originalOperationalLogins.set(`${tenantId}::${workspaceId}`, privateLogins);
     },
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
