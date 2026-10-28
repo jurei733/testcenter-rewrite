@@ -44,6 +44,50 @@ export type OriginalTestPort = {
 const unavailable = () => new FirstSliceError(409, 'original_test_history_unknown', 'The Original Test identity is unavailable.');
 
 /** Creation does not enter a controller, open a Test, save state or start timers. */
+export type OriginalTestCreationContext={repository:FirstSliceRepository;now:()=>string;id:()=>string;
+  currentBooklet:(person:ParticipantSession,fileId:string)=>Promise<{contentReleaseId:string;booklet:ContentReleaseBookletEntry}>};
+/** Trusted native creation shared by participant PUT and monitor registration;
+ * registration neither opens a Test nor rotates an existing person's bearer. */
+export async function createOriginalPersonTest(input:OriginalTestCreationContext,person:ParticipantSession,bookletName:string,monitor=false):Promise<string>{
+    const runs = (await input.repository.listOriginalPersonTestIdentities(person)).filter(run =>
+      run.participantSessionId === person.participantSessionId && run.tenantId === person.tenantId && run.workspaceId === person.workspaceId);
+    const select = (name: string): import('./original-person-tests.js').OriginalPersonTestIdentity | undefined => {
+      const found = runs.filter(run => originalParticipantGroupKeysEqual(run.originalResultState?.bookletName ?? run.bookletAssignmentKey ?? run.bookletKey, name));
+      if (found.length > 1) throw new FirstSliceError(409, 'original_test_history_ambiguous', 'The Original Test identity is ambiguous.');
+      if (found[0] && (typeof found[0].originalResultState?.bookletName !== 'string' || typeof found[0].originalResultState.bookletLabel !== 'string')) throw unavailable();
+      return found[0];
+    };
+    const finish = async (run: import('./original-person-tests.js').OriginalPersonTestIdentity, consumeSequence: boolean) => {
+      if (typeof run.originalResultState?.bookletName !== 'string' || typeof run.originalResultState.bookletLabel !== 'string') throw unavailable();
+      const number = await input.repository.getOrCreateOriginalTestNumber({...run, consumeSequence});
+      if (!monitor && run.locked) throw new FirstSliceError(423, 'original_test_locked', `Test #${number} \`${run.originalResultState!.bookletLabel}\` is locked.`);
+      return number;
+    };
+    // Source reads the raw name first: normalization misses still require a
+    // current physical file, even when the normalized Test already exists.
+    // Monitor registration always validates the current physical Booklet first,
+    // then looks up its normalized Test name and retains an existing lock.
+    const parsed=monitor?parseOriginalTestName(bookletName):undefined;
+    let current=parsed?await input.currentBooklet(person,parsed.fileId):undefined;
+    const previous = select(parsed?.name??bookletName);
+    if (previous) return finish(previous, false);
+    const name = parsed??parseOriginalTestName(bookletName);
+    current??=await input.currentBooklet(person, name.fileId);
+    select(name.name); // Fail closed for unknown legacy identity before reservation.
+    const timestamp = input.now();
+    const candidate: TestRun = {testRunId: input.id(), participantSessionId: person.participantSessionId,
+      tenantId: person.tenantId, workspaceId: person.workspaceId, contentReleaseId: current.contentReleaseId,
+      bookletKey: current.booklet.bookletKey, bookletAssignmentKey: name.name, presetBookletStates: name.states,
+      executionMode: person.executionMode, status: 'created', locked: false, currentUnitKey: null, unitResponses: {}, originalTestState:{},
+      originalResultState: {bookletName: name.name, bookletLabel: current.booklet.originalBookletLabel ?? current.booklet.displayLabel,
+        lastOpenedAt: null, lastTestStateAt: null, lastTestModifiedAt: timestamp, hasTestState: false},
+      createdAt: timestamp, updatedAt: timestamp, completedAt: null};
+    const reservation = monitor?await input.repository.getOrCreateOriginalPersonTest(candidate):await input.repository.getOrCreateTestRunForAssignment(candidate, undefined, true);
+    if (!reservation.originalTestNumber) throw new Error('Native Test creation did not commit its numeric identity.');
+    if (!monitor && reservation.testRun.locked) throw new FirstSliceError(423, 'original_test_locked', `Test #${reservation.originalTestNumber} \`${reservation.testRun.originalResultState!.bookletLabel}\` is locked.`);
+    return reservation.originalTestNumber;
+}
+
 export function createOriginalTestPort(input: {
   auth: OriginalAuthenticationPort; repository: FirstSliceRepository; now: () => string; id: () => string;
   readBooklet:(person:ParticipantSession,fileId:string)=>Promise<OriginalBookletFiles>;
@@ -109,39 +153,6 @@ export function createOriginalTestPort(input: {
     const state = await input.auth.read({token: request.token});
     if (state.kind !== 'person') throw new FirstSliceError(403, 'original_token_type_forbidden', 'The supplied token cannot perform that operation.');
     if (typeof request.bookletName !== 'string') throw new FirstSliceError(400, 'original_request_invalid', 'Required body-parameter is missing: `bookletName`');
-    const person = state.participantSession;
-    const runs = (await input.repository.listTestRunsByParticipantSessionId(person.participantSessionId)).filter(run =>
-      run.participantSessionId === person.participantSessionId && run.tenantId === person.tenantId && run.workspaceId === person.workspaceId);
-    const select = (name: string): TestRun | undefined => {
-      const found = runs.filter(run => originalParticipantGroupKeysEqual(run.originalResultState?.bookletName ?? run.bookletAssignmentKey ?? run.bookletKey, name));
-      if (found.length > 1) throw new FirstSliceError(409, 'original_test_history_ambiguous', 'The Original Test identity is ambiguous.');
-      if (found[0] && (typeof found[0].originalResultState?.bookletName !== 'string' || typeof found[0].originalResultState.bookletLabel !== 'string')) throw unavailable();
-      return found[0];
-    };
-    const finish = async (run: TestRun, consumeSequence: boolean) => {
-      if (typeof run.originalResultState?.bookletName !== 'string' || typeof run.originalResultState.bookletLabel !== 'string') throw unavailable();
-      const number = await input.repository.getOrCreateOriginalTestNumber({...run, consumeSequence});
-      if (run.locked) throw new FirstSliceError(423, 'original_test_locked', `Test #${number} \`${run.originalResultState!.bookletLabel}\` is locked.`);
-      return number;
-    };
-    // Source reads the raw name first: normalization misses still require a
-    // current physical file, even when the normalized Test already exists.
-    const previous = select(request.bookletName);
-    if (previous) return finish(previous, false);
-    const name = parseOriginalTestName(request.bookletName);
-    const current = await input.currentBooklet(person, name.fileId);
-    select(name.name); // Fail closed for unknown legacy identity before reservation.
-    const timestamp = input.now();
-    const candidate: TestRun = {testRunId: input.id(), participantSessionId: person.participantSessionId,
-      tenantId: person.tenantId, workspaceId: person.workspaceId, contentReleaseId: current.contentReleaseId,
-      bookletKey: current.booklet.bookletKey, bookletAssignmentKey: name.name, presetBookletStates: name.states,
-      executionMode: person.executionMode, status: 'created', locked: false, currentUnitKey: null, unitResponses: {}, originalTestState:{},
-      originalResultState: {bookletName: name.name, bookletLabel: current.booklet.originalBookletLabel ?? current.booklet.displayLabel,
-        lastOpenedAt: null, lastTestStateAt: null, lastTestModifiedAt: timestamp, hasTestState: false},
-      createdAt: timestamp, updatedAt: timestamp, completedAt: null};
-    const reservation = await input.repository.getOrCreateTestRunForAssignment(candidate, undefined, true);
-    if (!reservation.originalTestNumber) throw new Error('Native Test creation did not commit its numeric identity.');
-    if (reservation.testRun.locked) throw new FirstSliceError(423, 'original_test_locked', `Test #${reservation.originalTestNumber} \`${reservation.testRun.originalResultState!.bookletLabel}\` is locked.`);
-    return reservation.originalTestNumber;
+    return createOriginalPersonTest(input,state.participantSession,request.bookletName);
   }};
 }

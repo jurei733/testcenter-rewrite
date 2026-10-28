@@ -1,5 +1,6 @@
+import {parseOriginalTestName} from './original-test.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
-import type {ParticipantBookletAssignment, ParticipantRosterEntry, TestRun} from '@testcenter-rewrite-app/domain';
+import type {ParticipantBookletAssignment, ParticipantRosterEntry, ParticipantSession, TestRun} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort, OriginalAuthenticationState} from './original-authentication.js';
 import {FirstSliceError} from './first-slice-error.js';
@@ -35,9 +36,11 @@ export type OriginalSessionPort = {
  * password replay, guessed ownership, or private session IDs enter its reads. */
 export function createOriginalSessionPort(input: {
   auth: OriginalAuthenticationPort; repository: FirstSliceRepository;
+  registerDependants: (person:ParticipantSession)=>Promise<void>;
   assignments: (entry: ParticipantRosterEntry, code: string) => ParticipantBookletAssignment[];
   operational: (scope:{tenantId:string;workspaceId:string},loginKey:string)=>Promise<OriginalOperationalDefinition|null>;
   monitorAssignments: (entry:OriginalOperationalDefinition)=>Promise<ParticipantBookletAssignment[]>;
+  monitorGroups: (entry:OriginalOperationalDefinition)=>Promise<import('@testcenter-rewrite-app/contracts/original-session').OriginalTestGroupMonitorAccess[]>;
   bookletLabels: (scope: {tenantId: string; workspaceId: string}) => Promise<Map<string, string>>;
 }): OriginalSessionPort {
   const format = async (state: OriginalAuthenticationState, immediate: boolean): Promise<OriginalAccessSet> => {
@@ -75,29 +78,36 @@ export function createOriginalSessionPort(input: {
       const [labels, runs] = await Promise.all([input.bookletLabels(person!), input.repository.listOriginalSessionTestFlags(person!.participantSessionId)]);
       const claims: OriginalTestAccess[] = [];
       for (const assignment of assignments) {
-        const fileId = assignment.bookletKey.replace(/[a-z]/g, letter => letter.toUpperCase());
+        const nativeName=parseOriginalTestName(assignment.assignmentKey);
+        const fileId = nativeName.fileId.replace(/[a-z]/g, letter => letter.toUpperCase());
         const label = labels.get(fileId);
         if (label === undefined) throw new FirstSliceError(409, 'original_booklet_unavailable', 'An assigned Booklet is unavailable.');
         const owned = runs.filter(run => run.participantSessionId === person!.participantSessionId && run.tenantId === person!.tenantId &&
           run.workspaceId === person!.workspaceId && run.contentReleaseId === person!.contentReleaseId &&
-          originalParticipantGroupKeysEqual(run.bookletAssignmentKey ?? run.bookletKey, assignment.assignmentKey));
+          originalParticipantGroupKeysEqual(run.bookletAssignmentKey ?? run.bookletKey, nativeName.name));
         if (owned.length > 1) throw new FirstSliceError(409, 'original_test_history_ambiguous', 'The Original Test identity is ambiguous.');
         const run = owned[0];
         if (run && run.lastOpenedAt === undefined) throw new FirstSliceError(409, 'original_test_history_unknown', 'The Original Test opening state is unavailable.');
-        claims.push({id: assignment.assignmentKey, type: 'test', label,
+        claims.push({id: nativeName.name, type: 'test', label,
           flags: {locked: run?.locked === true, running: Boolean(run?.lastOpenedAt)}});
       }
       result.claims.test = claims; result.access.test = claims.map(claim => claim.id);
     }
     if (isOriginalOperationalLogin(entry!)) {
-      result.claims.testGroupMonitor=[{id:entry!.groupKey,type:'testGroupMonitor',label:entry!.groupLabel??entry!.groupKey,flags:[]}];
-      result.access.testGroupMonitor=[entry!.groupKey];
+      const groups=await input.monitorGroups(entry!);
+      if(groups.length){result.claims.testGroupMonitor=groups;result.access.testGroupMonitor=groups.map(group=>group.id);}
     }
     if (entry!.executionMode === 'run-review') { result.claims.review = []; result.access.review = []; }
     return result;
   };
   return {
-    login: async request => format(await input.auth.login(request), true),
+    async login(request) {
+      const state=await input.auth.login(request);
+      // Source registers dependants only while constructing a successful Login
+      // AccessSet. Credential checks, person-code entry and GET stay independent.
+      if(state.kind==='person')await input.registerDependants(state.participantSession);
+      return format(state,true);
+    },
     person: async request => format(await input.auth.person(request), true),
     read: async request => format(await input.auth.read(request), false),
     logout: request => input.auth.logout(request),

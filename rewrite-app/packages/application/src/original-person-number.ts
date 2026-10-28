@@ -47,3 +47,12 @@ export function validateOriginalPersonNumbers(records: Record<string, OriginalPe
     seen.add(record.personNumber);
   }
 }
+
+export type OriginalPersonCredentialInput = OriginalPersonNumberScope & {tokenHash: string; updatedAt: string};
+/** A trusted monitor may initialize a native bearer, but may never rotate an
+ * already active one or restore a concurrently deleted/out-of-scope person. */
+export function originalPersonCredentialMatches(input: OriginalPersonCredentialInput, person: PersonIdentity | null | undefined): boolean {
+  if (!knownScope(input) || typeof input.tokenHash !== 'string' || !/^[a-f0-9]{64}$/.test(input.tokenHash) ||
+    typeof input.updatedAt !== 'string' || !Number.isFinite(Date.parse(input.updatedAt))) throw new TypeError('Invalid native person credential initialization.');
+  return !!person && knownScope(person) && keys.every(key=>person[key]===input[key]);
+}

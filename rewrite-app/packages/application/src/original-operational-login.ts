@@ -31,12 +31,13 @@ export function prepareOriginalOperationalLogins(candidates: OperationalLoginMig
 export type OriginalOperationalDefinition = Omit<import('@testcenter-rewrite-app/domain').ParticipantRosterEntry,
   'participantRosterEntryId' | 'bookletKey' | 'executionMode' | 'importedAt' | 'displayName'> & {
   originalLoginIdentity: true;
-  originalOperationalMode: 'monitor-group';
+  originalOperationalMode: 'monitor-group' | 'monitor-study';
+  monitorProfiles: import('@testcenter-rewrite-app/domain').MonitorViewProfile[];
   executionMode?: never;
 };
 export type OriginalNativeLogin = (import('@testcenter-rewrite-app/domain').ParticipantRosterEntry & {originalOperationalMode?: never}) | OriginalOperationalDefinition;
 export function isOriginalOperationalLogin(login: OriginalNativeLogin): login is OriginalOperationalDefinition {
-  return login.originalOperationalMode === 'monitor-group';
+  return login.originalOperationalMode === 'monitor-group' || login.originalOperationalMode === 'monitor-study';
 }
 
 /** Only current private provenance can turn a public candidate into a native principal. */
@@ -46,7 +47,7 @@ export async function findOriginalOperationalDefinition(repository: import('./in
   const privateRows=await repository.listOriginalOperationalLoginsByWorkspace(scope.tenantId,scope.workspaceId);
   const matches=privateRows.filter(row=>row.loginKey===loginKey);
   if(!matches.length)return null;
-  if(matches.length!==1 || matches[0]!.loginMode!=='monitor-group')throw new TypeError('This native operational Login mode is not qualified.');
+  if(matches.length!==1 || !['monitor-group','monitor-study'].includes(matches[0]!.loginMode))throw new TypeError('This native operational Login mode is not qualified.');
   const candidates=(await repository.listOperationalLoginMigrationCandidatesByWorkspace(scope.tenantId,scope.workspaceId)).filter(row=>row.loginKey===loginKey);
   const candidate=candidates[0];
   if(candidates.length!==1 || !candidate || !candidate.groupKey)throw new TypeError('Native operational Login definition is unavailable.');
@@ -54,7 +55,7 @@ export async function findOriginalOperationalDefinition(repository: import('./in
   const validFrom=normalizeBoundary(candidate.validFrom),validTo=normalizeBoundary(candidate.validTo);
   if((candidate.validFrom&&!validFrom)||(candidate.validTo&&!validTo)||(validFrom&&validTo&&validFrom>validTo))throw new TypeError('Native operational Login validity is invalid.');
   return {passwordHash:matches[0]!.passwordHash,definition:{...candidate,...scope,originalLoginIdentity:true,
-    originalOperationalMode:'monitor-group',groupKey:candidate.groupKey,validFrom,validTo,
+    originalOperationalMode:matches[0]!.loginMode as 'monitor-group'|'monitor-study',groupKey:candidate.groupKey,validFrom,validTo,
     // A missing authored ViewSettings stays absent, rather than inventing UI defaults.
     viewSettings:candidate.viewSettings??{}}};
 }
