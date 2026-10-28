@@ -1,0 +1,29 @@
+name: Global early CI selection policy (not full acceptance)
+on:
+  push:
+    branches:
+      - codex/global-ci-priority-linux-20261028
+permissions:
+  contents: read
+env:
+  CI: "true"
+  FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
+jobs:
+  policy:
+    name: Native complete global-priority policy and stable focused selector
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Audit the complete locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high
+      - name: Retain every CI policy and actual shell failure countercase
+        run: npm run test:ci-policy
+      - name: Plan the unchanged promoted public selector without running a substitute application suite
+        run: npm run ci:focus -- --plan qualification/json-roster
