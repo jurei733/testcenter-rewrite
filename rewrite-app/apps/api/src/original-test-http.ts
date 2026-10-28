@@ -1,7 +1,7 @@
 import type {IncomingMessage} from 'node:http';
 import {randomUUID} from 'node:crypto';
 import {FirstSliceError,formatOriginalTestReadJson,formatOriginalUnitReadJson,type FirstSliceServices} from '@testcenter-rewrite-app/application';
-import {encodeOriginalReportJson} from '@testcenter-rewrite-app/application';
+import {encodeOriginalReportJson,decodeOriginalTestLogJson} from '@testcenter-rewrite-app/application';
 export const originalTestCreationPath='/test';
 type NativeErrorResponse={header:(name:string,value:string)=>void;raw:(status:number,text:string,contentType:string)=>void};
 function sendTestLogError(input:NativeErrorResponse,status:number,message:string):void{
@@ -27,7 +27,7 @@ export function originalTestRouteLabel(method:string,pathname:string):string|nul
  if(/^\/test\/[^/]+\/unit\/[^/]+$/.test(path))return method+' /test/:testId/unit/:unitName';
  if(path==='/test')return method+' /test';if(/^\/test\/[^/]+$/.test(path))return method+' /test/:testId';if(/^\/test\/[^/]+\/state$/.test(path))return method+' /test/:testId/state';if(/^\/test\/[^/]+\/log$/.test(path))return method+' /test/:testId/log';return null;
 }
-export async function handleOriginalTestHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;readBody:(allowEmpty?:boolean)=>Promise<unknown>;send:(status:number,value:unknown)=>void;raw:(status:number,text:string,contentType:string)=>void;binary:(bytes:Uint8Array,contentType:string)=>void;header:(name:string,value:string)=>void}):Promise<boolean>{
+export async function handleOriginalTestHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;readBody:(allowEmpty?:boolean,decode?:(payload:Uint8Array)=>unknown)=>Promise<unknown>;send:(status:number,value:unknown)=>void;raw:(status:number,text:string,contentType:string)=>void;binary:(bytes:Uint8Array,contentType:string)=>void;header:(name:string,value:string)=>void}):Promise<boolean>{
  let pathname:string;try{pathname=decodeURIComponent(input.pathname);}catch{if(!/^\/(?:test|file)(?:\/|$)/.test(input.pathname))return false;input.header('cache-control','private, no-store');input.send(400,'Invalid path.');return true;}
  const read=/^\/test\/([^/]+)$/.exec(pathname),state=/^\/test\/([^/]+)\/state$/.exec(pathname),log=/^\/test\/([^/]+)\/log$/.exec(pathname),file=/^\/file\/([^/]+)\/ws_([^/]+)\/(.*)$/.exec(pathname);
  const unitRead=/^\/test\/([^/]+)\/unit\/([^/]+)(?:\/alias\/([^/]+))?$/.exec(pathname),unitWrite=/^\/test\/([^/]+)\/unit\/([^/]+)\/(state|response|log)$/.exec(pathname);
@@ -43,7 +43,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   if(unitRead){const result=await input.services.originalUnit.read({token,testNumber:unitRead[1]!,unitName:unitRead[2]!,...(unitRead[3]===undefined?{}:{alias:unitRead[3]})});input.raw(200,formatOriginalUnitReadJson(result),'application/json');return true;}
   if(read){const testNumber=read[1]!;
    input.raw(200,formatOriginalTestReadJson(await input.services.originalTest.read({token,testNumber})),'application/json');return true;}
-  let body:unknown;try{body=await input.readBody(Boolean(log));}catch(error){if(error instanceof SyntaxError){if(log){sendTestLogError(input,500,'Internal error.');return true;}throw new FirstSliceError(400,'original_json_invalid','Request body must be valid JSON.');}throw error;}
+  let body:unknown;try{body=await input.readBody(Boolean(log),log?decodeOriginalTestLogJson:undefined);}catch(error){if(error instanceof SyntaxError){if(log){sendTestLogError(input,500,'Internal error.');return true;}throw new FirstSliceError(400,'original_json_invalid','Request body must be valid JSON.');}throw error;}
   if(log){await input.services.originalTest.putLog({token,testNumber:log[1]!,body});input.raw(201,'','text/html; charset=UTF-8');return true;}
   if(unitWrite){const request={token,testNumber:unitWrite[1]!,unitName:unitWrite[2]!,body};
    if(unitWrite[3]==='state')await input.services.originalUnit.patchState(request);else if(unitWrite[3]==='response')await input.services.originalUnit.putResponse(request);else await input.services.originalUnit.putLog(request);

@@ -2019,7 +2019,7 @@ const createFileRepository = (
           state.testRuns[input.testRunId] ?? null,
           state.participantSessions[input.participantSessionId] ?? null,
           Object.values(state.participantTestLogs).reduce((latest, log) =>
-            log.testRunId === input.testRunId && log.unitKey === null && log.logKey === "CONNECTION"
+            log.testRunId === input.testRunId && log.unitKey === null && !log.participantTestLogId.startsWith("original-test-log:") && log.logKey === "CONNECTION"
               ? Math.max(latest, log.timestamp) : latest, 0));
         if (result.presence) state.participantPresence[input.testRunId] = result.presence;
         else delete state.participantPresence[input.testRunId];

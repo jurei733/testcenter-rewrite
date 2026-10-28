@@ -1,10 +1,11 @@
-import type {ContentReleaseBookletEntry, ParticipantSession, TestRun} from '@testcenter-rewrite-app/domain';
+import {originalTestLogIdPrefix,type ContentReleaseBookletEntry,type ParticipantSession,type TestRun} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {parseOriginalTestStatePatch,applyOriginalTestStatePatch,assertOriginalTestState,originalPhpMap} from './original-test-state.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {parseOriginalTestLogEntries} from './original-test-log-json.js';
 import {hashOriginalSessionToken} from './original-session-token.js';
 import type {OriginalBookletFiles} from './original-test-files.js';
 import {parseOriginalNativeTestNumber,readOriginalPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
@@ -77,13 +78,12 @@ export function createOriginalTestPort(input: {
     async requireOwner({token,testNumber}){await resolveOriginalOwnedTestScope(input,token,testNumber);},
     async putLog({token,testNumber,body}){
       const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber);
-      const entries=parseOriginalTestStatePatch(Array.isArray(body)?body.map(row=>
-        row&&typeof row==='object'&&!Array.isArray(row)?{...row,content:row.content??''}:row):body);
+      const entries=parseOriginalTestLogEntries(body);
       if(!entries.length){await input.repository.appendOriginalTestLogs(scope,[]);return;}
       const recordedAt=input.now();
-      await input.repository.appendOriginalTestLogs(scope,entries.map(entry=>({participantTestLogId:input.id(),
+      await input.repository.appendOriginalTestLogs(scope,entries.map(entry=>({participantTestLogId:originalTestLogIdPrefix+input.id(),
         tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId,testRunId:scope.testRunId,
-        unitKey:null,originalUnitId:null,logKey:entry.key,logContent:encodeOriginalReportJson(entry.content),timestamp:entry.timeStamp,recordedAt})));
+        unitKey:null,originalUnitId:null,logKey:entry.key,logContent:entry.content,timestamp:entry.timeStamp,...(entry.originalClientTimestamp===undefined?{}:{originalClientTimestamp:entry.originalClientTimestamp}),recordedAt})));
     },
     async resource({groupToken,workspaceNumber,path}){
       if(typeof groupToken!=='string'||!groupToken)throw new FirstSliceError(401,'original_group_token_missing','No Token given');

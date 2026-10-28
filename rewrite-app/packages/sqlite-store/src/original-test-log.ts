@@ -1,3 +1,4 @@
+import {exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import {assertOriginalTestLogInput, prepareOriginalTestLogs, resultParentUnavailable, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import type {ParticipantTestLog} from '@testcenter-rewrite-app/domain';
 import type {DatabaseSync} from 'node:sqlite';
@@ -15,6 +16,6 @@ export function appendOriginalTestLogs(database: DatabaseSync, input: OriginalTe
     const prepared = prepareOriginalTestLogs(input, logs);
     const insert = database.prepare(`INSERT INTO participant_test_logs(participant_test_log_id,tenant_id,workspace_id,participant_session_id,test_run_id,unit_key,original_unit_id,log_key,log_content,timestamp,recorded_at,original_timestamp)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`);
-    for (const log of prepared) insert.run(log.participantTestLogId, log.tenantId, log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent, log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+    for (const log of prepared) insert.run(log.participantTestLogId, log.tenantId, log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent, BigInt(exactParticipantTestLogTimestamp(log)), log.recordedAt, log.originalTimestamp ?? null);
   });
 }

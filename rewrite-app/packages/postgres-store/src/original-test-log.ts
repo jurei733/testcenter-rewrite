@@ -1,3 +1,4 @@
+import {exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import {assertOriginalTestLogInput, prepareOriginalTestLogs, resultParentUnavailable, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import type {ParticipantTestLog} from '@testcenter-rewrite-app/domain';
 import type {Pool} from 'pg';
@@ -14,6 +15,6 @@ export async function appendOriginalTestLogs(pool: Pool, input: OriginalTestNumb
     if (!parent.rowCount) throw resultParentUnavailable();
     const prepared = prepareOriginalTestLogs(input, logs);
     for (const log of prepared) await client.query(`INSERT INTO participant_test_logs(participant_test_log_id,tenant_id,workspace_id,participant_session_id,test_run_id,unit_key,original_unit_id,log_key,log_content,timestamp,recorded_at,original_timestamp)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [log.participantTestLogId, log.tenantId, log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent, log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [log.participantTestLogId, log.tenantId, log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent, exactParticipantTestLogTimestamp(log), log.recordedAt, log.originalTimestamp ?? null]);
   });
 }

@@ -1144,7 +1144,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         state.testRuns.get(input.testRunId) ?? null,
         state.participantSessions.get(input.participantSessionId) ?? null,
         Array.from(state.participantTestLogs.values()).reduce((latest, log) =>
-          log.testRunId === input.testRunId && log.unitKey === null && log.logKey === "CONNECTION"
+          log.testRunId === input.testRunId && log.unitKey === null && !log.participantTestLogId.startsWith("original-test-log:") && log.logKey === "CONNECTION"
             ? Math.max(latest, log.timestamp) : latest, 0));
       if (result.presence) state.participantPresence.set(input.testRunId, result.presence);
       else state.participantPresence.delete(input.testRunId);

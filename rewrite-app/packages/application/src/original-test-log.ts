@@ -1,3 +1,4 @@
+import {exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import type {ParticipantSession, ParticipantTestLog, TestRun} from '@testcenter-rewrite-app/domain';
 import {parseOriginalNativeTestNumber} from './original-test-access.js';
 import {selectOwnedOriginalTestNumber, type OriginalTestNumberRecord} from './original-test-number.js';
@@ -22,11 +23,15 @@ export function prepareOriginalTestLogs(input: OriginalTestNumberRecord, logs: P
         log.unitKey !== null || log.originalUnitId !== null ||
         typeof log.participantTestLogId !== 'string' || !log.participantTestLogId ||
         typeof log.logKey !== 'string' || typeof log.logContent !== 'string' ||
-        !Number.isSafeInteger(log.timestamp) || Math.abs(log.timestamp) > 8640000000000000 ||
+        !Number.isInteger(log.timestamp) || !Number.isFinite(log.timestamp) ||
         typeof log.recordedAt !== 'string' || !Number.isFinite(Date.parse(log.recordedAt)) ||
         (log.originalTimestamp !== undefined && (log.originalTimestamp !== 0 || log.timestamp !== 0))) {
       throw new TypeError('A native Test log cannot cross its immutable parent or Unit scope.');
     }
+  }
+  for (const log of logs) {
+    if (!Number.isSafeInteger(log.timestamp) && log.originalClientTimestamp === undefined) throw new TypeError('The exact native timestamp is required.');
+    exactParticipantTestLogTimestamp(log);
   }
   if (new Set(logs.map(log => log.participantTestLogId)).size !== logs.length) {
     throw new Error('Native Test log identity collision.');

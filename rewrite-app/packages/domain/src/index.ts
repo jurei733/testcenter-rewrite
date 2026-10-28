@@ -1235,8 +1235,37 @@ export type ParticipantTestLog = {
   timestamp: number;
   /** Original's server-generated connection logs carry client epoch 0. */
   originalTimestamp?: 0;
+  /** Exact native int64 client clock when the JS numeric projection loses precision. */
+  originalClientTimestamp?: string;
   recordedAt: string;
 };
+
+export const originalTestLogIdPrefix = 'original-test-log:';
+
+/** SQL stores the full int64. The numeric projection matches a JS client;
+ * its original decimal is retained for lossless native JSON/CSV and backups. */
+export function readParticipantTestLogTimestamp(raw: unknown): Pick<ParticipantTestLog,'timestamp'|'originalClientTimestamp'> {
+  const numeric = Number(raw);
+  // Existing canonical SQLite records can carry fractional numeric clocks.
+  // Preserve their previous numeric projection; native log parsing is strict.
+  if (!Number.isInteger(numeric) || !Number.isFinite(numeric)) return {timestamp:numeric};
+  const text = typeof raw === 'bigint' ? raw.toString() : typeof raw === 'number' && Number.isInteger(raw) && Number.isFinite(raw) ? BigInt(raw).toString() : String(raw);
+  if (text.length > 20 || !/^(?:0|-?[1-9][0-9]*)$/.test(text)) throw new TypeError('Invalid log timestamp.');
+  const value = BigInt(text);
+  if (value < -9223372036854775808n || value > 9223372036854775807n) throw new TypeError('Log timestamp exceeds int64.');
+  const timestamp = Number(value);
+  return {timestamp,...(Number.isSafeInteger(timestamp) ? {} : {originalClientTimestamp:text})};
+}
+export function exactParticipantTestLogTimestamp(log: Pick<ParticipantTestLog,'timestamp'|'originalClientTimestamp'>): string {
+  if (log.originalClientTimestamp === undefined) return String(log.timestamp);
+  const value = readParticipantTestLogTimestamp(log.originalClientTimestamp);
+  if (value.timestamp !== log.timestamp || (!Number.isSafeInteger(log.timestamp) && log.originalClientTimestamp === undefined)) throw new TypeError('The exact native log timestamp is missing or inconsistent.');
+  return log.originalClientTimestamp ?? String(log.timestamp);
+}
+export function compareParticipantTestLogTimestamps(left: Pick<ParticipantTestLog,'timestamp'|'originalClientTimestamp'>, right: Pick<ParticipantTestLog,'timestamp'|'originalClientTimestamp'>): number {
+  if (left.originalClientTimestamp === undefined && right.originalClientTimestamp === undefined || !Number.isInteger(left.timestamp) || !Number.isInteger(right.timestamp)) return left.timestamp-right.timestamp;
+  const a=BigInt(exactParticipantTestLogTimestamp(left)),b=BigInt(exactParticipantTestLogTimestamp(right));return a < b ? -1 : a > b ? 1 : 0;
+}
 
 export const selectLatestParticipantTestStateLogs = (
   testLogs: ParticipantTestLog[],
@@ -1245,7 +1274,7 @@ export const selectLatestParticipantTestStateLogs = (
   const allowedLogKeys = new Set(logKeys);
   const latestLogs = new Map<string, ParticipantTestLog>();
   for (const testLog of testLogs) {
-    if (testLog.unitKey !== null || !allowedLogKeys.has(testLog.logKey)) {
+    if (testLog.participantTestLogId.startsWith(originalTestLogIdPrefix) || testLog.unitKey !== null || !allowedLogKeys.has(testLog.logKey)) {
       continue;
     }
     const stateKey = `${testLog.testRunId}\u0000${testLog.logKey}`;

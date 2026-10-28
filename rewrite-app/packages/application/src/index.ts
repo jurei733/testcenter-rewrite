@@ -1,3 +1,5 @@
+import {exactParticipantTestLogTimestamp,compareParticipantTestLogTimestamps} from '@testcenter-rewrite-app/domain';
+export {decodeOriginalTestLogJson,encodeOriginalTestLogContent,parseOriginalTestLogEntries} from './original-test-log-json.js';
 export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection,formatOriginalTestLogEntry} from './original-test-log.js';
 import {createOriginalUnitPort} from './original-unit.js';
 export {formatOriginalUnitReadJson} from './original-unit.js';
@@ -7663,7 +7665,7 @@ const listParticipantTestLogsForWorkspace = (input: {
       (!input.logKey || item.testLog.logKey === input.logKey)
     )
     .sort((left, right) =>
-      right.testLog.timestamp - left.testLog.timestamp ||
+      compareParticipantTestLogTimestamps(right.testLog,left.testLog) ||
       right.testLog.recordedAt.localeCompare(left.testLog.recordedAt) ||
       right.testLog.participantTestLogId.localeCompare(
         left.testLog.participantTestLogId
@@ -7686,7 +7688,7 @@ const formatParticipantTestLogCsv = (
     "logentry"
   ];
   const chronologicalItems = [...items].sort((left, right) =>
-    left.testLog.timestamp - right.testLog.timestamp ||
+    compareParticipantTestLogTimestamps(left.testLog,right.testLog) ||
     left.testLog.recordedAt.localeCompare(right.testLog.recordedAt) ||
     left.testLog.participantTestLogId.localeCompare(
       right.testLog.participantTestLogId
@@ -7703,7 +7705,7 @@ const formatParticipantTestLogCsv = (
         bookletname: item.bookletAssignmentKey,
         unitname: item.testLog.unitKey ?? "",
         originalUnitId: item.testLog.originalUnitId ?? "",
-        timestamp: item.testLog.originalTimestamp ?? item.testLog.timestamp,
+        timestamp: item.testLog.originalTimestamp ?? exactParticipantTestLogTimestamp(item.testLog),
         logentry: logEntry
       };
     })
@@ -16192,7 +16194,7 @@ const buildOriginalLogReportRows = (input: {
       bookletname: item.bookletAssignmentKey,
       unitname: item.testLog.unitKey ?? "",
       originalUnitId: item.testLog.originalUnitId ?? "",
-      timestamp: String(item.testLog.originalTimestamp ?? item.testLog.timestamp),
+      timestamp: String(item.testLog.originalTimestamp ?? exactParticipantTestLogTimestamp(item.testLog)),
       logentry: formatOriginalParticipantLogEntry(item.testLog)
     }))
     .sort(
