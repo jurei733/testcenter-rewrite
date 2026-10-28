@@ -1,0 +1,33 @@
+name: Docker schema inventory correction (not full acceptance)
+on:
+  push:
+    branches:
+      - codex/docker-schema-linux-20261028
+permissions:
+  contents: read
+jobs:
+  docker-image-runtime-smoke:
+    name: Docker image runtime smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "1"
+        with:
+          node-version-file: .node-version
+      - name: Qualify exact Node version and executable permissions
+        working-directory: ${{ github.workspace }}
+        run: node rewrite-app/scripts/ci-node-runtime.mjs
+      - name: Build and run production image smoke
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          DOCKER_IMAGE_TAG="testcenter-rewrite-app:${GITHUB_SHA::12}" \
+          npm run smoke:docker:runtime
