@@ -13,6 +13,8 @@ export {assertOriginalMonitorActor,selectOriginalMonitorSessions,readOriginalMon
 export type {OriginalMonitorData,OriginalMonitorPerson,OriginalMonitorLogin,OriginalMonitorRepository} from './original-monitor-store.js';
 export {originalMonitorable,originalMonitorGroupSelection,originalMonitorCurrentUnit,projectOriginalMonitorSession,formatOriginalMonitorSessionsJson} from './original-monitor-session.js';
 export type {OriginalMonitorActor,OriginalMonitorTest,OriginalMonitorUnit,OriginalMonitorPacket} from './original-monitor-session.js';
+import {readOriginalArchiveNativeUnits} from './original-archive-native-units.js';
+import {originalParticipantGroupKeysEqual as archiveUnitNamesEqual} from './original-participant-group.js';
 import {createOriginalCommandPort} from './original-command.js';
 export type {OriginalCommandPort} from './original-command.js';
 export * from './original-command-queue.js';
@@ -1641,6 +1643,7 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   /** One committed inventory snapshot; never returns response/timer values or private review text. */
   getOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   mutateOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput, transform: import('./original-unit-record.js').OriginalUnitTransform): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
+  listOriginalUnitsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalNativeUnit[]>;
   getOriginalGroupResultInventory(tenantId: string, workspaceId: string): Promise<import('./original-group-results.js').OriginalGroupResultInventory>;
   /** Atomically delete native group snapshots, current session descendants and capabilities. */
   deleteOriginalGroupResults(input: import('./original-group-deletion.js').OriginalGroupDeletionInput): Promise<import('./original-group-deletion.js').OriginalGroupDeletionResult | null>;
@@ -16075,7 +16078,7 @@ type OriginalResponseReportRow = {
   originalUnitId: string;
   responses: Array<{
     id: string;
-    content: string;
+    content: string | null;
     ts: number;
     responseType: string;
   }>;
@@ -16153,6 +16156,7 @@ const buildOriginalResponseReportRows = (input: {
   reviews: WorkspaceReview[];
   activityEvents: WorkspaceActivityEvent[];
   groupKeys: string[];
+  nativeUnits: import("@testcenter-rewrite-app/domain").OriginalNativeUnit[];
 }): OriginalResponseReportRow[] => {
   const sessionsById = new Map(
     input.participantSessions.map(session => [session.participantSessionId, session])
@@ -16161,7 +16165,20 @@ const buildOriginalResponseReportRows = (input: {
     input.contentReleases.map(release => [release.contentReleaseId, release])
   );
   const groupKeys = new Set(input.groupKeys);
-  const savedUnits = selectOriginalSavedUnitKeys(input);
+  const nativeByRun = new Map<string, typeof input.nativeUnits>();
+  for (const unit of input.nativeUnits) {
+    const units = nativeByRun.get(unit.testRunId) ?? [];
+    units.push(unit); nativeByRun.set(unit.testRunId, units);
+  }
+  const persistedUnitKeys = new Map(input.testRuns.map(run => {
+    const keys = Object.keys(run.unitResponses);
+    for (const unit of nativeByRun.get(run.testRunId) ?? []) {
+      const alias = keys.findIndex(key => archiveUnitNamesEqual(key, unit.unitName));
+      if (alias >= 0) keys[alias] = unit.unitName; else keys.push(unit.unitName);
+    }
+    return [run.testRunId, keys] as const;
+  }));
+  const savedUnits = selectOriginalSavedUnitKeys({...input, persistedUnitKeys});
 
   return input.testRuns
     .flatMap(rawTestRun => {
@@ -16173,6 +16190,15 @@ const buildOriginalResponseReportRows = (input: {
       const responseTimestamp = Date.parse(testRun.updatedAt);
       const timestamp = Number.isFinite(responseTimestamp) ? responseTimestamp : 0;
       return [...(savedUnits.get(testRun.testRunId) ?? [])].map(unitKey => {
+        const native = nativeByRun.get(testRun.testRunId)?.find(unit => archiveUnitNamesEqual(unit.unitName, unitKey));
+        if (native) return {
+          groupname:participantSession.groupKey, loginname:participantSession.originalLoginKey ?? participantSession.loginKey,
+          code:participantSession.originalNameSuffix ?? participantSession.participantCode ?? "",
+          bookletname:testRun.originalResultState?.bookletName ?? testRun.bookletAssignmentKey ?? testRun.bookletKey,
+          unitname:native.unitName, originalUnitId:native.originalUnitId,
+          responses:native.parts.map(part => ({...part})),
+          laststate:Object.keys(native.state).length ? JSON.stringify(native.state) : null
+        };
         const response = Object.hasOwn(testRun.unitResponses, unitKey) ? testRun.unitResponses[unitKey] : undefined;
         const unit = resolveOriginalReportUnit({
           contentReleasesById,
@@ -16385,6 +16411,7 @@ const createOriginalResultArchive = (input: {
   testLogs: ParticipantTestLog[];
   activityEvents: WorkspaceActivityEvent[];
   contentReleases: ContentRelease[];
+  nativeUnits: import("@testcenter-rewrite-app/domain").OriginalNativeUnit[];
 }): WorkspaceOriginalResultArchive => {
   const responseRows = input.groupKeys.length ? buildOriginalResponseReportRows(input) : [];
   const logRows = input.groupKeys.length ? buildOriginalLogReportRows(input) : [];
@@ -31270,10 +31297,14 @@ export const createFirstSliceServices = (
         const groupKeys = selectedGroupKeys ?? Array.from(
           new Set(participantSessions.map(session => session.groupKey))
         ).sort();
+        const nativeUnits = await readOriginalArchiveNativeUnits(repository, {
+          tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,testRuns,participantSessions,groupKeys
+        });
         return createOriginalResultArchive({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           groupKeys,
+          nativeUnits,
           generatedAt: now(),
           participantSessions,
           participantRosterEntries,

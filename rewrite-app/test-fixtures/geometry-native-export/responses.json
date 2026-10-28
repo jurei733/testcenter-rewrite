@@ -1,0 +1,80 @@
+[
+  {
+    "unitname": "S8ABE4D1C359AU1",
+    "originalUnitId": "S8ABE4D1C359AU1",
+    "laststate": "{\"RESPONSE_PROGRESS\": \"complete\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+    "responses": [
+      {
+        "id": "all",
+        "content": "[{\"id\":\"area\",\"value\":\"84\",\"status\":\"VALUE_CHANGED\"}]",
+        "ts": 1793186161309,
+        "responseType": "iqb-standard@1.1"
+      }
+    ]
+  },
+  {
+    "unitname": "S8ABE4D1C359AU2",
+    "originalUnitId": "S8ABE4D1C359AU2",
+    "laststate": "{\"RESPONSE_PROGRESS\": \"complete\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+    "responses": [
+      {
+        "id": "all",
+        "content": "[{\"id\":\"triangle_area\",\"value\":\"30\",\"status\":\"VALUE_CHANGED\"}]",
+        "ts": 1793186182247,
+        "responseType": "iqb-standard@1.1"
+      }
+    ]
+  },
+  {
+    "unitname": "S8ABE4D1C359AU3",
+    "originalUnitId": "S8ABE4D1C359AU3",
+    "laststate": "{\"RESPONSE_PROGRESS\": \"complete\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+    "responses": [
+      {
+        "id": "all",
+        "content": "[{\"id\":\"properties\",\"value\":[\"A\",\"C\"],\"status\":\"VALUE_CHANGED\"}]",
+        "ts": 1793186205086,
+        "responseType": "iqb-standard@1.1"
+      }
+    ]
+  },
+  {
+    "unitname": "S8ABE4D1C359AU4",
+    "originalUnitId": "S8ABE4D1C359AU4",
+    "laststate": "{\"RESPONSE_PROGRESS\": \"complete\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+    "responses": [
+      {
+        "id": "all",
+        "content": "[{\"id\":\"angle_35\",\"value\":\"acute\",\"status\":\"VALUE_CHANGED\"},{\"id\":\"angle_90\",\"value\":\"right\",\"status\":\"VALUE_CHANGED\"},{\"id\":\"angle_120\",\"value\":\"obtuse\",\"status\":\"VALUE_CHANGED\"}]",
+        "ts": 1793186229826,
+        "responseType": "iqb-standard@1.1"
+      }
+    ]
+  },
+  {
+    "unitname": "S8ABE4D1C359AU5",
+    "originalUnitId": "S8ABE4D1C359AU5",
+    "laststate": "{\"RESPONSE_PROGRESS\": \"complete\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+    "responses": [
+      {
+        "id": "all",
+        "content": "[{\"id\":\"hypotenuse\",\"value\":\"17\",\"status\":\"VALUE_CHANGED\"},{\"id\":\"reason\",\"value\":\"Die Leiter ist die Hypotenuse. Wegen des rechten Winkels gilt c²=8²+15²=289. Die Wurzel ist 17.\",\"status\":\"VALUE_CHANGED\"}]",
+        "ts": 1793186256467,
+        "responseType": "iqb-standard@1.1"
+      }
+    ]
+  },
+  {
+    "unitname": "S8ABE4D1C359AU6",
+    "originalUnitId": "S8ABE4D1C359AU6",
+    "laststate": "{\"RESPONSE_PROGRESS\": \"complete\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+    "responses": [
+      {
+        "id": "all",
+        "content": "[{\"id\":\"critique\",\"value\":\"Die Fläche steigt von 6·4=24 auf 12·4=48 cm². Der Umfang steigt von 2·(6+4)=20 auf 2·(12+4)=32 cm. Nur die Fläche verdoppelt sich.\",\"status\":\"VALUE_CHANGED\"}]",
+        "ts": 1793186285009,
+        "responseType": "iqb-standard@1.1"
+      }
+    ]
+  }
+]

@@ -1854,6 +1854,7 @@ const createFileRepository = (
         return deleteOriginalGroupsFromCollections(state, input);
       });
     },
+    async listOriginalUnitsByWorkspace(tenantId,workspaceId){return structuredClone(Object.values((await getState()).originalNativeUnits).filter(unit=>unit.tenantId===tenantId&&unit.workspaceId===workspaceId));},
     async getOriginalUnit(input){return readOriginalUnitCollection(await getState(),input);},
     async mutateOriginalUnit(input,transform){return mutate(state=>mutateOriginalUnitCollection(state,input,transform));},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
