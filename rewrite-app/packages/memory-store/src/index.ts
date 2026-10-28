@@ -977,6 +977,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       if (![...state.workspacesByScope.values()].some(row => row.tenantId === input.tenantId && row.workspaceId === input.workspaceId)) return null;
       return deleteOriginalGroupsFromCollections(state, input);
     },
+    async listOriginalUnitsByWorkspace(tenantId,workspaceId){return structuredClone(Array.from(state.originalNativeUnits.values()).filter(unit=>unit.tenantId===tenantId&&unit.workspaceId===workspaceId));},
     async getOriginalUnit(input){return readOriginalUnitCollection(state,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalUnitCollection(state,input,transform);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {

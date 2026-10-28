@@ -198,6 +198,42 @@ for (const kind of kinds) test(`${kind}: Original archive distinguishes omitted 
       if(kind!=='memory'){await storage.shutdown();await open();}
       assert.deepEqual(await checkSaved(),before);
     });
+    await t.test('native geometry answers retain every part, client clock and stored identity', async () => {
+      const fixtures = JSON.parse(await readFile(new URL('../test-fixtures/geometry-native-export/responses.json', import.meta.url)));
+      const participantSessionId = randomUUID(), testRunId = randomUUID();
+      await repository.getOrCreateOriginalParticipantGroup({...workspace, groupKey:'native', groupLabel:'Native',createdAt:timestamp});
+      await repository.bindOriginalLoginGroup({...workspace,loginKey:'native-login',groupKey:'native',groupSnapshotKey:'native',authenticatedAt:timestamp});
+      await repository.saveParticipantSession({...workspace, participantSessionId, loginKey:'native-login', originalLoginKey:'native-login',
+        originalNameSuffix:'source/abc12345', participantCode:'source', groupKey:'native', executionMode:'run-hot-restart', status:'launched', createdAt:timestamp});
+      await repository.saveTestRun({...workspace, participantSessionId, testRunId, bookletKey:'owned', bookletAssignmentKey:'assigned',
+        originalResultState:{bookletName:'source-booklet',lastOpenedAt:timestamp,lastTestModifiedAt:timestamp},
+        executionMode:'run-hot-return',status:'running',currentUnitKey:fixtures[0].unitname,unitResponses:{},createdAt:timestamp,updatedAt:timestamp,completedAt:null});
+      for (const row of fixtures) {
+        const state = JSON.parse(row.laststate);
+        await repository.mutateOriginalUnit({...workspace,participantSessionId,testRunId,unitName:row.unitname}, () => ({logs:[],unit:{
+          ...workspace,participantSessionId,testRunId,unitName:row.unitname,originalUnitId:row.originalUnitId,state,
+          stateClocks:Object.fromEntries(Object.keys(state).map(key=>[key,1])),parts:row.responses}}));
+      }
+      const check = async () => {
+        const rows = (await report(['native'])).rows.responses;
+        assert.equal(rows.length,6);assert.equal(rows.flatMap(row=>row.responses.flatMap(part=>JSON.parse(part.content))).length,9);
+        for (const fixture of fixtures) {
+          const row=rows.find(row=>row.unitname===fixture.unitname);assert.ok(row);
+          assert.deepEqual(row.responses,fixture.responses);assert.deepEqual(JSON.parse(row.laststate),JSON.parse(fixture.laststate));
+          assert.equal(row.originalUnitId,fixture.originalUnitId);assert.equal(row.loginname,'native-login');
+          assert.equal(row.code,'source/abc12345');assert.equal(row.bookletname,'source-booklet');
+        }
+        assert.deepEqual((await repository.getTestRunById(testRunId)).unitResponses,{},'Export never mirrors native answers into canonical storage.');
+        assert.deepEqual((await report([])).rows.responses,[]);
+      };
+      await check();
+      if(kind!=='memory'){await storage.shutdown();await open();} await check();
+      const key={...workspace,participantSessionId,testRunId,unitName:fixtures[0].unitname};
+      await repository.mutateOriginalUnit(key,previous=>({logs:[],unit:{...previous,unknownHistory:true}}));
+      await assert.rejects(()=>report(['native']),error=>error.errorCode==='original_unit_history_unknown');
+      assert.equal((await report(['beta'])).rows.responses.length,1,'Unselected unknown histories do not prevent scoped exports.');
+      await repository.mutateOriginalUnit(key,previous=>({logs:[],unit:{...previous,unknownHistory:undefined}}));
+    });
     await t.test('scoped journal filtering distinguishes omitted, selected and empty event kinds',async()=>{
       const all=await repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId,workspace.workspaceId);
       const kinds=['review_created','review_updated','review_deleted'];
