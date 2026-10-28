@@ -67,7 +67,7 @@ try {
   await operatorApi(workspace + '/participant-roster', {rosterText: '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="OWNED.NATIVE.BROWSER" label="Owned native browser">' +
     ['native-browser', 'native-peer'].map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login>`).join('') + `<Login name="native-monitor" pw="${password}" mode="monitor-group"/></Group></Testtakers>`}, operator, 201);
   setPhase('browser-launch');
-  browser = await chromium.launch({headless: process.env.CI === 'true' && process.env.UI_SMOKE_HEADFUL !== 'true'});
+  browser = await chromium.launch({channel: process.env.UI_SMOKE_BROWSER_CHANNEL?.trim() || undefined, headless: process.env.CI === 'true' && process.env.UI_SMOKE_HEADFUL !== 'true'});
   page = await browser.newPage({viewport: {width: 1280, height: 720}, locale: 'de-DE'});
   setPhase('owned-document-load');
   await page.goto(base + '/app/participant?ui=original', {waitUntil: 'domcontentloaded'});

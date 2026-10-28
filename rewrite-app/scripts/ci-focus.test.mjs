@@ -142,7 +142,7 @@ test('participant authentication focus retains all existing identity, HTTP, cred
   assert.equal(scripts['test:participant-auth'],'npm run build:core && npm run test:participant-auth:built');
   const files=scripts['test:participant-auth:built'].replace(/^node --test /,'').split(' ');
   assert.deepEqual(files,['scripts/original-participant-group.test.mjs','scripts/original-login-binding.test.mjs',
-    'scripts/original-person-identity.test.mjs','scripts/original-login-protocol.test.mjs','scripts/original-operational-login.test.mjs','scripts/original-monitor-auth.test.mjs','scripts/original-session.test.mjs','scripts/original-person-content-migration.test.mjs','scripts/participant-run-creation-api.test.mjs',
+    'scripts/original-person-identity.test.mjs','scripts/original-person-number.test.mjs','scripts/original-login-protocol.test.mjs','scripts/original-operational-login.test.mjs','scripts/original-monitor-auth.test.mjs','scripts/original-monitor-sessions.test.mjs','scripts/original-session.test.mjs','scripts/original-person-content-migration.test.mjs','scripts/participant-run-creation-api.test.mjs',
     'scripts/participant-access-credentials.test.mjs','scripts/participant-sign-out.test.mjs']);
   const mandatory=(scripts['test:unit:built']+' '+scripts['test:frontend-state']).split(/\s+/);
   for(const file of files)assert.ok(mandatory.includes(file),`${file} remains in required unit CI`);

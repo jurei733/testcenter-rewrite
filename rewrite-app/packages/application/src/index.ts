@@ -1,3 +1,18 @@
+import {createOriginalPersonTest,parseOriginalTestName} from './original-test.js';
+import {collectOriginalParticipantAssignments} from './original-participant-assignments.js';
+import {createOriginalSessionToken,hashOriginalSessionToken,OriginalSessionTokenCollisionError} from './original-session-token.js';
+export {originalPersonCredentialMatches} from './original-person-number.js';
+export type {OriginalPersonCredentialInput} from './original-person-number.js';
+export {projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from './original-person-tests.js';
+export type {OriginalPersonTestIdentity,OriginalPersonTestScope} from './original-person-tests.js';
+import {compareOriginalParticipantGroupKeys} from './original-participant-group.js';
+import {originalMonitorable} from './original-monitor-session.js';
+import {createOriginalMonitorPort} from './original-monitor.js';
+export type {OriginalMonitorPort} from './original-monitor.js';
+export {assertOriginalMonitorActor,selectOriginalMonitorSessions,readOriginalMonitorCollections} from './original-monitor-store.js';
+export type {OriginalMonitorData,OriginalMonitorPerson,OriginalMonitorLogin,OriginalMonitorRepository} from './original-monitor-store.js';
+export {originalMonitorable,originalMonitorGroupSelection,originalMonitorCurrentUnit,projectOriginalMonitorSession,formatOriginalMonitorSessionsJson} from './original-monitor-session.js';
+export type {OriginalMonitorActor,OriginalMonitorTest,OriginalMonitorUnit,OriginalMonitorPacket} from './original-monitor-session.js';
 import {createOriginalCommandPort} from './original-command.js';
 export type {OriginalCommandPort} from './original-command.js';
 export * from './original-command-queue.js';
@@ -24,8 +39,10 @@ import {createOriginalTestPort} from './original-test.js';
 export {parseOriginalTestName} from './original-test.js';
 export type {OriginalTestPort} from './original-test.js';
 import {originalParticipantGroupKeysEqual as sameOriginalTestName} from './original-participant-group.js';
+export {prepareOriginalPersonNumber,selectOriginalPersonNumber,validateOriginalPersonNumbers} from './original-person-number.js';
+export type {OriginalPersonNumberScope,OriginalPersonNumberRecord} from './original-person-number.js';
 export {prepareOriginalTestNumber, assertOriginalTestCreationCandidate} from './original-test-number.js';
-export type {OriginalTestNumberScope, OriginalTestNumberRecord, OriginalTestNumberInput} from './original-test-number.js';
+export type {OriginalTestNumberRun, OriginalTestNumberScope, OriginalTestNumberRecord, OriginalTestNumberInput} from './original-test-number.js';
 export {assertResultArtifactParent, guardResultArtifactCollections, activityResultParent, attachmentResultParent, resultParentUnavailable, type ResultArtifactParent} from './result-artifact-parent.js';
 export {prepareOriginalGroupDeletionInput, selectOriginalGroupDeletionKeys, deleteOriginalGroupsFromCollections, attachmentTestRunId} from './original-group-deletion.js';
 export type {OriginalGroupDeletionInput, OriginalGroupDeletionResult} from './original-group-deletion.js';
@@ -1290,6 +1307,7 @@ export type FirstSlicePorts = {
   originalAuthentication: import('./original-authentication.js').OriginalAuthenticationPort;
   originalTest: import('./original-test.js').OriginalTestPort;
   originalCommand: import('./original-command.js').OriginalCommandPort;
+  originalMonitor: import('./original-monitor.js').OriginalMonitorPort;
   originalUnit:import('./original-unit.js').OriginalUnitPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
@@ -1426,7 +1444,7 @@ export type FirstSliceServices = FirstSlicePorts & {
   }): Promise<CreateImportJobResult>;
 };
 
-export type FirstSliceRepository = import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
+export type FirstSliceRepository = import('./original-monitor-store.js').OriginalMonitorRepository & import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
@@ -1565,6 +1583,10 @@ export type FirstSliceRepository = import('./original-command-queue.js').Origina
   updateParticipantSessionValidity(input: {participantSessionId: string; tenantId: string; workspaceId: string; validUntil: string | null}): Promise<void>;
   /** Atomic native Login/suffix lookup and creation; validate runs before any durable effect. */
   resolveOriginalParticipantSession(candidate: ParticipantSession, validate?: (person: Readonly<ParticipantSession>) => void): Promise<import('./original-person-identity.js').OriginalPersonResolution | null>;
+  ensureOriginalPersonCredential(input:import('./original-person-number.js').OriginalPersonCredentialInput):Promise<boolean>;
+  listOriginalPersonTestIdentities(scope:import('./original-person-tests.js').OriginalPersonTestScope):Promise<import('./original-person-tests.js').OriginalPersonTestIdentity[]>;
+  /** Genuine durable native identity; unknown historical people return null. */
+  getOriginalPersonNumber(input: import('./original-person-number.js').OriginalPersonNumberScope): Promise<string | null>;
   /** First validated credential login wins; returns null if the workspace was deleted. */
   getOrCreateOriginalParticipantGroup(input: Omit<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup, "lastModifiedAt">): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup | null>;
   listOriginalParticipantGroupsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup[]>;
@@ -1653,6 +1675,7 @@ export type FirstSliceRepository = import('./original-command-queue.js').Origina
     transform: (context: ParticipantRunCommandApplicationContext) => ParticipantRunCommandEffect
   ): Promise<ParticipantRunCommandApplicationResult | null>;
   /** Reserve/reuse one exact assignment; initialize a fresh Run and all its artifacts in that same write. */
+  getOrCreateOriginalPersonTest(candidate:TestRun):Promise<import('./original-person-tests.js').OriginalPersonTestReservation>;
   getOrCreateTestRunForAssignment(
     candidate: TestRun,
     initialize?: ParticipantAssignmentRunInitializer,
@@ -6060,6 +6083,16 @@ const getParticipantRosterBookletAssignments = (
         ) === index
     );
 };
+
+/** XMLFileTesttakers uppercases the authored reference before appending raw
+ * Booklet-state presets. Keep this native spelling separate from canonical IDs. */
+const getOriginalParticipantBookletAssignments=(entry:ParticipantRosterEntry)=>getParticipantRosterBookletAssignments(entry).map(assignment=>{
+  const reference=assignment.bookletKey;
+  if(!assignment.assignmentKey.startsWith(reference))throw new FirstSliceError(409,'original_assignment_history_unknown','The authored Original Test reference is unavailable.');
+  const nativeReference=reference.replace(/[a-z]/g,letter=>letter.toUpperCase());
+  const name=parseOriginalTestName(nativeReference+assignment.assignmentKey.slice(reference.length));
+  return{...assignment,bookletKey:name.fileId,assignmentKey:name.name,statePreset:name.states};
+});
 
 const participantRosterRequiresCode = (
   entry: ParticipantRosterEntry | null | undefined
@@ -27837,6 +27870,52 @@ export const createFirstSliceServices = (
     if(!result)throw new FirstSliceError(409,'original_login_scope_changed','The Original login scope changed during authentication.');
     return result.participantSession;
   };
+  const currentOriginalBooklet=async(person:ParticipantSession,fileId:string)=>{
+    const current=await workspaceFiles.read(person);
+    const booklet=current.compilation?.runtimeSnapshot?.bookletEntries.find(entry=>sameOriginalTestName(entry.bookletKey,fileId));
+    if(!booklet)throw new FirstSliceError(404,'original_booklet_unavailable','No Booklet with id `'+fileId+'` found on workspace `'+person.workspaceId+'`!');
+    const release=await requireParticipantContentRelease(person);return{booklet,contentReleaseId:release.contentReleaseId};
+  };
+  const materializeOriginalMonitor=async(actor:ParticipantSession)=>{
+    if(actor.originalOperationalMode!=='monitor-group'&&actor.originalOperationalMode!=='monitor-study')return;
+    const current=await operationalDefinition(actor,actor.originalLoginKey!);
+    const binding=(await repository.listOriginalLoginBindingsByWorkspace(actor.tenantId,actor.workspaceId)).find(row=>row.loginKey===actor.originalLoginKey);
+    if(!current||!binding||!await activeNativeWorkspace(actor)||current.definition.originalOperationalMode!==actor.originalOperationalMode||
+      !sameOriginalTestName(current.definition.groupKey,actor.groupKey)||!sameOriginalTestName(binding.groupKey,actor.groupKey)){
+      throw new FirstSliceError(409,'original_login_scope_changed','The Original monitor scope changed during authentication.');
+    }
+    const members=(await repository.listParticipantRosterEntriesByWorkspace(actor.tenantId,actor.workspaceId)).filter(member=>
+      originalMonitorable(member)&&!participantExecutionModeDefinitions[member.executionMode!].alwaysNewSession&&
+      (actor.originalOperationalMode==='monitor-study'||sameOriginalTestName(member.groupKey,actor.groupKey)));
+    for(const member of members){
+      let memberBinding=(await repository.listOriginalLoginBindingsByWorkspace(actor.tenantId,actor.workspaceId)).find(row=>row.loginKey===member.loginKey);
+      if(!memberBinding){
+        const group=await repository.getOrCreateOriginalParticipantGroup({tenantId:actor.tenantId,workspaceId:actor.workspaceId,groupKey:member.groupKey,groupLabel:member.groupLabel??'',createdAt:now()});
+        if(!group)throw new FirstSliceError(409,'original_login_scope_changed','The Original member scope changed during registration.');
+        memberBinding=await repository.bindOriginalLoginGroup({tenantId:actor.tenantId,workspaceId:actor.workspaceId,loginKey:member.loginKey,groupKey:member.groupKey,groupSnapshotKey:group.groupKey,authenticatedAt:now()})??undefined;
+      }
+      if(!memberBinding)throw new FirstSliceError(409,'original_login_scope_changed','The Original member scope changed during registration.');
+      // Private recoverable capabilities are reused and never returned to a monitor.
+      for(const kind of ['login','group'] as const)for(let attempt=0;attempt<32;attempt++){
+        try{const capability=await repository.getOrCreateOriginalSessionToken({tenantId:actor.tenantId,workspaceId:actor.workspaceId,kind,subjectKey:kind==='login'?member.loginKey:memberBinding.groupSnapshotKey,token:createOriginalSessionToken(),createdAt:now()});
+          if(!capability)throw new FirstSliceError(409,'original_login_scope_changed','The Original member scope changed during registration.');break;
+        }catch(error){if(!(error instanceof OriginalSessionTokenCollisionError)||attempt===31)throw error;}
+      }
+      for(const[code,assignments]of collectOriginalParticipantAssignments(getOriginalParticipantBookletAssignments(member))){
+        const timestamp=now();
+        const resolved=await repository.resolveOriginalParticipantSession({participantSessionId:idGenerator(),tenantId:actor.tenantId,workspaceId:actor.workspaceId,contentReleaseId:null,
+          loginKey:member.loginKey,originalLoginKey:member.loginKey,originalNameSuffix:createOriginalPersonNameSuffix(code,false),participantCode:code,groupKey:memberBinding.groupKey,
+          executionMode:member.executionMode,status:'signed_in',createdAt:timestamp,validUntil:resolveParticipantSessionValidUntil(member,timestamp)});
+        if(!resolved||typeof resolved.participantSession.originalNameSuffix!=='string')throw new FirstSliceError(409,'original_person_history_unknown','The Original dependent person identity is unavailable.');
+        const person=resolved.participantSession;
+        // Source allowExpired=true, forceUpdateToken=false. This conditional
+        // write never replaces an active bearer from a concurrent human login.
+        if(!await repository.ensureOriginalPersonCredential({...person,originalLoginKey:person.originalLoginKey!,originalNameSuffix:person.originalNameSuffix!,
+          tokenHash:hashOriginalSessionToken(createOriginalSessionToken()),updatedAt:now()}))throw new FirstSliceError(409,'original_login_scope_changed','The Original member scope changed during registration.');
+        for(const assignment of assignments)await createOriginalPersonTest({repository,now,id:idGenerator,currentBooklet:currentOriginalBooklet},person,assignment.assignmentKey,true);
+      }
+    }
+  };
   const originalAuthentication = createOriginalAuthentication({
     repository, access: nativeAccess, now,
     error: (status, code, message) => new FirstSliceError(status, code, message),
@@ -32493,29 +32572,42 @@ export const createFirstSliceServices = (
     originalAuthentication,
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
     originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator}),
+    originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository}),
     originalTest: createOriginalTestPort({auth: originalAuthentication, repository, now, id: idGenerator,
       readBooklet:(scope,fileId)=>originalTestFiles.booklet(scope,fileId),
       readResource:(scope,path)=>originalTestFiles.resource(scope,path),
-      async currentBooklet(person, fileId) {
-        const current = await workspaceFiles.read(person);
-        const booklet = current.compilation?.runtimeSnapshot?.bookletEntries.find(entry => sameOriginalTestName(entry.bookletKey, fileId));
-        if (!booklet) throw new FirstSliceError(404, 'original_booklet_unavailable', `No Booklet with id \`${fileId}\` found on workspace \`${person.workspaceId}\`!`);
-        const release = await requireParticipantContentRelease(person);
-        return {booklet, contentReleaseId: release.contentReleaseId};
-      }
+      currentBooklet:currentOriginalBooklet
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
-    originalSession: createOriginalSessionPort({auth: originalAuthentication, repository,
+    originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,
       async monitorAssignments(entry){
+        if(entry.originalOperationalMode==='monitor-study')return[];
         const entries=await repository.listParticipantRosterEntriesByWorkspace(entry.tenantId,entry.workspaceId);
         const assignments=new Map<string,import('@testcenter-rewrite-app/domain').ParticipantBookletAssignment>();
-        for(const member of entries)if(member.originalLoginIdentity&&member.groupKey===entry.groupKey)for(const assignment of getParticipantRosterBookletAssignments(member)){
+        for(const member of entries)if(member.originalLoginIdentity&&sameOriginalTestName(member.groupKey,entry.groupKey))for(const assignment of getOriginalParticipantBookletAssignments(member)){
           if(!assignments.has(assignment.assignmentKey))assignments.set(assignment.assignmentKey,{...assignment,accessCodes:[]});
         }
         return [...assignments.values()];
       },
-      assignments: (entry, code) => selectOriginalParticipantAssignments(getParticipantRosterBookletAssignments(entry), code),
+      async monitorGroups(entry){
+        const groups:Array<{groupKey:string;groupLabel:string;validFrom?:string|null;validTo?:string|null}>=entry.originalOperationalMode==='monitor-group'?
+          [{groupKey:entry.groupKey,groupLabel:entry.groupLabel??entry.groupKey}]:
+          (await repository.listParticipantRosterEntriesByWorkspace(entry.tenantId,entry.workspaceId)).filter(originalMonitorable)
+            .map(member=>({groupKey:member.groupKey,groupLabel:member.groupLabel??'',validFrom:member.validFrom,validTo:member.validTo}))
+            .sort((a,b)=>compareOriginalParticipantGroupKeys(a.groupLabel,b.groupLabel));
+        const current=new Map<string,typeof groups[number]>();for(const group of groups)current.set(group.groupKey,group);
+        const clock=Math.floor(Date.parse(now())/1000)*1000;
+        return [...current.values()].flatMap(group=>{
+          const from=normalizeParticipantAccessBoundary(group.validFrom,participantAccessTimeZone),to=normalizeParticipantAccessBoundary(group.validTo,participantAccessTimeZone);
+          const flags:{expired?:number;scheduled?:number}=to&&clock>Math.floor(Date.parse(to)/1000)*1000?{expired:Math.floor(Date.parse(to)/1000)*1000}:
+            from&&clock<Math.floor(Date.parse(from)/1000)*1000?{scheduled:Math.floor(Date.parse(from)/1000)*1000}:{};
+          const base={id:group.groupKey,type:'testGroupMonitor' as const,label:group.groupLabel};
+          return entry.monitorProfiles.length?entry.monitorProfiles.map(profile=>({...base,flags:{...flags,profile:profile.profileId,subLabel:profile.label}})):
+            [{...base,flags:Object.keys(flags).length?flags:[] as []}];
+        });
+      },
+      assignments: (entry, code) => selectOriginalParticipantAssignments(getOriginalParticipantBookletAssignments(entry), code),
       async bookletLabels(scope) {
         const [sources, events] = await Promise.all([repository.listSourcePackagesByWorkspace(scope.tenantId, scope.workspaceId),
           repository.listWorkspaceActivityEventsByWorkspace(scope.tenantId, scope.workspaceId)]);

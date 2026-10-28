@@ -638,6 +638,7 @@ interface ParticipantVisibleCodeNotice {
           <ng-container *ngIf="!view.eagerBookletLoading; else eagerBookletLoading">
             <app-verona-player-host
               *ngIf="(interfaceMode.mode() === 'original' ? view.originalVeronaPlayer : view.veronaPlayer) as verona; else textResponsePlayer"
+              [attr.inert]="view.confirmationDialog() ? '' : null"
               [playerHtml]="verona.playerHtml"
               [playerKey]="verona.playerKey"
               [commandReloadSequence]="verona.commandReloadSequence"

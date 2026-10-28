@@ -1,0 +1,17 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "testMode": false,
+  "success": true,
+  "execution": "Local unchanged production Docker image testcenter-original-monitor:eedae418; Apache/PHP8.3.36/PostgreSQL18.4; actual ALTCHA and schema-valid admin uploads; no SQL seeds. No CI run is claimed.",
+  "checks": 75,
+  "httpObservations": 1139,
+  "sourceFilesIndependentlyMatched": 48,
+  "files": {
+    "receipt.json": "cc7fd219bf0123c544419030f199d7270898f3f222f48b08eb2a385f7e7d2399",
+    "monitor-unopened.json": "fa3826a9ad121f5d2b04a99e1014f0e94d0ad440d29dc84151427cde1fd98452",
+    "php-runtime.json": "235e9fb37804e4f2440251f09c235b4233f2103d7a2299eb36a65506fae785d1",
+    "verified-summary.json": "81116d8846d36b64a65e4851d0c458675330aa9700b51620b2ac4c842cdf4df9",
+    "http-observations.json": "41127130c9df55bf5fd281d6cee74b3a55e6da25eca0bf1b3073901349cb9822",
+    "oracle.mjs": "0e8b66444302bca728db7da59bfe013d17cfe52c1af1d4c22ad01b795a25f235"
+  }
+}

@@ -1,5 +1,6 @@
 import type {OriginalCommandDelivery} from './original-command-queue.js';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
+import type {OriginalPersonNumberRecord} from './original-person-number.js';
 import type {OriginalTestNumberRecord} from './original-test-number.js';
 import type {AttachmentFile, OriginalLoginBinding, OriginalParticipantGroup, ParticipantSession, TestRun, WorkspaceActivityEvent, WorkspaceReview, ParticipantTestLog, ParticipantRunCommand, ParticipantProgressDelivery} from '@testcenter-rewrite-app/domain';
 import type {OriginalSessionToken} from './original-session-token.js';
@@ -52,6 +53,7 @@ export type OriginalGroupDeletionCollections = {
   originalSessionTokens: Collection<OriginalSessionToken>; participantSessions: Collection<ParticipantSession>;
   originalTestRunsByNumber?: Collection<string>;
   originalTestNumbers?: Collection<OriginalTestNumberRecord>;
+  originalPersonNumbers?: Collection<OriginalPersonNumberRecord>;
   originalNativeUnits?:Collection<OriginalNativeUnit>;
   originalNativeCommands?:Collection<OriginalCommandDelivery>;
   participantAccessCredentials: Collection<{participantSessionId: string}>; testRuns: Collection<TestRun>;
@@ -87,6 +89,7 @@ export function deleteOriginalGroupsFromCollections(state: OriginalGroupDeletion
     }
   }
   if (state.originalTestNumbers) remove(state.originalTestNumbers, descendant);
+  if (state.originalPersonNumbers) remove(state.originalPersonNumbers,row=>scoped(row)&&people.has(row.participantSessionId));
   if(state.originalTestRunsByNumber)remove(state.originalTestRunsByNumber,id=>runs.has(id));
   remove(state.participantPresence, row => runs.has(row.testRunId));
   remove(state.participantAccessCredentials, row => people.has(row.participantSessionId));

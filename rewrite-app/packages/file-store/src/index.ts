@@ -1,3 +1,6 @@
+import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
+import {readOriginalMonitorCollections} from '@testcenter-rewrite-app/application';
+import {prepareOriginalPersonNumber,selectOriginalPersonNumber,validateOriginalPersonNumbers,type OriginalPersonNumberRecord} from '@testcenter-rewrite-app/application';
 import {nextOriginalCommandNumber,findOriginalCommandTargetCollection,appendOriginalCommandCollection,listOriginalCommandsCollection,acknowledgeOriginalCommandCollection,touchOriginalCommandPollingCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalCommandDelivery} from '@testcenter-rewrite-app/application';
 import {prepareOriginalOperationalLogins,projectOriginalOperationalModes} from '@testcenter-rewrite-app/application';
@@ -133,6 +136,8 @@ type PersistedFirstSliceState = {
   originalNativeUnits: Record<string,OriginalNativeUnit>;
   originalTestNumbers: Record<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
+  originalPersonNumbers: Record<string, OriginalPersonNumberRecord>;
+  originalPersonNumberCounter: string;
   originalTestRunsByNumber: Record<string,string>;
   originalWorkspaceNumbers: Record<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
@@ -199,6 +204,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   originalNativeUnits: {},
   originalTestNumbers: {},
   originalTestNumberCounter: "0",
+  originalPersonNumbers: {},
+  originalPersonNumberCounter: "0",
   originalTestRunsByNumber: {},
   originalWorkspaceNumbers: {},
   originalWorkspaceNumberCounter: "0",
@@ -768,6 +775,7 @@ const createFileRepository = (
       externalizedCollections = loaded.externalizedCollections;
       {const entries=Object.values(loaded.state.originalTestNumbers??{});const index=Object.fromEntries(entries.map(row=>[row.testNumber,row.testRunId]));if(Object.keys(index).length!==entries.length)throw Error('Duplicate native Test number.');loaded.state.originalTestRunsByNumber=index;}
 
+      validateOriginalPersonNumbers(loaded.state.originalPersonNumbers,loaded.state.originalPersonNumberCounter,loaded.state.participantSessions);
       return loaded.state;
     });
     return cachePromise;
@@ -1220,6 +1228,7 @@ const createFileRepository = (
         deleteMatching(state.originalSessionTokens, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
         deleteMatching(state.originalNativeUnits,workspaceMatches);
+        deleteMatching(state.originalPersonNumbers,workspaceMatches);
         if(state.originalTestNumbers)deleteMatching(state.originalTestNumbers,row=>{if(!workspaceMatches(row))return false;delete state.originalTestRunsByNumber[row.testNumber];return true;});
         if(state.originalWorkspaceNumbers)deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
@@ -1643,6 +1652,15 @@ const createFileRepository = (
       const state = await getState();
       return structuredClone(Object.values(state.originalLoginBindings).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
     },
+    async readOriginalMonitorSessions(actor,groupKey){return readOriginalMonitorCollections(await getState(),actor,groupKey);},
+    async ensureOriginalPersonCredential(input){return enqueueMutation(async()=>{
+      const current=await getState();if(!originalPersonCredentialMatches(input,current.participantSessions[input.participantSessionId]))return false;
+      if(current.participantAccessCredentials[input.participantSessionId]?.tokenHash)return true;
+      const next={...current,participantAccessCredentials:{...current.participantAccessCredentials,[input.participantSessionId]:{participantSessionId:input.participantSessionId,tokenHash:input.tokenHash,updatedAt:input.updatedAt}}};
+      await persistState(next);cachePromise=Promise.resolve(next);return true;
+    });},
+    async listOriginalPersonTestIdentities(scope){const state=await getState();return Object.values(state.testRuns).filter(run=>run.participantSessionId===scope.participantSessionId&&run.tenantId===scope.tenantId&&run.workspaceId===scope.workspaceId).map(projectOriginalPersonTestIdentity);},
+    async getOriginalPersonNumber(input){const state=await getState();return selectOriginalPersonNumber(input,state.originalPersonNumbers[input.participantSessionId],state.participantSessions[input.participantSessionId]);},
     async resolveOriginalParticipantSession(candidate,validate) {
       return enqueueMutation(async()=>{
         const state=await getState();
@@ -1651,7 +1669,8 @@ const createFileRepository = (
         const storedPeople=Object.values(state.participantSessions),result=resolveOriginalPerson(candidate,binding,storedPeople,validate);
         const people=projectOriginalPersonSessions(result.participantSession,storedPeople),storedRuns=Object.values(state.testRuns),runs=projectOriginalPersonRuns(result.participantSession,storedRuns,people);
         if(!result.created && people.every((person,index)=>person===storedPeople[index]) && runs.every((run,index)=>run===storedRuns[index]))return structuredClone(result);
-        const next={...state,participantSessions:Object.fromEntries(people.map(person=>[person.participantSessionId,person])),
+        const numbered=result.created?prepareOriginalPersonNumber(result.participantSession,state.originalPersonNumberCounter):undefined;
+        const next={...state,...(numbered?{originalPersonNumbers:{...state.originalPersonNumbers,[result.participantSession.participantSessionId]:numbered.record},originalPersonNumberCounter:numbered.counter}:{}),participantSessions:Object.fromEntries(people.map(person=>[person.participantSessionId,person])),
           testRuns:Object.fromEntries(runs.map(run=>[run.testRunId,run]))};
         await persistState(next);cachePromise=Promise.resolve(next);return structuredClone(result);
       });
@@ -1876,6 +1895,18 @@ const createFileRepository = (
       return Object.values(state.testRuns).filter(
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
+    },
+    async getOrCreateOriginalPersonTest(candidate){
+      const result=await mutateParticipantRunApplication(state=>{
+        const parent=state.participantSessions[candidate.participantSessionId]??null;
+        const prepared=prepareOriginalPersonTestCreation(candidate,parent,Object.values(state.testRuns).map(projectOriginalPersonTestIdentity),state.contentReleases[candidate.contentReleaseId]);
+        const numbered=prepareOriginalTestNumber({...prepared.testRun,consumeSequence:true},prepared.testRun,prepared.participantSession??parent,state.originalTestNumbers[prepared.testRun.testRunId],state.originalTestNumberCounter??'0');
+        if(prepared.fresh)state.testRuns[prepared.fresh.testRunId]=prepared.fresh;
+        if(prepared.participantSession)state.participantSessions[prepared.participantSession.participantSessionId]=prepared.participantSession;
+        if(numbered.changed){state.originalTestNumbers[prepared.testRun.testRunId]=numbered.record;state.originalTestRunsByNumber[numbered.record.testNumber]=prepared.testRun.testRunId;state.originalTestNumberCounter=numbered.counter;}
+        return{testRun:prepared.testRun,created:prepared.created,originalTestNumber:numbered.record.testNumber,applied:prepared.created||numbered.changed};
+      },true);
+      return{testRun:result.testRun,created:result.created,originalTestNumber:result.originalTestNumber};
     },
     async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
       if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}

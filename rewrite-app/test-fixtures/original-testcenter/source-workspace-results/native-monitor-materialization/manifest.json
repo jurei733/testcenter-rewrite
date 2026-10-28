@@ -1,0 +1,17 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "success": true,
+  "testMode": false,
+  "qualification": "Unchanged local production Apache/PHP/PostgreSQL image; actual ALTCHA, protected validated XML/HTTP only; no SQL seeds, no Source patches, no CI run claimed.",
+  "dockerProject": "source-materialization-v3-20261028",
+  "checks": 79,
+  "httpObservations": 1157,
+  "sourceFilesIndependentlyMatched": 48,
+  "precedingChecksRetained": 75,
+  "files": {
+    "receipt.json": "6e3e593c4f5a41347b990659856b2e222a622034c0cf6502abc2133dfb69cbf3",
+    "http-observations.json": "76c9096a8a5085af4d25be1ba817ba3d492dc5bde53bc60ecc766b01ca8b6464",
+    "oracle.mjs": "1644ef0038b42833ea5bb4e6a00d559b7d7873b8291da9df8d8e6174d7e1bb5c"
+  },
+  "updated": "2026-10-28T12:05:40.756870+00:00"
+}

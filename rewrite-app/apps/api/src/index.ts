@@ -1,3 +1,4 @@
+import {handleOriginalMonitorHttp,originalMonitorRouteLabel} from './original-monitor-http.js';
 import {handleOriginalTestHttp, originalTestCreationPath,originalTestRouteLabel,originalResourceLogPath} from './original-test-http.js';
 import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
 import {OriginalSessionProof} from './original-session-proof.js';
@@ -3329,6 +3330,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /system-check";
   }
 
+  const monitorLabel=originalMonitorRouteLabel(method,pathname);if(monitorLabel)return monitorLabel;
   const originalLabel=originalTestRouteLabel(method,pathname);if(originalLabel)return originalLabel;
   if (originalSessionRoutes.get(pathname)?.includes(method)) return `${method} ${pathname}`;
 
@@ -4978,6 +4980,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      if (await handleOriginalMonitorHttp({request,pathname,services,header:(name,value)=>response.setHeader(name,value),
+        raw:(status,text,contentType)=>{response.writeHead(status,{'content-type':contentType});response.end(text);}})) return;
       if (await handleOriginalTestHttp({request, pathname, services,
         reason: text => {response.statusMessage=text;},
         readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),

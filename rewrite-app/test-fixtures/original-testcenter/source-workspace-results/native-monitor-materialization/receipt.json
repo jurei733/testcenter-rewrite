@@ -1,0 +1,5036 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "transport": "unchanged production Apache HTTP; actual ALTCHA; no SQL seeds",
+  "testMode": false,
+  "checks": [
+    {
+      "name": "actual production Apache requires both native Login and person challenges"
+    },
+    {
+      "name": "owned XSD-validated fixture enters only through protected admin HTTP"
+    },
+    {
+      "name": "configured Login protection refuses direct password authentication"
+    },
+    {
+      "name": "actual native Login challenge is solved without replacing the production verifier",
+      "challenge": {
+        "keys": [
+          "algorithm",
+          "challenge",
+          "maxNumber",
+          "salt",
+          "signature"
+        ],
+        "algorithm": "SHA-256",
+        "maxnumber": 1000000,
+        "saltParameterNames": [
+          "loginType",
+          "name",
+          "password"
+        ],
+        "hasExpiryParameter": false
+      }
+    },
+    {
+      "name": "invalid signature and wrong work cannot authenticate through the native solution route"
+    },
+    {
+      "name": "a valid Login solution returns the coded Login AccessSet rather than a person"
+    },
+    {
+      "name": "Login-solution replay behavior is measured without assuming one-use semantics",
+      "status": 200,
+      "sameLoginToken": true
+    },
+    {
+      "name": "native person challenges require a Login bearer before issuing work"
+    },
+    {
+      "name": "configured person protection refuses direct code entry while Login metadata remains readable"
+    },
+    {
+      "name": "actual native person challenge retains its observed signed parameter shape",
+      "challenge": {
+        "keys": [
+          "algorithm",
+          "challenge",
+          "maxNumber",
+          "salt",
+          "signature"
+        ],
+        "algorithm": "SHA-256",
+        "maxnumber": 1000000,
+        "saltParameterNames": [
+          "code"
+        ],
+        "hasExpiryParameter": false
+      }
+    },
+    {
+      "name": "a person solution still requires the correct Login bearer and valid work"
+    },
+    {
+      "name": "a valid person solution returns exact raw code display and assigned Test claims without opening a Test"
+    },
+    {
+      "name": "person-solution replay and bearer rotation are observed separately",
+      "status": 200,
+      "rotatedPersonToken": true
+    },
+    {
+      "name": "person-solution binding to a different authorized Login is measured explicitly",
+      "status": 200,
+      "peerIdentity": "owned-native-pow-peer"
+    },
+    {
+      "name": "a signed person challenge cannot be used with modified salt parameters"
+    },
+    {
+      "name": "proof-based person entry and Login logout preserve the original first-factor capability"
+    },
+    {
+      "name": "native groups contain actual opened Tests, Unit state, answers, reviews and logs before deletion"
+    },
+    {
+      "name": "deleting an obsolete group snapshot preserves the Login, person and Test already rebound elsewhere"
+    },
+    {
+      "name": "read-only, anonymous and participant deletion is denied; an unknown group is a successful no-op"
+    },
+    {
+      "name": "case-equivalent whole-group deletion returns an empty HTTP200 and revokes every selected Login and person while preserving other groups and authored files"
+    },
+    {
+      "name": "new native authentication recreates fresh Login, group and person capabilities without reviving deleted Tests or old bearers"
+    },
+    {
+      "name": "native response requires an initialized Unit; state creates an owned alias independently of Booklet membership and records its first original ID and person suffix"
+    },
+    {
+      "name": "response parts retain independent client clocks and response types across partial writes, equal/stale rejection and the omitted-type default",
+      "parts": [
+        {
+          "id": "part-a",
+          "content": "  Exact part Ω/β\n\"; \\ kept  ",
+          "ts": 1792929600010,
+          "responseType": "first/Ω"
+        },
+        {
+          "id": "part-c",
+          "content": "new c",
+          "ts": 1792929600010,
+          "responseType": "third/γ"
+        },
+        {
+          "id": "part-default",
+          "content": "default type",
+          "ts": 1792929600040,
+          "responseType": "unknown"
+        },
+        {
+          "id": "part-z",
+          "content": "new z",
+          "ts": 1792929600020,
+          "responseType": "second/β"
+        }
+      ]
+    },
+    {
+      "name": "Unit field clocks and response clocks stay independent while the original Unit ID remains the first stored value",
+      "laststate": "{\"CUSTOM_Ω\": \"  Exact Ä/β\\n\\\";  \", \"RESPONSE_PROGRESS\": \"none\", \"PRESENTATION_PROGRESS\": \"complete\"}",
+      "originalUnitId": "FIRST.PERSISTED.ID"
+    },
+    {
+      "name": "real PHP review categories retain numeric first spelling, strict selected membership, empty tokens and distinct overflowing integer strings",
+      "categoryNames": [
+        "category_",
+        "category_1",
+        "category_02",
+        "category_10",
+        "category_9223372036854775807",
+        "category_9223372036854775808",
+        "category_9223372036854775809"
+      ]
+    },
+    {
+      "name": "enhanced report labels resolve the current physical Booklet alias and raw XML labels without rewriting stored Unit identity",
+      "bookletlabel": "  Current Booklet Ω\n  ",
+      "unitlabel": "  Alias current Ω  "
+    },
+    {
+      "name": "all four native report variants retain original JSON and CSV bytes; unknown groups return zero bytes in both formats",
+      "reports": [
+        {
+          "file": "unit-parts-responses.json",
+          "bytes": 725,
+          "sha256": "eee6651eb717499d7c8020a1224005e0d7bee770c22bc2a2b70d92445b9a0273",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-responses.csv",
+          "bytes": 768,
+          "sha256": "4cd713b969ca86fb9680fe25cd3013fbfded9b679233873d7f86331f46ba1df9",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-logs.json",
+          "bytes": 1542,
+          "sha256": "f5f140b330a5cd33ec34b3e87924d52dc189f60bb5d7cda733588d562c4a40f4",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-logs.csv",
+          "bytes": 1045,
+          "sha256": "cb21f0d3a73a3a8b7780fffe0334cc4d2ee9a6bf64603a181a91d1df4f3cec09",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-reviews-legacy.json",
+          "bytes": 2710,
+          "sha256": "26d431f6893c192ba61b63bc2ee051b9b08e0854944774b828e3665a74279f7e",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-reviews-legacy.csv",
+          "bytes": 1428,
+          "sha256": "7d8c66b1ec8ae252a318a1044acad2f163dd32bdc6c8cb0a7b1dff25c1c660ab",
+          "contentType": "text/csv;charset=UTF-8"
+        },
+        {
+          "file": "unit-parts-reviews-enhanced.json",
+          "bytes": 3310,
+          "sha256": "cb47d554aa5a2a0b17ab4ec92720545b320088f472dc9d7832d9439fab7883bc",
+          "contentType": "application/json"
+        },
+        {
+          "file": "unit-parts-reviews-enhanced.csv",
+          "bytes": 2041,
+          "sha256": "812c0144c027c9b11f02dd2d244c48cdaf69a5d66a574f257534a41e473f91ea",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native result downloads permit the owned read-only administrator and reject anonymous or participant capabilities"
+    },
+    {
+      "name": "native Test PUT accepts a real workspace Booklet outside current assignments, returns raw decimal201 and leaves it unopened",
+      "testId": 6,
+      "bookletName": "ORACLE.UNASSIGNED.BOOK",
+      "body": "6",
+      "contentType": "text/html; charset=UTF-8",
+      "loginDenied": 403,
+      "adminDenied": 403
+    },
+    {
+      "name": "native Test PUT reuses case-equivalent and whitespace-normalized names while canonicalizing duplicate preset keys in first-key order",
+      "testId": 6,
+      "presetId": 8,
+      "presetInput": "ORACLE.UNASSIGNED.BOOK#b:second;a:first;b:last",
+      "presetCanonical": "ORACLE.UNASSIGNED.BOOK#b:last;a:first"
+    },
+    {
+      "name": "native Test PUT retains the first raw physical Booklet label and rejects a locked unopened Test before opening",
+      "testId": 6,
+      "firstLabel": "  Unassigned first Ω\n  ",
+      "replacementLabel": "Replacement unassigned Ω",
+      "status": 423
+    },
+    {
+      "name": "native numeric Test GET enforces person ownership and opens an unassigned Test only once with current XML and canonical preset state",
+      "testId": 8,
+      "firstStart": true,
+      "secondStart": false,
+      "mode": "run-review",
+      "laststate": [],
+      "presetBookletStates": {
+        "b": "last",
+        "a": "first"
+      },
+      "xmlSha256": "d9d7a5fc60cad4d59e412a0fbccf15ecb5bea5e9fad6004b89d7996c1434844d"
+    },
+    {
+      "name": "native Test PUT resolves an already owned raw name before physical-file lookup but a normalization miss and new person require the current file",
+      "testId": 9,
+      "removedBooklet": "ORACLE.GONE.BOOK",
+      "retainedStatus": 201,
+      "whitespaceStatus": 404,
+      "newPersonStatus": 404
+    },
+    {
+      "name": "native Test GET resolves physical Unit resource relationships and group files preserve exact bytes and private cache headers",
+      "resources": {
+        "ORACLE.POW.UNIT": {
+          "usesPlayer": [
+            "Resource/player.html"
+          ]
+        }
+      },
+      "workspaceId": 1,
+      "resourceBytes": 431,
+      "resourceSha256": "102df5b4d604b698be7021df5825b720068d630fef6f1595111bf20220dd7ced",
+      "contentType": "text/html;charset=UTF-8",
+      "sourceHeader": "backend",
+      "cacheControl": "private"
+    },
+    {
+      "name": "native resource and Test reads enforce group-kind workspace containment and ownership before returning missing-test details",
+      "personAsGroup": 403,
+      "foreignWorkspace": 403,
+      "nonResource": 403,
+      "traversal": 404,
+      "nonpositiveTest": 400,
+      "unknownPositiveTest": 403
+    },
+    {
+      "name": "native Test state preserves scalar and array types but PHP-encodes object content; null required content is rejected without mutation",
+      "state": {
+        "ownedArray": [
+          1,
+          "Ω/x",
+          {
+            "inner": "nested/Ω"
+          }
+        ],
+        "ownedEmpty": "",
+        "ownedFalse": false,
+        "ownedChoice": "newest in batch",
+        "ownedNumber": 42,
+        "ownedObject": "{\"b\":\"\\u03a9\\/x\",\"a\":1}"
+      },
+      "nullStatus": 400,
+      "mode": "run-review",
+      "zeroOnlyState": []
+    },
+    {
+      "name": "native Test state clocks reset across batches while equal and zero entries keep within-batch first-writer semantics",
+      "firstBatch": "newest in batch",
+      "laterLowerClock": "older positive in later batch",
+      "equalBatch": "first equal in next batch",
+      "finalState": {
+        "ownedArray": [
+          1,
+          "Ω/x",
+          {
+            "inner": "nested/Ω"
+          }
+        ],
+        "ownedEmpty": "",
+        "ownedFalse": false,
+        "ownedChoice": "first equal in next batch",
+        "ownedNumber": 42,
+        "ownedObject": "{\"b\":\"\\u03a9\\/x\",\"a\":1}"
+      }
+    },
+    {
+      "name": "native Unit GET returns five fields from the current physical Unit without creating a saved Unit or opening its Test",
+      "empty": {
+        "state": {},
+        "dataParts": {},
+        "unitResponseType": "",
+        "definition": "Owned definition",
+        "definitionType": "owned-pow-player-6.0"
+      },
+      "contentType": "application/json",
+      "foreignDenied": 403,
+      "loginDenied": 403,
+      "missingPhysical": 404
+    },
+    {
+      "name": "native Unit state retains clocks across both body formats and keeps the first stored physical identity",
+      "state": {
+        "choice": "newest",
+        "second": "legacy array"
+      },
+      "firstOriginalUnitId": "FIRST.NATIVE.ID",
+      "bodyFormats": [
+        "newState object",
+        "legacy array"
+      ]
+    },
+    {
+      "name": "native Unit GET restores independent accepted data parts and Source final-row response type",
+      "dataParts": {
+        "a": "Exact Ω/x",
+        "z": "new z",
+        "c": "new c",
+        "zero": "zero first insert"
+      },
+      "unitResponseType": "unknown",
+      "state": {
+        "choice": "newest",
+        "second": "legacy array"
+      }
+    },
+    {
+      "name": "native Unit reads and writes stay independent of Test lock while a PHP-falsy zero alias falls back to the physical Unit name",
+      "lockedGet": 200,
+      "lockedState": 200,
+      "lockedResponse": 201,
+      "zeroAliasState": {}
+    },
+    {
+      "name": "native Testlog authorizes person ownership before body parsing and accepts canonical leading-zero Test identities",
+      "missing": 401,
+      "login": 403,
+      "admin": 403,
+      "foreign": 403,
+      "foreignMalformed": 403,
+      "zero": 400,
+      "unknown": 403,
+      "leadingZeros": 201
+    },
+    {
+      "name": "native Testlog defaults missing and null content to empty JSON strings without opening or changing its Test",
+      "status": 201,
+      "bodyBytes": 0,
+      "contentType": "text/html; charset=UTF-8",
+      "entries": [
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 0,
+          "logentry": "missing : \"\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1,
+          "logentry": "null : \"\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 2,
+          "logentry": "empty : \"\""
+        }
+      ],
+      "firstStart": true,
+      "laststate": []
+    },
+    {
+      "name": "native Testlog preserves typed PHP JSON bytes including numeric-zero falsiness and independent client timestamps",
+      "input": [
+        {
+          "key": "typed-0",
+          "content": "Exact Ω/β\n\"; 😀",
+          "timeStamp": 10
+        },
+        {
+          "key": "typed-1",
+          "content": 0,
+          "timeStamp": 11
+        },
+        {
+          "key": "typed-2",
+          "content": 42,
+          "timeStamp": 12
+        },
+        {
+          "key": "typed-3",
+          "content": 1.5,
+          "timeStamp": 13
+        },
+        {
+          "key": "typed-4",
+          "content": false,
+          "timeStamp": 14
+        },
+        {
+          "key": "typed-5",
+          "content": true,
+          "timeStamp": 15
+        },
+        {
+          "key": "typed-6",
+          "content": [
+            1,
+            "Ω/x",
+            {
+              "nested": "ä/y"
+            }
+          ],
+          "timeStamp": 16
+        },
+        {
+          "key": "typed-7",
+          "content": {
+            "b": "Ω/x",
+            "a": 1
+          },
+          "timeStamp": 17
+        }
+      ],
+      "entries": [
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 10,
+          "logentry": "typed-0 : \"Exact \\u03a9\\/\\u03b2\\n\\\"; \\ud83d\\ude00\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 11,
+          "logentry": "typed-1"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 12,
+          "logentry": "typed-2 : 42"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 13,
+          "logentry": "typed-3 : 1.5"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 14,
+          "logentry": "typed-4 : false"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 15,
+          "logentry": "typed-5 : true"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 16,
+          "logentry": "typed-6 : [1,\"\\u03a9\\/x\",{\"nested\":\"\\u00e4\\/y\"}]"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 17,
+          "logentry": "typed-7 : {\"b\":\"\\u03a9\\/x\",\"a\":1}"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog validates every batch row before inserting and records the actual malformed-JSON server-error boundary",
+      "missingFields": 400,
+      "nonArray": 400,
+      "malformedJson": 500,
+      "wrongMethod": 405,
+      "batchRowsAfterRejection": 11
+    },
+    {
+      "name": "native Testlog appends repeated packets twice while an empty batch leaves both logs and Test timestamps unchanged",
+      "duplicateEntries": [
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 99,
+          "logentry": "duplicate : \"same packet \\u03a9\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG",
+          "loginname": "owned-native-testlog",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#log:append",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 99,
+          "logentry": "duplicate : \"same packet \\u03a9\""
+        }
+      ],
+      "emptyStatus": 201,
+      "rows": 13
+    },
+    {
+      "name": "native Testlog append remains authorized independently of Test lock and does not advance the locked Test",
+      "status": 201
+    },
+    {
+      "name": "actual protected native Testlog reports retain complete JSON and CSV bytes with typed defaults duplicate packets and lock-independent appends",
+      "files": [
+        {
+          "file": "testlog-append.json",
+          "bytes": 3200,
+          "sha256": "dd6577dc5944737a7c82a26e1a8f401ec40a99a394320f6752104bbda58815b4",
+          "contentType": "application/json"
+        },
+        {
+          "file": "testlog-append.csv",
+          "bytes": 1838,
+          "sha256": "423093c56e5a362605c5474bacadea205bd6aa1cb0ad040e2fb83dc38f9efe93",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production codec records escaped NUL and line-separator content without opening or modifying a Test",
+      "input": [
+        {
+          "key": "NUL string",
+          "content": "a\u0000b",
+          "timeStamp": 1792929601100
+        },
+        {
+          "key": "NUL object",
+          "content": {
+            "zero\u0000key": "a\u0000b",
+            "empty": []
+          },
+          "timeStamp": 1792929601101
+        },
+        {
+          "key": "line separators",
+          "content": "left middle right",
+          "timeStamp": 1792929601102
+        }
+      ],
+      "entries": [
+        {
+          "groupname": "ORACLE.TESTLOG.CODEC",
+          "loginname": "owned-native-testlog-codec",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#codec:raw",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1792929601100,
+          "logentry": "NUL string : \"a\\u0000b\""
+        },
+        {
+          "groupname": "ORACLE.TESTLOG.CODEC",
+          "loginname": "owned-native-testlog-codec",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#codec:raw",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1792929601101,
+          "logentry": "NUL object : {\"zero\\u0000key\":\"a\\u0000b\",\"empty\":[]}"
+        },
+        {
+          "groupname": "ORACLE.TESTLOG.CODEC",
+          "loginname": "owned-native-testlog-codec",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#codec:raw",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1792929601102,
+          "logentry": "line separators : \"left\\u2028middle\\u2029right\""
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production codec records strict scalar-field and raw float-token error boundaries with no appended rows",
+      "cases": [
+        {
+          "label": "numeric key",
+          "input": [
+            {
+              "key": 7,
+              "content": "owned",
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":7,\"content\":\"owned\",\"timeStamp\":100}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "boolean key",
+          "input": [
+            {
+              "key": true,
+              "content": "owned",
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":true,\"content\":\"owned\",\"timeStamp\":100}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "array key",
+          "input": [
+            {
+              "key": [],
+              "content": "owned",
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":[],\"content\":\"owned\",\"timeStamp\":100}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "object key",
+          "input": [
+            {
+              "key": {},
+              "content": "owned",
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":{},\"content\":\"owned\",\"timeStamp\":100}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "string timestamp",
+          "input": [
+            {
+              "key": "owned invalid stamp",
+              "timeStamp": "100"
+            }
+          ],
+          "literal": "[{\"key\":\"owned invalid stamp\",\"timeStamp\":\"100\"}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "boolean timestamp",
+          "input": [
+            {
+              "key": "owned invalid stamp",
+              "timeStamp": true
+            }
+          ],
+          "literal": "[{\"key\":\"owned invalid stamp\",\"timeStamp\":true}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "float-token timestamp",
+          "input": [
+            {
+              "key": "owned float stamp",
+              "timeStamp": 1
+            }
+          ],
+          "literal": "[{\"key\":\"owned float stamp\",\"timeStamp\":1.0}]",
+          "status": 500,
+          "value": "Internal error.",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "null timestamp",
+          "input": [
+            {
+              "key": "owned null stamp",
+              "timeStamp": null
+            }
+          ],
+          "literal": "[{\"key\":\"owned null stamp\",\"timeStamp\":null}]",
+          "status": 400,
+          "value": "Required body-parameter is missing: `timeStamp`",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "null key",
+          "input": [
+            {
+              "key": null,
+              "timeStamp": 100
+            }
+          ],
+          "literal": "[{\"key\":null,\"timeStamp\":100}]",
+          "status": 400,
+          "value": "Required body-parameter is missing: `key`",
+          "contentType": "text/html;charset=UTF-8"
+        },
+        {
+          "label": "scalar row",
+          "input": [
+            42
+          ],
+          "literal": "[42]",
+          "status": 400,
+          "value": "Required body-parameter is missing: `key`",
+          "contentType": "text/html;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production codec records raw negative-zero exponent and int64 JSON number representations with complete report bytes",
+      "numbers": [
+        {
+          "literal": "0",
+          "entry": "raw-number-0"
+        },
+        {
+          "literal": "-0.0",
+          "entry": "raw-number-1 : -0"
+        },
+        {
+          "literal": "1.0",
+          "entry": "raw-number-2 : 1"
+        },
+        {
+          "literal": "1e-7",
+          "entry": "raw-number-3 : 1.0e-7"
+        },
+        {
+          "literal": "1e-5",
+          "entry": "raw-number-4 : 1.0e-5"
+        },
+        {
+          "literal": "1e17",
+          "entry": "raw-number-5 : 1.0e+17"
+        },
+        {
+          "literal": "1e20",
+          "entry": "raw-number-6 : 1.0e+20"
+        },
+        {
+          "literal": "100000000000000000",
+          "entry": "raw-number-7 : 100000000000000000"
+        },
+        {
+          "literal": "9007199254740993",
+          "entry": "raw-number-8 : 9007199254740993"
+        },
+        {
+          "literal": "9223372036854775807",
+          "entry": "raw-number-9 : 9223372036854775807"
+        },
+        {
+          "literal": "9223372036854775808",
+          "entry": "raw-number-10 : 9.223372036854776e+18"
+        }
+      ],
+      "files": [
+        {
+          "file": "testlog-codec.json",
+          "bytes": 3344,
+          "sha256": "ae0ecfb2bdd1e3d19b73b0b900683a0897d1bbcf3988e5299cce0d3d7b1ab7c5",
+          "contentType": "application/json"
+        },
+        {
+          "file": "testlog-codec.csv",
+          "bytes": 2092,
+          "sha256": "e2eda4e6be6c3c5ce2202b560cc8f5cdb4c65f9d1209521754c60856a0b7f7cd",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production boundaries retain raw int64 timestamps object ordering NUL keys and exact decoder depth outcomes",
+      "boundaries": [
+        {
+          "label": "embedded NUL log key",
+          "literal": "[{\"key\":\"owned\\u0000suffix\",\"content\":\"tail content\",\"timeStamp\":1792929601300}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "owned"
+            }
+          ]
+        },
+        {
+          "label": "numeric object property order",
+          "literal": "[{\"key\":\"object order\",\"content\":{\"2\":\"second\",\"1\":\"first\",\"02\":\"zero\"},\"timeStamp\":1792929601301}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "object order : {\"2\":\"second\",\"1\":\"first\",\"02\":\"zero\"}"
+            }
+          ]
+        },
+        {
+          "label": "duplicate object property order",
+          "literal": "[{\"key\":\"duplicate order\",\"content\":{\"b\":1,\"a\":2,\"b\":3},\"timeStamp\":1792929601302}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "duplicate order : {\"b\":3,\"a\":2}"
+            }
+          ]
+        },
+        {
+          "label": "invalid leading NUL object property",
+          "literal": "[{\"key\":\"nul property\",\"content\":{\"\\u0000invalid\":1},\"timeStamp\":1792929601303}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        },
+        {
+          "label": "non-finite decoded content",
+          "literal": "[{\"key\":\"overflow content\",\"content\":1e400,\"timeStamp\":1792929601304}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        },
+        {
+          "label": "exact client timestamp 9007199254740991",
+          "literal": "[{\"key\":\"wide timestamp 0\",\"content\":\"exact\",\"timeStamp\":9007199254740991}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "wide timestamp 0 : \"exact\""
+            }
+          ]
+        },
+        {
+          "label": "exact client timestamp 9007199254740993",
+          "literal": "[{\"key\":\"wide timestamp 1\",\"content\":\"exact\",\"timeStamp\":9007199254740993}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "wide timestamp 1 : \"exact\""
+            }
+          ]
+        },
+        {
+          "label": "exact client timestamp 9223372036854775807",
+          "literal": "[{\"key\":\"wide timestamp 2\",\"content\":\"exact\",\"timeStamp\":9223372036854775807}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "wide timestamp 2 : \"exact\""
+            }
+          ]
+        },
+        {
+          "label": "exact client timestamp -9223372036854775808",
+          "literal": "[{\"key\":\"wide timestamp 3\",\"content\":\"exact\",\"timeStamp\":-9223372036854775808}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "wide timestamp 3 : \"exact\""
+            }
+          ]
+        },
+        {
+          "label": "nested content depth 508",
+          "literal": "[{\"key\":\"depth 508\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "depth 508 : [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+            }
+          ]
+        },
+        {
+          "label": "nested content depth 509",
+          "literal": "[{\"key\":\"depth 509\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 201,
+          "addedRows": 1,
+          "entries": [
+            {
+              "logentry": "depth 509 : [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+            }
+          ]
+        },
+        {
+          "label": "nested content depth 510",
+          "literal": "[{\"key\":\"depth 510\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        },
+        {
+          "label": "nested content depth 511",
+          "literal": "[{\"key\":\"depth 511\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        },
+        {
+          "label": "nested content depth 512",
+          "literal": "[{\"key\":\"depth 512\",\"content\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],\"timeStamp\":1792929601400}]",
+          "status": 500,
+          "addedRows": 0,
+          "entries": []
+        }
+      ],
+      "files": [
+        {
+          "file": "testlog-codec-boundaries.json",
+          "bytes": 7530,
+          "sha256": "a7076a0efa94b89816a8b74f721c8a97c47a2c0bef00615b46063888ea40f461",
+          "contentType": "application/json"
+        },
+        {
+          "file": "testlog-codec-boundaries.csv",
+          "bytes": 5414,
+          "sha256": "e15f52f1921d2016e4170df0cce880fc6b31094899f5fe9bd3d83f397198e5d8",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native Testlog production PHP floating-point corpus preserves boundary subnormal signed-zero and deterministic IEEE754 encodings",
+      "values": [
+        {
+          "literal": "0e+0",
+          "entry": "float-corpus-0"
+        },
+        {
+          "literal": "-0e0",
+          "entry": "float-corpus-1 : -0"
+        },
+        {
+          "literal": "1e-4",
+          "entry": "float-corpus-2 : 0.0001"
+        },
+        {
+          "literal": "1e-5",
+          "entry": "float-corpus-3 : 1.0e-5"
+        },
+        {
+          "literal": "1e-6",
+          "entry": "float-corpus-4 : 1.0e-6"
+        },
+        {
+          "literal": "1e+16",
+          "entry": "float-corpus-5 : 10000000000000000"
+        },
+        {
+          "literal": "1e+17",
+          "entry": "float-corpus-6 : 1.0e+17"
+        },
+        {
+          "literal": "1e+20",
+          "entry": "float-corpus-7 : 1.0e+20"
+        },
+        {
+          "literal": "5e-324",
+          "entry": "float-corpus-8 : 5.0e-324"
+        },
+        {
+          "literal": "-5e-324",
+          "entry": "float-corpus-9 : -5.0e-324"
+        },
+        {
+          "literal": "1.7976931348623157e+308",
+          "entry": "float-corpus-10 : 1.7976931348623157e+308"
+        },
+        {
+          "literal": "-1.7976931348623157e+308",
+          "entry": "float-corpus-11 : -1.7976931348623157e+308"
+        },
+        {
+          "literal": "1e-1",
+          "entry": "float-corpus-12 : 0.1"
+        },
+        {
+          "literal": "3e-1",
+          "entry": "float-corpus-13 : 0.3"
+        },
+        {
+          "literal": "1.2345678901234567e+0",
+          "entry": "float-corpus-14 : 1.2345678901234567"
+        },
+        {
+          "literal": "2.2250738585072014e-308",
+          "entry": "float-corpus-15 : 2.2250738585072014e-308"
+        },
+        {
+          "literal": "2.225073858507201e-308",
+          "entry": "float-corpus-16 : 2.225073858507201e-308"
+        },
+        {
+          "literal": "-2.0012424078128821e+31",
+          "entry": "float-corpus-17 : -2.0012424078128821e+31"
+        },
+        {
+          "literal": "-1.2059816475332327e+3",
+          "entry": "float-corpus-18 : -1205.9816475332327"
+        },
+        {
+          "literal": "5.632903577603307e+29",
+          "entry": "float-corpus-19 : 5.632903577603307e+29"
+        },
+        {
+          "literal": "7.441469240764355e+81",
+          "entry": "float-corpus-20 : 7.441469240764355e+81"
+        },
+        {
+          "literal": "1.1296869654152169e-269",
+          "entry": "float-corpus-21 : 1.1296869654152169e-269"
+        },
+        {
+          "literal": "2.5678856392205046e-14",
+          "entry": "float-corpus-22 : 2.5678856392205046e-14"
+        },
+        {
+          "literal": "-1.7715815635136142e+68",
+          "entry": "float-corpus-23 : -1.7715815635136142e+68"
+        },
+        {
+          "literal": "1.0448473330900832e-199",
+          "entry": "float-corpus-24 : 1.0448473330900832e-199"
+        },
+        {
+          "literal": "-1.946435390390045e-177",
+          "entry": "float-corpus-25 : -1.946435390390045e-177"
+        },
+        {
+          "literal": "2.3699263485624314e-70",
+          "entry": "float-corpus-26 : 2.3699263485624314e-70"
+        },
+        {
+          "literal": "-1.7312715769299565e-190",
+          "entry": "float-corpus-27 : -1.7312715769299565e-190"
+        },
+        {
+          "literal": "-3.928381316055645e+60",
+          "entry": "float-corpus-28 : -3.928381316055645e+60"
+        },
+        {
+          "literal": "-8.244354584062311e+158",
+          "entry": "float-corpus-29 : -8.244354584062311e+158"
+        },
+        {
+          "literal": "-2.432085434121374e+298",
+          "entry": "float-corpus-30 : -2.432085434121374e+298"
+        },
+        {
+          "literal": "2.6883764285795014e-211",
+          "entry": "float-corpus-31 : 2.6883764285795014e-211"
+        },
+        {
+          "literal": "3.825708669977775e-10",
+          "entry": "float-corpus-32 : 3.825708669977775e-10"
+        },
+        {
+          "literal": "5.605318965384788e+148",
+          "entry": "float-corpus-33 : 5.605318965384788e+148"
+        },
+        {
+          "literal": "-5.63748902737612e+121",
+          "entry": "float-corpus-34 : -5.63748902737612e+121"
+        },
+        {
+          "literal": "-2.2679270401785645e-93",
+          "entry": "float-corpus-35 : -2.2679270401785645e-93"
+        },
+        {
+          "literal": "4.187226914471687e-191",
+          "entry": "float-corpus-36 : 4.187226914471687e-191"
+        },
+        {
+          "literal": "1.0259012859946678e-270",
+          "entry": "float-corpus-37 : 1.0259012859946678e-270"
+        },
+        {
+          "literal": "9.398186957610748e+20",
+          "entry": "float-corpus-38 : 9.398186957610748e+20"
+        },
+        {
+          "literal": "3.87397968834924e-285",
+          "entry": "float-corpus-39 : 3.87397968834924e-285"
+        },
+        {
+          "literal": "-1.780410171854547e-44",
+          "entry": "float-corpus-40 : -1.780410171854547e-44"
+        },
+        {
+          "literal": "-1.96870835901736e-21",
+          "entry": "float-corpus-41 : -1.96870835901736e-21"
+        },
+        {
+          "literal": "-6.923684725882752e-29",
+          "entry": "float-corpus-42 : -6.923684725882752e-29"
+        },
+        {
+          "literal": "4.193803211349294e+15",
+          "entry": "float-corpus-43 : 4193803211349294"
+        },
+        {
+          "literal": "1.2721426797609919e+234",
+          "entry": "float-corpus-44 : 1.2721426797609919e+234"
+        },
+        {
+          "literal": "-1.4971806508740852e-134",
+          "entry": "float-corpus-45 : -1.4971806508740852e-134"
+        },
+        {
+          "literal": "-1.225057822458929e-19",
+          "entry": "float-corpus-46 : -1.225057822458929e-19"
+        },
+        {
+          "literal": "1.7670475112399908e-75",
+          "entry": "float-corpus-47 : 1.7670475112399908e-75"
+        },
+        {
+          "literal": "1.602147878511269e+170",
+          "entry": "float-corpus-48 : 1.602147878511269e+170"
+        },
+        {
+          "literal": "-2.9537634440884337e+276",
+          "entry": "float-corpus-49 : -2.9537634440884337e+276"
+        },
+        {
+          "literal": "4.8826797158213885e-62",
+          "entry": "float-corpus-50 : 4.8826797158213885e-62"
+        },
+        {
+          "literal": "2.905881734707932e+19",
+          "entry": "float-corpus-51 : 2.905881734707932e+19"
+        },
+        {
+          "literal": "-5.830808322687726e+298",
+          "entry": "float-corpus-52 : -5.830808322687726e+298"
+        },
+        {
+          "literal": "-9.987734453899854e+286",
+          "entry": "float-corpus-53 : -9.987734453899854e+286"
+        },
+        {
+          "literal": "-2.5090554252521386e+160",
+          "entry": "float-corpus-54 : -2.5090554252521386e+160"
+        },
+        {
+          "literal": "-1.0403045527192443e-222",
+          "entry": "float-corpus-55 : -1.0403045527192443e-222"
+        },
+        {
+          "literal": "-3.496602789736025e-235",
+          "entry": "float-corpus-56 : -3.496602789736025e-235"
+        },
+        {
+          "literal": "3.472495200701484e+65",
+          "entry": "float-corpus-57 : 3.472495200701484e+65"
+        },
+        {
+          "literal": "6.776353360693974e+256",
+          "entry": "float-corpus-58 : 6.776353360693974e+256"
+        },
+        {
+          "literal": "1.924963258213851e-192",
+          "entry": "float-corpus-59 : 1.924963258213851e-192"
+        },
+        {
+          "literal": "-2.0771557468984196e+79",
+          "entry": "float-corpus-60 : -2.0771557468984196e+79"
+        },
+        {
+          "literal": "1.0130895964365964e+81",
+          "entry": "float-corpus-61 : 1.0130895964365964e+81"
+        },
+        {
+          "literal": "1.0818280160955321e+206",
+          "entry": "float-corpus-62 : 1.0818280160955321e+206"
+        },
+        {
+          "literal": "-7.560787939347412e+242",
+          "entry": "float-corpus-63 : -7.560787939347412e+242"
+        },
+        {
+          "literal": "-1.0362282312718303e-26",
+          "entry": "float-corpus-64 : -1.0362282312718303e-26"
+        },
+        {
+          "literal": "-2.7349833971708965e+250",
+          "entry": "float-corpus-65 : -2.7349833971708965e+250"
+        },
+        {
+          "literal": "-2.786016880510223e+55",
+          "entry": "float-corpus-66 : -2.786016880510223e+55"
+        },
+        {
+          "literal": "-2.2763576053536363e+268",
+          "entry": "float-corpus-67 : -2.2763576053536363e+268"
+        },
+        {
+          "literal": "-2.6760255839781517e-85",
+          "entry": "float-corpus-68 : -2.6760255839781517e-85"
+        },
+        {
+          "literal": "-2.5418949496646892e+35",
+          "entry": "float-corpus-69 : -2.5418949496646892e+35"
+        },
+        {
+          "literal": "-1.1362548008403062e+231",
+          "entry": "float-corpus-70 : -1.1362548008403062e+231"
+        },
+        {
+          "literal": "-2.5240371168067123e+78",
+          "entry": "float-corpus-71 : -2.5240371168067123e+78"
+        },
+        {
+          "literal": "-7.766844445077404e+149",
+          "entry": "float-corpus-72 : -7.766844445077404e+149"
+        },
+        {
+          "literal": "-4.599840607762396e+55",
+          "entry": "float-corpus-73 : -4.599840607762396e+55"
+        },
+        {
+          "literal": "-1.2067591910211631e+14",
+          "entry": "float-corpus-74 : -120675919102116.31"
+        },
+        {
+          "literal": "-2.6642930067270788e-79",
+          "entry": "float-corpus-75 : -2.6642930067270788e-79"
+        },
+        {
+          "literal": "-8.251954933139811e+49",
+          "entry": "float-corpus-76 : -8.251954933139811e+49"
+        },
+        {
+          "literal": "-6.374525312162607e-202",
+          "entry": "float-corpus-77 : -6.374525312162607e-202"
+        },
+        {
+          "literal": "9.512407002718432e+148",
+          "entry": "float-corpus-78 : 9.512407002718432e+148"
+        },
+        {
+          "literal": "2.78070163474701e-184",
+          "entry": "float-corpus-79 : 2.78070163474701e-184"
+        },
+        {
+          "literal": "1.4302487353508395e+267",
+          "entry": "float-corpus-80 : 1.4302487353508395e+267"
+        },
+        {
+          "literal": "-3.84812114291495e+297",
+          "entry": "float-corpus-81 : -3.84812114291495e+297"
+        },
+        {
+          "literal": "2.116981155917785e-28",
+          "entry": "float-corpus-82 : 2.116981155917785e-28"
+        },
+        {
+          "literal": "5.602119226121126e-300",
+          "entry": "float-corpus-83 : 5.602119226121126e-300"
+        },
+        {
+          "literal": "-4.3308395466750483e+74",
+          "entry": "float-corpus-84 : -4.3308395466750483e+74"
+        },
+        {
+          "literal": "-2.9600911203125983e-62",
+          "entry": "float-corpus-85 : -2.9600911203125983e-62"
+        },
+        {
+          "literal": "1.638421840564143e+151",
+          "entry": "float-corpus-86 : 1.638421840564143e+151"
+        },
+        {
+          "literal": "-1.39438798587921e-64",
+          "entry": "float-corpus-87 : -1.39438798587921e-64"
+        },
+        {
+          "literal": "-6.633498553066613e-142",
+          "entry": "float-corpus-88 : -6.633498553066613e-142"
+        },
+        {
+          "literal": "-1.1757503107569756e+150",
+          "entry": "float-corpus-89 : -1.1757503107569756e+150"
+        },
+        {
+          "literal": "-7.782234905711692e-203",
+          "entry": "float-corpus-90 : -7.782234905711692e-203"
+        },
+        {
+          "literal": "-6.602693604665408e-109",
+          "entry": "float-corpus-91 : -6.602693604665408e-109"
+        },
+        {
+          "literal": "-3.243847559937438e-46",
+          "entry": "float-corpus-92 : -3.243847559937438e-46"
+        },
+        {
+          "literal": "-1.2681941151511625e+192",
+          "entry": "float-corpus-93 : -1.2681941151511625e+192"
+        },
+        {
+          "literal": "7.607771741193338e-243",
+          "entry": "float-corpus-94 : 7.607771741193338e-243"
+        },
+        {
+          "literal": "2.427235497866031e+299",
+          "entry": "float-corpus-95 : 2.427235497866031e+299"
+        },
+        {
+          "literal": "-1.663073016449186e+261",
+          "entry": "float-corpus-96 : -1.663073016449186e+261"
+        },
+        {
+          "literal": "4.409844963634455e-182",
+          "entry": "float-corpus-97 : 4.409844963634455e-182"
+        },
+        {
+          "literal": "-1.1528690990053701e-185",
+          "entry": "float-corpus-98 : -1.1528690990053701e-185"
+        },
+        {
+          "literal": "1.6240582270569699e-267",
+          "entry": "float-corpus-99 : 1.6240582270569699e-267"
+        },
+        {
+          "literal": "3.5342515807870715e-68",
+          "entry": "float-corpus-100 : 3.5342515807870715e-68"
+        },
+        {
+          "literal": "-2.2774104755898064e-137",
+          "entry": "float-corpus-101 : -2.2774104755898064e-137"
+        },
+        {
+          "literal": "-2.5474529294661963e+72",
+          "entry": "float-corpus-102 : -2.5474529294661963e+72"
+        },
+        {
+          "literal": "1.0563555338790345e+153",
+          "entry": "float-corpus-103 : 1.0563555338790345e+153"
+        },
+        {
+          "literal": "-1.0913728748294438e+105",
+          "entry": "float-corpus-104 : -1.0913728748294438e+105"
+        },
+        {
+          "literal": "-3.185574418050127e+247",
+          "entry": "float-corpus-105 : -3.185574418050127e+247"
+        },
+        {
+          "literal": "6.892446975829339e+28",
+          "entry": "float-corpus-106 : 6.892446975829339e+28"
+        },
+        {
+          "literal": "2.7821190688070374e+36",
+          "entry": "float-corpus-107 : 2.7821190688070374e+36"
+        },
+        {
+          "literal": "3.149897868536659e-43",
+          "entry": "float-corpus-108 : 3.149897868536659e-43"
+        },
+        {
+          "literal": "2.516986671196675e+282",
+          "entry": "float-corpus-109 : 2.516986671196675e+282"
+        },
+        {
+          "literal": "-4.5032007838651804e+123",
+          "entry": "float-corpus-110 : -4.5032007838651804e+123"
+        },
+        {
+          "literal": "-9.91350163351462e+100",
+          "entry": "float-corpus-111 : -9.91350163351462e+100"
+        },
+        {
+          "literal": "-8.93111497731929e-49",
+          "entry": "float-corpus-112 : -8.93111497731929e-49"
+        },
+        {
+          "literal": "2.2308380833609816e+62",
+          "entry": "float-corpus-113 : 2.2308380833609816e+62"
+        },
+        {
+          "literal": "1.4086348213402274e+213",
+          "entry": "float-corpus-114 : 1.4086348213402274e+213"
+        },
+        {
+          "literal": "-3.0376845676981126e+291",
+          "entry": "float-corpus-115 : -3.0376845676981126e+291"
+        },
+        {
+          "literal": "1.128950684184697e-234",
+          "entry": "float-corpus-116 : 1.128950684184697e-234"
+        },
+        {
+          "literal": "4.373625801082457e+21",
+          "entry": "float-corpus-117 : 4.373625801082457e+21"
+        },
+        {
+          "literal": "2.5765652038936862e+25",
+          "entry": "float-corpus-118 : 2.5765652038936862e+25"
+        },
+        {
+          "literal": "5.216422647868899e-112",
+          "entry": "float-corpus-119 : 5.216422647868899e-112"
+        },
+        {
+          "literal": "1.3362894836380752e+73",
+          "entry": "float-corpus-120 : 1.3362894836380752e+73"
+        },
+        {
+          "literal": "1.6122878291590045e-189",
+          "entry": "float-corpus-121 : 1.6122878291590045e-189"
+        },
+        {
+          "literal": "-1.3156075262695502e-260",
+          "entry": "float-corpus-122 : -1.3156075262695502e-260"
+        },
+        {
+          "literal": "-2.5484678065160433e+196",
+          "entry": "float-corpus-123 : -2.5484678065160433e+196"
+        },
+        {
+          "literal": "-1.8724865922080095e-222",
+          "entry": "float-corpus-124 : -1.8724865922080095e-222"
+        },
+        {
+          "literal": "-4.401047943184785e-199",
+          "entry": "float-corpus-125 : -4.401047943184785e-199"
+        },
+        {
+          "literal": "-9.920238941127974e-79",
+          "entry": "float-corpus-126 : -9.920238941127974e-79"
+        },
+        {
+          "literal": "3.2386662515127687e-109",
+          "entry": "float-corpus-127 : 3.2386662515127687e-109"
+        },
+        {
+          "literal": "2.5710635999538448e+269",
+          "entry": "float-corpus-128 : 2.5710635999538448e+269"
+        },
+        {
+          "literal": "-1.2164969300840928e+115",
+          "entry": "float-corpus-129 : -1.2164969300840928e+115"
+        },
+        {
+          "literal": "-9.154824554892773e+22",
+          "entry": "float-corpus-130 : -9.154824554892773e+22"
+        },
+        {
+          "literal": "4.433917215144809e+134",
+          "entry": "float-corpus-131 : 4.433917215144809e+134"
+        },
+        {
+          "literal": "-2.4319428244974804e-64",
+          "entry": "float-corpus-132 : -2.4319428244974804e-64"
+        },
+        {
+          "literal": "-6.220935187230028e-130",
+          "entry": "float-corpus-133 : -6.220935187230028e-130"
+        },
+        {
+          "literal": "3.97470716062862e+242",
+          "entry": "float-corpus-134 : 3.97470716062862e+242"
+        },
+        {
+          "literal": "-5.151695874548174e-296",
+          "entry": "float-corpus-135 : -5.151695874548174e-296"
+        },
+        {
+          "literal": "-9.458119141673635e+60",
+          "entry": "float-corpus-136 : -9.458119141673635e+60"
+        },
+        {
+          "literal": "1.3970118003780087e-191",
+          "entry": "float-corpus-137 : 1.3970118003780087e-191"
+        },
+        {
+          "literal": "2.178252693727653e-2",
+          "entry": "float-corpus-138 : 0.02178252693727653"
+        },
+        {
+          "literal": "1.2256320680375024e-37",
+          "entry": "float-corpus-139 : 1.2256320680375024e-37"
+        },
+        {
+          "literal": "4.831327344590595e+131",
+          "entry": "float-corpus-140 : 4.831327344590595e+131"
+        },
+        {
+          "literal": "-2.0679110822296795e+238",
+          "entry": "float-corpus-141 : -2.0679110822296795e+238"
+        },
+        {
+          "literal": "8.573204545721145e-250",
+          "entry": "float-corpus-142 : 8.573204545721145e-250"
+        },
+        {
+          "literal": "-5.507045574631605e-136",
+          "entry": "float-corpus-143 : -5.507045574631605e-136"
+        },
+        {
+          "literal": "-3.163818049361329e-258",
+          "entry": "float-corpus-144 : -3.163818049361329e-258"
+        },
+        {
+          "literal": "7.77342925521946e-166",
+          "entry": "float-corpus-145 : 7.77342925521946e-166"
+        },
+        {
+          "literal": "3.0419848647313713e+109",
+          "entry": "float-corpus-146 : 3.0419848647313713e+109"
+        },
+        {
+          "literal": "-1.7200730674031865e-270",
+          "entry": "float-corpus-147 : -1.7200730674031865e-270"
+        },
+        {
+          "literal": "-1.096021073909835e-153",
+          "entry": "float-corpus-148 : -1.096021073909835e-153"
+        },
+        {
+          "literal": "-2.050138430418497e-295",
+          "entry": "float-corpus-149 : -2.050138430418497e-295"
+        },
+        {
+          "literal": "3.368512038098633e+55",
+          "entry": "float-corpus-150 : 3.368512038098633e+55"
+        },
+        {
+          "literal": "4.0096388467006383e-228",
+          "entry": "float-corpus-151 : 4.0096388467006383e-228"
+        },
+        {
+          "literal": "-8.683582091942051e-72",
+          "entry": "float-corpus-152 : -8.683582091942051e-72"
+        },
+        {
+          "literal": "6.638021668650921e-273",
+          "entry": "float-corpus-153 : 6.638021668650921e-273"
+        },
+        {
+          "literal": "-7.052130059246051e+68",
+          "entry": "float-corpus-154 : -7.052130059246051e+68"
+        },
+        {
+          "literal": "6.859527990571509e+82",
+          "entry": "float-corpus-155 : 6.859527990571509e+82"
+        },
+        {
+          "literal": "-1.1396626539902575e+257",
+          "entry": "float-corpus-156 : -1.1396626539902575e+257"
+        },
+        {
+          "literal": "3.5934887171634717e-54",
+          "entry": "float-corpus-157 : 3.5934887171634717e-54"
+        },
+        {
+          "literal": "-1.1490880925436591e+24",
+          "entry": "float-corpus-158 : -1.1490880925436591e+24"
+        },
+        {
+          "literal": "4.7929009224659225e+75",
+          "entry": "float-corpus-159 : 4.7929009224659225e+75"
+        },
+        {
+          "literal": "-3.5549844166540894e-127",
+          "entry": "float-corpus-160 : -3.5549844166540894e-127"
+        },
+        {
+          "literal": "3.796169754569722e-189",
+          "entry": "float-corpus-161 : 3.796169754569722e-189"
+        },
+        {
+          "literal": "1.12753221398741e-212",
+          "entry": "float-corpus-162 : 1.12753221398741e-212"
+        },
+        {
+          "literal": "4.352292807661921e-185",
+          "entry": "float-corpus-163 : 4.352292807661921e-185"
+        },
+        {
+          "literal": "2.6047854136602326e-21",
+          "entry": "float-corpus-164 : 2.6047854136602326e-21"
+        },
+        {
+          "literal": "1.6806067723595815e+286",
+          "entry": "float-corpus-165 : 1.6806067723595815e+286"
+        },
+        {
+          "literal": "1.803337808763201e-106",
+          "entry": "float-corpus-166 : 1.803337808763201e-106"
+        },
+        {
+          "literal": "5.0334774743001655e+126",
+          "entry": "float-corpus-167 : 5.0334774743001655e+126"
+        },
+        {
+          "literal": "6.396203562597267e-31",
+          "entry": "float-corpus-168 : 6.396203562597267e-31"
+        },
+        {
+          "literal": "-4.601760916988749e+192",
+          "entry": "float-corpus-169 : -4.601760916988749e+192"
+        },
+        {
+          "literal": "2.4756090361158833e+160",
+          "entry": "float-corpus-170 : 2.4756090361158833e+160"
+        },
+        {
+          "literal": "-1.571380606849671e+135",
+          "entry": "float-corpus-171 : -1.571380606849671e+135"
+        },
+        {
+          "literal": "1.0116199225227466e-76",
+          "entry": "float-corpus-172 : 1.0116199225227466e-76"
+        },
+        {
+          "literal": "2.379681382379791e-203",
+          "entry": "float-corpus-173 : 2.379681382379791e-203"
+        },
+        {
+          "literal": "-5.584632146150443e+20",
+          "entry": "float-corpus-174 : -5.584632146150443e+20"
+        },
+        {
+          "literal": "-2.043566238406978e-51",
+          "entry": "float-corpus-175 : -2.043566238406978e-51"
+        },
+        {
+          "literal": "-3.1944671574791184e-86",
+          "entry": "float-corpus-176 : -3.1944671574791184e-86"
+        }
+      ],
+      "files": [
+        {
+          "file": "testlog-codec-floats.json",
+          "bytes": 51721,
+          "sha256": "fa635ee5560ef56a40951ca88e29fade80a9ea4b5501cf0f4d735cb7689bd507",
+          "contentType": "application/json"
+        },
+        {
+          "file": "testlog-codec-floats.csv",
+          "bytes": 32613,
+          "sha256": "16b02bdbccb154cc048da55f60f4bd28f6d56ff799b1d3554f6e1a8b430865d7",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native Test lock checks person and current Test ownership before malformed JSON can affect an unopened Test",
+      "missing": 401,
+      "login": 403,
+      "admin": 403,
+      "foreign": 403
+    },
+    {
+      "name": "native Test lock records exact defaults strict typed-constructor failures int64 clocks and durable lock-after-error boundaries",
+      "outcomes": [
+        {
+          "label": "empty-body",
+          "body": "",
+          "status": 400,
+          "bodyBytes": 47,
+          "wireSha256": "ce0b2fe27b5ab2581755a3961635f60c306ed613398845490b04be607dc89e41",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": false,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "malformed",
+          "body": "{",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": false,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "json-null",
+          "body": "null",
+          "status": 400,
+          "bodyBytes": 47,
+          "wireSha256": "ce0b2fe27b5ab2581755a3961635f60c306ed613398845490b04be607dc89e41",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": false,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "json-array",
+          "body": "[]",
+          "status": 400,
+          "bodyBytes": 47,
+          "wireSha256": "ce0b2fe27b5ab2581755a3961635f60c306ed613398845490b04be607dc89e41",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": false,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "missing-clock",
+          "body": "{}",
+          "status": 400,
+          "bodyBytes": 47,
+          "wireSha256": "ce0b2fe27b5ab2581755a3961635f60c306ed613398845490b04be607dc89e41",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": false,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "null-clock",
+          "body": "{\"timeStamp\":null}",
+          "status": 400,
+          "bodyBytes": 47,
+          "wireSha256": "ce0b2fe27b5ab2581755a3961635f60c306ed613398845490b04be607dc89e41",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": false,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "default-message",
+          "body": "{\"timeStamp\":0}",
+          "status": 200,
+          "bodyBytes": 0,
+          "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "contentType": "text/html; charset=UTF-8",
+          "locked": true,
+          "appendCount": 1,
+          "entries": [
+            {
+              "groupname": "ORACLE.TEST.LOCK",
+              "loginname": "owned-native-test-lock",
+              "code": "Shared",
+              "bookletname": "ORACLE.POW.BOOK#lock:default-message",
+              "unitname": "",
+              "originalUnitId": "",
+              "timestamp": 0,
+              "logentry": ""
+            }
+          ]
+        },
+        {
+          "label": "null-message",
+          "body": "{\"timeStamp\":1,\"message\":null}",
+          "status": 200,
+          "bodyBytes": 0,
+          "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "contentType": "text/html; charset=UTF-8",
+          "locked": true,
+          "appendCount": 1,
+          "entries": [
+            {
+              "groupname": "ORACLE.TEST.LOCK",
+              "loginname": "owned-native-test-lock",
+              "code": "Shared",
+              "bookletname": "ORACLE.POW.BOOK#lock:null-message",
+              "unitname": "",
+              "originalUnitId": "",
+              "timestamp": 1,
+              "logentry": ""
+            }
+          ]
+        },
+        {
+          "label": "empty-message",
+          "body": "{\"timeStamp\":2,\"message\":\"\"}",
+          "status": 200,
+          "bodyBytes": 0,
+          "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "contentType": "text/html; charset=UTF-8",
+          "locked": true,
+          "appendCount": 1,
+          "entries": [
+            {
+              "groupname": "ORACLE.TEST.LOCK",
+              "loginname": "owned-native-test-lock",
+              "code": "Shared",
+              "bookletname": "ORACLE.POW.BOOK#lock:empty-message",
+              "unitname": "",
+              "originalUnitId": "",
+              "timestamp": 2,
+              "logentry": ""
+            }
+          ]
+        },
+        {
+          "label": "unicode-message",
+          "body": "{\"timeStamp\":3,\"message\":\"Owned Ω/β; \\n 😀\"}",
+          "status": 200,
+          "bodyBytes": 0,
+          "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "contentType": "text/html; charset=UTF-8",
+          "locked": true,
+          "appendCount": 1,
+          "entries": [
+            {
+              "groupname": "ORACLE.TEST.LOCK",
+              "loginname": "owned-native-test-lock",
+              "code": "Shared",
+              "bookletname": "ORACLE.POW.BOOK#lock:unicode-message",
+              "unitname": "",
+              "originalUnitId": "",
+              "timestamp": 3,
+              "logentry": "Owned Ω/β; \n 😀"
+            }
+          ]
+        },
+        {
+          "label": "nul-message",
+          "body": "{\"timeStamp\":4,\"message\":\"owned\\u0000tail\"}",
+          "status": 200,
+          "bodyBytes": 0,
+          "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "contentType": "text/html; charset=UTF-8",
+          "locked": true,
+          "appendCount": 1,
+          "entries": [
+            {
+              "groupname": "ORACLE.TEST.LOCK",
+              "loginname": "owned-native-test-lock",
+              "code": "Shared",
+              "bookletname": "ORACLE.POW.BOOK#lock:nul-message",
+              "unitname": "",
+              "originalUnitId": "",
+              "timestamp": 4,
+              "logentry": "owned"
+            }
+          ]
+        },
+        {
+          "label": "number-message",
+          "body": "{\"timeStamp\":5,\"message\":7}",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": true,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "false-message",
+          "body": "{\"timeStamp\":6,\"message\":false}",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": true,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "array-message",
+          "body": "{\"timeStamp\":7,\"message\":[]}",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": true,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "object-message",
+          "body": "{\"timeStamp\":8,\"message\":{}}",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": true,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "string-clock",
+          "body": "{\"timeStamp\":\"9\",\"message\":\"string clock\"}",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": true,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "float-clock",
+          "body": "{\"timeStamp\":1.0,\"message\":\"float clock\"}",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": true,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "false-clock",
+          "body": "{\"timeStamp\":false,\"message\":\"false clock\"}",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": true,
+          "appendCount": 0,
+          "entries": []
+        },
+        {
+          "label": "int64-max",
+          "body": "{\"timeStamp\":9223372036854775807,\"message\":\"int64 maximum\"}",
+          "status": 200,
+          "bodyBytes": 0,
+          "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "contentType": "text/html; charset=UTF-8",
+          "locked": true,
+          "appendCount": 1,
+          "entries": [
+            {
+              "groupname": "ORACLE.TEST.LOCK",
+              "loginname": "owned-native-test-lock",
+              "code": "Shared",
+              "bookletname": "ORACLE.POW.BOOK#lock:int64-max",
+              "unitname": "",
+              "originalUnitId": "",
+              "timestamp": 9223372036854776000,
+              "logentry": "int64 maximum"
+            }
+          ]
+        },
+        {
+          "label": "int64-min",
+          "body": "{\"timeStamp\":-9223372036854775808,\"message\":\"int64 minimum\"}",
+          "status": 200,
+          "bodyBytes": 0,
+          "wireSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "contentType": "text/html; charset=UTF-8",
+          "locked": true,
+          "appendCount": 1,
+          "entries": [
+            {
+              "groupname": "ORACLE.TEST.LOCK",
+              "loginname": "owned-native-test-lock",
+              "code": "Shared",
+              "bookletname": "ORACLE.POW.BOOK#lock:int64-min",
+              "unitname": "",
+              "originalUnitId": "",
+              "timestamp": -9223372036854776000,
+              "logentry": "int64 minimum"
+            }
+          ]
+        },
+        {
+          "label": "overflow-clock",
+          "body": "{\"timeStamp\":9223372036854775808,\"message\":\"overflow clock\"}",
+          "status": 500,
+          "bodyBytes": 15,
+          "wireSha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+          "contentType": "text/html;charset=UTF-8",
+          "locked": true,
+          "appendCount": 0,
+          "entries": []
+        }
+      ]
+    },
+    {
+      "name": "native Test lock repeats append independently accepts padded IDs and refuses subsequent native Test entry for opened and unopened Tests",
+      "repeatEntries": [
+        {
+          "groupname": "ORACLE.TEST.LOCK",
+          "loginname": "owned-native-test-lock",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#lock:repeat",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 42,
+          "logentry": "repeated raw key"
+        },
+        {
+          "groupname": "ORACLE.TEST.LOCK",
+          "loginname": "owned-native-test-lock",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#lock:repeat",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 42,
+          "logentry": "repeated raw key"
+        }
+      ],
+      "beforeOpenLock": [
+        {
+          "groupName": "ORACLE.DELETE.KEEP",
+          "groupLabel": "Retained label",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793188466
+        },
+        {
+          "groupName": "ORACLE.DELETE.MAIN",
+          "groupLabel": "Recreated deletion label",
+          "bookletsStarted": 3,
+          "numUnitsMin": 0,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 2,
+          "numUnitsAvg": 0.6666666666666666,
+          "lastChange": 1793188472
+        },
+        {
+          "groupName": "ORACLE.DELETE.NEXT",
+          "groupLabel": "Moved label",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793188468
+        },
+        {
+          "groupName": "ORACLE.TEST.LOCK",
+          "groupLabel": "Owned native Test lock",
+          "bookletsStarted": 1,
+          "numUnitsMin": 0,
+          "numUnitsMax": 0,
+          "numUnitsTotal": 0,
+          "numUnitsAvg": 0,
+          "lastChange": 1793188482
+        },
+        {
+          "groupName": "ORACLE.TESTLOG",
+          "groupLabel": "Owned native Testlog",
+          "bookletsStarted": 1,
+          "numUnitsMin": 0,
+          "numUnitsMax": 0,
+          "numUnitsTotal": 0,
+          "numUnitsAvg": 0,
+          "lastChange": 1793188474
+        }
+      ],
+      "afterOpenLock": [
+        {
+          "groupName": "ORACLE.DELETE.KEEP",
+          "groupLabel": "Retained label",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793188466
+        },
+        {
+          "groupName": "ORACLE.DELETE.MAIN",
+          "groupLabel": "Recreated deletion label",
+          "bookletsStarted": 3,
+          "numUnitsMin": 0,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 2,
+          "numUnitsAvg": 0.6666666666666666,
+          "lastChange": 1793188472
+        },
+        {
+          "groupName": "ORACLE.DELETE.NEXT",
+          "groupLabel": "Moved label",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793188468
+        },
+        {
+          "groupName": "ORACLE.TEST.LOCK",
+          "groupLabel": "Owned native Test lock",
+          "bookletsStarted": 1,
+          "numUnitsMin": 0,
+          "numUnitsMax": 0,
+          "numUnitsTotal": 0,
+          "numUnitsAvg": 0,
+          "lastChange": 1793188482
+        },
+        {
+          "groupName": "ORACLE.TESTLOG",
+          "groupLabel": "Owned native Testlog",
+          "bookletsStarted": 1,
+          "numUnitsMin": 0,
+          "numUnitsMax": 0,
+          "numUnitsTotal": 0,
+          "numUnitsAvg": 0,
+          "lastChange": 1793188474
+        }
+      ]
+    },
+    {
+      "name": "actual protected native Test lock JSON and CSV retain full report bytes after successful failed repeated and opened-Test operations",
+      "files": [
+        {
+          "file": "test-lock.json",
+          "bytes": 2336,
+          "sha256": "495510726637253eb20d549f91509b24dfa638b4882b692180dc9e96a742c09b",
+          "contentType": "application/json"
+        },
+        {
+          "file": "test-lock.csv",
+          "bytes": 1359,
+          "sha256": "51f4ce1e5e0fd86d9c0377426c7f30f62acdb92b27bc43221a409c782438c26e",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "name": "native command fixture uses genuine protected monitor-person work and empty polling does not open its Test",
+      "monitorLogin": "owned-native-command-monitor",
+      "empty": [],
+      "disabledBroadcastSubscribeToken": null
+    },
+    {
+      "name": "native command polling acknowledgement and delivery enforce person role and Test ownership before request fields",
+      "pollMissing": 401,
+      "pollForeign": 403,
+      "ackMissing": 401,
+      "ackForeign": 403,
+      "deliveryMissing": 401,
+      "nonMonitorDelivery": 403
+    },
+    {
+      "name": "native monitor delivery deduplicates targets shares command IDs and preserves typed string arguments and client-clock ordering",
+      "commands": [
+        {
+          "id": 1,
+          "keyword": "owned.command.first",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158810
+        },
+        {
+          "id": 2,
+          "keyword": "owned.command.second",
+          "arguments": [
+            "second"
+          ],
+          "timestamp": 1793158820
+        },
+        {
+          "id": 3,
+          "keyword": "owned.command.equal",
+          "arguments": [
+            "equal timestamp"
+          ],
+          "timestamp": 1793158820
+        }
+      ],
+      "peerCommands": [
+        {
+          "id": 1,
+          "keyword": "owned.command.first",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158810
+        }
+      ],
+      "files": [
+        {
+          "file": "command-initial.json",
+          "bytes": 300,
+          "sha256": "da82c27daa9de6f8bbc02eb6fa3024ec5b2ed7ae022f0fbfcf6504ccbf96c726",
+          "contentType": "application/json"
+        },
+        {
+          "file": "command-peer.json",
+          "bytes": 116,
+          "sha256": "acd8c4697b58f78fb86341f1a36d617f22966d28e7dc92641528d9988b0bedf5",
+          "contentType": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "native command last-ID filtering reads the GET JSON body ignores query parameters and excludes all equal-clock commands",
+      "query": [
+        {
+          "id": 1,
+          "keyword": "owned.command.first",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158810
+        },
+        {
+          "id": 2,
+          "keyword": "owned.command.second",
+          "arguments": [
+            "second"
+          ],
+          "timestamp": 1793158820
+        },
+        {
+          "id": 3,
+          "keyword": "owned.command.equal",
+          "arguments": [
+            "equal timestamp"
+          ],
+          "timestamp": 1793158820
+        }
+      ],
+      "afterFirst": [
+        {
+          "id": 2,
+          "keyword": "owned.command.second",
+          "arguments": [
+            "second"
+          ],
+          "timestamp": 1793158820
+        },
+        {
+          "id": 3,
+          "keyword": "owned.command.equal",
+          "arguments": [
+            "equal timestamp"
+          ],
+          "timestamp": 1793158820
+        }
+      ],
+      "afterEqualTimestamp": [],
+      "unknownScopedId": [],
+      "zero": [
+        {
+          "id": 1,
+          "keyword": "owned.command.first",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158810
+        },
+        {
+          "id": 2,
+          "keyword": "owned.command.second",
+          "arguments": [
+            "second"
+          ],
+          "timestamp": 1793158820
+        },
+        {
+          "id": 3,
+          "keyword": "owned.command.equal",
+          "arguments": [
+            "equal timestamp"
+          ],
+          "timestamp": 1793158820
+        }
+      ],
+      "stringBodyId": 500
+    },
+    {
+      "name": "native command ACK is scoped idempotent accepts padded IDs and returns the exact repeated-execution HTTP reason",
+      "firstReason": "OK",
+      "repeatedReason": "OK, was already marked as executed",
+      "unknownCommand": 404,
+      "unaddressedSharedId": 404,
+      "peerUnchanged": true
+    },
+    {
+      "name": "native polling retains actual LOST state because the zero-clock server patch is ignored while each poll appends its raw POLLING log",
+      "firstStart": true,
+      "laststate": {
+        "CONNECTION": "LOST"
+      },
+      "secondStart": false,
+      "subscribeToken": null,
+      "firstServerLogs": [
+        {
+          "groupname": "ORACLE.COMMAND",
+          "loginname": "owned-native-command-one",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#command:one",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 0,
+          "logentry": "\"CONNECTION\" : POLLING"
+        }
+      ],
+      "repeatedServerLogs": [
+        {
+          "groupname": "ORACLE.COMMAND",
+          "loginname": "owned-native-command-one",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#command:one",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 0,
+          "logentry": "\"CONNECTION\" : POLLING"
+        },
+        {
+          "groupname": "ORACLE.COMMAND",
+          "loginname": "owned-native-command-one",
+          "code": "Shared",
+          "bookletname": "ORACLE.POW.BOOK#command:one",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 0,
+          "logentry": "\"CONNECTION\" : POLLING"
+        }
+      ]
+    },
+    {
+      "name": "native command delivery polling and acknowledgement stay independent of the Test lock",
+      "lockedCommand": {
+        "id": 4,
+        "keyword": "owned.command.locked",
+        "arguments": [
+          "still queued"
+        ],
+        "timestamp": 1793158830
+      },
+      "lockedTestRead": 423
+    },
+    {
+      "name": "actual native command packets and protected polling-state reports retain exact production bytes and peer scope",
+      "files": [
+        {
+          "file": "command-polling.json",
+          "bytes": 1309,
+          "sha256": "5a7c6d7cb8061c4d39af6e21243c1e5e6c6eb54cb95ff3c18fea9ba0e46aac56",
+          "contentType": "application/json"
+        },
+        {
+          "file": "command-polling.csv",
+          "bytes": 830,
+          "sha256": "639d1a44d6584c565f907c2bdcea34543daffd0194491f1bb06a1dabf2ec4cd2",
+          "contentType": "text/csv;charset=UTF-8"
+        }
+      ],
+      "remainingPeerCommands": [
+        {
+          "id": 1,
+          "keyword": "owned.command.first",
+          "arguments": [
+            "Ω/x",
+            "0",
+            "",
+            "1",
+            "",
+            "42",
+            "1.5"
+          ],
+          "timestamp": 1793158810
+        }
+      ]
+    },
+    {
+      "name": "native command producer records actual keyword argument timestamp and target coercion and SQL failures through protected production HTTP",
+      "cases": [
+        {
+          "label": "normal",
+          "body": "{\"keyword\":\"edge.normal\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[40]}",
+          "targetTestId": 40,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 6,
+                "keyword": "edge.normal",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 5,
+          "sequenceAfter": 7,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "keyword-missing",
+          "body": "{\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[43]}",
+          "targetTestId": 43,
+          "produced": {
+            "status": 400,
+            "reason": "Bad Request",
+            "value": "Required body-parameter is missing: `keyword`",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 8,
+          "sequenceAfter": 9,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "keyword-null",
+          "body": "{\"keyword\":null,\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[46]}",
+          "targetTestId": 46,
+          "produced": {
+            "status": 400,
+            "reason": "Bad Request",
+            "value": "Required body-parameter is missing: `keyword`",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 10,
+          "sequenceAfter": 11,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "keyword-number",
+          "body": "{\"keyword\":7,\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[49]}",
+          "targetTestId": 49,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 12,
+          "sequenceAfter": 13,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "keyword-false",
+          "body": "{\"keyword\":false,\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[52]}",
+          "targetTestId": 52,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 14,
+          "sequenceAfter": 15,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "keyword-array",
+          "body": "{\"keyword\":[],\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[55]}",
+          "targetTestId": 55,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 16,
+          "sequenceAfter": 17,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "keyword-object",
+          "body": "{\"keyword\":{},\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[58]}",
+          "targetTestId": 58,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 18,
+          "sequenceAfter": 19,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "keyword-empty",
+          "body": "{\"keyword\":\"\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[61]}",
+          "targetTestId": 61,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 21,
+                "keyword": "",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 20,
+          "sequenceAfter": 22,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "keyword-zero",
+          "body": "{\"keyword\":\"0\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[64]}",
+          "targetTestId": 64,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 24,
+                "keyword": "0",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 23,
+          "sequenceAfter": 25,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "keyword-ascii50",
+          "body": "{\"keyword\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[67]}",
+          "targetTestId": 67,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 27,
+                "keyword": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 26,
+          "sequenceAfter": 28,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "keyword-ascii51",
+          "body": "{\"keyword\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[70]}",
+          "targetTestId": 70,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 29,
+          "sequenceAfter": 31,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "keyword-unicode50",
+          "body": "{\"keyword\":\"ΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩ\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[73]}",
+          "targetTestId": 73,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 33,
+                "keyword": "ΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩ",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 32,
+          "sequenceAfter": 34,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "keyword-unicode51",
+          "body": "{\"keyword\":\"ΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩΩ\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[76]}",
+          "targetTestId": 76,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 35,
+          "sequenceAfter": 37,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "keyword-nul",
+          "body": "{\"keyword\":\"before\\u0000after\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[79]}",
+          "targetTestId": 79,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 39,
+                "keyword": "before",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 38,
+          "sequenceAfter": 40,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "arguments-missing",
+          "body": "{\"keyword\":\"edge.arguments-missing\",\"timestamp\":1793158900,\"testIds\":[82]}",
+          "targetTestId": 82,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 42,
+                "keyword": "edge.arguments-missing",
+                "arguments": [],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 41,
+          "sequenceAfter": 43,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "arguments-null",
+          "body": "{\"keyword\":\"edge.arguments-null\",\"arguments\":null,\"timestamp\":1793158900,\"testIds\":[85]}",
+          "targetTestId": 85,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 45,
+                "keyword": "edge.arguments-null",
+                "arguments": [],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 44,
+          "sequenceAfter": 46,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "arguments-string",
+          "body": "{\"keyword\":\"edge.arguments-string\",\"arguments\":\"abc\",\"timestamp\":1793158900,\"testIds\":[88]}",
+          "targetTestId": 88,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 47,
+          "sequenceAfter": 48,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "arguments-false",
+          "body": "{\"keyword\":\"edge.arguments-false\",\"arguments\":false,\"timestamp\":1793158900,\"testIds\":[91]}",
+          "targetTestId": 91,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 49,
+          "sequenceAfter": 50,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "arguments-object",
+          "body": "{\"keyword\":\"edge.arguments-object\",\"arguments\":{},\"timestamp\":1793158900,\"testIds\":[94]}",
+          "targetTestId": 94,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 51,
+          "sequenceAfter": 52,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "arguments-empty",
+          "body": "{\"keyword\":\"edge.arguments-empty\",\"arguments\":[],\"timestamp\":1793158900,\"testIds\":[97]}",
+          "targetTestId": 97,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 54,
+                "keyword": "edge.arguments-empty",
+                "arguments": [],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 53,
+          "sequenceAfter": 55,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "arguments-nested-array",
+          "body": "{\"keyword\":\"edge.arguments-nested-array\",\"arguments\":[[1,2]],\"timestamp\":1793158900,\"testIds\":[100]}",
+          "targetTestId": 100,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 57,
+                "keyword": "edge.arguments-nested-array",
+                "arguments": [
+                  "Array"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 56,
+          "sequenceAfter": 58,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "arguments-nested-object",
+          "body": "{\"keyword\":\"edge.arguments-nested-object\",\"arguments\":[{\"x\":1}],\"timestamp\":1793158900,\"testIds\":[103]}",
+          "targetTestId": 103,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 59,
+          "sequenceAfter": 60,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "arguments-nul",
+          "body": "{\"keyword\":\"edge.arguments-nul\",\"arguments\":[\"before\\u0000after\"],\"timestamp\":1793158900,\"testIds\":[106]}",
+          "targetTestId": 106,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 61,
+          "sequenceAfter": 63,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "arguments-php-float-strings",
+          "body": "{\"keyword\":\"edge.arguments-php-float-strings\",\"arguments\":[-0.0,1e-7,1e-6,1e-5,1e20,1e21,1e22,1.2345678901234567,100000000000001,5e-324,1.7976931348623157e308,9007199254740993,9223372036854775807,9223372036854775808],\"timestamp\":1793158900,\"testIds\":[109]}",
+          "targetTestId": 109,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 65,
+                "keyword": "edge.arguments-php-float-strings",
+                "arguments": [
+                  "-0",
+                  "1.0E-7",
+                  "1.0E-6",
+                  "1.0E-5",
+                  "1.0E+20",
+                  "1.0E+21",
+                  "1.0E+22",
+                  "1.2345678901235",
+                  "100000000000001",
+                  "4.9406564584125E-324",
+                  "1.7976931348623E+308",
+                  "9007199254740993",
+                  "9223372036854775807",
+                  "9.2233720368548E+18"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 64,
+          "sequenceAfter": 66,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-missing",
+          "body": "{\"keyword\":\"edge.timestamp-missing\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"testIds\":[112]}",
+          "targetTestId": 112,
+          "produced": {
+            "status": 400,
+            "reason": "Bad Request",
+            "value": "Required body-parameter is missing: `timestamp`",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 67,
+          "sequenceAfter": 68,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "timestamp-null",
+          "body": "{\"keyword\":\"edge.timestamp-null\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":null,\"testIds\":[115]}",
+          "targetTestId": 115,
+          "produced": {
+            "status": 400,
+            "reason": "Bad Request",
+            "value": "Required body-parameter is missing: `timestamp`",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 69,
+          "sequenceAfter": 70,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "timestamp-zero",
+          "body": "{\"keyword\":\"edge.timestamp-zero\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":0,\"testIds\":[118]}",
+          "targetTestId": 118,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 71,
+          "sequenceAfter": 73,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-negative",
+          "body": "{\"keyword\":\"edge.timestamp-negative\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":-1,\"testIds\":[121]}",
+          "targetTestId": 121,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 74,
+          "sequenceAfter": 76,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-true",
+          "body": "{\"keyword\":\"edge.timestamp-true\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":true,\"testIds\":[124]}",
+          "targetTestId": 124,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 78,
+                "keyword": "edge.timestamp-true",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 77,
+          "sequenceAfter": 79,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-false",
+          "body": "{\"keyword\":\"edge.timestamp-false\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":false,\"testIds\":[127]}",
+          "targetTestId": 127,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 80,
+          "sequenceAfter": 82,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-numeric-string",
+          "body": "{\"keyword\":\"edge.timestamp-numeric-string\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":\"1793158900\",\"testIds\":[130]}",
+          "targetTestId": 130,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 84,
+                "keyword": "edge.timestamp-numeric-string",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 83,
+          "sequenceAfter": 85,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-garbage",
+          "body": "{\"keyword\":\"edge.timestamp-garbage\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":\"not-a-clock\",\"testIds\":[133]}",
+          "targetTestId": 133,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 86,
+          "sequenceAfter": 88,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-empty-array",
+          "body": "{\"keyword\":\"edge.timestamp-empty-array\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":[],\"testIds\":[136]}",
+          "targetTestId": 136,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 89,
+          "sequenceAfter": 91,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-nonempty-array",
+          "body": "{\"keyword\":\"edge.timestamp-nonempty-array\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":[1],\"testIds\":[139]}",
+          "targetTestId": 139,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 93,
+                "keyword": "edge.timestamp-nonempty-array",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 92,
+          "sequenceAfter": 94,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-object",
+          "body": "{\"keyword\":\"edge.timestamp-object\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":{},\"testIds\":[142]}",
+          "targetTestId": 142,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 96,
+                "keyword": "edge.timestamp-object",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 95,
+          "sequenceAfter": 97,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-fraction",
+          "body": "{\"keyword\":\"edge.timestamp-fraction\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900.75,\"testIds\":[145]}",
+          "targetTestId": 145,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 99,
+                "keyword": "edge.timestamp-fraction",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 98,
+          "sequenceAfter": 100,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-milliseconds-as-seconds",
+          "body": "{\"keyword\":\"edge.timestamp-milliseconds-as-seconds\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158800000,\"testIds\":[148]}",
+          "targetTestId": 148,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "sequenceBefore": 101,
+          "sequenceAfter": 103,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "timestamp-int64-overflow",
+          "body": "{\"keyword\":\"edge.timestamp-int64-overflow\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":9223372036854775808,\"testIds\":[151]}",
+          "targetTestId": 151,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 104,
+          "sequenceAfter": 106,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "testIds-missing",
+          "body": "{\"keyword\":\"edge.testIds-missing\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900}",
+          "targetTestId": 154,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 107,
+          "sequenceAfter": 108,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-empty",
+          "body": "{\"keyword\":\"edge.testIds-empty\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[]}",
+          "targetTestId": 157,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 109,
+          "sequenceAfter": 110,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-null",
+          "body": "{\"keyword\":\"edge.testIds-null\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":null}",
+          "targetTestId": 160,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 111,
+          "sequenceAfter": 112,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-string",
+          "body": "{\"keyword\":\"edge.testIds-string\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":\"abc\"}",
+          "targetTestId": 163,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 113,
+          "sequenceAfter": 114,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-false",
+          "body": "{\"keyword\":\"edge.testIds-false\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":false}",
+          "targetTestId": 166,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 115,
+          "sequenceAfter": 116,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-object",
+          "body": "{\"keyword\":\"edge.testIds-object\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":{}}",
+          "targetTestId": 169,
+          "produced": {
+            "status": 500,
+            "reason": "Internal Server Error",
+            "value": "Internal error.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 117,
+          "sequenceAfter": 118,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-unknown",
+          "body": "{\"keyword\":\"edge.testIds-unknown\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[9223372036854775807]}",
+          "targetTestId": 172,
+          "produced": {
+            "status": 404,
+            "reason": "404 Not Found",
+            "value": "Test `9223372036854775807` not found. `edge.testIds-unknown` not committed.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 119,
+          "sequenceAfter": 120,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-zero",
+          "body": "{\"keyword\":\"edge.testIds-zero\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[0]}",
+          "targetTestId": 175,
+          "produced": {
+            "status": 404,
+            "reason": "404 Not Found",
+            "value": "Test `0` not found. `edge.testIds-zero` not committed.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 121,
+          "sequenceAfter": 122,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-null-item",
+          "body": "{\"keyword\":\"edge.testIds-null-item\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[null]}",
+          "targetTestId": 178,
+          "produced": {
+            "status": 404,
+            "reason": "404 Not Found",
+            "value": "Test `0` not found. `edge.testIds-null-item` not committed.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 123,
+          "sequenceAfter": 124,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-false-item",
+          "body": "{\"keyword\":\"edge.testIds-false-item\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[false]}",
+          "targetTestId": 181,
+          "produced": {
+            "status": 404,
+            "reason": "404 Not Found",
+            "value": "Test `0` not found. `edge.testIds-false-item` not committed.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 125,
+          "sequenceAfter": 126,
+          "sequenceDelta": 1
+        },
+        {
+          "label": "testIds-duplicate",
+          "body": "{\"keyword\":\"edge.testIds-duplicate\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[184,184]}",
+          "targetTestId": 184,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 128,
+                "keyword": "edge.testIds-duplicate",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 127,
+          "sequenceAfter": 129,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "testIds-numeric-string",
+          "body": "{\"keyword\":\"edge.testIds-numeric-string\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[\"000187\"]}",
+          "targetTestId": 187,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 131,
+                "keyword": "edge.testIds-numeric-string",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 130,
+          "sequenceAfter": 132,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "testIds-fraction",
+          "body": "{\"keyword\":\"edge.testIds-fraction\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[190.9]}",
+          "targetTestId": 190,
+          "produced": {
+            "status": 201,
+            "reason": "Created",
+            "value": null,
+            "contentType": "text/html; charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [
+              {
+                "id": 134,
+                "keyword": "edge.testIds-fraction",
+                "arguments": [
+                  "Ω/x",
+                  "0",
+                  "",
+                  "1",
+                  "",
+                  "42",
+                  "1.5"
+                ],
+                "timestamp": 1793158900
+              }
+            ],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 133,
+          "sequenceAfter": 135,
+          "sequenceDelta": 2
+        },
+        {
+          "label": "testIds-mixed-unknown",
+          "body": "{\"keyword\":\"edge.testIds-mixed-unknown\",\"arguments\":[\"Ω/x\",0,false,true,null,42,1.5],\"timestamp\":1793158900,\"testIds\":[193,9223372036854775807]}",
+          "targetTestId": 193,
+          "produced": {
+            "status": 404,
+            "reason": "404 Not Found",
+            "value": "Test `9223372036854775807` not found. `edge.testIds-mixed-unknown` not committed.",
+            "contentType": "text/html;charset=UTF-8"
+          },
+          "polled": {
+            "status": 200,
+            "reason": "OK",
+            "value": [],
+            "contentType": "application/json"
+          },
+          "sequenceBefore": 136,
+          "sequenceAfter": 137,
+          "sequenceDelta": 1
+        }
+      ],
+      "file": "command-producer-boundaries.json",
+      "bytes": 35189,
+      "sha256": "1001ff6b716bd7b8a6e94a4ec88a93146e42484a1c495cfb7765d9fb8d54c9e7"
+    },
+    {
+      "name": "native command producer uses independent real before and after deliveries to expose reservation gaps without SQL seeds",
+      "vectors": 52,
+      "beforeAndAfterMarkers": 104,
+      "allPrecedingSourceGroupsRetained": 65,
+      "allocationDeltas": [
+        {
+          "label": "normal",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-missing",
+          "delta": 1,
+          "producedStatus": 400,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-null",
+          "delta": 1,
+          "producedStatus": 400,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-number",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-false",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-array",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-object",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-empty",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-zero",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-ascii50",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-ascii51",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-unicode50",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-unicode51",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "keyword-nul",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-missing",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-null",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-string",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-false",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-object",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-empty",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-nested-array",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-nested-object",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-nul",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "arguments-php-float-strings",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-missing",
+          "delta": 1,
+          "producedStatus": 400,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-null",
+          "delta": 1,
+          "producedStatus": 400,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-zero",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-negative",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-true",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-false",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-numeric-string",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-garbage",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-empty-array",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-nonempty-array",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-object",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-fraction",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "timestamp-milliseconds-as-seconds",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 500
+        },
+        {
+          "label": "timestamp-int64-overflow",
+          "delta": 2,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-missing",
+          "delta": 1,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-empty",
+          "delta": 1,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-null",
+          "delta": 1,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-string",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-false",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-object",
+          "delta": 1,
+          "producedStatus": 500,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-unknown",
+          "delta": 1,
+          "producedStatus": 404,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-zero",
+          "delta": 1,
+          "producedStatus": 404,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-null-item",
+          "delta": 1,
+          "producedStatus": 404,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-false-item",
+          "delta": 1,
+          "producedStatus": 404,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-duplicate",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-numeric-string",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-fraction",
+          "delta": 2,
+          "producedStatus": 201,
+          "polledStatus": 200
+        },
+        {
+          "label": "testIds-mixed-unknown",
+          "delta": 1,
+          "producedStatus": 404,
+          "polledStatus": 200
+        }
+      ]
+    },
+    {
+      "name": "monitor login materializes unopened Tests for current nonrandom monitorable members while session list excludes people without Tests",
+      "missing": 401,
+      "wrongRole": 403,
+      "materialized": [
+        {
+          "personId": 14,
+          "timestamp": 1793188499,
+          "testId": 195,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 15,
+          "timestamp": 1793188499,
+          "testId": 196,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        }
+      ],
+      "alwaysNewPersonWithoutTest": "owned-session-empty"
+    },
+    {
+      "name": "monitor packet exposes genuine stable numeric person and Test identities for unopened monitorable Tests without entering them",
+      "packet": [
+        {
+          "personId": 14,
+          "timestamp": 1793188499,
+          "testId": 195,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 14,
+          "timestamp": 1793188500,
+          "testId": 200,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:first",
+          "unitState": {}
+        },
+        {
+          "personId": 14,
+          "timestamp": 1793188500,
+          "testId": 201,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:same-person",
+          "unitState": {}
+        },
+        {
+          "personId": 15,
+          "timestamp": 1793188499,
+          "testId": 196,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 15,
+          "timestamp": 1793188500,
+          "testId": 202,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:second",
+          "unitState": {}
+        }
+      ],
+      "file": "monitor-unopened.json",
+      "sha256": "74390dd98733d16634cd6f84ae4fd89d0745bbf388aece394e845b254cbdbca8",
+      "excludedTestId": 203,
+      "peerTestId": 204
+    },
+    {
+      "name": "monitor production default-group keys and explicit group scope are recorded without copying observed scope defects",
+      "groupDefault": [],
+      "studyDefault": [
+        {
+          "personId": 14,
+          "timestamp": 1793188499,
+          "testId": 195,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 14,
+          "timestamp": 1793188500,
+          "testId": 200,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:first",
+          "unitState": {}
+        },
+        {
+          "personId": 14,
+          "timestamp": 1793188500,
+          "testId": 201,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:same-person",
+          "unitState": {}
+        },
+        {
+          "personId": 15,
+          "timestamp": 1793188499,
+          "testId": 196,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 15,
+          "timestamp": 1793188500,
+          "testId": 202,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:second",
+          "unitState": {}
+        },
+        {
+          "personId": 18,
+          "timestamp": 1793188500,
+          "testId": 199,
+          "groupName": "ORACLE.MONITOR.PEER",
+          "groupLabel": "Owned peer",
+          "personLabel": "owned-session-peer/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 18,
+          "timestamp": 1793188500,
+          "testId": 204,
+          "groupName": "ORACLE.MONITOR.PEER",
+          "groupLabel": "Owned peer",
+          "personLabel": "owned-session-peer/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:peer",
+          "unitState": {}
+        },
+        {
+          "personId": 1,
+          "timestamp": 1793188500,
+          "testId": 197,
+          "groupName": "ORACLE.POW",
+          "groupLabel": "Owned proof group",
+          "personLabel": "owned-native-pow/sHaReD",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 2,
+          "timestamp": 1793188500,
+          "testId": 198,
+          "groupName": "ORACLE.POW",
+          "groupLabel": "Owned proof group",
+          "personLabel": "owned-native-pow-peer/sHaReD",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        }
+      ],
+      "foreignStatus": 200,
+      "foreign": [
+        {
+          "personId": 18,
+          "timestamp": 1793188500,
+          "testId": 199,
+          "groupName": "ORACLE.MONITOR.PEER",
+          "groupLabel": "Owned peer",
+          "personLabel": "owned-session-peer/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 18,
+          "timestamp": 1793188500,
+          "testId": 204,
+          "groupName": "ORACLE.MONITOR.PEER",
+          "groupLabel": "Owned peer",
+          "personLabel": "owned-session-peer/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:peer",
+          "unitState": {}
+        }
+      ],
+      "unknownStatus": 200,
+      "unknown": []
+    },
+    {
+      "name": "monitor person numeric identity survives genuine protected reentry and shares both existing Tests",
+      "personId": 14,
+      "testIds": [
+        200,
+        201
+      ],
+      "rows": [
+        {
+          "personId": 14,
+          "timestamp": 1793188499,
+          "testId": 195,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 14,
+          "timestamp": 1793188500,
+          "testId": 200,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:first",
+          "unitState": {}
+        },
+        {
+          "personId": 14,
+          "timestamp": 1793188500,
+          "testId": 201,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-one/Shared",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:same-person",
+          "unitState": {}
+        },
+        {
+          "personId": 15,
+          "timestamp": 1793188499,
+          "testId": 196,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 15,
+          "timestamp": 1793188500,
+          "testId": 202,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:second",
+          "unitState": {}
+        }
+      ]
+    },
+    {
+      "name": "monitor projects current Unit state and server Test clock and overrides saved status with genuine running state",
+      "opened": {
+        "personId": 14,
+        "timestamp": 1793188501,
+        "testId": 200,
+        "groupName": "ORACLE.MONITOR",
+        "groupLabel": "Owned Ω monitor",
+        "personLabel": "owned-session-one/Shared",
+        "mode": "run-hot-return",
+        "testState": {
+          "status": "running",
+          "ownedState": "Ω first",
+          "CURRENT_UNIT_ID": "ORACLE.POW.UNIT"
+        },
+        "bookletName": "ORACLE.POW.BOOK#monitor:first",
+        "unitName": "ORACLE.POW.UNIT",
+        "unitState": {
+          "ownedUnit": "Ω unit",
+          "PRESENTATION_PROGRESS": "some"
+        }
+      }
+    },
+    {
+      "name": "monitor Test lock projection takes precedence without losing saved Test or Unit fields",
+      "locked": {
+        "personId": 14,
+        "timestamp": 1793188501,
+        "testId": 200,
+        "groupName": "ORACLE.MONITOR",
+        "groupLabel": "Owned Ω monitor",
+        "personLabel": "owned-session-one/Shared",
+        "mode": "run-hot-return",
+        "testState": {
+          "status": "locked",
+          "ownedState": "Ω first",
+          "CURRENT_UNIT_ID": "ORACLE.POW.UNIT"
+        },
+        "bookletName": "ORACLE.POW.BOOK#monitor:first",
+        "unitName": "ORACLE.POW.UNIT",
+        "unitState": {
+          "ownedUnit": "Ω unit",
+          "PRESENTATION_PROGRESS": "some"
+        }
+      }
+    },
+    {
+      "name": "monitor uses current imported Login mode and group label while preserving first numeric person and saved Test history",
+      "hidden": [
+        {
+          "personId": 15,
+          "timestamp": 1793188499,
+          "testId": 196,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        },
+        {
+          "personId": 15,
+          "timestamp": 1793188500,
+          "testId": 202,
+          "groupName": "ORACLE.MONITOR",
+          "groupLabel": "Owned Ω monitor",
+          "personLabel": "owned-session-two/Shared",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#monitor:second",
+          "unitState": {}
+        }
+      ],
+      "changed": {
+        "personId": 14,
+        "timestamp": 1793188501,
+        "testId": 200,
+        "groupName": "ORACLE.MONITOR",
+        "groupLabel": "Changed Ω group",
+        "personLabel": "owned-session-one/Shared",
+        "mode": "run-trial",
+        "testState": {
+          "status": "locked",
+          "ownedState": "Ω first",
+          "CURRENT_UNIT_ID": "ORACLE.POW.UNIT"
+        },
+        "bookletName": "ORACLE.POW.BOOK#monitor:first",
+        "unitName": "ORACLE.POW.UNIT",
+        "unitState": {
+          "ownedUnit": "Ω unit",
+          "PRESENTATION_PROGRESS": "some"
+        }
+      }
+    },
+    {
+      "name": "monitor polling is read-only and retains the saved server Test timestamp",
+      "clockBefore": 1793188501,
+      "clockAfter": 1793188501
+    },
+    {
+      "name": "fresh protected group monitor alone creates uncoded and per-code native people plus all unopened assigned Tests without participant authentication",
+      "monitorAccessSet": {
+        "token": "[redacted-owned-token-178]",
+        "displayName": "Alpha owned materialization/owned-auto-monitor",
+        "loginName": "owned-auto-monitor",
+        "groupLabel": "Alpha owned materialization",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "test": [
+            {
+              "id": "ORACLE.POW.BOOK#MATERIAL:FIRST",
+              "type": "test",
+              "label": "  Current Booklet Ω\n  ",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            },
+            {
+              "id": "ORACLE.POW.BOOK#MATERIAL:SECOND",
+              "type": "test",
+              "label": "  Current Booklet Ω\n  ",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            },
+            {
+              "id": "ORACLE.POW.BOOK",
+              "type": "test",
+              "label": "  Current Booklet Ω\n  ",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            }
+          ],
+          "testGroupMonitor": [
+            {
+              "id": "ORACLE.MATERIAL",
+              "type": "testGroupMonitor",
+              "label": "Alpha owned materialization",
+              "flags": []
+            }
+          ]
+        },
+        "groupToken": "[redacted-owned-groupToken-179]",
+        "viewSettings": [],
+        "access": {
+          "test": [
+            "ORACLE.POW.BOOK#MATERIAL:FIRST",
+            "ORACLE.POW.BOOK#MATERIAL:SECOND",
+            "ORACLE.POW.BOOK"
+          ],
+          "testGroupMonitor": [
+            "ORACLE.MATERIAL"
+          ]
+        }
+      },
+      "rows": [
+        {
+          "personId": 22,
+          "timestamp": 1793188503,
+          "testId": 205,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/A",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:FIRST",
+          "unitState": {}
+        },
+        {
+          "personId": 22,
+          "timestamp": 1793188503,
+          "testId": 206,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/A",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:SECOND",
+          "unitState": {}
+        },
+        {
+          "personId": 23,
+          "timestamp": 1793188503,
+          "testId": 207,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/B",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:FIRST",
+          "unitState": {}
+        },
+        {
+          "personId": 23,
+          "timestamp": 1793188503,
+          "testId": 208,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/B",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:SECOND",
+          "unitState": {}
+        },
+        {
+          "personId": 24,
+          "timestamp": 1793188503,
+          "testId": 209,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-plain",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        }
+      ],
+      "foreignBeforeStudy": []
+    },
+    {
+      "name": "first actual dependent person authentication reuses monitor-created numeric identity and all unopened Tests without rewriting clocks",
+      "personAccessSet": {
+        "token": "[redacted-owned-token-187]",
+        "displayName": "Alpha owned materialization/owned-auto-coded/a",
+        "loginName": "owned-auto-coded",
+        "groupLabel": "Alpha owned materialization",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "test": [
+            {
+              "id": "ORACLE.POW.BOOK#MATERIAL:FIRST",
+              "type": "test",
+              "label": "  Current Booklet Ω\n  ",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            },
+            {
+              "id": "ORACLE.POW.BOOK#MATERIAL:SECOND",
+              "type": "test",
+              "label": "  Current Booklet Ω\n  ",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            }
+          ]
+        },
+        "groupToken": "[redacted-owned-groupToken-179]",
+        "viewSettings": [],
+        "access": {
+          "test": [
+            "ORACLE.POW.BOOK#MATERIAL:FIRST",
+            "ORACLE.POW.BOOK#MATERIAL:SECOND"
+          ]
+        }
+      },
+      "rows": [
+        {
+          "personId": 23,
+          "timestamp": 1793188503,
+          "testId": 207,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/B",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:FIRST",
+          "unitState": {}
+        },
+        {
+          "personId": 23,
+          "timestamp": 1793188503,
+          "testId": 208,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/B",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:SECOND",
+          "unitState": {}
+        },
+        {
+          "personId": 22,
+          "timestamp": 1793188503,
+          "testId": 205,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/A",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:FIRST",
+          "unitState": {}
+        },
+        {
+          "personId": 22,
+          "timestamp": 1793188503,
+          "testId": 206,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/A",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:SECOND",
+          "unitState": {}
+        },
+        {
+          "personId": 24,
+          "timestamp": 1793188503,
+          "testId": 209,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-plain",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        }
+      ]
+    },
+    {
+      "name": "repeated protected monitor login does not rotate existing dependent person bearer or consume new person and Test identities",
+      "personBearerRetained": true,
+      "rows": [
+        {
+          "personId": 23,
+          "timestamp": 1793188503,
+          "testId": 207,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/B",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:FIRST",
+          "unitState": {}
+        },
+        {
+          "personId": 23,
+          "timestamp": 1793188503,
+          "testId": 208,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/B",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:SECOND",
+          "unitState": {}
+        },
+        {
+          "personId": 22,
+          "timestamp": 1793188503,
+          "testId": 205,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/A",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:FIRST",
+          "unitState": {}
+        },
+        {
+          "personId": 22,
+          "timestamp": 1793188503,
+          "testId": 206,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-coded/A",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK#MATERIAL:SECOND",
+          "unitState": {}
+        },
+        {
+          "personId": 24,
+          "timestamp": 1793188503,
+          "testId": 209,
+          "groupName": "ORACLE.MATERIAL",
+          "groupLabel": "Alpha owned materialization",
+          "personLabel": "owned-auto-plain",
+          "mode": "run-trial",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        }
+      ]
+    },
+    {
+      "name": "fresh protected study monitor materializes an unauthenticated foreign-group person and exposes current workspace group claims without own Test access",
+      "studyAccessSet": {
+        "token": "[redacted-owned-token-195]",
+        "displayName": "Alpha owned materialization/owned-auto-study",
+        "loginName": "owned-auto-study",
+        "groupLabel": "Alpha owned materialization",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "testGroupMonitor": [
+            {
+              "id": "ORACLE.MATERIAL",
+              "type": "testGroupMonitor",
+              "label": "Alpha owned materialization",
+              "flags": []
+            },
+            {
+              "id": "ORACLE.MATERIAL.PEER",
+              "type": "testGroupMonitor",
+              "label": "Beta owned materialization",
+              "flags": []
+            },
+            {
+              "id": "ORACLE.MONITOR",
+              "type": "testGroupMonitor",
+              "label": "Changed Ω group",
+              "flags": []
+            },
+            {
+              "id": "ORACLE.MONITOR.PEER",
+              "type": "testGroupMonitor",
+              "label": "Owned peer",
+              "flags": []
+            },
+            {
+              "id": "ORACLE.POW",
+              "type": "testGroupMonitor",
+              "label": "Owned proof group",
+              "flags": []
+            }
+          ]
+        },
+        "groupToken": "[redacted-owned-groupToken-179]",
+        "viewSettings": [],
+        "access": {
+          "testGroupMonitor": [
+            "ORACLE.MATERIAL",
+            "ORACLE.MATERIAL.PEER",
+            "ORACLE.MONITOR",
+            "ORACLE.MONITOR.PEER",
+            "ORACLE.POW"
+          ]
+        }
+      },
+      "peerRows": [
+        {
+          "personId": 26,
+          "timestamp": 1793188504,
+          "testId": 210,
+          "groupName": "ORACLE.MATERIAL.PEER",
+          "groupLabel": "Beta owned materialization",
+          "personLabel": "owned-auto-peer",
+          "mode": "run-hot-return",
+          "testState": {
+            "status": "pending"
+          },
+          "bookletName": "ORACLE.POW.BOOK",
+          "unitState": {}
+        }
+      ],
+      "defaultIncludesPeer": true
+    }
+  ],
+  "sourceFiles": {
+    "backend/routes.php": "8ecafc8e25edaf2cd0453c180a23be8a8d0568f048000eb033d7772af1b3a213",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/middleware/RequireToken.class.php": "f2d19714051837e46c07adec45bc1c52205cc9a282b37441a248bf9916f3c35a",
+    "backend/src/helper/SystemConfig.class.php": "2f97c265453d34d1d7be465afd2b58ac2422f60fbdcf7e970352b60bc23e957d",
+    "backend/src/helper/Token.class.php": "d57516492d6f68fecfb070d3a9fd81edb245bd7c365c389c419504bcbaa87cf9",
+    "backend/src/data-collection/AccessSet.class.php": "e76d5c03c642a8d178c583766ffc66b27355c3606bb34add287e55ccb6cdca6c",
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/controller/WorkspaceController.class.php": "f9cb336fc05ad115d1ebfca923d48eb397ed94cd065ccbdd83c359849233a6b4",
+    "backend/composer.lock": "47c7dda51f6d27fbbc93aaedc99d364b9eeb299d80f92d68226b0218a436b708",
+    "scripts/database/full.sql": "9ac4b941ba40d75a563cbe4fb9d55075f27e46894902eb50100eb7263594ed08",
+    "backend/src/helper/CSV.class.php": "77d3e0cfca1a99e37efccb49480b68d1737ea63ead252f25d18662ebe997bb84",
+    "backend/src/helper/ReviewCSVFormatter.php": "5db29ee7680ffa8ddf01febe71a95c0d5fc580091a4f5111ba819cc37123df2e",
+    "backend/src/helper/TimeStamp.class.php": "eba4eb49ca3dbe8aa99733a55b40b9259823edb05e0f67267e946c8bcac87a7d",
+    "backend/src/workspace/Report.php": "f81129e75bfb3550205d3668fb2de1821967f20994c604cc0d41b380a13e543f",
+    "backend/src/workspace/ResponseReportOutput.php": "0c88a1742d3e321cccb4c62c6fc34ca1627faa9b9e2763227310dc2dd1187466",
+    "backend/src/workspace/LogReportOutput.php": "cfcb2fd3418195fdac8bc6b7dcfeafeb53da36745c7fa1f37194e9fbf9da8b86",
+    "backend/src/workspace/ReviewReportOutput.php": "d1f39523e236b0f2265da3a1892775f1bd5977fdc50da4c2091afab48282ba59",
+    "backend/src/data-collection/ReportFormat.php": "3fb41e925c59daf7800a132187fb324f31a20562fbadd5932e464d90ea180f94",
+    "backend/src/files/XMLFileBooklet.class.php": "95cefab11030f5aa237941311874f46b4def068bcdd009638dfaec01b151bfa1",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/data-collection/TestName.class.php": "9cc3de2c85f03ab3464cda4b2b1fa5539f4675cc86c418df068fefd6ced6922e",
+    "backend/src/middleware/IsTestOwner.class.php": "f2b8f79c3588801f0ddd057027682e2a554c791cae05cdf5242519a9b3b26316",
+    "backend/src/helper/RequestHelper.class.php": "c5aab20fff896d13afb2c969346d91c3749e40936849e6d4d51ba74e0d2ab57f",
+    "backend/src/helper/State.class.php": "62475f6edc2adda96097658c33e67e2c5a7ad534ed5addb9d9a57b638e329c91",
+    "backend/src/workspace/Workspace.class.php": "5866681acead26a9dc570e0fd50a32a963e6e8f1b4098b98f3803d3d5a378ac0",
+    "backend/src/dao/WorkspaceDAO.class.php": "74e8df283418921640d4e4ddb780ce95483f319bca974b7464a17f5d1bb341f4",
+    "backend/src/helper/FileResponse.class.php": "1896bc0a2822d324a7a424fc744ab8d296aac1220fa2ee013e5183db9524bdb2",
+    "backend/src/helper/FileExt.class.php": "6babc2ccdb0f4a05b379876cb7100629e61e456ecea05fa8f57c325a1ce27156",
+    "backend/src/helper/Folder.class.php": "d3e1d59460ab519bfa299992a5e12458d17a0ccbed8e7a8ccdcbbd4a1114b9f7",
+    "backend/src/files/XMLFileUnit.class.php": "56e42c9860d562f94d317e3c32c5a66b1cf62a9b2b378a7926df1cf5ab7ed017",
+    "backend/src/helper/FileID.class.php": "8c490045d4e1af66639e2af191502a87f6062fada54d1ef57c523a7fe806214e",
+    "backend/src/data-collection/UnitLog.php": "351139441c71cd3dd29597383f656abe7e77875873b5ce27104f9725b60449db",
+    "backend/src/data-collection/TestLog.class.php": "a7d19bd78ee744ebe26d41b3034d48b2ef80d637d7a5c560a22e875cde82574a",
+    "backend/src/helper/JSON.class.php": "bb2a79d8853f35a82c80b71ab769f857ae03d268ae1a5919dab72f14000bfeda",
+    "backend/src/controller/MonitorController.class.php": "6cbde3f3eb4c7eec6f38aa1e6c2012488f46614e69fa688e81ad0411af92fc44",
+    "backend/src/data-collection/Command.class.php": "ad229250685b1219c8e30a85abab4f62c75c19da5d89f36fa35adef953cbf742",
+    "backend/src/middleware/IsGroupMonitor.class.php": "49a0b75d3efaac0a3ad10d0dec9577b2ef54d319727ccaaaf573c5a065f1031a",
+    "backend/src/helper/Mode.class.php": "bacc300340201d9698bb7a8fe96588403a8ac490dbb9c73677954a1a4d2a2b85",
+    "definitions/testtaker/test-mode.json": "abbd8746a1f304b5ea6f01177a297b27fbd7c04742b687cfd13bffea1658619e",
+    "frontend/src/app/group-monitor/backend.service.ts": "6031cc3838048aba3e8b103d610bf3a9cb7aefe94b9ccd761ce11d94f9a2d22c",
+    "backend/src/dao/DAO.class.php": "76eea068ed1a0a4f98bfbcc78f063432b5af6ed122de8fa5b098076f500c8fe0",
+    "backend/src/data-collection/SessionChangeMessage.class.php": "f73461197c01ee1f074c2b059b28d395b726f8fbc5c9fd0584a7d3cd2f3111f1",
+    "backend/src/data-collection/SessionChangeMessageArray.class.php": "9cbb9ee45e64272c3e236e3d29f5a45d0d32b3ccb7489beed1fced160091617c",
+    "backend/src/data-collection/Person.class.php": "d6d6dd0ece78a171e330c9258a7313ce77a25b95e36b958116a4f1a7bb83882f",
+    "backend/src/data-collection/PersonSession.class.php": "e1b577384df193b147dec4ed39c6430f16a93f7d91ff1f99e09fa1e835fd4926",
+    "backend/src/data-collection/LoginSession.class.php": "b4dccca03d7cc8241ceef4061550cd315d5cf1b68670c39a47ba66fd21c847c5"
+  },
+  "version": {
+    "version": "19.0.0"
+  },
+  "protectedScopes": [
+    "login",
+    "person"
+  ],
+  "success": true
+}

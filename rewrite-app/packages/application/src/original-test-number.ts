@@ -3,6 +3,7 @@ import {resultParentUnavailable} from './result-artifact-parent.js';
 
 export type OriginalTestNumberScope = Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId'>;
 export type OriginalTestNumberRecord = OriginalTestNumberScope & {testNumber: string};
+export type OriginalTestNumberRun = Pick<TestRun,'testRunId'|'participantSessionId'|'tenantId'|'workspaceId'|'contentReleaseId'|'originalResultState'>;
 export type OriginalTestNumberInput = OriginalTestNumberScope & {consumeSequence?: boolean};
 const keys = ['testRunId', 'participantSessionId', 'tenantId', 'workspaceId', 'contentReleaseId'] as const;
 const maximum = 9223372036854775807n;
@@ -15,7 +16,7 @@ const counterValue = (value: string): bigint => {
 
 /** IDs remain decimal strings internally, including values above JS safe integers.
  * Only a currently owned native Run with known first identity may acquire one. */
-export function prepareOriginalTestNumber(input: OriginalTestNumberInput, run: TestRun | null,
+export function prepareOriginalTestNumber(input: OriginalTestNumberInput, run: OriginalTestNumberRun | null,
   person: ParticipantSession | null, existing: OriginalTestNumberRecord | undefined, counter: string): {
     record: OriginalTestNumberRecord; counter: string; changed: boolean;
   } {

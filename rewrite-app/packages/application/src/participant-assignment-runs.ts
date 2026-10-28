@@ -18,7 +18,7 @@ export type ParticipantInitialContentRelease = Pick<ContentRelease, 'contentRele
 /** Bind only a genuinely unbound native person, under the same writer as its
  * first Test and initial artifacts. Existing/canonical parent scopes stay strict. */
 export function bindOriginalPersonContentForFirstTest(candidate: TestRun, session: ParticipantSession | null,
-  runs: TestRun[], release?: ParticipantInitialContentRelease | null): ParticipantSession | null {
+  runs: Pick<TestRun,'participantSessionId'>[], release?: ParticipantInitialContentRelease | null): ParticipantSession | null {
   if (session?.contentReleaseId !== null) return session;
   if (session.originalLoginKey === undefined || session.originalNameSuffix === undefined || session.status !== 'signed_in' ||
     runs.some(run => run.participantSessionId === session.participantSessionId) || !release || release.status !== 'active' ||

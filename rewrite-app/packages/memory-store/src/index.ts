@@ -1,3 +1,6 @@
+import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
+import {readOriginalMonitorCollections} from '@testcenter-rewrite-app/application';
+import {prepareOriginalPersonNumber,selectOriginalPersonNumber,type OriginalPersonNumberRecord} from '@testcenter-rewrite-app/application';
 import {nextOriginalCommandNumber,findOriginalCommandTargetCollection,appendOriginalCommandCollection,listOriginalCommandsCollection,acknowledgeOriginalCommandCollection,touchOriginalCommandPollingCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalCommandDelivery} from '@testcenter-rewrite-app/application';
 import {prepareOriginalOperationalLogins,projectOriginalOperationalModes} from '@testcenter-rewrite-app/application';
@@ -115,6 +118,8 @@ type InMemoryFirstSliceState = {
   originalNativeUnits: Map<string,OriginalNativeUnit>;
   originalTestNumbers: Map<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
+  originalPersonNumbers: Map<string, OriginalPersonNumberRecord>;
+  originalPersonNumberCounter: string;
   originalTestRunsByNumber: Map<string,string>;
   originalWorkspaceNumbers: Map<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
@@ -159,6 +164,8 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   originalNativeUnits: new Map(),
   originalTestNumbers: new Map(),
   originalTestNumberCounter: "0",
+  originalPersonNumbers: new Map(),
+  originalPersonNumberCounter: "0",
   originalTestRunsByNumber: new Map(),
   originalWorkspaceNumbers: new Map(),
   originalWorkspaceNumberCounter: "0",
@@ -462,6 +469,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       deleteMatching(state.originalSessionTokens, workspaceMatches);
       deleteMatching(state.originalParticipantGroups, workspaceMatches);
       deleteMatching(state.originalNativeUnits,workspaceMatches);
+      deleteMatching(state.originalPersonNumbers,workspaceMatches);
       deleteMatching(state.originalTestNumbers, row=>{if(!workspaceMatches(row))return false;state.originalTestRunsByNumber.delete(row.testNumber);return true;});
       deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
       for (const run of state.testRuns.values()) {
@@ -824,11 +832,21 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async listOriginalLoginBindingsByWorkspace(tenantId, workspaceId) {
       return structuredClone(Array.from(state.originalLoginBindings.values()).filter(binding => binding.tenantId === tenantId && binding.workspaceId === workspaceId));
     },
+    async readOriginalMonitorSessions(actor,groupKey){return readOriginalMonitorCollections(state,actor,groupKey);},
+    async ensureOriginalPersonCredential(input){
+      if(!originalPersonCredentialMatches(input,state.participantSessions.get(input.participantSessionId)))return false;
+      if(!state.participantAccessCredentials.get(input.participantSessionId)?.tokenHash)state.participantAccessCredentials.set(input.participantSessionId,{participantSessionId:input.participantSessionId,tokenHash:input.tokenHash,updatedAt:input.updatedAt});
+      return true;
+    },
+    async listOriginalPersonTestIdentities(scope){return Array.from(state.testRuns.values()).filter(run=>run.participantSessionId===scope.participantSessionId&&run.tenantId===scope.tenantId&&run.workspaceId===scope.workspaceId).map(projectOriginalPersonTestIdentity);},
+    async getOriginalPersonNumber(input){return selectOriginalPersonNumber(input,state.originalPersonNumbers.get(input.participantSessionId),state.participantSessions.get(input.participantSessionId));},
     async resolveOriginalParticipantSession(candidate,validate) {
       if(!Array.from(state.workspacesByScope.values()).some(workspace=>workspace.tenantId===candidate.tenantId && workspace.workspaceId===candidate.workspaceId))return null;
       const binding=Array.from(state.originalLoginBindings.values()).find(binding=>binding.tenantId===candidate.tenantId && binding.workspaceId===candidate.workspaceId && binding.loginKey===candidate.originalLoginKey);
       const storedPeople=Array.from(state.participantSessions.values()),result=resolveOriginalPerson(candidate,binding,storedPeople,validate);
       const people=projectOriginalPersonSessions(result.participantSession,storedPeople),runs=projectOriginalPersonRuns(result.participantSession,Array.from(state.testRuns.values()),people);
+      const numbered=result.created?prepareOriginalPersonNumber(result.participantSession,state.originalPersonNumberCounter):undefined;
+      if(numbered){state.originalPersonNumbers.set(result.participantSession.participantSessionId,numbered.record);state.originalPersonNumberCounter=numbered.counter;}
       for(const person of people)state.participantSessions.set(person.participantSessionId,person);
       for(const run of runs)state.testRuns.set(run.testRunId,run);
       return structuredClone(result);
@@ -1013,6 +1031,15 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return Array.from(state.testRuns.values()).filter(
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
+    },
+    async getOrCreateOriginalPersonTest(candidate){
+      const parent=state.participantSessions.get(candidate.participantSessionId)??null;
+      const prepared=prepareOriginalPersonTestCreation(candidate,parent,Array.from(state.testRuns.values()).map(projectOriginalPersonTestIdentity),state.contentReleases.get(candidate.contentReleaseId));
+      const numbered=prepareOriginalTestNumber({...prepared.testRun,consumeSequence:true},prepared.testRun,prepared.participantSession??parent,state.originalTestNumbers.get(prepared.testRun.testRunId),state.originalTestNumberCounter);
+      if(prepared.fresh)state.testRuns.set(prepared.fresh.testRunId,prepared.fresh);
+      if(prepared.participantSession)state.participantSessions.set(prepared.participantSession.participantSessionId,prepared.participantSession);
+      if(numbered.changed){state.originalTestNumbers.set(prepared.testRun.testRunId,numbered.record);state.originalTestRunsByNumber.set(numbered.record.testNumber,prepared.testRun.testRunId);state.originalTestNumberCounter=numbered.counter;}
+      return{testRun:prepared.testRun,created:prepared.created,originalTestNumber:numbered.record.testNumber};
     },
     async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
       if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}

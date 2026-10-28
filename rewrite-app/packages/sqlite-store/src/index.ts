@@ -1,3 +1,6 @@
+import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
+import {createOriginalMonitorRepository} from './original-monitor-session.js';
+import {prepareOriginalPersonNumber,selectOriginalPersonNumber} from '@testcenter-rewrite-app/application';
 import {createOriginalCommandRepository} from './original-command-queue.js';
 import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/application';
 import {lockOriginalTest} from './original-test-lock.js';
@@ -1802,6 +1805,13 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
       timestamp_seconds TEXT NOT NULL,executed INTEGER NOT NULL DEFAULT FALSE,
       PRIMARY KEY(command_number,test_number));
       CREATE INDEX original_native_commands_target ON original_native_commands(test_number,executed,timestamp_seconds,command_number);`}
+,{version:79,name:"original_native_person_numbers",sql:`CREATE TABLE original_person_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+      INSERT INTO original_person_number_counter(singleton,last_number) VALUES(1,'0');
+      CREATE UNIQUE INDEX original_person_number_parent_scope ON participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix);
+      CREATE TABLE original_person_numbers(person_number TEXT PRIMARY KEY,participant_session_id TEXT NOT NULL UNIQUE,
+        tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,original_login_key TEXT NOT NULL,original_name_suffix TEXT NOT NULL,
+        FOREIGN KEY(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix)
+          REFERENCES participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) ON DELETE CASCADE);`}
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -2197,6 +2207,7 @@ export const createSqliteFirstSliceStorage = (
 
   const repository: FirstSliceRepository = {
     ...createOriginalCommandRepository(database),
+    ...createOriginalMonitorRepository(database),
     async getApplicationSettings() {
       const row = database
         .prepare(
@@ -3474,6 +3485,19 @@ export const createSqliteFirstSliceStorage = (
     async listOriginalLoginBindingsByWorkspace(tenantId,workspaceId) {
       return database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? ORDER BY login_key").all(tenantId,workspaceId).map(mapOriginalLoginBinding);
     },
+    async ensureOriginalPersonCredential(input){database.exec('BEGIN IMMEDIATE');try{
+      const person=mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(input.participantSessionId));
+      if(!originalPersonCredentialMatches(input,person)){database.exec('ROLLBACK');return false;}
+      database.prepare('INSERT INTO participant_access_credentials(participant_session_id,token_hash,updated_at) VALUES(?,?,?) ON CONFLICT(participant_session_id) DO UPDATE SET token_hash=excluded.token_hash,updated_at=excluded.updated_at WHERE participant_access_credentials.token_hash IS NULL').run(input.participantSessionId,input.tokenHash,input.updatedAt);
+      database.exec('COMMIT');return true;
+    }catch(error){return rollbackAfterFailure(database,error);}},
+    async listOriginalPersonTestIdentities(scope){return database.prepare("SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,booklet_key,booklet_assignment_key,locked,json_extract(original_result_state_json,'$.bookletName') AS booklet_name,json_extract(original_result_state_json,'$.bookletLabel') AS booklet_label FROM test_runs WHERE participant_session_id=? AND tenant_id=? AND workspace_id=?").all(scope.participantSessionId,scope.tenantId,scope.workspaceId).map(row=>projectOriginalPersonTestIdentity({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id),bookletKey:String(row.booklet_key),bookletAssignmentKey:row.booklet_assignment_key==null?undefined:String(row.booklet_assignment_key),locked:row.locked===1,originalResultState:{bookletName:typeof row.booklet_name==='string'?row.booklet_name:undefined,bookletLabel:typeof row.booklet_label==='string'?row.booklet_label:undefined}}));},
+    async getOriginalPersonNumber(input){
+      const row=database.prepare('SELECT n.* FROM original_person_numbers n JOIN participant_sessions p ON p.participant_session_id=n.participant_session_id AND p.tenant_id=n.tenant_id AND p.workspace_id=n.workspace_id AND p.original_login_key=n.original_login_key AND p.original_name_suffix=n.original_name_suffix WHERE n.participant_session_id=? AND n.tenant_id=? AND n.workspace_id=? AND n.original_login_key=? AND n.original_name_suffix=?').get(input.participantSessionId,input.tenantId,input.workspaceId,input.originalLoginKey,input.originalNameSuffix);
+      if(!row)return null;
+      const record={participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),originalLoginKey:String(row.original_login_key),originalNameSuffix:String(row.original_name_suffix),personNumber:String(row.person_number)};
+      return selectOriginalPersonNumber(input,record,record);
+    },
     async resolveOriginalParticipantSession(candidate,validate) {
       database.exec("BEGIN IMMEDIATE");
       try {
@@ -3482,9 +3506,15 @@ export const createSqliteFirstSliceStorage = (
         const binding=database.prepare("SELECT * FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND login_key=?").get(candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null);
         const people=database.prepare("SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?").all(candidate.tenantId,candidate.workspaceId,candidate.originalLoginKey??null).map(mapParticipantSession).filter((person):person is ParticipantSession=>person!==null);
         const result=resolveOriginalPerson(candidate,binding?mapOriginalLoginBinding(binding):null,people,validate),person=result.participantSession;
-        const runs=database.prepare("SELECT * FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)").all(person.tenantId,person.workspaceId,person.originalLoginKey!).map(mapTestRun).filter((run):run is TestRun=>run!==null);
+        const runs=database.prepare("SELECT test_run_id,participant_session_id,tenant_id,workspace_id,execution_mode FROM test_runs WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?)").all(person.tenantId,person.workspaceId,person.originalLoginKey!).map(row=>({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),executionMode:row.execution_mode==null?undefined:row.execution_mode as TestRun['executionMode']}));
         projectOriginalPersonRuns(person,runs,people);
         if(result.created)database.prepare("INSERT INTO participant_sessions (participant_session_id,tenant_id,workspace_id,content_release_id,login_key,group_key,participant_code,execution_mode,status,valid_until,created_at,original_login_key,original_name_suffix,original_operational_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(...[person.participantSessionId,person.tenantId,person.workspaceId,person.contentReleaseId,person.loginKey,person.groupKey,person.participantCode??null,person.executionMode??null,person.status,person.validUntil??null,person.createdAt,person.originalLoginKey??null,person.originalNameSuffix??null,person.originalOperationalMode??null]);
+        if(result.created){
+          const counter=database.prepare('SELECT last_number FROM original_person_number_counter WHERE singleton=1').get();
+          const numbered=prepareOriginalPersonNumber(person,String(counter?.last_number));
+          database.prepare('UPDATE original_person_number_counter SET last_number=? WHERE singleton=1').run(numbered.counter);
+          database.prepare('INSERT INTO original_person_numbers(person_number,participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) VALUES(?,?,?,?,?,?)').run(numbered.record.personNumber,person.participantSessionId,person.tenantId,person.workspaceId,person.originalLoginKey!,person.originalNameSuffix!);
+        }
         database.prepare("UPDATE participant_sessions SET group_key=?,execution_mode=?,original_operational_mode=? WHERE tenant_id=? AND workspace_id=? AND original_login_key=? AND (group_key IS NOT ? OR execution_mode IS NOT ? OR original_operational_mode IS NOT ?)").run(person.groupKey,person.executionMode??null,person.originalOperationalMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.groupKey,person.executionMode??null,person.originalOperationalMode??null);
         database.prepare("UPDATE test_runs SET execution_mode=? WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=? AND original_login_key=?) AND execution_mode IS NOT ?").run(person.executionMode??null,person.tenantId,person.workspaceId,person.originalLoginKey!,person.executionMode??null);
         database.exec("COMMIT");return result;
@@ -3756,7 +3786,8 @@ export const createSqliteFirstSliceStorage = (
     async appendOriginalTestLogs(input, logs) {await appendOriginalTestLogs(database, input, logs);},
     async getOrCreateOriginalTestNumber(input) {
       return withResultArtifactParent(database, input, () => {
-        const run = mapTestRun(database.prepare('SELECT * FROM test_runs WHERE test_run_id=?').get(input.testRunId) as Record<string, unknown> | undefined);
+        const row=database.prepare("SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,json_extract(original_result_state_json,'$.bookletName') AS booklet_name,json_extract(original_result_state_json,'$.bookletLabel') AS booklet_label FROM test_runs WHERE test_run_id=?").get(input.testRunId);
+        const run=row?{testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id),originalResultState:{bookletName:typeof row.booklet_name==='string'?row.booklet_name:undefined,bookletLabel:typeof row.booklet_label==='string'?row.booklet_label:undefined}}:null;
         const person = mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(input.participantSessionId) as Record<string, unknown> | undefined);
         return allocateOriginalTestNumber(database, input, run, person);
       });
@@ -3818,6 +3849,17 @@ export const createSqliteFirstSliceStorage = (
         .all(tenantId, workspaceId) as Record<string, unknown>[];
       return rows.map(row => mapTestRun(row)).filter(Boolean) as TestRun[];
     },
+    async getOrCreateOriginalPersonTest(candidate){database.exec('BEGIN IMMEDIATE');try{
+      const parent=mapParticipantSession(database.prepare('SELECT * FROM participant_sessions WHERE participant_session_id=?').get(candidate.participantSessionId));
+      const identities=database.prepare("SELECT test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,booklet_key,booklet_assignment_key,locked,json_extract(original_result_state_json,'$.bookletName') AS booklet_name,json_extract(original_result_state_json,'$.bookletLabel') AS booklet_label FROM test_runs WHERE participant_session_id=? OR test_run_id=?").all(candidate.participantSessionId,candidate.testRunId).map(row=>projectOriginalPersonTestIdentity({testRunId:String(row.test_run_id),participantSessionId:String(row.participant_session_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),contentReleaseId:String(row.content_release_id),bookletKey:String(row.booklet_key),bookletAssignmentKey:row.booklet_assignment_key==null?undefined:String(row.booklet_assignment_key),locked:row.locked===1,originalResultState:{bookletName:typeof row.booklet_name==='string'?row.booklet_name:undefined,bookletLabel:typeof row.booklet_label==='string'?row.booklet_label:undefined}}));
+      const row=parent?.contentReleaseId===null?database.prepare('SELECT content_release_id,tenant_id,workspace_id,status FROM content_releases WHERE content_release_id=? AND tenant_id=? AND workspace_id=?').get(candidate.contentReleaseId,parent.tenantId,parent.workspaceId):undefined;
+      const release=row?{contentReleaseId:String(row.content_release_id),tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),status:row.status as ContentRelease['status']}:null;
+      const prepared=prepareOriginalPersonTestCreation(candidate,parent,identities,release);
+      if(prepared.fresh&&!persistTestRun(database,prepared.fresh,false))throw new Error('Native Test reservation was not persisted.');
+      if(prepared.participantSession)database.prepare('UPDATE participant_sessions SET content_release_id=? WHERE participant_session_id=?').run(prepared.participantSession.contentReleaseId,candidate.participantSessionId);
+      const originalTestNumber=allocateOriginalTestNumber(database,{...prepared.testRun,consumeSequence:true},prepared.testRun,prepared.participantSession??parent);
+      database.exec('COMMIT');return{testRun:prepared.testRun,created:prepared.created,originalTestNumber};
+    }catch(error){return rollbackAfterFailure(database,error);}},
     async getOrCreateTestRunForAssignment(candidate, initialize, allocateOriginalNumber) {
       if (allocateOriginalNumber) {assertOriginalTestCreationCandidate(candidate); if (initialize) throw new TypeError('Native creation cannot activate a controller.');}
       database.exec("BEGIN IMMEDIATE");
