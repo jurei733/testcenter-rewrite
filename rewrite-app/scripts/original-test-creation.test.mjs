@@ -387,7 +387,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       await services.originalUnit.patchState({...target,body:{originalUnitId:'ATOMIC.FIRST',newState:[{key:'accepted',content:'before',timeStamp:1}]}});
       const before=await repository.getOriginalUnit({...testRun,unitName}),logs=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),body={newState:[{key:'ownedLateUnitState',content:'must roll back',timeStamp:2}]};
       if(kind==='memory'){
-        const failing=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19',idGenerator:()=>logs.find(row=>row.testRunId===testRun.testRunId).participantTestLogId});
+        const failing=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19',idGenerator:()=>logs.find(row=>row.testRunId===testRun.testRunId&&row.logKey==='accepted').participantTestLogId.replace(/^original-unit-log:/,'')});
         await assert.rejects(failing.originalUnit.patchState({...target,body}),/collision|identity/i);
       }else if(kind==='file'){
         const backup=file+'.native-unit-backup',mutate=repository.mutateOriginalUnit;let projected=false;
@@ -938,6 +938,10 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         await nativeRequest('PUT',unitPath+'/response',httpPerson.person.token,{timeStamp:5,dataParts:{a:'equal rejected',b:'new default type'}},201);
         const restoredUnit=JSON.parse((await nativeRequest('GET',unitRead,httpPerson.person.token)).text);assert.deepEqual(restoredUnit.state,{choice:'newest'});assert.deepEqual(restoredUnit.dataParts,{a:'Exact HTTP Ω/x',b:'new default type'});assert.equal(restoredUnit.unitResponseType,'unknown');
         const logged=await nativeRequest('PUT',unitPath+'/log',httpPerson.person.token,{logEntries:[{key:'httpNativeUnitLog',content:{owned:true},timeStamp:0}]},201);assert.equal(logged.bytes.length,0);
+        const nativeUnitLog=(await repository.listParticipantTestLogsByWorkspace(workspace.tenantId,workspace.workspaceId)).find(row=>row.logKey==='httpNativeUnitLog');
+        assert.ok(nativeUnitLog);assert.match(nativeUnitLog.participantTestLogId,/^original-unit-log:/);
+        const {formatOriginalParticipantLogEntry:formatNativeUnitLog}=await import('../packages/application/dist/packages/application/src/original-report-csv.js');
+        assert.equal(formatNativeUnitLog(nativeUnitLog),'httpNativeUnitLog = {"owned":true}');
         assert.deepEqual(JSON.parse((await nativeRequest('GET','/test/'+expected,httpPerson.person.token)).text).laststate,reread.laststate);
         const logPath='/test/'+expected+'/log';
         const logMapping=await repository.findOriginalTestNumber({...ids,participantSessionId:httpPerson.person.participantSession.participantSessionId,testNumber:expected});assert.ok(logMapping);
