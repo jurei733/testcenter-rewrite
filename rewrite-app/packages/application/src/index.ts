@@ -43,6 +43,9 @@ export {prepareOriginalSessionToken, selectOriginalSessionToken, originalSession
   createOriginalSessionToken, OriginalSessionTokenCollisionError} from './original-session-token.js';
 export type {OriginalSessionToken, OriginalSessionTokenRepository} from './original-session-token.js';
 import {createOriginalAuthentication} from './original-authentication.js';
+import {findOriginalOperationalDefinition,isOriginalOperationalLogin} from './original-operational-login.js';
+export {prepareOriginalOperationalLogins,projectOriginalOperationalModes} from './original-operational-login.js';
+export type {OriginalOperationalLogin} from './original-operational-login.js';
 export type {OriginalAuthenticationPort, OriginalAuthenticationState} from './original-authentication.js';
 import type {WorkspaceFilePublicationInput} from "./workspace-file-publication.js";
 export {createWorkspaceFilePublicationRevision,prepareWorkspaceFilePublication} from "./workspace-file-publication.js";
@@ -1573,8 +1576,11 @@ export type FirstSliceRepository = ParticipantAccessRepository & import('./origi
   replaceOperationalLoginMigrationCandidatesByWorkspace(
     tenantId: string,
     workspaceId: string,
-    candidates: OriginalTestcenterOperationalLoginCandidate[]
+    candidates: OriginalTestcenterOperationalLoginCandidate[],
+    nativeLogins?: import('./original-operational-login.js').OriginalOperationalLogin[]
   ): Promise<void>;
+  /** Private native identities; never serialized as public migration candidates. */
+  listOriginalOperationalLoginsByWorkspace(tenantId: string, workspaceId: string): Promise<import('./original-operational-login.js').OriginalOperationalLogin[]>;
   getParticipantRosterPasswordHash(
     tenantId: string,
     workspaceId: string,
@@ -25122,6 +25128,10 @@ export const createFirstSliceServices = (
       repository,
       participantSessionId
     );
+    if (participantSession.originalOperationalMode !== undefined ||
+      (participantSession.originalLoginKey !== undefined && (await repository.listOriginalOperationalLoginsByWorkspace(participantSession.tenantId,participantSession.workspaceId)).some(login=>login.loginKey===participantSession.loginKey))) {
+      throw new FirstSliceError(403,'participant_operational_identity_forbidden','An operational native identity cannot use canonical participant access.');
+    }
     const rosterEntry = await findParticipantRosterEntryByLoginKey(
       repository,
       participantSession.tenantId,
@@ -25391,6 +25401,7 @@ export const createFirstSliceServices = (
     const operationalLoginCandidates = [] as OriginalTestcenterOperationalLoginCandidate[];
     const nativeEntries = new Set<ReturnType<typeof parseParticipantRosterText>[number]>();
     const nativeOperationalEntries = new Set<OriginalTestcenterOperationalLoginCandidate>();
+    const nativeOperationalPasswords = new Map<OriginalTestcenterOperationalLoginCandidate, string>();
 
     for (const rosterDocument of input.rosterDocuments) {
       const jsonInspection = inspectParticipantRosterJsonSource(
@@ -25434,7 +25445,15 @@ export const createFirstSliceServices = (
         const root = new DOMParser().parseFromString(rosterDocument.rosterText, "application/xml").documentElement;
         if (root && xmlElementLocalName(root) === "Testtakers") {
           for (const entry of documentEntries) nativeEntries.add(entry);
-          for (const entry of documentOperationalEntries) nativeOperationalEntries.add(entry);
+          for (const entry of documentOperationalEntries) {
+            nativeOperationalEntries.add(entry);
+            const elements = Array.from(root.getElementsByTagName('*')).filter(element =>
+              xmlElementLocalName(element) === 'Login' && element.getAttribute('name') === entry.loginKey &&
+              element.getAttribute('mode') === entry.loginMode);
+            if (elements.length !== 1) throw new FirstSliceError(400, 'original_operational_login_invalid', 'Native operational login identity is ambiguous.');
+            const password = elements[0]!.getAttribute('pw') ?? '';
+            nativeOperationalPasswords.set(entry, password);
+          }
         }
       }
       parsedEntries.push(...documentEntries);
@@ -25545,6 +25564,11 @@ export const createFirstSliceServices = (
       return { parsedEntry, validFrom, validTo };
     });
 
+    // Delay expensive credential derivation until the complete import has passed validation.
+    const nativeOperationalLogins = Array.from(nativeOperationalPasswords, ([entry, password]) => ({
+      loginKey: entry.loginKey, loginMode: entry.loginMode, passwordHash: password ? hashPassword(password) : null
+    }));
+
     const existingEntries =
       await repository.listParticipantRosterEntriesByWorkspace(
         workspace.tenantId,
@@ -25645,7 +25669,8 @@ export const createFirstSliceServices = (
     await repository.replaceOperationalLoginMigrationCandidatesByWorkspace(
       workspace.tenantId,
       workspace.workspaceId,
-      operationalLoginCandidates
+      operationalLoginCandidates,
+      nativeOperationalLogins
     );
 
     const migrationOnly = parsedEntries.length === 0;
@@ -27447,8 +27472,8 @@ export const createFirstSliceServices = (
   };
 
   const authenticateParticipantCredentials = async (
-    workspace: Workspace, rosterEntry: ParticipantRosterEntry | null, loginKey: string,
-    input: {password?: string; groupKey?: string}, nativeFirstFactor = false
+    workspace: Workspace, rosterEntry: Pick<ParticipantRosterEntry,'loginKey'|'groupKey'|'groupLabel'|'passwordRequired'|'validFrom'|'validTo'|'originalLoginIdentity'> | null, loginKey: string,
+    input: {password?: string; groupKey?: string}, nativeFirstFactor = false, nativeCredential?: {passwordHash:string|null}
   ) => {
     const signInTimestamp = now();
     // Original accepts the XML attribute but stores an empty label as NULL.
@@ -27487,11 +27512,11 @@ export const createFirstSliceServices = (
           }
         );
       }
-      const passwordHash = await repository.getParticipantRosterPasswordHash(
+      const passwordHash = nativeCredential === undefined ? await repository.getParticipantRosterPasswordHash(
         workspace.tenantId,
         workspace.workspaceId,
         loginKey
-      );
+      ) : nativeCredential.passwordHash;
       if (
         typeof input.password !== "string" ||
         (passwordHash ? !verifyPassword(input.password, passwordHash) :
@@ -27539,7 +27564,7 @@ export const createFirstSliceServices = (
 
   const signInParticipant = async (
     input: Parameters<ParticipantRuntimePort['signIn']>[0],
-    nativePrincipal?: import('./original-authentication.js').OriginalAuthenticationPrincipal
+    nativePrincipal?: {workspace:Workspace;rosterEntry:ParticipantRosterEntry;binding:import('@testcenter-rewrite-app/domain').OriginalLoginBinding}
   ): Promise<ParticipantSession> => {
     const tenantKey = normalizeOptionalParticipantTenantKey(input.tenantKey);
     const requestedWorkspaceKey = String(input.workspaceKey ?? "").trim();
@@ -27570,6 +27595,9 @@ export const createFirstSliceServices = (
       );
     }
 
+    if ((await repository.listOriginalOperationalLoginsByWorkspace(workspace.tenantId,workspace.workspaceId)).some(login=>login.loginKey===loginKey)) {
+      throw new FirstSliceError(403,'participant_operational_identity_forbidden','An operational native identity cannot sign in as a canonical participant.');
+    }
     const activeRelease = nativePrincipal ? null : await getActiveWorkspaceRelease(
       repository,
       workspace.tenantId,
@@ -27766,27 +27794,66 @@ export const createFirstSliceServices = (
     invalidAccess: () => new FirstSliceError(401, 'participant_session_invalid', 'Participant access is invalid or has expired.'),
     now, allowLegacySessionIds: true
   });
+  const operationalDefinition = (scope:{tenantId:string;workspaceId:string},loginKey:string) =>
+    findOriginalOperationalDefinition(repository,scope,loginKey,value=>normalizeParticipantAccessBoundary(value,participantAccessTimeZone));
+  const activeNativeWorkspace = async (scope:{tenantId:string;workspaceId:string}) => {
+    const tenant=(await repository.listTenants()).find(row=>row.tenantId===scope.tenantId&&row.status==='active');
+    return tenant?(await repository.listWorkspacesByTenantId(tenant.tenantId)).find(row=>row.workspaceId===scope.workspaceId&&row.status==='active'):undefined;
+  };
+  const nativeAccess = createParticipantAccessService({repository,now,allowLegacySessionIds:false,
+    invalidAccess:()=>new FirstSliceError(401,'original_session_invalid','The Original session token is invalid.'),
+    async getAccessibleSession(id){
+      const person=await repository.getParticipantSessionById(id);
+      if(!person||person.originalLoginKey===undefined)throw new FirstSliceError(401,'original_session_invalid','The Original session token is invalid.');
+      if(!await activeNativeWorkspace(person))throw new FirstSliceError(410,'original_login_gone','The Original workspace is no longer available.');
+      const operational=await operationalDefinition(person,person.originalLoginKey);
+      if(!operational){
+        if(person.originalOperationalMode!==undefined)throw new FirstSliceError(410,'original_login_gone','The Original login is no longer available.');
+        return requireAccessibleParticipantSession(id);
+      }
+      const binding=(await repository.listOriginalLoginBindingsByWorkspace(person.tenantId,person.workspaceId)).find(row=>row.loginKey===person.originalLoginKey);
+      if(!binding)throw new FirstSliceError(410,'original_login_gone','The Original login is no longer available.');
+      if(operational.definition.groupLabel==='')throw new FirstSliceError(500,'original_group_label_invalid','The imported Original group label is empty.');
+      assertParticipantAccessWindow(operational.definition,now(),person.validUntil);
+      const result={...person,groupKey:binding.groupKey,originalOperationalMode:operational.definition.originalOperationalMode};delete result.executionMode;return result;
+    }
+  });
+  const enterOperational = async (principal:import('./original-authentication.js').OriginalAuthenticationPrincipal,code:string):Promise<ParticipantSession> => {
+    if(!isOriginalOperationalLogin(principal.rosterEntry))throw new Error('An operational principal is required.');
+    if(code!=='')throw new FirstSliceError(403,'participant_code_invalid','The operational native Login has no assigned person code.');
+    const timestamp=now(),entry=principal.rosterEntry;
+    const candidate:ParticipantSession={participantSessionId:idGenerator(),tenantId:principal.workspace.tenantId,workspaceId:principal.workspace.workspaceId,
+      contentReleaseId:null,loginKey:entry.loginKey,groupKey:principal.binding.groupKey,originalLoginKey:entry.loginKey,
+      originalNameSuffix:'',originalOperationalMode:entry.originalOperationalMode,participantCode:'',status:'signed_in',createdAt:timestamp,
+      validUntil:resolveParticipantSessionValidUntil(entry,timestamp)};
+    assertParticipantAccessWindow(entry,timestamp,candidate.validUntil);
+    const result=await repository.resolveOriginalParticipantSession(candidate,person=>assertParticipantAccessWindow(entry,timestamp,person.validUntil));
+    if(!result)throw new FirstSliceError(409,'original_login_scope_changed','The Original login scope changed during authentication.');
+    return result.participantSession;
+  };
   const originalAuthentication = createOriginalAuthentication({
-    repository, access: participantAccess, now,
+    repository, access: nativeAccess, now,
     error: (status, code, message) => new FirstSliceError(status, code, message),
-    requiresCode: participantRosterRequiresCode,
+    requiresCode: entry => isOriginalOperationalLogin(entry) ? false : participantRosterRequiresCode(entry),
     async authenticate(name, password) {
       if (typeof name !== 'string' || !name || typeof password !== 'string') {
         throw new FirstSliceError(400, 'original_login_invalid', 'An Original login name and password are required.');
       }
-      const candidates: Array<{workspace: Workspace; rosterEntry: ParticipantRosterEntry}> = [];
+      const candidates: Array<{workspace: Workspace; rosterEntry: import('./original-operational-login.js').OriginalNativeLogin;nativeCredential?:{passwordHash:string|null}}> = [];
       for (const tenant of await repository.listTenants()) {
         if (tenant.status !== 'active') continue;
         for (const workspace of await repository.listWorkspacesByTenantId(tenant.tenantId)) {
           if (workspace.status !== 'active') continue;
+          const operational = await operationalDefinition(workspace,name);
+          if(operational){candidates.push({workspace,rosterEntry:operational.definition,nativeCredential:{passwordHash:operational.passwordHash}});continue;}
           const rosterEntry = (await repository.listParticipantRosterEntriesByWorkspace(workspace.tenantId, workspace.workspaceId))
             .find(entry => entry.originalLoginIdentity === true && entry.loginKey === name);
           if (rosterEntry) candidates.push({workspace, rosterEntry});
         }
       }
       if (candidates.length !== 1) throw new FirstSliceError(401, 'original_login_invalid', 'The Original login is invalid or ambiguous.');
-      const {workspace, rosterEntry} = candidates[0]!;
-      const authenticated = await authenticateParticipantCredentials(workspace, rosterEntry, name, {password}, true);
+      const {workspace, rosterEntry, nativeCredential} = candidates[0]!;
+      const authenticated = await authenticateParticipantCredentials(workspace, rosterEntry, name, {password}, true, nativeCredential);
       if (!authenticated.nativeBinding) throw new FirstSliceError(409, 'original_login_scope_changed', 'The Original login scope changed during authentication.');
       // First-factor success resets attempts even when no code is entered afterwards.
       await repository.resetParticipantLoginAttempts(workspace.tenantId, workspace.workspaceId, name);
@@ -27796,8 +27863,9 @@ export const createFirstSliceServices = (
       const tenant = (await repository.listTenants()).find(item => item.tenantId === scope.tenantId && item.status === 'active');
       const workspace = tenant ? (await repository.listWorkspacesByTenantId(tenant.tenantId))
         .find(item => item.workspaceId === scope.workspaceId && item.status === 'active') : undefined;
-      const rosterEntry = workspace ? (await repository.listParticipantRosterEntriesByWorkspace(scope.tenantId, scope.workspaceId))
-        .find(entry => entry.originalLoginIdentity === true && entry.loginKey === scope.subjectKey) : undefined;
+      const operational=workspace?await operationalDefinition(workspace,scope.subjectKey):null;
+      const rosterEntry = operational?.definition ?? (workspace ? (await repository.listParticipantRosterEntriesByWorkspace(scope.tenantId, scope.workspaceId))
+        .find(entry => entry.originalLoginIdentity === true && entry.loginKey === scope.subjectKey) : undefined);
       const binding = workspace ? (await repository.listOriginalLoginBindingsByWorkspace(scope.tenantId, scope.workspaceId))
         .find(item => item.loginKey === scope.subjectKey) : undefined;
       if (!workspace || !rosterEntry || !binding) throw new FirstSliceError(410, 'original_login_gone', 'The Original login is no longer available.');
@@ -27805,7 +27873,7 @@ export const createFirstSliceServices = (
       if (rosterEntry.groupLabel === '') throw new FirstSliceError(500, 'original_group_label_invalid', 'The imported Original group label is empty.');
       return {workspace, rosterEntry, binding};
     },
-    enter: (principal, code) => signInParticipant({loginKey: principal.rosterEntry.loginKey, participantCode: code}, principal)
+    enter: (principal, code) => isOriginalOperationalLogin(principal.rosterEntry) ? enterOperational(principal,code) : signInParticipant({loginKey: principal.rosterEntry.loginKey, participantCode: code}, {...principal,rosterEntry:principal.rosterEntry})
   });
 
   return {
@@ -32431,6 +32499,15 @@ export const createFirstSliceServices = (
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository,
+      operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,
+      async monitorAssignments(entry){
+        const entries=await repository.listParticipantRosterEntriesByWorkspace(entry.tenantId,entry.workspaceId);
+        const assignments=new Map<string,import('@testcenter-rewrite-app/domain').ParticipantBookletAssignment>();
+        for(const member of entries)if(member.originalLoginIdentity&&member.groupKey===entry.groupKey)for(const assignment of getParticipantRosterBookletAssignments(member)){
+          if(!assignments.has(assignment.assignmentKey))assignments.set(assignment.assignmentKey,{...assignment,accessCodes:[]});
+        }
+        return [...assignments.values()];
+      },
       assignments: (entry, code) => selectOriginalParticipantAssignments(getParticipantRosterBookletAssignments(entry), code),
       async bookletLabels(scope) {
         const [sources, events] = await Promise.all([repository.listSourcePackagesByWorkspace(scope.tenantId, scope.workspaceId),

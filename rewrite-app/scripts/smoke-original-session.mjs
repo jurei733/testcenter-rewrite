@@ -65,7 +65,7 @@ try {
   setPhase('owned-roster-fixture');
   const password = 'Owned-native-browser-private-2026!';
   await operatorApi(workspace + '/participant-roster', {rosterText: '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="OWNED.NATIVE.BROWSER" label="Owned native browser">' +
-    ['native-browser', 'native-peer'].map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login>`).join('') + '</Group></Testtakers>'}, operator, 201);
+    ['native-browser', 'native-peer'].map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login>`).join('') + `<Login name="native-monitor" pw="${password}" mode="monitor-group"/></Group></Testtakers>`}, operator, 201);
   setPhase('browser-launch');
   browser = await chromium.launch({headless: process.env.CI === 'true' && process.env.UI_SMOKE_HEADFUL !== 'true'});
   page = await browser.newPage({viewport: {width: 1280, height: 720}, locale: 'de-DE'});
@@ -219,6 +219,27 @@ try {
   await request('GET','/test/'+failedLockTest.rawText,undefined,peerPerson.token,423);
   await page.frameLocator('iframe').locator('main[data-started="true"]').waitFor();
   mark('browser-native-test-lock-preserves-unit-data-and-keeps-source-proven-lock-after-constructor-error');
+  setPhase('browser-native-monitor-person');
+  await request('PUT','/session/login',{name:'native-monitor',password},undefined,400);
+  const monitorWork=(await request('POST','/session/challenge',{loginType:'login',name:'native-monitor',password})).value;
+  const monitor=(await request('PUT','/session',await solve(monitorWork))).value;
+  assert.deepEqual(monitor.flags,[]);assert.equal(monitor.id,null);assert.equal(monitor.pwSetByAdmin,null);
+  assert.deepEqual(monitor.claims.testGroupMonitor,[{id:'OWNED.NATIVE.BROWSER',type:'testGroupMonitor',label:'Owned native browser',flags:[]}]);
+  assert.deepEqual(monitor.access,{test:['OWNED.BROWSER'],testGroupMonitor:['OWNED.NATIVE.BROWSER']});
+  assert.deepEqual(monitor.claims.test[0].flags,{locked:false,running:false});
+  const monitorTest=await request('PUT','/test',{bookletName:'OWNED.BROWSER'},monitor.token,201);
+  assert.notEqual(monitorTest.rawText,createdTest.rawText);
+  const monitorOpened=(await request('GET','/test/'+monitorTest.rawText,undefined,monitor.token)).value;
+  assert.equal(monitorOpened.mode,'monitor-group');assert.equal(monitorOpened.firstStart,true);
+  await request('GET','/test/'+monitorTest.rawText,undefined,identity.sessionToken,403);
+  await request('POST','/session/person/challenge',{code:'Shared'},monitor.token,403);
+  const originalMonitorToken=monitor.token,monitorAgain=(await request('PUT','/session',await solve((await request('POST','/session/challenge',{loginType:'login',name:'native-monitor',password})).value))).value;
+  assert.notEqual(monitorAgain.token,originalMonitorToken);assert.equal(monitorAgain.groupToken,monitor.groupToken);
+  await request('GET','/session',undefined,originalMonitorToken,401);
+  assert.equal((await request('PUT','/test',{bookletName:'OWNED.BROWSER'},monitorAgain.token,201)).rawText,monitorTest.rawText);
+  await page.frameLocator('iframe').locator('main[data-started="true"]').waitFor();
+  mark('browser-native-monitor-has-dual-claims-honest-own-test-mode-and-isolated-bearer');
+
 
 } catch (error) {
   await page?.screenshot({path: join(artifacts, 'failure.png'), fullPage: true}).catch(() => {});

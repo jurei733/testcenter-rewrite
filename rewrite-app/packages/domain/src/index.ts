@@ -581,6 +581,7 @@ export type OperationalLoginMigrationCandidate = {
   profileIds: string[];
   monitorProfiles: MonitorViewProfile[];
   monitorBookletVisibility: MonitorBookletVisibility;
+  viewSettings?: ParticipantViewSettings;
   customTexts: Record<string, string>;
   /** Original application asset filenames keyed by the Testtakers slot name. */
   assetAssignments?: Record<string, string>;
@@ -1136,6 +1137,8 @@ export type ParticipantSession = {
   originalLoginKey?: string;
   /** First server-generated Original person suffix; absent means unknown legacy history. */
   originalNameSuffix?: string;
+  /** Current native operational role; never a canonical participant execution mode. */
+  originalOperationalMode?: OperationalLoginMigrationCandidate['loginMode'];
   participantCode?: string | null;
   executionMode?: ParticipantExecutionMode;
   status: ParticipantSessionStatus;
