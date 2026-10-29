@@ -625,7 +625,7 @@ export class VeronaPlayerHostComponent
 
   @HostListener("document:visibilitychange")
   onVisibilityChange(): void {
-    this.scheduleFocusLog(!document.hidden);
+    this.scheduleFocusLog(!document.hidden && document.hasFocus());
   }
 
   private mountPlayer(): void {

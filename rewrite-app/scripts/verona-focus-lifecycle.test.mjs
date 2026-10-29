@@ -42,6 +42,13 @@ test('a later hidden-document event supersedes a pending player-focus hint',t=>{
  f.host.scheduleFocusLog(true);f.focus(false);f.visible(false);f.host.onVisibilityChange();
  t.mock.timers.tick(500);assert.deepEqual(f.entries.map(x=>x.content),['HAS_NOT']);
 });
+test('becoming visible without document focus cannot log HAS',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const unchanged=fixture();unchanged.focus(false);unchanged.host.lastFocusLogContent='HAS_NOT';
+ unchanged.host.onVisibilityChange();t.mock.timers.tick(500);assert.deepEqual(unchanged.entries,[]);
+ const changed=fixture();changed.focus(false);changed.host.onVisibilityChange();
+ t.mock.timers.tick(500);assert.deepEqual(changed.entries.map(x=>x.content),['HAS_NOT']);
+});
 test('a later owned player focus remains authoritative after application blur',t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.host.lastFocusLogContent='HAS_NOT';
  f.focus(false);f.host.onWindowBlur();f.host.scheduleFocusLog(true);
