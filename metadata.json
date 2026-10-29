@@ -2,7 +2,7 @@
   "cli_version": "0.12.2",
   "checkpoint_id": "01M63VD2M6MERT47FGG62QP9G9",
   "strategy": "manual-commit",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": null,
   "sessions": [
     {
@@ -11,24 +11,31 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 47136,
+    "input_tokens": 184715,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 7663744,
-    "output_tokens": 66106,
-    "api_call_count": 54
+    "cache_read_tokens": 9619072,
+    "output_tokens": 75280,
+    "api_call_count": 79
   },
   "redaction": {
-    "replacements": 59599,
+    "replacements": 59715,
     "layers": {
-      "betterleaks": 471,
+      "betterleaks": 563,
       "connection_string": 0,
       "credential_key": 0,
-      "credential_value": 228,
+      "credential_value": 233,
       "credentialed_uri": 76,
-      "entropy": 59061,
+      "entropy": 59088,
       "key_context": 0,
       "provider_token": 1,
       "shell_stdin": 2
@@ -39,5 +46,6 @@
       "sha": "b247486e7b6b6888cc03777fd6007478f0b2890b",
       "repo": "gh/jurei733/testcenter-rewrite"
     }
-  ]
+  ],
+  "has_review": true
 }
