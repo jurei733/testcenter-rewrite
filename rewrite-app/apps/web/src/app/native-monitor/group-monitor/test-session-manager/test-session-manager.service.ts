@@ -351,7 +351,8 @@ export class TestSessionManager {
   }
 
   commandFinishEverything(): Observable<CommandResponse> {
-    this.filters$.next([]);
+    // Finish targets come from a fresh complete snapshot. Keep the visible
+    // filter and auto-selection intact if the operation fails or is cancelled.
     const group = this.groupName;
     const revision = this.connectionRevision;
     const scope = this.bs.accessSignal;

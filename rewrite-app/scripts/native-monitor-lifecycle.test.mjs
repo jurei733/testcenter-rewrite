@@ -311,3 +311,26 @@ for(const command of ['goto','finish'])test('retired access cannot open another 
  if(command==='goto')f.component.testCommandGoto();else f.component.finishEverythingCommand();
  assert.equal(f.dialogRenders,0);assert.equal(f.gotoDialog.observed,false);assert.equal(f.confirmations.observed,false);assert.equal(f.finishes,0);assert.deepEqual(f.gotos,[]);f.component.ngOnDestroy();
 });
+
+for(const stage of ['snapshot','lock','terminate','cancel','unsubscribed'])test('failed finish preserves visible filters and later command recipients: '+stage,t=>{
+ clock(t);const f=managerFixture();f.manager.connect('A');f.rows('A',['1','2']);
+ const complete=f.manager.sessions.map(row=>row.data),failure=Error('Owned finish failure');
+ f.backend.getSessionsMonitor=()=>stage==='snapshot'?rx.throwError(()=>failure):rx.of(complete);
+ const lock=f.backend.lock,command=f.backend.command;
+ f.backend.lock=(...args)=>stage==='lock'?rx.throwError(()=>failure):lock(...args);
+ f.backend.command=(...args)=>stage==='terminate'&&args[0]==='terminate'?rx.throwError(()=>failure):command(...args);
+ f.manager.filterOptions.quick.filter.value='1';f.manager.filterOptions.quick.selected=true;f.manager.refreshFilters();
+ assert.deepEqual(f.manager.sessions.map(row=>row.data.testId),['1']);assert.deepEqual(f.manager.checked.map(row=>row.data.testId),['1']);
+ let error;const operation=f.manager.commandFinishEverything();
+ if(stage!=='unsubscribed'){
+  const sub=operation.subscribe({error:value=>{error=value;}});if(stage==='cancel')sub.unsubscribe();t.mock.timers.tick(1500);
+  if(stage!=='cancel')assert.equal(error,failure);
+ }
+ assert.equal(f.manager.filterOptions.quick.selected,true);assert.equal(f.manager.filterOptions.quick.filter.value,'1');
+ f.rows('A',['1','2']);
+ assert.deepEqual(f.manager.sessions.map(row=>row.data.testId),['1'],'displayed rows still obey the selected visible filter');
+ assert.deepEqual(f.manager.checked.map(row=>row.data.testId),['1'],'auto-check must not add hidden tests');
+ f.manager.testCommandResume();assert.deepEqual(f.writes.at(-1),{type:'resume',args:[],ids:['1']});
+ if(['terminate','cancel'].includes(stage))assert.deepEqual(f.writes.find(row=>row.type==='lock').ids,['1','2'],'finish-all still uses its independent complete snapshot');
+ f.manager.disconnect();
+});
