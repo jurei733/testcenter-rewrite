@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M63J8SC92BAER3GFEMT878CX",
+  "strategy": "manual-commit",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 191716,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 26822272,
+    "output_tokens": 141711,
+    "api_call_count": 120
+  },
+  "redaction": {
+    "replacements": 55382,
+    "layers": {
+      "betterleaks": 463,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 213,
+      "credentialed_uri": 76,
+      "entropy": 54844,
+      "key_context": 0,
+      "provider_token": 1,
+      "shell_stdin": 2
+    }
+  },
+  "linked_commits": [
+    {
+      "sha": "19bc24339495ce1f8b5676c52f93c595f03e8f6c",
+      "repo": "gh/jurei733/testcenter-rewrite"
+    }
+  ]
+}
