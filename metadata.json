@@ -2,7 +2,7 @@
   "cli_version": "0.12.2",
   "checkpoint_id": "01M643XHT0XH7YAMST8W6F4VPN",
   "strategy": "manual-commit",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": null,
   "sessions": [
     {
@@ -18,24 +18,31 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 265455,
+    "input_tokens": 376659,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 21479936,
-    "output_tokens": 150860,
-    "api_call_count": 112
+    "cache_read_tokens": 22553088,
+    "output_tokens": 157887,
+    "api_call_count": 129
   },
   "redaction": {
-    "replacements": 63184,
+    "replacements": 63268,
     "layers": {
-      "betterleaks": 531,
+      "betterleaks": 600,
       "connection_string": 0,
       "credential_key": 0,
-      "credential_value": 248,
+      "credential_value": 255,
       "credentialed_uri": 76,
-      "entropy": 62594,
+      "entropy": 62613,
       "key_context": 0,
       "provider_token": 2,
       "shell_stdin": 2
