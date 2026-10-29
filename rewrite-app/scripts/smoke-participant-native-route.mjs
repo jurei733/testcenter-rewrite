@@ -66,8 +66,10 @@ try {
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-native-route-browser" }, operator);
   await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="route-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
   const channel=process.env.UI_SMOKE_BROWSER_CHANNEL||(process.env.CI === "true" ? undefined : "chrome");
-  browser = await chromium.launch({ ...(channel?{channel}:{}), headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
+  const headless = process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true";
+  browser = await chromium.launch({ ...(channel?{channel}:{}), headless });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
+  observations.push({kind:'browser-mode',headless,channel:channel??'bundled-chromium',version:browser.version()});
   page = await context.newPage();
   page.on('request', request => pending.set(request, 'native-route'));
   for (const event of ['requestfinished', 'requestfailed']) page.on(event, request => pending.delete(request));
@@ -169,22 +171,31 @@ try {
     try { await route.fulfill({ response }); } catch {}
   };
   await page.route("**/save-progress", heldSave);
-  // A repeated focus within an already focused app is correctly deduplicated.
-  // Exercise a real document blur/focus through an owned second browser tab.
+  // Preserve each browser mode and prove its actual native focus transition.
+  // Headless Shell keeps separate targets focused; its own window can lose
+  // focus when minimized. Headed Chrome uses an actual owned second tab.
   const focusSession = await page.context().newCDPSession(page);
+  const window = headless ? await focusSession.send('Browser.getWindowForTarget') : null;
+  const restoreWindow = async () => {if(window)await focusSession.send('Browser.setWindowBounds',{windowId:window.windowId,bounds:{windowState:window.bounds.windowState??'normal'}});};
   await focusSession.send('Emulation.setFocusEmulationEnabled',{enabled:false});
-  const focusAway = await page.context().newPage();
-  const awaySession = await page.context().newCDPSession(focusAway);
-  await awaySession.send('Emulation.setFocusEmulationEnabled',{enabled:false});
+  let focusAway;
   try {
-    await focusAway.goto('about:blank'); await focusAway.bringToFront();
-    await poll(() => page.evaluate(() => !document.hasFocus()), "Owned tab did not blur the application");
+    if(window){
+      await focusSession.send('Browser.setWindowBounds',{windowId:window.windowId,bounds:{windowState:'minimized'}});
+    }else{
+      focusAway = await page.context().newPage();
+      const awaySession = await page.context().newCDPSession(focusAway);
+      await awaySession.send('Emulation.setFocusEmulationEnabled',{enabled:false});
+      await focusAway.goto('about:blank');await focusAway.bringToFront();
+    }
+    await poll(() => page.evaluate(() => !document.hasFocus()), "Owned browser action did not blur the application");
     await poll(() => Promise.resolve(unrelatedSaveSeen && focusSaves.includes('HAS_NOT')), "Real application blur did not exercise an unrelated save");
     unrelatedSaveSeen = false;const beforeRefocus=focusSaves.length;
-    await page.bringToFront(); await player().click();
+    await restoreWindow();await page.bringToFront();await player().click();
     await poll(() => page.evaluate(() => !document.hidden && document.hasFocus()), "Application did not regain real focus");
     await poll(() => Promise.resolve(unrelatedSaveSeen && focusSaves.slice(beforeRefocus).includes('HAS')), "Real player focus did not exercise an unrelated save");
-  } finally { await focusAway.close();await focusSession.send('Emulation.setFocusEmulationEnabled',{enabled:true});await focusSession.detach(); }
+    observations.push({kind:'real-browser-focus',action:window?'owned-window-minimize':'owned-tab',lostFocus:true,regainedFocus:true});
+  }finally{await restoreWindow();await focusAway?.close();await focusSession.send('Emulation.setFocusEmulationEnabled',{enabled:true});await focusSession.detach();}
   assert.equal(saveHeld, false, "A lifecycle/log-only save cannot qualify the closed answer buffer");
   mark("closed-answer-gate-ignores-player-lifecycle-and-focus-logs");
   await player().fill("Second Unit drain Ω");
