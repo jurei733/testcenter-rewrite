@@ -367,15 +367,28 @@ export class TestSessionManager {
         const unlocked = rows.filter(row => BigInt(row.testId) > 0n &&
           !TestSessionUtil.hasState(row.testState, 'status', 'locked'));
         const lockIds = unlocked.map(row => row.testId);
-        const terminateIds = unlocked.filter(row =>
+        const pending = new Set(this.bs.pendingFinishTargets(group));
+        const eligible = rows.filter(row => BigInt(row.testId) > 0n &&
           !TestSessionUtil.hasState(row.testState, 'status', 'pending') &&
-          !TestSessionUtil.hasState(row.testState, 'CONTROLLER', 'TERMINATED') &&
-          (TestSessionUtil.hasState(row.testState, 'CONNECTION', 'POLLING') ||
-            TestSessionUtil.hasState(row.testState, 'CONNECTION', 'WEBSOCKET')))
+          !TestSessionUtil.hasState(row.testState, 'CONTROLLER', 'TERMINATED'));
+        const remaining = new Set(eligible.map(row => row.testId));
+        for (const id of pending) if (!remaining.has(id)) pending.delete(id);
+        const terminateIds = eligible.filter(row => pending.has(row.testId) ||
+          (!TestSessionUtil.hasState(row.testState, 'status', 'locked') &&
+            (TestSessionUtil.hasState(row.testState, 'CONNECTION', 'POLLING') ||
+              TestSessionUtil.hasState(row.testState, 'CONNECTION', 'WEBSOCKET'))))
           .map(row => row.testId);
+        // Retain before writing: even an error/abort can follow a committed
+        // lock. A retry uses a fresh snapshot without adopting unrelated locks.
+        terminateIds.forEach(id => pending.add(id));
+        this.bs.rememberFinishTargets(group, [...pending]);
         return this.bs.lock(group, lockIds).pipe(
           delay(1500),
-          mergeMap(() => current() ? this.bs.command('terminate', ['lock'], terminateIds) : EMPTY)
+          mergeMap(() => current() ? this.bs.command('terminate', ['lock'], terminateIds) : EMPTY),
+          tap(() => {
+            if (current()) this.bs.rememberFinishTargets(group,
+              this.bs.pendingFinishTargets(group).filter(id => !terminateIds.includes(id)));
+          })
         );
       }),
       takeUntil(this.disconnected$),

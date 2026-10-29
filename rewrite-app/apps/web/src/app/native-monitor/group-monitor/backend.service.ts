@@ -14,6 +14,8 @@ export class BackendService {
  readonly connectionClosed$=this.connectionClosed.asObservable();
  get cacheIdentity(){return this.session.access();}
  get accessSignal(){return this.session.accessSignal;}
+ pendingFinishTargets(group:string){return this.session.pendingFinishTargets(group);}
+ rememberFinishTargets(group:string,ids:string[]){this.session.rememberFinishTargets(group,ids); }
  private request(method:string,path:string,body?:unknown,raw=false):Observable<string>{
   return new Observable(subscriber=>{
    const abort=new AbortController();

@@ -29,7 +29,7 @@ try{
  await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.UI.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-ui-player@1.2.3">Owned</Definition>'));
  await upload('booklet.xml',xml('Booklet','<Metadata><Id>OWNED.UI.BOOK</Id><Label>Owned Monitor Booklet</Label></Metadata><States><State id="route" label="Owned Route"><Option id="a" label="Alpha"/><Option id="b" label="Beta"/></State></States><Units><Testlet id="B1" label="Owned Block"><Restrictions><TimeMax minutes="10"/></Restrictions><Unit id="OWNED.UI.UNIT" label="Owned Unit"/></Testlet></Units>'));
  const presetBooklet='OWNED.UI.BOOK#route:b';
- const earlyCases=['snapshot','material'].map(mode=>({mode,group:'OWNED.UI.EARLY.'+mode.toUpperCase(),monitor:'owned-ui-early-'+mode+'-monitor',names:[0,1,2].map(n=>'owned-ui-early-'+mode+'-'+n),tests:[]}));
+ const earlyCases=['snapshot','material','recovery'].map(mode=>({mode,group:'OWNED.UI.EARLY.'+mode.toUpperCase(),monitor:'owned-ui-early-'+mode+'-monitor',names:[0,1,2].map(n=>'owned-ui-early-'+mode+'-'+n),tests:[]}));
  const earlyRoster=earlyCases.map(item=>`<Group id="${item.group}" label="Owned early ${item.mode}"><Login name="${item.monitor}" pw="${password}" mode="monitor-group"/>`+item.names.map(name=>`<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet>OWNED.UI.BOOK</Booklet></Login>`).join('')+'</Group>').join('');
  const initialRoster=xml('Testtakers','<Metadata/><CustomTexts><CustomText key="gm_message_command_sent_n_sessions">Owned feedback: %s / %s</CustomText><CustomText key="gm_control_pause">Owned Pause</CustomText></CustomTexts><Profiles><GroupMonitor><Profile id="full" label="Vollständig" view="full" groupColumn="show"/><Profile id="small" label="Kurz" view="small"/></GroupMonitor></Profiles>'+earlyRoster+`<Group id="${group}" label="Owned Monitor Group"><Login name="${monitorName}" pw="${password}" mode="monitor-group"><Profile id="full"/><Profile id="small"/></Login>`+[one,two].map(name=>`<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet>${name===one?presetBooklet:'OWNED.UI.BOOK'}</Booklet></Login>`).join('')+'</Group>');
  await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:initialRoster});
@@ -42,7 +42,7 @@ try{
 
  for(const item of earlyCases)for(const [index,name]of item.names.entries()){
   const access=await services.originalSession.login({name,password}),id=await services.originalTest.create({token:access.token,bookletName:'OWNED.UI.BOOK'});
-  if(index<2){await services.originalTest.read({token:access.token,testNumber:id});await services.originalTest.patchState({token:access.token,testNumber:id,patch:[{key:'CONTROLLER',content:'RUNNING',timeStamp:100},{key:'CONNECTION',content:'POLLING',timeStamp:101}]});}
+  if(index<2||item.mode==='recovery'){await services.originalTest.read({token:access.token,testNumber:id});await services.originalTest.patchState({token:access.token,testNumber:id,patch:[{key:'CONTROLLER',content:'RUNNING',timeStamp:100},{key:'CONNECTION',content:'POLLING',timeStamp:101}]});}
   item.tests.push({id,token:access.token});
  }
  // A second real workspace deliberately uses the same physical Booklet ID.
@@ -141,12 +141,14 @@ try{
  await reimport(movedRoster);
  assert.equal(await page.evaluate(async group=>{const r=await fetch('/monitor/group/'+encodeURIComponent(group)+'/test-sessions',{headers:{AuthToken:localStorage.getItem('testcenter-native-monitor-session')},cache:'no-store',signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('Native snapshot returned '+r.status);return (await r.json()).length;},peerGroup),0);
  await page.locator('tc-test-session').waitFor({state:'detached',timeout:15000});check('real-empty-native-snapshot-clears-previous-rows');
+ await page.locator('[data-cy=account-button]').click();await page.locator('[data-cy=logout-button]').click();await page.locator('[data-cy=dialog-confirm]').waitFor();const beforeRevokedDialog=wire.length;
  await reimport(peerRoster(false,'run-hot-return'));await page.locator('input[name=name]').waitFor({timeout:15000});assert.equal(await page.locator('tc-test-session').count(),0);assert.equal(await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session')),null);check('current-native-role-revocation-clears-monitor-and-local-bearer');
+ await page.locator('[data-cy=dialog-confirm]').waitFor({state:'detached'});assert.ok(!wire.slice(beforeRevokedDialog).some(r=>r.method==='DELETE'&&r.path==='/session'));check('revoked-access-retires-open-logout-confirmation-without-deleting-a-session');
 
  // Separate real groups exercise completion before the first rendered rows.
  // Keep either the first poll or its private material pending. A failed fresh
  // read must leave every owner queue untouched; a retry uses all native IDs.
- for(const item of earlyCases){
+ for(const item of earlyCases.filter(item=>item.mode!=='recovery')){
   const earlyContext=await browser.newContext({viewport:{width:1280,height:850},serviceWorkers:'block'}),earlyPage=await earlyContext.newPage(),requests=[];
   let phase='initial',first=true,closing=false,releaseHeld,heldStarted;const held=new Promise(done=>{releaseHeld=done;}),started=new Promise(done=>{heldStarted=done;});
   earlyPage.on('pageerror',error=>errors.push(String(error)));earlyPage.on('console',m=>{if(m.type()==='error'&&/NG\d{4}|TypeError|ReferenceError|SyntaxError|Error retrieving icon/.test(m.text()))errors.push(m.text());});
@@ -169,6 +171,30 @@ try{
    for(const owner of item.tests.slice(0,2)){const commands=await native('GET','/test/'+owner.id+'/commands',owner.token);assert.equal(commands.at(-1).keyword,'terminate');assert.deepEqual(commands.at(-1).arguments,['lock']);}assert.deepEqual(await native('GET','/test/'+item.tests[2].id+'/commands',item.tests[2].token),[]);check('finish-'+item.mode+'-loading-locks-complete-fresh-native-targets');
   }finally{closing=true;releaseHeld();await earlyContext.close();}
  }
+
+ // A committed lock followed by a failed terminate must remain recoverable.
+ // The third owner was already locked and must never enter the retry targets.
+ const recovery=earlyCases.find(item=>item.mode==='recovery');
+ await native('PATCH','/test/'+recovery.tests[2].id+'/lock',recovery.tests[2].token,{timeStamp:150,message:'Owned unrelated existing lock'});
+ const recoveryContext=await browser.newContext({viewport:{width:1280,height:850},serviceWorkers:'block'}),recoveryPage=await recoveryContext.newPage();
+ recoveryPage.on('pageerror',error=>errors.push(String(error)));
+ let failTermination=true;
+ await recoveryPage.route('**/monitor/command',async route=>{
+  if(failTermination&&JSON.parse(route.request().postData()).keyword==='terminate'){failTermination=false;await route.fulfill({status:503,contentType:'text/plain',body:'Owned terminate failure after committed lock'});}
+  else await route.continue();
+ });
+ try{
+  await recoveryPage.goto(base+'/app/group-monitor?ui=original',{waitUntil:'networkidle'});await recoveryPage.locator('input[name=name]').fill(recovery.monitor);await recoveryPage.locator('[data-cy=login-user]').click();await recoveryPage.locator('input[name=password]').waitFor();await recoveryPage.locator('input[name=password]').fill(password);await recoveryPage.locator('[data-cy=login-user]').click();
+  await recoveryPage.waitForFunction(()=>document.querySelectorAll('tc-test-session').length===3);
+  await recoveryPage.locator('[data-cy=GM_end_button]').click();await recoveryPage.locator('[data-cy=dialog-confirm]').click();await recoveryPage.getByText('Die Testdurchführung konnte nicht beendet werden.',{exact:true}).waitFor();
+  const token=await recoveryPage.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session')),snapshot=await native('GET','/monitor/group/'+encodeURIComponent(recovery.group)+'/test-sessions',token);
+  assert.equal(snapshot.length,3);assert.ok(snapshot.every(row=>row.testState.status==='locked'));assert.ok(new URL(recoveryPage.url()).pathname.includes(recovery.group));
+  for(const owner of recovery.tests)assert.deepEqual(await native('GET','/test/'+owner.id+'/commands',owner.token),[]);check('failed-finish-terminate-preserves-committed-locks-without-false-completion');
+  await recoveryPage.reload({waitUntil:'networkidle'});await recoveryPage.waitForFunction(()=>document.querySelectorAll('tc-test-session').length===3);for(const owner of recovery.tests)assert.deepEqual(await native('GET','/test/'+owner.id+'/commands',owner.token),[]);check('unfinished-finish-survives-reload-without-automatic-command');
+  await recoveryPage.locator('[data-cy=GM_end_button]').click();await recoveryPage.locator('[data-cy=dialog-confirm]').click();await recoveryPage.waitForURL(url=>url.pathname==='/app/group-monitor');
+  for(const owner of recovery.tests.slice(0,2)){const commands=await native('GET','/test/'+owner.id+'/commands',owner.token);assert.equal(commands.length,1);assert.equal(commands[0].keyword,'terminate');assert.deepEqual(commands[0].arguments,['lock']);}
+  assert.deepEqual(await native('GET','/test/'+recovery.tests[2].id+'/commands',recovery.tests[2].token),[]);check('finish-retry-terminates-only-original-owned-targets-after-lock');
+ }finally{await recoveryContext.close();}
  assert.deepEqual(errors,[]);await writeFile(join(artifacts,'result.json'),JSON.stringify({success:true,browser:browser.version(),markers,nativeRequests:wire.map(({body,...r})=>r),timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),privateCredentialBodiesOmitted:true,sourceVisualParityClaimed:false},null,2));console.log('native_monitor_ui_success=true');
 }catch(error){if(page){await page.screenshot({path:join(artifacts,'failure.png'),fullPage:false}).catch(()=>{});await writeFile(join(artifacts,'failure.json'),JSON.stringify({error:String(error),browserErrors:errors,markers,timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),requests:wire.map(({body,...r})=>r)},null,2));}throw error;}finally{try{await browser?.close();}finally{if(server)await stopNativeSmokeServer(server);}}
 

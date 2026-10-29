@@ -49,9 +49,10 @@ function transport(){
  const session={access:()=>access,accessSignal:controller.signal,text:async()=>''};bindings.set(NativeMonitorSessionService,session);
  return {backend:new BackendService(),session,controller};
 }
-function managerFixture(){
- const controller=new AbortController(),streams=new Map(),writes=[];
- const backend={accessSignal:controller.signal,getSessionsMonitor(){return rx.of(manager.sessions.map(row=>row.data));},cutConnection(){},observeSessionsMonitor(group){const stream=new rx.Subject();streams.set(group,stream);return stream;},lock(group,ids){writes.push({type:'lock',group,ids});return rx.of({commandType:'lock',testIds:ids});},command(keyword,args,ids){writes.push({type:keyword,args,ids});return rx.of({commandType:keyword,testIds:ids});}};
+const finishPlans=new WeakMap();
+function managerFixture(controller=new AbortController()){
+ const streams=new Map(),writes=[];if(!finishPlans.has(controller))finishPlans.set(controller,new Map());const plans=finishPlans.get(controller);
+ const backend={accessSignal:controller.signal,pendingFinishTargets:group=>plans.get(group)??[],rememberFinishTargets:(group,ids)=>plans.set(group,ids),getSessionsMonitor(){return rx.of(manager.sessions.map(row=>row.data));},cutConnection(){},observeSessionsMonitor(group){const stream=new rx.Subject();streams.set(group,stream);return stream;},lock(group,ids){writes.push({type:'lock',group,ids});return rx.of({commandType:'lock',testIds:ids});},command(keyword,args,ids){writes.push({type:keyword,args,ids});return rx.of({commandType:keyword,testIds:ids});}};
  bindings.set(GROUP_MONITOR_CONFIG,{checkForIdleInterval:0});
  const manager=new TestSessionManager(backend,{getBooklet:()=>rx.of({error:'general',species:null})});
  const rows=(group,ids)=>streams.get(group).next(ids.map(testId=>({testId,groupName:group,personLabel:testId,bookletName:'BOOK',timestamp:Date.now()/1000,testState:{CONTROLLER:'RUNNING',CONNECTION:'POLLING'}})));
@@ -257,4 +258,38 @@ for(const transition of ['group','access','disconnect'])test('finish pending sna
 
 test('Goto initializes the real form view before exposing its confirmation stream',()=>{
  const f=componentFixture();f.params.next({'group-name':'A'});selectGoto(f);f.component.testCommandGoto();assert.equal(f.dialogRenders,1);assert.equal(f.gotoDialog.observed,true);f.component.ngOnDestroy();
+});
+
+for(const stage of ['lock','terminate'])test('finish retries exact owned targets after a lost '+stage+' response',t=>{
+ clock(t);const f=managerFixture();f.manager.connect('A');
+ let rows=[finishPacket('9007199254740993'),finishPacket('9007199254740994',{status:'locked'})];
+ f.backend.getSessionsMonitor=()=>rx.of(rows);const failure=Error('Owned '+stage+' failure');let first=true;
+ const write=f.backend[stage==='lock'?'lock':'command'];f.backend[stage==='lock'?'lock':'command']=function(...args){
+  const result=write.apply(this,args);if(first){first=false;return rx.throwError(()=>failure);}return result;
+ };
+ let seen,completed=false;f.manager.commandFinishEverything().subscribe({next:()=>{completed=true;},error:error=>{seen=error;}});
+ t.mock.timers.tick(1500);assert.equal(seen,failure);assert.equal(completed,false);
+ rows=rows.map(row=>({...row,testState:{...row.testState,status:'locked'}}));
+ f.manager.commandFinishEverything().subscribe({next:()=>{completed=true;}});assert.equal(completed,false);t.mock.timers.tick(1500);
+ assert.equal(completed,true);assert.deepEqual(f.writes.at(-1),{type:'terminate',args:['lock'],ids:['9007199254740993']});f.manager.disconnect();
+});
+test('an interrupted finish retains its exact targets across manager retirement in the same access',t=>{
+ clock(t);const f=managerFixture();f.manager.connect('A');f.backend.getSessionsMonitor=()=>rx.of([finishPacket('9007199254740993')]);
+ const sub=f.manager.commandFinishEverything().subscribe();sub.unsubscribe();f.manager.disconnect();t.mock.timers.tick(2000);assert.equal(f.writes.length,1);
+ const next=managerFixture(f.controller);next.manager.connect('A');next.backend.getSessionsMonitor=()=>rx.of([finishPacket('9007199254740993',{status:'locked'}),finishPacket('9007199254740994',{status:'locked'})]);
+ next.manager.commandFinishEverything().subscribe();t.mock.timers.tick(1500);assert.deepEqual(next.writes.at(-1).ids,['9007199254740993']);next.manager.disconnect();
+});
+test('a finish recovery plan cannot cross a native access replacement',t=>{
+ clock(t);const old=managerFixture();old.manager.connect('A');old.backend.getSessionsMonitor=()=>rx.of([finishPacket('9007199254740993')]);old.manager.commandFinishEverything().subscribe();old.controller.abort();old.manager.disconnect();
+ const next=managerFixture();next.manager.connect('A');next.backend.getSessionsMonitor=()=>rx.of([finishPacket('9007199254740993',{status:'locked'})]);next.manager.commandFinishEverything().subscribe();t.mock.timers.tick(1500);assert.deepEqual(next.writes.at(-1).ids,[]);assert.equal(old.writes.length,1);next.manager.disconnect();
+});
+test('recovery excludes targets now terminated or pending and never broadens to unrelated locked tests',t=>{
+ clock(t);const f=managerFixture();f.manager.connect('A');f.backend.getSessionsMonitor=()=>rx.of([finishPacket('1'),finishPacket('2')]);const sub=f.manager.commandFinishEverything().subscribe();sub.unsubscribe();
+ f.backend.getSessionsMonitor=()=>rx.of([finishPacket('1',{status:'locked',CONTROLLER:'TERMINATED'}),finishPacket('2',{status:'pending'}),finishPacket('3',{status:'locked'})]);
+ f.manager.commandFinishEverything().subscribe();t.mock.timers.tick(1500);assert.deepEqual(f.writes.at(-1).ids,[]);f.manager.disconnect();
+});
+
+test('finish retains the Original connected TERMINATED_PAUSED target semantics',t=>{
+ clock(t);const f=managerFixture();f.manager.connect('A');f.backend.getSessionsMonitor=()=>rx.of([finishPacket('1',{CONTROLLER:'TERMINATED_PAUSED'})]);
+ f.manager.commandFinishEverything().subscribe();t.mock.timers.tick(1500);assert.deepEqual(f.writes.at(-1).ids,['1']);f.manager.disconnect();
 });

@@ -1,3 +1,4 @@
+import {fromEvent,Subscription,take} from 'rxjs';
 import {BookletService} from './group-monitor/booklet/booklet.service';
 import {TestSessionManager} from './group-monitor/test-session-manager/test-session-manager.service';
 import {GROUP_MONITOR_CONFIG} from './group-monitor/group-monitor.config';
@@ -29,7 +30,9 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly header=inject(HeaderService);readonly backend=inject(BackendService);
  private readonly backendSubscription=this.backend.problem$.subscribe(problem=>this.backendProblem.set(problem));
- ngOnDestroy(){this.backendSubscription.unsubscribe();}
+ private readonly view=new AbortController();
+ private retireLogout:(()=>void)|undefined;
+ ngOnDestroy(){this.view.abort();this.retireLogout?.();this.backendSubscription.unsubscribe();}
  readonly ready=signal(false);readonly problem=signal('');readonly passwordStep=signal(false);
  name='';password='';showPassword=false;
  private readonly router=inject(Router);private readonly route=inject(ActivatedRoute);private readonly dialog=inject(MatDialog);
@@ -45,11 +48,25 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   });
  }
  async submit(){if(this.session.busy()||this.name.trim().length<3)return;this.problem.set('');
-  try{const access=await this.session.login(this.name.trim(),this.passwordStep()?this.password:'');this.password='';this.passwordStep.set(false);const claims=access.claims.testGroupMonitor??[];if(claims.length===1)await this.open(claims[0]!);}
-  catch(error){if(!this.passwordStep()&&error instanceof NativeMonitorHttpError&&[400,401].includes(error.status)){this.passwordStep.set(true);this.session.problem.set('');}else{this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');this.password='';}}
+  try{const access=await this.session.login(this.name.trim(),this.passwordStep()?this.password:'',this.view.signal);if(this.view.signal.aborted||this.session.busy()||this.session.access()!==access)return;this.password='';this.passwordStep.set(false);const claims=access.claims.testGroupMonitor??[];if(claims.length===1)await this.open(claims[0]!);}
+  catch(error){if(this.view.signal.aborted||(error instanceof Error&&error.name==='AbortError'))return;if(!this.passwordStep()&&error instanceof NativeMonitorHttpError&&[400,401].includes(error.status)){this.passwordStep.set(true);this.session.problem.set('');}else{this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');this.password='';}}
  }
- async open(claim:OriginalTestGroupMonitorAccess){const flags=Array.isArray(claim.flags)?{}:claim.flags;const target=['/group-monitor',claim.id,...(flags.profile?[flags.profile]:[])];await this.router.navigate(target);}
+ async open(claim:OriginalTestGroupMonitorAccess){if(this.view.signal.aborted)return;const flags=Array.isArray(claim.flags)?{}:claim.flags;const target=['/group-monitor',claim.id,...(flags.profile?[flags.profile]:[])];await this.router.navigate(target);}
  claimLabel(claim:OriginalTestGroupMonitorAccess){return Array.isArray(claim.flags)?'':claim.flags.subLabel??'';}
- async selection(){await this.router.navigate(['/group-monitor']);}
- logout(){this.dialog.open(OriginalParticipantLogoutDialogComponent,{data:{safeMode:false},autoFocus:'dialog'}).afterClosed().subscribe(confirmed=>{if(confirmed)void this.session.logout().then(()=>this.router.navigate(['/group-monitor'])).catch(error=>this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.'));});}
+ async selection(){if(!this.view.signal.aborted)await this.router.navigate(['/group-monitor']);}
+ logout(){
+  const scope=this.session.accessSignal;if(this.view.signal.aborted||scope.aborted||this.retireLogout)return;
+  const ref=this.dialog.open(OriginalParticipantLogoutDialogComponent,{data:{safeMode:false},autoFocus:'dialog'});
+  const subscription=new Subscription();
+  const retire=()=>{subscription.unsubscribe();ref.close();if(this.retireLogout===retire)this.retireLogout=undefined;};
+  this.retireLogout=retire;
+  subscription.add(fromEvent(scope,'abort').subscribe(retire));
+  subscription.add(ref.afterClosed().pipe(take(1)).subscribe(confirmed=>{
+   retire();if(!confirmed||this.view.signal.aborted||scope!==this.session.accessSignal||scope.aborted)return;
+   const pending=this.session.logout(),clearedScope=this.session.accessSignal;
+   const current=()=>!this.view.signal.aborted&&clearedScope===this.session.accessSignal&&!this.session.access()&&!this.session.busy();
+   void pending.then(()=>{if(current())return this.router.navigate(['/group-monitor']);return undefined;})
+    .catch(error=>{if(current())this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.');});
+  }));
+ }
 }
