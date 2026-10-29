@@ -146,7 +146,9 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.interfaceMode.mode()==='original' && this.activeRouteView==='content' && this.app.hasAdminSession;
   }
 
-  get isOriginalNativeOperator(): boolean { return this.isOriginalAdministration || this.isOriginalWorkspaceFiles || this.router.url.split('?',1)[0].startsWith('/group-monitor'); }
+  get isNativeMonitorView(): boolean { return this.router.url.split('?',1)[0].startsWith('/group-monitor'); }
+
+  get isOriginalNativeOperator(): boolean { return this.isOriginalAdministration || this.isOriginalWorkspaceFiles || this.isNativeMonitorView; }
 
   get activeRouteView(): AppView {
     this.routeVersion();

@@ -124,13 +124,19 @@ app-root {
   --secondary-soft: #e1d7eb;
 }
 
-:root[data-interface-mode="original"] .page.is-participant-page {
+:root[data-interface-mode="original"] .page.is-participant-page,
+:root[data-interface-mode="original"] .page.is-native-monitor-page {
   max-width: none;
   padding: 0;
 }
 
 :root[data-interface-mode="original"] .participant-stage > router-outlet {
   display: none;
+}
+
+/* Original has content-box browser defaults; Material's own component rules win. */
+:where(app-native-monitor-entry, app-native-monitor-entry *) {
+  box-sizing: content-box;
 }
 
 .page {

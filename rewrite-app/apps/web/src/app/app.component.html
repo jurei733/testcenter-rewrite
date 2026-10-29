@@ -1,6 +1,7 @@
 <div
   class="page"
   [class.is-busy]="app.activeRequestLabel() !== null"
+  [class.is-native-monitor-page]="isNativeMonitorView"
   [class.is-participant-page]="isParticipantView || isOriginalAdminLogin"
 >
   <span hidden>{{ app.renderVersion() }}</span>

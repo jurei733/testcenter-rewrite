@@ -295,6 +295,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
 
   finishEverythingCommand(): void {
     const scope = this.bs.accessSignal;
+    if (scope.aborted) return;
     this.subscriptions.push(this.messageService.showConfirmDialog({
       title: 'Testdurchführung beenden',
       content: 'Achtung! Diese Aktion sperrt und beendet sämtliche Tests dieser Sitzung.',
@@ -328,6 +329,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
     const targets = this.tsm.checked;
     const ids = targets.map(session => session.data.testId);
     const scope = this.bs.accessSignal;
+    if (scope.aborted) return;
     const current = () => this.currentlySelected === selection && scope === this.bs.accessSignal && !scope.aborted &&
       JSON.stringify(this.tsm.checked.map(session => session.data.testId)) === JSON.stringify(ids);
     this.subscriptions.push((targets
@@ -336,7 +338,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
           testSession.timeLeft &&
           (testSession.timeLeft[selection.element.id] <= 0)
       ) ?
-      this.initializeDialog(this.dialog.open(
+      this.observeDialog(this.dialog.open(
         TimeRestrictionDialogComponent, {
           width: 'auto',
           data: <TimeRestrictionDialogData>{
@@ -349,7 +351,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
             remainingTime: this.tsm.getMaxTimeAcrossAllSessions(selection)
           }
         }
-      )).afterClosed() :
+      )) :
       of(1) // 1 as in 'true'
     ).pipe(
       take(1),
@@ -427,6 +429,10 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
 
   editFilter(key: string): void {
     this.openFilterDialog(this.tsm.filterOptions[key]);
+  }
+
+  private observeDialog<T, R>(dialog: MatDialogRef<T, R>): Observable<R | undefined> {
+    return this.initializeDialog(dialog).afterClosed().pipe(finalize(() => dialog.close()));
   }
 
   private initializeDialog<T, R>(dialog: MatDialogRef<T, R>): MatDialogRef<T, R> {

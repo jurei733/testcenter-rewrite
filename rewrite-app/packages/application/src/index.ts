@@ -27914,8 +27914,12 @@ export const createFirstSliceServices = (
       !sameOriginalTestName(current.definition.groupKey,actor.groupKey)||!sameOriginalTestName(binding.groupKey,actor.groupKey)){
       throw new FirstSliceError(409,'original_login_scope_changed','The Original monitor scope changed during authentication.');
     }
+    // A reimport can retain an older ordinary roster entry for a current
+    // operational Login. Never materialize it as a dependent and demote its
+    // authenticated monitor person (including a different study monitor).
+    const operationalKeys=new Set((await repository.listOriginalOperationalLoginsByWorkspace(actor.tenantId,actor.workspaceId)).map(login=>login.loginKey));
     const members=(await repository.listParticipantRosterEntriesByWorkspace(actor.tenantId,actor.workspaceId)).filter(member=>
-      originalMonitorable(member)&&!participantExecutionModeDefinitions[member.executionMode!].alwaysNewSession&&
+      !operationalKeys.has(member.loginKey)&&originalMonitorable(member)&&!participantExecutionModeDefinitions[member.executionMode!].alwaysNewSession&&
       (actor.originalOperationalMode==='monitor-study'||sameOriginalTestName(member.groupKey,actor.groupKey)));
     for(const member of members){
       let memberBinding=(await repository.listOriginalLoginBindingsByWorkspace(actor.tenantId,actor.workspaceId)).find(row=>row.loginKey===member.loginKey);

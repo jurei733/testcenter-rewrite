@@ -41,6 +41,7 @@ const {BookletService}=load('group-monitor/booklet/booklet.service.ts');
 const {TestSessionManager}=load('group-monitor/test-session-manager/test-session-manager.service.ts');
 const {GROUP_MONITOR_CONFIG}=load('group-monitor/group-monitor.config.ts');
 const {GroupMonitorComponent}=load('group-monitor/group-monitor.component.ts');
+const {MessageService}=load('shared/services/message.service.ts');
 const settle=()=>new Promise(done=>setImmediate(done));
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const clock=t=>t.mock.timers.enable({apis:['setTimeout','setInterval','Date']});
@@ -59,15 +60,16 @@ function managerFixture(controller=new AbortController()){
  return {backend,controller,manager,streams,writes,rows};
 }
 function componentFixture(){
- const params=new rx.Subject(),profiles=new Map(),connected=[],navigated=[],confirmations=new rx.Subject(),gotoDialog=new rx.Subject(),gotos=[];let finishes=0,dialogRenders=0;
+ const params=new rx.Subject(),profiles=new Map(),connected=[],navigated=[],confirmations=new rx.Subject(),gotoDialog=new rx.Subject(),gotos=[];let finishes=0,dialogRenders=0,gotoCloses=0,finishCloses=0;
  const controller=new AbortController();const backend={accessSignal:controller.signal,connectionStatus$:new rx.BehaviorSubject('initial'),getProfile(id){const stream=new rx.Subject();profiles.set(id,stream);return stream;}};
  const empty=()=>({allChecked:false,numberOfSessions:0,differentBooklets:0,differentBookletSpecies:0,pausedSessions:0,lockedSessions:0,bookletStateLabels:{}});
  const tsm={checked:[],getMaxTimeAcrossAllSessions:()=>10,testCommandGoto(selection,time,targets){gotos.push({selection,time,targets});return rx.of(true);},sessions$:new rx.BehaviorSubject([]),sessionsStats$:new rx.BehaviorSubject(empty()),checkedStats$:new rx.BehaviorSubject(empty()),commandResponses$:new rx.Subject(),checkingOptions:{enableAutoCheckAll:true},filterOptions:{},connect(group){connected.push(group);},disconnect(){},resetFilters(){this.filterOptions={quick:{selected:false,filter:{value:''}}};},refreshFilters(){},commandFinishEverything(){finishes++;return rx.of({commandType:'terminate',testIds:['1']});}};
  const filterDialog=new rx.Subject(),filterOpen=[];let filterCloses=0;const filterOverlay={open:(component,config)=>{filterOpen.push(config);return {afterClosed:()=>filterDialog,close:()=>{filterCloses++;}};}};
  const cts={getCustomText:()=>null};bindings.set(shared.CustomtextService,cts);
- const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog,componentRef:{changeDetectorRef:{detectChanges(){dialogRenders++;}}}})}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},filterOverlay,{},{},{showConfirmDialog:()=>confirmations});
+ bindings.set(token('MatDialog'),{open:()=>({afterClosed:()=>confirmations,close:()=>{finishCloses++;}})});const messages=new MessageService();
+ const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog,close:()=>{gotoCloses++;},componentRef:{changeDetectorRef:{detectChanges(){dialogRenders++;}}}})}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},filterOverlay,{},{},messages);
  component.ngOnInit();
- return {component,params,profiles,connected,navigated,confirmations,controller,tsm,gotoDialog,gotos,filterDialog,filterOpen,get dialogRenders(){return dialogRenders;},get filterCloses(){return filterCloses;},get finishes(){return finishes;}};
+ return {component,params,profiles,connected,navigated,confirmations,controller,tsm,gotoDialog,gotos,filterDialog,filterOpen,get dialogRenders(){return dialogRenders;},get filterCloses(){return filterCloses;},get finishes(){return finishes;},get gotoCloses(){return gotoCloses;},get finishCloses(){return finishCloses;}};
 }
 const profile=(settings={},filters=[])=>({settings,filters,filtersEnabled:{}});
 
@@ -292,4 +294,20 @@ test('recovery excludes targets now terminated or pending and never broadens to 
 test('finish retains the Original connected TERMINATED_PAUSED target semantics',t=>{
  clock(t);const f=managerFixture();f.manager.connect('A');f.backend.getSessionsMonitor=()=>rx.of([finishPacket('1',{CONTROLLER:'TERMINATED_PAUSED'})]);
  f.manager.commandFinishEverything().subscribe();t.mock.timers.tick(1500);assert.deepEqual(f.writes.at(-1).ids,['1']);f.manager.disconnect();
+});
+
+for(const transition of ['route','access','destroy'])for(const command of ['goto','finish'])test('owned confirmation closes on '+transition+' for '+command,()=>{
+ const f=componentFixture();f.params.next({'group-name':'A'});
+ if(command==='goto'){selectGoto(f);f.component.testCommandGoto();}else f.component.finishEverythingCommand();
+ assert.equal(command==='goto'?f.gotoCloses:f.finishCloses,0);
+ if(transition==='route')f.params.next({'group-name':'B'});else if(transition==='access')f.controller.abort();else f.component.ngOnDestroy();
+ assert.equal(command==='goto'?f.gotoCloses:f.finishCloses,1,'the retired overlay must close');
+ f.gotoDialog.next(7);f.confirmations.next(true);assert.deepEqual(f.gotos,[]);assert.equal(f.finishes,0);
+ if(transition!=='destroy')f.component.ngOnDestroy();
+});
+
+for(const command of ['goto','finish'])test('retired access cannot open another '+command+' confirmation',()=>{
+ const f=componentFixture();f.params.next({'group-name':'A'});selectGoto(f);f.controller.abort();
+ if(command==='goto')f.component.testCommandGoto();else f.component.finishEverythingCommand();
+ assert.equal(f.dialogRenders,0);assert.equal(f.gotoDialog.observed,false);assert.equal(f.confirmations.observed,false);assert.equal(f.finishes,0);assert.deepEqual(f.gotos,[]);f.component.ngOnDestroy();
 });

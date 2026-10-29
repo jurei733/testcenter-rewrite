@@ -85,6 +85,19 @@ for(const kind of process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:['memo
    await foreignUpload('foreign.xml',book.replaceAll('ORACLE.POW.BOOK','ORACLE.ONLY.FOREIGN'));
    await assert.rejects(booklet('ORACLE.ONLY.FOREIGN'),denied(404));
   });
+  await t.test('fresh monitor and study logins after a role regrant cannot demote operational people through historical roster entries',async()=>{
+   await importRoster('Changed','run-hot-return');
+   await assert.rejects(services.originalMonitor.sessions({token:monitor.token,groupKey:group}),denied(403));
+   await importRoster('Changed');
+   const fresh=await services.originalSession.login({name:monitorName,password});
+   assert.ok(Array.isArray(JSON.parse(await services.originalMonitor.sessions({token:fresh.token,groupKey:group}))));
+   const actor=(await services.originalAuthentication.read({token:fresh.token})).participantSession;
+   assert.equal((await repository.getParticipantSessionById(actor.participantSessionId)).originalOperationalMode,'monitor-group');
+   study=await services.originalSession.login({name:studyName,password});
+   monitor=fresh; // Successful reauthentication rotates the old credential.
+   assert.ok(Array.isArray(JSON.parse(await services.originalMonitor.sessions({token:fresh.token,groupKey:group}))));
+   assert.equal((await repository.getParticipantSessionById(actor.participantSessionId)).originalOperationalMode,'monitor-group');
+  });
   await t.test('unknown legacy raw profile history fails closed and validated reimport restores it without invented defaults',async()=>{
    const candidates=await repository.listOperationalLoginMigrationCandidatesByWorkspace(...ids),privateRows=await repository.listOriginalOperationalLoginsByWorkspace(...ids);
    await repository.replaceOperationalLoginMigrationCandidatesByWorkspace(...ids,candidates,privateRows.map(({originalMonitorProfiles,...row})=>row));
