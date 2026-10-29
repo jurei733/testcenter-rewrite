@@ -6,7 +6,12 @@ await import('@angular/compiler');
 const path=new URL('../apps/web/src/app/native-monitor/native-session.service.ts',import.meta.url);
 let code=ts.transpileModule(await readFile(path,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,experimentalDecorators:true}}).outputText;
 code=code.replaceAll("'@angular/core'",JSON.stringify(import.meta.resolve('@angular/core'))).replace("import('altcha-lib')",'Promise.resolve(globalThis.__nativeMonitorChallengeFixture)');
-const {NativeMonitorSessionService,NativeMonitorHttpError}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const sessionModuleUrl='data:text/javascript;base64,'+Buffer.from(code).toString('base64');
+const {NativeMonitorSessionService,NativeMonitorHttpError}=await import(sessionModuleUrl);
+const {createEnvironmentInjector,Injector}=await import('@angular/core');
+let starterCode=ts.transpileModule(await readFile(new URL('../apps/web/src/app/native-participant/native-test-starter.service.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,experimentalDecorators:true}}).outputText;
+starterCode=starterCode.replaceAll("'@angular/core'",JSON.stringify(import.meta.resolve('@angular/core'))).replace("'../native-monitor/native-session.service'",JSON.stringify(sessionModuleUrl));
+const {NativeTestStarterService}=await import('data:text/javascript;base64,'+Buffer.from(starterCode).toString('base64'));
 const storageKey='testcenter-native-monitor-session';
 const access=token=>({token,claims:{testGroupMonitor:[{id:'owned',label:'Owned',type:'testGroupMonitor',flags:[]}]},customTexts:{}});
 const response=(value,status=200)=>new Response(typeof value==='string'?value:JSON.stringify(value),{status});
@@ -67,7 +72,7 @@ test('a late failed login cannot overwrite a newer successful login problem stat
 test('retiring a proof-of-work login stops its workers and sends no proof completion',()=>fixture(async()=>{
  const saved={document:globalThis.document,Worker:globalThis.Worker,solver:globalThis.__nativeMonitorChallengeFixture};
  const work=deferred(),started=deferred(),workers=[],requests=[];globalThis.document={baseURI:'https://owned.example/'};
- globalThis.Worker=class{constructor(url,options){assert.equal(url.pathname,'/altcha-lib/dist/worker.js');assert.deepEqual(options,{type:'module'});this.stopped=false;workers.push(this);}terminate(){this.stopped=true;}};
+ globalThis.Worker=class extends EventTarget{constructor(url,options){super();assert.equal(url.pathname,'/altcha-lib/dist/worker.js');assert.deepEqual(options,{type:'module'});this.stopped=false;workers.push(this);}terminate(){this.stopped=true;}};
  globalThis.__nativeMonitorChallengeFixture={solveChallengeWorkers:(factory)=>{if(typeof factory==='function')factory();started.resolve();return work.promise;}};
  globalThis.fetch=async(path,options)=>{requests.push({path,method:options.method});return path==='/session/login'?response('Brute Force protection active',400):response({challenge:'owned',salt:'owned',algorithm:'SHA-256',signature:'owned',maxNumber:1});};
  try{const owner=new AbortController(),session=new NativeMonitorSessionService(),login=session.login('owned','password',owner.signal),rejected=assert.rejects(login);
@@ -91,3 +96,107 @@ test('same-token claim refresh erases retained targets for a revoked group',()=>
  let claims=access('current');globalThis.fetch=async()=>response(claims);const session=new NativeMonitorSessionService();await session.login('owned','password');session.rememberFinishTargets('owned',['1']);
  claims={...claims,claims:{testGroupMonitor:[{id:'other',flags:[]}]}};await session.refresh();assert.deepEqual(session.pendingFinishTargets('owned'),[]);assert.equal(tabValues.size,0);
 }));
+
+const participant=(token,flags=[],claims={test:[{id:'BOOKLET#native assignment',type:'test',label:'Owned Booklet',flags:{locked:false,running:false}}]})=>({token,flags,claims,customTexts:{},groupToken:'owned-group',loginName:'owned',access:{test:claims.test?.map(x=>x.id)}});
+test('participant entry retains the native Booklet claim and purpose without inventing a run ID',()=>fixture(async values=>{
+ const requests=[];globalThis.fetch=async(path,options)=>{requests.push({path,options});return response(participant('person'));};
+ const session=new NativeMonitorSessionService(),result=await session.loginParticipant('owned','password');
+ assert.equal(result.claims.test[0].id,'BOOKLET#native assignment');assert.equal(session.purpose(),'participant');assert.equal(values.get(storageKey+'-purpose'),'participant');assert.equal(values.get(storageKey),'person');
+ assert.deepEqual(requests.map(x=>x.path),['/session/login']);assert.deepEqual(JSON.parse(requests[0].options.body),{name:'owned',password:'password'});
+ assert.equal(requests[0].options.credentials,'omit');assert.equal(requests[0].options.redirect,'error');
+}));
+test('participant purpose restores empty assigned lists while default Monitor restoration still rejects them',()=>fixture(async values=>{
+ values.set(storageKey,'person');values.set(storageKey+'-purpose','participant');globalThis.fetch=async()=>response(participant('person',[],{}));
+ const session=new NativeMonitorSessionService();await settle();assert.equal(session.purpose(),'participant');assert.equal(session.access().token,'person');assert.deepEqual(session.access().claims,{});
+ session.clear();assert.equal(values.size,0);assert.equal(session.purpose(),'monitor');
+ values.set(storageKey,'person');const monitor=new NativeMonitorSessionService();await settle();assert.equal(monitor.access(),null);assert.equal(values.size,0);
+}));
+test('code entry requires a current participant Login stage and sends its exact native credential',()=>fixture(async()=>{
+ const requests=[];globalThis.fetch=async(path,options)=>{requests.push({path,options});return response(path==='/session/person'?participant('person'):participant('login',['codeRequired'],{}));};
+ const session=new NativeMonitorSessionService();await assert.rejects(session.person('code'),/Code-Anmeldung/);assert.equal(requests.length,0);
+ await session.loginParticipant('owned','');const scope=session.accessSignal;await session.person('unchanged code');assert.equal(scope.aborted,true);assert.equal(session.access().token,'person');
+ assert.deepEqual(requests.map(x=>[x.path,x.options.headers.AuthToken]),[['/session/login',undefined],['/session/person','login']]);assert.deepEqual(JSON.parse(requests[1].options.body),{code:'unchanged code'});
+ await assert.rejects(session.person('again'),/Code-Anmeldung/);assert.equal(requests.length,2);
+}));
+test('participant code proof completion remains bound to its Login credential',()=>fixture(async()=>{
+ const saved={document:globalThis.document,Worker:globalThis.Worker,solver:globalThis.__nativeMonitorChallengeFixture};const requests=[],workers=[];
+ globalThis.document={baseURI:'https://owned.example/'};globalThis.Worker=class extends EventTarget{terminate(){this.stopped=true;}};
+ globalThis.__nativeMonitorChallengeFixture={solveChallengeWorkers:async factory=>{workers.push(factory());return {number:7};}};
+ globalThis.fetch=async(path,options)=>{requests.push({path,options});if(path==='/session/login')return response(participant('login',['codeRequired'],{}));if(path==='/session/person')return response('Brute Force protection active',400);if(path==='/session/person/challenge')return response({algorithm:'SHA-256',salt:'salt',challenge:'challenge',signature:'signature',maxNumber:7});return response(participant('person'));};
+ try{const session=new NativeMonitorSessionService();await session.loginParticipant('owned','');await session.person('native-code');assert.equal(session.access().token,'person');
+  assert.deepEqual(requests.slice(1).map(x=>[x.path,x.options.headers.AuthToken]),[['/session/person','login'],['/session/person/challenge','login'],['/session','login']]);assert.deepEqual(JSON.parse(requests[2].options.body),{code:'native-code'});assert.deepEqual(JSON.parse(requests[3].options.body),{algorithm:'SHA-256',salt:'salt',challenge:'challenge',signature:'signature',number:7});assert.ok(workers.length&&workers.every(w=>w.stopped));
+ }finally{globalThis.document=saved.document;globalThis.Worker=saved.Worker;globalThis.__nativeMonitorChallengeFixture=saved.solver;}
+}));
+test('retired code completion is read and only its orphan Person credential is revoked',()=>fixture(async()=>{
+ const pending=deferred(),requests=[],owner=new AbortController();globalThis.fetch=async(path,options)=>{requests.push({path,options});if(options.method==='DELETE')return response('');if(path==='/session/person')return pending.promise;return response(JSON.parse(options.body).name==='replacement'?access('replacement'):participant('login',['codeRequired'],{}));};
+ const session=new NativeMonitorSessionService();await session.loginParticipant('owned','');const person=session.person('code',owner.signal),rejected=assert.rejects(person,error=>error.name==='AbortError');const write=requests.find(x=>x.path==='/session/person');
+ owner.abort();await session.login('replacement','');assert.equal(write.options.signal.aborted,false);pending.resolve(response(participant('orphan')));await rejected;
+ assert.equal(session.access().token,'replacement');assert.equal(session.purpose(),'monitor');assert.equal(session.problem(),'');assert.deepEqual(requests.filter(x=>x.options.method==='DELETE').map(x=>x.options.headers.AuthToken),['orphan']);
+}));
+test('late code completion cannot revoke a credential now owned by a replacement login',()=>fixture(async()=>{
+ const pending=deferred(),requests=[],owner=new AbortController();globalThis.fetch=async(path,options)=>{requests.push({path,options});if(path==='/session/person')return pending.promise;return response(JSON.parse(options.body).name==='replacement'?access('shared'):participant('login',['codeRequired'],{}));};
+ const session=new NativeMonitorSessionService();await session.loginParticipant('owned','');const person=session.person('code',owner.signal),rejected=assert.rejects(person);owner.abort();await session.login('replacement','');pending.resolve(response(participant('shared')));await rejected;
+ assert.equal(session.access().token,'shared');assert.equal(requests.filter(x=>x.options.method==='DELETE').length,0);
+}));
+test('revoked current Login credentials clear the code stage without exposing its token',()=>fixture(async values=>{
+ globalThis.fetch=async path=>path==='/session/login'?response(participant('private-login',['codeRequired'],{})):response('revoked private-login',403);
+ const session=new NativeMonitorSessionService();await session.loginParticipant('owned','');await assert.rejects(session.person('code'),error=>error.status===403&&!error.message.includes('private-login'));assert.equal(session.access(),null);assert.equal(session.busy(),false);assert.equal(values.size,0);
+}));
+test('running-only participant refresh retains ownership; actual grant, lock and group changes retire it',()=>fixture(async()=>{
+ let result=participant('person');globalThis.fetch=async()=>response(result);const session=new NativeMonitorSessionService();await session.loginParticipant('owned','');const scope=session.accessSignal;
+ result=participant('person');result.claims.test[0].flags.running=true;await session.refresh();assert.equal(session.accessSignal,scope);assert.equal(scope.aborted,false);assert.equal(session.access().claims.test[0].flags.running,true);
+ for(const change of [a=>a.claims.test[0].flags.locked=true,a=>a.claims.test[0].id='another Booklet',a=>a.groupToken='replacement group',a=>a.claims.test=[]]){
+  const before=session.accessSignal;result=participant('person');change(result);await session.refresh();assert.equal(before.aborted,true);assert.notEqual(session.accessSignal,before);
+ }
+}));
+
+async function stalledWorkers(run){
+ const saved={document:globalThis.document,Worker:globalThis.Worker,solver:globalThis.__nativeMonitorChallengeFixture};const started=deferred(),workers=[];
+ globalThis.document={baseURI:'https://owned.example/app/'};globalThis.Worker=class extends EventTarget{constructor(url){super();assert.equal(url.pathname,'/app/altcha-lib/dist/worker.js');}terminate(){this.stopped=true;}};
+ globalThis.__nativeMonitorChallengeFixture={solveChallengeWorkers:factory=>{workers.push(factory(),factory());started.resolve();return new Promise(()=>{});}};
+ globalThis.fetch=async path=>path==='/session/login'?response('Brute Force protection active',400):response({challenge:'owned',salt:'owned',algorithm:'SHA-256',signature:'owned',maxNumber:1});
+ try{const session=new NativeMonitorSessionService();await run(session,workers,started.promise);}finally{globalThis.document=saved.document;globalThis.Worker=saved.Worker;globalThis.__nativeMonitorChallengeFixture=saved.solver;}
+}
+test('worker transport and decoding errors stop every worker and release native login',()=>fixture(async()=>{
+ for(const kind of ['error','messageerror'])await stalledWorkers(async(session,workers,started)=>{
+  const login=session.loginParticipant('owned',''),rejected=assert.rejects(login,/Sicherheitsprüfung/);await started;const event=new Event(kind,{cancelable:true});workers[0].dispatchEvent(event);await rejected;
+  assert.equal(event.defaultPrevented,true);assert.equal(session.busy(),false);assert.equal(session.access(),null);assert.ok(workers.every(w=>w.stopped));
+ });
+}));
+test('a silent worker cannot leave native login busy beyond its finite20s work deadline',t=>fixture(async()=>{
+ t.mock.timers.enable({apis:['setTimeout']});await stalledWorkers(async(session,workers,started)=>{
+  const login=session.loginParticipant('owned',''),rejected=assert.rejects(login,/nicht rechtzeitig/);await started;t.mock.timers.tick(19999);assert.equal(session.busy(),true);t.mock.timers.tick(1);await rejected;
+  assert.equal(session.busy(),false);assert.equal(session.access(),null);assert.ok(workers.every(w=>w.stopped));
+ });
+}));
+
+function cardStarter(text){
+ let actor=new AbortController();const value=participant('owned'),session={access:()=>value,get accessSignal(){return actor.signal;},text};
+ const injector=createEnvironmentInjector([{provide:NativeMonitorSessionService,useValue:session},NativeTestStarterService],Injector.NULL);
+ return {service:injector.get(NativeTestStarterService),access:value,replace(){actor.abort();actor=new AbortController();},close(){injector.destroy();}};
+}
+test('native card start sends the exact Booklet and accepts only lossless positive int64 receipts',async()=>{
+ let raw='9223372036854775807';const calls=[],f=cardStarter(async(...args)=>{calls.push(args);return raw;});try{
+  assert.equal(await f.service.start('BOOKLET#native assignment',new AbortController().signal),'9223372036854775807');assert.deepEqual(calls[0].slice(0,4),['PUT','/test',{bookletName:'BOOKLET#native assignment'},'owned']);
+  for(raw of ['0','01','-1','"9007199254740993"','9223372036854775808','1e3','NaN',''])await assert.rejects(f.service.start('BOOKLET#native assignment',new AbortController().signal),/Test-ID/);assert.equal(f.service.pendingBooklet(),'');
+ }finally{f.close();}
+});
+test('native card start checks current grants and locks before creating a Test',async()=>{
+ let calls=0;const f=cardStarter(async()=>{calls++;return '1';});try{
+  await assert.rejects(f.service.start('another Booklet',new AbortController().signal),/nicht freigegeben/);f.access.claims.test[0].flags.locked=true;await assert.rejects(f.service.start('BOOKLET#native assignment',new AbortController().signal),/nicht freigegeben/);assert.equal(calls,0);
+ }finally{f.close();}
+});
+test('retired card owners cannot block or clear replacement starts in the same actor',async()=>{
+ const responses=[],f=cardStarter(()=>new Promise(resolve=>responses.push(resolve))),owner=new AbortController();try{
+  const old=f.service.start('BOOKLET#native assignment',owner.signal),rejected=assert.rejects(old,{name:'AbortError'});await assert.rejects(f.service.start('BOOKLET#native assignment',new AbortController().signal),/bereits geöffnet/);assert.equal(responses.length,1);
+  owner.abort();assert.equal(f.service.pendingBooklet(),'');const replacement=f.service.start('BOOKLET#native assignment',new AbortController().signal);assert.equal(responses.length,2);responses[0]('1');await rejected;assert.equal(f.service.pendingBooklet(),'BOOKLET#native assignment');responses[1]('9007199254740993');assert.equal(await replacement,'9007199254740993');assert.equal(f.service.pendingBooklet(),'');
+ }finally{f.close();}
+});
+test('destroying or replacing the native starter scope rejects late create receipts and stale instances',async()=>{
+ for(const retire of ['destroy','replace']){
+  let resolve,signal;const f=cardStarter((...args)=>{signal=args[5];return new Promise(done=>resolve=done);});try{
+   const start=f.service.start('BOOKLET#native assignment',new AbortController().signal),rejected=assert.rejects(start,{name:'AbortError'});
+   if(retire==='destroy'){f.service.ngOnDestroy();assert.equal(signal.aborted,true);await assert.rejects(f.service.start('BOOKLET#native assignment',new AbortController().signal),{name:'AbortError'});}else f.replace();assert.equal(f.service.pendingBooklet(),'');resolve('9007199254740993');await rejected;
+  }finally{f.close();}
+ }
+});
