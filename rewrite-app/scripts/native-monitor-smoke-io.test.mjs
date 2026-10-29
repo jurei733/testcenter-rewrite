@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
-import {once} from 'node:events';
-import {readNativeSmokeResponse, stopNativeSmokeServer} from './native-monitor-smoke-io.mjs';
+import {once,EventEmitter} from 'node:events';
+import {readNativeSmokeResponse, stopNativeSmokeServer, bindNativeSmokeServerOwner} from './native-monitor-smoke-io.mjs';
 
 async function serverFixture(t, handle) {
   const server = createServer(handle);
@@ -54,4 +54,25 @@ test('native smoke accepts a clean owned child shutdown', async () => {
     {stdio: ['ignore', 'ignore', 'ignore', 'ipc']});
   await once(child, 'message'); await stopNativeSmokeServer(child);
   assert.equal(child.signalCode, 'SIGTERM');
+});
+
+for (const event of ['SIGTERM', 'disconnect']) test('native API lease closes on owner '+event, {timeout: 5000}, async t => {
+  const module = new URL('./native-monitor-smoke-io.mjs', import.meta.url).href;
+  const child = spawn(process.execPath, ['--input-type=module', '-e',
+    `import {createServer} from 'node:http';import {bindNativeSmokeServerOwner} from ${JSON.stringify(module)};const s=createServer((_q,r)=>r.end('owned'));bindNativeSmokeServerOwner(s);s.listen(0,'127.0.0.1',()=>process.send(s.address().port));`],
+    {stdio: ['ignore', 'ignore', 'ignore', 'ipc']});
+  t.after(() => {if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');});
+  const [port] = await once(child, 'message');
+  assert.equal((await readNativeSmokeResponse('http://127.0.0.1:'+port)).text, 'owned');
+  const closed = once(child, 'exit');
+  if (event === 'disconnect') child.disconnect(); else child.kill('SIGTERM');
+  const [code] = await closed;assert.equal(code, 0);
+  await assert.rejects(readNativeSmokeResponse('http://127.0.0.1:'+port, {}, {timeoutMs: 200}));
+});
+test('native API lease has a finite failure when server shutdown stalls', async () => {
+  const owner = new EventEmitter(), exited = once(owner, 'exit-result');owner.exit = code => owner.emit('exit-result', code);
+  let closes = 0, connections = 0;
+  bindNativeSmokeServerOwner({closeAllConnections(){connections++;}, close(){closes++;}}, {owner, graceMs: 40});
+  owner.emit('disconnect');owner.emit('SIGTERM');
+  assert.deepEqual(await exited, [1]);assert.equal(closes, 1);assert.equal(connections, 1);
 });

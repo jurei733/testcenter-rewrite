@@ -37,3 +37,24 @@ export async function stopNativeSmokeServer(child, {timeoutMs = 10_000, killGrac
     child.removeListener('close', onClose); child.removeListener('error', onError);
   }
 }
+
+// The API subprocess must release inherited pipes when its test owner dies.
+// Its IPC lease is independent of a parent finally block or supervisor timer.
+export function bindNativeSmokeServerOwner(server, {owner = process, graceMs = 2_000} = {}) {
+  if (!Number.isSafeInteger(graceMs) || graceMs <= 0) throw Error('Owned native server grace must be finite and positive.');
+  let stopping = false;
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    const deadline = setTimeout(() => owner.exit(1), graceMs);
+    try {
+      server.closeAllConnections();
+      server.close(() => {clearTimeout(deadline); owner.exit(0);});
+    } catch {
+      clearTimeout(deadline); owner.exit(1);
+    }
+  };
+  owner.once('SIGTERM', stop);
+  owner.once('disconnect', stop);
+  return stop;
+}

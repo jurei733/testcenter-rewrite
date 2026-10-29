@@ -40,6 +40,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   this.ready.set(true);
  }
  get hasChild(){return !!this.route.firstChild;}
+ get headerTitle(){return this.hasChild&&this.allowedChild?this.header.title||this.settings.settings().appTitle:this.settings.settings().appTitle;}
  get allowedChild(){
   const params=this.route.firstChild?.snapshot.paramMap,group=params?.get('group-name'),profile=params?.get('profile-id')??'';
   return !!group&&this.session.access()?.claims.testGroupMonitor?.some(claim=>{

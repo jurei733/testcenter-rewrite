@@ -134,6 +134,17 @@ app-root {
   display: none;
 }
 
+/* Native Original routes use a viewport shell and browser heading defaults. */
+:root:has(app-native-monitor-entry),
+body:has(app-native-monitor-entry) {
+  height: 100%;
+  overflow: hidden;
+}
+app-native-monitor-entry h1 {
+  line-height: normal;
+  letter-spacing: normal;
+}
+
 /* Original has content-box browser defaults; Material's own component rules win. */
 :where(app-native-monitor-entry, app-native-monitor-entry *) {
   box-sizing: content-box;

@@ -7,19 +7,23 @@ import * as core from '@angular/core';
 import * as rx from 'rxjs';
 const tokens=new Map(),names=new Map();let bindings;
 const imports=new Proxy({}, {get:(_,name)=>{if(!tokens.has(name)){const value=class{};tokens.set(name,value);names.set(value,name);}return tokens.get(name);}});
-const source=process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV?execFileSync('git',['show',process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV+':rewrite-app/apps/web/src/app/native-monitor/native-monitor-entry.component.ts'],{encoding:'utf8'}):readFileSync(new URL('../apps/web/src/app/native-monitor/native-monitor-entry.component.ts',import.meta.url),'utf8');
-const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
-const exports={};new Function('exports','require',code)(exports,spec=>spec==='@angular/core'?{...core,Component:()=>value=>value,inject:key=>{const name=names.get(key);assert.ok(bindings.has(name),'Missing dependency '+name);return bindings.get(name);}}:spec==='rxjs'?rx:imports);
-const {NativeMonitorEntryComponent}=exports;
+function load(relative){
+ const source=process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV?execFileSync('git',['show',process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV+':rewrite-app/apps/web/src/app/native-monitor/'+relative],{encoding:'utf8'}):readFileSync(new URL('../apps/web/src/app/native-monitor/'+relative,import.meta.url),'utf8');
+ const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
+ const exports={};new Function('exports','require',code)(exports,spec=>spec==='@angular/core'?{...core,Component:()=>value=>value,Injectable:()=>value=>value,inject:key=>{const name=names.get(key);assert.ok(bindings.has(name),'Missing dependency '+name);return bindings.get(name);}}:spec==='rxjs'?rx:imports);return exports;
+}
+const {NativeMonitorEntryComponent}=load('native-monitor-entry.component.ts');
+const {HeaderService}=load('shared/services/header.service.ts');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const settle=()=>new Promise(done=>setImmediate(done));
 const access=token=>({token,claims:{testGroupMonitor:[{id:'owned',flags:[]}]}});
 function fixture(){
- const nav=[],closed=new rx.Subject(),problem$=new rx.BehaviorSubject(''),calls=[];let scope=new AbortController(),closes=0;
+ const route={firstChild:null},nav=[],closed=new rx.Subject(),problem$=new rx.BehaviorSubject(''),calls=[];let scope=new AbortController(),closes=0;
  const session={access:core.signal(access('original')),busy:core.signal(false),problem:core.signal(''),get accessSignal(){return scope.signal;},login:async()=>session.access(),logout:()=>{calls.push('logout');replace(null);return Promise.resolve();}};
  const replace=value=>{const old=scope;scope=new AbortController();session.access.set(value);old.abort();};
- bindings=new Map(Object.entries({NativeMonitorSessionService:session,ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},Router:{navigate:async path=>{nav.push(path);return true;}},ActivatedRoute:{firstChild:null},MatDialog:{open:()=>({afterClosed:()=>closed,close:()=>{closes++;}})},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')}}));
- const component=new NativeMonitorEntryComponent();component.name='owned';return {component,session,nav,closed,calls,replace,problem$,get closes(){return closes;}};
+ bindings=new Map(Object.entries({NativeMonitorSessionService:session,ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},Router:{navigate:async path=>{nav.push(path);return true;}},ActivatedRoute:route,MatDialog:{open:()=>({afterClosed:()=>closed,close:()=>{closes++;}})},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')}}));
+ const header=new HeaderService();bindings.set('HeaderService',header);
+ const component=new NativeMonitorEntryComponent();component.name='owned';return {component,header,route,session,nav,closed,calls,replace,problem$,get closes(){return closes;}};
 }
 test('retiring the entry cancels its login owner and cannot open a late sole claim',async()=>{
  const f=fixture(),pending=deferred();let owner;f.session.login=(_name,_password,signal)=>{owner=signal;return pending.promise;};
@@ -46,4 +50,20 @@ for(const outcome of ['success','failure'])test('an old logout '+outcome+' canno
 test('replacement-login cancellation is silent even while the same entry view remains alive',async()=>{
  const f=fixture(),pending=deferred();f.session.login=()=>pending.promise;const submitting=f.component.submit();f.replace(access('replacement'));pending.reject(new DOMException('retired login','AbortError'));await submitting;
  assert.equal(f.component.problem(),'');assert.deepEqual(f.nav,[]);assert.equal(f.session.access().token,'replacement');f.component.ngOnDestroy();
+});
+
+function monitorRoute(f,group='owned'){f.route.firstChild={snapshot:{paramMap:new Map([['group-name',group]])}};}
+test('retired access clears the private header even on the retained group route',()=>{
+ const f=fixture();monitorRoute(f);f.header.title='Private group A';assert.equal(f.header.title,'Private group A');
+ f.replace(null);assert.equal(f.header.title,'');assert.equal(f.component.headerTitle,'Owned');f.component.ngOnDestroy();
+});
+for(const sameToken of [false,true])test('a replacement access cannot display the previous header with '+(sameToken?'the same':'another')+' token',()=>{
+ const f=fixture();monitorRoute(f);f.header.title='Private group A';f.replace(access(sameToken?'original':'replacement'));
+ assert.equal(f.header.title,'');assert.equal(f.component.headerTitle,'Owned');f.header.title='Current group B';assert.equal(f.component.headerTitle,'Current group B');f.component.ngOnDestroy();
+});
+test('a new scope invalidates the old header even if its access object is retained',()=>{
+ const f=fixture();monitorRoute(f);f.header.title='Private group A';f.replace(f.session.access());assert.equal(f.header.title,'');assert.equal(f.component.headerTitle,'Owned');f.component.ngOnDestroy();
+});
+test('an unauthorized child route shows only the public application title',()=>{
+ const f=fixture();f.header.title='Private authorized group';monitorRoute(f,'forbidden');assert.equal(f.component.headerTitle,'Owned');f.component.ngOnDestroy();
 });

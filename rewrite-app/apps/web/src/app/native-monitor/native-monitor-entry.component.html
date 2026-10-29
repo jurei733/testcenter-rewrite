@@ -7,7 +7,7 @@
     <mat-menu #accountMenu="matMenu"><div class="account-heading">Nutzerinformationen</div><dl><dt>Anmeldename:</dt><dd>{{session.access()?.loginName}}</dd><dt>Gruppe:</dt><dd>{{session.access()?.groupLabel}}</dd><dt>Berechtigung:</dt><dd>Gruppenmonitor</dd></dl><button mat-menu-item (click)="selection()">Sitzung auswählen</button><button mat-menu-item (click)="logout()" data-cy="logout-button">Abmelden</button></mat-menu>
    }
   </div>
-  <div class="center"><h1>{{hasChild ? header.title : settings.settings().appTitle}}</h1></div>
+  <div class="center"><h1>{{headerTitle}}</h1></div>
   <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div>
  </mat-toolbar>
 </header>
