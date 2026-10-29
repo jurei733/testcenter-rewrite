@@ -669,6 +669,7 @@ jobs:
           path: |
             ${{ runner.temp }}/rewrite-ui-artifacts/failure.json
             ${{ runner.temp }}/rewrite-ui-artifacts/failure.png
+            ${{ runner.temp }}/rewrite-ui-artifacts/native-focus-evidence.json
           if-no-files-found: warn
           retention-days: 7
       - name: Retain Original sample transport diagnostics

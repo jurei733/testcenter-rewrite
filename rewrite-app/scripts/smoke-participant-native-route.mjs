@@ -11,7 +11,7 @@ import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 import {waitForParticipantNativeTabReady, verifyNativeTabReadiness} from './participant-native-tab-readiness.mjs';
-import {nativeRouteArtifactDirectory, writeNativeRouteFailure} from './participant-native-route-evidence.mjs';
+import {nativeFocusEvidence, nativeRouteArtifactDirectory, writeNativeRouteFailure} from './participant-native-route-evidence.mjs';
 
 // Actual production bundles, authenticated SQLite API and trusted Verona input.
 // Source formatter/parser/config contracts are verified separately against pinned excerpts.
@@ -33,6 +33,7 @@ gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
 const errors = [], checks = [], nativeRequests = [], observations = [], releases = [];
 let browser, page, origin = '';
+let focusProbe=null;
 const pending = new Map();
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
@@ -70,6 +71,14 @@ try {
   browser = await chromium.launch({ ...(channel?{channel}:{}), headless });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
   observations.push({kind:'browser-mode',headless,channel:channel??'bundled-chromium',version:browser.version()});
+  await context.addInitScript(()=>{
+    window.__ownedNativeFocusEvents=[];
+    const record=(type,extra={})=>{if(window.__ownedNativeFocusEvents.length<100)window.__ownedNativeFocusEvents.push({type,at:performance.now(),hasFocus:document.hasFocus(),hidden:document.hidden,...extra});};
+    for(const type of ['focus','blur'])window.addEventListener(type,event=>record(type,{trusted:event.isTrusted}));
+    document.addEventListener('visibilitychange',event=>record('visibilitychange',{trusted:event.isTrusted}));
+    window.addEventListener('message',event=>{if(event.source===document.querySelector('iframe')?.contentWindow&&event.data?.type==='vopWindowFocusChangedNotification')record('player-focus',{hasPlayerFocus:typeof event.data.hasFocus==='boolean'?event.data.hasFocus:null});});
+    record('initial');
+  });
   page = await context.newPage();
   page.on('request', request => pending.set(request, 'native-route'));
   for (const event of ['requestfinished', 'requestfailed']) page.on(event, request => pending.delete(request));
@@ -151,6 +160,7 @@ try {
   mark("angular-route-destruction-cancels-retry-and-reentry-cannot-replay-it");
 
   await native("resume"); await player().waitFor(); await emptyJournal();
+  focusProbe={playerEnabledAtVisibility:await player().isEnabled(),platform:process.platform,arch:process.arch,node:process.version,headless,browser:browser.version(),focusSaveContents:[]};
   let releaseSave, saveHeld = false;
   const saveGate = new Promise(done => { releaseSave = done; }); releases.push(releaseSave);
   let unrelatedSaveSeen = false;
@@ -159,7 +169,7 @@ try {
     const request = route.request().postDataJSON();
     const response = await route.fetch(); assert.equal(response.status(), 200);
     const focusContents=(request.logs??[]).flatMap(batch=>batch.entries??[]).filter(entry=>entry.key==='FOCUS').map(entry=>entry.content);
-    focusSaves.push(...focusContents);
+    focusSaves.push(...focusContents);if(focusProbe)focusProbe.focusSaveContents.push(...focusContents.filter(value=>value==='HAS'||value==='HAS_NOT'));
     // Player startup/focus logs share this endpoint. Only this Unit's actual
     // answer proves its closed buffer has reached the server before Goto.
     const ownsAnswer = (request.responseUnitKey ?? request.currentUnitKey) === "first-2" &&
@@ -178,6 +188,17 @@ try {
   const window = headless ? await focusSession.send('Browser.getWindowForTarget') : null;
   const restoreWindow = async () => {if(window)await focusSession.send('Browser.setWindowBounds',{windowId:window.windowId,bounds:{windowState:window.bounds.windowState??'normal'}});};
   await focusSession.send('Emulation.setFocusEmulationEnabled',{enabled:false});
+  // A visible demo input can still precede vopStartCommand. Establish the
+  // running player's real focus and persisted HAS before testing a new blur.
+  await poll(()=>player().isEnabled(), 'Resumed Verona player did not start');
+  await page.bringToFront();await player().click();
+  await poll(()=>page.evaluate(()=>!document.hidden&&document.hasFocus()), 'Running application did not gain real focus');
+  await poll(async()=>{
+    const result=await api(workspace+'/test-logs?testRunId='+encodeURIComponent(first.testRunId)+'&logKey=FOCUS',undefined,operator);
+    const logs=result.items.map(item=>item.testLog).filter(log=>log?.logKey==='FOCUS').sort((a,b)=>b.timestamp-a.timestamp);
+    return logs[0]?.logContent==='HAS';
+  }, 'Running player did not persist its initial HAS focus');
+  unrelatedSaveSeen=false;const beforeBlurFocus=focusSaves.length;
   let focusAway;
   try {
     if(window){
@@ -194,6 +215,7 @@ try {
     await restoreWindow();await page.bringToFront();await player().click();
     await poll(() => page.evaluate(() => !document.hidden && document.hasFocus()), "Application did not regain real focus");
     await poll(() => Promise.resolve(unrelatedSaveSeen && focusSaves.slice(beforeRefocus).includes('HAS')), "Real player focus did not exercise an unrelated save");
+    focusProbe.events=await page.evaluate(()=>window.__ownedNativeFocusEvents??[]);
     observations.push({kind:'real-browser-focus',action:window?'owned-window-minimize':'owned-tab',lostFocus:true,regainedFocus:true});
   }finally{await restoreWindow();await focusAway?.close();await focusSession.send('Emulation.setFocusEmulationEnabled',{enabled:true});await focusSession.detach();}
   assert.equal(saveHeld, false, "A lifecycle/log-only save cannot qualify the closed answer buffer");
@@ -270,9 +292,12 @@ try {
   catch (evidenceError) { throw new AggregateError([error, evidenceError], 'Native route failed and evidence could not be retained.', {cause: error}); }
   throw error;
 } finally {
+  if(focusProbe)focusProbe.events??=await page?.evaluate(()=>window.__ownedNativeFocusEvents??[]).catch(()=>[]);
   for (const release of releases) release(); await page?.unrouteAll({ behavior: "wait" });
   await writeFile(join(artifacts, "native-route.json"), JSON.stringify({ checks, errors, nativeRequests, observations }, null, 2));
   await browser?.close();
   if (server.exitCode === null) { server.kill("SIGTERM"); await Promise.race([closed, delay(5_000)]); if (server.exitCode === null) server.kill("SIGKILL"); }
-  await closed; gate.assertHealthy(); console.log("owned_api=shutdown");
+  await closed; gate.assertHealthy();
+  if(focusProbe)await writeFile(join(artifacts,"native-focus-evidence.json"),JSON.stringify(nativeFocusEvidence(focusProbe,focusProbe.events),null,2));
+  console.log("owned_api=shutdown");
 }
