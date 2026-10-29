@@ -210,7 +210,7 @@ try {
       await focusAway.goto('about:blank');await focusAway.bringToFront();
     }
     await poll(() => page.evaluate(() => !document.hasFocus()), "Owned browser action did not blur the application");
-    await poll(() => Promise.resolve(unrelatedSaveSeen && focusSaves.includes('HAS_NOT')), "Real application blur did not exercise an unrelated save");
+    await poll(() => Promise.resolve(unrelatedSaveSeen && focusSaves.slice(beforeBlurFocus).includes('HAS_NOT')), "Real application blur did not exercise an unrelated save");
     unrelatedSaveSeen = false;const beforeRefocus=focusSaves.length;
     await restoreWindow();await page.bringToFront();await player().click();
     await poll(() => page.evaluate(() => !document.hidden && document.hasFocus()), "Application did not regain real focus");
@@ -288,7 +288,7 @@ try {
   mark("committed-old-effect-stays-on-its-run-and-late-reply-cannot-project-on-replacement");
   assert.deepEqual(errors, []);
 } catch (error) {
-  try { await writeNativeRouteFailure({directory: artifacts, page, error, checks, pending, origin}); }
+  try { await writeNativeRouteFailure({directory: artifacts, page, error, checks, pending, origin, focusProbe}); }
   catch (evidenceError) { throw new AggregateError([error, evidenceError], 'Native route failed and evidence could not be retained.', {cause: error}); }
   throw error;
 } finally {

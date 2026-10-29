@@ -11,9 +11,10 @@ export async function nativeRouteArtifactDirectory(destination = process.env.UI_
 
 /** Match the workflow's exact failure.json/png paths. Never collect scratch
  * stores, bearer headers, request bodies, error payloads or document text. */
-export async function writeNativeRouteFailure({directory, page, error, checks, pending, origin}) {
+export async function writeNativeRouteFailure({directory, page, error, checks, pending, origin, focusProbe}) {
   await page?.screenshot({path: join(directory, 'failure.png'), fullPage: true}).catch(() => {});
-  await writeFile(join(directory, 'failure.json'), JSON.stringify(nativeTabFailureEvidence(error, checks, pending, origin), null, 2));
+  const focus=focusProbe?nativeFocusEvidence(focusProbe,await page?.evaluate(()=>window.__ownedNativeFocusEvents??[]).catch(()=>[])):undefined;
+  await writeFile(join(directory, 'failure.json'), JSON.stringify({...nativeTabFailureEvidence(error, checks, pending, origin),...(focus?{focus}:{})}, null, 2));
 }
 
 // Whitelist focus diagnostics separately from stores, bearer headers, request

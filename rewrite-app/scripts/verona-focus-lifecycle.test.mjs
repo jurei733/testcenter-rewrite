@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import test from 'node:test';
 import {runInNewContext} from 'node:vm';
 import ts from 'typescript';
 import * as contracts from '@testcenter-rewrite-app/contracts';
 import * as capture from '@testcenter-rewrite-app/contracts/participant-response-capture';
-import {nativeFocusEvidence} from './participant-native-route-evidence.mjs';
+import {nativeFocusEvidence,writeNativeRouteFailure} from './participant-native-route-evidence.mjs';
 
 // Execute the production host methods. Stub only Angular's decorator/UI boundary;
 // document focus and the clock are controlled to exercise event ordering.
@@ -56,4 +59,31 @@ test('focus evidence keeps only bounded focus metadata',()=>{
  assert.deepEqual(result,{platform:'linux',arch:'x64',node:'v22.23.4',browser:'147.0.7727.15',headless:true,focusSaveContents:['HAS_NOT','HAS'],events:[{type:'player-focus',at:123,hasFocus:false,hidden:false,trusted:true,hasPlayerFocus:false}]});
  assert.equal(nativeFocusEvidence(probe,Array(150).fill(result.events[0])).events.length,100);
  assert.deepEqual(nativeFocusEvidence({},[{type:'blur',at:Infinity,hasFocus:false,hidden:false},{type:'answer',at:1,hasFocus:false,hidden:false}]).events,[]);
+});
+test('the actual browser gate rejects an earlier HAS_NOT plus a later unrelated save',async()=>{
+ const sourceFile=ts.createSourceFile('smoke-participant-native-route.mjs',readFileSync(new URL('./smoke-participant-native-route.mjs',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);
+ const gates=[];
+ function visit(node){
+  if(ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.expression.text==='poll'&&node.arguments[1]?.text==='Real application blur did not exercise an unrelated save')gates.push(node.arguments[0]);
+  ts.forEachChild(node,visit);
+ }
+ visit(sourceFile);assert.equal(gates.length,1);
+ // Run the shipped poll predicate, rather than maintaining a second version.
+ const qualifies=new Function('unrelatedSaveSeen','focusSaves','beforeBlurFocus',`return (${gates[0].getText(sourceFile)})();`);
+ const prior=['HAS_NOT','HAS'],boundary=prior.length;
+ assert.equal(await qualifies(true,prior,boundary),false);
+ assert.equal(await qualifies(true,[...prior,'HAS'],boundary),false);
+ assert.equal(await qualifies(false,[...prior,'HAS_NOT'],boundary),false);
+ assert.equal(await qualifies(true,[...prior,'HAS_NOT'],boundary),true);
+});
+test('the existing failure document retains sanitized focus evidence without a new CI upload path',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'native-focus-evidence-'));
+ try{
+  const page={screenshot:async()=>{},evaluate:async()=>[{type:'blur',at:12,hasFocus:false,hidden:false,trusted:true,token:'private-marker',answer:'private-marker'}]};
+  await writeNativeRouteFailure({directory,page,error:Error('owned failure'),checks:[],pending:new Map(),origin:'https://owned.invalid',focusProbe:{platform:'linux',arch:'x64',node:'v22.23.4',browser:'147.0.7727.15',headless:true,focusSaveContents:['HAS_NOT'],token:'private-marker'}});
+  const serialized=await readFile(join(directory,'failure.json'),'utf8'),evidence=JSON.parse(serialized);
+  assert.equal(serialized.includes('private-marker'),false);
+  assert.deepEqual(evidence.focus.events,[{type:'blur',at:12,hasFocus:false,hidden:false,trusted:true}]);
+  assert.deepEqual(evidence.focus.focusSaveContents,['HAS_NOT']);
+ }finally{await rm(directory,{recursive:true,force:true});}
 });
