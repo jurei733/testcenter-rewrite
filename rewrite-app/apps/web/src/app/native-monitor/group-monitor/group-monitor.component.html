@@ -101,7 +101,7 @@
     </button>
   </mat-menu>
 
-  <mat-drawer-container>
+  <mat-drawer-container [attr.inert]="isClosing ? '' : null">
     <mat-drawer #sidenav opened="true" mode="side" class="toolbar">
       <h2>{{customtext(('Test-Steuerung'),('gm_controls'))}}</h2>
 
@@ -354,7 +354,7 @@
   </mat-drawer-container>
 
   @if (!sidenav.opened) {
-    <button mat-icon-button class="drawer-button-close"
+    <button mat-icon-button class="drawer-button-close" [attr.inert]="isClosing ? '' : null"
       matTooltip="Test-Steuerung einblenden" matTooltipPosition="right"
       (click)="sidenav.toggle()">
       <mat-icon svgIcon="chevron_right"></mat-icon>
@@ -362,7 +362,7 @@
   }
 
   @if (sidenav.opened) {
-    <button mat-icon-button class="drawer-button-open"
+    <button mat-icon-button class="drawer-button-open" [attr.inert]="isClosing ? '' : null"
       matTooltip="{{customtext(('Test-Steuerung verbergen'),('gm_hide_controls_tooltip'))}}" matTooltipPosition="above"
       (click)="sidenav.toggle()" >
       <mat-icon svgIcon="chevron_left"></mat-icon>
@@ -373,8 +373,8 @@
     <div id="shield"></div>
   }
   @if (isClosing) {
-    <mat-card id="shield-child" appearance="raised">
-      <mat-card-content>
+    <mat-card id="shield-child" appearance="raised" cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
+      <mat-card-content tabindex="-1" cdkFocusInitial>
         Alle Tests werden beendet. Bitte warten...
       </mat-card-content>
     </mat-card>

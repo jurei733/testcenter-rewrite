@@ -129,6 +129,13 @@ test('a profile failure leaves the group disconnected and a later route can reco
 test('finish returns to the actual native chooser after the existing delay',t=>{
  clock(t);const f=componentFixture();f.params.next({'group-name':'A'});f.component.finishEverythingCommand();f.confirmations.next(true);t.mock.timers.tick(1999);assert.deepEqual(f.navigated,[]);t.mock.timers.tick(1);assert.deepEqual(f.navigated,['/group-monitor']);assert.equal(f.component.isClosing,false);f.component.ngOnDestroy();
 });
+test('finish accepts only one confirmation and one active operation',t=>{
+ clock(t);const f=componentFixture();f.params.next({'group-name':'A'});
+ f.component.finishEverythingCommand();f.component.finishEverythingCommand();f.confirmations.next(true);
+ assert.equal(f.finishes,1);assert.equal(f.component.isClosing,true);
+ f.component.finishEverythingCommand();f.confirmations.next(true);assert.equal(f.finishes,1);
+ f.component.ngOnDestroy();assert.equal(f.component.isClosing,false);
+});
 for(const phase of ['confirmation','navigation'])test('route change cancels stale finish '+phase,t=>{
  clock(t);const f=componentFixture();f.params.next({'group-name':'A'});f.component.finishEverythingCommand();if(phase==='navigation')f.confirmations.next(true);f.params.next({'group-name':'B'});if(phase==='confirmation')f.confirmations.next(true);t.mock.timers.tick(3000);assert.deepEqual(f.navigated,[]);assert.equal(f.finishes,phase==='confirmation'?0:1);assert.equal(f.component.isClosing,false);f.component.ngOnDestroy();
 });

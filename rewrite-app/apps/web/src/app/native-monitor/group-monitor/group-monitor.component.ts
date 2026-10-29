@@ -19,7 +19,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import type { Sort } from '@angular/material/sort';
 import { MatSidenav } from '@angular/material/sidenav';
 import {
-  EMPTY, fromEvent, interval, Observable, of, Subject, Subscription
+  EMPTY, defer, fromEvent, interval, Observable, of, Subject, Subscription
 } from 'rxjs';
 import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
@@ -93,7 +93,10 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   displayOptions = GroupMonitorComponent.defaultDisplayOptions();
 
   isScrollable = false;
-  isClosing = false;
+  private readonly closingState = signal(false);
+  get isClosing(): boolean { return this.closingState(); }
+  set isClosing(value: boolean) { this.closingState.set(value); }
+  private finishPending = false;
   checkedSessionCount = 0;
 
   quickFilter: string = '';
@@ -299,12 +302,13 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
 
   finishEverythingCommand(): void {
     const scope = this.bs.accessSignal;
-    if (scope.aborted) return;
-    this.subscriptions.push(this.messageService.showConfirmDialog({
+    if (scope.aborted || this.finishPending) return;
+    this.finishPending = true;
+    this.subscriptions.push(defer(() => this.messageService.showConfirmDialog({
       title: 'Testdurchführung beenden',
       content: 'Achtung! Diese Aktion sperrt und beendet sämtliche Tests dieser Sitzung.',
       confirmText: 'Ja, ich möchte die Testdurchführung beenden'
-    }).pipe(
+    })).pipe(
       take(1),
       filter((confirmed: boolean) => confirmed),
       tap(() => { this.isClosing = true; }),
@@ -312,7 +316,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
       delay(2000),
       takeUntil(this.routeChanged$),
       takeUntil(fromEvent(scope, 'abort')),
-      finalize(() => { this.isClosing = false; })
+      finalize(() => { this.finishPending = false; this.isClosing = false; })
     ).subscribe({
       next: () => { void this.router.navigateByUrl('/group-monitor'); },
       error: () => { this.appendMessage({ level: 'error', customtext: '', text: 'Die Testdurchführung konnte nicht beendet werden.' }); }

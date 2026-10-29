@@ -1,3 +1,4 @@
+import {verifyNativeFinishBusy} from './native-monitor-finish-busy-smoke.mjs';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
@@ -129,6 +130,7 @@ try{
  await page.waitForFunction(id=>document.querySelector('tc-test-session[data-test-id="'+id+'"] .booklet-states')?.textContent.trim()==='',firstId);
  assert.equal((await page.locator('tc-test-session[data-test-id="'+secondId+'"] .booklet-states').innerText()).trim(),'Alpha');await page.getByText('Owned Route',{exact:true}).click();await page.waitForFunction(id=>document.querySelector('tc-test-session')?.getAttribute('data-test-id')===id,secondId);check('obsolete-booklet-state-renders-and-sorts-with-live-defaults');
  const beforeCancel=wire.length;await page.locator('[data-cy=GM_end_button]').click();await page.locator('[data-cy=dialog-cancel]').click();assert.ok(!wire.slice(beforeCancel).some(r=>r.path.endsWith('/tests/lock')));check('native-finish-cancel-has-no-side-effects');
+ await verifyNativeFinishBusy({page,base,wire,directory:join(artifactRoot,'native-monitor')});check('finish-shield-and-single-flight-appear-without-poll-and-retire-safely');
  // Materialize a real unopened Test, leaving lastOpenedAt null. It must
  // be locked by finish-all, without being targeted by a terminate command.
  const pendingName='owned-ui-pending';let pendingAccess,pendingId;
