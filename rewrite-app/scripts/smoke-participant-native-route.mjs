@@ -65,8 +65,10 @@ try {
   const imported = await api(workspace + "/import-jobs", { sourcePackageId: source.sourcePackage.sourcePackageId }, operator);
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-native-route-browser" }, operator);
   await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="route-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
-  browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
-  page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
+  const channel=process.env.UI_SMOKE_BROWSER_CHANNEL||(process.env.CI === "true" ? undefined : "chrome");
+  browser = await chromium.launch({ ...(channel?{channel}:{}), headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
+  page = await context.newPage();
   page.on('request', request => pending.set(request, 'native-route'));
   for (const event of ['requestfinished', 'requestfailed']) page.on(event, request => pending.delete(request));
   page.on("pageerror", error => errors.push(String(error)));
@@ -150,22 +152,39 @@ try {
   let releaseSave, saveHeld = false;
   const saveGate = new Promise(done => { releaseSave = done; }); releases.push(releaseSave);
   let unrelatedSaveSeen = false;
+  const focusSaves = [];
   const heldSave = async route => {
     const request = route.request().postDataJSON();
     const response = await route.fetch(); assert.equal(response.status(), 200);
+    const focusContents=(request.logs??[]).flatMap(batch=>batch.entries??[]).filter(entry=>entry.key==='FOCUS').map(entry=>entry.content);
+    focusSaves.push(...focusContents);
     // Player startup/focus logs share this endpoint. Only this Unit's actual
     // answer proves its closed buffer has reached the server before Goto.
     const ownsAnswer = (request.responseUnitKey ?? request.currentUnitKey) === "first-2" &&
       parseVeronaUnitResponse(request.unitResponse)?.unitState.dataParts.answer === "Second Unit drain Ω";
     observations.push({ kind: "closed-buffer-save", unitKey: request.responseUnitKey ?? request.currentUnitKey,
-      ownsAnswer, hasUnitResponse: typeof request.unitResponse === "string" });
+      ownsAnswer, hasUnitResponse: typeof request.unitResponse === "string", focusContents });
     if (ownsAnswer) { saveHeld = true; await saveGate; }
     else unrelatedSaveSeen = true;
     try { await route.fulfill({ response }); } catch {}
   };
   await page.route("**/save-progress", heldSave);
-  await player().focus();
-  await poll(() => Promise.resolve(unrelatedSaveSeen), "Player focus did not exercise an unrelated save");
+  // A repeated focus within an already focused app is correctly deduplicated.
+  // Exercise a real document blur/focus through an owned second browser tab.
+  const focusSession = await page.context().newCDPSession(page);
+  await focusSession.send('Emulation.setFocusEmulationEnabled',{enabled:false});
+  const focusAway = await page.context().newPage();
+  const awaySession = await page.context().newCDPSession(focusAway);
+  await awaySession.send('Emulation.setFocusEmulationEnabled',{enabled:false});
+  try {
+    await focusAway.goto('about:blank'); await focusAway.bringToFront();
+    await poll(() => page.evaluate(() => !document.hasFocus()), "Owned tab did not blur the application");
+    await poll(() => Promise.resolve(unrelatedSaveSeen && focusSaves.includes('HAS_NOT')), "Real application blur did not exercise an unrelated save");
+    unrelatedSaveSeen = false;const beforeRefocus=focusSaves.length;
+    await page.bringToFront(); await player().click();
+    await poll(() => page.evaluate(() => !document.hidden && document.hasFocus()), "Application did not regain real focus");
+    await poll(() => Promise.resolve(unrelatedSaveSeen && focusSaves.slice(beforeRefocus).includes('HAS')), "Real player focus did not exercise an unrelated save");
+  } finally { await focusAway.close();await focusSession.send('Emulation.setFocusEmulationEnabled',{enabled:true});await focusSession.detach(); }
   assert.equal(saveHeld, false, "A lifecycle/log-only save cannot qualify the closed answer buffer");
   mark("closed-answer-gate-ignores-player-lifecycle-and-focus-logs");
   await player().fill("Second Unit drain Ω");

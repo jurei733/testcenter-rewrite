@@ -100,6 +100,20 @@ try{
  await openFilters();await page.locator('[data-cy^=GM_filter_option_button]').filter({hasText:one}).locator('[svgicon=edit]').click();filterDialog=page.getByRole('dialog');assert.equal(await filterDialog.locator('[data-cy=comment-diag-value]').inputValue(),one);assert.equal(await page.locator('tc-test-session').getAttribute('data-test-id'),secondId);check('filter-edit-cancel-preserves-original-definition');
  await filterDialog.locator('[data-cy=comment-diag-value]').fill(two);await filterDialog.locator('[data-cy=comment-diag-submit]').click();await page.locator('mat-dialog-container').waitFor({state:'detached'});await page.waitForFunction(id=>document.querySelectorAll('tc-test-session').length===1&&document.querySelector('tc-test-session').getAttribute('data-test-id')===id,firstId);check('real-scoped-filter-dialog-edits-and-reapplies-custom-filter');
  await openFilters();await page.locator('[data-cy^=GM_filter_option_button]').filter({hasText:two}).click();await page.waitForFunction(()=>document.querySelectorAll('tc-test-session').length===2);
+ // Release the failed profile only after the initial zoneless view has painted.
+ // No subsequent user event or successful poll may supply the missing update.
+ let failProfile;const failedProfileGate=new Promise(done=>{failProfile=done;});
+ const failedProfile=async route=>{await failedProfileGate;await route.fulfill({status:503,contentType:'text/plain',body:'Owned profile unavailable'});};
+ await page.route('**/monitor/profile/small',failedProfile);
+ try{
+  await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'/small?ui=original',{waitUntil:'domcontentloaded'});
+  await page.locator('tc-group-monitor').waitFor();
+  await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+  failProfile();
+  await page.getByText('Das Monitorprofil konnte nicht geladen werden.',{exact:true}).waitFor({timeout:5000});
+  assert.equal(await page.locator('tc-test-session').count(),0);
+  check('asynchronous-profile-failure-renders-without-user-event-or-poll');
+ }finally{failProfile();await page.unroute('**/monitor/profile/small',failedProfile);}
  const beforeSmall=wire.length;await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'/small?ui=original',{waitUntil:'networkidle'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);assert.ok(wire.slice(beforeSmall).some(r=>r.path==='/monitor/profile/small'));await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'/full?ui=original',{waitUntil:'networkidle'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);check('both-claimed-profiles-open-through-restored-direct-routes');
  await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:join(artifacts,'native-monitor-desktop.png'),fullPage:false});await page.reload({waitUntil:'networkidle'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);check('native-bearer-restores-on-reload');
  // Exercise the real time confirmation and native Goto producer.

@@ -99,7 +99,11 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   quickFilter: string = '';
   quickFilterBoxOpen: boolean = false;
 
-  messages: UIMessage[] = [];
+  private readonly messageState = signal<UIMessage[]>([]);
+  get messages(): UIMessage[] { return this.messageState(); }
+  private appendMessage(message: UIMessage): void {
+    this.messageState.update(messages => [...messages, message]);
+  }
 
   bookletStates: { [p: string]: string } = {};
 
@@ -136,7 +140,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
         this.CurrentlyMarked = null;
         this.quickFilter = '';
         this.quickFilterBoxOpen = false;
-        this.messages = [];
+        this.messageState.set([]);
         this.bookletStates = {};
         this.groupLabel = this.mds.getAccessObject('testGroupMonitor', params['group-name']).label;
         this.headerService.title = `${this.mds.appTitle$.value} ${this.cts.getCustomText('gm_headline') ?? ''} - ${this.groupLabel}`;
@@ -148,7 +152,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
             if (profile) this.applyProfile(profile);
           }),
           catchError(() => {
-            this.messages.push({ level: 'error', customtext: '', text: 'Das Monitorprofil konnte nicht geladen werden.' });
+            this.appendMessage({ level: 'error', customtext: '', text: 'Das Monitorprofil konnte nicht geladen werden.' });
             return EMPTY;
           })
         );
@@ -162,11 +166,11 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
         this.onCheckedChange(stats);
       }),
       this.tsm.commandResponses$.subscribe(commandResponse => {
-        this.messages.push(this.commandResponseToMessage(commandResponse));
+        this.appendMessage(this.commandResponseToMessage(commandResponse));
       }),
       this.tsm.commandResponses$
         .pipe(switchMap(() => interval(7000)))
-        .subscribe(() => { this.messages.shift(); })
+        .subscribe(() => { this.messageState.update(messages => messages.slice(1)); })
     ];
 
     this.mds.appSubTitle$.next(this.cts.getCustomText('gm_headline') ?? '');
@@ -311,13 +315,13 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
       finalize(() => { this.isClosing = false; })
     ).subscribe({
       next: () => { void this.router.navigateByUrl('/group-monitor'); },
-      error: () => { this.messages.push({ level: 'error', customtext: '', text: 'Die Testdurchführung konnte nicht beendet werden.' }); }
+      error: () => { this.appendMessage({ level: 'error', customtext: '', text: 'Die Testdurchführung konnte nicht beendet werden.' }); }
     }));
   }
 
   testCommandGoto(): void {
     if (!this.currentlySelected?.element?.blockId) {
-      this.messages.push({
+      this.appendMessage({
         level: 'warning',
         customtext: 'gm_test_command_no_selected_block',
         text: 'Kein Zielblock ausgewählt'
@@ -361,7 +365,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
       takeUntil(fromEvent(scope, 'abort'))
     ).subscribe({
       next: () => { if (current()) this.selectNextBlock(); },
-      error: () => { this.messages.push({ level: 'error', customtext: '', text: 'Der Sprung konnte nicht ausgeführt werden.' }); }
+      error: () => { this.appendMessage({ level: 'error', customtext: '', text: 'Der Sprung konnte nicht ausgeführt werden.' }); }
     }));
   }
 
