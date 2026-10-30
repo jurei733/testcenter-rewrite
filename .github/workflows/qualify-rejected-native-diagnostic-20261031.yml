@@ -1,4 +1,4 @@
-name: Qualify rejected-cohort diagnostic controls on native Linux
+name: Qualify native manual selection and rejected-cohort diagnostics
 on:
   push:
     branches: [codex/rejected-native-diagnostic-20261030]
@@ -6,14 +6,17 @@ permissions:
   contents: read
 jobs:
   qualify:
-    name: Native diagnostic policy and process lifetime qualification
+    name: Actual native WebSocket manual selection and unchanged Source family
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: rewrite-app
     env:
       CI: "true"
+      FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
+      UI_SMOKE_HEADFUL: "true"
+      UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-selection-ui
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -27,11 +30,31 @@ jobs:
         run: npm run test:ci-policy > "$RUNNER_TEMP/rejected-diagnostic-qualification/policy.tap" 2>&1
       - name: Audit the unchanged locked graph
         run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json > "$RUNNER_TEMP/rejected-diagnostic-qualification/audit.json"
+      - name: Preserve actual native Debian archive controls
+        run: node --test scripts/ci-browser-system-linux.test.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/native-debian.tap" 2>&1
+      - name: Download the exact locked Chromium
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Capture authenticated native material without granting new admission
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/native-browser-system
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - name: Enforce the immutable qualified Source family
+        run: node scripts/verify-selection-native-family.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/source-family.json"
+      - name: Build the actual API, schema cache and web app
+        run: npm run build
+      - name: Exercise all real WebSocket browser cases with rendered manual selection
+        run: xvfb-run --auto-servernum node scripts/smoke-native-websocket.mjs
       - name: Retain actual diagnostic qualification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: rejected-diagnostic-qualification-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/rejected-diagnostic-qualification/
+          path: |
+            ${{ runner.temp }}/rejected-diagnostic-qualification/
+            ${{ runner.temp }}/native-browser-system/manifest.json
+            ${{ runner.temp }}/native-browser-system/*.deb
+            ${{ runner.temp }}/browser-material-*/
+            ${{ runner.temp }}/native-selection-ui/
           if-no-files-found: warn
           retention-days: 7
