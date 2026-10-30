@@ -73,7 +73,7 @@ export async function executeRejectedMeasurementStep(root,command,args,seconds=3
   cwd:root,env,maxBuffer:16*1024*1024,timeout:(seconds+20)*1000,killSignal:'SIGKILL'});
 }
 
-async function exerciseOwnedNode(root){
+export async function exerciseOwnedRejectedNode(root){
  const path=process.execPath;assert.equal(path,'/opt/hostedtoolcache/node/22.23.4/x64/bin/node');
  assert.equal(await realpath(path),path);const info=await lstat(path);assert.ok(info.isFile());
  assert.equal(info.uid,process.getuid());assert.equal(info.mode&0o7777,0o755);
@@ -99,7 +99,7 @@ async function measure(root,env){
   await step('locked-install','npm',['ci','--no-audit','--no-fund'],90);
   assert.equal(canonicalNativeInventory(),before,'Dependency installation changed the rejected native inventory');
   const current=await nativeContext(root,env);for(const [key,value]of Object.entries(context))assert.deepEqual(current[key],value,'Rejected host identity changed: '+key);
-  stage='owned-node-mode';reportSmokePhase(stage);const node=await exerciseOwnedNode(root);await writeFile(join(directory,'node-mode.json'),JSON.stringify(node)+'\n',{flag:'wx'});
+  stage='owned-node-mode';reportSmokePhase(stage);const node=await exerciseOwnedRejectedNode(root);await writeFile(join(directory,'node-mode.json'),JSON.stringify(node)+'\n',{flag:'wx'});
   await step('policy','npm',['run','test:ci-policy'],90);
   await step('native-debian',process.execPath,['--test','scripts/ci-browser-system-linux.test.mjs'],30);
   await step('audit','npm',['audit','--package-lock-only','--include=dev','--include=optional','--audit-level=high','--json'],60);

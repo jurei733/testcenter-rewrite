@@ -1,0 +1,37 @@
+name: Qualify rejected-cohort diagnostic controls on native Linux
+on:
+  push:
+    branches: [codex/rejected-native-diagnostic-20261030]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    name: Native diagnostic policy and process lifetime qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Prepare owned qualification evidence
+        run: mkdir -p "$RUNNER_TEMP/rejected-diagnostic-qualification"
+      - name: Exercise the diagnostic's actual owned Node mode correction
+        run: node --input-type=module -e 'import {exerciseOwnedRejectedNode} from "./scripts/measure-rejected-native-cohort.mjs"; console.log(JSON.stringify(await exerciseOwnedRejectedNode(process.cwd())));' > "$RUNNER_TEMP/rejected-diagnostic-qualification/node-mode.json"
+      - name: Preserve all native policy checks including real timeout escalation
+        run: npm run test:ci-policy > "$RUNNER_TEMP/rejected-diagnostic-qualification/policy.tap" 2>&1
+      - name: Audit the unchanged locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json > "$RUNNER_TEMP/rejected-diagnostic-qualification/audit.json"
+      - name: Retain actual diagnostic qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rejected-diagnostic-qualification-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rejected-diagnostic-qualification/
+          if-no-files-found: warn
+          retention-days: 7
