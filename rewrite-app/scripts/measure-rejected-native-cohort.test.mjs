@@ -9,7 +9,7 @@ import {parse} from 'yaml';
 import {cohortDigest} from './ci-browser-cohort-certificates.mjs';
 import {canonicalMaterial} from './ci-browser-material-contract.mjs';
 import {qualifiedNativeCohortFixture,qualifiedLockCohortFixture} from './qualified-native-cohort-fixture.mjs';
-import {validateRejectedNativeInputs,validateRejectedSourceFamily,successfulTapSummary,executeRejectedMeasurementStep} from './measure-rejected-native-cohort.mjs';
+import {validateRejectedNativeInputs,validateRejectedSourceFamily,successfulTapSummary,executeRejectedMeasurementStep,publicRejectedMirrorProfile} from './measure-rejected-native-cohort.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url)),historical=await qualifiedNativeCohortFixture(),known=await qualifiedLockCohortFixture();
 const older=historical.registry.records[0],before=older.nativeOracle.beforeInventory;
@@ -46,6 +46,19 @@ test('re-sealed Source pixel, font, browser, Node, collector, screen and Source 
 test('partial, skipped, failed, duplicate or absent TAP summaries cannot become native qualification receipts',()=>{
  const good='# tests 4\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';assert.equal(successfulTapSummary(good).pass,4);
  for(const bad of ['',good+good,good.replace('# pass 4','# pass 3'),...['fail','cancelled','skipped','todo'].map(key=>good.replace('# '+key+' 0','# '+key+' 1'))])assert.throws(()=>successfulTapSummary(bad));
+});
+test('public mirror evidence preserves permitted Ubuntu identities without changing sources or granting admission',()=>{
+ const source='# public runner profile\nhttp://us-east-1.ec2.archive.ubuntu.com/ubuntu/ priority:1\nhttps://archive.ubuntu.com/ubuntu/ priority:2\nhttps://security.ubuntu.com/ubuntu/ priority:3\n';
+ const profile=publicRejectedMirrorProfile(source);assert.equal(profile.sourceSha256,cohortDigest(source));assert.equal(profile.changesMade,false);
+ assert.deepEqual(profile.rows.map(row=>row.uri),['http://us-east-1.ec2.archive.ubuntu.com/ubuntu/','https://archive.ubuntu.com/ubuntu/','https://security.ubuntu.com/ubuntu/']);
+ assert.deepEqual(profile.rows[0].options,[{value:'priority:1'}]);
+ assert.equal(publicRejectedMirrorProfile('http://ARCHIVE.ubuntu.com:80/ubuntu priority:1\n').rows[0].uri,'http://ARCHIVE.ubuntu.com:80/ubuntu');
+});
+test('mirror evidence redacts credential-bearing, query-bearing, foreign or malformed transports and arbitrary options',()=>{
+ const secrets=['OWNED_USER','OWNED_PASSWORD','OWNED_QUERY','OWNED_COMMENT','OWNED_OPTION'];
+ const source='# OWNED_COMMENT\nhttps://OWNED_USER:OWNED_PASSWORD@archive.ubuntu.com/ubuntu/ priority:1\nhttps://archive.ubuntu.com/ubuntu/?token=OWNED_QUERY priority:2\nhttps://foreign.invalid/ubuntu/ trusted:OWNED_OPTION\nnot-a-url priority:3\n';
+ const profile=publicRejectedMirrorProfile(source),encoded=JSON.stringify(profile);assert.ok(profile.rows.every(row=>row.redactedTransport));for(const secret of secrets)assert.equal(encoded.includes(secret),false);
+ assert.ok(profile.rows[2].options[0].redacted);assert.throws(()=>publicRejectedMirrorProfile('x'.repeat(16385)));
 });
 test('the actual diagnostic CLI refuses an external output directory before it can create or modify files',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'owned-rejected-native-'));
