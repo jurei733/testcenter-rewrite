@@ -104,6 +104,9 @@ export class NativeBroadcaster {
     const target=peer.ticket.target,wire=target.channel==='commands'
      ?await this.services.originalCommand.pending({token:peer.ticket.credential,testNumber:target.testNumber})
      :await this.services.originalMonitor.sessions({token:peer.ticket.credential,groupKey:target.groupKey});
+    // A read may outlive its actor or scope. Recheck after the private result
+    // arrives, before any payload can cross the socket.
+    await this.authorize(peer.ticket);
     if(this.closed||peer.retired||peer.ws.readyState!==WebSocket.OPEN||wire===peer.wire)return;
     if(Buffer.byteLength(wire)>maxWireBytes||peer.ws.bufferedAmount>maxWireBytes){peer.ws.close(1013,'Use polling');return;}
     // Do not parse/re-serialize native signed-int64 IDs through JavaScript Number.

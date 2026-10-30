@@ -3,15 +3,16 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {once} from 'node:events';
 import {WebSocket} from 'ws';
+import {FirstSliceError} from '@testcenter-rewrite-app/application';
 import {NativeBroadcaster} from '../apps/api/dist/apps/api/src/native-broadcaster.js';
 async function setup(t,pending=async()=>'[]'){
- const reports=[],services={originalSession:{read:async()=>({token:'owned-credential'})},originalCommand:{requireOwner:async()=>{},pending,connectionLost:async()=>{}},originalMonitor:{requireMonitor:async()=>{},sessions:async()=>'[]'}};
+ const reports=[],services={originalSession:{read:async()=>({token:'owned-credential'})},originalCommand:{requireOwner:async()=>{},pending,connectionLost:async()=>{}},originalMonitor:{requireMonitor:async()=>{},sessions:pending}};
  const hub=new NativeBroadcaster(services,operation=>operation(),stage=>reports.push(stage)),server=createServer((_q,r)=>r.end());hub.attach(server);await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port,sockets=[];
  t.after(async()=>{hub.close();for(const ws of sockets)ws.terminate();await new Promise(done=>server.close(done));});
  const connect=token=>{const ws=new WebSocket(base.replace('http:','ws:')+'/ws?token='+token,{origin:base});ws.on('error',()=>{});sockets.push(ws);return ws;};
- const issue=()=>hub.issue({channel:'commands',testNumber:'9007199254740993'},'owned-credential');
+ const issue=(channel='commands')=>hub.issue(channel==='commands'?{channel,testNumber:'9007199254740993'}:{channel,groupKey:'OWNED'},'owned-credential');
  const reject=async token=>{const ws=connect(token);return new Promise((done,reject)=>{const timeout=setTimeout(()=>reject(Error('Owned rejection deadline')),5000);ws.once('unexpected-response',(_request,response)=>{clearTimeout(timeout);response.resume();ws.terminate();done(response.statusCode);});ws.once('open',()=>{clearTimeout(timeout);reject(Error('Expired ticket opened'));});});};
- return{hub,server,issue,connect,reject,reports};
+ return{hub,server,issue,connect,reject,reports,services};
 }
 test('unused native tickets expire instead of establishing an old private subscription',async t=>{
  const f=await setup(t),token=await f.issue(),nativeNow=Date.now;
@@ -24,4 +25,11 @@ test('repeated polls retain only a bounded set of unused tickets while the lates
 test('a stalled authorized reader loses its socket at the real configured deadline and cannot send a late private frame',async t=>{
  let resolve,start;const started=new Promise(done=>start=done),held=new Promise(done=>resolve=done);const f=await setup(t,async()=>{start();return held;}),ws=f.connect(await f.issue()),frames=[];ws.on('message',data=>frames.push(String(data)));await once(ws,'open');
  t.mock.timers.enable({apis:['setTimeout']});ws.send('{"event":"subscribe:commands"}');await started;const closed=once(ws,'close');t.mock.timers.tick(20000);t.mock.timers.reset();await closed;assert.deepEqual(f.reports,['read']);resolve('[{"id":9007199254740993}]');await new Promise(done=>setImmediate(done));assert.deepEqual(frames,[]);
+});
+
+for(const channel of ['commands','test-sessions'])test(channel+': revocation while a private read is held cannot leak its late payload',async t=>{
+ let resolve,start;const started=new Promise(done=>start=done),held=new Promise(done=>resolve=done);const f=await setup(t,async()=>{start();return held;}),ws=f.connect(await f.issue(channel)),frames=[];ws.on('message',data=>frames.push(String(data)));await once(ws,'open');ws.send(JSON.stringify({event:'subscribe:'+channel}));await started;
+ f.services.originalSession.read=async()=>{throw new FirstSliceError(403,'owned_credential_retired','Owned actor retired during its read');};
+ const closed=once(ws,'close');resolve('[{"private":"retired-actor-only","id":9007199254740993}]');await closed;
+ assert.deepEqual(frames,[],'A successful earlier authorization cannot grant a late private delivery after revocation');
 });
