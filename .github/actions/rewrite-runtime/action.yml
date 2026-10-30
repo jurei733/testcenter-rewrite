@@ -166,6 +166,22 @@ runs:
         path: ${{ runner.temp }}/browser-material-*/
         if-no-files-found: ignore
         retention-days: 7
+    - name: Measure the actual rejected native cohort without granting admission
+      if: failure() && !cancelled() && inputs.playwright == 'true' && inputs.browser-system-certified-cohorts == 'true' && steps.browser-route.outcome == 'failure'
+      shell: bash
+      working-directory: rewrite-app
+      env:
+        CI_BROWSER_COHORT_DIAGNOSTIC_DIR: ${{ runner.temp }}/browser-cohort
+        CI_BROWSER_REJECTION_MEASUREMENT_DIR: ${{ runner.temp }}/rejected-native-measurement
+      run: node scripts/measure-rejected-native-cohort.mjs
+    - name: Retain actual rejected-cohort measurements without granting admission
+      if: always() && inputs.playwright == 'true' && inputs.browser-system-certified-cohorts == 'true' && steps.browser-route.outcome == 'failure'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: rejected-native-${{ github.job }}-${{ inputs.browser-material-label }}-${{ github.sha }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/rejected-native-measurement/
+        if-no-files-found: ignore
+        retention-days: 7
     - name: Retain rejected initial package inventory
       if: failure() && inputs.browser-system-before-inventory-sha256 != ''
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
