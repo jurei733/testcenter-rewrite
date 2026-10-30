@@ -48,6 +48,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
 gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
 const errors = [], routeErrors = [], checks = [], requests = [], nativeRequests = [], progressRequests = [], loadingObservations = [];
+let terminalSnapshotDiagnostic;
 let browser, page, releaseSnapshot; const releases=[];
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
@@ -488,6 +489,25 @@ try {
     await remotePage.route("**/application",captureApplication);
     const terminalRuntimeGate=new Promise(done=>{releaseTerminalRuntime=done;});releases.push(releaseTerminalRuntime);
     const terminalRuntimeCapture=createInactiveRuntimeSnapshotGate(before.participantSessionId,terminalRuntimeGate);
+    let terminalCommandId;
+    terminalSnapshotDiagnostic=async()=>{
+      const run=await loadingRepository.getTestRunById(runId);
+      const debugText=remotePage.isClosed()?'':await remotePane.innerText({timeout:1000}).catch(()=>'');
+      return {
+      reads:terminalRuntimeCapture.reads,leadingActiveReads:terminalRuntimeCapture.leadingActiveReads,
+      heldParticipantStatus:terminalRuntimeCapture.heldSnapshot?.participantSession?.status??null,
+      runStatus:run?.status,controllerEntryActive:run?.controllerEntry?.active??null,
+      participantStatus:(await loadingRepository.getParticipantSessionById(before.participantSessionId))?.status,
+      terminalApplications:applications.filter(value=>value.application?.command?.commandId===terminalCommandId).map(value=>({
+        type:value.application.command.commandType,executed:Boolean(value.application.command.executedAt),
+        status:value.application.testRun?.status,entryActive:value.application.testRun?.controllerEntry?.active??null,
+        terminalContinuation:value.application.terminalContinuation??false,superseded:value.application.superseded??false
+      })),
+      terminalAcknowledgements:terminalCommandId?acks.filter(ack=>ack.path.includes(terminalCommandId)).length:0,
+      browserClosed:remotePage.isClosed(),
+      debugStatus:/STATUS:\s*([A-Z_]+)/.exec(debugText)?.[1]??null,
+      frames:remotePage.isClosed()?0:await remotePage.locator('iframe').count()
+    };};
     const runtimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
     await remotePage.route(url=>url.pathname===runtimePath,async route=>{
       try {
@@ -514,15 +534,18 @@ try {
     const previousFrame=await remotePage.locator('iframe').elementHandle();assert.ok(previousFrame);
     const terminalApplicationStart=applications.length;
     const terminate=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete'},operator)).command;
-    await poll(()=>Promise.resolve(terminalRuntimeCapture.reads===1),'Terminal command did not hold its inactive runtime snapshot');
+    terminalCommandId=terminate.commandId;
+    await poll(()=>Promise.resolve(terminalRuntimeCapture.holdPending&&terminalRuntimeCapture.heldSnapshot?.participantSession.status==='signed_in'),'Terminal command did not hold its inactive runtime snapshot');
+    console.log('participant_console_terminal_snapshot='+JSON.stringify(await terminalSnapshotDiagnostic()));
     await remotePage.evaluate(()=>window.tc.resume());
     await poll(async()=>{const run=await loadingRepository.getTestRunById(runId);return run.status==='running'&&(await loadingRepository.getParticipantSessionById(run.participantSessionId)).status==='launched';},'New native entry did not reactivate the terminated Run');
     await poll(()=>previousFrame.evaluate(frame=>!frame.isConnected),'New native receipt did not replace the prior Player');
     await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
     await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The newer native entry did not restore its stored answer');
     await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),'New native receipt did not project the active entry');
+    const readsBeforeTerminalRelease=terminalRuntimeCapture.reads;
     releaseTerminalRuntime();
-    await poll(()=>Promise.resolve(terminalRuntimeCapture.reads>=2),'Late terminal runtime snapshot was not re-read for the newer entry');
+    await poll(()=>Promise.resolve(terminalRuntimeCapture.reads>readsBeforeTerminalRelease),'Late terminal runtime snapshot was not re-read for the newer entry');
     await remotePage.unrouteAll({behavior:'wait'});
     await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
     assert.equal(await remotePage.locator('#originalParticipantStarter mat-card').count(),0);
@@ -930,7 +953,9 @@ try {
 } catch (error) {
   console.error("Participant console loading failure:", error.stack ?? String(error));
   await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => {});
-  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, routeErrors: routeErrors.map(String), requests, nativeRequests, progressRequests, loadingObservations, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
+  const terminalSnapshot=await terminalSnapshotDiagnostic?.().catch(diagnosticError=>({diagnosticError:String(diagnosticError)}));
+  if(terminalSnapshot)console.error('participant_console_terminal_snapshot='+JSON.stringify(terminalSnapshot));
+  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, routeErrors: routeErrors.map(String), requests, nativeRequests, progressRequests, loadingObservations, terminalSnapshot, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
   throw error;
 } finally {
   reportSmokePhase("final-route-cleanup"); releaseSnapshot?.(); for(const release of releases)release(); await page?.unrouteAll({behavior:"wait"}).catch(() => {});
