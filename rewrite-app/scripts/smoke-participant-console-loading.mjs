@@ -492,7 +492,7 @@ try {
     let terminalCommandId;
     terminalSnapshotDiagnostic=async()=>{
       const run=await loadingRepository.getTestRunById(runId);
-      const debugText=remotePage.isClosed()?'':await remotePane.textContent({timeout:1000}).catch(()=>'');
+      const debugText=remotePage.isClosed()?'':await remotePane.innerText({timeout:1000}).catch(()=>'');
       return {
       reads:terminalRuntimeCapture.reads,leadingActiveReads:terminalRuntimeCapture.leadingActiveReads,
       heldParticipantStatus:terminalRuntimeCapture.heldSnapshot?.participantSession?.status??null,
@@ -535,7 +535,7 @@ try {
     const terminalApplicationStart=applications.length;
     const terminate=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete'},operator)).command;
     terminalCommandId=terminate.commandId;
-    await poll(()=>Promise.resolve(terminalRuntimeCapture.reads===1),'Terminal command did not hold its inactive runtime snapshot');
+    await poll(()=>Promise.resolve(terminalRuntimeCapture.holdPending&&terminalRuntimeCapture.heldSnapshot?.participantSession.status==='signed_in'),'Terminal command did not hold its inactive runtime snapshot');
     console.log('participant_console_terminal_snapshot='+JSON.stringify(await terminalSnapshotDiagnostic()));
     await remotePage.evaluate(()=>window.tc.resume());
     await poll(async()=>{const run=await loadingRepository.getTestRunById(runId);return run.status==='running'&&(await loadingRepository.getParticipantSessionById(run.participantSessionId)).status==='launched';},'New native entry did not reactivate the terminated Run');
@@ -543,8 +543,9 @@ try {
     await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
     await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The newer native entry did not restore its stored answer');
     await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),'New native receipt did not project the active entry');
+    const readsBeforeTerminalRelease=terminalRuntimeCapture.reads;
     releaseTerminalRuntime();
-    await poll(()=>Promise.resolve(terminalRuntimeCapture.reads>=2),'Late terminal runtime snapshot was not re-read for the newer entry');
+    await poll(()=>Promise.resolve(terminalRuntimeCapture.reads>readsBeforeTerminalRelease),'Late terminal runtime snapshot was not re-read for the newer entry');
     await remotePage.unrouteAll({behavior:'wait'});
     await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
     assert.equal(await remotePage.locator('#originalParticipantStarter mat-card').count(),0);
