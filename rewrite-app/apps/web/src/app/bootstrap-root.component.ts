@@ -2,6 +2,7 @@ import {Component,inject,signal} from '@angular/core';
 import {Router,RouterOutlet,NavigationEnd} from '@angular/router';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {ApplicationSettingsService} from './application-settings.service';
+import {InterfaceModeService} from './interface-mode.service';
 
 /** The native UI and canonical UI each own their routed shell and private DOM. */
 @Component({selector:'app-root',standalone:true,imports:[RouterOutlet],
@@ -15,6 +16,9 @@ export class BootstrapRootComponent {
  private loadingNativeSettings=false;
  private readonly updateOnline=()=>this.online.set(navigator.onLine);
  constructor(){
+  // Capture the entry presentation before an authentication guard redirects
+  // its URL and the lazy canonical shell is constructed.
+  inject(InterfaceModeService);
   const update=()=>{const native=['/native-start','/native-test','/group-monitor'].some(path=>this.router.url.split('?',1)[0].startsWith(path));this.nativeView.set(native);if(native&&!this.settings.loaded()&&!this.loadingNativeSettings){this.loadingNativeSettings=true;void this.settings.load().catch(()=>undefined).finally(()=>this.loadingNativeSettings=false);}};
   this.router.events.pipe(takeUntilDestroyed()).subscribe(event=>{if(event instanceof NavigationEnd)update();});
   window.addEventListener('online',this.updateOnline);window.addEventListener('offline',this.updateOnline);
