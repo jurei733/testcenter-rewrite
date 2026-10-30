@@ -1,0 +1,178 @@
+import {NATIVE_PRODUCTION} from '../../../native-tokens';
+import {
+  ChangeDetectorRef, Component, Inject, type OnInit
+, inject } from '@angular/core';
+import {
+  AsyncPipe,
+  DecimalPipe,
+  JsonPipe,
+  KeyValuePipe,
+  NgForOf,
+  NgIf,
+  NgTemplateOutlet,
+  SlicePipe
+} from '@angular/common';
+import { CdkDrag } from '@angular/cdk/drag-drop';
+import { MatInput } from '@angular/material/input';
+import { MatTooltip } from '@angular/material/tooltip';
+import { MatAutocomplete, MatAutocompleteTrigger, MatOption } from '@angular/material/autocomplete';
+import {NativeMonitorIconComponent as MatIcon} from '../../../../native-monitor/native-monitor-icon.component';
+import { FormsModule } from '@angular/forms';
+import type { ResponseValueType as IQBVariableValueType } from '@iqbspecs/response/response.interface';
+import { type AuthData } from '../../../app.interfaces';
+import { TestControllerService } from '../../index';
+import { CustomtextService } from '../../../shared/services/customtext/customtext.service';
+import { MainDataService } from '../../../shared/services/maindata/maindata.service';
+import { CustomtextPipe } from '../../../shared/pipes/customtext/customtext.pipe';
+import { SchemeAsTextPipe } from '../../pipes/scheme-as-text.pipe';
+import { PropertiesPipe } from '../../pipes/properties.pipe';
+import { BlockConditionPipe } from '../../../shared/pipes/block-condition.pipe';
+import { TemplateContextDirective } from '../../../shared/directives/template-context.directive';
+import { TrustPipe } from '../../../shared/pipes/trust.pipe';
+import { CommandService } from '../../services/command.service';
+import { isTestlet, type Testlet, type Unit } from '../../interfaces/test-controller.interfaces';
+import { IqbVariableUtil } from '../../util/iqb-variable.util';
+import { TestLoaderService } from '../../services/test-loader.service';
+import { ConditionUtil } from '../../util/condition.util';
+
+@Component({
+  templateUrl: './debug-pane.component.html',
+  styleUrls: ['./debug-pane.component.css'],
+  selector: 'tc-debug-pane',
+  imports: [
+    CdkDrag,
+    NgForOf,
+    NgIf,
+    MatIcon,
+    AsyncPipe,
+    KeyValuePipe,
+    DecimalPipe,
+    NgTemplateOutlet,
+    FormsModule,
+    CustomtextPipe,
+    MatAutocomplete,
+    MatOption,
+    SchemeAsTextPipe,
+    SlicePipe,
+    PropertiesPipe,
+    MatInput,
+    MatAutocompleteTrigger,
+    MatTooltip,
+    BlockConditionPipe,
+    TemplateContextDirective,
+    JsonPipe,
+    TrustPipe
+  ]
+})
+export class DebugPaneComponent implements OnInit {
+  public isProductionMode=inject(NATIVE_PRODUCTION);
+  constructor(
+    public mds: MainDataService,
+    public tcs: TestControllerService,
+    private cts: CustomtextService,
+    public cmd: CommandService,
+    private cdr: ChangeDetectorRef,
+    private tls: TestLoaderService
+  ) {
+  }
+
+  windows = ['main', 'config', 'testmode', 'booklet', 'unit', 'customtexts', 'variables', 'states', 'system', 'tools'];
+  activeWindows : typeof this.windows[number][] = ['variables'];
+
+  bookletConfig: Array<[string, string]> = [];
+  testMode: Array<[string, string]> = [];
+  openPanes: Array<string> = [];
+  searchCustomText: string = '';
+  customTextKeys: Array<string> = [];
+  auth: AuthData | null = null;
+
+  unitContext?: { item: Unit; unit: Unit; single: boolean };
+  TestletContext?: { item: Testlet };
+
+  testingCondition: string = '';
+  testingConditionResults: string[] = [];
+
+  private getData(): void {
+    this.bookletConfig = this.tcs.booklet?.config.toEntries() || [];
+    this.testMode = Object.entries(this.tcs.testMode);
+    this.customTextKeys = this.cts.getCustomTextKeys();
+    this.auth = this.mds.getAuthData();
+  }
+
+  ngOnInit() {
+    this.tcs.navigation$
+      .subscribe(() => {
+        this.cdr.detectChanges();
+        this.getData();
+      });
+    const storedState = localStorage.getItem('tc-debug');
+    if (storedState) {
+      this.activeWindows = JSON.parse(storedState);
+    }
+  }
+
+  toggleWindow(tab: typeof this.windows[number]): void {
+    if (this.activeWindows.includes(tab)) {
+      this.activeWindows.splice(this.activeWindows.indexOf(tab), 1);
+    } else {
+      this.activeWindows.push(tab);
+    }
+    localStorage.setItem('tc-debug', JSON.stringify(this.activeWindows));
+  }
+
+  res(): void {
+    // eslint-disable-next-line no-console
+    console.log(this.tcs.booklet);
+  }
+
+  toggleMore(id: string): void {
+    const paneIndex = this.openPanes.indexOf(id);
+    if (paneIndex !== -1) {
+      this.openPanes.splice(paneIndex, 1);
+    } else {
+      this.openPanes.push(id);
+    }
+  }
+
+  protected readonly isTestlet = isTestlet;
+
+  closeWindow(id: string): void {
+    const tabId = this.activeWindows.indexOf(id);
+    if (tabId !== -1) {
+      this.activeWindows.splice(tabId, 1);
+    }
+    localStorage.setItem('tc-debug', JSON.stringify(this.activeWindows));
+  }
+
+  evaluateTestingCondition(): void {
+    const getVar =
+      (unitAlias: string, variableId: string) => this.tcs.units[this.tcs.unitAliasMap[unitAlias]].variables[variableId];
+    const domParser = new DOMParser();
+    const condStr = this.testingCondition.replace(/^\uFEFF/gm, '');
+    try {
+      const ifElement = domParser.parseFromString(condStr, 'text/xml').documentElement;
+      if (ifElement.nodeName === 'parsererror') {
+        throw new Error(ifElement.innerHTML);
+      }
+      if (ifElement.nodeName !== 'If') {
+        throw new Error(`Wrong root tag: '${ifElement.nodeName}'. Should be <If>.`);
+      }
+      const cond = this.tls.parseIf(ifElement);
+      this.testingConditionResults = cond
+        .map(c => ConditionUtil.isSatisfied(c, getVar))
+        .map(s => (s ? 'Satisfied' : 'Not Satisfied'));
+    } catch (e) {
+      if (e) {
+        this.testingConditionResults = [`${e}`];
+      } else {
+        this.testingConditionResults = ['Error: unknown'];
+      }
+    }
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  stringValue(value: IQBVariableValueType, shorten: boolean = false) {
+    const vStr = IqbVariableUtil.variableValueAsString(value);
+    return shorten ? vStr.substring(0, 12) + (vStr.length > 13 ? '...' : '') : vStr;
+  }
+}

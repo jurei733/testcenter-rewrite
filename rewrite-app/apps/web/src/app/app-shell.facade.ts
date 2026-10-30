@@ -30,6 +30,7 @@ const localDemoParticipantLink = buildParticipantEntryUrl(
 
 @Injectable({ providedIn: "root" })
 export class AppShellFacade {
+  private hydrated = false;
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly persistence = inject(RewriteAppShellPersistenceService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
@@ -327,7 +328,10 @@ export class AppShellFacade {
   }
 
   init(initialView: AppView | null = null): void {
-    this.persistence.hydrateShellState();
+    if (!this.hydrated) {
+      this.persistence.hydrateShellState();
+      this.hydrated = true;
+    }
     if (initialView) {
       this.uiState.activeView = initialView;
       this.persistence.persistShellState();

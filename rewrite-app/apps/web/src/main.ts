@@ -1,7 +1,7 @@
 import { bootstrapApplication } from "@angular/platform-browser";
 
 import { appConfig } from "./app/app.config";
-import { AppComponent } from "./app/app.component";
+import { BootstrapRootComponent } from "./app/bootstrap-root.component";
 
 const registerAppShellServiceWorker = async (): Promise<void> => {
   if (!("serviceWorker" in navigator)) {
@@ -21,7 +21,7 @@ const registerAppShellServiceWorker = async (): Promise<void> => {
   }
 };
 
-bootstrapApplication(AppComponent, appConfig)
+bootstrapApplication(BootstrapRootComponent, appConfig)
   .then(() => registerAppShellServiceWorker())
   .catch(error => {
     console.error(error);

@@ -44,7 +44,7 @@ const routeViews: AppView[] = [
 ];
 
 @Component({
-  selector: "app-root",
+  selector: "app-canonical-shell",
   standalone: true,
   imports: [
     NgTemplateOutlet,
@@ -146,7 +146,7 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.interfaceMode.mode()==='original' && this.activeRouteView==='content' && this.app.hasAdminSession;
   }
 
-  get isNativeMonitorView(): boolean { return this.router.url.split('?',1)[0].startsWith('/group-monitor'); }
+  get isNativeMonitorView(): boolean { return ['/group-monitor','/native-test','/native-start'].some(path=>this.router.url.split('?',1)[0].startsWith(path)); }
 
   get isOriginalNativeOperator(): boolean { return this.isOriginalAdministration || this.isOriginalWorkspaceFiles || this.isNativeMonitorView; }
 

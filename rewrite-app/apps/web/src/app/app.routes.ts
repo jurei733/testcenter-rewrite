@@ -1,4 +1,5 @@
 import type { Routes } from "@angular/router";
+import {Injector,inject} from '@angular/core';
 
 import {
   rejectSystemCheckOperator,
@@ -7,11 +8,7 @@ import {
 } from "./rewrite-app-admin-route.guard";
 import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
 
-export const appRoutes: Routes = [
-  {path:'group-monitor',loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),children:[
-    {path:':group-name/:profile-id',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)},
-    {path:':group-name',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)}
-  ]},
+const canonicalRoutes: Routes = [
   { path: "", pathMatch: "full", redirectTo: "home" },
   {
     path: "home",
@@ -111,4 +108,19 @@ export const appRoutes: Routes = [
     canActivate: [rejectSystemCheckOperator]
   },
   { path: "**", redirectTo: "home" }
+];
+
+export const appRoutes: Routes = [
+  {path:'native-start',loadComponent:()=>import('./native-participant/native-participant-entry.component').then(module=>module.NativeParticipantEntryComponent)},
+  {path:'native-test',loadChildren:()=>import('./native-participant/native-routes').then(module=>module.nativeParticipantRoutes)},
+  {path:'group-monitor',loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),children:[
+    {path:':group-name/:profile-id',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)},
+    {path:':group-name',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)}
+  ]},
+  {path:"",canActivate:[async()=>{
+    const injector=inject(Injector);
+    const {AppShellFacade}=await import('./app-shell.facade');
+    injector.get(AppShellFacade).init();
+    return true;
+  }],loadComponent:()=>import("./app.component").then(module=>module.AppComponent),children:canonicalRoutes}
 ];

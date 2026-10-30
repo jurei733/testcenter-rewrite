@@ -5,20 +5,35 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {canonicalMaterial} from './ci-browser-material-contract.mjs';
+import {qualifiedNativeCohortFixture} from './qualified-native-cohort-fixture.mjs';
 import {chooseCohortCertificate,cohortDigest,loadCohortCertificates,readCohortBindings,
-  validateCohortCertificate,validateCohortRegistry} from './ci-browser-cohort-certificates.mjs';
+  validateCohortCertificate,validateCohortFamily,validateCohortRegistry} from './ci-browser-cohort-certificates.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const registry=JSON.parse(await readFile(new URL('./fixtures/ci-browser-native-cohorts.json',import.meta.url),'utf8'));
+const {registry,bindings}=await qualifiedNativeCohortFixture();
 // These pure admission tests model the actually qualified Linux Node patch.
 // The native prepare/install qualifier separately executes real Node and APT.
-const bindings=await readCohortBindings(root,{nodeVersion:'v22.23.4'});
+const currentBindings=await readCohortBindings(root,{nodeVersion:'v22.23.4'});
+const currentName='ci-browser-native-cohorts-'+currentBindings.lockSha256+'.json';
+const currentBytes=await readFile(new URL('./fixtures/'+currentName,import.meta.url));
+const currentRegistry=JSON.parse(currentBytes);
 const fresh=()=>structuredClone(registry);
 const reseal=record=>{
   record.nativeOracle.runtimeMaterial.materialSha256=cohortDigest(canonicalMaterial(record.nativeOracle.runtimeMaterial.material));
   record.provenance.independentPNGVerification.materialSha256=record.nativeOracle.runtimeMaterial.materialSha256;
   record.provenance.nativeOracleManifestSha256=cohortDigest(JSON.stringify(record.nativeOracle)+'\n');
 };
+
+test('actual current inputs require their own qualification; the loader cannot retarget the historical records',async()=>{
+  const same=Object.keys(currentBindings).every(key=>currentBindings[key]===bindings[key]);
+  if(same)assert.deepEqual(validateCohortRegistry(registry,currentBindings),registry.records);
+  else assert.throws(()=>validateCohortRegistry(registry,currentBindings),/Current .* differs from qualified native input/);
+  // This actual loader check runs on the pinned native Node patch. macOS's
+  // different patch remains independently rejected by the existing control.
+  if(process.version===currentBindings.nodeVersion){
+    assert.deepEqual(await loadCohortCertificates(root),currentRegistry.records);
+  }
+});
 
 test('both actual native certificates retain qualified APT deltas, material and original measurement context',()=>{
   const before=JSON.stringify(registry),records=validateCohortRegistry(registry,bindings);
@@ -84,5 +99,71 @@ test('the fixed registry loader rejects symlinks and oversized input before read
     await assert.rejects(loadCohortCertificates(directory),/Unsafe native cohort registry/);
     await rm(path);await writeFile(path,Buffer.alloc(3*1024*1024+1));
     await assert.rejects(loadCohortCertificates(directory),/Unsafe native cohort registry/);
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('the separately qualified current lock retains actual provenance and admits only its measured cohort',()=>{
+  const before=JSON.stringify([registry,currentRegistry]);
+  const records=validateCohortFamily(registry,currentRegistry,currentBindings);
+  assert.deepEqual(records.map(record=>record.id),['20261026.354.1']);
+  const record=records[0],context=record.nativeOracle.context;
+  assert.equal(record.provenance.runId,41113160664);
+  assert.equal(context.commit,'2fc93fd5dee96b0877855feaad5a7746ac5ec299');
+  assert.equal(context.runId,'41113160664');
+  assert.equal(record.provenance.nativeQualification.policyTests,335);
+  assert.equal(chooseCohortCertificate(records,context,record.nativeOracle.beforeInventory,currentBindings,{requireRuntimeGraph:true}),record);
+  assert.throws(()=>chooseCohortCertificate(records,{...context,imageVersion:'20261023.334.3'},record.nativeOracle.beforeInventory,currentBindings),/No unique/);
+  for(const key of Object.keys(currentBindings)){
+    assert.throws(()=>validateCohortFamily(registry,currentRegistry,{...currentBindings,[key]:String(currentBindings[key])+'changed'}));
+  }
+  assert.equal(JSON.stringify([registry,currentRegistry]),before,'Loading a new qualification must not retarget either oracle');
+});
+
+test('a new lock cannot replace the historical Source pixels, fonts, browser or screen even with re-sealed digests',()=>{
+  for(const field of ['pixels','fonts','browser','screen']){
+    const d=structuredClone(currentRegistry),record=d.records[0],material=record.nativeOracle.runtimeMaterial.material;
+    if(field==='pixels')material.views[0].pixelSha256='d'.repeat(64);
+    if(field==='fonts'){record.nativeOracle.fontInventorySha256='e'.repeat(64);material.fontCatalogSha256='e'.repeat(64);}
+    if(field==='browser')material.browserVersion='999.0.0.0';
+    if(field==='screen')material.screen.width++;
+    reseal(record);validateCohortCertificate(record,{bindings:currentBindings});
+    assert.throws(()=>validateCohortFamily(registry,d,currentBindings),/identical Source pixels, fonts and browser inputs/);
+  }
+  const invalid=fresh();invalid.records[0].provenance.nativeQualification.conclusion='failure';
+  assert.throws(()=>validateCohortFamily(invalid,currentRegistry,currentBindings));
+});
+
+test('the actual pinned-Node loader selects only the exact-lock file and rejects unsafe shadows or changed inputs',
+  {skip:process.version!==currentBindings.nodeVersion},async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'owned-current-cohort-'));
+  try{
+    const app=join(directory,'rewrite-app'),fixtures=join(app,'scripts/fixtures');
+    await mkdir(fixtures,{recursive:true});
+    await writeFile(join(directory,'.node-version'),await readFile(join(root,'../.node-version')));
+    const inputs=['package-lock.json','scripts/ci-browser-material-profile.mjs','scripts/ci-node-runtime.mjs'];
+    for(const path of inputs)await writeFile(join(app,path),await readFile(join(root,path)));
+    const legacyPath=join(fixtures,'ci-browser-native-cohorts.json'),path=join(fixtures,currentName);
+    await writeFile(legacyPath,await readFile(new URL('./fixtures/ci-browser-native-cohorts.json',import.meta.url)));
+    await writeFile(path,currentBytes);
+    const loaded=await loadCohortCertificates(app);
+    assert.deepEqual(loaded,currentRegistry.records);
+    assert.ok(Object.isFrozen(loaded)&&Object.isFrozen(loaded[0])&&Object.isFrozen(loaded[0].nativeOracle.context));
+    assert.equal(cohortDigest(await readFile(legacyPath)),'566c6c86c10a04fd111e3e008d64c35138b5c230054a7ec1d211c913d445965b');
+    await rm(path);
+    await assert.rejects(loadCohortCertificates(app),/Current lockSha256 differs/);
+    await writeFile(join(fixtures,'ci-browser-native-cohorts-'+'0'.repeat(64)+'.json'),currentBytes);
+    await assert.rejects(loadCohortCertificates(app),/Current lockSha256 differs/);
+    await writeFile(path,'{');await assert.rejects(loadCohortCertificates(app),SyntaxError);
+    await writeFile(path,Buffer.alloc(3*1024*1024+1));await assert.rejects(loadCohortCertificates(app),/Unsafe native cohort registry/);
+    await rm(path);await symlink(legacyPath,path);await assert.rejects(loadCohortCertificates(app),/Unsafe native cohort registry/);
+    await rm(path);await mkdir(path);await assert.rejects(loadCohortCertificates(app),/Unsafe native cohort registry/);
+    await rm(path,{recursive:true});await writeFile(path,currentBytes);
+    for(const input of inputs){
+      const bytes=await readFile(join(app,input));await writeFile(join(app,input),Buffer.concat([bytes,Buffer.from('\n')]));
+      await assert.rejects(loadCohortCertificates(app),/Current .* differs from qualified native input/);
+      await writeFile(join(app,input),bytes);
+    }
+    await writeFile(join(directory,'.node-version'),'22.23.3\n');
+    await assert.rejects(loadCohortCertificates(app),/Actual Node must match the exact shared patch/);
   }finally{await rm(directory,{recursive:true,force:true});}
 });

@@ -1,4 +1,5 @@
 import {verifyNativeFinishBusy} from './native-monitor-finish-busy-smoke.mjs';
+import {runNativeParticipantSmoke} from './smoke-native-participant.mjs';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
@@ -229,4 +230,5 @@ try{
  assert.deepEqual(errors,[]);await writeFile(join(artifacts,'result.json'),JSON.stringify({success:true,browser:browser.version(),markers,nativeRequests:wire.map(({body,...r})=>r),timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),privateCredentialBodiesOmitted:true,sourceVisualParityClaimed:false},null,2));console.log('native_monitor_ui_success=true');
 }catch(error){if(page){await page.screenshot({path:join(artifacts,'failure.png'),fullPage:false}).catch(()=>{});await writeFile(join(artifacts,'failure.json'),JSON.stringify({error:String(error),browserErrors:errors,markers,timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),requests:wire.map(({body,...r})=>r)},null,2));}throw error;}finally{try{await browser?.close();}finally{if(server)await stopNativeSmokeServer(server);}}
 
+ await runNativeParticipantSmoke(artifactRoot);
 }

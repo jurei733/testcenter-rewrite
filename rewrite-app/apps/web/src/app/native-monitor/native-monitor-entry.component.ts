@@ -1,10 +1,10 @@
-import {fromEvent,Subscription,take} from 'rxjs';
+import {filter,fromEvent,Subscription,take,takeUntil} from 'rxjs';
 import {BookletService} from './group-monitor/booklet/booklet.service';
 import {TestSessionManager} from './group-monitor/test-session-manager/test-session-manager.service';
 import {GROUP_MONITOR_CONFIG} from './group-monitor/group-monitor.config';
-import {Component,inject,signal,type OnDestroy} from '@angular/core';
+import {ChangeDetectorRef,Component,inject,signal,type OnDestroy} from '@angular/core';
 import {FormsModule} from '@angular/forms';
-import {Router,RouterOutlet,RouterLink,ActivatedRoute} from '@angular/router';
+import {Router,RouterOutlet,RouterLink,ActivatedRoute,NavigationEnd} from '@angular/router';
 import {MatButton,MatIconButton} from '@angular/material/button';
 import {MatInput} from '@angular/material/input';
 import {MatFormField,MatLabel,MatSuffix} from '@angular/material/form-field';
@@ -37,6 +37,8 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  name='';password='';showPassword=false;
  private readonly router=inject(Router);private readonly route=inject(ActivatedRoute);private readonly dialog=inject(MatDialog);
  constructor(){inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
+  const detector=inject(ChangeDetectorRef);
+  this.router.events.pipe(filter(event=>event instanceof NavigationEnd),takeUntil(fromEvent(this.view.signal,'abort'))).subscribe(()=>detector.markForCheck());
   this.ready.set(true);
  }
  get hasChild(){return !!this.route.firstChild;}

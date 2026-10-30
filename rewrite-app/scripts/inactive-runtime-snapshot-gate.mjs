@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 /** Hold the owned inactive response, not a preceding active runtime read. */
 export function createInactiveRuntimeSnapshotGate(participantSessionId, release) {
-  let reads = 0, leadingActiveReads = 0, heldSnapshot = null;
+  let reads = 0, leadingActiveReads = 0, heldSnapshot = null, holdPending = false;
   return {
     async observe(response) {
       assert.equal(response.status(), 200, 'The held runtime must be a successful actual response.');
@@ -17,11 +17,13 @@ export function createInactiveRuntimeSnapshotGate(participantSessionId, release)
       reads++;
       if (heldSnapshot === null) {
         heldSnapshot = structuredClone(snapshot);
-        await release;
+        holdPending = true;
+        try { await release; } finally { holdPending = false; }
       }
     },
     get reads() { return reads; },
     get leadingActiveReads() { return leadingActiveReads; },
-    get heldSnapshot() { return structuredClone(heldSnapshot); }
+    get heldSnapshot() { return structuredClone(heldSnapshot); },
+    get holdPending() { return holdPending; }
   };
 }
