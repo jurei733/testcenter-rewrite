@@ -1,12 +1,12 @@
-name: Native changed-lock measurement (no acceptance)
+name: Native current-lock qualification (no production admission)
 on:
   push:
-    branches: [codex/native-lock-measure-20261030]
+    branches: [codex/native-lock-qualify-20261030]
 permissions:
   contents: read
 jobs:
   measure:
-    name: Actual native changed-lock measurement (${{ matrix.replica }})
+    name: Actual native current-lock qualification (${{ matrix.replica }})
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -29,7 +29,6 @@ jobs:
         run: node scripts/measure-native-lock-node.mjs > "$RUNNER_TEMP/native-lock-evidence/node-mode.json"
       - name: Record the full current policy gate
         id: policy
-        continue-on-error: true
         run: |
           set +e
           npm run test:ci-policy > "$RUNNER_TEMP/native-lock-evidence/policy.tap" 2>&1
@@ -53,7 +52,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: native-lock-${{ matrix.replica }}-${{ github.sha }}
+          name: qualified-native-lock-${{ matrix.replica }}-${{ github.sha }}
           path: |
             ${{ runner.temp }}/native-lock-evidence/
             ${{ runner.temp }}/native-browser-system/manifest.json

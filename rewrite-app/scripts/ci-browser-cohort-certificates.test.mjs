@@ -1,24 +1,37 @@
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,readFile,rm,symlink,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,symlink,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {canonicalMaterial} from './ci-browser-material-contract.mjs';
+import {qualifiedNativeCohortFixture} from './qualified-native-cohort-fixture.mjs';
 import {chooseCohortCertificate,cohortDigest,loadCohortCertificates,readCohortBindings,
   validateCohortCertificate,validateCohortRegistry} from './ci-browser-cohort-certificates.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const registry=JSON.parse(await readFile(new URL('./fixtures/ci-browser-native-cohorts.json',import.meta.url),'utf8'));
+const {registry,bindings}=await qualifiedNativeCohortFixture();
 // These pure admission tests model the actually qualified Linux Node patch.
 // The native prepare/install qualifier separately executes real Node and APT.
-const bindings=await readCohortBindings(root,{nodeVersion:'v22.23.4'});
+const currentBindings=await readCohortBindings(root,{nodeVersion:'v22.23.4'});
 const fresh=()=>structuredClone(registry);
 const reseal=record=>{
   record.nativeOracle.runtimeMaterial.materialSha256=cohortDigest(canonicalMaterial(record.nativeOracle.runtimeMaterial.material));
   record.provenance.independentPNGVerification.materialSha256=record.nativeOracle.runtimeMaterial.materialSha256;
   record.provenance.nativeOracleManifestSha256=cohortDigest(JSON.stringify(record.nativeOracle)+'\n');
 };
+
+test('actual current inputs require their own qualification; the loader cannot retarget the historical records',async()=>{
+  const same=Object.keys(currentBindings).every(key=>currentBindings[key]===bindings[key]);
+  if(same)assert.deepEqual(validateCohortRegistry(registry,currentBindings),registry.records);
+  else assert.throws(()=>validateCohortRegistry(registry,currentBindings),/Current .* differs from qualified native input/);
+  // This actual loader check runs on the pinned native Node patch. macOS's
+  // different patch remains independently rejected by the existing control.
+  if(process.version===currentBindings.nodeVersion){
+    if(same)assert.deepEqual(await loadCohortCertificates(root),registry.records);
+    else await assert.rejects(loadCohortCertificates(root),/Current .* differs from qualified native input/);
+  }
+});
 
 test('both actual native certificates retain qualified APT deltas, material and original measurement context',()=>{
   const before=JSON.stringify(registry),records=validateCohortRegistry(registry,bindings);
