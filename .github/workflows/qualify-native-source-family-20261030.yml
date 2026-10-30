@@ -1,0 +1,58 @@
+name: Qualify actual native WebSocket lock against immutable Source family
+on:
+  push:
+    branches: [codex/native-ws-lock-qualify-20261030]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    name: Actual native Source-family measurement (${{ matrix.replica }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [first, second, third, fourth]
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Prepare owned evidence directory
+        run: mkdir -p "$RUNNER_TEMP/native-family-evidence"
+      - name: Exercise actual owned Node permission correction
+        run: node scripts/measure-native-lock-node.mjs > "$RUNNER_TEMP/native-family-evidence/node-mode.json"
+      - name: Preserve the complete current policy gate
+        run: npm run test:ci-policy > "$RUNNER_TEMP/native-family-evidence/policy.tap" 2>&1
+      - name: Verify native Source-family controls
+        run: node --test scripts/observed-native-source-family.test.mjs > "$RUNNER_TEMP/native-family-evidence/source-family.tap" 2>&1
+      - name: Exercise actual Linux Debian archive controls
+        run: node --test scripts/ci-browser-system-linux.test.mjs > "$RUNNER_TEMP/native-family-evidence/native-debian.tap" 2>&1
+      - name: Audit the complete current locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json > "$RUNNER_TEMP/native-family-evidence/audit.json"
+      - name: Download exact locked Chromium
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Authenticate native APT and measure the actual full material
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/native-browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - name: Enforce the unchanged qualified Source family and exact known-cohort material
+        run: node scripts/observed-native-source-family.mjs > "$RUNNER_TEMP/native-family-evidence/comparison.json"
+      - name: Retain actual observations without granting production admission
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: observed-native-family-${{ matrix.replica }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-family-evidence/
+            ${{ runner.temp }}/native-browser-system/manifest.json
+            ${{ runner.temp }}/native-browser-system/*.deb
+            ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: warn
+          retention-days: 7
