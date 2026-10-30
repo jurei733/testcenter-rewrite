@@ -84,7 +84,7 @@ export class NativeMonitorSessionService {
   }catch(error){if(attempt.signal.aborted||revision!==this.revision)throw new DOMException('Die Anmeldung wurde abgebrochen.','AbortError');if(request.kind==='person'&&error instanceof NativeMonitorHttpError&&[401,403].includes(error.status))this.clear();this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');throw error;}
   finally{owner?.removeEventListener('abort',cancel);if(this.loginController===attempt)this.loginController=null;if(revision===this.revision)this.busy.set(false);}
  }
- async refresh(){const token=this.access()?.token,revision=this.revision,purpose=this.purpose();if(token){const access=await this.json<OriginalAccessSet>('GET','/session',undefined,token);if(revision===this.revision)this.set(access,purpose,true);}}
+ async refresh(owner?:AbortSignal){owner?.throwIfAborted();const token=this.access()?.token,revision=this.revision,purpose=this.purpose();if(token){const access=JSON.parse(await this.text('GET','/session',undefined,token,false,owner)) as OriginalAccessSet;owner?.throwIfAborted();if(revision===this.revision)this.set(access,purpose,true);}}
  async verifyAccess(owner:AbortSignal){
   owner.throwIfAborted();const previous=this.access(),scope=this.accessSignal,revision=this.revision,purpose=this.purpose();
   if(!previous||scope.aborted)return;

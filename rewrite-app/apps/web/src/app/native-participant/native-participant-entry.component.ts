@@ -50,7 +50,7 @@ export class NativeParticipantEntryComponent {
   if(this.refreshing()||this.view.signal.aborted)return;
   this.refreshing.set(true);this.refreshFailed.set(false);this.problem.set('');
   const scope=this.session.accessSignal,current=()=>!this.view.signal.aborted&&!scope.aborted&&scope===this.session.accessSignal;
-  try{await this.completions.whenSettled(scope);if(current())await this.session.refresh();}
+  try{await this.completions.whenSettled(scope);if(current())await this.session.refresh(this.view.signal);}
   catch(error){if(current()){this.refreshFailed.set(true);this.problem.set(error instanceof Error?error.message:'Die Übersicht konnte nicht aktualisiert werden.');}}
   finally{if(!this.view.signal.aborted)this.refreshing.set(false);}
  }

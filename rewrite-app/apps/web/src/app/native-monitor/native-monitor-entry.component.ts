@@ -71,7 +71,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   if(scope.aborted||this.starterRefresh?.scope===scope)return;
   const attempt={scope};this.starterRefresh=attempt;
   this.starterRefreshing.set(true);this.starterRefreshFailed.set(false);this.problem.set('');
-  try{await this.session.refresh();}
+  try{await this.session.refresh(this.view.signal);}
   catch(error){if(!this.view.signal.aborted&&this.starterRefresh===attempt&&scope===this.session.accessSignal&&!scope.aborted){
    this.starterRefreshFailed.set(true);this.problem.set(error instanceof Error?error.message:'Die Übersicht konnte nicht aktualisiert werden.');
   }}finally{if(!this.view.signal.aborted&&this.starterRefresh===attempt){this.starterRefresh=undefined;this.starterRefreshing.set(false);}}
