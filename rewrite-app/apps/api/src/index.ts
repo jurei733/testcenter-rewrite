@@ -4990,7 +4990,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),
         send: (status, value) => sendJson(response, status, value),
         raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
-        binary:(bytes,contentType)=>{response.writeHead(200,{...securityHeaders,"content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}
+        // Only successfully capability-authorized native Resource bytes reach this
+        // callback. Opaque Verona players fetch and frame them without cookies.
+        binary:(bytes,contentType)=>{response.writeHead(200,{...participantResourceSecurityHeaders,"access-control-allow-origin":"*","content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}
       })) return;
 
       if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,

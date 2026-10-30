@@ -13,7 +13,9 @@ const proxy=createServer((incoming,outgoing)=>{
  const testRead=incoming.method==='GET'&&/^\/test\/[^/]+$/.test(path);
  const sessionRead=incoming.method==='GET'&&path==='/session';
  const commandAck=incoming.method==='PATCH'&&/^\/test\/[^/]+\/command\/[^/]+\/executed$/.test(path);
- const record={phase,time:Date.now(),method:incoming.method,path,hasNativeToken:!!incoming.headers.authtoken};
+ const resourceRead=incoming.method==='GET'&&/^\/file\//.test(path);
+ const record={phase,time:Date.now(),method:incoming.method,path:resourceRead?path.replace(/^(\/file\/)[^/]+/,'$1[resource-capability]'):path,hasNativeToken:!!incoming.headers.authtoken};
+ if(resourceRead)outgoing.once('finish',()=>process.send?.({nativeResource:{...record,origin:incoming.headers.origin,status:outgoing.statusCode}}));
  if(responseWrite||testRead)outgoing.once('finish',()=>process.send?.({nativeResponse:{...record,status:outgoing.statusCode}}));
  if(sessionRead)outgoing.once('finish',()=>process.send?.({nativeSession:{...record,status:outgoing.statusCode}}));
  if(commandAck)outgoing.once('finish',()=>process.send?.({nativeCommand:{...record,status:outgoing.statusCode}}));
