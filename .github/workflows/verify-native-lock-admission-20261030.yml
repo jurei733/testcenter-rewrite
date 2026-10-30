@@ -1,0 +1,55 @@
+name: Verify actual WebSocket-lock native certificate admission
+on:
+  push:
+    branches: [codex/native-ws-lock-admit-20261030]
+permissions:
+  contents: read
+jobs:
+  admit:
+    name: Actual certificate selection and offline runtime restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Prepare owned evidence directory
+        run: mkdir -p "$RUNNER_TEMP/native-admission-evidence"
+      - name: Exercise actual owned Node permission correction
+        run: node scripts/measure-native-lock-node.mjs > "$RUNNER_TEMP/native-admission-evidence/node-mode.json"
+      - name: Verify full policy including actual pinned-Node filesystem controls
+        run: npm run test:ci-policy > "$RUNNER_TEMP/native-admission-evidence/policy.tap" 2>&1
+      - name: Exercise actual Linux archive controls
+        run: node --test scripts/ci-browser-system-linux.test.mjs > "$RUNNER_TEMP/native-admission-evidence/native-debian.tap" 2>&1
+      - name: Audit the complete locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json > "$RUNNER_TEMP/native-admission-evidence/audit.json"
+      - name: Select exact current certificate against actual native context and inventory
+        run: node scripts/select-native-lock-admission.mjs
+      - name: Download exact locked Chromium
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Prepare authenticated packages without changing initial inventory
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/certified-browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs prepare-certified > "$RUNNER_TEMP/native-admission-evidence/prepare.log" 2>&1
+      - name: Restore offline and verify complete native material and Source pixels
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/certified-browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore-certified > "$RUNNER_TEMP/native-admission-evidence/restore.log" 2>&1
+      - name: Retain actual admission evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-lock-admission-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-admission-evidence/
+            ${{ runner.temp }}/certified-browser-system/manifest.json
+            ${{ runner.temp }}/certified-browser-system/*.deb
+            ${{ runner.temp }}/browser-material-*/
+          if-no-files-found: warn
+          retention-days: 7
