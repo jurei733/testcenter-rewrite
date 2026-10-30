@@ -16,7 +16,6 @@ jobs:
       CI: "true"
       FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
       UI_SMOKE_HEADFUL: "true"
-      UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-selection-ui
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,6 +43,8 @@ jobs:
       - name: Build the actual API, schema cache and web app
         run: npm run build
       - name: Exercise all real WebSocket browser cases with rendered manual selection
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-selection-ui
         run: xvfb-run --auto-servernum node scripts/smoke-native-websocket.mjs
       - name: Retain actual diagnostic qualification evidence
         if: always()
