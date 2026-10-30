@@ -12,6 +12,7 @@ export function originalMonitorRouteLabel(method: string, pathname: string): str
 }
 export async function handleOriginalMonitorHttp(input: {request: IncomingMessage; pathname: string; services: FirstSliceServices;
   readBody: (allowEmpty?:boolean,decode?:(payload:Uint8Array)=>unknown)=>Promise<unknown>;
+  subscribe?:(target:{channel:'test-sessions';groupKey?:string},credential:string)=>Promise<void>;
   header: (name: string, value: string) => void; raw: (status: number, text: string, contentType: string) => void}): Promise<boolean> {
   if (!originalMonitorRouteLabel('', input.pathname)) return false;
   input.header('cache-control', 'private, no-store');
@@ -33,7 +34,9 @@ export async function handleOriginalMonitorHttp(input: {request: IncomingMessage
     let groupKey: string | undefined;
     const match = groupPath.exec(input.pathname);
     if (match) {try {groupKey = decodeURIComponent(match[1]!);} catch {throw new FirstSliceError(400, 'original_monitor_path_invalid', 'Invalid path.');}}
-    input.raw(200, await input.services.originalMonitor.sessions({token, groupKey}), 'application/json');
+    const snapshot=await input.services.originalMonitor.sessions({token,groupKey});
+    await input.subscribe?.({channel:'test-sessions',groupKey},token);
+    input.raw(200,snapshot,'application/json');
   } catch (error) {
     if (!(error instanceof FirstSliceError)) throw error;
     if(mutation||profilePath.test(input.pathname)||bookletPath.test(input.pathname)){

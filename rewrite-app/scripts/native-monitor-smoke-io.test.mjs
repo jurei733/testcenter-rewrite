@@ -76,3 +76,15 @@ test('native API lease has a finite failure when server shutdown stalls', async 
   owner.emit('disconnect');owner.emit('SIGTERM');
   assert.deepEqual(await exited, [1]);assert.equal(closes, 1);assert.equal(connections, 1);
 });
+
+test('native proxy lease closes both owned servers and waits for both completions',()=>{
+ const owner=new EventEmitter(),exits=[],closed=[],connections=[];owner.exit=code=>exits.push(code);const callbacks=[];
+ const server=id=>({closeAllConnections(){connections.push(id);},close(done){closed.push(id);callbacks.push(done);}});
+ bindNativeSmokeServerOwner(server('proxy'),{owner,extraServers:[server('backend')]});owner.emit('disconnect');owner.emit('SIGTERM');assert.deepEqual(connections,['proxy','backend']);assert.deepEqual(closed,['proxy','backend']);
+ callbacks[0]();assert.deepEqual(exits,[]);callbacks[1]();assert.deepEqual(exits,[0]);
+});
+test('native proxy deadline cannot later report success when a stalled extra server finally completes',async()=>{
+ const owner=new EventEmitter(),exits=[],callbacks=[];owner.exit=code=>exits.push(code);
+ const server={closeAllConnections(){},close(done){callbacks.push(done);}};
+ bindNativeSmokeServerOwner(server,{owner,graceMs:20,extraServers:[server]});owner.emit('disconnect');await new Promise(done=>setTimeout(done,40));assert.deepEqual(exits,[1]);for(const callback of callbacks)callback();assert.deepEqual(exits,[1]);
+});

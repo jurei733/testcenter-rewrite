@@ -1,10 +1,11 @@
+import {observeNativeRealtime} from '../../native-realtime';
 import {Injectable,inject} from '@angular/core';
 import {BehaviorSubject,EMPTY,Observable,of,Subject,timer} from 'rxjs';
-import {catchError,exhaustMap,map,tap} from 'rxjs/operators';
+import {catchError,map,tap,takeUntil} from 'rxjs/operators';
 import type {BookletError,CommandResponse,Profile,TestSessionData} from './group-monitor.interfaces';
 import type {ConnectionStatus} from '../shared/shared.module';
 import {NativeMonitorSessionService} from '../native-session.service';
-import {parseNativeMonitorSnapshot,nativeMonitorSelectionBody,nativeMonitorBookletFileId} from '../native-monitor-wire';
+import {parseNativeMonitorBroadcast,parseNativeMonitorSnapshot,nativeMonitorSelectionBody,nativeMonitorBookletFileId} from '../native-monitor-wire';
 @Injectable()
 export class BackendService {
  private readonly session=inject(NativeMonitorSessionService);
@@ -29,14 +30,13 @@ export class BackendService {
   return this.request('GET','/monitor/group/'+encodeURIComponent(groupName)+'/test-sessions').pipe(map(parseNativeMonitorSnapshot));
  }
  observeSessionsMonitor(groupName:string):Observable<TestSessionData[]>{
-  return timer(0,5000).pipe(exhaustMap(()=>{
-   this.connectionStatus$.next('polling-fetch');
-   return this.getSessionsMonitor(groupName).pipe(
-    tap(()=>{this.connectionStatus$.next('polling-sleep');this.problem$.next('');}),
-    // An error is never an empty successful snapshot. The next tick can retry.
-    catchError(error=>{this.connectionStatus$.next('error');this.problem$.next(error instanceof Error?error.message:'Verbindungsfehler');return EMPTY;})
-   );
-  }));
+  const scope=this.session.accessSignal;
+  return observeNativeRealtime<TestSessionData[]>({channel:'test-sessions',scope,current:()=>scope===this.session.accessSignal&&!scope.aborted,
+   read:async(signal)=>{let subscribeToken:string|null=null;const text=await this.session.text('GET','/monitor/group/'+encodeURIComponent(groupName)+'/test-sessions',undefined,undefined,false,signal,value=>{subscribeToken=value;});return{data:parseNativeMonitorSnapshot(text),subscribeToken};},
+   decode:parseNativeMonitorBroadcast,revalidate:()=>this.session.verifyAccess(scope),
+   status:status=>{this.connectionStatus$.next(status);if(status==='polling-sleep'||status==='ws-online')this.problem$.next('');},
+   error:error=>this.problem$.next(error instanceof Error?error.message:'Verbindungsfehler')
+  }).pipe(takeUntil(this.connectionClosed));
  }
  cutConnection(){this.connectionClosed.next();this.connectionStatus$.next('initial');this.problem$.next('');}
  getBooklet(name:string):Observable<string|BookletError>{return this.request('GET','/booklet/'+encodeURIComponent(nativeMonitorBookletFileId(name))).pipe(catchError(error=>of({error:error.status===404?'missing-file':'general',species:null} as BookletError)));}

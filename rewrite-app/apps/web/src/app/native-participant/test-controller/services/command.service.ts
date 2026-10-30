@@ -97,7 +97,7 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
           map(() => command),tap(value => this.executedCommandIds.push(value.id))
         ) : EMPTY).pipe(
           // A failed ACK has no local effect and remains eligible for a later poll.
-          catchError(() => {this.connectionStatus$.next('error');return EMPTY;}),
+          catchError(() => {this.connectionStatus$.next('error');this.recoverPolling();return EMPTY;}),
           finalize(() => this.pendingCommands.delete(command.id))
         )),
       takeUntil(fromEvent(this.http.accessSignal,'abort'))

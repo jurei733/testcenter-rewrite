@@ -7,14 +7,17 @@ function integer(value:unknown,source:string|undefined,zero=false):string{
  return raw;
 }
 export type NativeCommand={id:string;keyword:string;arguments:string[];timestamp:string};
-export function parseNativeParticipantJson(path:string,text:string):unknown{
+export function parseNativeParticipantJson(path:string,text:string):unknown{return parseNativeWire(path,text);}
+export function parseNativeParticipantBroadcast(path:string,text:string):NativeCommand[]|undefined{return parseNativeWire(path,text,'commands') as NativeCommand[]|undefined;}
+function parseNativeWire(path:string,text:string,channel?:string):unknown{
  if(path==='/test')return integer(Number(text),text);
  const tokens=new WeakMap<object,Record<string,string>>();
- const data:unknown=JSON.parse(text,function(this:object,key:string,value:unknown,context?:{source?:string}){
+ let data:unknown=JSON.parse(text,function(this:object,key:string,value:unknown,context?:{source?:string}){
   if(context?.source&&['id','timestamp','workspaceId'].includes(key)&&typeof value==='number'){
    const fields=tokens.get(this)??{};fields[key]=context.source;tokens.set(this,fields);
   }return value;
  });
+ if(channel){if(!data||typeof data!=='object'||Array.isArray(data)||typeof (data as any).event!=='string')throw Error('Malformed native broadcast');if((data as any).event!==channel)return;data=(data as any).data;}
  if(/^\/test\/[^/]+\/commands$/.test(path)){
   if(!Array.isArray(data))throw Error('Native commands must be an array.');
   let previous=0n;

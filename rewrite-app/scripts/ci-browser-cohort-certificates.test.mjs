@@ -5,18 +5,14 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {canonicalMaterial} from './ci-browser-material-contract.mjs';
-import {qualifiedNativeCohortFixture} from './qualified-native-cohort-fixture.mjs';
+import {qualifiedNativeCohortFixture,qualifiedLockCohortFixture} from './qualified-native-cohort-fixture.mjs';
 import {chooseCohortCertificate,cohortDigest,loadCohortCertificates,readCohortBindings,
   validateCohortCertificate,validateCohortFamily,validateCohortRegistry} from './ci-browser-cohort-certificates.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const {registry,bindings}=await qualifiedNativeCohortFixture();
-// These pure admission tests model the actually qualified Linux Node patch.
-// The native prepare/install qualifier separately executes real Node and APT.
-const currentBindings=await readCohortBindings(root,{nodeVersion:'v22.23.4'});
-const currentName='ci-browser-native-cohorts-'+currentBindings.lockSha256+'.json';
-const currentBytes=await readFile(new URL('./fixtures/'+currentName,import.meta.url));
-const currentRegistry=JSON.parse(currentBytes);
+// Keep the real earlier qualification immutable when dependencies advance.
+const {registry:qualifiedRegistry,bindings:qualifiedBindings,name:qualifiedName,bytes:qualifiedBytes,lockBytes:qualifiedLockBytes}=await qualifiedLockCohortFixture();
 const fresh=()=>structuredClone(registry);
 const reseal=record=>{
   record.nativeOracle.runtimeMaterial.materialSha256=cohortDigest(canonicalMaterial(record.nativeOracle.runtimeMaterial.material));
@@ -24,15 +20,12 @@ const reseal=record=>{
   record.provenance.nativeOracleManifestSha256=cohortDigest(JSON.stringify(record.nativeOracle)+'\n');
 };
 
-test('actual current inputs require their own qualification; the loader cannot retarget the historical records',async()=>{
-  const same=Object.keys(currentBindings).every(key=>currentBindings[key]===bindings[key]);
-  if(same)assert.deepEqual(validateCohortRegistry(registry,currentBindings),registry.records);
-  else assert.throws(()=>validateCohortRegistry(registry,currentBindings),/Current .* differs from qualified native input/);
-  // This actual loader check runs on the pinned native Node patch. macOS's
-  // different patch remains independently rejected by the existing control.
-  if(process.version===currentBindings.nodeVersion){
-    assert.deepEqual(await loadCohortCertificates(root),currentRegistry.records);
-  }
+test('the immutable qualified graph cannot retarget the historical records',()=>{
+  const same=Object.keys(qualifiedBindings).every(key=>qualifiedBindings[key]===bindings[key]);
+  if(same)assert.deepEqual(validateCohortRegistry(registry,qualifiedBindings),registry.records);
+  else assert.throws(()=>validateCohortRegistry(registry,qualifiedBindings),/Current .* differs from qualified native input/);
+  // Actual-root admission is checked below on the pinned Node patch, against
+  // that root's exact lock rather than the historical positive fixture.
 });
 
 test('both actual native certificates retain qualified APT deltas, material and original measurement context',()=>{
@@ -102,62 +95,62 @@ test('the fixed registry loader rejects symlinks and oversized input before read
   }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('the separately qualified current lock retains actual provenance and admits only its measured cohort',()=>{
-  const before=JSON.stringify([registry,currentRegistry]);
-  const records=validateCohortFamily(registry,currentRegistry,currentBindings);
+test('the separately qualified84 lock retains actual provenance and admits only its measured cohort',()=>{
+  const before=JSON.stringify([registry,qualifiedRegistry]);
+  const records=validateCohortFamily(registry,qualifiedRegistry,qualifiedBindings);
   assert.deepEqual(records.map(record=>record.id),['20261026.354.1']);
   const record=records[0],context=record.nativeOracle.context;
   assert.equal(record.provenance.runId,41113160664);
   assert.equal(context.commit,'2fc93fd5dee96b0877855feaad5a7746ac5ec299');
   assert.equal(context.runId,'41113160664');
   assert.equal(record.provenance.nativeQualification.policyTests,335);
-  assert.equal(chooseCohortCertificate(records,context,record.nativeOracle.beforeInventory,currentBindings,{requireRuntimeGraph:true}),record);
-  assert.throws(()=>chooseCohortCertificate(records,{...context,imageVersion:'20261023.334.3'},record.nativeOracle.beforeInventory,currentBindings),/No unique/);
-  for(const key of Object.keys(currentBindings)){
-    assert.throws(()=>validateCohortFamily(registry,currentRegistry,{...currentBindings,[key]:String(currentBindings[key])+'changed'}));
+  assert.equal(chooseCohortCertificate(records,context,record.nativeOracle.beforeInventory,qualifiedBindings,{requireRuntimeGraph:true}),record);
+  assert.throws(()=>chooseCohortCertificate(records,{...context,imageVersion:'20261023.334.3'},record.nativeOracle.beforeInventory,qualifiedBindings),/No unique/);
+  for(const key of Object.keys(qualifiedBindings)){
+    assert.throws(()=>validateCohortFamily(registry,qualifiedRegistry,{...qualifiedBindings,[key]:String(qualifiedBindings[key])+'changed'}));
   }
-  assert.equal(JSON.stringify([registry,currentRegistry]),before,'Loading a new qualification must not retarget either oracle');
+  assert.equal(JSON.stringify([registry,qualifiedRegistry]),before,'Loading a new qualification must not retarget either oracle');
 });
 
 test('a new lock cannot replace the historical Source pixels, fonts, browser or screen even with re-sealed digests',()=>{
   for(const field of ['pixels','fonts','browser','screen']){
-    const d=structuredClone(currentRegistry),record=d.records[0],material=record.nativeOracle.runtimeMaterial.material;
+    const d=structuredClone(qualifiedRegistry),record=d.records[0],material=record.nativeOracle.runtimeMaterial.material;
     if(field==='pixels')material.views[0].pixelSha256='d'.repeat(64);
     if(field==='fonts'){record.nativeOracle.fontInventorySha256='e'.repeat(64);material.fontCatalogSha256='e'.repeat(64);}
     if(field==='browser')material.browserVersion='999.0.0.0';
     if(field==='screen')material.screen.width++;
-    reseal(record);validateCohortCertificate(record,{bindings:currentBindings});
-    assert.throws(()=>validateCohortFamily(registry,d,currentBindings),/identical Source pixels, fonts and browser inputs/);
+    reseal(record);validateCohortCertificate(record,{bindings:qualifiedBindings});
+    assert.throws(()=>validateCohortFamily(registry,d,qualifiedBindings),/identical Source pixels, fonts and browser inputs/);
   }
   const invalid=fresh();invalid.records[0].provenance.nativeQualification.conclusion='failure';
-  assert.throws(()=>validateCohortFamily(invalid,currentRegistry,currentBindings));
+  assert.throws(()=>validateCohortFamily(invalid,qualifiedRegistry,qualifiedBindings));
 });
 
-test('the actual pinned-Node loader selects only the exact-lock file and rejects unsafe shadows or changed inputs',
-  {skip:process.version!==currentBindings.nodeVersion},async()=>{
+test('the pinned-Node loader with the immutable qualified84 graph selects only the exact-lock file and rejects unsafe shadows or changed inputs',
+  {skip:process.version!==qualifiedBindings.nodeVersion},async()=>{
   const directory=await mkdtemp(join(tmpdir(),'owned-current-cohort-'));
   try{
     const app=join(directory,'rewrite-app'),fixtures=join(app,'scripts/fixtures');
     await mkdir(fixtures,{recursive:true});
     await writeFile(join(directory,'.node-version'),await readFile(join(root,'../.node-version')));
     const inputs=['package-lock.json','scripts/ci-browser-material-profile.mjs','scripts/ci-node-runtime.mjs'];
-    for(const path of inputs)await writeFile(join(app,path),await readFile(join(root,path)));
-    const legacyPath=join(fixtures,'ci-browser-native-cohorts.json'),path=join(fixtures,currentName);
+    for(const path of inputs)await writeFile(join(app,path),path==='package-lock.json'?qualifiedLockBytes:await readFile(join(root,path)));
+    const legacyPath=join(fixtures,'ci-browser-native-cohorts.json'),path=join(fixtures,qualifiedName);
     await writeFile(legacyPath,await readFile(new URL('./fixtures/ci-browser-native-cohorts.json',import.meta.url)));
-    await writeFile(path,currentBytes);
+    await writeFile(path,qualifiedBytes);
     const loaded=await loadCohortCertificates(app);
-    assert.deepEqual(loaded,currentRegistry.records);
+    assert.deepEqual(loaded,qualifiedRegistry.records);
     assert.ok(Object.isFrozen(loaded)&&Object.isFrozen(loaded[0])&&Object.isFrozen(loaded[0].nativeOracle.context));
     assert.equal(cohortDigest(await readFile(legacyPath)),'566c6c86c10a04fd111e3e008d64c35138b5c230054a7ec1d211c913d445965b');
     await rm(path);
     await assert.rejects(loadCohortCertificates(app),/Current lockSha256 differs/);
-    await writeFile(join(fixtures,'ci-browser-native-cohorts-'+'0'.repeat(64)+'.json'),currentBytes);
+    await writeFile(join(fixtures,'ci-browser-native-cohorts-'+'0'.repeat(64)+'.json'),qualifiedBytes);
     await assert.rejects(loadCohortCertificates(app),/Current lockSha256 differs/);
     await writeFile(path,'{');await assert.rejects(loadCohortCertificates(app),SyntaxError);
     await writeFile(path,Buffer.alloc(3*1024*1024+1));await assert.rejects(loadCohortCertificates(app),/Unsafe native cohort registry/);
     await rm(path);await symlink(legacyPath,path);await assert.rejects(loadCohortCertificates(app),/Unsafe native cohort registry/);
     await rm(path);await mkdir(path);await assert.rejects(loadCohortCertificates(app),/Unsafe native cohort registry/);
-    await rm(path,{recursive:true});await writeFile(path,currentBytes);
+    await rm(path,{recursive:true});await writeFile(path,qualifiedBytes);
     for(const input of inputs){
       const bytes=await readFile(join(app,input));await writeFile(join(app,input),Buffer.concat([bytes,Buffer.from('\n')]));
       await assert.rejects(loadCohortCertificates(app),/Current .* differs from qualified native input/);
@@ -167,3 +160,16 @@ test('the actual pinned-Node loader selects only the exact-lock file and rejects
     await assert.rejects(loadCohortCertificates(app),/Actual Node must match the exact shared patch/);
   }finally{await rm(directory,{recursive:true,force:true});}
 });
+
+test('the actual current graph requires its own exact certificate and fails closed before qualification',
+ {skip:process.version!==qualifiedBindings.nodeVersion},async()=>{
+  const actual=await readCohortBindings(root),name='ci-browser-native-cohorts-'+actual.lockSha256+'.json';
+  let bytes;try{bytes=await readFile(new URL('./fixtures/'+name,import.meta.url));}
+  catch(error){if(error.code!=='ENOENT')throw error;
+   assert.notEqual(actual.lockSha256,qualifiedBindings.lockSha256,'The qualified graph must retain its own actual certificate');
+   await assert.rejects(loadCohortCertificates(root),/Current lockSha256 differs from qualified native input/);return;
+  }
+  const current=JSON.parse(bytes),loaded=await loadCohortCertificates(root);
+  assert.deepEqual(loaded,validateCohortFamily(registry,current,actual));
+  assert.ok(loaded.length>0&&loaded.every(record=>record.bindings.lockSha256===actual.lockSha256));
+ });

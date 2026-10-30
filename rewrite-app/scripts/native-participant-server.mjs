@@ -1,3 +1,4 @@
+import {bindNativeSmokeServerOwner} from './native-monitor-smoke-io.mjs';
 import {createServer,request} from 'node:http';
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
 
@@ -63,4 +64,4 @@ process.on('message',message=>{
  if(message?.nativeRelease){const value=held.get(message.nativeRelease);held.delete(message.nativeRelease);value?.forward();process.send?.({nativeReleased:message.nativeRelease,released:!!value});}
 });
 proxy.listen(0,'127.0.0.1',()=>process.send?.({port:proxy.address().port}));
-process.once('SIGTERM',()=>proxy.close(()=>backend.close(()=>process.exit(0))));
+bindNativeSmokeServerOwner(proxy,{extraServers:[backend]});

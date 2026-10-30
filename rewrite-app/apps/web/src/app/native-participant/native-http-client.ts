@@ -16,6 +16,7 @@ export class NativeHttpClient {
  private readonly lifetime=new AbortController();
  readonly accessSignal=AbortSignal.any([this.ownerScope,this.lifetime.signal]);
  private credential=this.session.access()?.token;
+ verifyAccess(owner:AbortSignal){return this.session.verifyAccess(owner);}
  get isCurrent(){return !!this.credential&&!this.accessSignal.aborted&&this.ownerScope===this.session.accessSignal;}
  private retire=()=>{this.credential=undefined;this.lifetime.abort();};
  constructor(){this.ownerScope.addEventListener('abort',this.retire,{once:true});}
