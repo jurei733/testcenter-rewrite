@@ -17,6 +17,20 @@ const access=token=>({token,claims:{testGroupMonitor:[{id:'owned',label:'Owned',
 const response=(value,status=200)=>new Response(typeof value==='string'?value:JSON.stringify(value),{status});
 const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
 const settle=()=>new Promise(done=>setImmediate(done));
+
+test('an identical complete access verification keeps the existing actor scope and open UI owner',()=>fixture(async()=>{
+ globalThis.fetch=async()=>response(access('current'));const session=new NativeMonitorSessionService();await session.login('owned','password');const scope=session.accessSignal,previous=session.access();await session.verifyAccess(new AbortController().signal);assert.equal(session.accessSignal,scope);assert.equal(scope.aborted,false);assert.equal(session.access(),previous);
+}));
+test('every changed access field still uses the normal monitor grant replacement fence',()=>fixture(async()=>{
+ let current=access('current');globalThis.fetch=async()=>response(current);const session=new NativeMonitorSessionService();await session.login('owned','password');const scope=session.accessSignal;current={...current,viewSettings:{monitorBookletVisibility:'hidden'}};await session.verifyAccess(new AbortController().signal);assert.equal(scope.aborted,true);assert.notEqual(session.accessSignal,scope);assert.equal(session.access().viewSettings.monitorBookletVisibility,'hidden');
+}));
+test('retiring the verification view cancels its request and rejects a late permission response',()=>fixture(async()=>{
+ const pending=deferred();let options;globalThis.fetch=async(_path,o)=>o.method==='PUT'?response(access('current')):(options=o,pending.promise);const session=new NativeMonitorSessionService();await session.login('owned','password');const scope=session.accessSignal,previous=session.access(),owner=new AbortController(),checking=session.verifyAccess(owner.signal);owner.abort();assert.equal(options.signal.aborted,true);pending.resolve(response({...access('current'),viewSettings:{monitorBookletVisibility:'hidden'}}));await assert.rejects(checking);assert.equal(session.access(),previous);assert.equal(session.accessSignal,scope);
+}));
+test('a current verification of revoked credentials retires the actor and a stale one cannot retire its replacement',()=>fixture(async values=>{
+ globalThis.fetch=async()=>response(access('current'));const session=new NativeMonitorSessionService();await session.login('owned','password');const scope=session.accessSignal;globalThis.fetch=async()=>response('revoked',403);await assert.rejects(session.verifyAccess(new AbortController().signal));assert.equal(scope.aborted,true);assert.equal(session.access(),null);assert.equal(values.has(storageKey),false);
+ const pending=deferred();globalThis.fetch=async(_path,o)=>o.method==='PUT'?response(access('next')):pending.promise;await session.login('owned','password');const checking=session.verifyAccess(new AbortController().signal);globalThis.fetch=async()=>response(access('replacement'));await session.login('owned','password');pending.resolve(response('old revoked',401));await assert.rejects(checking);assert.equal(session.access().token,'replacement');
+}));
 async function fixture(run,token){const oldFetch=globalThis.fetch,oldStorage=globalThis.localStorage,oldTabStorage=globalThis.sessionStorage,oldSecure=globalThis.isSecureContext,values=new Map(token?[[storageKey,token]]:[]),tabValues=new Map();globalThis.localStorage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};globalThis.sessionStorage={getItem:key=>tabValues.get(key)??null,setItem:(key,value)=>tabValues.set(key,value),removeItem:key=>tabValues.delete(key)};globalThis.isSecureContext=true;try{await run(values,tabValues);}finally{globalThis.fetch=oldFetch;globalThis.localStorage=oldStorage;globalThis.sessionStorage=oldTabStorage;globalThis.isSecureContext=oldSecure;}}
 
 test('late native restoration cannot replace a newer real login',()=>fixture(async values=>{

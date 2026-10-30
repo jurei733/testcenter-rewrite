@@ -19,7 +19,7 @@ const settle=()=>new Promise(done=>setImmediate(done));
 const access=token=>({token,claims:{testGroupMonitor:[{id:'owned',flags:[]}]}});
 function fixture(){
  const route={firstChild:null},nav=[],events=new rx.Subject(),closed=new rx.Subject(),problem$=new rx.BehaviorSubject(''),calls=[];let scope=new AbortController(),closes=0,marks=0;
- const session={access:core.signal(access('original')),busy:core.signal(false),problem:core.signal(''),get accessSignal(){return scope.signal;},login:async()=>session.access(),logout:()=>{calls.push('logout');replace(null);return Promise.resolve();}};
+ const session={access:core.signal(access('original')),busy:core.signal(false),problem:core.signal(''),get accessSignal(){return scope.signal;},login:async()=>session.access(),refresh:async()=>{},logout:()=>{calls.push('logout');replace(null);return Promise.resolve();}};
  const replace=value=>{const old=scope;scope=new AbortController();session.access.set(value);old.abort();};
  bindings=new Map(Object.entries({NativeMonitorSessionService:session,ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},ChangeDetectorRef:{markForCheck(){marks++;}},Router:{events,navigate:async path=>{nav.push(path);return true;}},ActivatedRoute:route,MatDialog:{open:()=>({afterClosed:()=>closed,close:()=>{closes++;}})},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')}}));
  const header=new HeaderService();bindings.set('HeaderService',header);
@@ -70,4 +70,20 @@ test('a new scope invalidates the old header even if its access object is retain
 });
 test('an unauthorized child route shows only the public application title',()=>{
  const f=fixture();f.header.title='Private authorized group';monitorRoute(f,'forbidden');assert.equal(f.component.headerTitle,'Owned');f.component.ngOnDestroy();
+});
+
+test('a fresh sole monitor claim still enters the Source Starter instead of auto-opening the Monitor',async()=>{
+ const f=fixture();await f.component.submit();assert.deepEqual(f.nav,[['/group-monitor']]);assert.equal(f.component.headerTitle,'Übersicht');assert.equal(f.component.showAccountPanel,true);f.component.ngOnDestroy();
+});
+test('the account panel belongs to the Starter and is absent from an authorized Monitor child',()=>{
+ const f=fixture();assert.equal(f.component.showAccountPanel,true);monitorRoute(f);assert.equal(f.component.showAccountPanel,false);monitorRoute(f,'forbidden');assert.equal(f.component.showAccountPanel,true);f.replace(null);assert.equal(f.component.showAccountPanel,false);f.component.ngOnDestroy();
+});
+test('a failed current Starter refresh hides stale actions and explicit retry recovers',async()=>{
+ const f=fixture();f.session.refresh=async()=>{throw Error('owned refresh unavailable');};await f.component.refreshStarter();assert.equal(f.component.starterRefreshing(),false);assert.equal(f.component.starterRefreshFailed(),true);assert.equal(f.component.problem(),'owned refresh unavailable');assert.ok(f.session.access());f.session.refresh=async()=>{};await f.component.refreshStarter();assert.equal(f.component.starterRefreshFailed(),false);assert.equal(f.component.problem(),'');f.component.ngOnDestroy();
+});
+test('an older refresh cannot publish errors or finish a replacement actors pending refresh',async()=>{
+ const f=fixture(),old=deferred(),next=deferred();f.session.refresh=()=>old.promise;const pending=f.component.refreshStarter();f.replace(access('replacement'));f.session.refresh=()=>next.promise;const current=f.component.refreshStarter();old.reject(Error('old private error'));await pending;assert.equal(f.component.starterRefreshing(),true);assert.equal(f.component.problem(),'');assert.equal(f.component.starterRefreshFailed(),false);next.resolve();await current;assert.equal(f.component.starterRefreshing(),false);assert.equal(f.session.access().token,'replacement');f.component.ngOnDestroy();
+});
+test('a retired entry cannot publish an outstanding Starter refresh error',async()=>{
+ const f=fixture(),pending=deferred();f.session.refresh=()=>pending.promise;const refresh=f.component.refreshStarter();f.component.ngOnDestroy();pending.reject(Error('retired refresh'));await refresh;assert.equal(f.component.problem(),'');assert.equal(f.component.starterRefreshFailed(),false);
 });

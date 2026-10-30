@@ -90,7 +90,7 @@ try{
  monitor.on('request',r=>{if(new URL(r.url()).pathname==='/monitor/command')monitorWire.push({method:r.method(),body:r.postData(),hasNativeToken:!!r.headers().authtoken});});
  await monitor.goto(base+'/app/group-monitor/OWNED.AUTH?ui=original');
  await monitor.locator('input[name=name]').fill('native-monitor');await monitor.locator('[data-cy=login-user]').click();
- await monitor.locator('input[name=password]').fill(password);await monitor.locator('[data-cy=login-user]').click();
+ await monitor.locator('input[name=password]').fill(password);await monitor.locator('[data-cy=login-user]').click();await monitor.locator('[data-cy=gm-card-0]').getByRole('button',{name:'Gruppen-Monitor Starten',exact:true}).click();
  await monitor.waitForURL(/\/group-monitor\/OWNED.AUTH\/full(?:\?|$)/);await monitor.locator('tc-test-session[data-test-id="9007199254740994"]').waitFor();
  await monitor.locator('[data-cy=GM_search_button]').click();await monitor.locator('input[type=text]').last().fill('native-direct');
  await monitor.waitForFunction(()=>{const rows=[...document.querySelectorAll('tc-test-session')];return rows.length===2&&rows.some(row=>row.getAttribute('data-test-id')==='9007199254740994')&&rows.every(row=>row.getAttribute('data-test-id')==='9007199254740994'||row.classList.contains('pending'));});
@@ -145,7 +145,7 @@ try{
  const commandErrorStart=errors.length;await configure('native-goto',0);
  monitor=await browser.newPage({viewport:{width:1280,height:850}});monitor.setDefaultTimeout(20000);monitor.on('pageerror',error=>errors.push('monitor: '+String(error)));
  monitor.on('request',r=>{if(new URL(r.url()).pathname==='/monitor/command')monitorWire.push({method:r.method(),body:r.postData(),hasNativeToken:!!r.headers().authtoken});});
- await monitor.goto(base+'/app/group-monitor/OWNED.AUTH?ui=original');await monitor.locator('input[name=name]').fill('native-monitor');await monitor.locator('[data-cy=login-user]').click();await monitor.locator('input[name=password]').fill(password);await monitor.locator('[data-cy=login-user]').click();await monitor.waitForURL(/\/group-monitor\/OWNED.AUTH\/full(?:\?|$)/);
+ await monitor.goto(base+'/app/group-monitor/OWNED.AUTH?ui=original');await monitor.locator('input[name=name]').fill('native-monitor');await monitor.locator('[data-cy=login-user]').click();await monitor.locator('input[name=password]').fill(password);await monitor.locator('[data-cy=login-user]').click();await monitor.locator('[data-cy=gm-card-0]').getByRole('button',{name:'Gruppen-Monitor Starten',exact:true}).click();await monitor.waitForURL(/\/group-monitor\/OWNED.AUTH\/full(?:\?|$)/);
  const timedRow=monitor.locator('tc-test-session[data-test-id="9007199254740995"]');await timedRow.locator('[svgicon=timer_off]').waitFor();
  const allToggle=monitor.locator('[data-cy=GM_control_all_tests]').getByRole('switch');await allToggle.waitFor();if(await allToggle.getAttribute('aria-checked')==='true'&&await allToggle.isEnabled())await allToggle.click();
  for(const box of await monitor.locator('[data-cy=GM-tt-checkbox] input').all())if(await box.isEnabled())await box.uncheck();await timedRow.getByRole('checkbox').check();

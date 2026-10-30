@@ -85,6 +85,15 @@ export class NativeMonitorSessionService {
   finally{owner?.removeEventListener('abort',cancel);if(this.loginController===attempt)this.loginController=null;if(revision===this.revision)this.busy.set(false);}
  }
  async refresh(){const token=this.access()?.token,revision=this.revision,purpose=this.purpose();if(token){const access=await this.json<OriginalAccessSet>('GET','/session',undefined,token);if(revision===this.revision)this.set(access,purpose,true);}}
+ async verifyAccess(owner:AbortSignal){
+  owner.throwIfAborted();const previous=this.access(),scope=this.accessSignal,revision=this.revision,purpose=this.purpose();
+  if(!previous||scope.aborted)return;
+  const access=JSON.parse(await this.text('GET','/session',undefined,previous.token,false,owner)) as OriginalAccessSet;
+  owner.throwIfAborted();scope.throwIfAborted();
+  // A byte-for-byte identical complete access response renews no capability.
+  // Any changed field still takes the normal grant replacement/retirement path.
+  if(revision===this.revision&&scope===this.accessSignal&&this.access()===previous&&JSON.stringify(access)!==JSON.stringify(previous))this.set(access,purpose,true);
+ }
  async logout(){const token=this.access()?.token;this.clear();if(token)await this.text('DELETE','/session',undefined,token);}
  pendingFinishTargets(group:string):string[]{return this.access()?[...(this.finishTargets.get(group)??[])]:[];}
  rememberFinishTargets(group:string,ids:string[]){

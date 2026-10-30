@@ -30,8 +30,17 @@ export class NativeStarterComponent implements AfterViewInit {
  private readonly observer=new IntersectionObserver(([entry])=>this.showScrollButton.set(!entry.isIntersecting));
  @ViewChild('bottomSentinel',{static:true})private bottom!:ElementRef<HTMLElement>;
  readonly problem=signal('');readonly showScrollButton=signal(false);
- private readonly retire=()=>{this.owner.abort();this.starter.ngOnDestroy();this.element.nativeElement.replaceChildren();};
- constructor(){this.scope.addEventListener('abort',this.retire,{once:true});}
+ private verifyTimer:ReturnType<typeof setTimeout>|undefined;
+ private readonly retire=()=>{if(this.verifyTimer!==undefined)clearTimeout(this.verifyTimer);this.verifyTimer=undefined;this.owner.abort();this.starter.ngOnDestroy();this.element.nativeElement.replaceChildren();};
+ constructor(){this.scope.addEventListener('abort',this.retire,{once:true});this.scheduleAccessCheck();}
+ private scheduleAccessCheck(){
+  if(!this.current)return;
+  this.verifyTimer=setTimeout(async()=>{
+   this.verifyTimer=undefined;
+   try{await this.session.verifyAccess(this.owner.signal);}catch{ /* Current401/403 already retires the actor; transient failures keep its existing scope. */ }
+   this.scheduleAccessCheck();
+  },5000);
+ }
  get claims(){return this.current?this.session.access()?.claims:undefined;}
  get current(){return !this.owner.signal.aborted&&!this.scope.aborted&&this.scope===this.session.accessSignal;}
  get booklets(){return this.claims?.test?.map(claim=>({id:claim.id,name:claim.label,mode:(claim.flags.locked?'locked':claim.flags.running?'continue':this.claims?.testGroupMonitor?'view':'start') as 'locked'|'continue'|'view'|'start'}))??[];}
