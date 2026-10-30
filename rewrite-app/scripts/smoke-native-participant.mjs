@@ -22,7 +22,7 @@ const {createSqliteFirstSliceStorage}=await mod('@testcenter-rewrite-app/sqlite-
 const {prepareOriginalXmlSchemaValidator}=await import(pathToFileURL(join(app,'packages/application/dist/packages/application/src/original-xml-schema.js')));
 const {stopNativeSmokeServer}=await import(pathToFileURL(join(app,'scripts/native-monitor-smoke-io.mjs')));
 const scratch=await mkdtemp(join(tmpdir(),'owned-native-auth-start-')),file=join(scratch,'owned.sqlite');
-const storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(join(app,'.data/original-xml-schemas'),false);
+const storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE||join(app,'.data/original-xml-schemas')),false);
 const services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
 const tenant=await services.platform.createTenant({tenantKey:'owned-auth',displayName:'Owned auth'}),workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'owned',displayName:'Owned auth'}),scope={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey};
