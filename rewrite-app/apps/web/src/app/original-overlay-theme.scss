@@ -12,6 +12,7 @@
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,
 :root[data-interface-mode='original'] .original-player-menu,
+:root[data-interface-mode='original'] .original-native-monitor-menu,
 :root[data-interface-mode='original'] .original-application-logo-tooltip,
 :root[data-interface-mode='original'] .original-participant-error-dialog,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog {
@@ -48,4 +49,13 @@
   button.mat-mdc-button-base:disabled {
     opacity: 1;
   }
+}
+
+
+// Monitor menus are body-level portals. Preserve the browser button defaults
+// used by the pinned Original instead of inheriting the Rewrite shell reset.
+:root[data-interface-mode='original'] .original-native-monitor-menu button.mat-mdc-menu-item {
+  font-family: revert;
+  font-weight: revert;
+  border-radius: 0;
 }
