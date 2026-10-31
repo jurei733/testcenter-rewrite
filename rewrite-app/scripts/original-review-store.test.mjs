@@ -1,6 +1,6 @@
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {mkdtemp,rm,readFile,writeFile,rename,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
@@ -19,6 +19,14 @@ const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-ins
 const modes=['run-trial','run-review','run-demo','run-hot-return','run-hot-restart','run-simulation'];
 const kinds=['memory','file','sqlite'];if(process.env.FIRST_SLICE_STORE==='postgres'){assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);kinds.push('postgres');}
 const body={entry:'Exact native Ω\n  second line',categories:'tech design',priority:2,reviewer:'Reviewer Ä',page:3,pagelabel:'Teilaufgabe β',userAgent:'Owned native agent',originalUnitId:'FIRST.ORIGINAL'};
+test('actual Original operator Review fixture retains49 HTTP exchanges and authenticated JSON/CSV provenance',async()=>{
+ const root=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-review-report-http/',import.meta.url),load=async name=>readFile(new URL(name,root));
+ const manifest=JSON.parse(await load('manifest.json'));assert.equal(manifest.sourceCommit,'eedae41840cbe90e5547c0211da818bdf620f5aa');assert.equal(manifest.httpExchanges,49);
+ for(const[name,digest]of Object.entries(manifest.files))assert.equal(createHash('sha256').update(await load(name)).digest('hex'),digest,name);
+ const observed=JSON.parse(await load('observations.json')),proof=JSON.parse(await load('independent-verification.json'));assert.equal(observed.verified,true);assert.equal(observed.rows.length,49);assert.equal(observed.sourceCodeAndVendorUnmodified,true);assert.equal(observed.actualPostgresAndRedis,true);assert.equal(observed.sqlSeedsOrDaoStubs,false);assert.equal(observed.configuration.testMode,false);assert.equal(proof.allowTestMode,false);assert.equal(proof.xmlSchemaValidation,true);assert.equal(proof.sourceFilesReverified,137);assert.equal(proof.lockedProductionComposerPackagesReverified,19);assert.equal(proof.exactImage,manifest.backendImage);
+ const rows=new Map(observed.rows.map(row=>[row.label,row]));for(const label of ['review-export-json','operator-review-json','operator-review-csv']){const row=rows.get(label);assert.equal(row.status,200);assert.equal(createHash('sha256').update(row.rawText).digest('hex'),row.bodySha256);}
+ assert.equal(rows.get('review-export-json').rawText,rows.get('operator-review-json').rawText);assert.deepEqual(rows.get('operator-review-json').value.map(row=>row.unitname),['OWNED.UNIT','']);assert.match(rows.get('operator-review-csv').contentType,/^text\/csv/);assert.ok(rows.get('operator-review-csv').rawText.startsWith('\uFEFF'));assert.ok((await load('capture.mjs')).toString().includes('Accept:accept'));
+});
 for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atomic`,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'owned-native-review-')),file=join(directory,kind==='file'?'state.json':'state.sqlite');
  const schema='owned_native_review_'+randomUUID().replaceAll('-',''),url=kind==='postgres'?new URL(process.env.FIRST_SLICE_POSTGRES_URL):null;
@@ -82,6 +90,13 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
    assert.equal(json.status,200);const rows=JSON.parse(json.body);assert.equal(rows.length,2);assert.equal(rows[0].bookletlabel,'  Booklet Ω  ');assert.equal(rows[0].unitlabel,'  Unit β  ');assert.equal(rows[0].groupname,'OWNED.GROUP');assert.equal(rows[0].category_content,true);assert.equal(rows[0].reviewtime,'2026-10-31 19:53:24');assert.equal(rows[0].page,3);assert.equal(rows[0].reviewer,null);
    assert.equal(csv.status,200);assert.ok(csv.body.includes('"Edited Ω"'));assert.ok(!csv.body.includes('[object Object]'));
    const empty=await services.originalReview.export({token:peer.token,format:'json'});assert.deepEqual(empty,{status:200,body:'[]'});
+  });
+  await t.test('native operator Review reports preserve Source Unit-before-Booklet collection order instead of UI edit sorting',async()=>{
+   at='2026-10-31T18:53:25.000Z';await services.originalReview.update({...booklet,reviewNumber:'1',body:{...body,entry:'Updated later Booklet Ω'}});
+   const native=await services.originalReview.export({token:owner.token,format:'json'});assert.deepEqual(JSON.parse(native.body).map(row=>row.unitname),['OWNED.UNIT','']);
+   const csv=await services.originalReview.export({token:owner.token,format:'csv'}),archive=await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.GROUP']});
+   const files=new Map();let offset=0;while(archive.body.readUInt32LE(offset)===0x04034b50){const len=archive.body.readUInt32LE(offset+18),n=archive.body.readUInt16LE(offset+26),start=offset+30+n+archive.body.readUInt16LE(offset+28);files.set(archive.body.subarray(offset+30,offset+30+n).toString(),archive.body.subarray(start,start+len).toString());offset=start+len;}
+   assert.equal(files.get('reviews.json'),native.body,'Operator native row sequence must agree with Source grouping, irrespective of a later Booklet edit');assert.equal(files.get('reviews.csv'),csv.body);
   });
   await t.test('foreign people and wrong modes cannot read or mutate private Review data',async()=>{
    const before=await services.originalReview.list(request);

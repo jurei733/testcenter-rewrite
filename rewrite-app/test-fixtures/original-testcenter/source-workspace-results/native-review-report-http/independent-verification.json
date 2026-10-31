@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-31T23:12:10.921715+00:00",
+  "observationSha256": "50cef1ab6ef2b4c8f2497ab0d42c2a8b75a81f98cd70547240fb6c905e7059d4",
+  "sourceFilesReverified": 137,
+  "lockedProductionComposerPackagesReverified": 19,
+  "exactImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "actualContainerId": "a49058f746eb71683bb2f6ecfaf4dad3ca4a39128e32a9c36ac7822d9b0bbecd",
+  "allowTestMode": false,
+  "xmlSchemaValidation": true,
+  "rawReportBodyHashesVerified": true,
+  "SourceCodeModified": false,
+  "SourceDatabaseSeedsOrDaoSubstitutes": false,
+  "scope": "Actual observed Unit-before-Booklet report branches; Source SQL declares no within-branch ORDER BY."
+}

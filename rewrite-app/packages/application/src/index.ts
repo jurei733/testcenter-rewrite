@@ -16313,6 +16313,15 @@ const buildOriginalReviewReportRows = (input: {
     limitMaximum: 50_001
   });
   const nativeById=new Map((input.nativeReviews??[]).map(row=>[row.reviewId,row]));
+  // Source AdminDAO emits the Unit branch then the Booklet branch. Native
+  // collection order must not inherit the canonical UI's latest-edit sort.
+  // Source has no within-branch ORDER BY; retain the supplied native order.
+  const nativeOrder=[...(input.nativeReviews??[]).filter(row=>row.record.unitname!==''),...(input.nativeReviews??[]).filter(row=>row.record.unitname==='')];
+  const nativeRank=new Map(nativeOrder.map((row,index)=>[row.reviewId,index]));
+  if(nativeRank.size)items.sort((left,right)=>{
+    const a=nativeRank.get(left.review.reviewId),b=nativeRank.get(right.review.reviewId);
+    return a===undefined?(b===undefined?0:1):b===undefined?-1:a-b;
+  });
   const categories = items.some(item=>nativeById.has(item.review.reviewId)) ? originalReviewReportCategoryKeys(items.map(item=>({categories:nativeById.get(item.review.reviewId)?.record.categories??item.review.categories.join(' ')}))) : Array.from(
     new Set(items.flatMap(item => item.review.categories))
   ).sort();

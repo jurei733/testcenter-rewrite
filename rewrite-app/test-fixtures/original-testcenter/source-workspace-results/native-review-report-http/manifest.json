@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "httpExchanges": 49,
+  "sourceFiles": 137,
+  "lockedProductionPackages": 19,
+  "nativeAndOperatorJsonExact": true,
+  "operatorCsvActualAccept": true,
+  "sourceRowKinds": [
+    "unit",
+    "booklet"
+  ],
+  "withinBranchOrdering": "No Source ORDER BY; do not invent timestamp or numeric-ID sorting.",
+  "files": {
+    "capture.mjs": "de9def48423118cac7f4b14bf050779b80474fc1d0676ed2b4a9d9901e8a22cf",
+    "observations.json": "50cef1ab6ef2b4c8f2497ab0d42c2a8b75a81f98cd70547240fb6c905e7059d4",
+    "independent-verification.json": "e610129ec8522a10e026b90b6286d74086f2917fb507a9e4402cfd74076706cc"
+  }
+}
