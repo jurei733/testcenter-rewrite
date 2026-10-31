@@ -142,6 +142,8 @@ app-root {
   overflow: hidden;
 }
 body:has(:where(app-native-monitor-entry .login-page, app-native-participant-entry .login-page)) {
+  /* Pinned Original src/theme/index.scss applies the light scheme to body. */
+  color-scheme: light;
   background: white;
 }
 app-native-monitor-entry h1 {
