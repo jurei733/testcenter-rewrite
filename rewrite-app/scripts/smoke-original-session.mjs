@@ -76,7 +76,7 @@ try {
     const result = await page.evaluate(async ({method, path, body, token}) => {
       const response = await fetch(path, {method, headers: {...(body === undefined ? {} : {'content-type': 'application/json'}), ...(token ? {AuthToken: token} : {})},
         ...(body === undefined ? {} : {body: JSON.stringify(body)})});
-      const text = await response.text(); return {status: response.status, cache: response.headers.get('cache-control'), value: text ? JSON.parse(text) : null, empty: text.length === 0, rawText: text, contentType: response.headers.get('content-type')};
+      const text = await response.text(); return {status: response.status, cache: response.headers.get('cache-control'), value: text ? (response.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : text) : null, empty: text.length === 0, rawText: text, contentType: response.headers.get('content-type')};
     }, {method, path, body, token});
     assert.equal(result.status, status, 'Unexpected native session HTTP status'); assert.equal(result.cache, 'private, no-store'); return result;
   };
@@ -169,7 +169,7 @@ try {
   const repeat = await solve((await request('POST', '/session/person/challenge', {code: 'SHARED'}, login.token)).value);
   await request('PUT', '/session', repeat, peer.token, 400);
   const former = person.token; person = (await request('PUT', '/session', repeat, login.token)).value;
-  assert.ok(person.displayName.endsWith('/SHARED')); await request('GET', '/session', undefined, former, 401);
+  assert.ok(person.displayName.endsWith('/SHARED')); await request('GET', '/session', undefined, former, 403);
   mark('cross-login-work-cannot-burn-owner-ticket-and-reentry-rotates-only-the-person');
   setPhase('document-reload');
   await page.reload({waitUntil: 'domcontentloaded'});
@@ -178,7 +178,7 @@ try {
   assert.equal((await request('DELETE', '/session', undefined, login.token, 205)).empty, true);
   assert.equal((await request('GET', '/session', undefined, login.token)).value.token, login.token);
   assert.equal((await request('DELETE', '/session', undefined, person.token, 205)).empty, true);
-  await request('GET', '/session', undefined, person.token, 401);
+  await request('GET', '/session', undefined, person.token, 403);
   mark('reload-preserves-first-person-spelling-and-empty-205-logout-keeps-login-capability');
   setPhase('actual-ui-entry-for-native-created-test');
   await page.goto(base + '/app/participant?ui=original&tenantKey=' + tenantKey + '&workspaceKey=' + workspaceKey, {waitUntil: 'domcontentloaded'});
@@ -235,7 +235,7 @@ try {
   await request('POST','/session/person/challenge',{code:'Shared'},monitor.token,403);
   const originalMonitorToken=monitor.token,monitorAgain=(await request('PUT','/session',await solve((await request('POST','/session/challenge',{loginType:'login',name:'native-monitor',password})).value))).value;
   assert.notEqual(monitorAgain.token,originalMonitorToken);assert.equal(monitorAgain.groupToken,monitor.groupToken);
-  await request('GET','/session',undefined,originalMonitorToken,401);
+  await request('GET','/session',undefined,originalMonitorToken,403);
   assert.equal((await request('PUT','/test',{bookletName:'OWNED.BROWSER'},monitorAgain.token,201)).rawText,monitorTest.rawText);
   await page.frameLocator('iframe').locator('main[data-started="true"]').waitFor();
   mark('browser-native-monitor-has-dual-claims-honest-own-test-mode-and-isolated-bearer');

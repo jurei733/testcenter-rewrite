@@ -100,7 +100,7 @@ for(const kind of kinds)test(`${kind}: Source65 native monitor is an uncoded per
     await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port;
     const request=async(method,path,body,token,status=200)=>{
      const response=await fetch(base+path,{method,headers:{...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});
-     const text=await response.text();assert.equal(response.status,status,method+' '+path);assert.equal(response.headers.get('cache-control'),'private, no-store');return text?JSON.parse(text):null;
+     const text=await response.text();assert.equal(response.status,status,method+' '+path);assert.equal(response.headers.get('cache-control'),'private, no-store');return text?(response.headers.get('content-type')?.includes('application/json')?JSON.parse(text):text):null;
     };
     await request('PUT','/session/login',{name,password},undefined,400);
     const challenge=await request('POST','/session/challenge',{loginType:'login',name,password});assert.equal(JSON.stringify(challenge).includes(password),false);

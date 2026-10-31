@@ -4645,7 +4645,9 @@ const streamMonitorEvents = async (input: {
   pollHandle.unref();
 };
 
-const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>, broadcaster?:NativeBroadcaster) =>
+type ProductionApiServerOptions = {originalSessionErrorId?: () => string};
+
+const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>, broadcaster?:NativeBroadcaster, options: ProductionApiServerOptions = {}) =>
   runtime.requestLifecycle.wrap(async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const services = runtime.services;
     const requestId = randomUUID();
@@ -4999,6 +5001,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       })) return;
 
       if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,
+        timeZone: runtime.config.participantAccessTimeZone, createErrorId: options.originalSessionErrorId,
+        propagateError: error => error instanceof ClientRequestAbortedError || error instanceof RequestBodyTooLargeError,
+        reportError: receipt => {
+          if (receipt.errorCode === 'internal_error') metrics.errorCounts.internal += 1;
+          else metrics.errorCounts.firstSlice += 1;
+          // Correlation belongs in private process logs, never the public diagnostics DTO.
+          logStructured(receipt.statusCode >= 500 ? 'error' : 'info', 'native_session_error',
+            {requestId, method, path: pathname, ...receipt});
+        },
         readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),
         raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
         send: (status, value) => {
@@ -9903,11 +9914,11 @@ const applyHttpServerTimeouts = (
 const createNativeBroadcaster=(runtime:Awaited<ReturnType<typeof createApiRuntime>>)=>['true','1'].includes((process.env.FIRST_SLICE_NATIVE_WEBSOCKET_ENABLED??'').toLowerCase())
   ?new NativeBroadcaster(runtime.services,operation=>runtime.requestLifecycle.wrap(operation)(),stage=>recordRuntimeOperationalEvent(runtime,"error","native_broadcast_failed",{stage})):undefined;
 
-export const createProductionApiServer = async () =>
+export const createProductionApiServer = async (options: ProductionApiServerOptions = {}) =>
   {
     const runtime = await createApiRuntime();
     const broadcaster=createNativeBroadcaster(runtime);
-    const server = createServer(createRequestHandler(runtime,broadcaster));broadcaster?.attach(server);
+    const server = createServer(createRequestHandler(runtime,broadcaster,options));broadcaster?.attach(server);
     applyHttpServerTimeouts(server, runtime);
     let shutdownPromise: Promise<void> | undefined;
     const shutdownRuntime = () => shutdownPromise ??= runtime.shutdown();
