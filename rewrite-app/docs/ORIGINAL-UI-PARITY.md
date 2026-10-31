@@ -4350,3 +4350,29 @@ layouts did not change between the previous UI reference and this revision.
 The Original repository is MIT licensed (IQB). Retain the relevant copyright
 and license notices when copying layouts, styles or assets. Account for fonts
 and other assets' own license notices separately.
+
+
+### Native Monitor icon-button font boundary (2026-10-31)
+
+The native Monitor entry now reverts only the generic Rewrite `font-family`
+and `font-weight` overrides on Material icon buttons. The pinned Original
+inherits the browser's Arial/400 button font; the integration previously used
+Avenir Next/600. The Material icon size remains unchanged. Source-derived SVG
+paths, templates, button behavior and the Original checkout are unchanged.
+
+A controlled headed Chrome 156 diagnostic with `--disable-gpu-rasterization`
+first established zero-pixel Original self-control. Before this correction,
+all four animation phases then showed 53 differing desktop pixels and 34 mobile
+pixels at the search, settings and drawer glyphs. After the final correction,
+all eight complete Original-to-Rewrite viewport pairs are RGBA-identical.
+An independent PNG decoder verified those pairs, all 48 white repaint witnesses,
+and matching geometry plus font properties for all 28 icon instances
+across the two viewport sizes. This is controlled-rendering evidence, not a
+replacement browser configuration or whole-Monitor qualification.
+
+Default accelerated local Chrome still exhibits Original-vs-Original shadow
+variance. Disabling Graphite in a separate diagnostic also forced software
+rendering, so that experiment cannot isolate Graphite alone. Existing capture
+criteria, zero-pixel comparison, three consecutive complete frames, native
+browser modes and all broad visual acceptance rows remain unchanged. Default
+locked Linux browser qualification and fresh current-head reviews remain open.
