@@ -1,0 +1,125 @@
+name: Qualify native Monitor command dialogs
+on:
+  push:
+    branches: [codex/native-monitor-dialogs-qualify-20261031]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    name: Actual native ten-scene Monitor and unchanged Source family
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: "true"
+      FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
+      UI_SMOKE_HEADFUL: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Prepare owned qualification evidence
+        run: mkdir -p "$RUNNER_TEMP/rejected-diagnostic-qualification"
+      - name: Exercise the diagnostic's actual owned Node mode correction
+        run: node --input-type=module -e 'import {exerciseOwnedRejectedNode} from "./scripts/measure-rejected-native-cohort.mjs"; console.log(JSON.stringify(await exerciseOwnedRejectedNode(process.cwd())));' > "$RUNNER_TEMP/rejected-diagnostic-qualification/node-mode.json"
+      - name: Preserve all native policy checks including real timeout escalation
+        run: npm run test:ci-policy > "$RUNNER_TEMP/rejected-diagnostic-qualification/policy.tap" 2>&1
+      - name: Audit the unchanged locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json > "$RUNNER_TEMP/rejected-diagnostic-qualification/audit.json"
+      - name: Require a genuinely zero-vulnerability qualification audit
+        run: node --input-type=module -e 'import assert from "node:assert/strict";import {readFile} from "node:fs/promises";import {join} from "node:path";const audit=JSON.parse(await readFile(join(process.env.RUNNER_TEMP,"rejected-diagnostic-qualification/audit.json"),"utf8"));assert.equal(audit.metadata.vulnerabilities.total,0);'
+      - name: Preserve actual native Debian archive controls
+        run: node --test scripts/ci-browser-system-linux.test.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/native-debian.tap" 2>&1
+      - name: Enforce actual Source-family and changed-lock rejection controls
+        run: node --test scripts/observed-native-source-family.test.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/source-family.tap" 2>&1
+      - name: Download the exact locked Chromium
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Retain the actual public mirror profile without changing package sources
+        run: |
+          node --input-type=module -e 'import assert from "node:assert/strict"; import {lstat,readFile,writeFile} from "node:fs/promises"; import {join} from "node:path"; import {publicRejectedMirrorProfile} from "./scripts/measure-rejected-native-cohort.mjs"; const file="/etc/apt/apt-mirrors.txt", info=await lstat(file); assert.ok(info.isFile()&&!info.isSymbolicLink()&&info.size<=16384); await writeFile(join(process.env.RUNNER_TEMP,"rejected-diagnostic-qualification/apt-mirror-profile.json"),JSON.stringify(publicRejectedMirrorProfile(await readFile(file,"utf8")))+"\n");'
+      - name: Capture authenticated native material without granting new admission
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/native-browser-system
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - name: Enforce the immutable qualified Source family
+        run: node scripts/verify-selection-native-family.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/source-family.json"
+      - name: Expose the identical authenticated native reference for the production harness
+        run: |
+          mkdir -p "$RUNNER_TEMP/browser-system"
+          cp "$RUNNER_TEMP/native-browser-system/manifest.json" "$RUNNER_TEMP/browser-system/manifest.json"
+          cmp "$RUNNER_TEMP/native-browser-system/manifest.json" "$RUNNER_TEMP/browser-system/manifest.json"
+      - name: Build the actual API, schema cache and web app
+        run: npm run build
+      - name: Bind the actual capture-program files to this qualification
+        run: sha256sum scripts/native-viewport-repaint.mjs scripts/stable-viewport-capture.mjs scripts/stable-viewport-capture.test.mjs scripts/fixtures/native-viewport-repaint-before-scrollbar-witness.mjs scripts/smoke-native-monitor-visual.mjs scripts/native-monitor-visual-scenes.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/capture-inputs.sha256"
+      - name: Preserve actual native paint and layout negative controls
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-capture-controls
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+      - name: Exercise all real WebSocket browser cases with rendered manual selection
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-selection-ui
+        run: xvfb-run --auto-servernum node scripts/smoke-native-websocket.mjs
+      - name: Check out the unchanged pinned Original for native full-page comparison
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: iqb-berlin/testcenter
+          ref: eedae41840cbe90e5547c0211da818bdf620f5aa
+          path: rewrite-app/.ci/original-monitor-reference
+          persist-credentials: false
+      - name: Verify the Original source and install its exact locked dependencies
+        run: |
+          node scripts/original-browser-reference.mjs verify-source .ci/original-monitor-reference
+          npm ci --no-audit --no-fund --prefix .ci/original-monitor-reference/frontend
+      - name: Build the unchanged Original frontend
+        working-directory: rewrite-app/.ci/original-monitor-reference/frontend
+        run: |
+          cp src/environments/environment.dev.ts src/environments/environment.ts
+          npm run build -- --configuration production
+      - name: Bind the real Original build to this exact qualification head
+        run: |
+          node scripts/original-browser-reference.mjs pack .ci/original-monitor-reference
+          cp -R .ci/original-monitor-reference/frontend/dist/testcenter-frontend/browser "$RUNNER_TEMP/native-monitor-original-build"
+      - name: Require all ten exact Original self-control scenes in the default native browser
+        env:
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
+        run: |
+          mkdir -p "$RUNNER_TEMP/native-monitor-source-control"
+          for scene in baseline selected-row settings-menu new-filter-dialog filter-target-menu filter-value-options advanced-filter-dialog finish-dialog time-dialog time-dialog-edited; do
+            UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-source-control/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$scene"
+          done
+      - name: Require all80 complete Original-to-Rewrite Monitor viewports
+        env:
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
+        run: |
+          mkdir -p "$RUNNER_TEMP/native-monitor-visual"
+          for scene in baseline selected-row settings-menu new-filter-dialog filter-target-menu filter-value-options advanced-filter-dialog finish-dialog time-dialog time-dialog-edited; do
+            UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-visual/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$scene"
+          done
+      - name: Verify Original source and build remain unchanged after browser capture
+        run: |
+          node scripts/original-browser-reference.mjs verify-source .ci/original-monitor-reference
+          node scripts/original-browser-reference.mjs verify-build "$RUNNER_TEMP/native-monitor-original-build"
+      - name: Retain actual diagnostic qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-monitor-dialog-qualification-${{ github.sha }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/rejected-diagnostic-qualification/
+            ${{ runner.temp }}/native-browser-system/manifest.json
+            ${{ runner.temp }}/browser-system/manifest.json
+            ${{ runner.temp }}/native-monitor-capture-controls/
+            ${{ runner.temp }}/native-browser-system/*.deb
+            ${{ runner.temp }}/browser-material-*/
+            ${{ runner.temp }}/native-selection-ui/
+            ${{ runner.temp }}/native-monitor-original-build/
+            ${{ runner.temp }}/native-monitor-source-control/
+            ${{ runner.temp }}/native-monitor-visual/
+          if-no-files-found: warn
+          retention-days: 7
