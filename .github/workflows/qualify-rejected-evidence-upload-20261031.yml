@@ -1,0 +1,75 @@
+name: Qualify rejected runtime evidence upload
+on:
+  push:
+    branches: [codex/rejected-evidence-upload-qualify-20261031]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    name: Actual uploader rejects legacy APT traversal and retains all selected evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Prepare public evidence fixtures and an actual inaccessible APT partial directory
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'rejected-native-measurement'
+          assert not root.exists()
+          files={'measurement.json':'{"fixtureOnly":true,"productionAdmission":false}\n',
+                 'native-oracle.log':'public owned fixture output\n',
+                 'native-oracle.stderr.log':'public owned fixture diagnostics\n',
+                 'supervision/supervision.json':'{"fixtureOnly":true,"outcome":"passed"}\n',
+                 'native-browser-system/manifest.json':'{"fixtureOnly":true,"authenticatedRuntime":false}\n',
+                 'native-browser-system/'+('a'*64)+'.deb':'public fixture, not a Debian archive\n',
+                 'browser-material-owned/profile.json':'{"fixtureOnly":true,"pixelQualification":false}\n'}
+          expected={}
+          for name,content in files.items():
+              path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content)
+              expected[name]=hashlib.sha256(path.read_bytes()).hexdigest()
+          (root/'expected-fixture-files.json').write_text(json.dumps(expected,sort_keys=True)+'\n')
+          partial=root/'browser-system-apt-owned/archives/partial';partial.mkdir(parents=True)
+          (partial/'must-not-be-uploaded.txt').write_text('public cache sentinel\n')
+          PY
+          sudo chown root:root "$RUNNER_TEMP/rejected-native-measurement/browser-system-apt-owned/archives/partial"
+          sudo chmod 0700 "$RUNNER_TEMP/rejected-native-measurement/browser-system-apt-owned/archives/partial"
+          node --input-type=module -e 'import assert from "node:assert/strict";import {readdirSync} from "node:fs";import {join} from "node:path";assert.notEqual(process.getuid(),0);assert.throws(()=>readdirSync(join(process.env.RUNNER_TEMP,"rejected-native-measurement/browser-system-apt-owned/archives/partial")),{code:"EACCES"});'
+      - name: Exercise the actual legacy uploader against the inaccessible APT cache
+        id: legacy
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rejected-evidence-legacy-counter-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rejected-native-measurement/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require genuine rejection by the legacy uploader
+        env:
+          LEGACY_UPLOAD_OUTCOME: ${{ steps.legacy.outcome }}
+        run: node --input-type=module -e 'import assert from "node:assert/strict";assert.equal(process.env.LEGACY_UPLOAD_OUTCOME,"failure");'
+      - name: Read the actual production action evidence selection
+        id: paths
+        run: |
+          node --input-type=module -e 'import assert from "node:assert/strict";import {readFileSync,appendFileSync} from "node:fs";import {parse} from "yaml";const action=parse(readFileSync("../.github/actions/rewrite-runtime/action.yml","utf8"));const step=action.runs.steps.find(step=>step.name==="Retain actual rejected-cohort measurements without granting admission");assert.equal(step.uses,"actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9");const paths=step.with.path.replaceAll("\u0024{{ runner.temp }}",process.env.RUNNER_TEMP);assert.ok(!paths.includes("\u0024{{"));appendFileSync(process.env.GITHUB_OUTPUT,"paths<<OWNED_EVIDENCE_PATHS\n"+paths+"\nOWNED_EVIDENCE_PATHS\n");'
+      - name: Execute the actual pinned uploader with the production evidence selection
+        id: current
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rejected-evidence-selected-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ steps.paths.outputs.paths }}
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require a successful immutable evidence artifact
+        env:
+          CURRENT_UPLOAD_OUTCOME: ${{ steps.current.outcome }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.current.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_DIGEST: ${{ steps.current.outputs.artifact-digest }}
+        run: node --input-type=module -e 'import assert from "node:assert/strict";assert.equal(process.env.CURRENT_UPLOAD_OUTCOME,"success");assert.match(process.env.EVIDENCE_ARTIFACT_ID,/^[0-9]+$/);assert.match(process.env.EVIDENCE_ARTIFACT_DIGEST,/^[a-f0-9]{64}$/);'
