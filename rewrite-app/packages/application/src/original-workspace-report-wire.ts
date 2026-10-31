@@ -100,7 +100,7 @@ const compareCategory = (left:string, right:string):number => {
   }
   return Buffer.compare(Buffer.from(left,'utf8'),Buffer.from(right,'utf8'));
 };
-const categoryKeys = (rows:OriginalReviewReportRecord[]):string[] => {
+export const originalReviewReportCategoryKeys = (rows:ReadonlyArray<Pick<OriginalReviewReportRecord,'categories'>>):string[] => {
   const keys:string[]=[];
   for (const row of rows) {
     // PHP empty('0') is true. Internal spaces still produce empty categories.
@@ -114,7 +114,7 @@ const categoryKeys = (rows:OriginalReviewReportRecord[]):string[] => {
 
 export function formatOriginalReviewReport(input:{rows:OriginalReviewReportRecord[]; format:OriginalReportFormat;
   useNewVersion:boolean; labels?:(bookletName:string,unitName:string)=>OriginalReportLabels}):string {
-  const keys=categoryKeys(input.rows);
+  const keys=originalReviewReportCategoryKeys(input.rows);
   const rows=input.rows.map(row => {
     const values=trim(row.categories).split(' ');
     const categories=Object.fromEntries(keys.map(key => {

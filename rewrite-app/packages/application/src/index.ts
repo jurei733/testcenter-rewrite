@@ -1,3 +1,6 @@
+import {readOriginalReviewReports,type OriginalReviewReportProjection} from './original-review-report.js';
+import {originalReviewReportCategoryKeys,encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {originalReviewHistoryUnavailable} from './original-review-record.js';
 import {createOriginalReviewPort} from './original-review.js';
 export * from './original-review.js';
 export * from './original-review-record.js';
@@ -16107,7 +16110,7 @@ type OriginalLogReportRow = {
   logentry: string;
 };
 
-type OriginalReviewReportRow = Record<string, string | number | boolean | null>;
+type OriginalReviewReportRow = Record<string, string | number | boolean | null | {readonly rawJSON:string}>;
 
 const formatOriginalLogReportCsv = (
   columns: string[],
@@ -16126,7 +16129,7 @@ const formatOriginalReviewReportCsv = (
         key,
         key.startsWith("category_") && typeof value === "boolean"
           ? (value ? "TRUE" : "FALSE")
-          : value
+          : key === "page" && value && typeof value === "object" && "rawJSON" in value ? value.rawJSON : value
       ])
     ))
   );
@@ -16295,6 +16298,7 @@ const buildOriginalReviewReportRows = (input: {
   reviews: WorkspaceReview[];
   contentReleases: ContentRelease[];
   groupKeys: string[];
+  nativeReviews?:OriginalReviewReportProjection[];
 }): { rows: OriginalReviewReportRow[]; categoryColumns: string[] } => {
   const contentReleasesById = new Map(
     input.contentReleases.map(release => [release.contentReleaseId, release])
@@ -16308,11 +16312,14 @@ const buildOriginalReviewReportRows = (input: {
     limit: 50_001,
     limitMaximum: 50_001
   });
-  const categories = Array.from(
+  const nativeById=new Map((input.nativeReviews??[]).map(row=>[row.reviewId,row]));
+  const categories = items.some(item=>nativeById.has(item.review.reviewId)) ? originalReviewReportCategoryKeys(items.map(item=>({categories:nativeById.get(item.review.reviewId)?.record.categories??item.review.categories.join(' ')}))) : Array.from(
     new Set(items.flatMap(item => item.review.categories))
   ).sort();
   const categoryColumns = categories.map(category => `category_${category}`);
   const rows = items.map(item => {
+    const native=nativeById.get(item.review.reviewId);
+    const selectedCategories=native?native.record.categories.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g,'').split(' '):item.review.categories;
     const testRun = item.testRun ? normalizeTestRun(item.testRun) : null;
     const unit = testRun
       ? resolveOriginalReportUnit({
@@ -16337,7 +16344,7 @@ const buildOriginalReviewReportRows = (input: {
       ...Object.fromEntries(
         categories.map(category => [
           `category_${category}`,
-          item.review.categories.includes(category)
+          selectedCategories.includes(category)
         ])
       ),
       reviewtime: toOriginalReportDateTime(item.review.createdAt),
@@ -16348,7 +16355,9 @@ const buildOriginalReviewReportRows = (input: {
       reviewer: item.review.reviewerId,
       entry: item.review.comment,
       unitlabel: unit.unitLabel,
-      bookletlabel: unit.bookletLabel
+      bookletlabel: unit.bookletLabel,
+      ...(native?Object.fromEntries(Object.entries(native.record).filter(([key])=>key!=='categories')):{}),
+      ...(native?native.labels:{})
     } satisfies OriginalReviewReportRow;
   });
   return { rows, categoryColumns };
@@ -16422,6 +16431,7 @@ const createOriginalResultArchive = (input: {
   testLogs: ParticipantTestLog[];
   activityEvents: WorkspaceActivityEvent[];
   contentReleases: ContentRelease[];
+  nativeReviews:OriginalReviewReportProjection[];
   nativeUnits: import("@testcenter-rewrite-app/domain").OriginalNativeUnit[];
 }): WorkspaceOriginalResultArchive => {
   const responseRows = input.groupKeys.length ? buildOriginalResponseReportRows(input) : [];
@@ -16515,7 +16525,7 @@ const createOriginalResultArchive = (input: {
     ["responses.csv", formatOriginalReportCsv(responseColumns, responsesCsvRows)],
     ["logs.json", JSON.stringify(logRows)],
     ["logs.csv", formatOriginalLogReportCsv(logColumns, logRows)],
-    ["reviews.json", JSON.stringify(reviewReport.rows)],
+    ["reviews.json", input.nativeReviews.length ? encodeOriginalReportJson(reviewReport.rows) : JSON.stringify(reviewReport.rows)],
     ["reviews.csv", formatOriginalReviewReportCsv(reviewColumns, reviewCsvRows)]
   ] as const;
   return {
@@ -31324,7 +31334,16 @@ export const createFirstSliceServices = (
         const nativeUnits = await readOriginalArchiveNativeUnits(repository, {
           tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,testRuns,participantSessions,groupKeys
         });
+        const nativeReviews:OriginalReviewReportProjection[]=[];
+        for(const person of participantSessions){
+          if(person.tenantId!==workspace.tenantId||person.workspaceId!==workspace.workspaceId||typeof person.originalLoginKey!=='string'||!groupKeys.includes(person.groupKey))continue;
+          const reports=await readOriginalReviewReports({repository,timeZone:participantAccessTimeZone,
+            labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)},person);
+          if(reports.some(row=>!groupKeys.some(key=>archiveUnitNamesEqual(key,row.record.groupname))))throw originalReviewHistoryUnavailable();
+          nativeReviews.push(...reports);
+        }
         return createOriginalResultArchive({
+          nativeReviews,
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           groupKeys,

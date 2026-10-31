@@ -7,7 +7,7 @@ import {join,resolve} from 'node:path';
 import test from 'node:test';
 import {DatabaseSync} from 'node:sqlite';
 import {Pool} from 'pg';
-import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
+import {createFirstSliceServices,OriginalReviewInteger} from '@testcenter-rewrite-app/application';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
@@ -164,12 +164,50 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
     await call('PUT',unitPath+'/review',{...body,page:'3'},400);await call('PUT',unitPath+'/review',{...body,page:{value:'3'}},400);
     const json=await call('GET','/reviews/export',undefined,200);assert.ok(json.text.includes('"page":-9223372036854775808'));
     const csv=await call('GET','/reviews/export',undefined,200,owner.token,'text/csv');assert.ok(csv.text.includes('-9223372036854775808'));assert.ok(!csv.text.includes('[object Object]'));
+    // This is the actual protected operator ZIP boundary, not a repository or
+    // authentication stub. Native participant credentials cannot authorize it.
+    const archivePath='/api/v1/tenants/'+encodeURIComponent(scope.tenantKey)+'/workspaces/'+encodeURIComponent(scope.workspaceKey)+'/exports/original-results.zip?groupKey=OWNED.GROUP';
+    assert.equal((await fetch(base+archivePath)).status,401);assert.equal((await fetch(base+archivePath,{headers:{AuthToken:owner.token}})).status,401);
+    const adminPassword='Owned archive operator password';const boot=await fetch(base+'/api/v1/admin/auth/bootstrap',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'owned-archive-root',password:adminPassword})});assert.equal(boot.status,201);
+    const signed=await fetch(base+'/api/v1/admin/auth/sign-in',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'owned-archive-root',password:adminPassword})});assert.equal(signed.status,200);const operator=await signed.json();assert.ok(operator.sessionToken);
+    const zipped=await fetch(base+archivePath,{headers:{Authorization:'Bearer '+operator.sessionToken}});assert.equal(zipped.status,200);assert.equal(zipped.headers.get('cache-control'),'private, no-store');assert.match(zipped.headers.get('content-type'),/^application\/zip/);
+    const zip=Buffer.from(await zipped.arrayBuffer());let zipOffset=0;const zipEntries=new Map();while(zip.readUInt32LE(zipOffset)===0x04034b50){const len=zip.readUInt32LE(zipOffset+18),names=zip.readUInt16LE(zipOffset+26),start=zipOffset+30+names+zip.readUInt16LE(zipOffset+28);zipEntries.set(zip.subarray(zipOffset+30,zipOffset+30+names).toString(),zip.subarray(start,start+len).toString());zipOffset=start+len;}
+    assert.ok(zipEntries.get('reviews.json').includes('"page":-9223372036854775808'));assert.ok(zipEntries.get('reviews.csv').includes('"-9223372036854775808"'));assert.ok(!zipEntries.get('reviews.csv').includes('[object Object]'));
     await call('DELETE',unitPath+'/review/'+id,undefined,204);await call('DELETE',unitPath+'/review/'+id,undefined,404);assert.equal((await call('GET',unitPath+'/reviews',undefined,200)).text,'[]');
     const before=JSON.parse((await call('GET',testPath+'/reviews',undefined,200)).text);
     await call('PUT',testPath+'/review',body,201);const after=JSON.parse((await call('GET',testPath+'/reviews',undefined,200)).text);assert.equal(after.length,before.length+1);
     const existing=new Set(before.map(row=>row.id)),testId=after.find(row=>!existing.has(row.id)).id;
     await call('PATCH',testPath+'/review/'+testId,{entry:'HTTP booklet edit',categories:'design'},200);await call('DELETE',testPath+'/review/'+testId,undefined,204);
    }finally{if(server){server.closeAllConnections?.();await new Promise(done=>server.close(done));}}
+  });
+  await t.test('operator Original ZIP preserves raw native Review fields, edited clock and PHP category identities',async()=>{
+   const peerRequest={token:peer.token,testNumber:peerNumber,unitName:'OWNED.UNIT'};
+   at='2026-10-31T18:54:25.000Z';
+   await services.originalReview.create({...peerRequest,body:{...body,entry:'Archive raw Ω',reviewer:null,categories:'1 01 0 tech  tech ',page:new OriginalReviewInteger('9007199254740993')}});
+   const nativeRows=await repository.listOriginalReviews(await services.originalReview.authorize({...peerRequest,write:false}));
+   const added=nativeRows.find(row=>row.entry==='Archive raw Ω');assert.ok(added);
+   at='2026-10-31T18:55:26.058Z';await services.originalReview.update({...peerRequest,reviewNumber:added.reviewNumber,body:{entry:'Archive raw edited Ω',reviewer:null,categories:'1 01 0 tech  tech ',priority:2,pagelabel:'Edited page Ω'}});
+   await reopen(); // Read raw integer/null/category metadata from the durable store.
+   const native=await services.originalReview.export({token:peer.token,format:'json'});assert.equal(native.status,200);assert.ok(native.body.includes('"page":9007199254740993'));
+   const archive=await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.GROUP']});
+   const entries=new Map();let offset=0;while(archive.body.readUInt32LE(offset)===0x04034b50){const length=archive.body.readUInt32LE(offset+18),nameLength=archive.body.readUInt16LE(offset+26),start=offset+30+nameLength+archive.body.readUInt16LE(offset+28);entries.set(archive.body.subarray(offset+30,offset+30+nameLength).toString('utf8'),archive.body.subarray(start,start+length).toString('utf8'));offset=start+length;}
+   const raw=entries.get('reviews.json');assert.ok(raw.includes('"page":9007199254740993'),'The operator JSON must retain the literal numeric page, without a rounded or null projection');
+   const parse=text=>JSON.parse(text,(key,value,context)=>key==='page'&&typeof value==='number'&&!Number.isSafeInteger(value)?{rawNumericToken:context.source}:value);
+   const expected=parse(native.body).find(row=>row.entry==='Archive raw edited Ω'),actual=parse(raw).find(row=>row.entry==='Archive raw edited Ω');assert.ok(expected&&actual);
+   assert.equal(expected.reviewtime,'2026-10-31 19:55:26');assert.equal(expected.reviewer,null);assert.equal(expected.priority,2);assert.equal(expected.category_1,true);assert.equal(Object.hasOwn(expected,'category_01'),false);
+   for(const [key,value]of Object.entries(expected))assert.deepEqual(actual[key],value,key);
+   assert.equal(Object.hasOwn(actual,'category_01'),false);
+   const csv=entries.get('reviews.csv');assert.ok(csv.startsWith('\uFEFF'));assert.ok(csv.includes('"9007199254740993"'));assert.ok(!csv.includes('[object Object]'));
+   const empty=await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:[]});let i=0;while(empty.body.readUInt32LE(i)===0x04034b50){const n=empty.body.readUInt16LE(i+26),start=i+30+n+empty.body.readUInt16LE(i+28),len=empty.body.readUInt32LE(i+18),name=empty.body.subarray(i+30,i+30+n).toString();if(name==='reviews.json')assert.equal(empty.body.subarray(start,start+len).toString(),'[]');i=start+len;}
+  });
+  await t.test('selected unknown native Review history fails closed while empty and unrelated group exports remain available',async()=>{
+   const known=(await repository.listWorkspaceReviewsByWorkspace(storeScope.tenantId,storeScope.workspaceId)).find(row=>row.participantSessionId===peer.participantSession.participantSessionId);assert.ok(known);
+   const legacy={...known,reviewId:randomUUID(),comment:'Owned legacy canonical Review'};await repository.saveWorkspaceReview(legacy);
+   assert.equal((await repository.getWorkspaceReviewById(legacy.reviewId)).comment,legacy.comment);
+   await assert.rejects(()=>services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.GROUP']}),error=>error.statusCode===409);
+   assert.ok((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:[]})).body.length>0);
+   assert.ok((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.UNKNOWN']})).body.length>0);
+   await repository.deleteWorkspaceReview(legacy.reviewId);
   });
  }finally{await storage?.shutdown();if(admin){await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);await admin.end();}await rm(directory,{recursive:true,force:true});}
 });
