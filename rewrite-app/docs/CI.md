@@ -3749,3 +3749,22 @@ artifact13025395638 proves its exact audit-stage stop at16 moderate reports.
 The other live jobs remain useful evidence. A changed dependency lock requires
 actual fresh native Source-family qualification and separate production admission;
 no historical certificate may be relabeled or reused as current qualification.
+
+
+### Development dependency security correction (2026-10-31)
+
+Exact overrides for glob14.0.2 and minimatch11.0.1 remove the two reviewed
+moderate advisories without a framework upgrade. The only changed lock entries
+are glob, minimatch, path-scurry, its lru-cache and the new nonrecursive matcher;
+all five are development-only. Angular CLI21.2.28, Angular core21.2.25,
+Material20.2.14, Playwright and the entire remaining resolved graph retain their
+actual previous records. A normal clean npm ci, actual production build and all
+367 policy cases (363 pass, four Linux-only skips on macOS) pass. The complete
+new locked audit reports zero vulnerabilities at lock
+20f914213a99024d838032f412219b5e1bf0e4c1a4726789c8f7010767c196ea.
+
+This lock has no production cohort certificate yet. The actual-current-graph
+policy case explicitly requires rejection before qualification; historical
+Source oracles and their real contexts remain unchanged. Fresh native material,
+Source-family comparisons, successful qualification provenance and separate
+actual offline production admission are required before this lock is accepted.
