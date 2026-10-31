@@ -5,7 +5,7 @@ const glyphs:Record<string,{viewBox:string;paths:string[]}>={"chevron_left":{"vi
 @Component({selector:'mat-icon[svgIcon]',standalone:true,
  host:{class:'mat-icon mat-icon-no-color',role:'img','aria-hidden':'true','data-mat-icon-type':'svg','[attr.data-mat-icon-name]':'svgIcon'},
  template:`@if(glyph){<svg [attr.viewBox]="glyph.viewBox" focusable="false" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">@for(path of glyph.paths;track $index){<path [attr.d]="path" />}</svg>}`,
- styles:[`:host{user-select:none;background-repeat:no-repeat;display:inline-block;fill:currentColor;height:24px;width:24px;overflow:hidden;flex-shrink:0}svg{width:100%;height:100%;fill:currentColor}`]})
+ styles:[`:host{user-select:none;background-repeat:no-repeat;display:inline-block;fill:currentColor;height:24px;width:24px;overflow:hidden}svg{width:100%;height:100%;fill:currentColor}`]})
 export class NativeMonitorIconComponent {
  @Input() svgIcon='';
  get glyph(){return glyphs[this.svgIcon];}
