@@ -27548,7 +27548,7 @@ export const createFirstSliceServices = (
     // Original accepts the XML attribute but stores an empty label as NULL.
     // Its Login construction then fails before checking the password. Keep
     // that invalid stored metadata visible; never invent a group-key label.
-    if (rosterEntry?.groupLabel === "") {
+    if (!nativeFirstFactor && rosterEntry?.groupLabel === "") {
       assertParticipantAccessWindow(rosterEntry, signInTimestamp);
       throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
     }
@@ -27580,6 +27580,15 @@ export const createFirstSliceServices = (
             maxFailures: participantLoginMaxFailures
           }
         );
+      }
+      // Source SessionController checks the failure cache before SessionDAO;
+      // getLogin then checks the absolute window before verifying the password.
+      // Preserve canonical participant credential-first behavior separately.
+      if (nativeFirstFactor) {
+        assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+        if (rosterEntry?.groupLabel === "") {
+          throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
+        }
       }
       const passwordHash = nativeCredential === undefined ? await repository.getParticipantRosterPasswordHash(
         workspace.tenantId,
