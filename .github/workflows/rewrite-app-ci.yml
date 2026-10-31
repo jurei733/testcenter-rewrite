@@ -307,10 +307,15 @@ jobs:
           retention-days: 30
 
   native-monitor-visual:
-    name: Native Monitor full-viewport Original parity
+    name: Native Monitor full-viewport Original parity (${{ matrix.scenario }})
     needs: [build, original-reference-build, browser-system-dependencies, fast-feedback]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        scenario: [baseline, selected-row, settings-menu]
     defaults:
       run:
         working-directory: rewrite-app
@@ -331,7 +336,7 @@ jobs:
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
           browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
           browser-system-certified-cohorts: "true"
-          browser-material-label: single
+          browser-material-label: ${{ strategy.job-index }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}
@@ -344,18 +349,20 @@ jobs:
       - name: Require exact Original self-control
         env:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-source-control
+          NATIVE_MONITOR_VISUAL_SCENE: ${{ matrix.scenario }}
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
-        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control
+        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$NATIVE_MONITOR_VISUAL_SCENE"
       - name: Require eight exact complete Original-to-Rewrite Monitor viewports
         env:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-visual
+          NATIVE_MONITOR_VISUAL_SCENE: ${{ matrix.scenario }}
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
-        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs
+        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$NATIVE_MONITOR_VISUAL_SCENE"
       - name: Retain complete native Monitor parity evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: native-monitor-parity-${{ github.sha }}-${{ github.run_attempt }}
+          name: native-monitor-parity-${{ matrix.scenario }}-${{ github.sha }}-${{ github.run_attempt }}
           include-hidden-files: true
           path: |
             ${{ runner.temp }}/native-monitor-capture-controls/

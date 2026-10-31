@@ -3663,29 +3663,39 @@ are unchanged. Actual successful native qualification and admission evidence
 remain necessary before any new cohort certificate is prepared.
 
 
-### Required native Monitor baseline (2026-10-31)
+### Required native Monitor viewports (2026-10-31)
 
-`native-monitor-visual` adds one required group after Fast feedback, the shared
-build, the authenticated browser-package producer and the pinned Original build.
-The existing 90 job instances remain; complete acceptance now requires 91.
-The new consumer uses the verified same-run application outputs and Original
-artifact, the existing offline runtime restoration and the normal headed locked
+`native-monitor-visual` adds three required matrix jobs after Fast feedback, the
+shared build, the authenticated browser-package producer and the pinned Original
+build. The existing 90 job instances remain; complete acceptance now requires93.
+The states are the baseline, one manually selected row and the open settings
+menu. Each consumer uses verified same-run application outputs and the Original
+artifact, existing offline runtime restoration and the normal headed locked
 browser. Its rendering reference comes from the authenticated format3 bundle or
 the unchanged native oracle embedded in a format4 certified bundle; oracle
 contexts are never relabeled.
 
-The group runs actual paint/layout negative controls, then eight Original
-self-control pairs and eight Original-to-Rewrite full-viewport pairs at 1280x720
-and390x844 with four fixed native polling-animation phases. Every capture still
-requires three identical independently repainted complete frames, and every pair
-requires zero differing RGBA pixels. A failure in self-control, missing Source
-files, changed source/build bytes, browser errors or any pixel difference fails
-the group and complete acceptance. Complete Source files (including hidden
-assets), original/rewrite HTML, PNGs, repaint witnesses and runtime-reference
-contexts are retained for30 days on success or failure.
+Each state runs actual paint/layout negative controls, then eight Original
+self-control pairs and eight Original-to-Rewrite full-viewport pairs at1280x720
+and390x844 with four fixed native polling-animation phases. The selection uses
+an actual trusted checkbox change, exactly one checked row and an enabled Pause
+button. Mobile selection waits for the real closed drawer and finished finite
+animations before clicking; it never sets document scroll or geometry. The menu
+opens through its real settings button. Every capture requires three identical
+independently repainted complete frames, and every pair requires zero differing
+RGBA pixels. A failure in self-control, missing Source files, changed source or
+build bytes, browser errors or any pixel difference fails that job and complete
+acceptance. Complete Source files (including hidden assets), original/rewrite
+HTML, PNGs, scene actions, repaint witnesses and runtime-reference contexts are
+retained for30 days on success or failure.
 
-This required group covers the baseline state only. Additional Monitor states,
-all eight broad visual rows, backend equivalence and complete Original parity
-remain open. The capture program is promoted from the independently verified
-native qualification41150306578; the production runtime path and format4
-reference selection are integration changes requiring fresh current-head CI.
+The native menu inherits the Original Material theme through its entry-scoped
+overlay class. Its buttons and content use the Source font, line height and box
+sizing; other interfaces retain their own styles. Controlled local Chrome
+captures reproduce zero differing pixels for all eight menu and eight selected
+row pairs. They explicitly use a diagnostic GPU-rasterization flag and do not
+qualify the default native browser. The baseline capture program was previously
+verified in native qualification41150306578; all three current scenes and the
+production runtime integration still require fresh current-head native CI.
+Additional Monitor states, all eight broad visual rows, backend equivalence and
+complete Original parity remain open.

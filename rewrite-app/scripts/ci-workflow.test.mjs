@@ -572,7 +572,7 @@ test('global early eligibility uses the complete accepted 60-row observation wit
  assert.equal(actual.length+data.model.SourceFamilies+data.model.databaseApi+data.model.databaseBrowser+data.model.checkpointSlots,20);
  assert.equal(workflow.jobs['original-browser-reference'].strategy.matrix.family.length,5);
  assert.equal(workflow.jobs['quick-extended'].strategy['max-parallel'],8);
- const instances=Object.values(workflow.jobs).reduce((n,job)=>n+(job.strategy?.matrix?.include?.length??job.strategy?.matrix?.family?.length??1),0);assert.equal(instances,91); // Keep all 89 recorded jobs, the native Quick gate and the additional full-viewport gate.
+ const instances=Object.values(workflow.jobs).reduce((n,job)=>n+(job.strategy?.matrix?.include?.length??job.strategy?.matrix?.family?.length??job.strategy?.matrix?.scenario?.length??1),0);assert.equal(instances,93); // Keep all 90 prior jobs and add three distinct full-viewport Monitor states.
  assert.deepEqual(qualificationEarly.needs,broadEarly.needs);
  assert.deepEqual(qualificationEarly.needs,['build','typecheck','dependencies','unit','browser-system-dependencies']);
  const ancestors=new Set();const visit=id=>{for(const need of[workflow.jobs[id].needs??[]].flat())if(!ancestors.has(need)){ancestors.add(need);visit(need);}};visit('quick-extended-long');
@@ -933,7 +933,7 @@ test('all v3 consumers use exact immutable producer format and digest and cannot
   assert.equal(step.with['browser-system-material-sha256'],'${{ needs.browser-system-dependencies.outputs.material-sha256 }}',name);
   assert.equal(step.with['browser-system-before-inventory-sha256'],'${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}',name);
   assert.equal(step.with['browser-system-certified-cohorts'],'true',name);
-  assert.equal(step.with['browser-material-label'],name==='native-monitor-visual'?'single':'${{ strategy.job-index }}',name);
+  assert.equal(step.with['browser-material-label'],'${{ strategy.job-index }}',name);
  }
  const qualification=workflow.jobs['browser-system-qualification'];
  const restore=qualification.steps.find(step=>step.run?.includes('ci-browser-system.mjs restore'));
@@ -1073,6 +1073,7 @@ test('native monitor keeps protected real-browser coverage and all numeric, reco
 
 test('complete native Monitor pixels are a required same-run Source and runtime consumer',()=>{
  const job=workflow.jobs['native-monitor-visual'];
+ assert.deepEqual(job.strategy.matrix.scenario,['baseline','selected-row','settings-menu']);assert.equal(job.strategy['fail-fast'],false);assert.equal(job.strategy['max-parallel'],3);
  assert.deepEqual(job.needs,['build','original-reference-build','browser-system-dependencies','fast-feedback']);
  assert.equal(job.env.UI_SMOKE_HEADFUL,'true');assert.equal(job['timeout-minutes'],15);
  assert.equal(job.defaults.run['working-directory'],'rewrite-app');assert.equal(job['continue-on-error'],undefined);
@@ -1084,12 +1085,12 @@ test('complete native Monitor pixels are a required same-run Source and runtime 
  assert.equal(download.with['digest-mismatch'],'error');assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
  const self=job.steps.find(step=>step.name==='Require exact Original self-control');
  const pair=job.steps.find(step=>step.name==='Require eight exact complete Original-to-Rewrite Monitor viewports');
- assert.equal(self.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control');
- assert.equal(pair.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs');
+ assert.equal(self.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$NATIVE_MONITOR_VISUAL_SCENE"');
+ assert.equal(pair.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$NATIVE_MONITOR_VISUAL_SCENE"');
  assert.ok(job.steps.indexOf(runtime)<job.steps.indexOf(self));assert.ok(job.steps.indexOf(self)<job.steps.indexOf(pair));
- for(const step of [self,pair]){assert.equal(step.env.ORIGINAL_BROWSER_REFERENCE_ROOT,download.with.path);assert.equal(step.if,undefined);assert.equal(step['continue-on-error'],undefined);}
+ for(const step of [self,pair]){assert.equal(step.env.NATIVE_MONITOR_VISUAL_SCENE,'${{ matrix.scenario }}');assert.equal(step.env.ORIGINAL_BROWSER_REFERENCE_ROOT,download.with.path);assert.equal(step.if,undefined);assert.equal(step['continue-on-error'],undefined);}
  const evidence=job.steps.find(step=>step.uses?.startsWith('actions/upload-artifact@'));
- assert.equal(evidence.if,'always()');assert.equal(evidence.with['include-hidden-files'],true);assert.equal(evidence.with['if-no-files-found'],'error');assert.equal(evidence.with['retention-days'],30);
+ assert.equal(evidence.with.name,'native-monitor-parity-${{ matrix.scenario }}-${{ github.sha }}-${{ github.run_attempt }}');assert.equal(evidence.if,'always()');assert.equal(evidence.with['include-hidden-files'],true);assert.equal(evidence.with['if-no-files-found'],'error');assert.equal(evidence.with['retention-days'],30);
  assert.ok(evidence.with.path.includes(download.with.path));assert.ok(evidence.with.path.includes(self.env.UI_SMOKE_ARTIFACT_DIR));assert.ok(evidence.with.path.includes(pair.env.UI_SMOKE_ARTIFACT_DIR));
  assert.ok(workflow.jobs.acceptance.needs.includes('native-monitor-visual'));
 });
