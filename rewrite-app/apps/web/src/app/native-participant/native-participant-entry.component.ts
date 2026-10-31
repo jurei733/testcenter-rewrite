@@ -17,6 +17,7 @@ import {OriginalFooterComponent} from '../original-footer.component';
 import {NativeLoginBrowserNoticeComponent} from '../native-login-browser-notice.component';
 import {AlertComponent} from '../native-monitor/shared/components/alert/alert.component';
 import {nativeLoginProblemText} from '../native-login-problem';
+import {NativeLoginFailureService} from '../native-login-failure.service';
 import {OriginalParticipantLogoutDialogComponent} from '../original-participant-logout-dialog.component';
 import {NativeStarterComponent} from './starter/native-starter.component';
 import {CodeInputComponent} from './shared/components/code-input/code-input.component';
@@ -26,7 +27,7 @@ import {CustomtextService} from './shared/services/customtext/customtext.service
 import type {CodeInputType} from './app.interfaces';
 @Component({selector:'app-native-participant-entry',standalone:true,
  imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,CodeInputComponent],
- providers:[AssetService,CustomtextService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
+ providers:[NativeLoginFailureService,AssetService,CustomtextService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
  template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(session.access()&&!session.busy()){<button matIconButton class="account-button" [matMenuTriggerFor]="accountMenu" aria-label="Nutzerinformationen"><mat-icon svgIcon="person" /></button><mat-menu #accountMenu="matMenu"><div class="account-heading">Nutzerinformationen</div><dl><dt>Anmeldename:</dt><dd>{{session.access()?.loginName}}</dd><dt>Gruppe:</dt><dd>{{session.access()?.groupLabel}}</dd></dl><button mat-menu-item (click)="logout()" data-cy="logout-button">Abmelden</button></mat-menu>}</div><div class="center"><h1>{{!session.access()?'Anmelden':!codeRequired?'Übersicht':settings.settings().appTitle}}</h1></div><div class="side logo"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></div></mat-toolbar></header>
  @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
  @if(session.restoring()||refreshing()){<p role="status">Sitzung wird geprüft …</p>}
@@ -46,6 +47,7 @@ export class NativeParticipantEntryComponent {
  private textScope:AbortSignal|undefined;
  private readonly clearTexts=()=>this.cts.restoreDefault(true);
  readonly passwordStep=signal(false);readonly problem=signal('');name='';password='';showPassword=false;
+ private readonly loginFailure=inject(NativeLoginFailureService);
  readonly loginProblem=signal('');readonly loginProblemCode=signal(0);readonly loginProblemLevel=signal<'error'|'warning'>('error');
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
@@ -77,6 +79,7 @@ export class NativeParticipantEntryComponent {
    if(!passwordStep){this.passwordStep.set(true);this.session.problem.set('');return;}
    const text=nativeLoginProblemText(error.status);
    if(text){this.passwordStep.set(false);this.name='';this.password='';this.loginProblem.set(text);this.loginProblemLevel.set('error');this.session.problem.set('');return;}
+   this.loginProblem.set('Problem bei der Anmeldung.');this.loginProblemLevel.set('error');this.session.problem.set('');await this.loginFailure.show(error,this.view.signal);return;
   }this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');}}
  async code(value:string){if(this.session.busy())return;this.problem.set('');try{const access=await this.session.person(value,this.view.signal);if(!this.view.signal.aborted&&this.session.access()===access)this.bindTexts(access.customTexts);}catch(error){if(!this.view.signal.aborted)this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');}}
  logout(){if(this.logoutCleanup||this.view.signal.aborted)return;const scope=this.session.accessSignal,ref=this.dialog.open(OriginalParticipantLogoutDialogComponent,{data:{safeMode:this.settings.settings().themeName==='Primar'},autoFocus:'dialog'}),subscriptions=new Subscription();

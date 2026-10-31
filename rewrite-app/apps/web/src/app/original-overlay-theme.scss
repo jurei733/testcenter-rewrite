@@ -18,6 +18,7 @@
 :root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog,
 :root[data-interface-mode='original'] .original-native-monitor-filter-options,
 :root[data-interface-mode='original'] .original-application-logo-tooltip,
+:root[data-interface-mode='original'] .original-native-login-error-dialog,
 :root[data-interface-mode='original'] .original-participant-error-dialog,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog {
   @include theme.apply();
@@ -30,6 +31,7 @@
 :root[data-interface-mode='original'] .original-native-monitor-filter-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-native-monitor-time-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog button.mat-mdc-button-base:hover,
+:root[data-interface-mode='original'] .original-native-login-error-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-error-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog button.mat-mdc-button-base:hover {
   transform: none;
@@ -45,6 +47,7 @@
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,
+:root[data-interface-mode='original'] .original-native-login-error-dialog,
 :root[data-interface-mode='original'] .original-participant-error-dialog,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog {
   color: var(--mat-sys-on-surface);
@@ -106,3 +109,7 @@
   font: revert; width: revert; border: revert; border-radius: revert;
   padding: revert; background: revert; color: revert; box-sizing: revert;
 }
+
+// This body-level Source dialog retains browser defaults beneath Material's own rules.
+:where(:root[data-interface-mode='original'] .original-native-login-error-dialog,
+       :root[data-interface-mode='original'] .original-native-login-error-dialog *){box-sizing:content-box}
