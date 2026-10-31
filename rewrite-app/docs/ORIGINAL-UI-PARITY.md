@@ -4374,5 +4374,24 @@ Default accelerated local Chrome still exhibits Original-vs-Original shadow
 variance. Disabling Graphite in a separate diagnostic also forced software
 rendering, so that experiment cannot isolate Graphite alone. Existing capture
 criteria, zero-pixel comparison, three consecutive complete frames, native
-browser modes and all broad visual acceptance rows remain unchanged. Default
-locked Linux browser qualification and fresh current-head reviews remain open.
+browser modes and all broad visual acceptance rows remain unchanged. Full Monitor scenario
+qualification and fresh current-head reviews remain open.
+
+The separate native qualification at `c0634a0f` completed successfully in
+[run 41150306578](https://github.com/jurei733/testcenter-rewrite/actions/runs/41150306578).
+It used actual Ubuntu image `20261026.354.1`, Node `22.23.4`, locked Chromium
+`147.0.7727.15`, the normal headed browser arguments and the unchanged pinned
+Original. Independent archive verification confirmed all 80 Original build
+files, eight exact full-viewport Source self-control pairs, eight exact
+Source-to-Rewrite pairs, all 32 final visual PNGs and 96 complete white repaint
+witnesses. The separate qualified native material retained its 591 file records,
+eight visible PNGs, 24 white PNGs and nine authenticated Debian archives.
+All 349 native policy checks, four native Debian controls and nine real
+WebSocket browser cases passed without skips; dependency audit found zero
+vulnerabilities. Source and compiled API hashes match the local font correction.
+The artifact includes hidden files because the initial successful job's upload
+omitted `assets/.browserslistrc`; that earlier archive is incomplete evidence.
+
+This proves the two baseline Monitor viewport states at their four polling
+animation phases. Full Monitor scenarios, all eight broad visual acceptance
+rows, Source-backend equivalence and complete Original parity remain open.

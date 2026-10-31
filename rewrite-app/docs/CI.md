@@ -3631,3 +3631,33 @@ SQLite journey through the complete unchanged review-comments prefix passes on
 the rebuilt application. API/domain/storage code is unchanged from the qualified
 3,036-test PostgreSQL application. A fresh complete 89-job run on the changed
 head is still required before main merge; this is not broad visual parity.
+
+
+### Observed AWS native runner archive profile (2026-10-31)
+
+The failed native image `20261018.96.1` job in
+[CI 41147780535](https://github.com/jurei733/testcenter-rewrite/actions/runs/41147780535/job/124378804786)
+retained a bounded public APT mirror profile before changing package sources.
+Its three lines contain the existing `us-east-2.ec2.archive.ubuntu.com` cloud
+archive plus the existing HTTPS archive and security endpoints. Reconstructing
+those public rows reproduces the actual 152-byte file and SHA-256
+`af9816b59bc904eaf28838ae673ac2b625b6628bebfc67a7cbeae78ba06e226a`.
+The fixture comes from artifact `13022148204`, ZIP SHA-256
+`9edb3e86000fe79cf9cd9857b5d714f745c69ab13ca596ab78a1c230fc3d4f47`.
+
+APT preference now recognizes exactly that complete observed AWS profile and
+the existing complete Azure profile. Each path only reorders its own three
+sources, preferring the two existing HTTPS endpoints while retaining its own
+cloud fallback. Other regions, lookalike or credential-bearing hosts, changed
+paths/ports, mixed cloud sets, extra archives and insecure options fail closed.
+All 324 legacy Azure order/priority/newline combinations retain byte-identical
+output against `f8cde3fd`; the original five control bodies remain unchanged.
+Fourteen focused controls pass. The complete current local policy command has
+358 tests: 354 pass, zero fail, and four native-Linux-only skips on macOS.
+
+This does not admit or qualify image18. Its original browser-route rejection
+remains a failure, and the existing artifact contains no successful native APT
+oracle or Source material. The exact-lock certificate registry, collector,
+archive authentication, native Debian controls and production admission rules
+are unchanged. Actual successful native qualification and admission evidence
+remain necessary before any new cohort certificate is prepared.
