@@ -572,7 +572,7 @@ test('global early eligibility uses the complete accepted 60-row observation wit
  assert.equal(actual.length+data.model.SourceFamilies+data.model.databaseApi+data.model.databaseBrowser+data.model.checkpointSlots,20);
  assert.equal(workflow.jobs['original-browser-reference'].strategy.matrix.family.length,5);
  assert.equal(workflow.jobs['quick-extended'].strategy['max-parallel'],8);
- const instances=Object.values(workflow.jobs).reduce((n,job)=>n+(job.strategy?.matrix?.include?.length??job.strategy?.matrix?.family?.length??job.strategy?.matrix?.scenario?.length??1),0);assert.equal(instances,93); // Keep all 90 prior jobs and add three distinct full-viewport Monitor states.
+ const instances=Object.values(workflow.jobs).reduce((n,job)=>n+(job.strategy?.matrix?.include?.length??job.strategy?.matrix?.family?.length??job.strategy?.matrix?.scenario?.length??1),0);assert.equal(instances,97); // Keep all 90 prior jobs and add seven distinct full-viewport Monitor states.
  assert.deepEqual(qualificationEarly.needs,broadEarly.needs);
  assert.deepEqual(qualificationEarly.needs,['build','typecheck','dependencies','unit','browser-system-dependencies']);
  const ancestors=new Set();const visit=id=>{for(const need of[workflow.jobs[id].needs??[]].flat())if(!ancestors.has(need)){ancestors.add(need);visit(need);}};visit('quick-extended-long');
@@ -1073,7 +1073,7 @@ test('native monitor keeps protected real-browser coverage and all numeric, reco
 
 test('complete native Monitor pixels are a required same-run Source and runtime consumer',()=>{
  const job=workflow.jobs['native-monitor-visual'];
- assert.deepEqual(job.strategy.matrix.scenario,['baseline','selected-row','settings-menu']);assert.equal(job.strategy['fail-fast'],false);assert.equal(job.strategy['max-parallel'],3);
+ assert.deepEqual(job.strategy.matrix.scenario,['baseline','selected-row','settings-menu','new-filter-dialog','filter-target-menu','filter-value-options','advanced-filter-dialog']);assert.equal(job.strategy['fail-fast'],false);assert.equal(job.strategy['max-parallel'],3);
  assert.deepEqual(job.needs,['build','original-reference-build','browser-system-dependencies','fast-feedback']);
  assert.equal(job.env.UI_SMOKE_HEADFUL,'true');assert.equal(job['timeout-minutes'],15);
  assert.equal(job.defaults.run['working-directory'],'rewrite-app');assert.equal(job['continue-on-error'],undefined);

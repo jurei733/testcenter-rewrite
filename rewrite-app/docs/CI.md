@@ -3720,3 +3720,32 @@ but the new-filter dialog still differs35,667 desktop and32,647 mobile pixels.
 Its inherited global Material theme, typography and form geometry need a scoped
 correction and fresh qualification. Additional Monitor states, all eight broad
 visual rows, backend equivalence and complete Original parity remain open.
+
+
+### Native Monitor filter dialog states (2026-10-31)
+
+The native filter dialog and its select/autocomplete portals now receive scoped
+Original Material tokens and the pinned dialog overrides. Its zero-specificity
+content-box defaults preserve Material's own explicit border-box rules. The
+existing synchronous form initialization, cloned edit data, view-owned providers,
+access retirement and cleanup stay intact. Four additional matrix states cover
+the new dialog, field options, real Booklet-label completion and advanced mode;
+all90 old jobs and the three Monitor states remain, requiring97 total jobs.
+
+Controlled local Chrome diagnostics at eeade9b1 verify all32 complete RGBA pairs
+with zero differing pixels,192 white repaint witnesses and current407 frontend
+hashes. They use the disclosed diagnostic GPU-rasterization flag; default native
+qualification is still required. The first field-options diagnostic measured its
+Source anchor during the dialog's80% entry scale. Waiting for actual identity
+and finished finite animations before interaction yields8/8 exact pairs without
+setting overlay geometry. Source does not populate personLabel completions;
+the completion case uses the authored Booklet field and its actual one option.
+No Source edits, masks, expected-image selection or deadlines are introduced.
+
+The existing1ca445d2 full CI41156270521 observes real unqualified image18 in two
+consumers. Their admission gates fail before browser tests; Fast feedback and the
+new visual matrix consequently cannot qualify. The failure-only measurement
+artifact13025395638 proves its exact audit-stage stop at16 moderate reports.
+The other live jobs remain useful evidence. A changed dependency lock requires
+actual fresh native Source-family qualification and separate production admission;
+no historical certificate may be relabeled or reused as current qualification.
