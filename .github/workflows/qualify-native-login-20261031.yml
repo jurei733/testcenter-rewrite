@@ -30,6 +30,19 @@ jobs:
         run: node --test scripts/native-login-qualification-slices.test.mjs
       - name: Prepare owned qualification evidence
         run: mkdir -p "$RUNNER_TEMP/rejected-diagnostic-qualification"
+      - name: Record independent hosted image metadata without overriding runtime identity
+        run: |
+          node --input-type=module <<'JS' > "$RUNNER_TEMP/rejected-diagnostic-qualification/runner-identity.json"
+          import assert from 'node:assert/strict';
+          import {readFile,lstat} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          const sources={};
+          for(const path of ['/imagegeneration/imagedata.json','/etc/os-release']){
+            try{const stat=await lstat(path);assert.ok(stat.isFile()&&!stat.isSymbolicLink()&&stat.size<=65536);const bytes=await readFile(path);sources[path]={sha256:createHash('sha256').update(bytes).digest('hex'),text:bytes.toString('utf8')};}
+            catch(error){if(error.code!=='ENOENT')throw error;sources[path]={missing:true};}
+          }
+          console.log(JSON.stringify({imageOS:process.env.ImageOS,imageVersion:process.env.ImageVersion,commit:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,runAttempt:process.env.GITHUB_RUN_ATTEMPT,node:process.version,platform:process.platform,arch:process.arch,sources}));
+          JS
       - name: Exercise the diagnostic's actual owned Node mode correction
         run: node --input-type=module -e 'import {exerciseOwnedRejectedNode} from "./scripts/measure-rejected-native-cohort.mjs"; console.log(JSON.stringify(await exerciseOwnedRejectedNode(process.cwd())));' > "$RUNNER_TEMP/rejected-diagnostic-qualification/node-mode.json"
       - name: Preserve all native policy checks including real timeout escalation
