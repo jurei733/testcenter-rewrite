@@ -1,10 +1,50 @@
 import assert from 'node:assert/strict';
 
-export const monitorVisualScenes=Object.freeze(['baseline','selected-row','settings-menu','new-filter-dialog','filter-target-menu','filter-value-options','advanced-filter-dialog']);
+export const monitorVisualScenes=Object.freeze(['baseline','selected-row','settings-menu','new-filter-dialog','filter-target-menu','filter-value-options','advanced-filter-dialog','finish-dialog','time-dialog','time-dialog-edited']);
 
 export async function prepareMonitorVisualScene(page,scene,screen) {
   assert.ok(monitorVisualScenes.includes(scene),'Unknown native Monitor visual scene');
   if(scene==='baseline')return {scene};
+  if(scene==='finish-dialog'){
+    await page.locator('[data-cy=GM_end_button]').click();await page.getByRole('dialog').waitFor();
+    await page.locator('[data-cy=dialog-confirm]').waitFor();await page.locator('[data-cy=dialog-cancel]').waitFor();
+    return {scene};
+  }
+  if(scene.startsWith('time-dialog')){
+    const finite=()=>page.waitForFunction(()=>document.getAnimations().every(animation=>
+      !Number.isFinite(animation.effect?.getTiming().iterations)||animation.playState==='finished'),{},{timeout:2000});
+    // The real full view exposes the timed block selector. Seeded native Test
+    // state expires this block; no component or DOM state is patched here.
+    await page.locator('[data-cy=GM_setting_button]').click();await page.getByRole('menu').waitFor();
+    await page.locator('[data-cy=GM_activity_button]').hover();await page.locator('[data-cy=GM_display_option_full]').click();
+    await page.locator('tc-test-session [data-cy=gm-testlet-select]').first().waitFor();
+    await page.locator('tc-test-session [svgicon=timer_off]').first().waitFor();
+    if(screen==='mobile'){
+      await page.locator('.drawer-button-open').click();
+      await page.waitForFunction(()=>{const drawer=document.querySelector('.mat-drawer');return drawer&&getComputedStyle(drawer).visibility==='hidden'&&!drawer.classList.contains('mat-drawer-opened');});await finite();
+    }
+    await page.locator('tc-test-session [data-cy=gm-testlet-select]').first().click();
+    await page.waitForFunction(()=>{const button=document.querySelector('[data-cy=GM_jump_button]');return button&&!button.disabled;});
+    if(screen==='mobile'){
+      await page.locator('.drawer-button-close').click();
+      await page.waitForFunction(()=>{const drawer=document.querySelector('.mat-drawer');return drawer&&getComputedStyle(drawer).visibility==='visible'&&drawer.classList.contains('mat-drawer-opened');});await finite();
+    }
+    await page.locator('[data-cy=GM_jump_button]').click();await page.locator('#setTimer').waitFor();await finite();
+    assert.equal(await page.locator('#setTimer').inputValue(),'10');
+    const inputEvents=[];
+    if(scene==='time-dialog-edited'){
+      await page.evaluate(()=>{
+        window.__ownedVisualTimerInputs=[];
+        document.querySelector('#setTimer').addEventListener('input',event=>window.__ownedVisualTimerInputs.push({trusted:event.isTrusted,value:event.target.value}));
+      });
+      await page.locator('#setTimer').fill('5');
+      inputEvents.push(...await page.evaluate(()=>window.__ownedVisualTimerInputs));
+      assert.deepEqual(inputEvents,[{trusted:true,value:'5'}]);
+    }
+    const input=await page.locator('#setTimer').evaluate(input=>({value:input.value,type:input.type,min:input.min,max:input.max,valid:input.validity.valid}));
+    assert.deepEqual(input,{value:scene==='time-dialog-edited'?'5':'10',type:'number',min:'1',max:'10',valid:true});
+    return {scene,input,inputEvents};
+  }
   if(scene==='settings-menu'){
     await page.locator('[data-cy=GM_setting_button]').click();
     await page.getByRole('menu').waitFor();
