@@ -80,7 +80,7 @@ test('the actual failure-only action preserves every previously qualified runtim
  assert.equal(added[1].if,"always() && inputs.playwright == 'true' && inputs.browser-system-certified-cohorts == 'true' && steps.browser-route.outcome == 'failure'");
  assert.ok(added.every(step=>step['continue-on-error']===undefined));
  assert.equal(added[0].run,'node scripts/measure-rejected-native-cohort.mjs');
- assert.equal(added[1].with.path,'${{ runner.temp }}/rejected-native-measurement/');
+ assert.deepEqual(added[1].with.path.trim().split('\n'),['*.json','*.log','supervision/','native-browser-system/','browser-material-*/'].map(path=>'${{ runner.temp }}/rejected-native-measurement/'+path));
  assert.ok(added[1].with.name.endsWith('-${{ github.run_attempt }}'));assert.equal(added[1].with.overwrite,undefined);
 });
 test('actual native measurement commands preserve exit status and GNU timeout terminates a child ignoring TERM',
