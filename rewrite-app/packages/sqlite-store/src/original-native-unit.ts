@@ -3,7 +3,7 @@ import type {OriginalNativeUnit,TestRun} from '@testcenter-rewrite-app/domain';
 import {assertOriginalUnitInput,assertOriginalUnitRecord,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitParentMatches,resultParentUnavailable,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from '@testcenter-rewrite-app/application';
 import {withResultArtifactParent} from './result-artifact-parent.js';
 import type {DatabaseSync} from 'node:sqlite';
-function read(database:DatabaseSync,input:OriginalUnitInput):OriginalNativeUnit|null{
+export function readOriginalNativeUnitInTransaction(database:DatabaseSync,input:OriginalUnitInput):OriginalNativeUnit|null{
  const parent=database.prepare(`SELECT 1 FROM test_runs t JOIN participant_sessions p ON p.participant_session_id=t.participant_session_id AND p.tenant_id=t.tenant_id AND p.workspace_id=t.workspace_id AND p.content_release_id=t.content_release_id
   WHERE t.test_run_id=? AND t.participant_session_id=? AND t.tenant_id=? AND t.workspace_id=? AND t.content_release_id=?`).get(input.testRunId,input.participantSessionId,input.tenantId,input.workspaceId,input.contentReleaseId);
  if(!parent)throw resultParentUnavailable();
@@ -19,11 +19,11 @@ function read(database:DatabaseSync,input:OriginalUnitInput):OriginalNativeUnit|
  const unit=JSON.parse(String(row.unit_json)) as OriginalNativeUnit;assertOriginalUnitRecord(unit);if(!originalUnitParentMatches(input,unit)||unit.unitName!==name)throw resultParentUnavailable();return unit;
 }
 export function readOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput):OriginalNativeUnit|null{
- assertOriginalUnitInput(input);return withResultArtifactParent(database,input,()=>read(database,input));
+ assertOriginalUnitInput(input);return withResultArtifactParent(database,input,()=>readOriginalNativeUnitInTransaction(database,input));
 }
 export function mutateOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput,transform:OriginalUnitTransform):OriginalNativeUnit|null{
  assertOriginalUnitInput(input);return withResultArtifactParent(database,input,()=>{
-  const previous=read(database,input),effect=prepareOriginalUnitMutation(input,previous,transform);
+  const previous=readOriginalNativeUnitInTransaction(database,input),effect=prepareOriginalUnitMutation(input,previous,transform);
   if(effect.unit){const unit=effect.unit;database.prepare(`INSERT INTO original_native_units(test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,unit_name,unit_json) VALUES(?,?,?,?,?,?,?)
    ON CONFLICT(test_run_id,unit_name) DO UPDATE SET unit_json=excluded.unit_json`).run(unit.testRunId,unit.participantSessionId,unit.tenantId,unit.workspaceId,unit.contentReleaseId,unit.unitName,JSON.stringify(unit));}
   for(const log of effect.logs)database.prepare(`INSERT INTO participant_test_logs(participant_test_log_id,tenant_id,workspace_id,participant_session_id,test_run_id,unit_key,original_unit_id,log_key,log_content,timestamp,recorded_at,original_timestamp)

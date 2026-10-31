@@ -1,3 +1,7 @@
+import {createOriginalReviewPort} from './original-review.js';
+export * from './original-review.js';
+export * from './original-review-record.js';
+export * from './original-review-collections.js';
 export {prepareOriginalMonitorSelectedLock,changeOriginalMonitorLockCollection} from './original-monitor-lock.js';
 export type {OriginalMonitorLockResult,OriginalMonitorLockTarget} from './original-monitor-lock.js';
 import {collectOriginalMonitorProfiles} from './original-monitor-profile.js';
@@ -1314,6 +1318,7 @@ export type FirstSlicePorts = {
   originalCommand: import('./original-command.js').OriginalCommandPort;
   originalMonitor: import('./original-monitor.js').OriginalMonitorPort;
   originalUnit:import('./original-unit.js').OriginalUnitPort;
+  originalReview:import('./original-review.js').OriginalReviewPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
   monitorRead: MonitorReadPort;
@@ -1647,6 +1652,9 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   getOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   mutateOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput, transform: import('./original-unit-record.js').OriginalUnitTransform): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   listOriginalUnitsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalNativeUnit[]>;
+  listOriginalReviews(scope:import('./original-review-record.js').OriginalReviewScope):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
+  mutateOriginalReview(scope:import('./original-review-record.js').OriginalReviewScope,operation:import('./original-review-record.js').OriginalReviewMutation):Promise<import('./original-review-record.js').OriginalNativeReview|null>;
+  listOriginalReviewsByPerson(scope:{participantSessionId:string;tenantId:string;workspaceId:string}):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
   getOriginalGroupResultInventory(tenantId: string, workspaceId: string): Promise<import('./original-group-results.js').OriginalGroupResultInventory>;
   /** Atomically delete native group snapshots, current session descendants and capabilities. */
   deleteOriginalGroupResults(input: import('./original-group-deletion.js').OriginalGroupDeletionInput): Promise<import('./original-group-deletion.js').OriginalGroupDeletionResult | null>;
@@ -32618,6 +32626,7 @@ export const createFirstSliceServices = (
     participantAccess,
     originalAuthentication,
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
+    originalReview:createOriginalReviewPort({auth:originalAuthentication,repository,now,id:idGenerator,timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
     originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator}),
     originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository,now,id:idGenerator,
       async profiles(actor){const entry=(await operationalDefinition(actor,actor.originalLoginKey))?.definition;

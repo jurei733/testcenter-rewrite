@@ -1,3 +1,4 @@
+import {runNativeParticipantReviewSmoke} from './native-participant-review-smoke.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
@@ -16,7 +17,12 @@ const collect=async path=>{const files=[];for(const entry of await readdir(join(
 const sourceFiles=await collect('apps/web/src');
 const hashSources=async()=>Object.fromEntries(await Promise.all(sourceFiles.map(async path=>[path,createHash('sha256').update(await readFile(join(app,path))).digest('hex')])));
 const sourceHashes=await hashSources();
-const qualificationFiles=['scripts/smoke-native-participant.mjs','scripts/native-participant-server.mjs','apps/api/src/index.ts','apps/api/dist/apps/api/src/index.js'];
+const qualificationFiles=['scripts/smoke-native-participant.mjs','scripts/native-participant-review-smoke.mjs','scripts/native-participant-server.mjs','apps/api/src/index.ts','apps/api/dist/apps/api/src/index.js'];
+for(const [name,files]of [['application',['index','original-group-deletion','original-test-files','original-workspace-report-wire','original-review-record','original-review-collections','original-review']],['memory-store',['index']],['file-store',['index']],['sqlite-store',['index','original-native-unit','original-native-review']],['postgres-store',['index','original-native-unit','original-native-review']]]){
+ for(const file of files)qualificationFiles.push(`packages/${name}/src/${file}.ts`,`packages/${name}/dist/packages/${name}/src/${file}.js`);
+}
+qualificationFiles.push('apps/api/src/original-review-http.ts','apps/api/dist/apps/api/src/original-review-http.js');
+
 const hashQualification=async()=>Object.fromEntries(await Promise.all(qualificationFiles.map(async path=>[path,createHash('sha256').update(await readFile(join(app,path))).digest('hex')])));
 const qualificationHashes=await hashQualification();
 const mod=async name=>import(pathToFileURL(require.resolve(name)).href);
@@ -49,9 +55,9 @@ await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.UNIT</Id><Label>Owned Un
 await upload('booklet.xml',xml('Booklet','<Metadata><Id>OWNED.BROWSER</Id><Label>Owned Native Booklet</Label></Metadata><Units><Unit id="OWNED.UNIT" label="Owned Unit"/><Unit id="OWNED.UNIT" alias="OWNED.SECOND" label="Owned Second Unit"/></Units>'));
 await upload('other-booklet.xml',xml('Booklet','<Metadata><Id>OWNED.OTHER</Id><Label>Owned Other Booklet</Label></Metadata><BookletConfig><Config key="toolbar_show_time_left">TRUE</Config></BookletConfig><Units><Testlet id="OWNED.FIRST" label="Owned First Block"><Restrictions><TimeMax minutes="10"/></Restrictions><Unit id="OWNED.UNIT" label="Owned Other Unit"/></Testlet><Testlet id="OWNED.LAST" label="Owned Last Block"><Restrictions><TimeMax minutes="10"/></Restrictions><Unit id="OWNED.UNIT" alias="OWNED.OTHER.SECOND" label="Owned Other Second Unit"/></Testlet></Units>'));
 const password='Owned native auth password';
-await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers',`<Metadata/><CustomTexts><CustomText key="booklet_pausedmessage">Owned remote pause Ω</CustomText></CustomTexts><Profiles><GroupMonitor><Profile id="full" label="Vollständig" view="full" groupColumn="show"/></GroupMonitor></Profiles><Group id="OWNED.AUTH" label="Owned Native Group"><Login name="native-monitor" pw="${password}" mode="monitor-group"><Profile id="full"/></Login><Login name="native-code" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login><Login name="native-direct" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login><Login name="native-seed" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group>`)});
+await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers',`<Metadata/><CustomTexts><CustomText key="booklet_pausedmessage">Owned remote pause Ω</CustomText></CustomTexts><Profiles><GroupMonitor><Profile id="full" label="Vollständig" view="full" groupColumn="show"/></GroupMonitor></Profiles><Group id="OWNED.AUTH" label="Owned Native Group"><Login name="native-monitor" pw="${password}" mode="monitor-group"><Profile id="full"/></Login><Login name="native-code" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login><Login name="native-direct" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login><Login name="native-seed" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group><Group id="OWNED.REVIEWS" label="Owned Native Review Group"><Login name="native-review-trial" pw="${password}" mode="run-trial"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login><Login name="native-review-review" pw="${password}" mode="run-review"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login></Group>`)});
 const seed=await services.originalSession.login({name:'native-seed',password:''});await services.originalTest.create({token:seed.token,bookletName:'OWNED.BROWSER'});await storage.shutdown();
-const {DatabaseSync}=await import('node:sqlite'),db=new DatabaseSync(file);assert.equal(db.prepare('UPDATE original_test_number_counter SET last_number=? WHERE singleton=1').run('9007199254740992').changes,1);assert.equal(db.prepare('UPDATE original_native_command_counter SET last_number=? WHERE singleton=1').run('9007199254740992').changes,1);db.close();
+const {DatabaseSync}=await import('node:sqlite'),db=new DatabaseSync(file);assert.equal(db.prepare('UPDATE original_test_number_counter SET last_number=? WHERE singleton=1').run('9007199254740992').changes,1);assert.equal(db.prepare('UPDATE original_native_command_counter SET last_number=? WHERE singleton=1').run('9007199254740992').changes,1);assert.equal(db.prepare('UPDATE original_native_review_counters SET last_number=?').run('9007199254740992').changes,2);db.close();
 const checks=[],errors=[],wire=[],consoleErrors=[],responseReceipts=[],commandReceipts=[],resourceReceipts=[],monitorWire=[],serverMessages=[];let server,browser,page,monitor;
 const mark=name=>{checks.push(name);console.log('native_participant_ui='+name+':passed');reportSmokePhase(name);};
 try{
@@ -199,6 +205,7 @@ try{
  assert.equal((await terminalLog).status(),201);assert.deepEqual(errors.slice(commandErrorStart),[]);
  mark('remote-termination-persists-its-command-executed-log-after-the-owned-starter-navigation');
  await monitor.close();monitor=undefined;
+ await runNativeParticipantReviewSmoke({browser,base,password,out,mark,errors});
 
  assert.deepEqual(consoleErrors.filter(x=>/NG\d{4}|TypeError|ReferenceError|SyntaxError|Error retrieving icon/.test(x)),[]);
  assert.deepEqual(await hashSources(),sourceHashes);assert.deepEqual(await hashQualification(),qualificationHashes,'Participant harness and actual API build must remain unchanged during qualification');

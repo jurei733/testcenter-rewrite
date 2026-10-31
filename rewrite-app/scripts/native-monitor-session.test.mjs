@@ -217,3 +217,24 @@ test('destroying or replacing the native starter scope rejects late create recei
   }finally{f.close();}
  }
 });
+
+test('native Starter review export sends exact CSV Accept, UTF-8 BOM and the captured native credential',()=>fixture(async()=>{
+ const claims={...participant('reviewer'),claims:{test:[],review:[]}},requests=[];
+ globalThis.fetch=async(path,options)=>{requests.push({path,options});return response(path==='/session/login'?claims:'\uFEFF"Exact native Ω"\n');};
+ const session=new NativeMonitorSessionService();await session.loginParticipant('owned','password');
+ assert.equal(await session.exportReviews(new AbortController().signal),'\uFEFF"Exact native Ω"\n');
+ const last=requests.at(-1);assert.equal(last.path,'/reviews/export');assert.equal(last.options.headers.Accept,'text/csv');assert.equal(last.options.headers.AuthToken,'reviewer');assert.equal(last.options.credentials,'omit');assert.equal(last.options.redirect,'error');
+}));
+test('native Starter export rejects a missing review claim before any download request',()=>fixture(async()=>{
+ const requests=[];globalThis.fetch=async path=>{requests.push(path);return response(participant('trial'));};
+ const session=new NativeMonitorSessionService();await session.loginParticipant('owned','password');await assert.rejects(session.exportReviews(new AbortController().signal),/keine Reviews/);assert.deepEqual(requests,['/session/login']);
+}));
+test('native Starter CSV completion cannot cross a retired view or replacement actor',()=>fixture(async(values,tabValues)=>{
+ for(const retirement of ['view','actor']){
+  values.clear();tabValues.clear();
+  const pending=deferred(),owner=new AbortController();let downloadSignal;
+  globalThis.fetch=async(path,options)=>{if(path==='/session/login')return response({...participant('reviewer'),claims:{test:[],review:[]}});downloadSignal=options.signal;return pending.promise;};
+  const session=new NativeMonitorSessionService();await session.loginParticipant('owned','password');const downloading=session.exportReviews(owner.signal),rejected=assert.rejects(downloading,{name:'AbortError'});
+  if(retirement==='view')owner.abort();else session.clear();assert.equal(downloadSignal.aborted,true);pending.resolve(response('Private old CSV'));await rejected;
+ }
+}));

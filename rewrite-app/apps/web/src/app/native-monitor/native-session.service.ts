@@ -119,14 +119,23 @@ export class NativeMonitorSessionService {
   for(const group of this.finishTargets.keys())if(!access.claims.testGroupMonitor?.some(claim=>claim.id===group))this.rememberFinishTargets(group,[]);
  }
  clear(){this.finishTargets.clear();try{sessionStorage.removeItem(finishKey);}catch{}this.loginController?.abort();this.loginController=null;this.renewAccessScope();this.revision++;this.restoring.set(false);this.busy.set(false);this.access.set(null);this.purpose.set('monitor');try{localStorage.removeItem(key);localStorage.removeItem(purposeKey);}catch{}}
+ async exportReviews(owner:AbortSignal):Promise<string>{
+  owner.throwIfAborted();
+  const access=this.access(),scope=this.accessSignal;
+  if(!access||scope.aborted||!Object.hasOwn(access.claims,'review'))throw new Error('Dieser Zugang kann keine Reviews herunterladen.');
+  const text=await this.readText('GET','/reviews/export',undefined,access.token,false,owner,scope,true,undefined,'text/csv',true);
+  owner.throwIfAborted();scope.throwIfAborted();return text;
+ }
  async text(method:string,path:string,body?:unknown,token=this.access()?.token??'',rawBody=false,signal?:AbortSignal,subscribeToken?:(value:string|null)=>void):Promise<string>{
   const scope=token&&token===this.access()?.token?this.accessSignal:undefined;
   return this.readText(method,path,body,token,rawBody,signal,scope,true,subscribeToken);
  }
- private async readText(method:string,path:string,body:unknown,token:string,rawBody:boolean,signal?:AbortSignal,scope?:AbortSignal,invalidate=true,subscribeToken?:(value:string|null)=>void):Promise<string>{
+ private async readText(method:string,path:string,body:unknown,token:string,rawBody:boolean,signal?:AbortSignal,scope?:AbortSignal,invalidate=true,subscribeToken?:(value:string|null)=>void,accept='application/json',preserveBom=false):Promise<string>{
   const signals=[AbortSignal.timeout(20000),...(signal?[signal]:[]),...(scope?[scope]:[])];
-  const response=await fetch(path,{method,headers:{Accept:'application/json',...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:rawBody?String(body):JSON.stringify(body)}),signal:AbortSignal.any(signals),cache:'no-store',credentials:'omit',redirect:'error'});
-  const text=await response.text();scope?.throwIfAborted();if(!response.ok){
+  const response=await fetch(path,{method,headers:{Accept:accept,...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:rawBody?String(body):JSON.stringify(body)}),signal:AbortSignal.any(signals),cache:'no-store',credentials:'omit',redirect:'error'});
+  // Response.text() removes the Source CSV's UTF-8 BOM. Preserve it when
+  // recreating that file; ordinary JSON/error text keeps its existing decoder.
+  const text=preserveBom?new TextDecoder('utf-8',{ignoreBOM:true}).decode(await response.arrayBuffer()):await response.text();scope?.throwIfAborted();if(!response.ok){
    if(invalidate&&[401,403].includes(response.status)&&token&&token===this.access()?.token)this.clear();
    throw new NativeMonitorHttpError(response.status,token?text.replaceAll(token,'[redacted]'):text,{url:response.url,statusText:response.statusText,errorId:response.headers.get('error-id'),testMode:response.headers.get('test-mode')});
   }subscribeToken?.(response.headers.get('SubscribeToken'));return text;

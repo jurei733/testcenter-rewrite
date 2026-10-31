@@ -5,7 +5,7 @@ import {createRequire} from 'node:module';
 import ts from 'typescript';
 import {Subject} from 'rxjs';
 const require=createRequire(import.meta.url),load=path=>{const exports={};const source=readFileSync(new URL('../apps/web/src/app/'+path,import.meta.url),'utf8');const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;new Function('exports','require',code)(exports,require);return exports;};
-const {observeNativeRealtime}=load('native-realtime.ts'),{parseNativeParticipantBroadcast}=load('native-participant/native-wire.ts'),{parseNativeMonitorBroadcast}=load('native-monitor/native-monitor-wire.ts');
+const {observeNativeRealtime}=load('native-realtime.ts'),{parseNativeParticipantBroadcast,parseNativeParticipantJson}=load('native-participant/native-wire.ts'),{parseNativeMonitorBroadcast}=load('native-monitor/native-monitor-wire.ts');
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 function setup(t,read,extras={}){
  const previous={socket:globalThis.WebSocket,location:globalThis.location};const sockets=[];
@@ -44,4 +44,13 @@ test('malformed subscription headers cannot become a WebSocket URL',async t=>{
 test('Source event envelopes retain actual signed-int64 identities through both production decoders',()=>{
  const commands=parseNativeParticipantBroadcast('/test/9007199254740993/commands','{"event":"commands","data":[{"id":9007199254740993,"keyword":"pause","arguments":[],"timestamp":1793390000}]}');assert.equal(commands[0].id,'9007199254740993');assert.equal(parseNativeParticipantBroadcast('/test/1/commands','{"event":"test-sessions","data":[]}'),undefined);
  const snapshot=parseNativeMonitorBroadcast('{"event":"test-sessions","data":[{"testId":9007199254740993,"personId":9007199254740995,"groupName":"owned","personLabel":"Owned","timestamp":1,"testState":{},"unitState":{}}]}');assert.equal(snapshot[0].testId,'9007199254740993');assert.equal(snapshot[0].personId,'9007199254740995');assert.equal(parseNativeMonitorBroadcast('{"event":"commands","data":[]}'),undefined);assert.throws(()=>parseNativeMonitorBroadcast('{"event":"test-sessions","data":{}}'));
+});
+
+test('native Review lists keep exact numeric IDs and signed pages through the production client decoder',()=>{
+ const wire='[{"id":9007199254740993,"person_id":9007199254740995,"test_id":9223372036854775807,"page":-9223372036854775808,"entry":"Owned Ω","categories":"tech design","priority":1,"reviewer":null}]';
+ const row=parseNativeParticipantJson('/test/9223372036854775807/unit/OWNED/reviews',wire)[0];
+ assert.equal(row.id,'9007199254740993');assert.equal(row.person_id,'9007199254740995');assert.equal(row.test_id,'9223372036854775807');assert.equal(row.page,'-9223372036854775808');
+ const booklet=parseNativeParticipantJson('/test/9223372036854775807/reviews',wire.replace('test_id','booklet_id'))[0];assert.equal(booklet.booklet_id,'9223372036854775807');
+ for(const invalid of ['"9007199254740993"','1.2','0','9223372036854775808'])assert.throws(()=>parseNativeParticipantJson('/test/1/unit/OWNED/reviews',wire.replace('9007199254740993',invalid)));
+ assert.throws(()=>parseNativeParticipantJson('/test/1/unit/OWNED/reviews',wire.replace('-9223372036854775808','-9223372036854775809')));
 });

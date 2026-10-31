@@ -1,0 +1,25 @@
+@use '../original-material-theme' as theme;
+@use '@angular/material' as mat;
+
+// Pinned Source theme/index.scss and theme/material-overrides.scss. The
+// dynamically mounted controller is a descendant of this authenticated host.
+:host {
+  @include theme.apply();
+  @include mat.toolbar-overrides((container-background-color: var(--mat-sys-primary), container-text-color: var(--mat-sys-on-primary)));
+  @include mat.sidenav-overrides((content-background-color: white));
+  color: var(--mat-sys-on-surface);
+  color-scheme: light;
+}
+
+// Source styles.css utilities must reach the copied child components, just as
+// the Source document-wide rules do. Keep their scope within the native run.
+:host ::ng-deep {
+  .flex-row { display: flex; flex-direction: row; }
+  .flex-row-center { display: flex; flex-direction: row; justify-content: center; }
+  .flex-row-wrap { display: flex; flex-direction: row; flex-wrap: wrap; }
+  .flex-column { display: flex; flex-direction: column; }
+  .mdc-button.mat-tonal-button { border: 1px solid var(--mat-sys-outline-variant); }
+  .mat-toolbar {
+    @include mat.icon-button-overrides((icon-color: var(--mat-sys-on-primary), disabled-icon-color: color-mix(in srgb, var(--mat-sys-on-primary) 38%, transparent)));
+  }
+}

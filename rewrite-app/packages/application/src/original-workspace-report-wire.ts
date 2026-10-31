@@ -12,7 +12,7 @@ export type OriginalLogReportRecord = Identity & {originalUnitId:string; timesta
  * already been rendered in the configured system timezone. */
 export type OriginalReviewReportRecord = Identity & {
   priority:number; categories:string; reviewtime:string|null; entry:string;
-  page:number|null; pagelabel:string|null; originalUnitId:string; userAgent:string|null; reviewer:string|null;
+  page:number|{readonly rawJSON:string}|null; pagelabel:string|null; originalUnitId:string; userAgent:string|null; reviewer:string|null;
 };
 export type OriginalReportLabels = {unitlabel:string; bookletlabel:string};
 const requireUnicode = (text:string):void => {
@@ -123,7 +123,7 @@ export function formatOriginalReviewReport(input:{rows:OriginalReviewReportRecor
         : ['category: '+key,selected?'X':null];
     }));
     const record:Record<string,unknown>={...identity(row),priority:row.priority,...categories,
-      reviewtime:row.reviewtime,...(input.useNewVersion?{}:{entry:row.entry}),page:row.page,pagelabel:row.pagelabel,
+      reviewtime:row.reviewtime,...(input.useNewVersion?{}:{entry:row.entry}),page:row.page&&typeof row.page==='object'&&input.format==='csv'?row.page.rawJSON:row.page,pagelabel:row.pagelabel,
       originalUnitId:row.originalUnitId,userAgent:row.userAgent};
     if (input.useNewVersion) {
       const labels=row.bookletname && row.bookletname!=='0' ? input.labels?.(row.bookletname,row.unitname) : undefined;

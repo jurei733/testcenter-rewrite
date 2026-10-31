@@ -1,3 +1,4 @@
+import type {OriginalNativeReview} from './original-review-record.js';
 import type {OriginalCommandDelivery} from './original-command-queue.js';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import type {OriginalPersonNumberRecord} from './original-person-number.js';
@@ -55,6 +56,7 @@ export type OriginalGroupDeletionCollections = {
   originalTestNumbers?: Collection<OriginalTestNumberRecord>;
   originalPersonNumbers?: Collection<OriginalPersonNumberRecord>;
   originalNativeUnits?:Collection<OriginalNativeUnit>;
+  originalNativeReviews?:Collection<OriginalNativeReview>;
   originalNativeCommands?:Collection<OriginalCommandDelivery>;
   participantAccessCredentials: Collection<{participantSessionId: string}>; testRuns: Collection<TestRun>;
   workspaceReviews: Collection<WorkspaceReview>; participantTestLogs: Collection<ParticipantTestLog>;
@@ -81,6 +83,7 @@ export function deleteOriginalGroupsFromCollections(state: OriginalGroupDeletion
     typeof row.details.reviewId === 'string' && reviews.has(row.details.reviewId)));
   remove(state.participantRunCommands, descendant); remove(state.participantProgressDeliveries, descendant);
   if(state.originalNativeUnits)remove(state.originalNativeUnits,descendant);
+  if(state.originalNativeReviews)remove(state.originalNativeReviews,descendant);
   if(state.originalNativeCommands){
     remove(state.originalNativeCommands,descendant);
     const commands=state.originalNativeCommands;

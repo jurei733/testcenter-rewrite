@@ -28,7 +28,7 @@ export class BackendService {
       `${this.backendUrl}test/${testId}${unitAlias ? `/unit/${unitAlias}` : ''}/reviews`);
   }
 
-  deleteReview(testId: string, unitAlias: string | null, reviewID: number): Observable<void> {
+  deleteReview(testId: string, unitAlias: string | null, reviewID: string): Observable<void> {
     return this.http.delete<void>(
       `${this.backendUrl}test/${testId}${unitAlias ? `/unit/${unitAlias}` : ''}/review/${reviewID}`);
   }
@@ -53,7 +53,7 @@ export class BackendService {
     );
   }
 
-  updateReview(testId: string, unitAlias: string | null, reviewID: number, priority: number,
+  updateReview(testId: string, unitAlias: string | null, reviewID: string, priority: number,
                categories: string, entry: string, reviewer: string | null, pagelabel: string | null): Observable<void> {
     return this.http.patch<void>(
       `${this.backendUrl}test/${testId}${unitAlias ? `/unit/${unitAlias}` : ''}/review/${reviewID}`,

@@ -1,3 +1,4 @@
+import {readOriginalReviewCollection,mutateOriginalReviewCollection,readOriginalReviewPersonCollection,validateOriginalReviewCollections,synchronizeOriginalReviewCollection,deleteOriginalReviewCollection,type OriginalNativeReview} from '@testcenter-rewrite-app/application';
 import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {readOriginalMonitorCollections} from '@testcenter-rewrite-app/application';
@@ -117,6 +118,8 @@ type InMemoryFirstSliceState = {
   participantLoginAttempts: Map<string, ParticipantLoginAttempt>;
   testRuns: Map<string, TestRun>;
   originalNativeUnits: Map<string,OriginalNativeUnit>;
+  originalNativeReviews:Map<string,OriginalNativeReview>;
+  originalUnitReviewCounter:string;originalTestReviewCounter:string;
   originalTestNumbers: Map<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
   originalPersonNumbers: Map<string, OriginalPersonNumberRecord>;
@@ -163,6 +166,8 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   participantLoginAttempts: new Map(),
   testRuns: new Map(),
   originalNativeUnits: new Map(),
+  originalNativeReviews:new Map(),
+  originalUnitReviewCounter:"0",originalTestReviewCounter:"0",
   originalTestNumbers: new Map(),
   originalTestNumberCounter: "0",
   originalPersonNumbers: new Map(),
@@ -470,6 +475,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       deleteMatching(state.originalSessionTokens, workspaceMatches);
       deleteMatching(state.originalParticipantGroups, workspaceMatches);
       deleteMatching(state.originalNativeUnits,workspaceMatches);
+      deleteMatching(state.originalNativeReviews,workspaceMatches);
       deleteMatching(state.originalPersonNumbers,workspaceMatches);
       deleteMatching(state.originalTestNumbers, row=>{if(!workspaceMatches(row))return false;state.originalTestRunsByNumber.delete(row.testNumber);return true;});
       deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
@@ -1000,6 +1006,9 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async listOriginalUnitsByWorkspace(tenantId,workspaceId){return structuredClone(Array.from(state.originalNativeUnits.values()).filter(unit=>unit.tenantId===tenantId&&unit.workspaceId===workspaceId));},
     async getOriginalUnit(input){return readOriginalUnitCollection(state,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalUnitCollection(state,input,transform);},
+    async listOriginalReviews(scope){return readOriginalReviewCollection(state,scope);},
+    async mutateOriginalReview(scope,operation){return mutateOriginalReviewCollection(state,scope,operation);},
+    async listOriginalReviewsByPerson(scope){return readOriginalReviewPersonCollection(state,scope);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
       const nativeByRun=new Map<string,OriginalNativeUnit[]>();
@@ -1162,6 +1171,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
           if (receipt.testRunId === testRunId) state.participantProgressDeliveries.delete(key);
         }
         for(const[key,row]of state.originalNativeUnits)if(row.testRunId===testRunId)state.originalNativeUnits.delete(key);
+        deleteOriginalReviewCollection(state,row=>row.testRunId===testRunId);
         const nativeNumber=state.originalTestNumbers.get(testRunId);if(nativeNumber)state.originalTestRunsByNumber.delete(nativeNumber.testNumber);
         state.originalTestNumbers.delete(testRunId);
         if (state.testRuns.delete(testRunId)) {
@@ -1237,9 +1247,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveWorkspaceReview(review) {
       guardResultArtifactCollections(state, review);
+      synchronizeOriginalReviewCollection(state,review);
       state.workspaceReviews.set(review.reviewId, review);
     },
     async deleteWorkspaceReview(reviewId) {
+      deleteOriginalReviewCollection(state,row=>row.reviewId===reviewId);
       return state.workspaceReviews.delete(reviewId);
     },
     async deleteWorkspaceReviewsByTestRunIds(testRunIds) {
@@ -1247,6 +1259,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       let deletedCount = 0;
       for (const review of state.workspaceReviews.values()) {
         if (testRunIdSet.has(review.testRunId)) {
+          deleteOriginalReviewCollection(state,row=>row.reviewId===review.reviewId);
           state.workspaceReviews.delete(review.reviewId);
           deletedCount += 1;
         }

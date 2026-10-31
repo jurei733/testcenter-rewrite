@@ -1,3 +1,4 @@
+import {handleOriginalReviewHttp,originalReviewRouteLabel} from './original-review-http.js';
 import {NativeBroadcaster} from './native-broadcaster.js';
 import {handleOriginalMonitorHttp,originalMonitorRouteLabel} from './original-monitor-http.js';
 import {handleOriginalTestHttp, originalTestCreationPath,originalTestRouteLabel,originalResourceLogPath} from './original-test-http.js';
@@ -3335,6 +3336,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
   }
 
   const monitorLabel=originalMonitorRouteLabel(method,pathname);if(monitorLabel)return monitorLabel;
+  const reviewLabel=originalReviewRouteLabel(method,pathname);if(reviewLabel)return reviewLabel;
   const originalLabel=originalTestRouteLabel(method,pathname);if(originalLabel)return originalLabel;
   if (originalSessionRoutes.get(pathname)?.includes(method)) return `${method} ${pathname}`;
 
@@ -4990,6 +4992,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const subscribe=broadcaster?async(target:Parameters<NativeBroadcaster['issue']>[0],credential:string)=>{const ticket=await broadcaster.issue(target,credential);if(ticket&&!response.destroyed&&!response.headersSent)response.setHeader('SubscribeToken',ticket);}:undefined;
       if (await handleOriginalMonitorHttp({request,pathname,services,subscribe,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
         raw:(status,text,contentType)=>{response.writeHead(status,{'content-type':contentType});response.end(text);}})) return;
+      if(await handleOriginalReviewHttp({request,pathname,services,
+        propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
+        reportError:receipt=>{
+          if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
+          logStructured(receipt.statusCode>=500?'error':'info','native_review_error',{requestId,...receipt,method:request.method,path:originalReviewRouteLabel('',pathname)?.trim()??'/test/:testId/review'});
+        },
+        readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),
+        header:(name,value)=>response.setHeader(name,value),
+        raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
       if (await handleOriginalTestHttp({request, pathname, services,subscribe,
         reason: text => {response.statusMessage=text;},
         readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),

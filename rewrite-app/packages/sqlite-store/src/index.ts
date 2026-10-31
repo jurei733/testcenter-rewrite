@@ -1,3 +1,4 @@
+import {listOriginalNativeReviews,mutateOriginalNativeReview,listOriginalNativeReviewsByPerson,synchronizeOriginalNativeReview} from './original-native-review.js';
 import {changeOriginalMonitorTestLock} from './original-monitor-lock.js';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {createOriginalMonitorRepository} from './original-monitor-session.js';
@@ -1813,6 +1814,15 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
         tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,original_login_key TEXT NOT NULL,original_name_suffix TEXT NOT NULL,
         FOREIGN KEY(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix)
           REFERENCES participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) ON DELETE CASCADE);`}
+,{version:80,name:"original_native_reviews",sql:`CREATE TABLE original_native_review_counters(kind TEXT PRIMARY KEY CHECK(kind IN ('unit','test')),last_number TEXT NOT NULL);
+ INSERT INTO original_native_review_counters(kind,last_number) VALUES('unit','0'),('test','0');
+ CREATE TABLE original_native_reviews(kind TEXT NOT NULL CHECK(kind IN ('unit','test')),review_number TEXT NOT NULL,
+ review_id TEXT NOT NULL UNIQUE REFERENCES workspace_reviews(review_id) ON DELETE CASCADE,
+ test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+ participant_session_id TEXT NOT NULL REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE,
+ tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_release_id TEXT NOT NULL,review_json TEXT NOT NULL,
+ PRIMARY KEY(kind,review_number));
+ CREATE INDEX original_native_reviews_scope ON original_native_reviews(test_run_id,participant_session_id);`}
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -3808,6 +3818,9 @@ export const createSqliteFirstSliceStorage = (
     async listOriginalUnitsByWorkspace(tenantId,workspaceId){return database.prepare('SELECT unit_json FROM original_native_units WHERE tenant_id=? AND workspace_id=?').all(tenantId,workspaceId).map(row=>JSON.parse(String(row.unit_json)));},
     async getOriginalUnit(input){return readOriginalNativeUnit(database,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(database,input,transform);},
+    async listOriginalReviews(scope){return listOriginalNativeReviews(database,scope);},
+    async mutateOriginalReview(scope,operation){return mutateOriginalNativeReview(database,scope,operation);},
+    async listOriginalReviewsByPerson(scope){return listOriginalNativeReviewsByPerson(database,scope);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(database, tenantId, workspaceId);
     },
@@ -4257,6 +4270,7 @@ export const createSqliteFirstSliceStorage = (
     },
     async saveWorkspaceReview(review) {
       withResultArtifactParent(database, review, () => {
+        synchronizeOriginalNativeReview(database,review);
         database
           .prepare(
             `INSERT INTO workspace_reviews (

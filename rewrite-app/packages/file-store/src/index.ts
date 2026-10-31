@@ -1,3 +1,4 @@
+import {readOriginalReviewCollection,mutateOriginalReviewCollection,readOriginalReviewPersonCollection,validateOriginalReviewCollections,synchronizeOriginalReviewCollection,deleteOriginalReviewCollection,type OriginalNativeReview} from '@testcenter-rewrite-app/application';
 import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {readOriginalMonitorCollections} from '@testcenter-rewrite-app/application';
@@ -135,6 +136,8 @@ type PersistedFirstSliceState = {
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
   originalNativeUnits: Record<string,OriginalNativeUnit>;
+  originalNativeReviews:Record<string,OriginalNativeReview>;
+  originalUnitReviewCounter:string;originalTestReviewCounter:string;
   originalTestNumbers: Record<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
   originalPersonNumbers: Record<string, OriginalPersonNumberRecord>;
@@ -203,6 +206,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantLoginAttempts: {},
   testRuns: {},
   originalNativeUnits: {},
+  originalNativeReviews:{},
+  originalUnitReviewCounter:"0",originalTestReviewCounter:"0",
   originalTestNumbers: {},
   originalTestNumberCounter: "0",
   originalPersonNumbers: {},
@@ -777,6 +782,7 @@ const createFileRepository = (
       {const entries=Object.values(loaded.state.originalTestNumbers??{});const index=Object.fromEntries(entries.map(row=>[row.testNumber,row.testRunId]));if(Object.keys(index).length!==entries.length)throw Error('Duplicate native Test number.');loaded.state.originalTestRunsByNumber=index;}
 
       validateOriginalPersonNumbers(loaded.state.originalPersonNumbers,loaded.state.originalPersonNumberCounter,loaded.state.participantSessions);
+      validateOriginalReviewCollections(loaded.state);
       return loaded.state;
     });
     return cachePromise;
@@ -1229,6 +1235,7 @@ const createFileRepository = (
         deleteMatching(state.originalSessionTokens, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
         deleteMatching(state.originalNativeUnits,workspaceMatches);
+        deleteMatching(state.originalNativeReviews,workspaceMatches);
         deleteMatching(state.originalPersonNumbers,workspaceMatches);
         if(state.originalTestNumbers)deleteMatching(state.originalTestNumbers,row=>{if(!workspaceMatches(row))return false;delete state.originalTestRunsByNumber[row.testNumber];return true;});
         if(state.originalWorkspaceNumbers)deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
@@ -1859,6 +1866,9 @@ const createFileRepository = (
     async listOriginalUnitsByWorkspace(tenantId,workspaceId){return structuredClone(Object.values((await getState()).originalNativeUnits).filter(unit=>unit.tenantId===tenantId&&unit.workspaceId===workspaceId));},
     async getOriginalUnit(input){return readOriginalUnitCollection(await getState(),input);},
     async mutateOriginalUnit(input,transform){return mutate(state=>mutateOriginalUnitCollection(state,input,transform));},
+    async listOriginalReviews(scope){return readOriginalReviewCollection(await getState(),scope);},
+    async mutateOriginalReview(scope,operation){return mutate(state=>mutateOriginalReviewCollection(state,scope,operation));},
+    async listOriginalReviewsByPerson(scope){return readOriginalReviewPersonCollection(await getState(),scope);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       const state = await getState();
       const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
@@ -2036,6 +2046,7 @@ const createFileRepository = (
             if (receipt.testRunId === testRunId) delete state.participantProgressDeliveries[key];
           }
           for(const[key,row]of Object.entries(state.originalNativeUnits))if(row.testRunId===testRunId)delete state.originalNativeUnits[key];
+          deleteOriginalReviewCollection(state,row=>row.testRunId===testRunId);
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
             const nativeNumber=state.originalTestNumbers?.[testRunId];if(nativeNumber)delete state.originalTestRunsByNumber[nativeNumber.testNumber];
@@ -2124,6 +2135,7 @@ const createFileRepository = (
     async saveWorkspaceReview(review) {
       await mutate(state => {
         guardResultArtifactCollections(state, review);
+        synchronizeOriginalReviewCollection(state,review);
         state.workspaceReviews[review.reviewId] = review;
       });
     },
@@ -2131,6 +2143,7 @@ const createFileRepository = (
       let deleted = false;
       await mutate(state => {
         deleted = Boolean(state.workspaceReviews[reviewId]);
+        deleteOriginalReviewCollection(state,row=>row.reviewId===reviewId);
         delete state.workspaceReviews[reviewId];
       });
       return deleted;
@@ -2141,6 +2154,7 @@ const createFileRepository = (
       await mutate(state => {
         for (const review of Object.values(state.workspaceReviews)) {
           if (testRunIdSet.has(review.testRunId)) {
+            deleteOriginalReviewCollection(state,row=>row.reviewId===review.reviewId);
             delete state.workspaceReviews[review.reviewId];
             deletedCount += 1;
           }

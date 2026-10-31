@@ -145,8 +145,8 @@ export enum MaxTimerEvent {
 }
 
 export interface Review {
-  id: number;
-  person_id: number;
+  id: string;
+  person_id: string;
   reviewtime: string;
   priority: number;
   categories: string;
@@ -156,13 +156,13 @@ export interface Review {
 }
 
 export interface BookletReview extends Review {
-  booklet_id: number;
+  booklet_id: string;
 }
 
 export interface UnitReview extends Review {
   unit_name: string;
-  test_id: number;
-  page: number | null;
+  test_id: string;
+  page: string | null;
   pagelabel: string | null;
   originalUnitId: string;
 }

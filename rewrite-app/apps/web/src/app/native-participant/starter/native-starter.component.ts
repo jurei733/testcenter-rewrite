@@ -6,13 +6,17 @@ import {NativeMonitorSessionService} from '../../native-monitor/native-session.s
 import type {OriginalTestGroupMonitorAccess} from '@testcenter-rewrite-app/contracts/original-session';
 import {NativeTestStarterService} from '../native-test-starter.service';
 import {TestCardComponent} from './test-card.component';
+import {MatButton} from '@angular/material/button';
+import {OriginalToastService} from '../../original-toast.service';
+import {OriginalToastContainerComponent} from '../../original-toast-container.component';
+import {downloadTextFile} from '../../download-text-file';
 import {AssetService} from '../shared/services/asset.service';
 import {CustomtextService} from '../shared/services/customtext/customtext.service';
 import {CustomtextPipe} from '../shared/pipes/customtext/customtext.pipe';
 import {NativeMonitorIconComponent as MatIcon} from '../../native-monitor/native-monitor-icon.component';
 @Component({selector:'app-native-starter',standalone:true,
- imports:[TestCardComponent,AsyncPipe,NgTemplateOutlet,CustomtextPipe,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatIcon],
- providers:[NativeTestStarterService,AssetService,CustomtextService],styleUrls:['./starter.component.scss'],
+ imports:[MatButton,OriginalToastContainerComponent,TestCardComponent,AsyncPipe,NgTemplateOutlet,CustomtextPipe,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatIcon],
+ providers:[NativeTestStarterService,AssetService,CustomtextService,OriginalToastService],styleUrls:['./starter.component.scss'],
  template:`<div class="intro"><img class="companion-image" [src]="assets.getAssetSrc('starterCompanion')" alt="companion-image"/><div class="flex-column"><p class="intro-heading">Schön, dass du da bist!</p><p>Komm, wir legen los. Wähle einen Teil aus.</p></div></div>
  @if(problem()){<p role="alert">{{problem()}}</p>}
  <div class="cards">
@@ -22,16 +26,17 @@ import {NativeMonitorIconComponent as MatIcon} from '../../native-monitor/native
  @if(claims?.test&&!claims?.testGroupMonitor){<ng-container [ngTemplateOutlet]="testCardList" />}
  </div>
  @if(!booklets.length&&!claims?.testGroupMonitor?.length){<p role="status">{{'Für diese Anmeldung wurde kein Test gefunden.'|customtext:'login_noBookletsAvailable'|async}}</p>}
- <div #bottomSentinel class="sentinel"></div>@if(showScrollButton()){<button class="scroll-button" (click)="scrollDown()">Unten geht es weiter<mat-icon svgIcon="arrow_cool_down" /></button>}`})
+ <div #bottomSentinel class="sentinel"></div>@if(showScrollButton()){<button class="scroll-button" (click)="scrollDown()">Unten geht es weiter<mat-icon svgIcon="arrow_cool_down" /></button>}<div class="button-box">@if(claims?.review){<button matButton="tonal" data-cy="review-download" (click)="downloadReview()">Reviews downloaden</button>}</div><app-original-toast-container />`})
 export class NativeStarterComponent implements AfterViewInit {
  readonly session=inject(NativeMonitorSessionService);readonly starter=inject(NativeTestStarterService);readonly assets=inject(AssetService);
+ private readonly toast=inject(OriginalToastService);
  private readonly router=inject(Router);private readonly element=inject<ElementRef<HTMLElement>>(ElementRef);
  private readonly owner=new AbortController();private readonly scope=this.session.accessSignal;
  private readonly observer=new IntersectionObserver(([entry])=>this.showScrollButton.set(!entry.isIntersecting));
  @ViewChild('bottomSentinel',{static:true})private bottom!:ElementRef<HTMLElement>;
  readonly problem=signal('');readonly showScrollButton=signal(false);
  private verifyTimer:ReturnType<typeof setTimeout>|undefined;
- private readonly retire=()=>{if(this.verifyTimer!==undefined)clearTimeout(this.verifyTimer);this.verifyTimer=undefined;this.owner.abort();this.starter.ngOnDestroy();this.element.nativeElement.replaceChildren();};
+ private readonly retire=()=>{if(this.verifyTimer!==undefined)clearTimeout(this.verifyTimer);this.verifyTimer=undefined;this.owner.abort();this.starter.ngOnDestroy();this.toast.ngOnDestroy();this.element.nativeElement.replaceChildren();};
  constructor(){this.scope.addEventListener('abort',this.retire,{once:true});this.scheduleAccessCheck();}
  private scheduleAccessCheck(){
   if(!this.current)return;
@@ -48,6 +53,15 @@ export class NativeStarterComponent implements AfterViewInit {
  groupLabel(group:OriginalTestGroupMonitorAccess){return Array.isArray(group.flags)?'':group.flags.subLabel;}
  groupDisabled(group:OriginalTestGroupMonitorAccess){return !Array.isArray(group.flags)&&!!(group.flags.scheduled||group.flags.expired);}
  async start(bookletName:string){if(!this.current)return;this.problem.set('');try{const id=await this.starter.start(bookletName,this.owner.signal);if(this.current)await this.router.navigate(['/native-test',id]);}catch(error){if(this.current)this.problem.set(error instanceof Error?error.message:'Problem beim Start.');}}
+ async downloadReview(){
+  if(!this.current)return;
+  try{
+   const csv=await this.session.exportReviews(this.owner.signal);
+   if(!this.current)return;
+   if(csv==='')this.toast.show('Keine Kommentare verfügbar.');
+   else downloadTextFile({filename:'testcenter-reviews.csv',mediaType:'text/csv;charset=UTF-8',text:csv});
+  }catch(error){if(this.current)this.problem.set(error instanceof Error?error.message:'Problem beim Herunterladen der Kommentare.');}
+ }
  async monitor(group:OriginalTestGroupMonitorAccess){if(!this.current||this.groupDisabled(group))return;const profile=Array.isArray(group.flags)?'':group.flags.profile;await this.router.navigate(['/group-monitor',group.id,...(profile?[profile]:[])]);}
  ngAfterViewInit(){this.observer.observe(this.bottom.nativeElement);}
  scrollDown(){this.element.nativeElement.closest<HTMLElement>('.page')?.scrollBy({top:300,behavior:'smooth'});}

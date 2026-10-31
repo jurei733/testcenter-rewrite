@@ -18,7 +18,8 @@ import {HeaderService} from './shared/services/header.service';
  @if(session.restoring()){<p role="status">Sitzung wird geprüft …</p>}
  @if(!session.restoring()&&!session.access()){<button matButton="filled" (click)="back()">Anmelden</button>}
  <ng-container #controller />`,
- styles:`:host{display:flex;flex-direction:column;height:100%;min-height:0}mat-toolbar{display:flex;gap:16px}h1{flex:1;margin:0;text-align:center;font-size:20px}img{max-width:170px;max-height:48px}`})
+ styleUrls:['./native-run-host.component.scss'],
+ styles:`:host{display:flex;flex-direction:column;height:100vh;min-height:0}mat-toolbar{display:flex;gap:16px}h1{flex:1;margin:0;text-align:center;font-size:20px}img{max-width:170px;max-height:48px}`})
 export class NativeRunHostComponent implements AfterViewInit {
  @ViewChild('controller',{read:ViewContainerRef,static:true}) private slot!:ViewContainerRef;
  readonly runtime=inject(NativeRunRuntime);readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);

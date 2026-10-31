@@ -9,8 +9,8 @@ import {Pool} from 'pg';
 import {createFirstSliceServices, prepareOriginalPersonNumber, selectOriginalPersonNumber} from '@testcenter-rewrite-app/application';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
-import {createSqliteFirstSliceStorage, SQLITE_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/sqlite-store';
-import {createPostgresFirstSliceStorage, POSTGRES_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/postgres-store';
+import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
+import {createPostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
 
 const evidence = new URL('../test-fixtures/original-testcenter/source-workspace-results/native-monitor-sessions/', import.meta.url);
 test('Source75 protected production HTTP proves stable shared numeric person identity before Test entry', async () => {
@@ -92,9 +92,11 @@ for (const kind of kinds) test(`${kind}: atomic native person numbers retain sco
       if (kind === 'sqlite' || kind === 'postgres') {
         await storage.shutdown();
         control = kind === 'sqlite' ? new DatabaseSync(file) : new Pool({connectionString: url.toString()});
+        const numberVersion=Number((await query("SELECT version FROM schema_migrations WHERE name='original_native_person_numbers'"))[0].version);
+        await query('DROP TABLE IF EXISTS original_native_reviews');await query('DROP TABLE IF EXISTS original_native_review_counters');
         await query('DROP TABLE original_person_numbers'); await query('DROP TABLE original_person_number_counter');
         await query('DROP INDEX original_person_number_parent_scope');
-        await query('DELETE FROM schema_migrations WHERE version=' + (kind === 'sqlite' ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION));
+        await query('DELETE FROM schema_migrations WHERE version>=' + numberVersion);
         if (kind === 'postgres') {
           const failureName = schema + '_failed_startup', failureUrl = new URL(url);
           failureUrl.searchParams.set('application_name', failureName);
