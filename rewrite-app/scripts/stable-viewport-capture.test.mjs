@@ -7,6 +7,7 @@ import {join, resolve} from 'node:path';
 import {chromium} from 'playwright';
 import {createHash} from 'node:crypto';
 import {captureStableViewport} from './stable-viewport-capture.mjs';
+import {repaintNativeViewport as legacyRepaintNativeViewport} from './fixtures/native-viewport-repaint-before-scrollbar-witness.mjs';
 import {compareScreenshots} from './exact-rgba-comparison.mjs';
 import {captureViewportRepaintDiagnostic,captureSurfaceBackgroundDiagnostic} from './viewport-repaint-diagnostic.mjs';
 
@@ -200,3 +201,23 @@ test('a layout change during the cleared frame cannot become the restored baseli
   await assert.rejects(readFile(path),{code:'ENOENT'});
  });
 });
+
+
+test('native Linux root scrollbars are cleared without hiding or resizing the restored viewport',
+ {skip:process.platform==='linux'?false:'The native Linux scrollbar is part of the full viewport witness.'},async()=>{
+  await withViewport(async(page,measure)=>{
+    await page.addStyleTag({content:'html{position:fixed;width:100%;overflow-y:scroll}'});
+    await page.evaluate(()=>document.documentElement.setAttribute('style','--owned-root-sentinel:1'));
+    const scrollbar=await page.evaluate(()=>innerWidth-document.documentElement.clientWidth);
+    assert.ok(scrollbar>0,'This countercase must contain a real native root scrollbar.');
+    const geometry=await measure(),before=await page.screenshot({fullPage:false});
+    await assert.rejects(legacyRepaintNativeViewport(page,measure,join(artifacts,'legacy-root-scrollbar.png')),
+      /Native repaint must witness a fully cleared viewport/);
+    const capture=await captureStableViewport(page,measure,join(artifacts,'root-scrollbar.png'));
+    assert.equal(capture.paintDiagnostics.nativeRepaint.hiddenFrame.nonWhitePixels,0);
+    assert.equal((await compareScreenshots(page,before,capture.bytes)).differingPixels,0);
+    assert.deepEqual(await measure(),geometry);
+    assert.equal(await page.evaluate(()=>innerWidth-document.documentElement.clientWidth),scrollbar);
+    assert.equal(await page.evaluate(()=>document.documentElement.getAttribute('style')),'--owned-root-sentinel:1');
+  });
+ });
