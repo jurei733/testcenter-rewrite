@@ -59,7 +59,8 @@ test('replacement-login cancellation is silent even while the same entry view re
 function monitorRoute(f,group='owned'){f.route.firstChild={snapshot:{paramMap:new Map([['group-name',group]])}};}
 test('retired access clears the private header even on the retained group route',()=>{
  const f=fixture();monitorRoute(f);f.header.title='Private group A';assert.equal(f.header.title,'Private group A');
- f.replace(null);assert.equal(f.header.title,'');assert.equal(f.component.headerTitle,'Owned');f.component.ngOnDestroy();
+ // Pinned Source LoginComponent restores the public 'Anmelden' heading.
+ f.replace(null);assert.equal(f.header.title,'');assert.equal(f.component.headerTitle,'Anmelden');f.component.ngOnDestroy();
 });
 for(const sameToken of [false,true])test('a replacement access cannot display the previous header with '+(sameToken?'the same':'another')+' token',()=>{
  const f=fixture();monitorRoute(f);f.header.title='Private group A';f.replace(access(sameToken?'original':'replacement'));

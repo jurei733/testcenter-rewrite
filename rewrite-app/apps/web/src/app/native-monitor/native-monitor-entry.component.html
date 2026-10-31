@@ -18,14 +18,14 @@
    <div class="welcome-section"><img [src]="settings.assetUrl('loginIllustration')" alt="" /><div><p class="heading">Willkommen im IQB‑Testcenter</p><p>Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.</p></div></div>
    <div class="login-section"><form (ngSubmit)="submit()">
     @if(!passwordStep()){
-     <h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" autocapitalize="off" autocomplete="username" /></mat-form-field>
+     <h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" required minlength="3" autocapitalize="off" autocomplete="username" /></mat-form-field>
     }@else{
      <div class="password-headline"><button matIconButton type="button" (click)="passwordStep.set(false);password=''" aria-label="Zurück"><mat-icon svgIcon="chevron_left" /></button><h2>Kennwort eingeben</h2></div>
      <mat-form-field appearance="outline"><mat-label>Kennwort</mat-label><input matInput name="password" [(ngModel)]="password" [type]="showPassword?'text':'password'" autocomplete="current-password" /><button mat-icon-button matSuffix type="button" aria-label="Kennwort anzeigen" (click)="showPassword=!showPassword"><mat-icon svgIcon="visibility" /></button></mat-form-field>
     }
-    <button matButton="filled" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">{{passwordStep()?'Anmelden':'Weiter'}}</button>
+    <button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>
     @if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}
-   </form></div>
+   </form><div class="button-section"><button matButton="tonal" type="button" routerLink="/ops" data-cy="login-admin-form">Adminbereich</button></div></div>
   </div>
  }@else if(hasChild&&allowedChild){
   @if(backendProblem();as problem){<p class="native-error" role="alert">{{problem}}</p>}
@@ -37,3 +37,5 @@
   @else{@for(owner of starterOwners;track owner){<app-native-starter />}}
  }
 }
+
+@if(!session.access()){<app-original-footer />}

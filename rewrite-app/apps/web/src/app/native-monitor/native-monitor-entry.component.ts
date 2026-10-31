@@ -17,13 +17,14 @@ import {NativeMonitorSessionService,NativeMonitorHttpError} from './native-sessi
 import {InterfaceModeService} from '../interface-mode.service';
 import {ApplicationSettingsService} from '../application-settings.service';
 import {OriginalOverlayStylesComponent} from '../original-overlay-styles.component';
+import {OriginalFooterComponent} from '../original-footer.component';
 import {OriginalParticipantLogoutDialogComponent} from '../original-participant-logout-dialog.component';
 import {MainDataService} from './shared/shared.module';
 import {HeaderService} from './shared/services/header.service';
 import {BackendService} from './group-monitor/backend.service';
 import {NativeStarterComponent} from '../native-participant/starter/native-starter.component';
 @Component({selector:'app-native-monitor-entry',standalone:true,
- imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent],
+ imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,OriginalFooterComponent,NativeStarterComponent],
  providers:[BackendService,BookletService,TestSessionManager,{provide:MAT_MENU_DEFAULT_OPTIONS,useFactory:()=>({...inject(MAT_MENU_DEFAULT_OPTIONS,{skipSelf:true}),overlayPanelClass:'original-native-monitor-menu'})},{provide:GROUP_MONITOR_CONFIG,useValue:{checkForIdleInterval:180000}}],
  templateUrl:'./native-monitor-entry.component.html',styleUrls:['./native-monitor-entry.component.css','../original-login-theme.scss']})
 export class NativeMonitorEntryComponent implements OnDestroy {
@@ -48,7 +49,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   this.ready.set(true);
  }
  get hasChild(){return !!this.route.firstChild;}
- get headerTitle(){return this.hasChild&&this.allowedChild?this.header.title||this.settings.settings().appTitle:this.session.access()&&!this.hasChild?'Übersicht':this.settings.settings().appTitle;}
+ get headerTitle(){if(!this.session.access())return 'Anmelden';return this.hasChild&&this.allowedChild?this.header.title||this.settings.settings().appTitle:this.session.access()&&!this.hasChild?'Übersicht':this.settings.settings().appTitle;}
  get showAccountPanel(){return !!this.session.access()&&!(this.hasChild&&this.allowedChild);}
  get starterOwners(){this.session.access();return [this.session.accessSignal];}
  get allowedChild(){

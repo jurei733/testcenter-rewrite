@@ -136,7 +136,8 @@ app-root {
 
 /* Source html/body defaults must stay below CDK global-scrollblock specificity.
    Native modal scrollbars retain their actual layout and width. */
-:where(:root:has(app-native-monitor-entry), body:has(app-native-monitor-entry)) {
+:where(:root:has(app-native-monitor-entry), body:has(app-native-monitor-entry),
+       :root:has(app-native-participant-entry .login-page), body:has(app-native-participant-entry .login-page)) {
   height: 100%;
   overflow: hidden;
 }

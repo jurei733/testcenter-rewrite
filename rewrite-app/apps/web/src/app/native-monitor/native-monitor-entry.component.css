@@ -9,4 +9,28 @@ header mat-toolbar { display:flex; flex-direction:row; justify-content:space-bet
 /* Revert the generic Rewrite reset where Original uses the browser defaults. */
 :host ::ng-deep button[mat-icon-button] { font-family:revert; font-weight:revert; }
 :host ::ng-deep .mat-mdc-slide-toggle .mdc-label { display:revert; gap:normal; font:inherit; color:inherit; }
-.account-heading,dl{padding:12px 16px}dd{margin:0 0 8px}.login-page{display:flex;flex:1;min-height:calc(100vh - 64px)}.welcome-section{flex:1;background:var(--mat-sys-primary-container);display:flex;align-items:center;flex-direction:column;justify-content:center;padding:48px}.welcome-section img{max-width:350px;width:100%;max-height:300px;object-fit:contain}.welcome-section .heading{font-size:28px}.welcome-section p{max-width:440px}.login-section{flex:1;display:flex;align-items:center;justify-content:center;padding:32px}.login-section form{display:flex;flex-direction:column;min-width:300px;gap:16px}.password-headline{display:flex;align-items:center}.monitor-selection{max-width:850px;width:100%;margin:32px auto}.monitor-claim{margin:8px;min-height:72px}.monitor-claim strong,.monitor-claim span{display:block}.native-error{padding:12px 24px;background:#ffdad6;color:#410002}@media(max-width:700px){.welcome-section{display:none}.login-section{padding:24px}}
+
+.account-heading, dl { padding: 12px 16px; }
+dd { margin: 0 0 8px; }
+/* The pinned Original login layout. The shell supplies the real header/footer;
+   this flex child uses their remaining space, including narrow viewports. */
+.login-page { display: flex; flex: 1; min-height: 0; flex-direction: row; gap: 64px; color: var(--mat-sys-on-surface); }
+.welcome-section { display: flex; flex: 0 1 auto; flex-direction: column; align-items: center; width: 25%; gap: 48px; max-height: 100%; overflow: auto; box-sizing: border-box; padding: 64px 24px 20px; background: var(--mat-sys-secondary); }
+.welcome-section img { width: 100%; }
+.welcome-section .heading { font-size: 30px; }
+.login-section { display: flex; flex: 0 1 auto; flex-direction: column; justify-content: start; align-items: start; width: 75%; gap: 60px; }
+.login-section form { margin-top: 64px; display: flex; flex-direction: column; text-align: left; min-width: 0; width: 80%; gap: 24px; }
+.login-section h2 { margin: .83em 0; font-family: inherit; font-size: 30px; font-weight: 400; line-height: normal; letter-spacing: normal; }
+.login-section mat-form-field { display: block; }
+.login-section input.mat-mdc-input-element { font: inherit; border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+.login-submit { width: 15%; min-width: 120px; }
+.login-submit:disabled { opacity: 1; }
+.login-page button:hover { transform: none; }
+.password-headline { display: flex; flex-direction: row; justify-content: left; align-items: center; gap: 24px; }
+.password-headline > button { color: var(--mat-sys-primary); border: 1px solid var(--mat-sys-primary); border-radius: 12px; }
+.button-section { align-self: end; display: flex; gap: 9px; margin-top: auto; padding-bottom: 12px; margin-right: 24px; }
+.button-section button { border: 1px solid var(--mat-sys-primary); }
+.monitor-selection { max-width: 850px; width: 100%; margin: 32px auto; }
+.monitor-claim { margin: 8px; min-height: 72px; }
+.monitor-claim strong, .monitor-claim span { display: block; }
+.native-error { padding: 12px 24px; background: #ffdad6; color: #410002; }
