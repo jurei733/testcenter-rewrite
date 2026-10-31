@@ -3,7 +3,7 @@ import {FormsModule} from '@angular/forms';
 import {MatDialogTitle,MatDialogContent,MatDialogActions,MatDialogClose} from '@angular/material/dialog';
 import {MatFormField,MatLabel} from '@angular/material/form-field';
 import {MatInput} from '@angular/material/input';
-import {MatSelect,MatOption} from '@angular/material/select';
+import {MatSelect,MatOption,MAT_SELECT_CONFIG} from '@angular/material/select';
 import {MatSlideToggle} from '@angular/material/slide-toggle';
 import {MatAutocomplete,MatAutocompleteTrigger} from '@angular/material/autocomplete';
 import {NativeMonitorIconComponent as MatIcon} from '../../../native-monitor-icon.component';
@@ -36,6 +36,7 @@ import { TestSessionManager } from '../../test-session-manager/test-session-mana
     'add-filter-dialog.component.css'
   ],
   standalone: true,
+  providers: [{provide: MAT_SELECT_CONFIG, useFactory: () => ({...inject(MAT_SELECT_CONFIG, {skipSelf: true, optional: true}), overlayPanelClass: 'original-native-monitor-filter-options'})}],
   imports: [FormsModule, MatDialogTitle, MatDialogContent, MatDialogActions, MatDialogClose, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatSlideToggle, MatAutocomplete, MatAutocompleteTrigger, MatIcon, MatButton, AlertComponent]
 })
 export class AddFilterDialogComponent implements OnInit {

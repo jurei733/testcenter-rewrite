@@ -13,6 +13,8 @@
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,
 :root[data-interface-mode='original'] .original-player-menu,
 :root[data-interface-mode='original'] .original-native-monitor-menu,
+:root[data-interface-mode='original'] .original-native-monitor-filter-dialog,
+:root[data-interface-mode='original'] .original-native-monitor-filter-options,
 :root[data-interface-mode='original'] .original-application-logo-tooltip,
 :root[data-interface-mode='original'] .original-participant-error-dialog,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog {
@@ -23,6 +25,7 @@
 // dialogs do not. Keep the correction local to these Original renderers.
 :root[data-interface-mode='original'] .original-password-confirmation-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-administration-editor-dialog button.mat-mdc-button-base:hover,
+:root[data-interface-mode='original'] .original-native-monitor-filter-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-error-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog button.mat-mdc-button-base:hover {
   transform: none;
@@ -32,6 +35,7 @@
 // these tokens; the native Rewrite confirmation renderer stays untouched.
 :root[data-interface-mode='original'] .original-participant-logout-dialog,
 :root[data-interface-mode='original'] .original-administration-editor-dialog,
+:root[data-interface-mode='original'] .original-native-monitor-filter-dialog,
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,
@@ -66,4 +70,21 @@
 // content/arrow nodes use the browser content-box default in the Original.
 :root[data-interface-mode='original'] .original-native-monitor-menu :is(.mat-mdc-menu-content, .mat-mdc-menu-item-text, .mat-mdc-menu-submenu-icon) {
   box-sizing: revert;
+}
+
+// Match the Source browser defaults at this body-level form portal. Keep the
+// selector at zero specificity so Material's own border-box rules still win.
+:where(:root[data-interface-mode='original'] .original-native-monitor-filter-dialog,
+       :root[data-interface-mode='original'] .original-native-monitor-filter-dialog *) {
+  box-sizing: content-box;
+}
+:root[data-interface-mode='original'] .original-native-monitor-filter-dialog {
+  input.mat-mdc-input-element {
+    font: inherit; border: 0; border-radius: 0; padding: 0;
+    background: transparent; box-shadow: none; box-sizing: content-box;
+  }
+  .mdc-floating-label { gap: normal; }
+  .mat-mdc-slide-toggle .mdc-label {
+    display: revert; gap: normal; font: inherit; color: inherit;
+  }
 }

@@ -64,7 +64,7 @@
         data-cy="comment-diag-value"
         required
         >
-      <mat-autocomplete #auto2="matAutocomplete">
+      <mat-autocomplete #auto2="matAutocomplete" class="original-native-monitor-filter-options">
         @for (option of lists[filter.target]; track option) {
           <mat-option [value]="option">
             {{ (subValueLists[filter.target]?.[option]) ? subValueLists[filter.target]?.[option]?.label : option}}
@@ -90,7 +90,7 @@
         required
         [matAutocomplete]="auto3"
         >
-      <mat-autocomplete #auto3="matAutocomplete">
+      <mat-autocomplete #auto3="matAutocomplete" class="original-native-monitor-filter-options">
         @if (!isStringArray(filter.value)) {
           @if (subValueLists[filter.target]; as list) {
             @if (list[filter.value]; as subValueSelect) {

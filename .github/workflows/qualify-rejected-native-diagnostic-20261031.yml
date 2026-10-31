@@ -1,4 +1,4 @@
-name: Qualify native Monitor baseline, selection and menu pixels
+name: Qualify native Monitor filters and patched development graph
 on:
   push:
     branches: [codex/rejected-native-diagnostic-20261030]
@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   qualify:
-    name: Actual native Monitor three-scene pixels and unchanged Source family
+    name: Actual native seven-scene Monitor and unchanged Source family
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
@@ -29,8 +29,12 @@ jobs:
         run: npm run test:ci-policy > "$RUNNER_TEMP/rejected-diagnostic-qualification/policy.tap" 2>&1
       - name: Audit the unchanged locked graph
         run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json > "$RUNNER_TEMP/rejected-diagnostic-qualification/audit.json"
+      - name: Require a genuinely zero-vulnerability qualification audit
+        run: node --input-type=module -e 'import assert from "node:assert/strict";import {readFile} from "node:fs/promises";import {join} from "node:path";const audit=JSON.parse(await readFile(join(process.env.RUNNER_TEMP,"rejected-diagnostic-qualification/audit.json"),"utf8"));assert.equal(audit.metadata.vulnerabilities.total,0);'
       - name: Preserve actual native Debian archive controls
         run: node --test scripts/ci-browser-system-linux.test.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/native-debian.tap" 2>&1
+      - name: Enforce actual Source-family and changed-lock rejection controls
+        run: node --test scripts/observed-native-source-family.test.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/source-family.tap" 2>&1
       - name: Download the exact locked Chromium
         run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
       - name: Retain the actual public mirror profile without changing package sources
@@ -78,20 +82,20 @@ jobs:
         run: |
           node scripts/original-browser-reference.mjs pack .ci/original-monitor-reference
           cp -R .ci/original-monitor-reference/frontend/dist/testcenter-frontend/browser "$RUNNER_TEMP/native-monitor-original-build"
-      - name: Require all three exact Original self-control scenes in the default native browser
+      - name: Require all seven exact Original self-control scenes in the default native browser
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
         run: |
           mkdir -p "$RUNNER_TEMP/native-monitor-source-control"
-          for scene in baseline selected-row settings-menu; do
+          for scene in baseline selected-row settings-menu new-filter-dialog filter-target-menu filter-value-options advanced-filter-dialog; do
             UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-source-control/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$scene"
           done
-      - name: Require all24 complete Original-to-Rewrite Monitor viewports
+      - name: Require all56 complete Original-to-Rewrite Monitor viewports
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
         run: |
           mkdir -p "$RUNNER_TEMP/native-monitor-visual"
-          for scene in baseline selected-row settings-menu; do
+          for scene in baseline selected-row settings-menu new-filter-dialog filter-target-menu filter-value-options advanced-filter-dialog; do
             UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-visual/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$scene"
           done
       - name: Verify Original source and build remain unchanged after browser capture
