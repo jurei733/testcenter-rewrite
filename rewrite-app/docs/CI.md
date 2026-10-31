@@ -3826,3 +3826,68 @@ is promoted to a certificate. The normal complete97-job current-head acceptance
 and fresh Code/Security/Slop subscription reviews remain required. This admission
 proves the runtime path, not full application or Original parity; all49 capability
 requirements and eight broad visual rows retain their scope.
+
+
+### Native Monitor command dialogs and visible block interaction (2026-10-31)
+
+The native Monitor now applies the pinned Original theme to its finish and timed
+Goto dialogs, including the browser's intrinsic number-input sizing. The native
+remaining-time form, cancellation, literal targets and lifecycle stay intact.
+The required visual matrix retains all seven previous states and adds finish,
+initial time and edited time dialogs: all90 previous jobs remain,100 required
+jobs in total. The default native browser, complete viewport RGBA equality,
+three independent native repaint witnesses and all security/deadline gates stay
+mandatory.
+
+[Actual qualification41166542512](https://github.com/jurei733/testcenter-rewrite/actions/runs/41166542512)
+succeeds on application3c34d75ca6ac8a76f62b90f070e2fa8001c1b243, qualification
+head eafc2b0bf91923899494e1a89da7eb58a1215ec3. Independent decoding verifies80
+Original self-control and80 Original-to-Rewrite pairs,320 visible PNGs and960
+actual white repaint frames; all80 compiled Original files,407 frontend and415
+WebSocket source/build hashes agree. Default headed Chromium147.0.7727.15,
+Node22.23.4 and actual image20261026.354.1 reproduce the unchanged native material
+f50648565f43d01072e7420b99d295b09abb00f19ee92cbf912440d22a6ad621. All367 native
+policy cases,22 actual capture controls,4 native archive controls,4 Source-family
+controls and9 real WebSocket browser cases pass without skips. Audit remains0.
+Artifact13029805780 is45,036,309bytes with ZIP SHA256
+`6aef8b4467244366106b0b52aceaf178bacfecb4b89040b19b19cea8f55cb132`;
+2118 safe members contain no fixture databases. No new runtime certificate is
+prepared or old oracle retagged.
+
+The first ten-state attempt41164008949 remains failed: four desktop time-dialog
+pairs differ while68 pairs and80 Source controls match. Source-only41165271472
+then reproduces the same15px offset between two unchanged Original views.
+Read-only41165765318 records hidden BODY scrolling after the view menu and
+before Goto/dialog/input focus; native paint preserves that offset. The test now
+waits for actual menu disposal, uses a genuine mouse click on the measured,
+visible desktop target with viewport and hit-target checks, and waits for the
+actual dialog focus lifecycle. It does not set scroll positions, impose reference
+coordinates, change Original CSS, mask pixels or weaken comparison. Mobile keeps
+its existing real drawer and container interaction. Full native qualification
+above verifies the resulting complete viewports.
+
+The failure-only measurement uploader now selects its produced JSON/log files,
+supervision, native-browser-system and browser-material directories without
+walking APT's protected temporary cache. Actual pinned-uploader qualification
+41164457205 reproduces the legacy EACCES, then successfully retains every selected
+evidence class. Downloaded artifact13028915805 verifies8 safe members and7 fixture
+file hashes, SHA256 `02f0a7604195074cb0cc5158a54087b1becfc91c1d2876022e72a64bd32b1540`.
+This fixture upload proof grants no native-runtime admission.
+
+The previous public24ad full run41162016403 is terminal95/97success: one
+unqualified20261018.96.1 browser consumer stops before application tests and the
+final acceptance fails. Its actual measurement reaches audit0 and Source-family
+validation, but the old recursive upload fails at APT archives/partial; that
+missing artifact cannot qualify a certificate. Image18 remains unqualified for
+the current20f9 lock. Do not rerun unchanged or waive the failed route.
+
+Current application bytes pass93 local default-headed Chrome functional cases,
+2253 frontend cases, typecheck and the418.37kB production build. The subsequent
+actor/upload changes preserve those application and case bytes. Fresh complete
+100-job production acceptance and current-head local reviews remain required.
+The latest published69e reviews are historical. These owned Monitor fixtures do
+not establish the complete Original backend, full Monitor scope, all themes or
+whole-project parity. The49-row ledger remains27done/22partial with all8 broad
+visual rows open; the actual native login still has measured layout, title,
+required-field, footer and administration-entry differences. PR13 stays Draft;
+no approval, merge or deployment is issued.
