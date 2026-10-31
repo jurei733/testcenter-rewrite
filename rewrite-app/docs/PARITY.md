@@ -1,5 +1,35 @@
 # Testcenter parity checklist
 
+### Review ownership across accepted Unit changes (2026-10-31)
+
+The Original-compatible participant Review drawer now closes when its Run or
+Unit changes, matching the pinned Source panel subscription. The accepted state
+transition resets the shared editor; a retired drawer cannot clear a newer draft.
+Late saves, deletes, confirmations and Review reads cannot change a later owner,
+and a same-Unit reopen retains its current list and draft state.
+
+A real protected SQLite/Chrome counterexample retained the first Unit draft in
+the second Unit before the fix. The corrected browser flow checks forward and
+back navigation at desktop and mobile widths, verifies an empty new draft and
+checks that the saved comment belongs only to its actual second Unit. All prior
+24 rendered Review states and protected persistence/security checks remain.
+The production-class controls pass 21/21; the full frontend state suite passes
+2,298/2,298 with no skips. Typecheck and the production build pass.
+
+The required JSON-roster journey also completes locally in headed Chrome through
+its configured entry-link boundary. A trusted show-list click changes the actual
+panel from form-visible to list-visible, and both diagnostic files now use the
+existing imported path resolver. The preceding published CI failed 104/122:
+16 browser jobs encountered the diagnostic writer's undefined `join`; the console
+loading job also encountered an already-handled held Pause route. Its scoped
+callback drain retains the original command-order, persistence and safety checks;
+the complete protected console-loading browser run now passes locally, with the
+same fatal 60-second phase and 480-second total deadlines.
+The earlier e113 hidden-comment CI outcome remains retained and unexplained;
+this successful local run does not establish its cause. New CI acceptance and
+fresh exact-head reviews remain required. The 49-row ledger stays 27 done /
+22 partial, all eight broad visual rows open. No merge or deployment.
+
 ### Native Unit read/state/response/log candidate (2026-10-26)
 
 Literal Unit routes now connect to separate scoped Unit rows in all four stores.

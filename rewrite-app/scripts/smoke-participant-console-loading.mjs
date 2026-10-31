@@ -97,7 +97,7 @@ try {
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-debug-browser" }, operator);
   await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="debug-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="loading-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="remote-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
   reportSmokePhase('chromium-launch');
-  browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
+  browser = await chromium.launch({ channel: process.env.UI_SMOKE_BROWSER_CHANNEL?.trim() || undefined, headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
   await qualifySmokeRouteFailureSettlement(browser, base);
   await qualifyOwnedSmokeRouteDrain(browser, base);
   reportConsolePhase('participant_console_loading=scoped-route-drain-retains-unrelated-handlers-and-rejects-real-failures:passed');
@@ -208,6 +208,7 @@ try {
   const siblingBefore = await loadingRepository.getTestRunById(sibling.testRunId);
   const remoteContext = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
   const remotePage = await remoteContext.newPage();page=remotePage;
+  const remotePauseRoutes = createOwnedSmokeRoutes(remotePage,{observe:pending=>reportSmokeObservation(`remote-pause:pending-owned-routes:${JSON.stringify(pending)}`)});
   let releasePausedView,releaseTerminalRuntime,releaseGotoView;const pausedGate=new Promise(done=>{releasePausedView=done;});releases.push(releasePausedView);
   try {
     remotePage.on("pageerror",error=>errors.push(String(error)));
@@ -237,12 +238,12 @@ try {
       applications.some(value=>value.application.command.commandId===command.commandId)&&
       acks.some(ack=>ack.path.includes(command.commandId))),
       `Remote command ${command.commandId} did not apply and acknowledge`);
-    await remotePage.route("**/application",captureApplication);
-    await remotePage.route("**/current-state?*",async route=>{
-      const response=await route.fetch(),data=await response.json();
-      if(!pausedHeld&&data.currentRunState.testRun.status==="paused"){pausedHeld=true;await pausedGate;}
-      await route.fulfill({response});
-    });
+    await remotePauseRoutes.route("**/application",captureApplication,"remote-pause-application");
+    await remotePauseRoutes.route("**/current-state?*",async (route,stage)=>{
+      stage("fetch");const response=await route.fetch(),data=await response.json();
+      if(!pausedHeld&&data.currentRunState.testRun.status==="paused"){pausedHeld=true;stage("held-pause-view");await pausedGate;}
+      stage("fulfill");await route.fulfill({response});
+    },"remote-pause-current-view");
     const pause=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:"pause"},operator)).command;
     await poll(()=>Promise.resolve(pausedHeld),"Remote Pause did not request its following full view");
     await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),"Remote Pause receipt did not project before its held full view");
@@ -253,7 +254,7 @@ try {
     await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),"Remote Resume receipt did not project RUNNING");
     await remotePage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
     await poll(async()=>(await remotePage.frameLocator("iframe").locator("#demoPlayerAnswer").inputValue())==="3","The resumed Player did not restore its stored answer");
-    releasePausedView();await remotePage.unrouteAll({behavior:"wait"});
+    releasePausedView();await phaseStep("remote-pause-view-route-drain",()=>remotePauseRoutes.drain());
     await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),"Late Pause view reverted the accepted Resume");
     const after=await loadingRepository.getTestRunById(runId);
     assert.deepEqual(after.unitResponses,before.unitResponses);assert.deepEqual(after.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
@@ -797,7 +798,7 @@ try {
       }
     }
 
-  }finally{releasePausedView();releaseTerminalRuntime?.();releaseGotoView?.();await remotePage.unrouteAll({behavior:"ignoreErrors"}).catch(()=>{});await remoteContext.close();}
+  }finally{releasePausedView();releaseTerminalRuntime?.();releaseGotoView?.();await remotePauseRoutes.drain().catch(()=>{});await remotePage.unrouteAll({behavior:"ignoreErrors"}).catch(()=>{});await remoteContext.close();}
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();
   page.on("pageerror", error => errors.push(String(error)));

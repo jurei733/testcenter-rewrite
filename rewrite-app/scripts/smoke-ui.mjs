@@ -18788,11 +18788,11 @@ try {
   catch (error) {
     const diagnostic = await page.evaluate(() => ({records: window.__ownedReviewVisibility?.records,
       panel: document.querySelector('app-original-review-panel')?.outerHTML}));
-    if (failureArtifactDirectory) await writeFile(join(failureArtifactDirectory, 'original-review-visibility.json'), JSON.stringify(diagnostic, null, 2));
+    if (failureArtifactDirectory) await writeFile(resolve(failureArtifactDirectory, 'original-review-visibility.json'), JSON.stringify(diagnostic, null, 2));
     throw error;
   } finally {
     const record = await page.evaluate(() => {const trace = window.__ownedReviewVisibility; trace?.stop(); return trace?.records;});
-    if (artifactDirectory) await writeFile(join(artifactDirectory, 'original-review-visibility-events.json'), JSON.stringify(record, null, 2));
+    if (artifactDirectory) await writeFile(resolve(artifactDirectory, 'original-review-visibility-events.json'), JSON.stringify(record, null, 2));
   }
   assert.equal(await originalSavedReview.textContent(), originalSurfaceComment);
   await originalSavedReview.click();
