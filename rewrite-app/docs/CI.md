@@ -3768,3 +3768,40 @@ policy case explicitly requires rejection before qualification; historical
 Source oracles and their real contexts remain unchanged. Fresh native material,
 Source-family comparisons, successful qualification provenance and separate
 actual offline production admission are required before this lock is accepted.
+
+
+### Seven native Monitor states and patched-lock qualification (2026-10-31)
+
+Actual qualification41160586438 at wrapperfe0e9e5d succeeds with the product
+application/runtime inputs from0d55f9e4. Independent archive and PNG verification
+confirms56 Original-self and56 Original-to-Rewrite complete pairs,224 visible
+images and672 actual white repaint witnesses,80 compiled Original files,407
+current frontend source hashes and415 WebSocket source/build hashes. All367
+native policy cases pass without skips, four Debian controls, four Source-family
+controls, the native capture countercases and nine real WebSocket cases pass;
+the complete locked audit has zero vulnerabilities. The browser uses its default
+headed arguments at147.0.7727.15, Node22.23.4 on actual image20261026.354.1.
+
+The earlier failed41157910242 genuinely exposed the native15px scrollbar outside
+root opacity. Its12660 nonwhite mobile pixels span x375..389 and y0..843 exactly.
+The clearing helper now recolours that native scrollbar only during the actual
+clearing frame and restores the exact root style and original screenshot; no
+scrollbar is hidden or resized. A real Linux countercase rejects the immutable
+old helper and verifies zero changed pixels after the fixed repaint. The next
+failed41159695712 passes all56 self-controls but exposes31563 differing mobile
+filter pixels: candidate global root specificity suppressed CDK global-scrollblock.
+Zero-specificity native defaults let the same CDK class win as in the Source,
+restoring the real375px layout. Both failed attempts remain rejected evidence.
+
+The final local default-headed Chrome run passes all93 functional cases with
+current source hashes. An earlier Peer chooser click timed out with an unstable
+button; bounded telemetry and two subsequent meaningful current-state runs pass,
+but the original cause is unproved and the failed evidence is retained. No click
+is forced or deadline extended. The Source backend and full Monitor/49-row
+Original scope remain unqualified.
+
+The new exact20f9 registry records only the genuinely qualified26 cohort and its
+actualfe0e9e5d oracle context. Legacy/84/faac oracles remain untouched. Preparing
+this certificate is not proof of production restoration: the real current loader,
+context selection and network-isolated offline installation must still succeed
+in a separate admission run before publishing the dependency change.
