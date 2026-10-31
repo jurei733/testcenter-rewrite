@@ -25,7 +25,23 @@ console.log('owned_artifacts='+artifacts);
 const file=join(artifacts,'store.sqlite'),storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE||'.data/original-xml-schemas'),false),services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
 const password='Owned native monitor browser password',monitorName='owned-ui-monitor',one='owned-ui-alpha',two='owned-ui-beta',group='OWNED.UI.GROUP',firstId='9007199254740993',secondId='9007199254740994';
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
-let browser,server,page;const errors=[],wire=[],markers=[];const chooseMonitor=target=>target.locator('tc-test-card[data-cy^="gm-card-"]').first().getByRole('button',{name:'Gruppen-Monitor Starten',exact:true}).click();
+let browser,server,page;const errors=[],wire=[],markers=[],chooserDiagnostics=[];
+const chooseMonitor=async target=>{
+ const diagnostic={path:new URL(target.url()).pathname,samples:[]};chooserDiagnostics.push(diagnostic);
+ let pending=false,finished=false;
+ const timer=setInterval(()=>{if(pending||finished||diagnostic.samples.length>=800)return;pending=true;
+  void target.evaluate(()=>{
+   const button=document.querySelector('tc-test-card[data-cy^="gm-card-"] button');
+   const box=element=>{const b=element?.getBoundingClientRect();return b?{x:b.x,y:b.y,width:b.width,height:b.height}:null;};
+   const parents=[];for(let node=button?.parentElement;node&&parents.length<6;node=node.parentElement)parents.push({tag:node.tagName,classes:node.className,box:box(node),scrollTop:node.scrollTop});
+   const css=button?getComputedStyle(button):null;
+   return{time:performance.now(),online:navigator.onLine,scroll:[scrollX,scrollY],button:box(button),hovered:button?.matches(':hover'),transform:css?.transform,transition:css?.transition,
+    parents,animations:document.getAnimations().map(a=>({name:a.animationName,state:a.playState,currentTime:typeof a.currentTime==='number'?a.currentTime:null})),offlineBanner:document.body.innerText.startsWith('Offline mode')};
+  }).then(sample=>diagnostic.samples.push(sample),error=>diagnostic.samples.push({error:String(error)})).finally(()=>{pending=false;});
+ },50);
+ try{await target.locator('tc-test-card[data-cy^="gm-card-"]').first().getByRole('button',{name:'Gruppen-Monitor Starten',exact:true}).click();}
+ finally{finished=true;clearInterval(timer);}
+};
  const openLogoutFromStarter=async()=>{
   assert.equal(await page.locator('[data-cy=account-button]').count(),0);
   const refreshed=page.waitForResponse(r=>new URL(r.url()).pathname==='/session'&&r.request().method()==='GET');void refreshed.catch(()=>{});
@@ -240,8 +256,8 @@ try{
   for(const owner of recovery.tests.slice(0,2)){const commands=await native('GET','/test/'+owner.id+'/commands',owner.token);assert.equal(commands.length,1);assert.equal(commands[0].keyword,'terminate');assert.deepEqual(commands[0].arguments,['lock']);}
   assert.deepEqual(await native('GET','/test/'+recovery.tests[2].id+'/commands',recovery.tests[2].token),[]);check('finish-retry-terminates-only-original-owned-targets-after-lock');
  }finally{await recoveryContext.close();}
- assert.deepEqual(errors,[]);await writeFile(join(artifacts,'result.json'),JSON.stringify({success:true,browser:browser.version(),markers,nativeRequests:wire.map(({body,...r})=>r),timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),privateCredentialBodiesOmitted:true,sourceVisualParityClaimed:false},null,2));console.log('native_monitor_ui_success=true');
-}catch(error){if(page){await page.screenshot({path:join(artifacts,'failure.png'),fullPage:false}).catch(()=>{});await writeFile(join(artifacts,'failure.json'),JSON.stringify({error:String(error),browserErrors:errors,markers,timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),requests:wire.map(({body,...r})=>r)},null,2));}throw error;}finally{try{await browser?.close();}finally{if(server)await stopNativeSmokeServer(server);}}
+ assert.deepEqual(errors,[]);await writeFile(join(artifacts,'result.json'),JSON.stringify({success:true,browser:browser.version(),markers,chooserDiagnostics,nativeRequests:wire.map(({body,...r})=>r),timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),privateCredentialBodiesOmitted:true,sourceVisualParityClaimed:false},null,2));console.log('native_monitor_ui_success=true');
+}catch(error){if(page){await page.screenshot({path:join(artifacts,'failure.png'),fullPage:false}).catch(()=>{});await writeFile(join(artifacts,'failure.json'),JSON.stringify({error:String(error),browserErrors:errors,markers,chooserDiagnostics,timerEvents:await page.evaluate(()=>window.__ownedTimerEvents??[]),nativeGotoArguments:wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').map(r=>JSON.parse(r.body)).filter(body=>body.keyword==='goto').map(body=>body.arguments),requests:wire.map(({body,...r})=>r)},null,2));}throw error;}finally{try{await browser?.close();}finally{if(server)await stopNativeSmokeServer(server);}}
 
  await runNativeParticipantSmoke(artifactRoot);
  await runNativeWebsocketSmoke(join(artifactRoot,'native-websocket'));

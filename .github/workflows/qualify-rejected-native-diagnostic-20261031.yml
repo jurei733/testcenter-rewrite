@@ -54,6 +54,8 @@ jobs:
           cmp "$RUNNER_TEMP/native-browser-system/manifest.json" "$RUNNER_TEMP/browser-system/manifest.json"
       - name: Build the actual API, schema cache and web app
         run: npm run build
+      - name: Bind the actual capture-program files to this qualification
+        run: sha256sum scripts/native-viewport-repaint.mjs scripts/stable-viewport-capture.mjs scripts/stable-viewport-capture.test.mjs scripts/fixtures/native-viewport-repaint-before-scrollbar-witness.mjs scripts/smoke-native-monitor-visual.mjs scripts/native-monitor-visual-scenes.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/capture-inputs.sha256"
       - name: Preserve actual native paint and layout negative controls
         env:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-capture-controls
