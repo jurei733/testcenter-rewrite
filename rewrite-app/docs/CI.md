@@ -3661,3 +3661,31 @@ oracle or Source material. The exact-lock certificate registry, collector,
 archive authentication, native Debian controls and production admission rules
 are unchanged. Actual successful native qualification and admission evidence
 remain necessary before any new cohort certificate is prepared.
+
+
+### Required native Monitor baseline (2026-10-31)
+
+`native-monitor-visual` adds one required group after Fast feedback, the shared
+build, the authenticated browser-package producer and the pinned Original build.
+The existing 90 job instances remain; complete acceptance now requires 91.
+The new consumer uses the verified same-run application outputs and Original
+artifact, the existing offline runtime restoration and the normal headed locked
+browser. Its rendering reference comes from the authenticated format3 bundle or
+the unchanged native oracle embedded in a format4 certified bundle; oracle
+contexts are never relabeled.
+
+The group runs actual paint/layout negative controls, then eight Original
+self-control pairs and eight Original-to-Rewrite full-viewport pairs at 1280x720
+and390x844 with four fixed native polling-animation phases. Every capture still
+requires three identical independently repainted complete frames, and every pair
+requires zero differing RGBA pixels. A failure in self-control, missing Source
+files, changed source/build bytes, browser errors or any pixel difference fails
+the group and complete acceptance. Complete Source files (including hidden
+assets), original/rewrite HTML, PNGs, repaint witnesses and runtime-reference
+contexts are retained for30 days on success or failure.
+
+This required group covers the baseline state only. Additional Monitor states,
+all eight broad visual rows, backend equivalence and complete Original parity
+remain open. The capture program is promoted from the independently verified
+native qualification41150306578; the production runtime path and format4
+reference selection are integration changes requiring fresh current-head CI.
