@@ -41,7 +41,7 @@ export class OriginalSessionProof {
   directAllowed(kind: 'login' | 'person', protectedInput: string): void {
     const scope = kind === 'login' ? 'participant' : 'second_code';
     if (this.config.enabledScopes.includes(scope) && protectedInput !== '') {
-      throw new FirstSliceError(400, 'original_work_required', 'Brute Force protection active. Challenge must be solved to create a session');
+      throw new FirstSliceError(400, 'original_work_required', `Brute Force protection active. Challenge for this ${kind === 'login' ? 'password' : 'code'} must be solved to create a session`);
     }
   }
   create(target: OriginalProofTarget): OriginalWorkChallenge {

@@ -9,10 +9,13 @@ export const originalSessionRoutes = new Map<string, string[]>([
   [originalSessionPaths.challenge, ['POST']], [originalSessionPaths.personChallenge, ['POST']]
 ]);
 const object = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
-const fields = (value: unknown, required: string[], optional: string[] = []) => {
+const requireFields = (value: unknown, required: string[]): void => {
   for (const key of required) if (!object(value) || value[key] === undefined || value[key] === null) {
     throw new FirstSliceError(400, 'original_request_invalid', `Required body-parameter is missing: \`${key}\``);
   }
+};
+const fields = (value: unknown, required: string[], optional: string[] = []) => {
+  requireFields(value, required);
   if (!object(value) || required.some(key => typeof value[key] !== 'string') ||
     optional.some(key => value[key] !== undefined && typeof value[key] !== 'string')) {
     throw new FirstSliceError(400, 'original_request_invalid', 'Invalid session request fields.');
@@ -72,7 +75,7 @@ export async function handleOriginalSessionHttp(input: {
     if (input.pathname === '/session/login') {
       const body = fields(await readBody(), ['name'], ['password']);
       loginName = body.name!;
-      input.proof.directAllowed('login', body.name!);
+      input.proof.directAllowed('login', body.password ?? '');
       input.send(200, await session.login({name: body.name!, password: body.password ?? ''}));
     } else if (input.pathname === '/session/person') {
       const loginToken = token(); await session.requireLogin({token: loginToken});
@@ -90,7 +93,9 @@ export async function handleOriginalSessionHttp(input: {
     } else if (method === 'PUT') {
       const rawHeader = input.request.headers.authtoken;
       const loginToken = typeof rawHeader === 'string' ? rawHeader : '';
-      const target = await input.proof.consume(await readBody(), loginToken, token => session.requireLogin({token}));
+      const body = await readBody();
+      requireFields(body, ['algorithm', 'challenge', 'salt', 'signature', 'number']);
+      const target = await input.proof.consume(body, loginToken, token => session.requireLogin({token}));
       if (target.kind === 'login') loginName = target.name;
       input.send(200, target.kind === 'login' ? await session.login({name: target.name, password: target.password})
         : await session.person({loginToken, code: target.code}));

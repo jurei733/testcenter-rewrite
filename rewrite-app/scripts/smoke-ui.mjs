@@ -18757,9 +18757,43 @@ try {
   await originalSidebar.waitFor({ state: "detached" });
   assert.equal(await page.locator('[data-cy="send-comments"]').evaluate(element => element === document.activeElement), true);
   await page.locator('[data-cy="send-comments"]').click();
+  await page.evaluate(() => {
+    const records = [], identities = new WeakMap(); let nextIdentity = 0, lastState = '';
+    const record = (event = {}) => {
+      const host = document.querySelector('app-original-review-panel');
+      if (host && !identities.has(host)) identities.set(host, ++nextIdentity);
+      const form = host?.querySelector('form'), list = host?.querySelector('.review-list');
+      const state = {host: host ? identities.get(host) : null, heading: host?.querySelector('h2')?.textContent,
+        formHidden: form?.hidden, listHidden: list?.hidden, activeTag: document.activeElement?.tagName};
+      const serialized = JSON.stringify(state);
+      if (records.length < 64 && (serialized !== lastState || Object.keys(event).length)) {
+        records.push({at: performance.now(), ...state, ...event}); lastState = serialized;
+      }
+    };
+    const observer = new MutationObserver(() => record());
+    observer.observe(document.documentElement, {subtree: true, childList: true, attributes: true, attributeFilter: ['hidden']});
+    const click = event => {
+      const button = event.target.closest?.('button');
+      if (button?.getAttribute('data-cy')?.startsWith('comment-')) {
+        record({event: 'click', button: button.getAttribute('data-cy'), trusted: event.isTrusted});
+        queueMicrotask(() => record({event: 'after-click'}));
+      }
+    };
+    document.addEventListener('click', click, true); record({event: 'start'});
+    window.__ownedReviewVisibility = {records, stop: () => {observer.disconnect(); document.removeEventListener('click', click, true);}};
+  });
   await page.locator('[data-cy="comment-toolbar-show-list"]').click();
   const originalSavedReview = page.locator('[data-cy="comment-list-unit-comments"]').filter({ hasText: originalSurfaceComment });
-  await originalSavedReview.waitFor();
+  try { await originalSavedReview.waitFor(); }
+  catch (error) {
+    const diagnostic = await page.evaluate(() => ({records: window.__ownedReviewVisibility?.records,
+      panel: document.querySelector('app-original-review-panel')?.outerHTML}));
+    if (failureArtifactDirectory) await writeFile(join(failureArtifactDirectory, 'original-review-visibility.json'), JSON.stringify(diagnostic, null, 2));
+    throw error;
+  } finally {
+    const record = await page.evaluate(() => {const trace = window.__ownedReviewVisibility; trace?.stop(); return trace?.records;});
+    if (artifactDirectory) await writeFile(join(artifactDirectory, 'original-review-visibility-events.json'), JSON.stringify(record, null, 2));
+  }
   assert.equal(await originalSavedReview.textContent(), originalSurfaceComment);
   await originalSavedReview.click();
   await page.waitForFunction(comment =>

@@ -17,7 +17,7 @@ import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js'
 
 const fixtureRoot = new URL('../test-fixtures/original-testcenter/source-workspace-results/', import.meta.url);
 const source = JSON.parse(await readFile(new URL('native-login-protocol/http-observations.json', fixtureRoot), 'utf8'));
-for (const folder of ['native-login-protocol', 'native-pow-protocol', 'native-session-wire']) {
+for (const folder of ['native-login-protocol', 'native-pow-protocol', 'native-session-wire', 'native-protected-session-http']) {
   const manifest = JSON.parse(await readFile(new URL(folder + '/manifest.json', fixtureRoot), 'utf8'));
   assert.equal(manifest.testMode, false); assert.equal(manifest.sourceCommit, 'eedae41840cbe90e5547c0211da818bdf620f5aa');
   for (const [file, sha] of Object.entries(manifest.files)) {
@@ -448,6 +448,73 @@ test('native Session errors match the captured production Source wire format and
   } finally {
     for (const [stream, write] of originalWrites) stream.write = write;
     if (server) { server.closeAllConnections(); await new Promise(done => server.close(done)); } await storage?.shutdown();
+    if (created) await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool?.end(); await rm(directory, {recursive: true, force: true});
+  }
+});
+
+
+test('protected passwordless Source HTTP permits the empty-secret name step and preserves challenge requirements', async t => {
+  const oracle = JSON.parse(await readFile(new URL('native-protected-session-http/observations.json', fixtureRoot), 'utf8'));
+  assert.equal(oracle.verified, true); assert.deepEqual(oracle.configuration.bruteForceProtection, ['login', 'person']);
+  const rows = new Map(oracle.rows.map(row => [row.label, row])), directory = await mkdtemp(join(tmpdir(), 'owned-passwordless-http-'));
+  const postgres = process.env.FIRST_SLICE_STORE === 'postgres', schema = 'owned_passwordless_' + randomUUID().replaceAll('-', '');
+  const url = postgres ? new URL(process.env.FIRST_SLICE_POSTGRES_URL) : null; url?.searchParams.set('options', '-c search_path=' + schema); url?.searchParams.set('application_name', schema);
+  const environment = {FIRST_SLICE_STORE: postgres ? 'postgres' : 'sqlite', FIRST_SLICE_SQLITE_FILE: join(directory, 'owned.sqlite'),
+    FIRST_SLICE_BOOTSTRAP_DEMO: 'false', FIRST_SLICE_OPERATOR_AUTH_REQUIRED: 'true', FIRST_SLICE_XML_SCHEMA_PROFILE: 'original-19', REQUIRE_LOGIN_PASSWORD: 'false',
+    FIRST_SLICE_PROOF_OF_WORK_SCOPES: 'participant,second_code', FIRST_SLICE_PROOF_OF_WORK_SECRET: secret, FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET: '',
+    FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER: '12', FIRST_SLICE_PROOF_OF_WORK_TTL_MS: '60000', ...(url ? {FIRST_SLICE_POSTGRES_URL: url.toString()} : {})};
+  const previous = new Map(Object.keys(environment).map(key => [key, process.env[key]])); let server, storage, pool, created = false;
+  try {
+    if (url) { pool = new Pool({connectionString: process.env.FIRST_SLICE_POSTGRES_URL}); await pool.query(`CREATE SCHEMA "${schema}"`); created = true; }
+    try { Object.assign(process.env, environment); server = await createProductionApiServer(); }
+    finally { for (const [key, value] of previous) if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    storage = url ? await createPostgresFirstSliceStorage(url.toString()) : createSqliteFirstSliceStorage(environment.FIRST_SLICE_SQLITE_FILE);
+    const repository = storage.repository, services = createFirstSliceServices({repository, originalXmlSchemaValidator: validator, xmlSchemaProfile: 'original-19'});
+    const tenant = await services.platform.createTenant({tenantKey: 'owned-' + randomUUID(), displayName: 'Owned Source passwordless'});
+    const workspace = await services.platform.createWorkspace({tenantKey: tenant.tenantKey, workspaceKey: 'owned', displayName: 'Owned Source passwordless'});
+    const scope = {tenantKey: tenant.tenantKey, workspaceKey: workspace.workspaceKey}; await uploadDependencies(services, scope);
+    await services.contentIntake.uploadWorkspaceFile({...scope, fileName: 'booklet.xml', sourceDocument: booklet('Owned protected Booklet'), mediaType: 'application/xml'});
+    await services.workspaceAdminRead.importParticipantRoster({...scope, rosterText: xml('Testtakers', 'testcenter-testtaker-xml', '<Metadata/><Group id="OWNED.PROTECTED" label="Owned protected group">' +
+      '<Login name="owned-protected-code" pw="' + password + '" mode="run-hot-return"><Booklet codes="Shared">ORACLE.BOOK.A</Booklet></Login>' +
+      '<Login name="owned-passwordless-code" mode="run-hot-return"><Booklet codes="Shared">ORACLE.BOOK.A</Booklet></Login>' +
+      '<Login name="owned-passwordless-no-code" mode="run-hot-return"><Booklet>ORACLE.BOOK.A</Booklet></Login>' +
+      '<Login name="owned-passwordless-monitor" mode="monitor-group"/></Group>')});
+    await new Promise(done => server.listen(0, '127.0.0.1', done)); const base = 'http://127.0.0.1:' + server.address().port;
+    const request = async (path, body) => {const response = await fetch(base + path, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: AbortSignal.timeout(15000)});
+      const text = await response.text(); return {status: response.status, text, headers: response.headers, value: response.ok ? JSON.parse(text) : null};};
+    for (const [label, body] of [
+      ['passworded-empty', {name: 'owned-protected-code', password: ''}],
+      ['passworded-direct-correct', {name: 'owned-protected-code', password}],
+      ['passwordless-coded-direct-empty', {name: 'owned-passwordless-code', password: ''}],
+      ['passwordless-coded-omitted-password', {name: 'owned-passwordless-code'}],
+      ['passwordless-no-code-direct-empty', {name: 'owned-passwordless-no-code', password: ''}],
+      ['passwordless-monitor-direct-empty', {name: 'owned-passwordless-monitor', password: ''}],
+      ['proof-missing-algorithm', {}],
+      ['proof-missing-number', {algorithm: 'SHA-256', challenge: 'a'.repeat(64), salt: 'owned', signature: '0'.repeat(64)}]
+    ]) await t.test(label + ' matches actual protected Source', async () => {
+      const expected = rows.get(label), actual = await request(label.startsWith('proof-') ? '/session' : '/session/login', body);
+      assert.equal(actual.status, expected.status);
+      if (actual.status >= 400) {assert.equal(actual.text, expected.value); assert.equal(actual.headers.get('content-type'), expected.contentType); assert.equal(actual.headers.get('test-mode'), 'NO');}
+      else {assert.deepEqual(actual.value.flags, expected.value.flags); assert.equal(actual.value.loginName, expected.value.loginName);
+        assert.equal(actual.value.displayName, expected.value.displayName); assert.equal(actual.value.groupLabel, expected.value.groupLabel);
+        assert.deepEqual(Object.keys(actual.value).sort(), Object.keys(expected.value).sort()); assert.match(actual.value.token, /^[a-z0-9_-]{24}$/);
+        assert.equal(actual.value.pwSetByAdmin, null); assert.equal(actual.headers.get('error-id'), null);
+        if (actual.value.access.test) assert.deepEqual(actual.value.access.test, ['ORACLE.BOOK.A']);
+        if (actual.value.access.testGroupMonitor) assert.deepEqual(actual.value.access.testGroupMonitor, ['OWNED.PROTECTED']);}
+      assert.equal(actual.text.includes(password), false);
+    });
+    await t.test('global password-required configuration still rejects the empty-secret path', async () => {
+      server.closeAllConnections(); await new Promise(done => server.close(done)); server = undefined;
+      try {Object.assign(process.env, environment, {REQUIRE_LOGIN_PASSWORD: 'true'}); server = await createProductionApiServer();}
+      finally {for (const [key, value] of previous) if (value === undefined) delete process.env[key]; else process.env[key] = value;}
+      await new Promise(done => server.listen(0, '127.0.0.1', done));
+      const response = await fetch('http://127.0.0.1:' + server.address().port + '/session/login', {method: 'PUT',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: 'owned-passwordless-code', password: ''}), signal: AbortSignal.timeout(15000)});
+      assert.equal(response.status, 400); assert.equal(await response.text(), 'No Login for `owned-passwordless-code` with this password.');
+      assert.equal(response.headers.get('test-mode'), 'NO');
+    });
+  } finally {
+    if (server) {server.closeAllConnections(); await new Promise(done => server.close(done));} await storage?.shutdown();
     if (created) await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool?.end(); await rm(directory, {recursive: true, force: true});
   }
 });
