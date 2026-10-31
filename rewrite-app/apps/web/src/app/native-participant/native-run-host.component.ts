@@ -1,9 +1,10 @@
+import {NgTemplateOutlet} from '@angular/common';
+import {MatTooltip} from '@angular/material/tooltip';
 import {type AfterViewInit,Component,ViewChild,ViewContainerRef,inject,signal,effect,untracked} from '@angular/core';
-import {ActivatedRoute,ChildrenOutletContexts,Router} from '@angular/router';
+import {ActivatedRoute,ChildrenOutletContexts,Router,RouterLink} from '@angular/router';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {MatToolbar} from '@angular/material/toolbar';
-import {MatButton,MatIconButton} from '@angular/material/button';
-import {NativeMonitorIconComponent as MatIcon} from '../native-monitor/native-monitor-icon.component';
+import {MatButton} from '@angular/material/button';
 import {NativeMonitorSessionService} from '../native-monitor/native-session.service';
 import {ApplicationSettingsService} from '../application-settings.service';
 import {InterfaceModeService} from '../interface-mode.service';
@@ -11,15 +12,16 @@ import {OriginalOverlayStylesComponent} from '../original-overlay-styles.compone
 import {NativeRunRuntime} from './native-run-runtime.service';
 import type {NativeRunContext} from './native-run-context';
 import {HeaderService} from './shared/services/header.service';
-@Component({selector:'app-native-run-host',standalone:true,imports:[MatToolbar,MatButton,MatIconButton,MatIcon,OriginalOverlayStylesComponent],
+@Component({selector:'app-native-run-host',standalone:true,imports:[NgTemplateOutlet,RouterLink,MatTooltip,MatToolbar,MatButton,OriginalOverlayStylesComponent],
  template:`<app-original-overlay-styles />
- @if(!header?.isHeaderHidden){<header><mat-toolbar><button matIconButton aria-label="Zur Übersicht" (click)="back()"><mat-icon svgIcon="chevron_left" /></button><h1>{{header?.title||settings.settings().appTitle}}</h1><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></mat-toolbar></header>}
+ @if(!header?.isHeaderHidden){<header><mat-toolbar data-cy="header"><div class="side"></div><div class="center">@if(header?.title){<h1>{{header?.title}}</h1>}</div><div class="side logo"><ng-container [ngTemplateOutlet]="logo" /></div></mat-toolbar></header>}
+ @else{<div class="logo standalone-logo"><ng-container [ngTemplateOutlet]="logo" /></div>}
+ <ng-template #logo><a [routerLink]="['/native-start']" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" data-cy="logo" alt="Logo der Anwendung" matTooltip="Zur Startseite" /></a></ng-template>
  @if(problem()){<p role="alert">{{problem()}}</p>}
  @if(session.restoring()){<p role="status">Sitzung wird geprüft …</p>}
  @if(!session.restoring()&&!session.access()){<button matButton="filled" (click)="back()">Anmelden</button>}
  <ng-container #controller />`,
- styleUrls:['./native-run-host.component.scss'],
- styles:`:host{display:flex;flex-direction:column;height:100vh;min-height:0}mat-toolbar{display:flex;gap:16px}h1{flex:1;margin:0;text-align:center;font-size:20px}img{max-width:170px;max-height:48px}`})
+ styleUrls:['./native-run-host.component.scss']})
 export class NativeRunHostComponent implements AfterViewInit {
  @ViewChild('controller',{read:ViewContainerRef,static:true}) private slot!:ViewContainerRef;
  readonly runtime=inject(NativeRunRuntime);readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
