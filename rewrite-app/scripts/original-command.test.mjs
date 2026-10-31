@@ -76,6 +76,19 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    await send({keyword:'owned.command.locked',arguments:['still queued'],timestamp:clock+30,testIds:[Number(id)]});const queued=JSON.parse(await poll());assert.equal(queued[0].id,4);assert.equal(await ack(4),'OK');await poll();await assert.rejects(services.originalTest.read({token:owner.person.token,testNumber:id}),e=>e.statusCode===423);
    const loggedRunId=(await current()).testRunId;const logs=(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId)).filter(log=>log.testRunId===loggedRunId).sort((a,b)=>a.recordedAt.localeCompare(b.recordedAt)).map(log=>({timestamp:log.timestamp,logentry:formatOriginalTestLogEntry(log)}));assert.deepEqual(logs,polling.map(row=>({timestamp:row.timestamp,logentry:row.logentry})));assert.equal((await run()).originalTestState.CONNECTION,'LOST');
   });
+  await t.test('WebSocket reads stay read-only and final-connection cleanup retains Source zero-clock log semantics',async()=>{
+   const token=owner.person.token,testNumber=id;
+   await services.originalTest.patchState({token,testNumber,patch:[{key:'CONNECTION',content:'WEBSOCKET',timeStamp:888}]});
+   const before=await run(),logs=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId);
+   assert.equal(await services.originalCommand.pending({token,testNumber}),'[]');assert.deepEqual(await run(),before);
+   await services.originalCommand.connectionLost({token,testNumber,stillDisconnected:()=>false});assert.deepEqual(await run(),before);assert.deepEqual(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),logs);
+   await services.originalCommand.connectionLost({token,testNumber,stillDisconnected:()=>true});const after=await run(),nextLogs=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId);
+   assert.deepEqual(after.originalTestState,before.originalTestState);assert.equal(after.locked,before.locked);assert.equal(after.originalResultState.lastOpenedAt,before.originalResultState.lastOpenedAt);assert.equal(nextLogs.length,logs.length+1);
+   const added=nextLogs.find(log=>!logs.some(old=>old.participantTestLogId===log.participantTestLogId));assert.equal(added.logKey,'"CONNECTION"');assert.equal(added.logContent,'LOST');assert.equal(added.timestamp,0);
+   await assert.rejects(services.originalCommand.connectionLost({token:peer.person.token,testNumber,stillDisconnected:()=>true}),e=>e.statusCode===403);assert.deepEqual(await run(),after);
+   await services.originalTest.patchState({token,testNumber,patch:[{key:'CONNECTION',content:'LOST',timeStamp:889}]});const already=await run(),alreadyLogs=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId);
+   await services.originalCommand.connectionLost({token,testNumber,stillDisconnected:()=>true});assert.deepEqual(await run(),already);assert.deepEqual(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),alreadyLogs);
+  });
   await t.test('all52 production Source67 producer vectors retain their real allocation gap, packet values and insert-failure atomicity across restart',async()=>{
    const fresh=label=>create('command-edge:'+label);
    const marker=async label=>{const target=await fresh('marker-'+label);await send({keyword:'edge.marker',timestamp:clock+100,testIds:[Number(target)]});const packet=JSON.parse(await poll(target));assert.equal(packet.length,1);return packet[0].id;};

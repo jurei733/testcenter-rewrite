@@ -1,0 +1,132 @@
+import assert from 'node:assert/strict';
+
+export const monitorVisualScenes=Object.freeze(['baseline','selected-row','settings-menu','new-filter-dialog','filter-target-menu','filter-value-options','advanced-filter-dialog','finish-dialog','time-dialog','time-dialog-edited']);
+
+export async function prepareMonitorVisualScene(page,scene,screen) {
+  assert.ok(monitorVisualScenes.includes(scene),'Unknown native Monitor visual scene');
+  if(scene==='baseline')return {scene};
+  if(scene==='finish-dialog'){
+    await page.locator('[data-cy=GM_end_button]').click();await page.getByRole('dialog').waitFor();
+    await page.locator('[data-cy=dialog-confirm]').waitFor();await page.locator('[data-cy=dialog-cancel]').waitFor();
+    return {scene};
+  }
+  if(scene.startsWith('time-dialog')){
+    const finite=()=>page.waitForFunction(()=>document.getAnimations().every(animation=>
+      !Number.isFinite(animation.effect?.getTiming().iterations)||animation.playState==='finished'),{},{timeout:2000});
+    // The real full view exposes the timed block selector. Seeded native Test
+    // state expires this block; no component or DOM state is patched here.
+    await page.locator('[data-cy=GM_setting_button]').click();await page.getByRole('menu').waitFor();
+    await page.locator('[data-cy=GM_activity_button]').hover();await page.locator('[data-cy=GM_display_option_full]').click();
+    await page.waitForFunction(()=>!document.querySelector('.mat-mdc-menu-panel'),{},{timeout:2000});await finite();
+    await page.locator('tc-test-session [data-cy=gm-testlet-select]').first().waitFor();
+    await page.locator('tc-test-session [svgicon=timer_off]').first().waitFor();
+    if(screen==='mobile'){
+      await page.locator('.drawer-button-open').click();
+      await page.waitForFunction(()=>{const drawer=document.querySelector('.mat-drawer');return drawer&&getComputedStyle(drawer).visibility==='hidden'&&!drawer.classList.contains('mat-drawer-opened');});await finite();
+    }
+    const block=page.locator('tc-test-session [data-cy=gm-testlet-select]').first();
+    if(screen==='desktop'){
+      // Locator.click always asks the browser to scroll, even for this already
+      // visible non-focusable block. Actual native Source controls showed that
+      // moving the hidden body produces two different complete Source frames.
+      // Use the live visible target, without scrolling or changing its geometry.
+      const box=await block.boundingBox(),viewport=page.viewportSize();assert.ok(box&&viewport);
+      assert.ok(box.width>0&&box.height>0&&box.x>=0&&box.y>=0&&box.x+box.width<=viewport.width&&box.y+box.height<=viewport.height);
+      const point={x:box.x+box.width/2,y:box.y+box.height/2};
+      assert.equal(await block.evaluate((element,point)=>element.contains(document.elementFromPoint(point.x,point.y)),point),true);
+      await page.mouse.click(point.x,point.y);
+    }else await block.click();
+    await page.waitForFunction(()=>{const button=document.querySelector('[data-cy=GM_jump_button]');return button&&!button.disabled;});
+    if(screen==='mobile'){
+      await page.locator('.drawer-button-close').click();
+      await page.waitForFunction(()=>{const drawer=document.querySelector('.mat-drawer');return drawer&&getComputedStyle(drawer).visibility==='visible'&&drawer.classList.contains('mat-drawer-opened');});await finite();
+    }
+    await page.locator('[data-cy=GM_jump_button]').click();await page.locator('#setTimer').waitFor();await finite();
+    await page.waitForFunction(()=>document.activeElement===document.querySelector('#setTimer')&&!document.querySelector('.mat-mdc-dialog-opening'),{},{timeout:2000});
+    assert.equal(await page.locator('#setTimer').inputValue(),'10');
+    const inputEvents=[];
+    if(scene==='time-dialog-edited'){
+      await page.evaluate(()=>{
+        window.__ownedVisualTimerInputs=[];
+        document.querySelector('#setTimer').addEventListener('input',event=>window.__ownedVisualTimerInputs.push({trusted:event.isTrusted,value:event.target.value}));
+      });
+      await page.locator('#setTimer').fill('5');
+      inputEvents.push(...await page.evaluate(()=>window.__ownedVisualTimerInputs));
+      assert.deepEqual(inputEvents,[{trusted:true,value:'5'}]);
+    }
+    const input=await page.locator('#setTimer').evaluate(input=>({value:input.value,type:input.type,min:input.min,max:input.max,valid:input.validity.valid}));
+    assert.deepEqual(input,{value:scene==='time-dialog-edited'?'5':'10',type:'number',min:'1',max:'10',valid:true});
+    return {scene,input,inputEvents};
+  }
+  if(scene==='settings-menu'){
+    await page.locator('[data-cy=GM_setting_button]').click();
+    await page.getByRole('menu').waitFor();
+    return {scene};
+  }
+  if(['new-filter-dialog','filter-target-menu','filter-value-options','advanced-filter-dialog'].includes(scene)){
+    await page.locator('[data-cy=GM_setting_button]').click();await page.getByRole('menu').waitFor();
+    await page.locator('[data-cy=GM_filter_button]').hover();
+    await page.waitForFunction(()=>[...document.querySelectorAll('[role=menu]')].filter(menu=>getComputedStyle(menu).visibility!=='hidden').length===2);
+    await page.locator('[data-cy=GM_add_filter_button]').click();await page.getByRole('dialog').waitFor();
+    // A child overlay must measure the completed dialog, not its 80% entry
+    // transform. Wait for actual identity/finished animations; never set size.
+    await page.waitForFunction(()=>{
+      const surface=document.querySelector('.mat-mdc-dialog-container .mdc-dialog__surface');
+      if(!surface)return false;const transform=getComputedStyle(surface).transform;
+      return (transform==='none'||new DOMMatrixReadOnly(transform).isIdentity)&&document.getAnimations().every(animation=>
+        !Number.isFinite(animation.effect?.getTiming().iterations)||animation.playState==='finished');
+    },{},{timeout:2000});
+    const evidence={scene};
+    if(scene==='filter-target-menu'){
+      await page.locator('[data-cy=GM_filtersetting_field]').click();await page.getByRole('listbox').waitFor();
+      const options=await page.getByRole('option').allTextContents();assert.ok(options.length>0);
+      evidence.options=options.map(value=>value.trim());
+    }
+    if(scene==='filter-value-options'){
+      // The pinned Source populates Booklet labels, not the default person list.
+      await page.locator('[data-cy=GM_filtersetting_field]').click();await page.getByRole('listbox').waitFor();
+      await page.getByRole('option',{name:'Testheft',exact:true}).click();await page.getByRole('listbox').waitFor({state:'hidden'});
+      await page.locator('[data-cy=comment-diag-value]').fill('Owned');await page.getByRole('listbox').waitFor();
+      assert.equal(await page.getByRole('option').count(),1);
+      assert.equal(await page.getByRole('option',{name:'Owned Monitor Booklet',exact:true}).count(),1);
+      evidence.options=['Owned Monitor Booklet'];evidence.value=await page.locator('[data-cy=comment-diag-value]').inputValue();
+    }
+    if(scene==='advanced-filter-dialog'){
+      assert.equal(await page.getByRole('dialog').getByRole('switch').count(),1);
+      await page.getByRole('dialog').getByRole('switch').click();await page.locator('[data-cy=comment-diag-name]').waitFor();
+      assert.equal(await page.getByRole('dialog').getByRole('switch').last().getAttribute('aria-checked'),'true');
+      evidence.advancedMode=true;
+    }
+    return evidence;
+  }
+  await page.getByRole('switch').click();
+  await page.waitForFunction(()=>document.querySelector('[role=switch]')?.getAttribute('aria-checked')==='false'&&
+    document.querySelectorAll('tc-test-session input[type=checkbox]').length===2&&
+    [...document.querySelectorAll('tc-test-session input[type=checkbox]')].every(input=>!input.checked)&&
+    document.querySelector('[data-cy=GM_pause_button]')?.disabled);
+  if(screen==='mobile'){
+    await page.locator('.drawer-button-open').click();
+    // The closed class changes before the drawer transition ends. Clicking
+    // while it moves can scroll the document before the final row is visible.
+    await page.waitForFunction(()=>{
+      const drawer=document.querySelector('.mat-drawer'),content=document.querySelector('.mat-drawer-content');
+      return !!drawer&&getComputedStyle(drawer).visibility==='hidden'&&!drawer.classList.contains('mat-drawer-opened')&&content?.getBoundingClientRect().x===0;
+    });
+    await page.waitForFunction(()=>document.getAnimations().every(animation=>
+      !Number.isFinite(animation.effect?.getTiming().iterations)||animation.playState==='finished'),{},{timeout:2000});
+  }
+  await page.evaluate(()=>{
+    window.__ownedVisualSelections=[];
+    document.addEventListener('change',event=>{
+      const input=event.target;
+      if(input instanceof HTMLInputElement&&input.type==='checkbox'&&input.closest('tc-test-session'))
+        window.__ownedVisualSelections.push({trusted:event.isTrusted,checked:input.checked});
+    },true);
+  });
+  await page.locator('tc-test-session').first().locator('input[type=checkbox]').check();
+  await page.waitForFunction(()=>[...document.querySelectorAll('tc-test-session input[type=checkbox]')].filter(input=>input.checked).length===1&&
+    !document.querySelector('[data-cy=GM_pause_button]')?.disabled);
+  const selection=await page.evaluate(()=>window.__ownedVisualSelections);
+  assert.deepEqual(selection,[{trusted:true,checked:true}]);
+  return {scene,selection};
+}

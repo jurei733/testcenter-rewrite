@@ -27548,7 +27548,7 @@ export const createFirstSliceServices = (
     // Original accepts the XML attribute but stores an empty label as NULL.
     // Its Login construction then fails before checking the password. Keep
     // that invalid stored metadata visible; never invent a group-key label.
-    if (rosterEntry?.groupLabel === "") {
+    if (!nativeFirstFactor && rosterEntry?.groupLabel === "") {
       assertParticipantAccessWindow(rosterEntry, signInTimestamp);
       throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
     }
@@ -27580,6 +27580,15 @@ export const createFirstSliceServices = (
             maxFailures: participantLoginMaxFailures
           }
         );
+      }
+      // Source SessionController checks the failure cache before SessionDAO;
+      // getLogin then checks the absolute window before verifying the password.
+      // Preserve canonical participant credential-first behavior separately.
+      if (nativeFirstFactor) {
+        assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+        if (rosterEntry?.groupLabel === "") {
+          throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
+        }
       }
       const passwordHash = nativeCredential === undefined ? await repository.getParticipantRosterPasswordHash(
         workspace.tenantId,
@@ -27914,8 +27923,12 @@ export const createFirstSliceServices = (
       !sameOriginalTestName(current.definition.groupKey,actor.groupKey)||!sameOriginalTestName(binding.groupKey,actor.groupKey)){
       throw new FirstSliceError(409,'original_login_scope_changed','The Original monitor scope changed during authentication.');
     }
+    // A reimport can retain an older ordinary roster entry for a current
+    // operational Login. Never materialize it as a dependent and demote its
+    // authenticated monitor person (including a different study monitor).
+    const operationalKeys=new Set((await repository.listOriginalOperationalLoginsByWorkspace(actor.tenantId,actor.workspaceId)).map(login=>login.loginKey));
     const members=(await repository.listParticipantRosterEntriesByWorkspace(actor.tenantId,actor.workspaceId)).filter(member=>
-      originalMonitorable(member)&&!participantExecutionModeDefinitions[member.executionMode!].alwaysNewSession&&
+      !operationalKeys.has(member.loginKey)&&originalMonitorable(member)&&!participantExecutionModeDefinitions[member.executionMode!].alwaysNewSession&&
       (actor.originalOperationalMode==='monitor-study'||sameOriginalTestName(member.groupKey,actor.groupKey)));
     for(const member of members){
       let memberBinding=(await repository.listOriginalLoginBindingsByWorkspace(actor.tenantId,actor.workspaceId)).find(row=>row.loginKey===member.loginKey);

@@ -320,11 +320,14 @@ for(const kind of kinds)test(`${kind}: native first code spelling and person suf
   if(kind==='sqlite'||kind==='postgres')await t.test('late SQL suffix insert failure leaves no partial parent and a later signup succeeds',async()=>{
    // The credential step may legitimately move the Login group before person creation.
    await login('restart-coded','abc');
-   const before=await repository.listParticipantSessionsByWorkspace(tenant.tenantId,workspace.workspaceId);control=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
+   // Repository SQL lists have no ordering contract. Compare every complete row
+   // (including duplicate multiplicity) by opaque ID, without dropping fields.
+   const snapshot=async()=>(await repository.listParticipantSessionsByWorkspace(tenant.tenantId,workspace.workspaceId)).toSorted((a,b)=>a.participantSessionId.localeCompare(b.participantSessionId));
+   const before=await snapshot();control=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
    const execute=sql=>kind==='sqlite'?control.exec(sql):control.query(sql);
    try{
     await execute(kind==='sqlite'?"CREATE TRIGGER owned_suffix_fail BEFORE INSERT ON participant_sessions WHEN NEW.login_key='restart-coded' BEGIN SELECT RAISE(ABORT,'owned suffix failure'); END;":"CREATE FUNCTION owned_suffix_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.login_key='restart-coded' THEN RAISE EXCEPTION 'owned suffix failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER owned_suffix_fail BEFORE INSERT ON participant_sessions FOR EACH ROW EXECUTE FUNCTION owned_suffix_fail();");
-    await assert.rejects(login('restart-coded','abc'),/owned suffix failure/);assert.deepEqual(await repository.listParticipantSessionsByWorkspace(tenant.tenantId,workspace.workspaceId),before);
+    await assert.rejects(login('restart-coded','abc'),/owned suffix failure/);assert.deepEqual(await snapshot(),before);
     await execute(kind==='sqlite'?'DROP TRIGGER owned_suffix_fail':'DROP TRIGGER owned_suffix_fail ON participant_sessions; DROP FUNCTION owned_suffix_fail()');
     assert.match((await login('restart-coded','abc')).originalNameSuffix,/^abc\/[a-z0-9_-]{8}$/);
    }finally{if(kind==='sqlite')control.close();else await control.end();control=null;}

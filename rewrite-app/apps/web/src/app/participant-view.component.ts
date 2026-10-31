@@ -1131,18 +1131,20 @@ interface ParticipantVisibleCodeNotice {
         </div>
       </article>
       <ng-template #confirmationFallback let-confirmation>
-      <section
+      <dialog
+        #participantConfirmationModal
         id="participantConfirmationBackdrop"
         class="participant-confirmation-backdrop"
-        cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
-        (keydown.escape)="resolveOriginalConfirmation(confirmation, false); $event.stopPropagation()"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="participantConfirmationTitle"
+        aria-describedby="participantConfirmationMessage"
+        (keydown.escape)="resolveOriginalConfirmation(confirmation, false); $event.preventDefault(); $event.stopPropagation()"
+        (cancel)="$event.preventDefault(); resolveOriginalConfirmation(confirmation, false)"
       >
         <article
           class="participant-confirmation-dialog"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="participantConfirmationTitle"
-          aria-describedby="participantConfirmationMessage"
+          cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
         >
           <img
             id="participantConfirmationAsset"
@@ -1171,7 +1173,7 @@ interface ParticipantVisibleCodeNotice {
             }
           </div>
         </article>
-      </section>
+      </dialog>
       </ng-template>
       @if (interfaceMode.mode() === 'original' && view.controllerError; as error) {
         @for (request of [error]; track request) {
@@ -1218,6 +1220,13 @@ interface ParticipantVisibleCodeNotice {
   `
 })
 export class ParticipantViewComponent implements OnInit, OnDestroy {
+  @ViewChild('participantConfirmationModal')
+  set participantConfirmationModal(element: ElementRef<HTMLDialogElement> | undefined) {
+    const modal = element?.nativeElement;
+    if (!modal?.isConnected || modal.open) return;
+    if (typeof modal.showModal === 'function') modal.showModal();
+    else modal.open = true;
+  }
   readonly redactBugReportText = redactBugReportText;
   resolveOriginalConfirmation(request: ParticipantConfirmationDialog, confirmed: boolean): void {
     if (this.view.confirmationDialog() === request) this.view.resolveConfirmation(confirmed);

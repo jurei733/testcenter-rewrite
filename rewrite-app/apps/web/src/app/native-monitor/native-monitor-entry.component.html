@@ -1,0 +1,35 @@
+<app-original-overlay-styles />
+<header>
+ <mat-toolbar data-cy="header">
+  <div class="side">
+   @if(showAccountPanel){
+    <button matIconButton class="account-button" [matMenuTriggerFor]="accountMenu" data-cy="account-button" aria-label="Nutzerinformationen"><mat-icon svgIcon="person" /></button>
+    <mat-menu #accountMenu="matMenu"><div class="account-heading">Nutzerinformationen</div><dl><dt>Anmeldename:</dt><dd>{{session.access()?.loginName}}</dd><dt>Gruppe:</dt><dd>{{session.access()?.groupLabel}}</dd><dt>Berechtigung:</dt><dd>Gruppenmonitor</dd></dl><button mat-menu-item (click)="selection()">Sitzung auswählen</button><button mat-menu-item (click)="logout()" data-cy="logout-button">Abmelden</button></mat-menu>
+   }
+  </div>
+  <div class="center"><h1>{{headerTitle}}</h1></div>
+  <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div>
+ </mat-toolbar>
+</header>
+@if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
+@if(ready()){
+ @if(session.restoring()){<p role="status">Sitzung wird geprüft …</p>}@else if(!session.access()){
+  <div class="native-login-outlet"><div class="native-login-host"><div class="login-page">
+   <div class="welcome-section"><img [src]="settings.assetUrl('loginIllustration')" alt="" /><div><p class="heading">Willkommen im IQB‑Testcenter</p><p>Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.</p></div></div>
+   <div class="login-section">@if(!passwordStep()){<form (ngSubmit)="submit()"><h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" required minlength="3" autocapitalize="off" autocomplete="username" /></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>
+    @if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}@else{<form (ngSubmit)="submit()"><div class="password-headline"><button matIconButton type="button" (click)="passwordStep.set(false);password=''" aria-label="Zurück"><mat-icon svgIcon="chevron_left" /></button><h2>Kennwort eingeben</h2></div>
+     <mat-form-field appearance="outline"><mat-label>Kennwort</mat-label><input matInput name="password" autofocus (keyup)="passwordKeyUp($event)" [(ngModel)]="password" [type]="showPassword?'text':'password'" autocomplete="current-password" /><button mat-icon-button matSuffix type="button" aria-label="Kennwort anzeigen" [attr.aria-pressed]="showPassword" (click)="showPassword=!showPassword"><mat-icon svgIcon="visibility" /></button></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>
+    @if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}<app-native-login-browser-notice /><div class="button-section"><button matButton="tonal" type="button" routerLink="/ops" data-cy="login-admin-form">Adminbereich</button></div></div>
+  </div></div></div>
+ }@else if(hasChild&&allowedChild){
+  @if(backendProblem();as problem){<p class="native-error" role="alert">{{problem}}</p>}
+  <router-outlet />
+ }@else{
+  @if(hasChild){<p role="alert">Bitte eine freigegebene Gruppenmonitor-Sitzung auswählen.</p>}
+  @if(starterRefreshing()){<p role="status">Sitzung wird geprüft …</p>}
+  @else if(starterRefreshFailed()){<button matButton="filled" (click)="refreshStarter()">Übersicht erneut laden</button>}
+  @else{@for(owner of starterOwners;track owner){<app-native-starter />}}
+ }
+}
+
+@if(!session.access()){<app-original-footer />}

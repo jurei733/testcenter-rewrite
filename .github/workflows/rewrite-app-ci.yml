@@ -306,6 +306,149 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  native-monitor-visual:
+    name: Native Monitor full-viewport Original parity (${{ matrix.scenario }})
+    needs: [build, original-reference-build, browser-system-dependencies, fast-feedback]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        scenario: [baseline, selected-row, settings-menu, new-filter-dialog, filter-target-menu, filter-value-options, advanced-filter-dialog, finish-dialog, time-dialog, time-dialog-edited]
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      UI_SMOKE_HEADFUL: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          build-attempt: ${{ needs.build.outputs.attempt }}
+          playwright: "true"
+          browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
+          browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
+          browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
+          browser-material-label: ${{ strategy.job-index }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}
+          path: ${{ runner.temp }}/original-browser
+          digest-mismatch: error
+      - name: Verify actual native paint and layout negative controls
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-capture-controls
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+      - name: Require exact Original self-control
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-source-control
+          NATIVE_MONITOR_VISUAL_SCENE: ${{ matrix.scenario }}
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
+        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$NATIVE_MONITOR_VISUAL_SCENE"
+      - name: Require eight exact complete Original-to-Rewrite Monitor viewports
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-visual
+          NATIVE_MONITOR_VISUAL_SCENE: ${{ matrix.scenario }}
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
+        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$NATIVE_MONITOR_VISUAL_SCENE"
+      - name: Retain complete native Monitor parity evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-monitor-parity-${{ matrix.scenario }}-${{ github.sha }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/native-monitor-capture-controls/
+            ${{ runner.temp }}/native-monitor-source-control/
+            ${{ runner.temp }}/native-monitor-visual/
+            ${{ runner.temp }}/original-browser/
+            ${{ runner.temp }}/browser-system/manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
+  native-login-visual:
+    name: Native login full-viewport Original parity (${{ matrix.entry }}/${{ matrix.scenario }})
+    needs: [build, original-reference-build, browser-system-dependencies, fast-feedback]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        entry: [monitor, participant]
+        scenario: [empty, name-filled, password, password-filled, password-visible, password-back, password-error, password-rate-limit, password-expired, password-scheduled]
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      UI_SMOKE_HEADFUL: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          build-attempt: ${{ needs.build.outputs.attempt }}
+          playwright: "true"
+          browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
+          browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
+          browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
+          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
+          browser-system-certified-cohorts: "true"
+          browser-material-label: ${{ strategy.job-index }}
+      - id: original-login-reference
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}
+          path: ${{ runner.temp }}/original-browser
+          digest-mismatch: error
+      - name: Verify actual native paint and layout negative controls
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-login-capture-controls
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+      - name: Require exact Original login self-control
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-login-source-control
+          NATIVE_LOGIN_ENTRY: ${{ matrix.entry }}
+          NATIVE_LOGIN_SCENE: ${{ matrix.scenario }}
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
+        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs source-self-control
+      - name: Require eight exact complete Original-to-Rewrite login viewports
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-login-visual
+          NATIVE_LOGIN_ENTRY: ${{ matrix.entry }}
+          NATIVE_LOGIN_SCENE: ${{ matrix.scenario }}
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
+        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs rewrite
+      - name: Verify Original build remains unchanged after login capture
+        if: always() && steps.original-login-reference.outcome == 'success'
+        env:
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
+        run: node scripts/original-browser-reference.mjs verify-build "$ORIGINAL_BROWSER_REFERENCE_ROOT"
+      - name: Retain complete native login parity evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-login-parity-${{ matrix.entry }}-${{ matrix.scenario }}-${{ github.sha }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/native-login-capture-controls/
+            ${{ runner.temp }}/native-login-source-control/
+            ${{ runner.temp }}/native-login-visual/
+            ${{ runner.temp }}/original-browser/
+            ${{ runner.temp }}/browser-system/manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
   dependencies:
     name: Dependency audit
     runs-on: ubuntu-24.04
@@ -362,6 +505,9 @@ jobs:
           - check: bug-report
             group: entry
             command: npm run smoke:ui:bug-report:built
+          - check: native-monitor
+            group: entry
+            command: npm run smoke:ui:native-monitor:built
           - check: original-login
             group: entry
             command: npm run smoke:ui:original-login:built
@@ -1054,7 +1200,7 @@ jobs:
   acceptance:
     name: CI acceptance
     if: always()
-    needs: [build, browser-system-dependencies, browser-system-qualification, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, quick-extended, quick-extended-long, verify-long-ui, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
+    needs: [build, browser-system-dependencies, browser-system-qualification, original-reference-build, original-browser-reference, native-monitor-visual, native-login-visual, typecheck, dependencies, unit, quick, quick-extended, quick-extended-long, verify-long-ui, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

@@ -1,0 +1,76 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 400px;
+}
+
+.sidebar-main {
+  padding: 15px;
+  margin-bottom: 1em;
+  flex: 1;
+  max-width: 100%;
+}
+
+.sidebar-bottom {
+  padding: 15px;
+  align-self: center;
+  min-width: 200px;
+}
+
+h3 {
+  text-align: center;
+  margin-bottom: 1em;
+  width: 100%;
+}
+
+
+.headline-level-0,
+.headline-level-1,
+.headline-level-2,
+.headline-level-3,
+.headline-level-4,
+.headline-level-5,
+.headline-level-6 {
+  text-align: center;
+  margin-bottom: 4px;
+  width: 100%;
+}
+
+a {
+  width: 100%;
+  overflow: hidden;
+  margin: 0.6em 0 0.6em;
+  max-width: 32em;
+}
+
+a.current[disabled="true"] {
+  color: black !important;
+}
+
+a:last-of-type {
+  margin-bottom: 0;
+}
+
+.current {
+  background: var(--accent) !important;
+}
+
+.mat-mdc-button-base {
+  height: auto !important;
+  min-height: 36px;
+  text-align: center;
+  padding: 0.3em;
+}
+
+.testlet {
+  /*border: 1px solid red;*/
+  margin-bottom: 2em;
+  text-align: center;
+}
+
+.current-option mat-icon {
+  right: 0;
+  position: absolute;
+  color: silver;
+}

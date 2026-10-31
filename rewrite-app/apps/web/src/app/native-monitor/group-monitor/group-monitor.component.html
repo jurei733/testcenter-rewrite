@@ -1,0 +1,381 @@
+<mat-menu #rootMenu="matMenu">
+  <button mat-menu-item [matMenuTriggerFor]="filters" data-cy="GM_filter_button">
+    {{customtext(('Sitzungen ausblenden'),('gm_menu_filter'))}}
+  </button>
+  <button mat-menu-item [matMenuTriggerFor]="group" data-cy="GM_columns_button">
+    {{customtext(('Spalten'),('gm_menu_cols'))}}
+  </button>
+  <button mat-menu-item [matMenuTriggerFor]="activity" data-cy="GM_activity_button">
+    {{customtext(('Aktivität'),('gm_col_state'))}}
+  </button>
+</mat-menu>
+
+<mat-menu #filters="matMenu">
+  @for (fo of entries((tsm.filterOptions),(sortFilterMenuEntries)); track fo.key; let i = $index) {
+    @if (fo.value.source !== 'quick') {
+      <button mat-menu-item (click)="tsm.switchFilter(fo.key)" [attr.data-cy]="'GM_filter_option_button-' + i">
+        @if (fo.value.selected) {
+          <mat-icon
+            svgIcon="check"
+            class="in-menu-icon"
+          ></mat-icon>
+        }
+        <div
+          class="menu-filter-label"
+          [style.padding-right.px]="27"
+          >
+          {{customtext((fo.value.filter.label),(fo.value.filter.label))}}
+        </div>
+        @if (fo.value.source != 'base') {
+          <mat-icon
+            svgIcon="edit"
+            class="in-menu-icon right"
+            (click)="$event.stopPropagation(); editFilter(fo.key)"
+          ></mat-icon>
+        }
+      </button>
+    }
+  }
+  <hr>
+    <button mat-menu-item (click)="addFilter()" data-cy="GM_add_filter_button">
+      <mat-icon svgIcon="add"></mat-icon>
+      <span>{{customtext(('Eigenen Filter hinzufügen'),('gm_add_custom_filter'))}}</span>
+    </button>
+  </mat-menu>
+
+  <mat-menu #group="matMenu">
+    <button mat-menu-item (click)="setDisplayOption('groupColumn', (displayOptions.groupColumn === 'hide') ? 'show' : 'hide')" data-cy="GM_column_group_button">
+      @if (displayOptions.groupColumn === 'show') {
+        <mat-icon svgIcon="check" data-cy="GM_columns_checked_group"></mat-icon>
+      }
+      <span>{{customtext(('Gruppe'),('gm_col_groupName'))}}</span>
+    </button>
+    <button mat-menu-item (click)="setDisplayOption('bookletColumn', (displayOptions.bookletColumn === 'hide') ? 'show' : 'hide')" data-cy="GM_column_booklet_button">
+      @if (displayOptions.bookletColumn === 'show') {
+        <mat-icon svgIcon="check" data-cy="GM_columns_checked_booklet"></mat-icon>
+      }
+      <span>{{customtext(('Testheft'),('gm_col_bookletLabel'))}}</span>
+    </button>
+    <button mat-menu-item (click)="setDisplayOption('blockColumn', (displayOptions.blockColumn === 'hide') ? 'show' : 'hide')" data-cy="GM_column_block_button">
+      @if (displayOptions.blockColumn === 'show') {
+        <mat-icon svgIcon="check" data-cy="GM_columns_checked_block"></mat-icon>
+      }
+      <span>{{customtext(('Block'),('gm_col_blockLabel'))}}</span>
+    </button>
+    <button mat-menu-item (click)="setDisplayOption('unitColumn', (displayOptions.unitColumn === 'hide') ? 'show' : 'hide')" data-cy="GM_column_unit_button">
+      @if (displayOptions.unitColumn === 'show') {
+        <mat-icon svgIcon="check" data-cy="GM_columns_checked_unit"></mat-icon>
+      }
+      <span>{{customtext(('Aufgabe'),('gm_col_unitLabel'))}}</span>
+    </button>
+    @for (bookletState of entries((bookletStates)); track bookletState; let i = $index) {
+      <button
+        mat-menu-item (click)="toggleBookletStatesColumn(bookletState.key)"
+        [attr.data-cy]="'GM_columns_state_button-' + i" >
+        @if (displayOptions.bookletStatesColumns.includes(bookletState.key)) {
+          <mat-icon svgIcon="check" [attr.data-cy]="'GM_columns_checked_state-' + i"></mat-icon>
+        }
+        <span>{{customtext(('Zustände'),('gm_menu_cols_states'))}} {{bookletState.value}}</span>
+      </button>
+    }
+  </mat-menu>
+
+  <mat-menu #activity="matMenu">
+    <button mat-menu-item (click)="setDisplayOption('view', 'full')" data-cy="GM_display_option_full">
+      @if (displayOptions.view === 'full') {
+        <mat-icon svgIcon="check" data-cy="GM_view_checked_full"></mat-icon>
+      }
+      <span>{{customtext(('Vollständig'),('gm_view_full'))}}</span>
+    </button>
+    <button mat-menu-item (click)="setDisplayOption('view', 'medium')" data-cy="GM_display_option_medium">
+      @if (displayOptions.view === 'medium') {
+        <mat-icon svgIcon="check" data-cy="GM_view_checked_medium"></mat-icon>
+      }
+      <span>{{customtext(('Nur Blöcke'),('gm_view_medium'))}}</span>
+    </button>
+    <button mat-menu-item (click)="setDisplayOption('view', 'small')" data-cy="GM_display_option_short">
+      @if (displayOptions.view === 'small') {
+        <mat-icon svgIcon="check" data-cy="GM_view_checked_small"></mat-icon>
+      }
+      <span>{{customtext(('Kurz'),('gm_view_small'))}}</span>
+    </button>
+  </mat-menu>
+
+  <mat-drawer-container [attr.inert]="isClosing ? '' : null">
+    <mat-drawer #sidenav opened="true" mode="side" class="toolbar">
+      <h2>{{customtext(('Test-Steuerung'),('gm_controls'))}}</h2>
+
+      @if (sessionsStats(); as sessionsStats) {
+        <div class="toolbar-section">
+          <mat-slide-toggle
+            data-cy="GM_control_all_tests"
+            (change)="toggleAlwaysCheckAll($event)"
+            [disabled]="!tsm.checkingOptions.enableAutoCheckAll"
+            [checked]="tsm.checkingOptions.autoCheckAll"
+            [matTooltipDisabled]="sessionsStats.differentBookletSpecies <= 1"
+          matTooltip="{{
+          customtext(('Die verwendeten Booklets sind zu unterschiedlich, um gemeinsam gesteuert zu werden.'),('gm_multiple_booklet_species_warning'))
+           }}"
+            >
+            {{customtext(('Alle Tests gleichzeitig steuern'),('gm_auto_checkall')) }}
+          </mat-slide-toggle>
+        </div>
+      }
+
+      <div class="toolbar-section min-height-section">
+        @if (displayOptions.manualChecking) {
+          @if (checkedStats(); as checkedStats) {
+            @if (checkedStats.numberOfSessions) {
+              <tc-alert
+                level="info"
+                customtext="gm_selection_info"
+                text="%s %s Test%s mit %s Testheft%s ausgewählt."
+            [replacements]="[
+              (checkedStats.allChecked ? ' Alle' : ''),
+              checkedStats.numberOfSessions.toString(10),
+              (checkedStats.numberOfSessions !== 1 ? 's' : ''),
+              checkedStats.differentBooklets.toString(10),
+              (checkedStats.differentBooklets !== 1 ? 'en' : '')
+            ]"
+              ></tc-alert>
+            } @else {
+              <tc-alert level="info" customtext="gm_selection_info_none" text="Kein Test ausgewählt."></tc-alert>
+            }
+          }
+        }
+      </div>
+
+      <div class="toolbar-section">
+        <button mat-raised-button class="control" data-cy="GM_forward_button" [disabled]="!checkedSessionCount" (click)="tsm.testCommandResume()">
+          <mat-icon svgIcon="play_arrow"></mat-icon>
+          {{customtext(('weiter'),('gm_control_resume'))}}
+        </button>
+
+        <button mat-raised-button class="control" data-cy="GM_pause_button" [disabled]="!checkedSessionCount" (click)="tsm.testCommandPause()">
+          <mat-icon svgIcon="pause"></mat-icon>
+          {{customtext(('pause'),('gm_control_pause'))}}
+        </button>
+      </div>
+
+      <div class="toolbar-section">
+        <button
+          mat-raised-button
+          class="control"
+          data-cy="GM_jump_button"
+          [disabled]="!checkedSessionCount"
+          (click)="testCommandGoto()"
+          matTooltip="{{currentlySelected?.element?.blockId ? null : (customtext(('Bitte Block auswählen'),('gm_control_goto_tooltip')))}}"
+          >
+          <mat-icon svgIcon="arrow_forward"></mat-icon>
+          {{customtext(('Springe zu'),('gm_control_goto'))}}
+          @if (currentlySelected?.element?.blockId) {
+            <span class="emph">{{customtext(('Block'),('gm_col_blockLabel'))}} {{currentlySelected?.element?.blockId}}</span>
+          }
+        </button>
+      </div>
+
+      <div class="toolbar-section">
+        <button
+          mat-raised-button
+          class="control"
+          data-cy="GM_lock_button"
+          [disabled]="!checkedSessionCount"
+          (click)="unlockCommand()"
+          matTooltip="{{customtext(('Freigeben'),('gm_control_unlock_tooltip'))}}"
+          >
+          <mat-icon svgIcon="lock_open"></mat-icon>
+          {{customtext(('Test Entsperren'),('gm_control_unlock'))}}
+        </button>
+      </div>
+
+      <div id="message-panel" class="toolbar-section">
+        @for (m of messages; track m) {
+          <tc-alert
+            [text]="m.text"
+            [level]="m.level"
+            [customtext]="m.customtext"
+            [replacements]="m.replacements || []"
+          ></tc-alert>
+        }
+      </div>
+
+      <div class="toolbar-section-bottom">
+        <div class="toolbar-section">
+          <button mat-raised-button class="control" data-cy="GM_end_button" (click)="finishEverythingCommand()">
+            <mat-icon svgIcon="stop"></mat-icon>{{customtext(('Testung beenden'),('gm_control_finish_everything'))}}
+          </button>
+        </div>
+      </div>
+    </mat-drawer>
+
+    <mat-drawer-content>
+      <div #adminbackground class="adminbackground" (scroll)="updateScrollHint()">
+
+        <div class="corner-menu">
+          @if (connectionStatus(); as connectionStatus) {
+            <div
+              [class]="connectionStatus + ' connection-status'" style="color:white">
+            <mat-icon [svgIcon]="connectionStatus === 'error' ? 'error' :
+                                 connectionStatus === 'ws-online' ? 'wifi_tethering' :
+                                 connectionStatus ? 'autorenew' :
+                                 ''">
+              </mat-icon>
+              {{connectionStatus === 'error' ? 'Offline' : ''}}
+              {{connectionStatus === 'polling-fetch' ? 'Online' : ''}}
+              {{connectionStatus === 'polling-sleep' ? 'Online' : ''}}
+              {{connectionStatus === 'ws-offline' ? 'Reconn.' : ''}}
+              {{connectionStatus === 'ws-online' ? 'Live' : ''}}
+            </div>
+          }
+          @if (quickFilterBoxOpen) {
+            <input
+              type="text"
+              placeholder="Teilnehmer suchen"
+              [(ngModel)]="quickFilter"
+              (ngModelChange)="quickFilterOnUpdateModel()"
+              (focusout)="quickFilterOnFocusOut()"
+              [cdkTrapFocusAutoCapture]="quickFilterBoxOpen"
+              [cdkTrapFocus]="quickFilterBoxOpen"
+              >
+          }
+
+          <button
+            class="search-button"
+            data-cy="GM_search_button"
+            mat-icon-button
+            (click)="toggleQuickFilterBox()"
+            matTooltip="{{customtext(('Suche Teilnehmer'),('gm_search_testtaker'))}}"
+            matTooltipPosition="above"
+            >
+            <mat-icon svgIcon="search"></mat-icon>
+          </button>
+          <button
+            class="settings-button"
+            data-cy="GM_setting_button"
+            mat-icon-button
+            [matMenuTriggerFor]="rootMenu"
+            matTooltip="{{customtext(('Ansicht'),('gm_settings_tooltip'))}}"
+            matTooltipPosition="above"
+            >
+            <mat-icon svgIcon="settings"></mat-icon>
+          </button>
+        </div>
+
+        @if (isScrollable) {
+          <div class="scroll-hint">
+            <button
+              mat-icon-button
+              (click)="scrollDown()"
+              matTooltip="{{customtext(('Ganz nach unten'),('gm_scroll_down'))}}"
+              matTooltipPosition="above"
+              >
+              <mat-icon svgIcon="keyboard_arrow_down"></mat-icon>
+            </button>
+          </div>
+        }
+
+        <div class="test-session-table-wrapper">
+          <table class="test-session-table" matSort matSortActive="personLabel" matSortDirection="asc" (matSortChange)="setTableSorting($event)">
+            <thead>
+              <tr class="mat-sort-container">
+                @if (displayOptions.manualChecking) {
+                  <td mat-sort-header="_checked">
+                    @if (checkedStats(); as checkedStats) {
+                      <mat-checkbox
+                        (click)="$event.stopPropagation()"
+                        (change)="toggleCheckAll($event)"
+                        [checked]="checkedStats.allChecked"
+                        (contextmenu)="invertChecked($event)"
+                      ></mat-checkbox>
+                    }
+                  </td>
+                }
+                <td mat-sort-header="_superState">
+                  <mat-icon svgIcon="person"></mat-icon>
+                </td>
+                @if (displayOptions.groupColumn === 'show') {
+                  <td mat-sort-header="groupLabel">
+                    {{customtext(('Gruppe'),('gm_col_groupName'))}}
+                  </td>
+                }
+                <td mat-sort-header="personLabel">
+                  {{customtext(('Teilnehmer'),('gm_col_personLabel'))}}
+                </td>
+                @if (displayOptions.bookletColumn === 'show') {
+                  <td mat-sort-header="bookletName">
+                    {{customtext(('Testheft'),('gm_col_bookletLabel'))}}
+                  </td>
+                }
+                @if (displayOptions.blockColumn === 'show') {
+                  <td mat-sort-header="_currentBlock">
+                    {{customtext(('Block'),('gm_col_blockLabel'))}}
+                  </td>
+                }
+                <td mat-sort-header="timestamp">
+                  {{customtext(('Aktivität'),('gm_col_state'))}}
+                </td>
+                @if (displayOptions.unitColumn === 'show') {
+                  <td mat-sort-header="_currentUnit">
+                    {{customtext(('Aufgabe'),('gm_col_unitLabel'))}}
+                  </td>
+                }
+
+                @for (bookletState of entries((bookletStates)); track bookletState) {
+                  @if (displayOptions.bookletStatesColumns.includes(bookletState.key)) {
+                    <td
+                      mat-sort-header="bookletState:{{bookletState.key}}">
+                      {{ bookletState.value }}
+                    </td>
+                  }
+                }
+              </tr>
+            </thead>
+
+            @for (session of sessionRows(); track trackSession($index, session)) {
+              <tc-test-session [attr.data-test-id]="session.data.testId"
+                [class]="session.state"
+                [testSession]="session"
+                [displayOptions]="displayOptions"
+                [marked]="CurrentlyMarked"
+                (markedElement$)="markElement($event)"
+                [selected]="currentlySelected"
+                (selectedElement$)="selectElement($event)"
+                [checked]="tsm.isChecked(session)"
+                (checked$)="toggleChecked(session)"
+                [style.background]="getSessionColor(session)"
+                [bookletStates]="bookletStates"
+                >
+              </tc-test-session>
+            }
+          </table>
+        </div>
+      </div>
+    </mat-drawer-content>
+  </mat-drawer-container>
+
+  @if (!sidenav.opened) {
+    <button mat-icon-button class="drawer-button-close" [attr.inert]="isClosing ? '' : null"
+      matTooltip="Test-Steuerung einblenden" matTooltipPosition="right"
+      (click)="sidenav.toggle()">
+      <mat-icon svgIcon="chevron_right"></mat-icon>
+    </button>
+  }
+
+  @if (sidenav.opened) {
+    <button mat-icon-button class="drawer-button-open" [attr.inert]="isClosing ? '' : null"
+      matTooltip="{{customtext(('Test-Steuerung verbergen'),('gm_hide_controls_tooltip'))}}" matTooltipPosition="above"
+      (click)="sidenav.toggle()" >
+      <mat-icon svgIcon="chevron_left"></mat-icon>
+    </button>
+  }
+
+  @if (isClosing) {
+    <div id="shield"></div>
+  }
+  @if (isClosing) {
+    <mat-card id="shield-child" appearance="raised" cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
+      <mat-card-content tabindex="-1" cdkFocusInitial>
+        Alle Tests werden beendet. Bitte warten...
+      </mat-card-content>
+    </mat-card>
+  }

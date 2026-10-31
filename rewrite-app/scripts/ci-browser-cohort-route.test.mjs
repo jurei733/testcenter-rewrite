@@ -1,16 +1,24 @@
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {chooseBrowserInstallRoute} from './ci-browser-cohort-route.mjs';
 import {cohortDigest,readCohortBindings,certifiedBrowserPolicy} from './ci-browser-cohort-certificates.mjs';
-const records=JSON.parse(await readFile(new URL('./fixtures/ci-browser-native-cohorts.json',import.meta.url),'utf8')).records;
-const bindings=await readCohortBindings(fileURLToPath(new URL('../',import.meta.url)),{nodeVersion:'v22.23.4'});
+import {qualifiedNativeCohortFixture} from './qualified-native-cohort-fixture.mjs';
+const {registry,bindings}=await qualifiedNativeCohortFixture(),records=registry.records;
+const currentBindings=await readCohortBindings(fileURLToPath(new URL('../',import.meta.url)),{nodeVersion:'v22.23.4'});
 const inputs=(consumer=0,producer=0)=>({format:'3',producerAttempt:'1',producerImageVersion:records[producer].id,
   producerMaterialSha256:records[producer].nativeOracle.runtimeMaterial.materialSha256,
   producerBeforeSha256:cohortDigest(records[producer].nativeOracle.beforeInventory),
   consumerContext:{...structuredClone(records[consumer].nativeOracle.context),runAttempt:'3'},
   before:records[consumer].nativeOracle.beforeInventory,allowCertified:true,records,bindings});
+test('both actual current cross-cohort directions reject historical qualification when inputs changed',()=>{
+  const same=Object.keys(currentBindings).every(key=>currentBindings[key]===bindings[key]);
+  for(const [consumer,producer]of [[0,1],[1,0]]){
+    const current={...inputs(consumer,producer),bindings:currentBindings};
+    if(same)assert.equal(chooseBrowserInstallRoute(current).route,'certified');
+    else assert.throws(()=>chooseBrowserInstallRoute(current),/Current .* differs from qualified native input/);
+  }
+});
 test('matching complete initial inventories retain the original same-run path and exact earlier producer attempt',()=>{
   for(const allowCertified of [false,true])assert.deepEqual(chooseBrowserInstallRoute({...inputs(),allowCertified,records:undefined}),
     {route:'same-run',producerAttempt:'1'});

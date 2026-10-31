@@ -1,3 +1,4 @@
+import {NativeBroadcaster} from './native-broadcaster.js';
 import {handleOriginalMonitorHttp,originalMonitorRouteLabel} from './original-monitor-http.js';
 import {handleOriginalTestHttp, originalTestCreationPath,originalTestRouteLabel,originalResourceLogPath} from './original-test-http.js';
 import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
@@ -3186,7 +3187,10 @@ const serveFrontendRequest = async (
       ? ""
       : pathname.replace(/^\/app\/?/, "");
 
-  if (relativePath === "" || !relativePath.includes(".")) {
+  // Native group/profile IDs are path data and can contain dots. Recognize
+  // exactly this client route before applying the static-asset extension rule.
+  const nativeMonitorRoute = /^group-monitor(?:\/[^/]+){0,2}\/?$/.test(relativePath);
+  if (relativePath === "" || nativeMonitorRoute || !relativePath.includes(".")) {
     const html = await readFile(frontendIndexPath, "utf8");
     sendHtml(response, 200, html);
     return true;
@@ -4641,7 +4645,7 @@ const streamMonitorEvents = async (input: {
   pollHandle.unref();
 };
 
-const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>) =>
+const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>, broadcaster?:NativeBroadcaster) =>
   runtime.requestLifecycle.wrap(async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const services = runtime.services;
     const requestId = randomUUID();
@@ -4665,6 +4669,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         "max-age=31536000; includeSubDomains"
       );
     }
+    response.once('finish',()=>{if(response.statusCode<400&&!['GET','HEAD','OPTIONS'].includes(method))broadcaster?.wake();});
     metrics.activeRequests += 1;
     metrics.totalRequests += 1;
     incrementCounter(metrics.requestCountsByMethod, method);
@@ -4980,14 +4985,17 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
-      if (await handleOriginalMonitorHttp({request,pathname,services,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
+      const subscribe=broadcaster?async(target:Parameters<NativeBroadcaster['issue']>[0],credential:string)=>{const ticket=await broadcaster.issue(target,credential);if(ticket&&!response.destroyed&&!response.headersSent)response.setHeader('SubscribeToken',ticket);}:undefined;
+      if (await handleOriginalMonitorHttp({request,pathname,services,subscribe,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
         raw:(status,text,contentType)=>{response.writeHead(status,{'content-type':contentType});response.end(text);}})) return;
-      if (await handleOriginalTestHttp({request, pathname, services,
+      if (await handleOriginalTestHttp({request, pathname, services,subscribe,
         reason: text => {response.statusMessage=text;},
         readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),
         send: (status, value) => sendJson(response, status, value),
         raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
-        binary:(bytes,contentType)=>{response.writeHead(200,{...securityHeaders,"content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}
+        // Only successfully capability-authorized native Resource bytes reach this
+        // callback. Opaque Verona players fetch and frame them without cookies.
+        binary:(bytes,contentType)=>{response.writeHead(200,{...participantResourceSecurityHeaders,"access-control-allow-origin":"*","content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}
       })) return;
 
       if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,
@@ -9891,10 +9899,14 @@ const applyHttpServerTimeouts = (
   server.keepAliveTimeout = runtime.config.httpTimeouts.keepAliveTimeoutMs;
 };
 
+const createNativeBroadcaster=(runtime:Awaited<ReturnType<typeof createApiRuntime>>)=>['true','1'].includes((process.env.FIRST_SLICE_NATIVE_WEBSOCKET_ENABLED??'').toLowerCase())
+  ?new NativeBroadcaster(runtime.services,operation=>runtime.requestLifecycle.wrap(operation)(),stage=>recordRuntimeOperationalEvent(runtime,"error","native_broadcast_failed",{stage})):undefined;
+
 export const createProductionApiServer = async () =>
   {
     const runtime = await createApiRuntime();
-    const server = createServer(createRequestHandler(runtime));
+    const broadcaster=createNativeBroadcaster(runtime);
+    const server = createServer(createRequestHandler(runtime,broadcaster));broadcaster?.attach(server);
     applyHttpServerTimeouts(server, runtime);
     let shutdownPromise: Promise<void> | undefined;
     const shutdownRuntime = () => shutdownPromise ??= runtime.shutdown();
@@ -9907,12 +9919,12 @@ export const createProductionApiServer = async () =>
       });
     });
     const close = server.close.bind(server);
-    server.close = callback => close(error => {
+    server.close = callback => {broadcaster?.close();return close(error => {
       void shutdownRuntime().then(() => callback?.(error), failure => {
         if (callback) callback(error ?? failure as Error);
         else server.emit("error", failure);
       });
-    });
+    });};
     return server;
   };
 
@@ -9920,11 +9932,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const runtime = await createApiRuntime();
   const port = runtime.config.port;
   const shutdownDrainDelayMs = runtime.config.shutdownDrainDelayMs;
-  const server = createServer(createRequestHandler(runtime));
+  const broadcaster=createNativeBroadcaster(runtime);
+  const server = createServer(createRequestHandler(runtime,broadcaster));broadcaster?.attach(server);
   applyHttpServerTimeouts(server, runtime);
   let shuttingDown = false;
 
   const closeServer = () => {
+    broadcaster?.close();
     server.closeIdleConnections?.();
     const forceCloseHandle = setTimeout(() => {
       server.closeAllConnections?.();

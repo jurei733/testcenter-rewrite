@@ -1,0 +1,48 @@
+import {
+  Component, EventEmitter, Input, type OnChanges, Output, type SimpleChanges, ViewChild
+} from '@angular/core';
+import { AsyncPipe, NgTemplateOutlet } from '@angular/common';
+import { CustomtextPipe } from '../../pipes/customtext/customtext.pipe';
+import { type CodeInputType } from '../../../app.interfaces';
+import { AssetService } from '../../services/asset.service';
+import { TextFieldFormComponent } from './text-field-form.component';
+import { FabFormComponent } from './fab-form/fab-form.component';
+
+@Component({
+  selector: 'tc-code-input',
+  templateUrl: './code-input.component.html',
+  styleUrl: './code-input.component.scss',
+  imports: [
+    TextFieldFormComponent,
+    FabFormComponent,
+    NgTemplateOutlet,
+    AsyncPipe,
+    CustomtextPipe
+  ]
+})
+export class CodeInputComponent implements OnChanges {
+  @Input() problemText = '';
+  @Input() inputType: CodeInputType = 'text-field';
+  @Input() length: number | undefined; // only used for keypad input
+  @Input() disabled: boolean = false;
+  @Input() buttonLabel: string = 'Anmelden';
+  @Output() submitCode = new EventEmitter<string>();
+  @ViewChild(FabFormComponent) fabForm!: FabFormComponent;
+  protected companionImageSrc?: string;
+
+  constructor(protected assetService: AssetService) {
+    this.assetService.assetSlots$.subscribe(() => {
+      this.companionImageSrc = this.assetService.getAssetSrc('codeInputCompanion');
+    });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (this.inputType !== 'text-field' && changes.problemText) {
+      this.fabForm?.clear();
+    }
+  }
+
+  protected onSubmit(code: string) {
+    this.submitCode.emit(code);
+  }
+}

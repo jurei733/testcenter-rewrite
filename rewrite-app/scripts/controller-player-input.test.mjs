@@ -20,13 +20,13 @@ for (const name of helperNames) {
   assert.equal(candidates[name].length, 1, `The real ${name} helper must be unambiguous.`);
   assert.ok(candidates[name][0]);
 }
-const moduleSource = `export const createControllerHelper = page => {
+const moduleSource = `export const createControllerHelper = (page, requestAnimationFrame) => {
   const checkOriginalControllerRadio = ${candidates.checkOriginalControllerRadio[0].getText(ast)};
   return (${candidates.completeOriginalControllerUnit[0].getText(ast)});
 };`;
 const { createControllerHelper } = await import(`data:text/javascript;base64,${Buffer.from(moduleSource).toString("base64")}`);
 
-const fixture = ({ prepare, paint, check, next } = {}) => {
+const fixture = ({ prepare, paint, childPaint, check, next } = {}) => {
   const calls = [];
   const page = { locator: selector => {
     assert.equal(selector, "#participantVeronaPlayerFrame");
@@ -45,6 +45,13 @@ const fixture = ({ prepare, paint, check, next } = {}) => {
   const frame = {
     locator: selector => {
       if (selector === '[data-cy="TestController-radio1-Aufg1"]') return {
+        evaluate: async (render, ...options) => {
+          assert.deepEqual(options, []);
+          calls.push("child-paint-start");
+          await childPaint?.();
+          await render();
+          calls.push("child-paint-done");
+        },
         check: async (...options) => {
           assert.deepEqual(options, [], "Keep the native checked-state assertion without force or bypass options.");
           calls.push("native-radio-check");
@@ -67,15 +74,21 @@ const fixture = ({ prepare, paint, check, next } = {}) => {
       } };
     }
   };
-  return { calls, run: () => createControllerHelper(page)(frame) };
+  return { calls, run: () => createControllerHelper(page, callback => {
+    calls.push("child-frame"); queueMicrotask(callback);
+  })(frame) };
 };
+const childRender = ["child-paint-start", "child-frame", "child-frame", "child-paint-done"];
 
 test("Controller input waits for the exact frame's viewport render before the unchanged native check", async () => {
-  let finishPreparation, finishPaint, beginPaint;
+  let finishPreparation, finishPaint, beginPaint, finishChildPaint, beginChildPaint;
   const preparation = new Promise(resolve => { finishPreparation = resolve; });
   const painting = new Promise(resolve => { finishPaint = resolve; });
   const paintStarted = new Promise(resolve => { beginPaint = resolve; });
-  const { calls, run } = fixture({ prepare: () => preparation, paint: () => { beginPaint(); return painting; } });
+  const childPainting = new Promise(resolve => { finishChildPaint = resolve; });
+  const childStarted = new Promise(resolve => { beginChildPaint = resolve; });
+  const { calls, run } = fixture({ prepare: () => preparation, paint: () => { beginPaint(); return painting; },
+    childPaint: () => { beginChildPaint(); return childPainting; } });
   const completing = run();
   assert.deepEqual(calls, ["prepare-start"]);
   finishPreparation();
@@ -84,8 +97,11 @@ test("Controller input waits for the exact frame's viewport render before the un
   })]);
   assert.deepEqual(calls, ["prepare-start", "prepare-done", "paint-start"]);
   finishPaint();
+  await childStarted;
+  assert.deepEqual(calls, ["prepare-start", "prepare-done", "paint-start", "paint-done", "child-paint-start"]);
+  finishChildPaint();
   await completing;
-  assert.deepEqual(calls, ["prepare-start", "prepare-done", "paint-start", "paint-done", "native-radio-check",
+  assert.deepEqual(calls, ["prepare-start", "prepare-done", "paint-start", "paint-done", ...childRender, "native-radio-check",
     "native-next-page-click", "presentation-complete"]);
 });
 
@@ -107,12 +123,22 @@ test("a failed native radio check remains a failure without retry, bypass or pag
   const error = new Error("Clicking the checkbox did not change its state");
   const { calls, run } = fixture({ check: () => { throw error; } });
   await assert.rejects(run(), value => value === error);
-  assert.deepEqual(calls, ["prepare-start", "prepare-done", "paint-start", "paint-done", "native-radio-check"]);
+  assert.deepEqual(calls, ["prepare-start", "prepare-done", "paint-start", "paint-done", ...childRender, "native-radio-check"]);
 });
 
 test("a failed native page click cannot claim completed presentation", async () => {
   const error = new Error("next page is blocked");
   const { calls, run } = fixture({ next: () => { throw error; } });
   await assert.rejects(run(), value => value === error);
-  assert.deepEqual(calls, ["prepare-start", "prepare-done", "paint-start", "paint-done", "native-radio-check", "native-next-page-click"]);
+  assert.deepEqual(calls, ["prepare-start", "prepare-done", "paint-start", "paint-done", ...childRender, "native-radio-check", "native-next-page-click"]);
+});
+
+test("a stalled embedded render fails within its deadline without native input", async t => {
+  t.mock.timers.enable({apis:["setTimeout"]});
+  const {calls,run}=fixture({childPaint:()=>new Promise(()=>{})});
+  const result=run(), rejected=assert.rejects(result,/Original Player did not render/);
+  await new Promise(done=>setImmediate(done));
+  t.mock.timers.tick(1999);assert.equal(calls.includes("native-radio-check"),false);
+  t.mock.timers.tick(1);await rejected;
+  assert.deepEqual(calls,["prepare-start","prepare-done","paint-start","paint-done","child-paint-start"]);
 });

@@ -1,0 +1,554 @@
+import {AsyncPipe,NgIf} from '@angular/common';
+import {RouterOutlet} from '@angular/router';
+import {MatButton,MatIconButton} from '@angular/material/button';
+import {MatMenu,MatMenuTrigger} from '@angular/material/menu';
+import {MatTooltip} from '@angular/material/tooltip';
+import {MatSidenav,MatSidenavContainer,MatSidenavContent} from '@angular/material/sidenav';
+import {NativeMonitorIconComponent} from '../../../../native-monitor/native-monitor-icon.component';
+import {NativeRunOutletDirective} from '../../../native-run-outlet.directive';
+import {UnitMenuComponent} from '../unit-menu/unit-menu.component';
+import {NavigationComponent} from '../navigation/navigation.component';
+import {DebugPaneComponent} from '../debug-pane/debug-pane.component';
+import {LoadingProgressComponent} from '../../../shared/components/loading-progress/loading-progress.component';
+import {NATIVE_PRODUCTION} from '../../../native-tokens';
+import {NATIVE_RUN_TEST_ID} from '../../../native-tokens';
+import {NativeTerminalCompletionService} from '../../../native-terminal-completion.service';
+import {NativeHttpClient} from '../../../native-http-client';
+import { ActivatedRoute } from '@angular/router';
+import {
+  Component, HostListener, Inject, type OnDestroy, type OnInit, ViewChild
+, inject } from '@angular/core';
+import { combineLatest, Observable, Subscription } from 'rxjs';
+import {
+  debounceTime, distinctUntilChanged, filter, map
+} from 'rxjs/operators';
+import { NativeOwnedDialog as MatDialog } from '../../../native-owned-overlays';
+import { NativeOwnedSnackBar as MatSnackBar } from '../../../native-owned-overlays';
+import { HeaderService } from '../../../shared/services/header.service';
+import {
+  CustomtextService, MainDataService, BackendService as SharedBackendService
+} from '../../../shared/shared.module';
+import {
+  type Command, MaxTimerEvent, type NavControlContext, type NavigationState, type Unit,
+  UnitNavigationTarget, type WindowFocusState
+} from '../../interfaces/test-controller.interfaces';
+import { BackendService } from '../../services/backend.service';
+import { TestControllerService } from '../../services/test-controller.service';
+import { CommandService } from '../../services/command.service';
+import { TestLoaderService } from '../../services/test-loader.service';
+import { TimerData } from '../../classes/test-controller.classes';
+import { MissingBookletError } from '../../classes/missing-booklet-error.class';
+import { ReviewPanelComponent } from '../review-panel/review-panel.component';
+import { PageService } from '../../services/page.service';
+import { VeronaAPIService } from '../../services/verona-api.service';
+import { MessageService } from '../../../shared/services/message.service';
+
+@Component({
+  templateUrl: './test-controller.component.html',
+  styleUrls: ['./test-controller.component.css'],
+  standalone: true,
+  imports:[AsyncPipe,NgIf,RouterOutlet,NativeRunOutletDirective,MatButton,MatIconButton,MatMenu,MatMenuTrigger,MatTooltip,MatSidenav,MatSidenavContainer,MatSidenavContent,NativeMonitorIconComponent,UnitMenuComponent,NavigationComponent,DebugPaneComponent,LoadingProgressComponent,ReviewPanelComponent]
+})
+export class TestControllerComponent implements OnInit, OnDestroy {
+  private readonly nativeHttp=inject(NativeHttpClient);
+  private readonly terminalCompletions=inject(NativeTerminalCompletionService);
+  private readonly ownedTestId=inject(NATIVE_RUN_TEST_ID);
+  private initializationTimer:ReturnType<typeof setTimeout>|undefined;
+  @ViewChild(ReviewPanelComponent) reviewComponent?: ReviewPanelComponent;
+
+  private subscriptions: { [key: string]: Subscription | null } = {
+    errorReporting: null,
+    testStatus: null,
+    routing: null,
+    appWindowHasFocus: null,
+    appFocus: null,
+    command: null,
+    maxTimer: null,
+    connectionStatus: null
+  };
+
+  timerValue: TimerData | null = null;
+
+  debugPane = false;
+  sideNavContent: 'unit-menu' | 'review-form' = 'unit-menu';
+
+  currentUnit: Unit | null = null;
+  toolbarUnitLabel = '';
+
+  unitNavContext: NavControlContext = {
+    labelMode: 'INDEX',
+    label: '',
+    currentIndex: 0,
+    maxIndex: 0
+  };
+
+  pageNavContext: NavControlContext = {
+    labelMode: 'INDEX',
+    label: '',
+    currentIndex: 0,
+    maxIndex: 0
+  };
+
+  public isProductionMode=inject(NATIVE_PRODUCTION);
+  constructor(public mainDataService: MainDataService,
+              public tcs: TestControllerService,
+              private bs: BackendService,
+              private sharedBs: SharedBackendService,
+              private snackBar: MatSnackBar,
+              private route: ActivatedRoute,
+              private cts: CustomtextService,
+              public cmd: CommandService,
+              private tls: TestLoaderService,
+              public dialog: MatDialog,
+              private headerService: HeaderService,
+              public pageService: PageService,
+              private apiService: VeronaAPIService,
+              private messageService: MessageService) { }
+
+  // Whether there is currently nothing ready to show to the testee yet: either the test itself is
+  // still (re)loading, or - once routed to a unit - that unit's own block resources are still
+  // loading (see TestControllerService.unitContentReady$). Drives both the shared loading overlay
+  // in the template below and hiding the navigation controls (which would otherwise reference
+  // not-yet-populated navigation state) until there is something to navigate.
+  readonly isLoading$: Observable<boolean> = combineLatest([this.tcs.state$, this.tcs.unitContentReady$]).pipe(
+    map(([state, unitContentReady]) => state === 'LOADING' || (state === 'RUNNING' && !unitContentReady))
+  );
+
+  ngOnInit(): void {
+    this.initializationTimer=setTimeout(() => {
+      if(!this.nativeHttp.isCurrent)return;
+      this.mainDataService.clearErrorBuffer();
+      this.subscriptions.errorReporting = this.mainDataService.appError$
+        .pipe(filter(e => !!e))
+        .subscribe(() => this.tcs.errorOut());
+
+      this.subscriptions.testStatus = this.tcs.state$
+        .pipe(distinctUntilChanged())
+        .subscribe(status => this.tcs.addToTestStateBuffer('CONTROLLER', status));
+
+      this.subscriptions.appWindowHasFocus = this.mainDataService.appWindowHasFocus$
+        .subscribe(hasFocus => {
+          this.tcs.windowFocusState$.next(hasFocus ? 'HOST' : 'UNKNOWN');
+        });
+
+      this.subscriptions.command = this.cmd.command$
+        .pipe(
+          distinctUntilChanged((command1: Command, command2: Command): boolean => (command1.id === command2.id))
+        )
+        .subscribe((command: Command) => {
+          const completion=command.keyword.toLowerCase()==='terminate'?
+            this.terminalCompletions.begin(this.ownedTestId,CommandService.commandToString(command)):undefined;
+          this.handleCommand(command.keyword, command.arguments)
+            .then(() => {
+              if(completion)return completion.complete();
+              this.bs.addTestLog(this.tcs.testId, [{
+                key: 'command executed',
+                timeStamp: Date.now(),
+                content: CommandService.commandToString(command)
+              }]);
+            }).catch(error=>{
+              completion?.cancel();
+              throw this.nativeHttp.ownError(error&&typeof error==='object'?error:new Error(String(error)));
+            });
+        });
+
+      this.subscriptions.routing = this.route.params
+        .subscribe(async params => {
+          if(!this.nativeHttp.isCurrent||params.t!==this.ownedTestId)return;
+          this.tcs.testId = params.t;
+          try {
+            await this.tls.loadTest();
+            if(!this.nativeHttp.isCurrent)return;
+            // set all visual flags from booklet configs
+            this.showGlobalBack = this.deriveGlobalBack();
+            this.showGlobalForward = this.deriveGlobalForward();
+          } catch (err) {
+            if(!this.nativeHttp.isCurrent)return;
+            if (err instanceof MissingBookletError) { // this happens when loading was aborted.
+              // eslint-disable-next-line no-console
+              console.error(err); // don't swallow error entirely for the case, rootTestlet is missing in loading
+              return;
+            }
+            await Promise.reject(err);
+            return;
+          }
+          this.startAppFocusLogging();
+          this.startConnectionStatusLogging();
+          if (this.tcs.booklet?.config.ask_for_fullscreen !== 'OFF') {
+            await this.requestFullScreen();
+          }
+        });
+
+      this.subscriptions.maxTimer = this.tcs.timers$
+        .subscribe(maxTimerEvent => this.handleTimer(maxTimerEvent));
+
+      if (!this.isProductionMode) {
+        this.debugPane = !!localStorage.getItem('tc-debug');
+      }
+
+      this.tcs.currentUnitSequenceId$.subscribe(() => {
+        this.currentUnit = this.tcs.currentUnit;
+        const unitLabel = this.currentUnit?.label || '';
+        const unitLabelShort = this.currentUnit?.labelShort || unitLabel;
+        this.toolbarUnitLabel = (this.tcs.booklet?.config.toolbar_unit_label === 'LABEL_SHORT') ?
+          unitLabelShort :
+          unitLabel;
+
+        let navbarUnitLabel = unitLabel;
+        if (this.tcs.booklet?.config.navbar_unit_label === 'INDEX') navbarUnitLabel = 'Aufgabe';
+        if (this.tcs.booklet?.config.navbar_unit_label === 'LABEL_SHORT') navbarUnitLabel = unitLabelShort;
+        this.unitNavContext = {
+          labelMode: (this.tcs.booklet?.config.navbar_unit_label === 'INDEX') ? 'INDEX' : 'LABEL',
+          readonly: (this.tcs.booklet?.config.navbar_unit_controls_hidden === 'TRUE'),
+          label: navbarUnitLabel,
+          currentIndex: this.tcs.currentUnitSequenceId - 1,
+          maxIndex: Object.keys(this.tcs.units).length
+        };
+
+        if (this.tcs.booklet?.config.header_hidden === 'TRUE') {
+          this.headerService.isHeaderHidden = true;
+        } else {
+          switch (this.tcs.booklet?.config.header_content) {
+          case 'NONE':
+            this.headerService.title = '';
+            break;
+          case 'BLOCK_LABEL':
+            this.headerService.title = this.currentUnit?.parent.label;
+            break;
+          case 'BOOKLET_LABEL':
+            this.headerService.title = this.tcs.booklet?.metadata.label;
+            break;
+          case 'UNIT_LABEL':
+            this.headerService.title = unitLabel;
+            break;
+          case 'UNIT_LABEL_SHORT':
+            this.headerService.title = unitLabelShort;
+            break;
+          // no default
+          }
+        }
+      });
+      this.tcs.navigation$.subscribe((nav: NavigationState) => {
+        this.unitNavContext.isBackwardAllowed = nav.directions.backward !== 'no';
+        this.unitNavContext.isForwardAllowed = nav.directions.forward !== 'no';
+      });
+      this.pageService.pagesUpdated.subscribe(() => {
+        this.pageNavContext = {
+          labelMode: this.tcs.booklet?.config.navbar_page_label || 'INDEX',
+          readonly: (this.tcs.booklet?.config.navbar_page_controls_hidden === 'TRUE'),
+          label: (this.tcs.booklet?.config.navbar_page_label === 'LABEL') ?
+            this.pageService.getCurrentPage()?.label || '' :
+            'Teilaufgabe',
+          currentIndex: this.pageService.currentPageIndex,
+          maxIndex: this.pageService.pages.length,
+          isForwardAllowed: !this.pageService.isLastPage(),
+          isBackwardAllowed: !this.pageService.isFirstPage()
+        };
+      });
+    });
+  }
+
+  reload() {
+    this.sharedBs.clearCache('cache').subscribe();
+    // @ts-ignore: force reload with 'true' only works for firefox so far, that's why we clear cache manually
+    setTimeout(() => { window.location.reload(true); }, 100);
+  }
+
+  private startAppFocusLogging() {
+    if (!this.tcs.testMode.saveResponses) {
+      return;
+    }
+    if (this.subscriptions.appFocus !== null) {
+      this.subscriptions.appFocus.unsubscribe();
+    }
+    this.subscriptions.appFocus = this.tcs.windowFocusState$.pipe(
+      debounceTime(500)
+    ).subscribe((newState: WindowFocusState) => {
+      if (['ERROR', 'TERMINATED'].includes(this.tcs.state$.getValue())) {
+        return;
+      }
+      if (newState === 'UNKNOWN') {
+        this.tcs.addToTestStateBuffer('FOCUS', 'HAS_NOT');
+      } else {
+        this.tcs.addToTestStateBuffer('FOCUS', 'HAS');
+      }
+    });
+  }
+
+  private startConnectionStatusLogging() {
+    this.subscriptions.connectionStatus = this.cmd.connectionStatus$
+      .pipe(
+        map(status => status === 'ws-online'),
+        distinctUntilChanged()
+      )
+      .subscribe(isWsConnected => {
+        this.tcs.addToTestStateBuffer('CONNECTION', isWsConnected ? 'WEBSOCKET' : 'POLLING');
+      });
+  }
+
+  handleCommand(commandName: string, params: string[]): Promise<boolean> {
+    switch (commandName.toLowerCase()) {
+      case 'debug':
+        return this.toggleDebugPane(params);
+      case 'pause':
+        return this.tcs.pause();
+      case 'resume':
+        return this.tcs.resume();
+      case 'terminate':
+        return this.tcs.terminateTest('BOOKLETLOCKEDbyOPERATOR', true, params.indexOf('lock') > -1);
+      case 'goto':
+        return this.goto(params);
+      default:
+        return Promise.reject();
+    }
+  }
+
+  private goto(params: string[]): Promise<boolean> {
+    this.tcs.state$.next('RUNNING');
+    // eslint-disable-next-line no-case-declarations
+    let gotoTarget: string = '';
+    if ((params.length > 1) && (params[0] === 'id')) {
+      gotoTarget = (this.tcs.unitAliasMap[params[1]]).toString(10);
+    } else if (params.length === 1) {
+      gotoTarget = params[0];
+    }
+    if (gotoTarget && gotoTarget !== '0') {
+      const targetUnit = this.tcs.units[parseInt(gotoTarget, 10)];
+      if (targetUnit) {
+        if (targetUnit.parent.timerId !== this.tcs.currentUnit?.parent.timerId) {
+          this.tcs.cancelTimer();
+          // parse the last word as integer
+          this.tcs.restoreTime(targetUnit.parent, parseInt(params[2].trim().split(' ').pop()!, 10));
+        }
+        this.tcs.updateSingleLock(targetUnit.parent, 'afterLeave', false);
+        targetUnit.lockedAfterLeaving = false;
+        this.tcs.clearCodeLock(targetUnit.parent.id);
+      }
+      return this.tcs.setUnitNavigationRequest(gotoTarget, true);
+    }
+    return Promise.reject();
+  }
+
+  private toggleDebugPane(params: string[]): Promise<boolean> {
+    this.debugPane = params.length === 0 || params[0].toLowerCase() !== 'off';
+    if (this.debugPane) {
+      localStorage.setItem('tc-debug', '["main"]');
+    } else {
+      localStorage.removeItem('tc-debug');
+    }
+    return Promise.resolve(true);
+  }
+
+  private async handleTimer(timer: TimerData): Promise<boolean> {
+    const minute = timer.timeLeftSeconds / 60;
+    switch (timer.type) {
+      case MaxTimerEvent.STARTED:
+        if (this.tcs.shouldShowConfirmationUI()) {
+          this.snackBar.open(this.cts.getCustomText('booklet_msgTimerStarted') + timer.timeLeftMinString, '', {
+            duration: 5000,
+            panelClass: ['snackbar-time-started']
+          });
+        }
+        this.timerValue = timer;
+        this.tcs.timers[timer.id] = timer.timeLeftSeconds / 60;
+        this.tcs.addToTestStateBuffer('TESTLETS_TIMELEFT', JSON.stringify(this.tcs.timers));
+        return true;
+      case MaxTimerEvent.ENDED:
+        if (this.tcs.shouldShowConfirmationUI()) {
+          this.snackBar.open(this.cts.getCustomText('booklet_msgTimeOver'), '', {
+            duration: 5000,
+            panelClass: ['snackbar-time-ended']
+          });
+        }
+        this.tcs.timers[timer.id] = 0;
+        // attention: TODO store timer as well in localStorage to prevent F5-cheating
+        this.tcs.addToTestStateBuffer('TESTLETS_TIMELEFT', JSON.stringify(this.tcs.timers));
+        this.timerValue = null;
+        if (this.tcs.testMode.forceTimeRestrictions) {
+          if (this.tcs.currentUnit) {
+            this.tcs.updateSingleLock(this.tcs.currentUnit.parent, 'time', true);
+          }
+          return this.tcs.setUnitNavigationRequest(
+            UnitNavigationTarget.NEXT ?? UnitNavigationTarget.END,
+            true
+          );
+        }
+        return true;
+      case MaxTimerEvent.CANCELLED:
+        if (this.tcs.shouldShowConfirmationUI()) {
+          this.snackBar.open(this.cts.getCustomText('booklet_msgTimerCancelled'), '', {
+            duration: 5000,
+            panelClass: ['snackbar-time-canceled']
+          });
+        }
+        this.tcs.timers[timer.id] = 0;
+        // attention: TODO store timer as well in localStorage to prevent F5-cheating
+        this.tcs.addToTestStateBuffer('TESTLETS_TIMELEFT', JSON.stringify(this.tcs.timers));
+        this.timerValue = null;
+        if (this.tcs.testMode.forceTimeRestrictions && this.tcs.currentUnit) {
+          this.tcs.updateSingleLock(this.tcs.currentUnit.parent, 'time', true);
+        }
+        return true;
+      case MaxTimerEvent.INTERRUPTED:
+        this.timerValue = null;
+        return true;
+      case MaxTimerEvent.STEP:
+        this.timerValue = timer;
+        this.tcs.timers[timer.id] = timer.timeLeftSeconds / 60;
+        if ((timer.timeLeftSeconds % 15) === 0) {
+          // attention: TODO store timer as well in localStorage to prevent F5-cheating
+          this.tcs.addToTestStateBuffer('TESTLETS_TIMELEFT', JSON.stringify(this.tcs.timers));
+        }
+        if (this.tcs.timerWarningPoints.includes(minute) && this.tcs.shouldShowConfirmationUI()) {
+          const text = this.cts.getCustomText('booklet_msgSoonTimeOver').replace('%s', minute.toString(10));
+          this.snackBar.open(text, '', {
+            duration: 5000,
+            panelClass: ['snackbar-timerWarning']
+          });
+        }
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  ngOnDestroy(): void {
+    if(this.initializationTimer!==undefined)clearTimeout(this.initializationTimer);
+    Object.keys(this.subscriptions)
+      .filter(subscriptionKey => this.subscriptions[subscriptionKey])
+      .forEach(subscriptionKey => {
+        this.subscriptions[subscriptionKey]?.unsubscribe();
+        this.subscriptions[subscriptionKey] = null;
+      });
+    if (this.mainDataService.isFullScreen) {
+      document.exitFullscreen();
+    }
+    this.headerService.isHeaderHidden = false;
+  }
+
+  @HostListener('window:unload', ['$event'])
+  unloadHandler(_event?: Event): void {
+    if (!this.tcs.testMode.saveResponses) {
+      return;
+    }
+    if (this.cmd.connectionStatus$.getValue() !== 'ws-online') {
+      this.bs.notifyDyingTest(this.tcs.testId);
+    }
+  }
+
+  async setFullScreen(): Promise<void> {
+    if (this.mainDataService.isFullScreen) {
+      return;
+    }
+    const rootElem = document.documentElement;
+    if (!rootElem) {
+      return;
+    }
+    if ('requestFullscreen' in rootElem) {
+      await rootElem.requestFullscreen();
+      return;
+    }
+    if ('webkitRequestFullscreen' in rootElem) { // iOS
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      await rootElem.webkitRequestFullscreen();
+    }
+  }
+
+  async toggleFullScreen(): Promise<void> {
+    if (this.mainDataService.isFullScreen) {
+      await document.exitFullscreen();
+    } else {
+      await this.setFullScreen();
+    }
+  }
+
+  async requestFullScreen(): Promise<void> {
+    if (this.mainDataService.isFullScreen) {
+      return;
+    }
+
+    this.messageService.showConfirmDialog({
+      title: 'Vollbild',
+      content: this.cts.getCustomText('booklet_requestFullscreen'),
+      confirmText: 'Ja',
+      cancelText: 'Nein'
+    }).subscribe(async (confirmed: boolean) => {
+      if (confirmed) await this.setFullScreen();
+    });
+  }
+
+  gotoNextPage(): void {
+    if (this.pageService.isLastPage()) {
+      if (this.tcs.shouldShowConfirmationUI()) this.messageService.showSnackbar('Bereits auf der letzten Seite');
+      return;
+    }
+    this.gotoPage(this.pageService.currentPageIndex += 1);
+  }
+
+  gotoPreviousPage(): void {
+    if (this.pageService.isFirstPage()) {
+      if (this.tcs.shouldShowConfirmationUI()) this.messageService.showSnackbar('Bereits auf der ersten Seite');
+      return;
+    }
+    this.gotoPage(this.pageService.currentPageIndex -= 1);
+  }
+
+  gotoPage(targetPageIndex: number): void {
+    this.pageService.setCurrentPage(targetPageIndex);
+    this.apiService.sendPageNav(this.tcs.currentUnit?.alias,
+      this.pageService.pages[this.pageService.currentPageIndex].id);
+  }
+
+  protected readonly unitNavigationTarget = UnitNavigationTarget;
+
+  protected showGlobalBack = false;
+  protected deriveGlobalBack(): boolean {
+    const mode = this.tcs.booklet?.config.navbar_backward_button;
+
+    switch (mode) {
+      case 'DYNAMIC':
+      case 'UNITS':
+      case 'PAGES':
+        return true;
+      case 'HIDDEN':
+      case undefined:
+      default:
+        return false;
+    }
+  }
+
+  protected showGlobalForward: boolean = false;
+  protected deriveGlobalForward(): boolean {
+    const mode = this.tcs.booklet?.config.navbar_forward_button;
+
+    switch (mode) {
+      case 'DYNAMIC':
+      case 'UNITS':
+      case 'PAGES':
+        return true;
+      case 'HIDDEN':
+      case undefined:
+      default:
+        return false;
+    }
+  }
+
+  protected onNavBack() {
+    const mode = this.tcs.booklet?.config?.navbar_backward_button;
+    if (mode === 'UNITS' || (mode === 'DYNAMIC' && this.pageService.isFirstPage())) {
+      this.tcs.setUnitNavigationRequest(UnitNavigationTarget.PREVIOUS);
+    } else {
+      this.gotoPreviousPage();
+    }
+  }
+
+  protected onNavForward() {
+    const mode = this.tcs.booklet?.config?.navbar_forward_button;
+    if (mode === 'UNITS' || (mode === 'DYNAMIC' && this.pageService.isLastPage())) {
+      this.tcs.setUnitNavigationRequest(UnitNavigationTarget.NEXT);
+    } else {
+      this.gotoNextPage();
+    }
+  }
+}

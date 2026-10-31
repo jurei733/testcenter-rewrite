@@ -124,13 +124,36 @@ app-root {
   --secondary-soft: #e1d7eb;
 }
 
-:root[data-interface-mode="original"] .page.is-participant-page {
+:root[data-interface-mode="original"] .page.is-participant-page,
+:root[data-interface-mode="original"] .page.is-native-monitor-page {
   max-width: none;
   padding: 0;
 }
 
 :root[data-interface-mode="original"] .participant-stage > router-outlet {
   display: none;
+}
+
+/* Source html/body defaults must stay below CDK global-scrollblock specificity.
+   Native modal scrollbars retain their actual layout and width. */
+:where(:root:has(app-native-monitor-entry), body:has(app-native-monitor-entry),
+       :root:has(app-native-participant-entry .login-page), body:has(app-native-participant-entry .login-page)) {
+  height: 100%;
+  overflow: hidden;
+}
+body:has(:where(app-native-monitor-entry .login-page, app-native-participant-entry .login-page)) {
+  /* Pinned Original src/theme/index.scss applies the light scheme to body. */
+  color-scheme: light;
+  background: white;
+}
+app-native-monitor-entry h1 {
+  line-height: normal;
+  letter-spacing: normal;
+}
+
+/* Original has content-box browser defaults; Material's own component rules win. */
+:where(app-native-monitor-entry, app-native-monitor-entry *) {
+  box-sizing: content-box;
 }
 
 .page {
@@ -273,7 +296,17 @@ h1 {
   padding: 24px;
   background: rgba(20, 35, 38, 0.72);
   backdrop-filter: blur(5px);
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  color: inherit;
+  font: inherit;
 }
+
+.participant-confirmation-backdrop::backdrop { background: transparent; }
 
 .participant-confirmation-dialog {
   display: grid;

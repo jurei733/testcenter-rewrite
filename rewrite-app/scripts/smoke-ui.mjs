@@ -23,6 +23,8 @@ import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
   assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
 import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 import { runParticipantUnitLabelSmoke } from "./participant-unit-label-smoke.mjs";
+import { matchesMergedReturnBaseline } from "./merged-return-baseline.mjs";
+import { smokeCaseFailures } from "./smoke-case-failure.mjs";
 import { runCurrentOriginalBookletConfigSmoke } from "./current-original-booklet-config-smoke.mjs";
 import { setWorkspaceAutoRefreshEnabled } from "./workspace-auto-refresh-smoke.mjs";
 import { createAttachmentQrCameraVideo } from "./attachment-camera-fixture.mjs";
@@ -10905,8 +10907,8 @@ try {
   await mergedReturnFrame.locator("#playerAnswer").fill(mergedReturnAnswer);
   const mergedReturnBefore = (
     await pollJsonWithPredicate(mergedReturnStateUrl, payload =>
-      payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey]?.includes(
-        mergedReturnAnswer
+      matchesMergedReturnBaseline(
+        payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey], mergedReturnAnswer
       )
     )
   ).currentRunState;
@@ -19026,6 +19028,22 @@ try {
     // and immediate radio click. Keep the checked-state assertion unchanged.
     await page.locator("#participantVeronaPlayerFrame").scrollIntoViewIfNeeded();
     await page.locator("#participantVeronaPlayerFrame").screenshot();
+    // Painting the owner does not ensure that its embedded document has had
+    // a render opportunity. Keep the first native click inside the child;
+    // no input retry, forced action or DOM-dispatched event is used.
+    let childPaintTimer;
+    try {
+      await Promise.race([
+        frame.locator('[data-cy="TestController-radio1-Aufg1"]').evaluate(
+          () => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))
+        ),
+        new Promise((_, reject) => {
+          childPaintTimer = setTimeout(() => reject(
+            new Error("Original Player did not render before native radio input.")
+          ), 2_000);
+        })
+      ]);
+    } finally { clearTimeout(childPaintTimer); }
     await frame
       .locator('[data-cy="TestController-radio1-Aufg1"]')
       .check();
@@ -26470,9 +26488,11 @@ try {
           }), undefined, { timeout: 2_000 });
         } catch (captureError) { navigation = { unavailable: String(captureError).split("\nCall log:")[0] }; }
         await writeFile(resolve(failureDirectory, "failure.json"), JSON.stringify({
-          error: String(error?.message ?? error).split("\nCall log:")[0], navigation
+          error: String(error?.message ?? error).split("\nCall log:")[0], navigation, ownedCases: smokeCaseFailures(error).map(item => item.evidence)
         }, null, 2) + "\n");
-        await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true });
+        const childFailure = smokeCaseFailures(error).find(item => item.screenshot);
+        if (childFailure) await writeFile(resolve(failureDirectory, "failure.png"), childFailure.screenshot);
+        else await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true });
         process.stderr.write(`UI smoke failure screenshot: ${failureDirectory}/failure.png\n`);
       } catch (captureError) {
         // A full disk or a closed browser must not replace the actual test failure.

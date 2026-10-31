@@ -3631,3 +3631,263 @@ SQLite journey through the complete unchanged review-comments prefix passes on
 the rebuilt application. API/domain/storage code is unchanged from the qualified
 3,036-test PostgreSQL application. A fresh complete 89-job run on the changed
 head is still required before main merge; this is not broad visual parity.
+
+
+### Observed AWS native runner archive profile (2026-10-31)
+
+The failed native image `20261018.96.1` job in
+[CI 41147780535](https://github.com/jurei733/testcenter-rewrite/actions/runs/41147780535/job/124378804786)
+retained a bounded public APT mirror profile before changing package sources.
+Its three lines contain the existing `us-east-2.ec2.archive.ubuntu.com` cloud
+archive plus the existing HTTPS archive and security endpoints. Reconstructing
+those public rows reproduces the actual 152-byte file and SHA-256
+`af9816b59bc904eaf28838ae673ac2b625b6628bebfc67a7cbeae78ba06e226a`.
+The fixture comes from artifact `13022148204`, ZIP SHA-256
+`9edb3e86000fe79cf9cd9857b5d714f745c69ab13ca596ab78a1c230fc3d4f47`.
+
+APT preference now recognizes exactly that complete observed AWS profile and
+the existing complete Azure profile. Each path only reorders its own three
+sources, preferring the two existing HTTPS endpoints while retaining its own
+cloud fallback. Other regions, lookalike or credential-bearing hosts, changed
+paths/ports, mixed cloud sets, extra archives and insecure options fail closed.
+All 324 legacy Azure order/priority/newline combinations retain byte-identical
+output against `f8cde3fd`; the original five control bodies remain unchanged.
+Fourteen focused controls pass. The complete current local policy command has
+358 tests: 354 pass, zero fail, and four native-Linux-only skips on macOS.
+
+This does not admit or qualify image18. Its original browser-route rejection
+remains a failure, and the existing artifact contains no successful native APT
+oracle or Source material. The exact-lock certificate registry, collector,
+archive authentication, native Debian controls and production admission rules
+are unchanged. Actual successful native qualification and admission evidence
+remain necessary before any new cohort certificate is prepared.
+
+
+### Required native Monitor viewports (2026-10-31)
+
+`native-monitor-visual` adds three required matrix jobs after Fast feedback, the
+shared build, the authenticated browser-package producer and the pinned Original
+build. The existing 90 job instances remain; complete acceptance now requires93.
+The states are the baseline, one manually selected row and the open settings
+menu. Each consumer uses verified same-run application outputs and the Original
+artifact, existing offline runtime restoration and the normal headed locked
+browser. Its rendering reference comes from the authenticated format3 bundle or
+the unchanged native oracle embedded in a format4 certified bundle; oracle
+contexts are never relabeled.
+
+Each state runs actual paint/layout negative controls, then eight Original
+self-control pairs and eight Original-to-Rewrite full-viewport pairs at1280x720
+and390x844 with four fixed native polling-animation phases. The selection uses
+an actual trusted checkbox change, exactly one checked row and an enabled Pause
+button. Mobile selection waits for the real closed drawer and finished finite
+animations before clicking; it never sets document scroll or geometry. The menu
+opens through its real settings button. Every capture requires three identical
+independently repainted complete frames, and every pair requires zero differing
+RGBA pixels. A failure in self-control, missing Source files, changed source or
+build bytes, browser errors or any pixel difference fails that job and complete
+acceptance. Complete Source files (including hidden assets), original/rewrite
+HTML, PNGs, scene actions, repaint witnesses and runtime-reference contexts are
+retained for30 days on success or failure.
+
+The native menu inherits the Original Material theme through its entry-scoped
+overlay class. Its buttons and content use the Source font, line height and box
+sizing; other interfaces retain their own styles. Controlled local Chrome
+captures reproduce zero differing pixels for all eight menu and eight selected
+row pairs. They explicitly use a diagnostic GPU-rasterization flag and do not
+qualify the default native browser. The baseline capture program was previously
+verified in native qualification41150306578. The follow-up qualification
+41155524520 on9f0cd3ab genuinely passes all24 self-control and24 paired viewports
+on image20261026.354.1, default visible locked Chromium147.0.7727.15, with all367
+native policy cases, four Debian controls and nine real WebSocket cases. An
+independent ZIP and PNG audit verifies96 visible images,288 actual white repaint
+witnesses,80 compiled Source files and current407 frontend source hashes. The
+native rendering material equals the existing qualified oracle; this grants no
+new cohort admission. That qualifier captures native material directly, so
+production offline restoration and the new required matrix still need fresh
+complete93-job acceptance.
+
+The qualification archive contains six databases created solely from the owned
+synthetic fixture; these are recorded and excluded from independent extraction.
+The production harness now keeps its owned database in a separate temporary
+directory and removes it after process cleanup, including failures. PNGs, scene
+actions and provenance remain the published evidence. The captured dependency
+audit has16 moderate reports through the development CLI's glob/minimatch graph,
+zero high and zero critical reports. The unchanged high-severity audit gate
+passes; a zero-vulnerability or complete security qualification is not claimed.
+
+Further controlled Chrome diagnostics verify eight exact columns-submenu pairs,
+but the new-filter dialog still differs35,667 desktop and32,647 mobile pixels.
+Its inherited global Material theme, typography and form geometry need a scoped
+correction and fresh qualification. Additional Monitor states, all eight broad
+visual rows, backend equivalence and complete Original parity remain open.
+
+
+### Native Monitor filter dialog states (2026-10-31)
+
+The native filter dialog and its select/autocomplete portals now receive scoped
+Original Material tokens and the pinned dialog overrides. Its zero-specificity
+content-box defaults preserve Material's own explicit border-box rules. The
+existing synchronous form initialization, cloned edit data, view-owned providers,
+access retirement and cleanup stay intact. Four additional matrix states cover
+the new dialog, field options, real Booklet-label completion and advanced mode;
+all90 old jobs and the three Monitor states remain, requiring97 total jobs.
+
+Controlled local Chrome diagnostics at eeade9b1 verify all32 complete RGBA pairs
+with zero differing pixels,192 white repaint witnesses and current407 frontend
+hashes. They use the disclosed diagnostic GPU-rasterization flag; default native
+qualification is still required. The first field-options diagnostic measured its
+Source anchor during the dialog's80% entry scale. Waiting for actual identity
+and finished finite animations before interaction yields8/8 exact pairs without
+setting overlay geometry. Source does not populate personLabel completions;
+the completion case uses the authored Booklet field and its actual one option.
+No Source edits, masks, expected-image selection or deadlines are introduced.
+
+The existing1ca445d2 full CI41156270521 observes real unqualified image18 in two
+consumers. Their admission gates fail before browser tests; Fast feedback and the
+new visual matrix consequently cannot qualify. The failure-only measurement
+artifact13025395638 proves its exact audit-stage stop at16 moderate reports.
+The other live jobs remain useful evidence. A changed dependency lock requires
+actual fresh native Source-family qualification and separate production admission;
+no historical certificate may be relabeled or reused as current qualification.
+
+
+### Development dependency security correction (2026-10-31)
+
+Exact overrides for glob14.0.2 and minimatch11.0.1 remove the two reviewed
+moderate advisories without a framework upgrade. The only changed lock entries
+are glob, minimatch, path-scurry, its lru-cache and the new nonrecursive matcher;
+all five are development-only. Angular CLI21.2.28, Angular core21.2.25,
+Material20.2.14, Playwright and the entire remaining resolved graph retain their
+actual previous records. A normal clean npm ci, actual production build and all
+367 policy cases (363 pass, four Linux-only skips on macOS) pass. The complete
+new locked audit reports zero vulnerabilities at lock
+20f914213a99024d838032f412219b5e1bf0e4c1a4726789c8f7010767c196ea.
+
+This lock has no production cohort certificate yet. The actual-current-graph
+policy case explicitly requires rejection before qualification; historical
+Source oracles and their real contexts remain unchanged. Fresh native material,
+Source-family comparisons, successful qualification provenance and separate
+actual offline production admission are required before this lock is accepted.
+
+
+### Seven native Monitor states and patched-lock qualification (2026-10-31)
+
+Actual qualification41160586438 at wrapperfe0e9e5d succeeds with the product
+application/runtime inputs from0d55f9e4. Independent archive and PNG verification
+confirms56 Original-self and56 Original-to-Rewrite complete pairs,224 visible
+images and672 actual white repaint witnesses,80 compiled Original files,407
+current frontend source hashes and415 WebSocket source/build hashes. All367
+native policy cases pass without skips, four Debian controls, four Source-family
+controls, the native capture countercases and nine real WebSocket cases pass;
+the complete locked audit has zero vulnerabilities. The browser uses its default
+headed arguments at147.0.7727.15, Node22.23.4 on actual image20261026.354.1.
+
+The earlier failed41157910242 genuinely exposed the native15px scrollbar outside
+root opacity. Its12660 nonwhite mobile pixels span x375..389 and y0..843 exactly.
+The clearing helper now recolours that native scrollbar only during the actual
+clearing frame and restores the exact root style and original screenshot; no
+scrollbar is hidden or resized. A real Linux countercase rejects the immutable
+old helper and verifies zero changed pixels after the fixed repaint. The next
+failed41159695712 passes all56 self-controls but exposes31563 differing mobile
+filter pixels: candidate global root specificity suppressed CDK global-scrollblock.
+Zero-specificity native defaults let the same CDK class win as in the Source,
+restoring the real375px layout. Both failed attempts remain rejected evidence.
+
+The final local default-headed Chrome run passes all93 functional cases with
+current source hashes. An earlier Peer chooser click timed out with an unstable
+button; bounded telemetry and two subsequent meaningful current-state runs pass,
+but the original cause is unproved and the failed evidence is retained. No click
+is forced or deadline extended. The Source backend and full Monitor/49-row
+Original scope remain unqualified.
+
+The new exact20f9 registry records only the genuinely qualified26 cohort and its
+actualfe0e9e5d oracle context. Legacy/84/faac oracles remain untouched. Preparing
+this certificate is not proof of production restoration: the real current loader,
+context selection and network-isolated offline installation must still succeed
+in a separate admission run before publishing the dependency change.
+
+
+### Actual patched-lock production admission (2026-10-31)
+
+Admission41161732828 at727553b8 is genuinely successful. The real current loader
+selects only the qualified26 certificate for lock20f91421, then installs all nine
+authenticated archives through the unchanged network-isolated restore path.
+Independent artifact verification confirms the format4 consumer context remains
+this admission run while its embedded native oracle retains successful
+qualification41160586438/fe0e9e5d. All591 runtime records exactly match that oracle;
+eight native visible PNGs and24 real white repaint frames are independently
+decoded. Actual Node22.23.4,367 policy passes with zero skips, four Debian controls
+and zero locked audit vulnerabilities are confirmed. Artifact13026924613 has
+SHA256edd1acea71d25ef6c5d0841986879e357f2dfb90ff6a43444170682acb691a6b.
+
+The registry remains byte-identical to its prepared8d58c571 digest. Image18 is
+still unqualified; no failed measurement or successful step within a failed job
+is promoted to a certificate. The normal complete97-job current-head acceptance
+and fresh Code/Security/Slop subscription reviews remain required. This admission
+proves the runtime path, not full application or Original parity; all49 capability
+requirements and eight broad visual rows retain their scope.
+
+
+### Native Monitor command dialogs and visible block interaction (2026-10-31)
+
+The native Monitor now applies the pinned Original theme to its finish and timed
+Goto dialogs, including the browser's intrinsic number-input sizing. The native
+remaining-time form, cancellation, literal targets and lifecycle stay intact.
+The required visual matrix retains all seven previous states and adds finish,
+initial time and edited time dialogs: all90 previous jobs remain,100 required
+jobs in total. The default native browser, complete viewport RGBA equality,
+three independent native repaint witnesses and all security/deadline gates stay
+mandatory.
+
+[Actual qualification41166542512](https://github.com/jurei733/testcenter-rewrite/actions/runs/41166542512)
+succeeds on application3c34d75ca6ac8a76f62b90f070e2fa8001c1b243, qualification
+head eafc2b0bf91923899494e1a89da7eb58a1215ec3. Independent decoding verifies80
+Original self-control and80 Original-to-Rewrite pairs,320 visible PNGs and960
+actual white repaint frames; all80 compiled Original files,407 frontend and415
+WebSocket source/build hashes agree. Default headed Chromium147.0.7727.15,
+Node22.23.4 and actual image20261026.354.1 reproduce the unchanged native material
+f50648565f43d01072e7420b99d295b09abb00f19ee92cbf912440d22a6ad621. All367 native
+policy cases,22 actual capture controls,4 native archive controls,4 Source-family
+controls and9 real WebSocket browser cases pass without skips. Audit remains0.
+Artifact13029805780 is45,036,309bytes with ZIP SHA256
+`6aef8b4467244366106b0b52aceaf178bacfecb4b89040b19b19cea8f55cb132`;
+2118 safe members contain no fixture databases. No new runtime certificate is
+prepared or old oracle retagged.
+
+The first ten-state attempt41164008949 remains failed: four desktop time-dialog
+pairs differ while68 pairs and80 Source controls match. Source-only41165271472
+then reproduces the same15px offset between two unchanged Original views.
+Read-only41165765318 records hidden BODY scrolling after the view menu and
+before Goto/dialog/input focus; native paint preserves that offset. The test now
+waits for actual menu disposal, uses a genuine mouse click on the measured,
+visible desktop target with viewport and hit-target checks, and waits for the
+actual dialog focus lifecycle. It does not set scroll positions, impose reference
+coordinates, change Original CSS, mask pixels or weaken comparison. Mobile keeps
+its existing real drawer and container interaction. Full native qualification
+above verifies the resulting complete viewports.
+
+The failure-only measurement uploader now selects its produced JSON/log files,
+supervision, native-browser-system and browser-material directories without
+walking APT's protected temporary cache. Actual pinned-uploader qualification
+41164457205 reproduces the legacy EACCES, then successfully retains every selected
+evidence class. Downloaded artifact13028915805 verifies8 safe members and7 fixture
+file hashes, SHA256 `02f0a7604195074cb0cc5158a54087b1becfc91c1d2876022e72a64bd32b1540`.
+This fixture upload proof grants no native-runtime admission.
+
+The previous public24ad full run41162016403 is terminal95/97success: one
+unqualified20261018.96.1 browser consumer stops before application tests and the
+final acceptance fails. Its actual measurement reaches audit0 and Source-family
+validation, but the old recursive upload fails at APT archives/partial; that
+missing artifact cannot qualify a certificate. Image18 remains unqualified for
+the current20f9 lock. Do not rerun unchanged or waive the failed route.
+
+Current application bytes pass93 local default-headed Chrome functional cases,
+2253 frontend cases, typecheck and the418.37kB production build. The subsequent
+actor/upload changes preserve those application and case bytes. Fresh complete
+100-job production acceptance and current-head local reviews remain required.
+The latest published69e reviews are historical. These owned Monitor fixtures do
+not establish the complete Original backend, full Monitor scope, all themes or
+whole-project parity. The49-row ledger remains27done/22partial with all8 broad
+visual rows open; the actual native login still has measured layout, title,
+required-field, footer and administration-entry differences. PR13 stays Draft;
+no approval, merge or deployment is issued.

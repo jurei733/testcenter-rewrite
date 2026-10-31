@@ -17,9 +17,11 @@ export async function repaintNativeViewport(page,measure,path){
       // Visibility invalidates descendant raster, while opacity also clears
       // explicitly visible children. Keep actual focus and hover targets visible
       // under the transparent root; clearing cannot replay focus or mouse input.
+      // Native root scrollbars paint outside root opacity. Clear their colour
+      // too, preserving their width and restoring the exact authored style.
       await page.evaluate(({elements,styles,style})=>{
         elements.forEach((element,index)=>element.setAttribute('style',(styles[index]===null?'':styles[index]+';')+'visibility:visible!important'));
-        document.documentElement.setAttribute('style',(style===null?'':style+';')+'visibility:hidden!important;opacity:0!important');
+        document.documentElement.setAttribute('style',(style===null?'':style+';')+'visibility:hidden!important;opacity:0!important;scrollbar-color:white white!important');
       },{elements:targets,styles:targetStyles,style:rootStyle});
       await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
       hidden=await page.screenshot({fullPage:false});

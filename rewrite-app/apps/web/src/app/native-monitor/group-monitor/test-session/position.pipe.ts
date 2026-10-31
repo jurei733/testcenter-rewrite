@@ -1,0 +1,44 @@
+import {
+  isUnit, type Testlet, type TestSession, type Unit
+} from '../group-monitor.interfaces';
+
+export class PositionPipe {
+  // eslint-disable-next-line class-methods-use-this
+  transform(testSession: TestSession, root: Testlet): string {
+    const c = {
+      hiddenUnits: 0,
+      hasShow: false,
+      found: false,
+      position: 0
+    };
+    const countHiddenChildren = (testlet: Testlet): void => {
+      let i = 0;
+      let child: Testlet | Unit;
+      while (child = testlet.children[i++]) {
+        if (isUnit(child)) {
+          if (child.alias === testSession.current?.unit?.alias) {
+            c.found = true;
+            if (testSession.current) {
+              c.position =
+                testSession.current[root.id === '[0]' ? 'indexGlobal' : 'indexAncestor'] + 1 - c.hiddenUnits;
+            }
+          }
+          continue;
+        }
+        if (child.restrictions.show) {
+          c.hasShow = true;
+        }
+        countHiddenChildren(child);
+        if (
+          !!child.restrictions.show &&
+          testSession.bookletStates &&
+          (testSession.bookletStates[child.restrictions.show.if] !== child.restrictions.show.is)
+        ) {
+          c.hiddenUnits += child.descendantCount;
+        }
+      }
+    };
+    countHiddenChildren(root);
+    return `${c.position ? `${c.position} / ` : ''}${root.descendantCount - c.hiddenUnits}${c.hasShow ? '*' : ''}`;
+  }
+}

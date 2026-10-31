@@ -84,7 +84,7 @@ test('dependency audit skips installation while preserving the complete locked g
 test('every actual browser consumer waits for the authenticated same-run package producer',()=>{
  const consumers=Object.entries(workflow.jobs).filter(([,job])=>job.steps?.some(step=>
   step.uses==='./.github/actions/rewrite-runtime' && step.with?.playwright && step.with.playwright!=='false'));
- assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','quick','quick-extended-long','quick-extended','verify-long-ui','verify-memory-sqlite','verify-postgres-ui'].sort());
+ assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','native-monitor-visual','native-login-visual','quick','quick-extended-long','quick-extended','verify-long-ui','verify-memory-sqlite','verify-postgres-ui'].sort());
  for(const [name,job]of consumers)assert.ok(job.needs.includes('browser-system-dependencies'),name);
  const download=action.runs.steps.find(step=>step.name==='Restore authenticated same-run browser system packages');
  assert.equal(download.if,"inputs.playwright == 'true' && steps.browser-route.outputs.route != 'certified'");assert.equal(download.with.name,'browser-system-${{ github.sha }}-${{ inputs.browser-system-attempt }}');
@@ -369,7 +369,7 @@ test('compound browser gates share one display and preserve either command failu
     }
   } finally { rmSync(scratch, {recursive: true, force: true}); }
 });
-test("all 28 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
+test("all 29 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
   const quick = workflow.jobs.quick;
   const extended = workflow.jobs["quick-extended"];
   const shards = [...quick.strategy.matrix.include, ...qualificationRows];
@@ -377,7 +377,7 @@ test("all 28 browser scenarios run once across fast and extended shards, with co
   assert.equal(extended.strategy["fail-fast"], false);
   assert.equal(extended.strategy["max-parallel"], 8, "Bound the extended group while releasing its measured four-slot tail");
   assert.deepEqual([...new Set(shards.map(item => item.group))], ["entry", "system-check", "participant", "content"]);
-  assert.equal(shards.length, 28);
+  assert.equal(shards.length, 29);
   assert.equal(new Set(shards.map(item => item.check)).size, shards.length);
   const split = command => expand(command).split("&&").map(value => value.trim()).filter(Boolean);
   const complete = split("npm run ci:browser:quick:built");
@@ -407,7 +407,7 @@ test("all 28 browser scenarios run once across fast and extended shards, with co
 });
 test("the early browser set is bounded and retains real authentication, isolation, Start restoration and Systemcheck", () => {
   assert.deepEqual(workflow.jobs.quick.strategy.matrix.include.map(item=>item.check).sort(),
-    ["bug-report","original-login","original-login-protected","original-admin-login","proof-of-work","system-check","participant-variant","ib-player"].sort());
+    ["bug-report","native-monitor","original-login","original-login-protected","original-admin-login","proof-of-work","system-check","participant-variant","ib-player"].sort());
   assert.equal(qualificationRows.length,20);
   assert.equal(workflow.jobs["quick-extended"].strategy.matrix.include.length,19);
   assert.deepEqual(workflow.jobs["quick-extended-long"].strategy.matrix.include.map(row=>row.check),["json-roster"]);
@@ -572,17 +572,21 @@ test('global early eligibility uses the complete accepted 60-row observation wit
  assert.equal(actual.length+data.model.SourceFamilies+data.model.databaseApi+data.model.databaseBrowser+data.model.checkpointSlots,20);
  assert.equal(workflow.jobs['original-browser-reference'].strategy.matrix.family.length,5);
  assert.equal(workflow.jobs['quick-extended'].strategy['max-parallel'],8);
- const instances=Object.values(workflow.jobs).reduce((n,job)=>n+(job.strategy?.matrix?.include?.length??job.strategy?.matrix?.family?.length??1),0);assert.equal(instances,89);
+ const instances=Object.values(workflow.jobs).reduce((n,job)=>{const matrix=job.strategy?.matrix;return n+(matrix?.include?.length??Object.values(matrix??{}).reduce((product,axis)=>product*axis.length,1));},0);assert.equal(instances,120); // Keep all 90 prior jobs, ten Monitor states, and twenty native login state/root pairs.
  assert.deepEqual(qualificationEarly.needs,broadEarly.needs);
  assert.deepEqual(qualificationEarly.needs,['build','typecheck','dependencies','unit','browser-system-dependencies']);
  const ancestors=new Set();const visit=id=>{for(const need of[workflow.jobs[id].needs??[]].flat())if(!ancestors.has(need)){ancestors.add(need);visit(need);}};visit('quick-extended-long');
  assert.equal(ancestors.has('quick'),false);assert.equal(ancestors.has('fast-feedback'),false);
  assert.ok(workflow.jobs.acceptance.needs.includes('quick-extended-long'));assert.equal(qualificationEarly.if,undefined);
  const unchanged=structuredClone(workflow);delete unchanged.jobs['quick-extended-long'];
+ assert.ok(unchanged.jobs['native-monitor-visual']);delete unchanged.jobs['native-monitor-visual'];
+ assert.ok(unchanged.jobs['native-login-visual']);delete unchanged.jobs['native-login-visual'];
+ assert.deepEqual(unchanged.jobs.quick.strategy.matrix.include.filter(row=>row.check==='native-monitor'),[{check:'native-monitor',group:'entry',command:'npm run smoke:ui:native-monitor:built'}]);
+ unchanged.jobs.quick.strategy.matrix.include=unchanged.jobs.quick.strategy.matrix.include.filter(row=>row.check!=='native-monitor');
  for(const id of['verify-long-ui','verify-memory-sqlite','quick-extended'])unchanged.jobs[id].strategy.matrix.include=[];
- unchanged.jobs.acceptance.needs=unchanged.jobs.acceptance.needs.filter(id=>id!=='quick-extended-long');
+ unchanged.jobs.acceptance.needs=unchanged.jobs.acceptance.needs.filter(id=>!['quick-extended-long','native-monitor-visual','native-login-visual'].includes(id));
  assert.equal(createHash('sha256').update(JSON.stringify(unchanged)).digest('hex'),data.baselineContextSha256,
-  'Only the three matrix partitions, one cloned early owner and its mandatory acceptance edge may change.');
+  'Only the three recorded matrix partitions, their early owner and acceptance edge, plus the explicitly checked native Quick and full-viewport Monitor/login gates may change.');
  const clone=structuredClone(qualificationEarly),later=workflow.jobs['quick-extended'];
  clone.needs=later.needs;clone.strategy.matrix.include=later.strategy.matrix.include;
  assert.deepEqual(clone,later,'The promoted qualification retains its complete prior shell, artifact ownership, browser mode and execution context.');
@@ -1055,4 +1059,67 @@ test('Docker and Compose schema assertions use the same dependency-free complete
    assert.ok(driver.includes('readiness.storage?.schemaVersion'));assert.ok(driver.includes('manifest.storage?.schemaVersion'));
    assert.ok(!driver.includes('source.matchAll('));
  }
+});
+
+test('native monitor keeps protected real-browser coverage and all numeric, record and session regressions mandatory',()=>{
+ const row=workflow.jobs.quick.strategy.matrix.include.find(row=>row.check==='native-monitor');
+ assert.equal(row.command,'npm run smoke:ui:native-monitor:built');
+ assert.equal(workflow.jobs.quick.env.UI_SMOKE_HEADFUL,'true');
+ assert.equal(scripts['smoke:ui:native-monitor:built'],'node scripts/smoke-native-monitor.mjs');
+ for(const file of ['native-monitor-wire','native-monitor-number','native-monitor-views','native-monitor-session','native-monitor-lifecycle'])assert.ok(scripts['test:frontend-state'].split(/\s+/).includes('scripts/'+file+'.test.mjs'));
+ const driver=read('./smoke-native-monitor.mjs');
+ for(const marker of ['real-native-protected-login-and-profile-choice','literal-int64-snapshots-real-booklet-and-profile-rendering','same-browser-workspace-switch-does-not-reuse-private-booklet-or-selection','real-empty-native-snapshot-clears-previous-rows','current-native-role-revocation-clears-monitor-and-local-bearer'])assert.ok(driver.includes(marker));
+});
+
+
+test('complete native Monitor pixels are a required same-run Source and runtime consumer',()=>{
+ const job=workflow.jobs['native-monitor-visual'];
+ assert.deepEqual(job.strategy.matrix.scenario,['baseline','selected-row','settings-menu','new-filter-dialog','filter-target-menu','filter-value-options','advanced-filter-dialog','finish-dialog','time-dialog','time-dialog-edited']);assert.equal(job.strategy['fail-fast'],false);assert.equal(job.strategy['max-parallel'],3);
+ assert.deepEqual(job.needs,['build','original-reference-build','browser-system-dependencies','fast-feedback']);
+ assert.equal(job.env.UI_SMOKE_HEADFUL,'true');assert.equal(job['timeout-minutes'],15);
+ assert.equal(job.defaults.run['working-directory'],'rewrite-app');assert.equal(job['continue-on-error'],undefined);
+ const runtime=job.steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
+ assert.equal(runtime.with.prebuilt,'true');assert.equal(runtime.with.playwright,'true');
+ assert.equal(runtime.with['build-attempt'],'${{ needs.build.outputs.attempt }}');
+ const download=job.steps.find(step=>step.uses?.startsWith('actions/download-artifact@'));
+ assert.equal(download.with.name,'original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}');
+ assert.equal(download.with['digest-mismatch'],'error');assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
+ const self=job.steps.find(step=>step.name==='Require exact Original self-control');
+ const pair=job.steps.find(step=>step.name==='Require eight exact complete Original-to-Rewrite Monitor viewports');
+ assert.equal(self.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$NATIVE_MONITOR_VISUAL_SCENE"');
+ assert.equal(pair.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$NATIVE_MONITOR_VISUAL_SCENE"');
+ assert.ok(job.steps.indexOf(runtime)<job.steps.indexOf(self));assert.ok(job.steps.indexOf(self)<job.steps.indexOf(pair));
+ for(const step of [self,pair]){assert.equal(step.env.NATIVE_MONITOR_VISUAL_SCENE,'${{ matrix.scenario }}');assert.equal(step.env.ORIGINAL_BROWSER_REFERENCE_ROOT,download.with.path);assert.equal(step.if,undefined);assert.equal(step['continue-on-error'],undefined);}
+ const evidence=job.steps.find(step=>step.uses?.startsWith('actions/upload-artifact@'));
+ assert.equal(evidence.with.name,'native-monitor-parity-${{ matrix.scenario }}-${{ github.sha }}-${{ github.run_attempt }}');assert.equal(evidence.if,'always()');assert.equal(evidence.with['include-hidden-files'],true);assert.equal(evidence.with['if-no-files-found'],'error');assert.equal(evidence.with['retention-days'],30);
+ assert.ok(evidence.with.path.includes(download.with.path));assert.ok(evidence.with.path.includes(self.env.UI_SMOKE_ARTIFACT_DIR));assert.ok(evidence.with.path.includes(pair.env.UI_SMOKE_ARTIFACT_DIR));
+ assert.ok(workflow.jobs.acceptance.needs.includes('native-monitor-visual'));
+});
+
+test('both native login roots require all ten exact Source states and retain immutable same-run evidence',()=>{
+ const job=workflow.jobs['native-login-visual'];
+ assert.deepEqual(job.strategy.matrix.entry,['monitor','participant']);
+ assert.deepEqual(job.strategy.matrix.scenario,['empty','name-filled','password','password-filled','password-visible','password-back','password-error','password-rate-limit','password-expired','password-scheduled']);
+ assert.equal(job.strategy['fail-fast'],false);assert.equal(job.strategy['max-parallel'],3);
+ assert.deepEqual(job.needs,['build','original-reference-build','browser-system-dependencies','fast-feedback']);
+ assert.equal(job.env.UI_SMOKE_HEADFUL,'true');assert.equal(job['timeout-minutes'],15);assert.equal(job['continue-on-error'],undefined);
+ assert.equal(job.defaults.run['working-directory'],'rewrite-app');
+ const runtime=job.steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
+ assert.equal(runtime.with.prebuilt,'true');assert.equal(runtime.with.playwright,'true');assert.equal(runtime.with['browser-system-certified-cohorts'],'true');
+ assert.equal(runtime.with['build-attempt'],'${{ needs.build.outputs.attempt }}');
+ const download=job.steps.find(step=>step.uses?.startsWith('actions/download-artifact@'));
+ assert.equal(download.id,'original-login-reference');assert.equal(download.with.name,'original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}');
+ assert.equal(download.with['digest-mismatch'],'error');assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
+ const controls=job.steps.find(step=>step.name==='Verify actual native paint and layout negative controls');assert.equal(controls.run,'xvfb-run --auto-servernum npm run test:browser-capture:built');
+ const self=job.steps.find(step=>step.name==='Require exact Original login self-control'),pair=job.steps.find(step=>step.name==='Require eight exact complete Original-to-Rewrite login viewports');
+ assert.equal(self.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs source-self-control');
+ assert.equal(pair.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs rewrite');
+ assert.ok(job.steps.indexOf(runtime)<job.steps.indexOf(controls));assert.ok(job.steps.indexOf(controls)<job.steps.indexOf(self));assert.ok(job.steps.indexOf(self)<job.steps.indexOf(pair));
+ for(const step of [self,pair]){assert.equal(step.env.NATIVE_LOGIN_ENTRY,'${{ matrix.entry }}');assert.equal(step.env.NATIVE_LOGIN_SCENE,'${{ matrix.scenario }}');assert.equal(step.env.ORIGINAL_BROWSER_REFERENCE_ROOT,download.with.path);assert.equal(step.if,undefined);assert.equal(step['continue-on-error'],undefined);}
+ const post=job.steps.find(step=>step.name==='Verify Original build remains unchanged after login capture');
+ assert.equal(post.if,"always() && steps.original-login-reference.outcome == 'success'");assert.equal(post.env.ORIGINAL_BROWSER_REFERENCE_ROOT,download.with.path);assert.equal(post.run,'node scripts/original-browser-reference.mjs verify-build "$ORIGINAL_BROWSER_REFERENCE_ROOT"');assert.ok(job.steps.indexOf(pair)<job.steps.indexOf(post));
+ const evidence=job.steps.find(step=>step.uses?.startsWith('actions/upload-artifact@'));assert.equal(evidence.if,'always()');assert.equal(evidence.with['include-hidden-files'],true);assert.equal(evidence.with['if-no-files-found'],'error');assert.equal(evidence.with['retention-days'],30);
+ assert.equal(evidence.with.name,'native-login-parity-${{ matrix.entry }}-${{ matrix.scenario }}-${{ github.sha }}-${{ github.run_attempt }}');
+ for(const path of [controls.env.UI_SMOKE_ARTIFACT_DIR,self.env.UI_SMOKE_ARTIFACT_DIR,pair.env.UI_SMOKE_ARTIFACT_DIR,download.with.path,'${{ runner.temp }}/browser-system/manifest.json'])assert.ok(evidence.with.path.includes(path));
+ assert.ok(workflow.jobs.acceptance.needs.includes('native-login-visual'));
 });

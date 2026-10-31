@@ -1,0 +1,157 @@
+@if (!originalId) {
+  <p
+    mat-dialog-title
+    data-cy="comment-diag-title"
+  >Neuen Filter hinzufügen</p>
+}
+
+@if (originalId) {
+  <p
+    mat-dialog-title
+    data-cy="comment-diag-title"
+  >Filter bearbeiten</p>
+}
+
+<mat-dialog-content>
+  <p>Folgende Test-Sitzungen sollen herausgefiltert werden:</p>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Feld</mat-label>
+    <mat-select [(ngModel)]="filter.target" (ngModelChange)="updateFilterId()" data-cy = "GM_filtersetting_field">
+      @for (target of targets.all; track target) {
+        @if (advancedMode || !isAdvancedTestSessionFilterTarget(target) || target == filter.target) {
+          <mat-option [value]="target" data-cy="column-selection">
+            {{(customtext((''),('gm_col_' + target))) || (customtext((target),('gm_filter_target_' + target))) }}
+          </mat-option>
+        }
+      }
+    </mat-select>
+  </mat-form-field>
+
+  @if (filter.target !== 'state') {
+    <mat-form-field appearance="outline">
+      <mat-label>Filtertyp</mat-label>
+      <mat-select [(ngModel)]="filter.type" (ngModelChange)="validate(); updateFilterId()" data-cy = "GM_filtersetting_type">
+        @for (type of filterTypes.all; track type) {
+          @if (advancedMode || !isAdvancedTestSessionFilterType(type) || type == filter.type) {
+            <mat-option [value]="type">
+              {{customtext((type),('gm_filter_type_' + type))}}
+            </mat-option>
+          }
+        }
+      </mat-select>
+    </mat-form-field>
+  }
+
+  <p>
+    @if (advancedMode) {
+      <mat-slide-toggle [(ngModel)]="filter.not" (ngModelChange)="updateFilterId()">
+        {{customtext(('Nicht'),('gm_filter_not'))}}
+      </mat-slide-toggle>
+    }
+  </p>
+
+  @if (filter.target !== 'state') {
+    <mat-form-field appearance="outline">
+      <mat-label>Filter</mat-label>
+      <input
+        type="text"
+        matInput
+        [(ngModel)]="filter.value"
+        (ngModelChange)="validate(); updateFilterId()"
+        [matAutocomplete]="auto2"
+        placeholder=""
+        data-cy="comment-diag-value"
+        required
+        >
+      <mat-autocomplete #auto2="matAutocomplete" class="original-native-monitor-filter-options">
+        @for (option of lists[filter.target]; track option) {
+          <mat-option [value]="option">
+            {{ (subValueLists[filter.target]?.[option]) ? subValueLists[filter.target]?.[option]?.label : option}}
+          </mat-option>
+        }
+      </mat-autocomplete>
+      @if (!isValid) {
+        <tc-alert level="error" text="Ungültiger Wert" />
+      }
+    </mat-form-field>
+  }
+
+  @if (filter.target === 'testState' || filter.target === 'bookletStates') {
+    <mat-form-field appearance="outline">
+      <mat-label>Unterfilter</mat-label>
+      <input
+        type="text"
+        matInput
+        [(ngModel)]="filter.subValue"
+        (ngModelChange)="updateFilterId()"
+        placeholder=""
+        data-cy="comment-diag-subValue"
+        required
+        [matAutocomplete]="auto3"
+        >
+      <mat-autocomplete #auto3="matAutocomplete" class="original-native-monitor-filter-options">
+        @if (!isStringArray(filter.value)) {
+          @if (subValueLists[filter.target]; as list) {
+            @if (list[filter.value]; as subValueSelect) {
+              @for (option of entries((subValueSelect.options)); track option) {
+                <mat-option [value]="option.key">
+                  {{ option.value.label }}
+                </mat-option>
+              }
+            }
+          }
+        }
+      </mat-autocomplete>
+    </mat-form-field>
+  }
+
+  @if (filter.target === 'state') {
+    <mat-form-field appearance="outline">
+      <mat-label>Filter</mat-label>
+      <mat-select [(ngModel)]="filter.value" (ngModelChange)="updateFilterId()" multiple>
+        @for (superState of entries((superStates)); track superState) {
+          <mat-option
+            [value]="superState.key"
+            class="super-state {{superState.value?.class}}"
+            >
+            <mat-icon [svgIcon]="superState.value?.icon || ''"></mat-icon>
+            {{superState.value?.tooltip}}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  }
+
+  @if (advancedMode) {
+    <mat-form-field appearance="outline">
+      <mat-label>Filtername</mat-label>
+      <input
+        matInput
+        [(ngModel)]="filter.label"
+        placeholder=""
+        data-cy="comment-diag-name"
+        required>
+    </mat-form-field>
+  }
+
+
+</mat-dialog-content>
+
+<mat-dialog-actions>
+  <button
+    mat-raised-button
+    type="submit"
+    [mat-dialog-close]="filter"
+    [disabled]="!filter.label || !filter.value || !isValid"
+    data-cy="comment-diag-submit"
+    >
+    Speichern
+  </button>
+  <button mat-raised-button [mat-dialog-close]="false">
+    Abbrechen
+  </button>
+  <p>
+    <mat-slide-toggle [(ngModel)]="advancedMode">Erweiterter Modus</mat-slide-toggle>
+  </p>
+</mat-dialog-actions>
