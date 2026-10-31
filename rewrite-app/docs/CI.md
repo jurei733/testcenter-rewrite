@@ -3695,7 +3695,28 @@ sizing; other interfaces retain their own styles. Controlled local Chrome
 captures reproduce zero differing pixels for all eight menu and eight selected
 row pairs. They explicitly use a diagnostic GPU-rasterization flag and do not
 qualify the default native browser. The baseline capture program was previously
-verified in native qualification41150306578; all three current scenes and the
-production runtime integration still require fresh current-head native CI.
-Additional Monitor states, all eight broad visual rows, backend equivalence and
-complete Original parity remain open.
+verified in native qualification41150306578. The follow-up qualification
+41155524520 on9f0cd3ab genuinely passes all24 self-control and24 paired viewports
+on image20261026.354.1, default visible locked Chromium147.0.7727.15, with all367
+native policy cases, four Debian controls and nine real WebSocket cases. An
+independent ZIP and PNG audit verifies96 visible images,288 actual white repaint
+witnesses,80 compiled Source files and current407 frontend source hashes. The
+native rendering material equals the existing qualified oracle; this grants no
+new cohort admission. That qualifier captures native material directly, so
+production offline restoration and the new required matrix still need fresh
+complete93-job acceptance.
+
+The qualification archive contains six databases created solely from the owned
+synthetic fixture; these are recorded and excluded from independent extraction.
+The production harness now keeps its owned database in a separate temporary
+directory and removes it after process cleanup, including failures. PNGs, scene
+actions and provenance remain the published evidence. The captured dependency
+audit has16 moderate reports through the development CLI's glob/minimatch graph,
+zero high and zero critical reports. The unchanged high-severity audit gate
+passes; a zero-vulnerability or complete security qualification is not claimed.
+
+Further controlled Chrome diagnostics verify eight exact columns-submenu pairs,
+but the new-filter dialog still differs35,667 desktop and32,647 mobile pixels.
+Its inherited global Material theme, typography and form geometry need a scoped
+correction and fresh qualification. Additional Monitor states, all eight broad
+visual rows, backend equivalence and complete Original parity remain open.

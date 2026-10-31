@@ -5,7 +5,8 @@ import {createRequire} from 'node:module';
 import {spawn,execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {createServer} from 'node:http';
-import {readFile,writeFile,mkdir,readdir,realpath} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,readdir,realpath,mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import {resolve,join,extname,relative} from 'node:path';
 import {pathToFileURL} from 'node:url';
 const app=process.cwd(),selfControl=process.argv[2]==='source-self-control';
@@ -34,7 +35,10 @@ const {captureStableViewport}=await import(pathToFileURL(join(app,'scripts/stabl
 const {compareScreenshots}=await import(pathToFileURL(join(app,'scripts/exact-rgba-comparison.mjs')));
 const {readNativeSmokeResponse,stopNativeSmokeServer}=await import(pathToFileURL(join(app,'scripts/native-monitor-smoke-io.mjs')));
 const manifest=await verifyOriginalBuild(root);
-const file=join(out,'store.sqlite'),storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(process.env.FIRST_SLICE_XML_SCHEMA_CACHE??join(app,'.data/original-xml-schemas'),false),services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+// Keep the owned fixture database outside the published evidence directory.
+const storeRoot=await mkdtemp(join(tmpdir(),'owned-native-monitor-visual-'));
+try{
+const file=join(storeRoot,'store.sqlite'),storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(process.env.FIRST_SLICE_XML_SCHEMA_CACHE??join(app,'.data/original-xml-schemas'),false),services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
 const group='OWNED.PARITY',name='owned-parity-monitor';
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
 const t=await services.platform.createTenant({tenantKey:'owned-parity',displayName:'Owned parity'}),w=await services.platform.createWorkspace({tenantKey:t.tenantKey,workspaceKey:'owned',displayName:'Owned parity'}),scope={tenantKey:t.tenantKey,workspaceKey:w.workspaceKey};
@@ -109,3 +113,5 @@ try{
  assert.deepEqual(captureFailures,[],'Every complete native frame must stabilize');assert.equal(Object.values(comparisons).flatMap(Object.values).length,8);assert.ok(Object.values(comparisons).flatMap(Object.values).every(value=>value.differingPixels===0),'All eight full native viewport comparisons must be exactly RGBA-identical');
 }catch(error){for(const {page,side,screen}of pages)if(!page.isClosed()){await page.screenshot({path:join(out,screen+'-'+side+'-failure.png')}).catch(()=>{});await writeFile(join(out,screen+'-'+side+'-failure.html'),await page.content().catch(()=>''));}await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),errors,unknown,requests},null,2));throw error;}
 finally{try{await browser?.close();}finally{if(sourceServer){sourceServer.closeAllConnections();await new Promise(done=>sourceServer.close(done));}if(server)await stopNativeSmokeServer(server);}}
+
+}finally{await rm(storeRoot,{recursive:true,force:true});}
