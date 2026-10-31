@@ -383,7 +383,7 @@ jobs:
       max-parallel: 3
       matrix:
         entry: [monitor, participant]
-        scenario: [empty, name-filled, password, password-filled, password-visible, password-back, password-error]
+        scenario: [empty, name-filled, password, password-filled, password-visible, password-back, password-error, password-rate-limit, password-expired, password-scheduled]
     defaults:
       run:
         working-directory: rewrite-app
