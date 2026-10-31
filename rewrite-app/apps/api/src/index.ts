@@ -5000,6 +5000,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
       if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,
         readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),
+        raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
         send: (status, value) => {
           if (status === 205) { response.writeHead(205, securityHeaders); response.end(); }
           else sendJson(response, status, value);

@@ -572,7 +572,7 @@ test('global early eligibility uses the complete accepted 60-row observation wit
  assert.equal(actual.length+data.model.SourceFamilies+data.model.databaseApi+data.model.databaseBrowser+data.model.checkpointSlots,20);
  assert.equal(workflow.jobs['original-browser-reference'].strategy.matrix.family.length,5);
  assert.equal(workflow.jobs['quick-extended'].strategy['max-parallel'],8);
- const instances=Object.values(workflow.jobs).reduce((n,job)=>{const matrix=job.strategy?.matrix;return n+(matrix?.include?.length??Object.values(matrix??{}).reduce((product,axis)=>product*axis.length,1));},0);assert.equal(instances,120); // Keep all 90 prior jobs, ten Monitor states, and twenty native login state/root pairs.
+ const instances=Object.values(workflow.jobs).reduce((n,job)=>{const matrix=job.strategy?.matrix;return n+(matrix?.include?.length??Object.values(matrix??{}).reduce((product,axis)=>product*axis.length,1));},0);assert.equal(instances,122); // Keep all 90 prior jobs, ten Monitor states, and twenty-two native login state/root pairs.
  assert.deepEqual(qualificationEarly.needs,broadEarly.needs);
  assert.deepEqual(qualificationEarly.needs,['build','typecheck','dependencies','unit','browser-system-dependencies']);
  const ancestors=new Set();const visit=id=>{for(const need of[workflow.jobs[id].needs??[]].flat())if(!ancestors.has(need)){ancestors.add(need);visit(need);}};visit('quick-extended-long');
@@ -1099,7 +1099,7 @@ test('complete native Monitor pixels are a required same-run Source and runtime 
 test('both native login roots require all ten exact Source states and retain immutable same-run evidence',()=>{
  const job=workflow.jobs['native-login-visual'];
  assert.deepEqual(job.strategy.matrix.entry,['monitor','participant']);
- assert.deepEqual(job.strategy.matrix.scenario,['empty','name-filled','password','password-filled','password-visible','password-back','password-error','password-rate-limit','password-expired','password-scheduled']);
+ assert.deepEqual(job.strategy.matrix.scenario,['empty','name-filled','password','password-filled','password-visible','password-back','password-error','password-rate-limit','password-expired','password-scheduled','password-server-error']);
  assert.equal(job.strategy['fail-fast'],false);assert.equal(job.strategy['max-parallel'],3);
  assert.deepEqual(job.needs,['build','original-reference-build','browser-system-dependencies','fast-feedback']);
  assert.equal(job.env.UI_SMOKE_HEADFUL,'true');assert.equal(job['timeout-minutes'],15);assert.equal(job['continue-on-error'],undefined);

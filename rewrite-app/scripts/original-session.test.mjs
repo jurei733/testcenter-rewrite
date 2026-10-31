@@ -27,6 +27,16 @@ for (const folder of ['native-login-protocol', 'native-pow-protocol']) {
 }
 const sourceLogin = source.find(row => row.path === '/session/login' && row.status === 200).value;
 const sourcePerson = source.find(row => row.path === '/session/person' && row.status === 200).value;
+const httpOracleRoot = new URL('native-login-http/', fixtureRoot);
+const httpOracleManifest = JSON.parse(await readFile(new URL('manifest.json', httpOracleRoot), 'utf8'));
+const httpOracle = JSON.parse(await readFile(new URL('observations.json', httpOracleRoot), 'utf8'));
+assert.equal(httpOracleManifest.sourceCommit, 'eedae41840cbe90e5547c0211da818bdf620f5aa');
+assert.equal(httpOracleManifest.sourceBackendHttpCaptured, true);assert.equal(httpOracleManifest.sqlSeedsOrDaoStubs, false);assert.equal(httpOracleManifest.testMode, false);
+assert.equal(httpOracleManifest.sourceFilesVerifiedBeforeAndAfter, 137);assert.equal(httpOracle.rows.length, 24);
+for (const [file, sha] of Object.entries(httpOracleManifest.files)) {
+  assert.match(file, /^[a-z0-9][a-z0-9.-]*$/);
+  assert.equal(createHash('sha256').update(await readFile(new URL(file, httpOracleRoot))).digest('hex'), sha);
+}
 const validator = await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE || '.data/original-xml-schemas'), process.env.FIRST_SLICE_XML_SCHEMA_DOWNLOAD !== 'false');
 const name = 'owned-native-binary-login', password = 'OWNED_PRIVATE_HTTP_PASSWORD_2026';
 const secret = 'OWNED_NATIVE_WORK_CURRENT_SECRET_2026_123456789', nextSecret = 'OWNED_NATIVE_WORK_ROTATED_SECRET_2026_987654321';
@@ -320,4 +330,31 @@ test(`real ${process.env.FIRST_SLICE_STORE === 'postgres' ? 'PostgreSQL' : 'SQLi
     if (created) { assert.equal(Number((await admin.query('SELECT count(*) AS count FROM pg_stat_activity WHERE application_name=$1', [schema])).rows[0].count), 0); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); }
     await admin?.end(); await rm(directory, {recursive: true, force: true});
   }
+});
+
+
+test('native session server faults match the real Source HTTP oracle without exposing implementation details', async t => {
+ const directory=await mkdtemp(join(tmpdir(),'owned-native-source-error-')),schema='owned_native_error_'+randomUUID().replaceAll('-','');
+ const postgres=process.env.FIRST_SLICE_STORE==='postgres',url=postgres?new URL(process.env.FIRST_SLICE_POSTGRES_URL):null;
+ url?.searchParams.set('options','-c search_path='+schema);url?.searchParams.set('application_name',schema);
+ let server,storage,pool,created=false;
+ const environment={FIRST_SLICE_STORE:postgres?'postgres':'sqlite',FIRST_SLICE_SQLITE_FILE:join(directory,'owned.sqlite'),FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',REQUIRE_LOGIN_PASSWORD:'false',...(url?{FIRST_SLICE_POSTGRES_URL:url.toString()}:{})};
+ const previous=new Map(Object.keys(environment).map(k=>[k,process.env[k]]));
+ try{
+  if(url){pool=new Pool({connectionString:process.env.FIRST_SLICE_POSTGRES_URL});await pool.query(`CREATE SCHEMA "${schema}"`);created=true;}
+  try{Object.assign(process.env,environment);server=await createProductionApiServer();}finally{for(const[k,v]of previous){if(v===undefined)delete process.env[k];else process.env[k]=v;}}
+  storage=url?await createPostgresFirstSliceStorage(url.toString()):createSqliteFirstSliceStorage(environment.FIRST_SLICE_SQLITE_FILE);
+  const repository=storage.repository,services=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+  const tenant=await services.platform.createTenant({tenantKey:'owned-'+randomUUID(),displayName:'Owned HTTP errors'}),workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'owned',displayName:'Owned HTTP errors'});
+  const password='Owned Source error password';await services.workspaceAdminRead.importParticipantRoster({tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey,rosterText:xml('Testtakers','testcenter-testtaker-xml','<Metadata/><Group id="OWNED.ERROR" label=""><Login name="owned-http-empty" pw="'+password+'" mode="monitor-group"/></Group>')});
+  await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port;
+  for(const row of httpOracle.rows.filter(r=>r.state==='empty'))await t.test(row.passwordKind+' credential retains Source generic raw server-error response',async()=>{
+   const response=await fetch(base+'/session/login',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'owned-http-empty',password:row.passwordKind==='empty'?'':row.passwordKind==='wrong'?'Owned wrong password':password}),signal:AbortSignal.timeout(15000)});
+   const text=await response.text();assert.equal(response.status,row.status);assert.equal(text,row.value);assert.equal(response.headers.get('content-type'),row.contentType);assert.equal(response.headers.get('cache-control'),'private, no-store');
+   for(const privateText of [password,'original_group_label_invalid','imported Original group label'])assert.ok(!text.includes(privateText));
+   assert.deepEqual(await repository.listParticipantSessionsByWorkspace(workspace.tenantId,workspace.workspaceId),[]);assert.deepEqual(await repository.listOriginalLoginBindingsByWorkspace(workspace.tenantId,workspace.workspaceId),[]);
+  });
+ }finally{
+  if(server){server.closeAllConnections();await new Promise(done=>server.close(done));}await storage?.shutdown();if(created)await pool.query(`DROP SCHEMA "${schema}" CASCADE`);await pool?.end();await rm(directory,{recursive:true,force:true});
+ }
 });

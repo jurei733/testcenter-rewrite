@@ -1,0 +1,29 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "actualSourceFilesUnmodified": true,
+  "sourceBackendHttpCaptured": true,
+  "actualPostgresAndRedis": true,
+  "adminWorkspaceAndRosterUploadedOverHttp": true,
+  "sqlSeedsOrDaoStubs": false,
+  "testMode": false,
+  "testModeFixtureClock": false,
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "versions": {
+    "php": "8.3.36",
+    "postgres": "PostgreSQL 18.4 (Debian 18.4-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+  },
+  "vendor": {
+    "sourceComposerLockSha256": "47c7dda51f6d27fbbc93aaedc99d364b9eeb299d80f92d68226b0218a436b708",
+    "installedMetadataSha256": "a36c0ba39721cefd2628912f2e5213a197e4ee86c0eb4b354ecf33be248d64b4",
+    "installedPackages": 19,
+    "requiredProductionPackages": 19,
+    "allInstalledVersionsAndSourceReferencesMatchPinnedLock": true
+  },
+  "cases": 24,
+  "files": {
+    "observations.json": "47e5a79b511c40b54f631fe191142fb72f9a1f43bce107585de4c160e028bfc4",
+    "capture.mjs": "f7fda26b4bdc23c190d41b8ed89924bfec2c4e40f977b68e5a2ad5a25b07a8e2"
+  },
+  "scope": "Pinned Original production Apache/PHP participant login with real Source PostgreSQL/Redis and schema-validated HTTP roster import; protection disabled only in this owned instance for literal credentials. Does not qualify full Original, protected challenge flow, all HTTP errors or visual parity."
+}

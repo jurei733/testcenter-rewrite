@@ -21,6 +21,7 @@ const fields = (value: unknown, required: string[], optional: string[] = []) => 
 export async function handleOriginalSessionHttp(input: {
   request: IncomingMessage; pathname: string; services: FirstSliceServices; proof: OriginalSessionProof;
   readBody: () => Promise<unknown>; send: (status: number, value: unknown) => void;
+  raw: (status: number, value: string, contentType: string) => void;
   header: (name: string, value: string) => void;
 }): Promise<boolean> {
   const methods = originalSessionRoutes.get(input.pathname);
@@ -70,7 +71,10 @@ export async function handleOriginalSessionHttp(input: {
   } catch (error) {
     if (!(error instanceof FirstSliceError)) throw error;
     const badCredentials = ['original_login_invalid', 'participant_login_invalid', 'participant_password_invalid', 'participant_code_required'];
-    input.send(badCredentials.includes(error.errorCode) ? 400 : error.statusCode, error.message);
+    // Pinned production Source ErrorHandler never returns internal server-fault
+    // messages to the client. Native successes and canonical RPC DTOs stay separate.
+    if (error.statusCode >= 500) input.raw(error.statusCode, 'Internal error.', 'text/html;charset=UTF-8');
+    else input.send(badCredentials.includes(error.errorCode) ? 400 : error.statusCode, error.message);
   }
   return true;
 }
