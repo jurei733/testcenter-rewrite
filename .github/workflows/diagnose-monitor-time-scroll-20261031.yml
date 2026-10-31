@@ -84,13 +84,13 @@ jobs:
         run: |
           node scripts/original-browser-reference.mjs pack .ci/original-monitor-reference
           cp -R .ci/original-monitor-reference/frontend/dist/testcenter-frontend/browser "$RUNNER_TEMP/native-monitor-original-build"
-      - name: Require exact time-dialog Original self-controls in the default native browser
+      - name: Record both Original self-control scroll states before diagnosing their difference
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
         run: |
           mkdir -p "$RUNNER_TEMP/native-monitor-source-control"
           for scene in time-dialog time-dialog-edited; do
-            UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-source-control/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$scene"
+            UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-source-control/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/diagnose-native-monitor-time-scroll.mjs source-self-control "$scene"
           done
       - name: Record full time-dialog viewports and actual ancestor scroll events
         env:

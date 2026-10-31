@@ -85,13 +85,13 @@ try{
    await page.waitForFunction(()=>document.querySelectorAll('tc-test-session').length===2);await page.getByText('Owned Monitor Booklet',{exact:true}).first().waitFor();await page.evaluate(()=>document.fonts.ready);await page.mouse.move(1,1);
    await page.evaluate(()=>{
     const node=value=>{
-     const e=value instanceof Element?value:document.scrollingElement,c=e?getComputedStyle(e):null,b=e?.getBoundingClientRect();
-     return e?{tag:e.tagName,id:e.id,classes:typeof e.className==='string'?e.className:'',scroll:[e.scrollLeft,e.scrollTop],client:[e.clientWidth,e.clientHeight],scrollSize:[e.scrollWidth,e.scrollHeight],offset:[e.offsetWidth,e.offsetHeight],box:{x:b.x,y:b.y,width:b.width,height:b.height},css:Object.fromEntries(['display','height','min-height','max-height','overflow-x','overflow-y','flex','flex-shrink','box-sizing','position'].map(k=>[k,c.getPropertyValue(k)]))}:null;
+     const e=value instanceof Element?value:value===document?document.scrollingElement:null,c=e?getComputedStyle(e):null,b=e?.getBoundingClientRect();
+     return e?{tag:e.tagName,id:e.id,dataCy:e.getAttribute('data-cy'),role:e.getAttribute('role'),classes:typeof e.className==='string'?e.className:'',scroll:[e.scrollLeft,e.scrollTop],client:[e.clientWidth,e.clientHeight],scrollSize:[e.scrollWidth,e.scrollHeight],offset:[e.offsetWidth,e.offsetHeight],box:{x:b.x,y:b.y,width:b.width,height:b.height},css:Object.fromEntries(['display','height','min-height','max-height','overflow-x','overflow-y','flex','flex-shrink','box-sizing','position'].map(k=>[k,c.getPropertyValue(k)]))}:null;
     };
     const chain=e=>{const rows=[];for(;e&&rows.length<16;e=e.parentElement)rows.push(node(e));return rows;};
     const snapshot=()=>({headerAncestors:chain(document.querySelector('[data-cy=header]')),testletAncestors:chain(document.querySelector('tc-test-session [data-cy=gm-testlet-select]')),roots:['html','body','tc-root','app-root','.page','app-native-monitor-entry'].map(s=>({selector:s,value:node(document.querySelector(s))}))});
     const initial=snapshot(),events=[];
-    document.addEventListener('scroll',event=>{if(events.length<160)events.push({trusted:event.isTrusted,target:node(event.target),ancestors:chain(event.target instanceof Element?event.target:document.scrollingElement),header:node(document.querySelector('[data-cy=header]'))});},true);
+    for(const type of ['scroll','focusin'])document.addEventListener(type,event=>{if(events.length<160)events.push({type,trusted:event.isTrusted,target:node(event.target),active:node(document.activeElement),ancestors:chain(event.target instanceof Element?event.target:document.scrollingElement),header:node(document.querySelector('[data-cy=header]'))});},true);
     window.__ownedNativeScrollReport=()=>({initial,events,final:snapshot()});
    });
    const sceneEvidence=await prepareMonitorVisualScene(page,scene,screen);await writeFile(join(out,screen+'-'+side+'-scene.json'),JSON.stringify(sceneEvidence,null,2));await page.mouse.move(1,1);
@@ -118,6 +118,7 @@ try{
    const liveAnimation=await page.evaluate(async()=>{const a=document.getAnimations().find(a=>a.effect?.target?.matches('.connection-status')),before=a.currentTime;a.play();await a.ready;await new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(done))));return {before,after:a.currentTime,state:a.playState};});assert.equal(liveAnimation.state,'running');assert.ok(liveAnimation.after>liveAnimation.before);
    await writeFile(join(out,screen+'-'+side+'-animation-resumed.json'),JSON.stringify(liveAnimation));
 
+   await writeFile(join(out,screen+'-'+side+'-scroll-after-paint.json'),JSON.stringify(await page.evaluate(()=>window.__ownedNativeScrollReport()),null,2));
    await context.close();
   }
  }
