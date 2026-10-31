@@ -134,9 +134,9 @@ app-root {
   display: none;
 }
 
-/* Native Original routes use a viewport shell and browser heading defaults. */
-:root:has(app-native-monitor-entry),
-body:has(app-native-monitor-entry) {
+/* Source html/body defaults must stay below CDK global-scrollblock specificity.
+   Native modal scrollbars retain their actual layout and width. */
+:where(:root:has(app-native-monitor-entry), body:has(app-native-monitor-entry)) {
   height: 100%;
   overflow: hidden;
 }
