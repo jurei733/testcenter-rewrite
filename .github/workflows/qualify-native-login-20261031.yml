@@ -81,6 +81,7 @@ jobs:
           cp src/environments/environment.dev.ts src/environments/environment.ts
           npm run build -- --configuration production
       - name: Bind the real Original build to this exact qualification head
+        id: original-reference-build
         run: |
           node scripts/original-browser-reference.mjs pack .ci/original-monitor-reference
           cp -R .ci/original-monitor-reference/frontend/dist/testcenter-frontend/browser "$RUNNER_TEMP/native-monitor-original-build"
@@ -120,6 +121,7 @@ jobs:
             done
           done
       - name: Verify Original source and build remain unchanged after browser capture
+        if: always() && steps.original-reference-build.outcome == 'success'
         run: |
           node scripts/original-browser-reference.mjs verify-source .ci/original-monitor-reference
           node scripts/original-browser-reference.mjs verify-build "$RUNNER_TEMP/native-monitor-original-build"
