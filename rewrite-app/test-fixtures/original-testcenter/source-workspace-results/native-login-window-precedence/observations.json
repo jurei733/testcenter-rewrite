@@ -1,0 +1,51 @@
+{
+    "scope": "Actual pinned Source SessionDAO.getLogin and TimeStamp code with an owned in-memory DAO row; no live DB/session writes; not full Source HTTP qualification",
+    "php": "8.3.36",
+    "sourceHashes": {
+        "src/exception/HttpError.class.php": "9afa5b6ecdb2b116b96926d228eea0789339737a3a81ce8293e94ebbb0a5e0c7",
+        "src/data-collection/ExpirationStateType.enum.php": "6721b483572334023ec9b766cb1f0b6c290151da4f676746bc5e030768964afb",
+        "src/data-collection/ExpirationState.class.php": "3b2358989cc58677e9fc28eb459dec5726d940c426ac382c413b839a16c2d96a",
+        "src/helper/TimeStamp.class.php": "eba4eb49ca3dbe8aa99733a55b40b9259823edb05e0f67267e946c8bcac87a7d",
+        "src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+        "src/helper/Password.class.php": "6f807473c2014ad8ece505448cea1375a9cce6fc8c688a1b9892676c8a016643"
+    },
+    "clock": "2026-01-01 12:00:00",
+    "rows": [
+        {
+            "state": "expired",
+            "passwordKind": "empty",
+            "status": 410,
+            "message": "Testing Period for this login is over since 2000-01-01 13:00:00"
+        },
+        {
+            "state": "expired",
+            "passwordKind": "wrong",
+            "status": 410,
+            "message": "Testing Period for this login is over since 2000-01-01 13:00:00"
+        },
+        {
+            "state": "expired",
+            "passwordKind": "correct",
+            "status": 410,
+            "message": "Testing Period for this login is over since 2000-01-01 13:00:00"
+        },
+        {
+            "state": "scheduled",
+            "passwordKind": "empty",
+            "status": 401,
+            "message": "Testing Period for this login has not yet started and will begin at 2099-01-01 13:00:00"
+        },
+        {
+            "state": "scheduled",
+            "passwordKind": "wrong",
+            "status": 401,
+            "message": "Testing Period for this login has not yet started and will begin at 2099-01-01 13:00:00"
+        },
+        {
+            "state": "scheduled",
+            "passwordKind": "correct",
+            "status": 401,
+            "message": "Testing Period for this login has not yet started and will begin at 2099-01-01 13:00:00"
+        }
+    ]
+}
