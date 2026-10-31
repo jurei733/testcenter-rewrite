@@ -6,9 +6,14 @@ permissions:
   contents: read
 jobs:
   qualify:
-    name: Actual native login and retained ten-scene Monitor
+    name: Actual native ${{ matrix.slice }} qualification
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        slice: [monitor, login]
     defaults:
       run:
         working-directory: rewrite-app
@@ -21,6 +26,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/rewrite-runtime
+      - name: Require complete disjoint qualification slices and unchanged deadlines
+        run: node --test scripts/native-login-qualification-slices.test.mjs
       - name: Prepare owned qualification evidence
         run: mkdir -p "$RUNNER_TEMP/rejected-diagnostic-qualification"
       - name: Exercise the diagnostic's actual owned Node mode correction
@@ -54,6 +61,8 @@ jobs:
           cmp "$RUNNER_TEMP/native-browser-system/manifest.json" "$RUNNER_TEMP/browser-system/manifest.json"
       - name: Build the actual API, schema cache and web app
         run: npm run build
+      - name: Exercise actual native validity ordering, canonical credentials and failure-cache priority
+        run: node --test scripts/original-login-window-precedence.test.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/native-validity.tap" 2>&1
       - name: Bind the actual capture-program files to this qualification
         run: sha256sum scripts/native-viewport-repaint.mjs scripts/stable-viewport-capture.mjs scripts/stable-viewport-capture.test.mjs scripts/fixtures/native-viewport-repaint-before-scrollbar-witness.mjs scripts/smoke-native-monitor-visual.mjs scripts/native-monitor-visual-scenes.mjs scripts/smoke-native-login-visual.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/capture-inputs.sha256"
       - name: Preserve actual native paint and layout negative controls
@@ -86,6 +95,7 @@ jobs:
           node scripts/original-browser-reference.mjs pack .ci/original-monitor-reference
           cp -R .ci/original-monitor-reference/frontend/dist/testcenter-frontend/browser "$RUNNER_TEMP/native-monitor-original-build"
       - name: Require all ten exact Original self-control scenes in the default native browser
+        if: matrix.slice == 'monitor'
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
         run: |
@@ -94,6 +104,7 @@ jobs:
             UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-source-control/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$scene"
           done
       - name: Require all80 complete Original-to-Rewrite Monitor viewports
+        if: matrix.slice == 'monitor'
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
         run: |
@@ -102,6 +113,7 @@ jobs:
             UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-visual/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$scene"
           done
       - name: Require all ten static Original login self-control states
+        if: matrix.slice == 'login'
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
         run: |
@@ -110,6 +122,7 @@ jobs:
             NATIVE_LOGIN_ENTRY=monitor NATIVE_LOGIN_SCENE="$state" UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-login-source-control/$state" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs source-self-control
           done
       - name: Require complete native Monitor and participant login comparisons
+        if: matrix.slice == 'login'
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
         run: |
@@ -129,7 +142,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: native-login-and-monitor-qualification-${{ github.sha }}-${{ github.run_attempt }}
+          name: native-${{ matrix.slice }}-qualification-${{ github.sha }}-${{ github.run_attempt }}
           include-hidden-files: true
           path: |
             ${{ runner.temp }}/rejected-diagnostic-qualification/
@@ -146,3 +159,15 @@ jobs:
             ${{ runner.temp }}/native-login-visual/
           if-no-files-found: warn
           retention-days: 7
+
+  qualification-acceptance:
+    name: Require complete native Monitor and login qualification
+    needs: [qualify]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every qualification slice
+        env:
+          QUALIFICATION_RESULT: ${{ needs.qualify.result }}
+        run: test "$QUALIFICATION_RESULT" = success
