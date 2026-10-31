@@ -19,13 +19,15 @@ import {ApplicationSettingsService} from '../application-settings.service';
 import {OriginalOverlayStylesComponent} from '../original-overlay-styles.component';
 import {OriginalFooterComponent} from '../original-footer.component';
 import {NativeLoginBrowserNoticeComponent} from '../native-login-browser-notice.component';
+import {AlertComponent} from './shared/components/alert/alert.component';
+import {nativeLoginProblemText} from '../native-login-problem';
 import {OriginalParticipantLogoutDialogComponent} from '../original-participant-logout-dialog.component';
 import {MainDataService} from './shared/shared.module';
 import {HeaderService} from './shared/services/header.service';
 import {BackendService} from './group-monitor/backend.service';
 import {NativeStarterComponent} from '../native-participant/starter/native-starter.component';
 @Component({selector:'app-native-monitor-entry',standalone:true,
- imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,NativeStarterComponent],
+ imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,NativeStarterComponent],
  providers:[BackendService,BookletService,TestSessionManager,{provide:MAT_MENU_DEFAULT_OPTIONS,useFactory:()=>({...inject(MAT_MENU_DEFAULT_OPTIONS,{skipSelf:true}),overlayPanelClass:'original-native-monitor-menu'})},{provide:GROUP_MONITOR_CONFIG,useValue:{checkForIdleInterval:180000}}],
  templateUrl:'./native-monitor-entry.component.html',styleUrls:['./native-monitor-entry.component.css','../original-login-theme.scss']})
 export class NativeMonitorEntryComponent implements OnDestroy {
@@ -40,6 +42,9 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  readonly starterRefreshing=signal(false);readonly starterRefreshFailed=signal(false);
  private starterRefresh:{scope:AbortSignal}|undefined;
  name='';password='';showPassword=false;
+ readonly loginProblem=signal('');readonly loginProblemCode=signal(0);readonly loginProblemLevel=signal<'error'|'warning'>('error');
+ clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
+ passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
  private readonly router=inject(Router);private readonly route=inject(ActivatedRoute);private readonly dialog=inject(MatDialog);
  constructor(){inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
   const detector=inject(ChangeDetectorRef);
@@ -60,9 +65,14 @@ export class NativeMonitorEntryComponent implements OnDestroy {
    return claim.id===group&&(flags.profile??'')===profile;
   });
  }
- async submit(){if(this.session.busy()||this.name.trim().length<3)return;this.problem.set('');
-  try{const access=await this.session.login(this.name.trim(),this.passwordStep()?this.password:'',this.view.signal);if(this.view.signal.aborted||this.session.busy()||this.session.access()!==access)return;this.password='';this.passwordStep.set(false);await this.selection();}
-  catch(error){if(this.view.signal.aborted||(error instanceof Error&&error.name==='AbortError'))return;if(!this.passwordStep()&&error instanceof NativeMonitorHttpError&&[400,401].includes(error.status)){this.passwordStep.set(true);this.session.problem.set('');}else{this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');this.password='';}}
+ async submit(){if(this.session.busy()||this.name.trim().length<3)return;this.problem.set('');const passwordStep=this.passwordStep();if(passwordStep)this.clearLoginWarning();else this.loginProblemCode.set(0);
+  try{const access=await this.session.login(this.name.trim(),passwordStep?this.password:'',this.view.signal);if(this.view.signal.aborted||this.session.busy()||this.session.access()!==access)return;this.password='';this.passwordStep.set(false);await this.selection();}
+  catch(error){if(this.view.signal.aborted||(error instanceof Error&&error.name==='AbortError'))return;if(error instanceof NativeMonitorHttpError){
+   this.loginProblemCode.set(error.status);
+   if(!passwordStep){this.passwordStep.set(true);this.session.problem.set('');return;}
+   const text=nativeLoginProblemText(error.status);
+   if(text){this.passwordStep.set(false);this.name='';this.password='';this.loginProblem.set(text);this.loginProblemLevel.set('error');this.session.problem.set('');return;}
+  }this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');this.password='';}
  }
  async open(claim:OriginalTestGroupMonitorAccess){if(this.view.signal.aborted)return;const flags=Array.isArray(claim.flags)?{}:claim.flags;const target=['/group-monitor',claim.id,...(flags.profile?[flags.profile]:[])];await this.router.navigate(target);}
  claimLabel(claim:OriginalTestGroupMonitorAccess){return Array.isArray(claim.flags)?'':claim.flags.subLabel??'';}
