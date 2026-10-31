@@ -454,7 +454,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
     const scope = this.bs.accessSignal;
     if (scope.aborted) return;
     const data = filterEntry ? filterEntry.filter : {};
-    const dialogRef = this.initializeDialog(this.addFilterDialog.open(AddFilterDialogComponent, { width: 'auto', data, viewContainerRef: this.filterDialogView }));
+    const dialogRef = this.initializeDialog(this.addFilterDialog.open(AddFilterDialogComponent, { width: 'auto', data, viewContainerRef: this.filterDialogView, panelClass: 'original-native-monitor-filter-dialog' }));
 
     this.subscriptions.push(dialogRef.afterClosed().pipe(
       take(1), takeUntil(this.routeChanged$), takeUntil(fromEvent(scope, 'abort')),
