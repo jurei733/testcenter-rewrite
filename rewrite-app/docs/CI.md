@@ -3805,3 +3805,24 @@ actualfe0e9e5d oracle context. Legacy/84/faac oracles remain untouched. Preparin
 this certificate is not proof of production restoration: the real current loader,
 context selection and network-isolated offline installation must still succeed
 in a separate admission run before publishing the dependency change.
+
+
+### Actual patched-lock production admission (2026-10-31)
+
+Admission41161732828 at727553b8 is genuinely successful. The real current loader
+selects only the qualified26 certificate for lock20f91421, then installs all nine
+authenticated archives through the unchanged network-isolated restore path.
+Independent artifact verification confirms the format4 consumer context remains
+this admission run while its embedded native oracle retains successful
+qualification41160586438/fe0e9e5d. All591 runtime records exactly match that oracle;
+eight native visible PNGs and24 real white repaint frames are independently
+decoded. Actual Node22.23.4,367 policy passes with zero skips, four Debian controls
+and zero locked audit vulnerabilities are confirmed. Artifact13026924613 has
+SHA256edd1acea71d25ef6c5d0841986879e357f2dfb90ff6a43444170682acb691a6b.
+
+The registry remains byte-identical to its prepared8d58c571 digest. Image18 is
+still unqualified; no failed measurement or successful step within a failed job
+is promoted to a certificate. The normal complete97-job current-head acceptance
+and fresh Code/Security/Slop subscription reviews remain required. This admission
+proves the runtime path, not full application or Original parity; all49 capability
+requirements and eight broad visual rows retain their scope.
