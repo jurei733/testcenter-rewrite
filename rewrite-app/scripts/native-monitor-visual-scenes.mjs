@@ -17,19 +17,32 @@ export async function prepareMonitorVisualScene(page,scene,screen) {
     // state expires this block; no component or DOM state is patched here.
     await page.locator('[data-cy=GM_setting_button]').click();await page.getByRole('menu').waitFor();
     await page.locator('[data-cy=GM_activity_button]').hover();await page.locator('[data-cy=GM_display_option_full]').click();
+    await page.waitForFunction(()=>!document.querySelector('.mat-mdc-menu-panel'),{},{timeout:2000});await finite();
     await page.locator('tc-test-session [data-cy=gm-testlet-select]').first().waitFor();
     await page.locator('tc-test-session [svgicon=timer_off]').first().waitFor();
     if(screen==='mobile'){
       await page.locator('.drawer-button-open').click();
       await page.waitForFunction(()=>{const drawer=document.querySelector('.mat-drawer');return drawer&&getComputedStyle(drawer).visibility==='hidden'&&!drawer.classList.contains('mat-drawer-opened');});await finite();
     }
-    await page.locator('tc-test-session [data-cy=gm-testlet-select]').first().click();
+    const block=page.locator('tc-test-session [data-cy=gm-testlet-select]').first();
+    if(screen==='desktop'){
+      // Locator.click always asks the browser to scroll, even for this already
+      // visible non-focusable block. Actual native Source controls showed that
+      // moving the hidden body produces two different complete Source frames.
+      // Use the live visible target, without scrolling or changing its geometry.
+      const box=await block.boundingBox(),viewport=page.viewportSize();assert.ok(box&&viewport);
+      assert.ok(box.width>0&&box.height>0&&box.x>=0&&box.y>=0&&box.x+box.width<=viewport.width&&box.y+box.height<=viewport.height);
+      const point={x:box.x+box.width/2,y:box.y+box.height/2};
+      assert.equal(await block.evaluate((element,point)=>element.contains(document.elementFromPoint(point.x,point.y)),point),true);
+      await page.mouse.click(point.x,point.y);
+    }else await block.click();
     await page.waitForFunction(()=>{const button=document.querySelector('[data-cy=GM_jump_button]');return button&&!button.disabled;});
     if(screen==='mobile'){
       await page.locator('.drawer-button-close').click();
       await page.waitForFunction(()=>{const drawer=document.querySelector('.mat-drawer');return drawer&&getComputedStyle(drawer).visibility==='visible'&&drawer.classList.contains('mat-drawer-opened');});await finite();
     }
     await page.locator('[data-cy=GM_jump_button]').click();await page.locator('#setTimer').waitFor();await finite();
+    await page.waitForFunction(()=>document.activeElement===document.querySelector('#setTimer')&&!document.querySelector('.mat-mdc-dialog-opening'),{},{timeout:2000});
     assert.equal(await page.locator('#setTimer').inputValue(),'10');
     const inputEvents=[];
     if(scene==='time-dialog-edited'){
