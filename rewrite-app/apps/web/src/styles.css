@@ -141,6 +141,9 @@ app-root {
   height: 100%;
   overflow: hidden;
 }
+body:has(:where(app-native-monitor-entry .login-page, app-native-participant-entry .login-page)) {
+  background: white;
+}
 app-native-monitor-entry h1 {
   line-height: normal;
   letter-spacing: normal;
