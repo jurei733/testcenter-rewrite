@@ -1,4 +1,4 @@
-name: Qualify native Monitor pixels, manual selection and rejected-cohort diagnostics
+name: Qualify native Monitor baseline, selection and menu pixels
 on:
   push:
     branches: [codex/rejected-native-diagnostic-20261030]
@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   qualify:
-    name: Actual native Monitor pixels, WebSocket selection and unchanged Source family
+    name: Actual native Monitor three-scene pixels and unchanged Source family
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
@@ -43,8 +43,17 @@ jobs:
         run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
       - name: Enforce the immutable qualified Source family
         run: node scripts/verify-selection-native-family.mjs > "$RUNNER_TEMP/rejected-diagnostic-qualification/source-family.json"
+      - name: Expose the identical authenticated native reference for the production harness
+        run: |
+          mkdir -p "$RUNNER_TEMP/browser-system"
+          cp "$RUNNER_TEMP/native-browser-system/manifest.json" "$RUNNER_TEMP/browser-system/manifest.json"
+          cmp "$RUNNER_TEMP/native-browser-system/manifest.json" "$RUNNER_TEMP/browser-system/manifest.json"
       - name: Build the actual API, schema cache and web app
         run: npm run build
+      - name: Preserve actual native paint and layout negative controls
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-capture-controls
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
       - name: Exercise all real WebSocket browser cases with rendered manual selection
         env:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-selection-ui
@@ -69,16 +78,22 @@ jobs:
         run: |
           node scripts/original-browser-reference.mjs pack .ci/original-monitor-reference
           cp -R .ci/original-monitor-reference/frontend/dist/testcenter-frontend/browser "$RUNNER_TEMP/native-monitor-original-build"
-      - name: Require zero-pixel Original self-control in the default native browser
+      - name: Require all three exact Original self-control scenes in the default native browser
         env:
-          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-source-control
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
-        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/qualify-native-monitor-visual.mjs source-self-control
-      - name: Require all eight exact full-page Original-to-Rewrite Monitor comparisons
+        run: |
+          mkdir -p "$RUNNER_TEMP/native-monitor-source-control"
+          for scene in baseline selected-row settings-menu; do
+            UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-source-control/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs source-self-control "$scene"
+          done
+      - name: Require all24 complete Original-to-Rewrite Monitor viewports
         env:
-          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-monitor-visual
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
-        run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/qualify-native-monitor-visual.mjs
+        run: |
+          mkdir -p "$RUNNER_TEMP/native-monitor-visual"
+          for scene in baseline selected-row settings-menu; do
+            UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-visual/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$scene"
+          done
       - name: Verify Original source and build remain unchanged after browser capture
         run: |
           node scripts/original-browser-reference.mjs verify-source .ci/original-monitor-reference
@@ -92,6 +107,8 @@ jobs:
           path: |
             ${{ runner.temp }}/rejected-diagnostic-qualification/
             ${{ runner.temp }}/native-browser-system/manifest.json
+            ${{ runner.temp }}/browser-system/manifest.json
+            ${{ runner.temp }}/native-monitor-capture-controls/
             ${{ runner.temp }}/native-browser-system/*.deb
             ${{ runner.temp }}/browser-material-*/
             ${{ runner.temp }}/native-selection-ui/
