@@ -1,6 +1,6 @@
 import {Injectable,signal} from '@angular/core';
 import type {OriginalAccessSet,OriginalWorkChallenge} from '@testcenter-rewrite-app/contracts/original-session';
-export class NativeMonitorHttpError extends Error {constructor(readonly status:number,message:string){super(message);}}
+export class NativeMonitorHttpError extends Error {constructor(readonly status:number,message:string,readonly response?:{url:string;statusText:string;errorId?:string|null;testMode?:string|null}){super(message);}}
 const key='testcenter-native-monitor-session';
 const finishKey=key+'-unfinished-finish';
 const purposeKey=key+'-purpose';
@@ -128,7 +128,7 @@ export class NativeMonitorSessionService {
   const response=await fetch(path,{method,headers:{Accept:'application/json',...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:rawBody?String(body):JSON.stringify(body)}),signal:AbortSignal.any(signals),cache:'no-store',credentials:'omit',redirect:'error'});
   const text=await response.text();scope?.throwIfAborted();if(!response.ok){
    if(invalidate&&[401,403].includes(response.status)&&token&&token===this.access()?.token)this.clear();
-   throw new NativeMonitorHttpError(response.status,token?text.replaceAll(token,'[redacted]'):text);
+   throw new NativeMonitorHttpError(response.status,token?text.replaceAll(token,'[redacted]'):text,{url:response.url,statusText:response.statusText,errorId:response.headers.get('error-id'),testMode:response.headers.get('test-mode')});
   }subscribeToken?.(response.headers.get('SubscribeToken'));return text;
  }
  async json<T>(method:string,path:string,body?:unknown,token=this.access()?.token??''):Promise<T>{return JSON.parse(await this.text(method,path,body,token)) as T;}
