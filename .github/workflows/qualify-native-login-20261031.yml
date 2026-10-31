@@ -101,12 +101,12 @@ jobs:
           for scene in baseline selected-row settings-menu new-filter-dialog filter-target-menu filter-value-options advanced-filter-dialog finish-dialog time-dialog time-dialog-edited; do
             UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-monitor-visual/$scene" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-monitor-visual.mjs rewrite "$scene"
           done
-      - name: Require all five static Original login self-control states
+      - name: Require all seven static Original login self-control states
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/native-monitor-original-build
         run: |
           mkdir -p "$RUNNER_TEMP/native-login-source-control"
-          for state in empty name-filled password password-filled password-visible; do
+          for state in empty name-filled password password-filled password-visible password-back password-error; do
             NATIVE_LOGIN_ENTRY=monitor NATIVE_LOGIN_SCENE="$state" UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-login-source-control/$state" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs source-self-control
           done
       - name: Require complete native Monitor and participant login comparisons
@@ -116,7 +116,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/native-login-visual"
           for entry in monitor participant; do
             mkdir -p "$RUNNER_TEMP/native-login-visual/$entry"
-            for state in empty name-filled password password-filled password-visible; do
+            for state in empty name-filled password password-filled password-visible password-back password-error; do
               NATIVE_LOGIN_ENTRY="$entry" NATIVE_LOGIN_SCENE="$state" UI_SMOKE_ARTIFACT_DIR="$RUNNER_TEMP/native-login-visual/$entry/$state" timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs rewrite
             done
           done
