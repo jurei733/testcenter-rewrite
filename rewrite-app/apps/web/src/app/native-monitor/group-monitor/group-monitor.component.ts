@@ -349,6 +349,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
       this.observeDialog(this.dialog.open(
         TimeRestrictionDialogComponent, {
           width: 'auto',
+          panelClass: 'original-native-monitor-time-dialog',
           data: <TimeRestrictionDialogData>{
             title:
                 this.cts.getCustomText('gm_control_goto_unlock_blocks_confirm_headline'),

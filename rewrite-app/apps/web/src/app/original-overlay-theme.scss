@@ -14,6 +14,8 @@
 :root[data-interface-mode='original'] .original-player-menu,
 :root[data-interface-mode='original'] .original-native-monitor-menu,
 :root[data-interface-mode='original'] .original-native-monitor-filter-dialog,
+:root[data-interface-mode='original'] .original-native-monitor-time-dialog,
+:root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog,
 :root[data-interface-mode='original'] .original-native-monitor-filter-options,
 :root[data-interface-mode='original'] .original-application-logo-tooltip,
 :root[data-interface-mode='original'] .original-participant-error-dialog,
@@ -26,6 +28,8 @@
 :root[data-interface-mode='original'] .original-password-confirmation-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-administration-editor-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-native-monitor-filter-dialog button.mat-mdc-button-base:hover,
+:root[data-interface-mode='original'] .original-native-monitor-time-dialog button.mat-mdc-button-base:hover,
+:root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-error-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog button.mat-mdc-button-base:hover {
   transform: none;
@@ -36,6 +40,8 @@
 :root[data-interface-mode='original'] .original-participant-logout-dialog,
 :root[data-interface-mode='original'] .original-administration-editor-dialog,
 :root[data-interface-mode='original'] .original-native-monitor-filter-dialog,
+:root[data-interface-mode='original'] .original-native-monitor-time-dialog,
+:root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog,
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,
@@ -75,7 +81,11 @@
 // Match the Source browser defaults at this body-level form portal. Keep the
 // selector at zero specificity so Material's own border-box rules still win.
 :where(:root[data-interface-mode='original'] .original-native-monitor-filter-dialog,
-       :root[data-interface-mode='original'] .original-native-monitor-filter-dialog *) {
+       :root[data-interface-mode='original'] .original-native-monitor-filter-dialog *,
+       :root[data-interface-mode='original'] .original-native-monitor-time-dialog,
+       :root[data-interface-mode='original'] .original-native-monitor-time-dialog *,
+       :root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog,
+       :root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog *) {
   box-sizing: content-box;
 }
 :root[data-interface-mode='original'] .original-native-monitor-filter-dialog {
@@ -87,4 +97,12 @@
   .mat-mdc-slide-toggle .mdc-label {
     display: revert; gap: normal; font: inherit; color: inherit;
   }
+}
+
+// The pinned time dialog deliberately uses an unwrapped native number input.
+// Restore its browser defaults, including intrinsic min/max sizing; do not turn
+// it into the Rewrite shell's full-width field or impose measured dimensions.
+:root[data-interface-mode='original'] .original-native-monitor-time-dialog input.mat-mdc-input-element {
+  font: revert; width: revert; border: revert; border-radius: revert;
+  padding: revert; background: revert; color: revert; box-sizing: revert;
 }
