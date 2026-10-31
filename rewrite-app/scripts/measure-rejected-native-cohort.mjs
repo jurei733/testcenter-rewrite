@@ -50,6 +50,22 @@ export function successfulTapSummary(text){
  return result;
 }
 
+/** Retain public Ubuntu mirror identities without ever copying credentials,
+ * arbitrary source options, comments or an apt-config/proxy dump. */
+export function publicRejectedMirrorProfile(source){
+ assert.equal(typeof source,'string');assert.ok(Buffer.byteLength(source)<=16384);
+ const rows=source.split(/\r?\n/).filter(line=>line.trim()&&!line.trimStart().startsWith('#')).map(line=>{
+  const [transport,...options]=line.trim().split(/\s+/);let uri;
+  try{
+   const parsed=new URL(transport),publicHost=parsed.hostname==='archive.ubuntu.com'||parsed.hostname==='security.ubuntu.com'||parsed.hostname==='ports.ubuntu.com'||parsed.hostname.endsWith('.archive.ubuntu.com');
+   if(publicHost&&['http:','https:'].includes(parsed.protocol)&&!parsed.username&&!parsed.password&&!parsed.port&&!parsed.search&&!parsed.hash&&/^\/ubuntu\/?$/.test(parsed.pathname))uri=transport;
+  }catch{}
+  return{...(uri?{uri}:{redactedTransport:true,transportSha256:cohortDigest(transport)}),
+   options:options.map(option=>/^(priority|weight):[0-9]{1,5}$/.test(option)?{value:option}:{redacted:true,sha256:cohortDigest(option)})};
+ });
+ return{sourceSha256:cohortDigest(source),bytes:Buffer.byteLength(source),rows,changesMade:false};
+}
+
 const regular=async(path,max)=>{const info=await lstat(path);assert.ok(info.isFile()&&!info.isSymbolicLink()&&info.size<=max,'Unsafe rejection evidence');return readFile(path);};
 async function prepare(root,env){
  assert.equal(env.GITHUB_ACTIONS,'true');
@@ -107,6 +123,9 @@ async function measure(root,env){
   assert.equal(JSON.parse(await readFile(join(directory,'audit.log'),'utf8')).metadata.vulnerabilities.total,0);
   await step('locked-chromium','npx',['--no-install','playwright','install','chromium']);
   assert.equal(canonicalNativeInventory(),before,'Rejected native inventory changed before its actual APT oracle');
+  stage='native-apt-profile';reportSmokePhase(stage);
+  const mirrors=await regular('/etc/apt/apt-mirrors.txt',16384);
+  await writeFile(join(directory,'apt-mirror-profile.json'),JSON.stringify(publicRejectedMirrorProfile(mirrors.toString('utf8')))+'\n',{flag:'wx'});
   const system=join(directory,'native-browser-system');
   await step('native-oracle',process.execPath,['scripts/ci-browser-system.mjs','pack'],300,{...env,CI_BROWSER_SYSTEM_DIR:system,CI_BROWSER_SYSTEM_FORMAT:'3'});
   stage='unchanged-source-family';reportSmokePhase(stage);
