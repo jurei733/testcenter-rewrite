@@ -30,8 +30,14 @@ export async function runNativeParticipantReviewSmoke({browser,base,password,out
    const test=/\/native-test\/([0-9]+)/.exec(new URL(page.url()).pathname)?.[1];assert.ok(test);const root='/test/'+test,unit=root+'/unit/OWNED.UNIT';
    await open();await page.evaluate(()=>document.fonts.ready);
    const controls=await panel.evaluate(node=>{const textarea=node.querySelector('textarea'),reviewer=node.querySelector('[data-cy=comment-diag-reviewer]');return {textareaHeight:textarea.getBoundingClientRect().height,reviewerHeight:reviewer.getBoundingClientRect().height,labelDisplay:getComputedStyle(node.querySelector('mat-radio-group > label')).display};});
-   assert.equal(controls.textareaHeight,80,'The native Source CDK five-row editor must not inherit the generic Rewrite minimum height');assert.equal(controls.reviewerHeight,24);assert.notEqual(controls.labelDisplay,'grid');
-   await page.screenshot({path:join(out,'review-'+mode+'-'+width+'-form.png')});mark(prefix+'-real-actor-enters-the-native-review-form');mark(prefix+'-Source-editor-and-label-sizes-survive-generic-Rewrite-styles');
+   assert.equal(controls.reviewerHeight,24);assert.notEqual(controls.labelDisplay,'grid');
+   // Source CDK caches a native row height, which differs between macOS and
+   // Linux. Exercise real autosizing instead of pinning one platform's pixels.
+   // The leaked Rewrite minimum makes a six-line edit remain stuck at560px.
+   await comment.fill('Owned line1\nOwned line2\nOwned line3\nOwned line4\nOwned line5\nOwned line6');
+   await page.waitForFunction(height=>document.querySelector('tc-review-panel textarea').getBoundingClientRect().height>height,controls.textareaHeight);
+   await comment.fill('');await page.waitForFunction(height=>document.querySelector('tc-review-panel textarea').getBoundingClientRect().height===height,controls.textareaHeight);
+   await page.screenshot({path:join(out,'review-'+mode+'-'+width+'-form.png')});mark(prefix+'-real-actor-enters-the-native-review-form');mark(prefix+'-Source-editor-autosizes-and-restores-its-platform-native-minimum');
    await panel.locator('[data-cy=comment-diag-reviewer]').fill('Owned native reviewer');
    await panel.locator('[data-cy=comment-diag-currentPage] input[type=radio]').check();await panel.locator('input[formControlName=targetLabel]').fill('Owned page Ω');
    const first='Native '+mode+' comment Ω';await comment.fill(first);
