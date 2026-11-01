@@ -1,5 +1,24 @@
 # Testcenter parity checklist
 
+### Native null versus explicit empty Unit state (2026-11-01)
+
+The unchanged production Source68 HTTP witness distinguishes Review-only NULL
+from an explicit empty Unit-state write, including a rejected timestamp-zero
+field. Native response JSON/CSV now retain that distinction across all four
+stores and actual reopen. A private provenance marker supplements existing
+state/clock evidence; truly unknown legacy empty history fails explicitly.
+[Native state provenance and scope](ORIGINAL-SESSION.md).
+
+The current paired desktop Review investigation at `36921cce` independently
+repeats ten Source viewports exactly. Both Trial and Review still differ by
+20 pixels while closed and 466 in each open form/list/edit state. Copying
+Source root overflow or body color-scheme does not change those counts and
+is rejected. Read-only Chrome layer evidence shows the preserved opaque
+player's additional IFrame layer. No visual fix, isolation weakening, mask,
+GPU flag or tolerance is admitted. All49 ledger rows remain in scope:
+27 done /22 partial, with all eight broad visual rows open.
+
+
 ### Review ownership across accepted Unit changes (2026-10-31)
 
 The Original-compatible participant Review drawer now closes when its Run or

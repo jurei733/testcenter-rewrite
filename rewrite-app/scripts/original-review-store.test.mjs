@@ -232,5 +232,18 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
   await t.test('Source57 mixed-case Unicode part IDs retain actual Original database collation',async()=>{
    const previous=at;try{await assertNativeResultReportWitness({services:()=>services,tenantKey:tenant.tenantKey,setNow:value=>{at=value;},reopen,witness:'observations-collation.json',workspaceKey:'source-wire-collation'});}finally{at=previous;}
   });
+  await t.test('Source68 native response report distinguishes review-only null and explicit empty state after reopen',async()=>{
+   const previous=at;try{
+    const witness=await assertNativeResultReportWitness({services:()=>services,tenantKey:tenant.tenantKey,setNow:value=>{at=value;},reopen,witness:'observations-empty-state.json',workspaceKey:'source-wire-empty-state',onZeroState:async({workspaceId})=>{const [unit]=await repository.listOriginalUnitsByWorkspace(tenant.tenantId,workspaceId);assert.deepEqual(unit.state,{});assert.deepEqual(unit.stateClocks,{ZERO_REJECTED:0});await repository.mutateOriginalUnit(unit,previous=>{delete previous.stateInitialized;return{unit:previous,logs:[]};});await reopen();}});
+    const [saved]=await repository.listOriginalUnitsByWorkspace(tenant.tenantId,witness.workspaceId);assert.equal(saved.stateInitialized,true);
+    await repository.mutateOriginalUnit(saved,unit=>{delete unit.stateInitialized;return{unit,logs:[]};});await reopen();
+    await services.workspaceAdminRead.exportOriginalResultArchive({tenantKey:tenant.tenantKey,workspaceKey:witness.workspaceKey,groupKeys:[witness.groupKey]}); // Nonempty legacy state has its own evidence.
+    await repository.mutateOriginalUnit(saved,unit=>{delete unit.stateInitialized;unit.state={};unit.stateClocks={};return{unit,logs:[]};});await reopen();
+    await assert.rejects(services.workspaceAdminRead.exportOriginalResultArchive({tenantKey:tenant.tenantKey,workspaceKey:witness.workspaceKey,groupKeys:[witness.groupKey]}),error=>error.statusCode===409&&error.errorCode==='original_unit_history_unknown');
+    await services.originalUnit.patchState({...witness.unitRequest,body:{newState:[]}});await reopen();
+    const [repaired]=await repository.listOriginalUnitsByWorkspace(tenant.tenantId,witness.workspaceId);assert.equal(repaired.stateInitialized,true);assert.deepEqual(repaired.state,{});
+    await services.workspaceAdminRead.exportOriginalResultArchive({tenantKey:tenant.tenantKey,workspaceKey:witness.workspaceKey,groupKeys:[witness.groupKey]});
+   }finally{at=previous;}
+  });
  }finally{await storage?.shutdown();if(admin){await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);await admin.end();}await rm(directory,{recursive:true,force:true});}
 });

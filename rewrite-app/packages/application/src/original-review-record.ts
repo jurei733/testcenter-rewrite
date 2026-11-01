@@ -2,7 +2,7 @@ import {participantExecutionModeDefinitions} from '@testcenter-rewrite-app/domai
 import type {OriginalNativeUnit,ParticipantSession,WorkspaceReview} from '@testcenter-rewrite-app/domain';
 import {FirstSliceError} from './first-slice-error.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
-import {assertOriginalUnitInput,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitText,patchOriginalUnitState,type OriginalUnitScope} from './original-unit-record.js';
+import {assertOriginalUnitInput,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitText,createOriginalUnitRecord,type OriginalUnitScope} from './original-unit-record.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 
 export type OriginalReviewScope=OriginalUnitScope&{unitName:string|null};
@@ -111,7 +111,7 @@ export function prepareOriginalReviewMutation(scope:OriginalReviewScope,context:
     if(previous||BigInt(counter)===maximum)throw new FirstSliceError(409,'original_review_number_exhausted','The native Review number space is unavailable.');
     const fields=inputFields(operation.body,true,scope.unitName!==null);
     const unit=scope.unitName===null?undefined:context.unit?structuredClone(context.unit):
-      patchOriginalUnitState({...scope,unitName:scope.unitName},null,{newState:[],originalUnitId:fields.originalUnitId}).unit;
+      createOriginalUnitRecord({...scope,unitName:scope.unitName},fields.originalUnitId??'');
     if(unit){assertOriginalUnitRecord(unit);if(!originalUnitParentMatches(scope,unit)||!originalParticipantGroupKeysEqual(unit.unitName,scope.unitName!))throw invalid();}
     const review:OriginalNativeReview={...scope,reviewId:operation.reviewId,reviewNumber:(BigInt(counter)+1n).toString(),
       testNumber:originalReviewNumber(context.testNumber),personNumber:originalReviewNumber(context.personNumber),

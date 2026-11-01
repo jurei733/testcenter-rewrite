@@ -17,11 +17,12 @@ export async function verifyNativeResultReportWitness(){
   if(format==='csv'){assert.match(row.contentType,/^text\/csv/);assert.ok(row.rawText.startsWith('\uFEFF'));}
  }
  assert.match(byLabel.get('operator-log-json').rawText,/"timestamp":9007199254740993/);
+ const empty=JSON.parse(await load('observations-empty-state.json')),emptyProof=JSON.parse(await load('independent-verification-empty-state.json'));assert.equal(empty.rows.length,68);assert.equal(manifest.emptyStateWitness.httpExchanges,68);assert.equal(emptyProof.observationSha256,createHash('sha256').update(await load('observations-empty-state.json')).digest('hex'));assert.equal(emptyProof.sourceFilesReverified,137);assert.equal(emptyProof.lockedProductionComposerPackagesReverified,19);assert.equal(emptyProof.exactImage,manifest.backendImage);assert.equal(emptyProof.allowTestMode,false);assert.equal(emptyProof.xmlSchemaValidation,true);const e=new Map(empty.rows.map(row=>[row.label,row]));assert.equal(e.get('before-empty-state-response-json').value[0].laststate,null);assert.equal(e.get('after-empty-state-response-json').value[0].laststate,'{}');assert.equal(e.get('after-zero-state-response-json').value[0].laststate,'{}');assert.equal(e.get('before-empty-state-unit-read').rawText,e.get('after-zero-state-unit-read').rawText);assert.equal(e.get('before-empty-state-unit-read').rawText,e.get('after-empty-state-unit-read').rawText);
 }
 
 /** Replay actual public participant operations, then reopen the real store.
  * No DAO-shaped row seeding or normalization of Source response bytes. */
-export async function assertNativeResultReportWitness({services,tenantKey,setNow,reopen,witness='observations.json',workspaceKey='source-wire'}){
+export async function assertNativeResultReportWitness({services,tenantKey,setNow,reopen,onZeroState,witness='observations.json',workspaceKey='source-wire'}){
  const current=JSON.parse(await load(witness)),byLabel=new Map(current.rows.map(row=>[row.label,row])),identity=byLabel.get('operator-response-json').value[0];
  const workspace=await services().platform.createWorkspace({tenantKey,workspaceKey,displayName:'Source wire witness'});
  const scope={tenantKey,workspaceKey:workspace.workspaceKey};
@@ -39,6 +40,10 @@ export async function assertNativeResultReportWitness({services,tenantKey,setNow
   const instant=byLabel.get(kind+'-list').value[0].reviewtime.replace(' ','T').replace(/\+00$/,'Z');setNow(instant);
   await services().originalReview.create({...unit,unitName,body:JSON.parse(byLabel.get(kind+'-create').requestBodyText)});
  }
+ if(byLabel.has('patch-explicit-empty-state')){
+  const check=async label=>{await reopen();const archive=await services().workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:[identity.groupname]}),files=new Map();let offset=0;while(archive.body.readUInt32LE(offset)===0x04034b50){const len=archive.body.readUInt32LE(offset+18),n=archive.body.readUInt16LE(offset+26),start=offset+30+n+archive.body.readUInt16LE(offset+28);files.set(archive.body.subarray(offset+30,offset+30+n).toString(),archive.body.subarray(start,start+len).toString());offset=start+len;}for(const format of ['json','csv'])assert.equal(files.get('responses.'+format),byLabel.get(label+'-response-'+format).rawText,label+' '+format+' must retain actual null versus explicit empty Source state after reopen');};
+  await check('before-empty-state');if(byLabel.has('patch-zero-state')){await services().originalUnit.patchState({...unit,body:JSON.parse(byLabel.get('patch-zero-state').requestBodyText)});await check('after-zero-state');await onZeroState?.({workspaceId:workspace.workspaceId});await check('after-zero-state');}await services().originalUnit.patchState({...unit,body:JSON.parse(byLabel.get('patch-explicit-empty-state').requestBodyText)});await check('after-empty-state');
+ }
  await services().originalUnit.patchState({...unit,body:JSON.parse(byLabel.get('wire-unit-state').requestBodyText)});
  await services().originalUnit.putResponse({...unit,body:JSON.parse(byLabel.get('wire-unit-response').requestBodyText)});
  await services().originalUnit.putLog({...unit,body:JSON.parse(byLabel.get('wire-unit-log').requestBodyText)});
@@ -47,5 +52,5 @@ export async function assertNativeResultReportWitness({services,tenantKey,setNow
  const archive=await services().workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:[identity.groupname]}),files=new Map();let offset=0;
  while(archive.body.readUInt32LE(offset)===0x04034b50){const len=archive.body.readUInt32LE(offset+18),n=archive.body.readUInt16LE(offset+26),start=offset+30+n+archive.body.readUInt16LE(offset+28);files.set(archive.body.subarray(offset+30,offset+30+n).toString(),archive.body.subarray(start,start+len).toString());offset=start+len;}
  for(const[family,file]of [['response','responses'],['log','logs']])for(const format of ['json','csv'])assert.equal(files.get(file+'.'+format),byLabel.get('operator-'+family+'-'+format).rawText,family+' '+format+' must retain actual Source bytes after durable reopen');
- return scope;
+ return {...scope,workspaceId:workspace.workspaceId,unitRequest:unit,groupKey:identity.groupname};
 }

@@ -16210,14 +16210,17 @@ const buildOriginalResponseReportRows = (input: {
       const timestamp = Number.isFinite(responseTimestamp) ? responseTimestamp : 0;
       return [...(savedUnits.get(testRun.testRunId) ?? [])].map(unitKey => {
         const native = nativeByRun.get(testRun.testRunId)?.find(unit => archiveUnitNamesEqual(unit.unitName, unitKey));
-        if (native) return {
+        if (native) {
+          if (!Object.keys(native.state).length && !Object.keys(native.stateClocks).length && native.stateInitialized === undefined) throw new FirstSliceError(409, "original_unit_history_unknown", "The historical native Unit state initialization is unavailable.");
+          return {
           groupname:participantSession.groupKey, loginname:participantSession.originalLoginKey ?? participantSession.loginKey,
           code:participantSession.originalNameSuffix ?? participantSession.participantCode ?? "",
           bookletname:testRun.originalResultState?.bookletName ?? testRun.bookletAssignmentKey ?? testRun.bookletKey,
           unitname:native.unitName, originalUnitId:native.originalUnitId,
           responses:[...native.parts].sort((a,b)=>nativeCompare!(a.id,b.id)).map(part => ({...part})),
-          laststate:Object.keys(native.state).length ? formatOriginalUnitStateReport(native.state) : null
-        };
+          laststate:Object.keys(native.state).length || Object.keys(native.stateClocks).length || native.stateInitialized === true ? formatOriginalUnitStateReport(native.state) : null
+          };
+        }
         const response = Object.hasOwn(testRun.unitResponses, unitKey) ? testRun.unitResponses[unitKey] : undefined;
         const unit = resolveOriginalReportUnit({
           contentReleasesById,

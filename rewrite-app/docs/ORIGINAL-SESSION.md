@@ -1,5 +1,35 @@
 # Native participant Session boundary
 
+### Native Unit report state provenance (2026-11-01)
+
+A Unit created by a Review has SQL NULL `laststate` in the pinned Original.
+An actual `PATCH /test/{id}/unit/{name}/state` with `newState: []` writes the
+JSONB object `{}`. A patch at timestamp zero also writes that object, even
+though its field is rejected. The public Unit GET is byte-identical in all
+three states; the operator response JSON and CSV distinguish null from `{}`.
+The Source68 witness in `source-workspace-results/native-result-report-http`
+retains these actual Apache/PHP/PostgreSQL18/Redis8 HTTP exchanges, with 137
+Source files and 19 locked production Composer packages independently checked.
+XML validation is enabled and test mode disabled; no SQL seeds or DAO stubs.
+The metadata-valid fixture player is not a rendered-player qualification.
+
+The private native Unit row now records `stateInitialized`: a Review-only
+creation stores false, and every accepted state-patch operation stores true.
+The existing durable Unit JSON retains that marker in all four stores without
+changing their schemas. This marker is not accepted as public write authority.
+Legacy nonempty state or even a zero-valued state-clock entry proves a previous
+state write and remains reportable. A legacy empty row with neither state-clock
+nor initialization evidence returns `original_unit_history_unknown` (409),
+instead of fabricating a null value. A real new patch establishes current
+provenance. Replays compare actual Source response/log bytes after reopening
+the stores and remove only the marker from a real zero-clock write to check
+legacy recovery. Unknown empty history remains a separate fail-closed control.
+
+This closes this bounded report-state distinction. Literal operator report
+routes, the native Results/Tests pages, broader report/history semantics and
+whole-project visual parity remain open.
+
+
 The participant boundary implements the Original paths `PUT /session/login`,
 `PUT /session/person`, `GET|PUT|DELETE /session`, `POST /session/challenge` and
 `POST /session/person/challenge`. It uses `AuthToken` and the Original participant

@@ -22,7 +22,10 @@
     "capture-collation.mjs": "618d40568dbb845cb4b136e77090e6019053ac11ab77629deea139211a918c37",
     "observations-collation.json": "6be7365054e54305d313b1883f8d7e59cd38cd3495f5fbea8bc59c25c4e1afef",
     "independent-verification-collation.json": "32c10e940790fe292d2c192359a7ba594910b98c4008ae20c1fe8f6fda8f6e05",
-    "collation-comparisons.json": "277b7008b2cdf520acd52a5d04ec79bd2ef329deec80a136f4bdafcb84f6a3c5"
+    "collation-comparisons.json": "277b7008b2cdf520acd52a5d04ec79bd2ef329deec80a136f4bdafcb84f6a3c5",
+    "capture-empty-state.mjs": "d0190f36961496c4fcce4fe6445a52e47a390184c2255197a9e546ecf5e67c38",
+    "observations-empty-state.json": "c1b9624021b9a9819d632159a5e45da6878e40bdfd38befca25e0e5a98a1968e",
+    "independent-verification-empty-state.json": "885826e237b819859cfa94a9c8eee3e3a92620b9ff03bf58d654087594e9ba28"
   },
   "collationWitness": {
     "httpExchanges": 57,
@@ -37,5 +40,14 @@
     "allScalarCount": 1112063,
     "compoundCount": 977895,
     "directComparatorAdmittedForTheseComparisons": true
+  },
+  "emptyStateWitness": {
+    "httpExchanges": 68,
+    "unitReadBytesUnchanged": true,
+    "beforeEmptyPatchLaststate": null,
+    "afterEmptyPatchLaststate": "{}",
+    "actualParticipantPatch": true,
+    "afterZeroTimestampPatchLaststate": "{}",
+    "zeroTimestampStateIgnoredButStateWriteKnown": true
   }
 }

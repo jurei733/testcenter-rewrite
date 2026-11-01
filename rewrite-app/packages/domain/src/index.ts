@@ -2165,6 +2165,9 @@ export type OriginalNativeUnit = Pick<TestRun,
   originalUnitId: string;
   /** A canonical write touched this Unit without native clock provenance. */
   unknownHistory?: true;
+  /** Explicit native state write, distinct from a Review-only SQL NULL.
+   * Missing on legacy rows whose empty-state provenance is unavailable. */
+  stateInitialized?: boolean;
   state: Record<string, string>;
   stateClocks: Record<string, number>;
   parts: Array<{id: string; content: string | null; ts: number; responseType: string}>;

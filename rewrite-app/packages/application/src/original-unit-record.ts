@@ -32,7 +32,9 @@ export function selectOriginalUnitName(input:OriginalUnitInput,names:readonly st
 }
 export function assertOriginalUnitRecord(unit:OriginalNativeUnit):void{
  if(unit.unknownHistory!==undefined&&unit.unknownHistory!==true)throw invalid();
+ if(unit.stateInitialized!==undefined&&typeof unit.stateInitialized!=='boolean')throw invalid();
  assertOriginalUnitInput(unit);originalUnitText(unit.unitName,50);originalUnitText(unit.originalUnitId,255);assertOriginalTestState(unit.state);assertOriginalTestState(unit.stateClocks);
+ if(unit.stateInitialized===false&&(Object.keys(unit.state).length||Object.keys(unit.stateClocks).length))throw invalid();
  for(const value of Object.values(unit.state))originalUnitText(value);
  for(const[key,value]of Object.entries(unit.stateClocks))if(!Number.isSafeInteger(value)||value<0||value>0&&!Object.hasOwn(unit.state,key))throw invalid();
  for(const key of Object.keys(unit.state))if(!Object.hasOwn(unit.stateClocks,key))throw invalid();
@@ -47,12 +49,16 @@ export function prepareOriginalUnitMutation(input:OriginalUnitInput,previous:Ori
  if(!Array.isArray(effect.logs)||effect.logs.some(log=>!keys.filter(key=>key!=='contentReleaseId').every(key=>log[key]===input[key])||typeof log.unitKey!=='string'||!originalParticipantGroupKeysEqual(log.unitKey,input.unitName)))throw invalid();
  if(new Set(effect.logs.map(log=>log.participantTestLogId)).size!==effect.logs.length)throw Error('Native Unit log identity collision.');return effect;
 }
+export function createOriginalUnitRecord(input:OriginalUnitInput,originalUnitId:string):OriginalNativeUnit{
+ const unit:OriginalNativeUnit={testRunId:input.testRunId,participantSessionId:input.participantSessionId,tenantId:input.tenantId,workspaceId:input.workspaceId,contentReleaseId:input.contentReleaseId,unitName:input.unitName,originalUnitId,stateInitialized:false,state:{},stateClocks:{},parts:[]};assertOriginalUnitRecord(unit);return unit;
+}
 export function patchOriginalUnitState(input:OriginalUnitInput,previous:OriginalNativeUnit|null,body:unknown):{unit:OriginalNativeUnit;entries:ReturnType<typeof parseOriginalTestStatePatch>}{
  const object=!Array.isArray(body)&&body&&typeof body==='object'?body as Record<string,unknown>:null;
  const entries=parseOriginalTestStatePatch(object?object.newState:body);for(const entry of entries)originalUnitText(entry.content);
  const originalUnitId=object?.originalUnitId??'';originalUnitText(originalUnitId,255);
  if(previous?.unknownHistory)throw originalUnitHistoryUnavailable();
- const unit:OriginalNativeUnit=previous?structuredClone(previous):{testRunId:input.testRunId,participantSessionId:input.participantSessionId,tenantId:input.tenantId,workspaceId:input.workspaceId,contentReleaseId:input.contentReleaseId,unitName:input.unitName,originalUnitId,state:{},stateClocks:{},parts:[]};
+ const unit:OriginalNativeUnit=previous?structuredClone(previous):createOriginalUnitRecord(input,originalUnitId);
+ unit.stateInitialized=true;
  const values=new Map(Object.entries(unit.state)),clocks=new Map(Object.entries(unit.stateClocks));
  for(const entry of entries){if(!clocks.has(entry.key))clocks.set(entry.key,0);if(entry.timeStamp>clocks.get(entry.key)!){values.set(entry.key,entry.content as string);clocks.set(entry.key,entry.timeStamp);}}
  unit.state=Object.fromEntries(values);unit.stateClocks=Object.fromEntries(clocks);assertOriginalUnitRecord(unit);return{unit,entries};
