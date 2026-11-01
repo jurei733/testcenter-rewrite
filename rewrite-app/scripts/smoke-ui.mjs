@@ -2903,6 +2903,50 @@ try {
         if (typeof answers === "string") window.__originalSystemCheckReportedAnswers = JSON.parse(answers);
       });
     });
+    // Source's per-toggle click emits a command even for the selected page.
+    // Observe real commands inside the existing isolated Player; do not assign
+    // either controller or Material selection state to manufacture a retry.
+    await page.waitForFunction(() => document.querySelector("#participantVeronaPlayerStatus")?.textContent?.trim() === "running");
+    const pageCommandPrefix = "OWNED_SYSTEMCHECK_PAGE_COMMAND ";
+    const pageCommands = [];
+    const collectPageCommand = message => {
+      if (message.text().startsWith(pageCommandPrefix)) pageCommands.push(JSON.parse(message.text().slice(pageCommandPrefix.length)));
+    };
+    page.on("console", collectPageCommand);
+    const pageCommandObserver = await originalUnitFrame.locator("body").evaluateHandle(body => {
+      const listener = event => {
+        if (event.data?.type === "vopPageNavigationCommand") console.log("OWNED_SYSTEMCHECK_PAGE_COMMAND " + JSON.stringify({target:event.data.target}));
+      };
+      body.ownerDocument.defaultView.addEventListener("message", listener);
+      return listener;
+    });
+    const assertPageActivation = async (label, target, activate) => {
+      const before = pageCommands.length;
+      const command = page.waitForEvent("console", {predicate:message => message.text().startsWith(pageCommandPrefix) && JSON.parse(message.text().slice(pageCommandPrefix.length)).target === target});
+      void command.catch(() => {});
+      await activate();
+      try {await command;} catch (error) {throw new Error(label + " did not reach the real Player", {cause:error});}
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      assert.equal(pageCommands.length - before, 1, label + " sends exactly one real Player command");
+      console.log("ui_smoke_page_activation=" + label + ":passed");
+    };
+    try {
+      await assertPageActivation("Changed numbered-page click", "2", () => page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-1'] button").click());
+      await originalUnitFrame.getByRole("textbox", {name:"Second page answer"}).waitFor();
+      await assertPageActivation("Changed first-page click", "1", () => page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").click());
+      await originalUnitFrame.locator("#var1").waitFor();
+      await assertPageActivation("Selected numbered-page click", "1", () => page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").click());
+      await assertPageActivation("Selected numbered-page Enter", "1", async () => {await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").focus();await page.keyboard.press("Enter");});
+      await assertPageActivation("Selected numbered-page Space", "1", async () => {await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").focus();await page.keyboard.press("Space");});
+      await assertPageActivation("Numbered-page ArrowRight", "2", async () => {await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").focus();await page.keyboard.press("ArrowRight");});
+      await originalUnitFrame.getByRole("textbox", {name:"Second page answer"}).waitFor();
+      await assertPageActivation("Numbered-page ArrowLeft", "1", async () => {await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-1'] button").focus();await page.keyboard.press("ArrowLeft");});
+      await originalUnitFrame.locator("#var1").waitFor();
+    } finally {
+      page.off("console", collectPageCommand);
+      await pageCommandObserver.evaluate(listener => window.removeEventListener("message", listener));
+      await pageCommandObserver.dispose();
+    }
     await originalUnitFrame.locator("#var1").fill("Original Systemcheck Unit answer");
     await originalUnitFrame.locator("#var1").blur();
     assert.equal(await originalUnitFrame.locator("body").evaluate(() => window.__systemCheckLogPolicy), "disabled");
