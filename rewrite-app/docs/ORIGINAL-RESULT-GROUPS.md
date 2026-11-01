@@ -1,5 +1,37 @@
 # Original participant group snapshots
 
+## Native Test administration Source reference (2026-11-01)
+
+The unchanged production Original now has a retained [116-request reference](../test-fixtures/original-testcenter/source-workspace-results/native-test-administration-http/manifest.json) for
+`GET/DELETE /workspace/{id}/responses/detailed`. It verifies all137 pinned Source
+files before and after real Apache/PHP, PostgreSQL18.4, Redis8, XSD uploads and
+signed person work; all19 Composer packages match the pinned lock. Test mode stays
+disabled. No SQL seed, DAO stub or Source patch is used.
+
+The deletion list is independent of Results: persisted nonempty Test state
+qualifies an unopened Test, while an opened Booklet with empty Test state, Unit
+state or Unit answers alone does not qualify. The exact seven-field rows retain
+the first stored code/suffix and captured Test label after the live Booklet label
+changes. Actual Test IDs crossing9/10 establish numeric order within snapshot
+groups. Always-new people keep separate code-prefixed suffixes. Native person
+reentry rotates its token while preserving the person, Tests and first stored code.
+
+Read-only readers can list but cannot delete; anonymous/participant access,
+malformed selections and unknown tuples preserve every Test. Exact selected-Test
+deletion removes its answer/log rows, preserves every other Test and the other
+Booklet's raw answer-export bytes, and keeps the current person bearer. Relaunch
+creates a new empty Test with a new numeric ID and current Booklet label.
+
+Seven frozen-reference controls now run through the existing mandatory Original
+group-results suite. This is **Source evidence**, not a Rewrite Test-admin port,
+selected-Test transaction or native Results/Tests page. The existing group-only
+thin inventory lacks code/suffix, captured Test label, saved-state predicate and
+numeric Test order; it cannot be reused unchanged. Full native transport/admin
+permissions, all-store atomic deletion and writer fencing, four native downloads,
+the actual four-tab UI and paired visuals remain required. All49 requirements
+and all eight broad visual surfaces remain in scope.
+
+
 ## Native report serialization and remaining data history (2026-10-25)
 
 The separate [native report output component](ORIGINAL-REPORTS.md) matches 24

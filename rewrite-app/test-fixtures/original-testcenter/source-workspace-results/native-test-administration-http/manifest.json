@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceVersion": "19.0.0",
+  "capturedWorkingCopyBase": "9bc5dc7d096d674ada7b71b67d2a2dfc1057b95d",
+  "httpObservations": 116,
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "lockedComposerPackages": 19,
+  "configuration": {
+    "XML_SCHEMA_VALIDATION": "true",
+    "ALLOW_TEST_MODE": "false",
+    "bruteForceProtection": [
+      "login",
+      "person"
+    ]
+  },
+  "transport": "unchanged production Apache/PHP, PostgreSQL18.4 and Redis8; actual XSD uploads and signed work; no SQL seeds or DAO stubs",
+  "files": {
+    "capture.mjs": "441710db59f156f7ba85985ba878ef85735ada0ac1cbca07df69c78afdaa75ca",
+    "compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    "observations.json": "cf3481a03989289dac748dea77fcb345878718d61946cb1c4868ab801061a395"
+  },
+  "actualRequestBodyHashesComputedBeforeRedaction": true,
+  "nativeTokenAliasesRedactedBeforePublication": true,
+  "sourceCodeAndVendorUnmodified": true,
+  "firstAttempt": "The probe initially expected a stable person token on reentry. Source62 already qualified actual rotation with retained person/Test identity. The corrected probe asserts token rotation and unchanged saved code/label/Test rows; no Source behavior was altered. Local failed attempt is retained separately with redacted capabilities.",
+  "qualification": "Actual Source Test administration reference only. Native Rewrite Test read/delete HTTP/UI and whole Original parity remain unimplemented/unproven."
+}
