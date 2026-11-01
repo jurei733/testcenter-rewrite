@@ -1,3 +1,4 @@
+import {readOriginalTestAdministrationCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalReviewCollection,mutateOriginalReviewCollection,readOriginalReviewPersonCollection,validateOriginalReviewCollections,synchronizeOriginalReviewCollection,deleteOriginalReviewCollection,type OriginalNativeReview} from '@testcenter-rewrite-app/application';
 import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
@@ -1009,6 +1010,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async listOriginalReviews(scope){return readOriginalReviewCollection(state,scope);},
     async mutateOriginalReview(scope,operation){return mutateOriginalReviewCollection(state,scope,operation);},
     async listOriginalReviewsByPerson(scope){return readOriginalReviewPersonCollection(state,scope);},
+    async getOriginalTestAdministrationInventory(tenantId,workspaceId){return readOriginalTestAdministrationCollections(state,{tenantId,workspaceId});},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
       const nativeByRun=new Map<string,OriginalNativeUnit[]>();

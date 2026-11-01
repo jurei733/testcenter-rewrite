@@ -1,3 +1,4 @@
+import {formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/application';
 import {handleOriginalReviewHttp,originalReviewRouteLabel} from './original-review-http.js';
 import {NativeBroadcaster} from './native-broadcaster.js';
 import {handleOriginalMonitorHttp,originalMonitorRouteLabel} from './original-monitor-http.js';
@@ -2482,6 +2483,7 @@ const groupResultsPattern = createRoutePattern(
   productionApiRoutes.workspace.listGroupResults
 );
 const originalGroupResultsPattern = createRoutePattern(productionApiRoutes.workspace.listOriginalGroupResults);
+const originalTestSessionsPattern = createRoutePattern(productionApiRoutes.workspace.listOriginalTestSessions);
 const reviewListPattern = createRoutePattern(
   productionApiRoutes.workspace.listReviews
 );
@@ -2716,6 +2718,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", detailedResponsesPattern],
   ["GET", groupResultsPattern],
   ["GET", originalGroupResultsPattern],
+  ["GET", originalTestSessionsPattern],
   ["DELETE", originalGroupResultsPattern],
   ["DELETE", groupResultsPattern],
   ["GET", reviewListPattern],
@@ -3701,6 +3704,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.listGroupResults
     ],
     ["GET", originalGroupResultsPattern, productionApiRoutes.workspace.listOriginalGroupResults],
+    ["GET", originalTestSessionsPattern, productionApiRoutes.workspace.listOriginalTestSessions],
     ["DELETE", originalGroupResultsPattern, productionApiRoutes.workspace.deleteOriginalGroupResults],
     [
       "DELETE",
@@ -7644,6 +7648,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         sendJson<ListDetailedResponsesResponse>(response, 200, { items });
         return;
+      }
+
+      const originalTestSessions = originalTestSessionsPattern.exec(pathname);
+      if(request.method==="GET"&&originalTestSessions?.groups){
+        const tenantKey=decodeRouteGroup(originalTestSessions.groups.tenantKey),workspaceKey=decodeRouteGroup(originalTestSessions.groups.workspaceKey);
+        if(!tenantKey||!workspaceKey){sendError(response,400,'invalid_workspace_scope','tenantKey and workspaceKey are required.');return;}
+        const groups=await services.originalTestAdministration.list({tenantKey,workspaceKey});
+        response.setHeader('cache-control','private, no-store');response.setHeader('content-type','application/json; charset=utf-8');
+        response.statusCode=200;response.end(formatOriginalTestAdministrationJson(groups));return;
       }
 
       const originalGroups = originalGroupResultsPattern.exec(pathname);

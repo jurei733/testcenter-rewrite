@@ -1,3 +1,4 @@
+import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
 import {listOriginalNativeReviews,mutateOriginalNativeReview,listOriginalNativeReviewsByPerson,synchronizeOriginalNativeReview} from './original-native-review.js';
 import {changeOriginalMonitorTestLock} from './original-monitor-lock.js';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
@@ -3660,6 +3661,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async listOriginalReviews(scope){return listOriginalNativeReviews(pool,scope);},
     async mutateOriginalReview(scope,operation){return mutateOriginalNativeReview(pool,scope,operation);},
     async listOriginalReviewsByPerson(scope){return listOriginalNativeReviewsByPerson(pool,scope);},
+    async getOriginalTestAdministrationInventory(tenantId,workspaceId){return readOriginalTestAdministrationInventory(pool,tenantId,workspaceId);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(pool, tenantId, workspaceId);
     },

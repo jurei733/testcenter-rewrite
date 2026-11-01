@@ -1,3 +1,4 @@
+import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
 import {listOriginalNativeReviews,mutateOriginalNativeReview,listOriginalNativeReviewsByPerson,synchronizeOriginalNativeReview} from './original-native-review.js';
 import {changeOriginalMonitorTestLock} from './original-monitor-lock.js';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
@@ -3821,6 +3822,7 @@ export const createSqliteFirstSliceStorage = (
     async listOriginalReviews(scope){return listOriginalNativeReviews(database,scope);},
     async mutateOriginalReview(scope,operation){return mutateOriginalNativeReview(database,scope,operation);},
     async listOriginalReviewsByPerson(scope){return listOriginalNativeReviewsByPerson(database,scope);},
+    async getOriginalTestAdministrationInventory(tenantId,workspaceId){return readOriginalTestAdministrationInventory(database,tenantId,workspaceId);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(database, tenantId, workspaceId);
     },

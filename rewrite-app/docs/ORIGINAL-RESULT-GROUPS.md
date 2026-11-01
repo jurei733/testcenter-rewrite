@@ -1,5 +1,32 @@
 # Original participant group snapshots
 
+## Native Test-list read foundation (2026-11-01)
+
+The protected versioned
+`GET /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-tests`
+now reads native Test administration across Memory, File, SQLite and PostgreSQL.
+Each adapter returns one consistent metadata snapshot; SQL selects no private
+Test state, answers or timers. Included rows require known saved-state evidence,
+first code/suffix and captured Test identity plus one exact scoped native Test
+number. Unknown legacy history returns409 instead of inferred labels or rows.
+
+The Source-shaped JSON preserves empty arrays, native row/key order and numeric
+Test IDs beyond JavaScript's safe integer range. Current case-equivalent Login
+bindings retain the original snapshot spelling in the listing. Explicit known
+no-code people use nullable internal codes and render Source's empty string;
+absent legacy code remains unknown. Frozen Source116 JSON, real native creation/
+writes, private SQL decoder fences, durable reopen, an actual Login-move snapshot
+race and protected SQLite/PostgreSQL HTTP pass the focused27/33 controls with no
+skips. The new suite is included in existing unit, results and PostgreSQL gates.
+
+This is the read foundation. The literal numeric Source admin route and explicit
+workspace-grant mapping, atomic selected-Test deletion and actual delayed-writer
+fences, all four native downloads, Results/Tests page adoption and paired visuals
+remain required. Parent people and capabilities must survive selected deletion;
+whole-group deletion cannot implement it. All49 requirements and all eight broad
+visual rows remain open to their complete acceptance evidence.
+
+
 ## Native Test administration Source reference (2026-11-01)
 
 The unchanged production Original now has a retained [116-request reference](../test-fixtures/original-testcenter/source-workspace-results/native-test-administration-http/manifest.json) for

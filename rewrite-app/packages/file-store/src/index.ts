@@ -1,3 +1,4 @@
+import {readOriginalTestAdministrationCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalReviewCollection,mutateOriginalReviewCollection,readOriginalReviewPersonCollection,validateOriginalReviewCollections,synchronizeOriginalReviewCollection,deleteOriginalReviewCollection,type OriginalNativeReview} from '@testcenter-rewrite-app/application';
 import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
@@ -1869,6 +1870,7 @@ const createFileRepository = (
     async listOriginalReviews(scope){return readOriginalReviewCollection(await getState(),scope);},
     async mutateOriginalReview(scope,operation){return mutate(state=>mutateOriginalReviewCollection(state,scope,operation));},
     async listOriginalReviewsByPerson(scope){return readOriginalReviewPersonCollection(await getState(),scope);},
+    async getOriginalTestAdministrationInventory(tenantId,workspaceId){const owned=await getState();return readOriginalTestAdministrationCollections(owned,{tenantId,workspaceId});},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       const state = await getState();
       const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;

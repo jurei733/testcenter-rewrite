@@ -65,6 +65,9 @@ export type {OriginalGroupResultInventory} from './original-group-results.js';
 export {projectOriginalResultTest} from './original-group-results.js';
 export type {OriginalResultTest} from './original-group-results.js';
 import {createOriginalGroupResultsPort} from './original-group-results.js';
+import {createOriginalTestAdministrationPort} from './original-test-administration.js';
+export {projectOriginalTestAdministrationRun,projectOriginalTestAdministrationInventory,readOriginalTestAdministrationCollections,projectOriginalTestAdministration,formatOriginalTestAdministrationJson} from './original-test-administration.js';
+export type {OriginalTestAdministrationInventory,OriginalTestAdministrationGroup} from './original-test-administration.js';
 export {projectOriginalSessionTest} from './original-session.js';
 export type {OriginalSessionTest} from './original-session.js';
 import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
@@ -1326,6 +1329,7 @@ export type FirstSlicePorts = {
   originalReview:import('./original-review.js').OriginalReviewPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
+  originalTestAdministration: import('./original-test-administration.js').OriginalTestAdministrationPort;
   monitorRead: MonitorReadPort;
   monitorControl: MonitorControlPort;
   systemCheck: SystemCheckPort;
@@ -1661,6 +1665,7 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   mutateOriginalReview(scope:import('./original-review-record.js').OriginalReviewScope,operation:import('./original-review-record.js').OriginalReviewMutation):Promise<import('./original-review-record.js').OriginalNativeReview|null>;
   listOriginalReviewsByPerson(scope:{participantSessionId:string;tenantId:string;workspaceId:string}):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
   getOriginalGroupResultInventory(tenantId: string, workspaceId: string): Promise<import('./original-group-results.js').OriginalGroupResultInventory>;
+  getOriginalTestAdministrationInventory(tenantId:string,workspaceId:string):Promise<import('./original-test-administration.js').OriginalTestAdministrationInventory>;
   /** Atomically delete native group snapshots, current session descendants and capabilities. */
   deleteOriginalGroupResults(input: import('./original-group-deletion.js').OriginalGroupDeletionInput): Promise<import('./original-group-deletion.js').OriginalGroupDeletionResult | null>;
   listTestRunsByParticipantSessionId(
@@ -32685,6 +32690,7 @@ export const createFirstSliceServices = (
       currentBooklet:currentOriginalBooklet
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
+    originalTestAdministration: createOriginalTestAdministrationPort(repository,(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey)),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,
       async monitorAssignments(entry){
