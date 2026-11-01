@@ -4099,13 +4099,13 @@ export const createSqliteFirstSliceStorage = (
         .run(...testRunIds);
       return Number(result.changes);
     },
-    async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
+    async listParticipantTestLogsByWorkspace(tenantId, workspaceId, options) {
       const rows = database
         .prepare(
           `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, CAST(timestamp AS TEXT) AS timestamp, recorded_at, original_timestamp
-           FROM participant_test_logs
+           FROM participant_test_logs${options?.order==="collection"?" NOT INDEXED":""}
            WHERE tenant_id = ? AND workspace_id = ?
-           ORDER BY participant_test_logs.timestamp DESC, recorded_at DESC`
+           ${options?.order==="collection"?"":"ORDER BY participant_test_logs.timestamp DESC, recorded_at DESC"}`
         )
         .all(tenantId, workspaceId) as Record<string, unknown>[];
       return rows

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "httpExchanges": 57,
+  "sourceFiles": 137,
+  "lockedProductionPackages": 19,
+  "reportFamilies": [
+    "response",
+    "log",
+    "review"
+  ],
+  "formats": [
+    "json",
+    "csv"
+  ],
+  "orderingLimits": "Source log UNION ALL has no within-branch ORDER BY; retain supplied collection order, do not invent timestamp/ID sorting.",
+  "files": {
+    "capture.mjs": "cd197a3e33bd5526d2ae9924154eeb279c37320194a5e32d4f9aeffd86c97804",
+    "observations.json": "111ef4ab8777ec829c491b8929df261db379dc44065d714e0339eb9e9f72d7eb",
+    "independent-verification.json": "a91acc16b0abbee5b4608e0f198455dca2346b8a771a64907e11dab44faefddc",
+    "capture-collation.mjs": "618d40568dbb845cb4b136e77090e6019053ac11ab77629deea139211a918c37",
+    "observations-collation.json": "6be7365054e54305d313b1883f8d7e59cd38cd3495f5fbea8bc59c25c4e1afef",
+    "independent-verification-collation.json": "32c10e940790fe292d2c192359a7ba594910b98c4008ae20c1fe8f6fda8f6e05",
+    "collation-comparisons.json": "277b7008b2cdf520acd52a5d04ec79bd2ef329deec80a136f4bdafcb84f6a3c5"
+  },
+  "collationWitness": {
+    "httpExchanges": 57,
+    "databaseCollation": "en_US.utf8",
+    "distinctMixedPartNames": 15,
+    "binaryAndStandardIntlComparatorsRejected": true
+  },
+  "portableCollation": {
+    "provider": "libc",
+    "version": "2.41",
+    "locale": "en_US.utf8",
+    "allScalarCount": 1112063,
+    "compoundCount": 977895,
+    "directComparatorAdmittedForTheseComparisons": true
+  }
+}

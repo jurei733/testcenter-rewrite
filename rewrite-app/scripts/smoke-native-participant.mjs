@@ -18,7 +18,7 @@ const sourceFiles=await collect('apps/web/src');
 const hashSources=async()=>Object.fromEntries(await Promise.all(sourceFiles.map(async path=>[path,createHash('sha256').update(await readFile(join(app,path))).digest('hex')])));
 const sourceHashes=await hashSources();
 const qualificationFiles=['scripts/smoke-native-participant.mjs','scripts/native-participant-review-smoke.mjs','scripts/native-participant-server.mjs','apps/api/src/index.ts','apps/api/dist/apps/api/src/index.js'];
-for(const [name,files]of [['application',['index','original-group-deletion','original-test-files','original-workspace-report-wire','original-review-record','original-review-collections','original-review','original-review-report']],['memory-store',['index']],['file-store',['index']],['sqlite-store',['index','original-native-unit','original-native-review']],['postgres-store',['index','original-native-unit','original-native-review']]]){
+for(const [name,files]of [['application',['index','original-group-deletion','original-test-files','original-workspace-report-wire','original-report-collation','original-report-collation-data','original-review-record','original-review-collections','original-review','original-review-report']],['memory-store',['index']],['file-store',['index']],['sqlite-store',['index','original-native-unit','original-native-review']],['postgres-store',['index','original-native-unit','original-native-review']]]){
  for(const file of files)qualificationFiles.push(`packages/${name}/src/${file}.ts`,`packages/${name}/dist/packages/${name}/src/${file}.js`);
 }
 qualificationFiles.push('apps/api/src/original-review-http.ts','apps/api/dist/apps/api/src/original-review-http.js');

@@ -1,3 +1,4 @@
+import {assertNativeResultReportWitness,verifyNativeResultReportWitness} from './original-native-result-report-witness.mjs';
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
@@ -27,6 +28,7 @@ test('actual Original operator Review fixture retains49 HTTP exchanges and authe
  const rows=new Map(observed.rows.map(row=>[row.label,row]));for(const label of ['review-export-json','operator-review-json','operator-review-csv']){const row=rows.get(label);assert.equal(row.status,200);assert.equal(createHash('sha256').update(row.rawText).digest('hex'),row.bodySha256);}
  assert.equal(rows.get('review-export-json').rawText,rows.get('operator-review-json').rawText);assert.deepEqual(rows.get('operator-review-json').value.map(row=>row.unitname),['OWNED.UNIT','']);assert.match(rows.get('operator-review-csv').contentType,/^text\/csv/);assert.ok(rows.get('operator-review-csv').rawText.startsWith('\uFEFF'));assert.ok((await load('capture.mjs')).toString().includes('Accept:accept'));
 });
+test('Source57 native result report fixture retains actual runtime and wire provenance',verifyNativeResultReportWitness);
 for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atomic`,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'owned-native-review-')),file=join(directory,kind==='file'?'state.json':'state.sqlite');
  const schema='owned_native_review_'+randomUUID().replaceAll('-',''),url=kind==='postgres'?new URL(process.env.FIRST_SLICE_POSTGRES_URL):null;
@@ -223,6 +225,12 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
    assert.ok((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:[]})).body.length>0);
    assert.ok((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.UNKNOWN']})).body.length>0);
    await repository.deleteWorkspaceReview(legacy.reviewId);
+  });
+  await t.test('Source57 native response and log report bytes survive durable reopen',async()=>{
+   const previous=at;try{await assertNativeResultReportWitness({services:()=>services,tenantKey:tenant.tenantKey,setNow:value=>{at=value;},reopen});}finally{at=previous;}
+  });
+  await t.test('Source57 mixed-case Unicode part IDs retain actual Original database collation',async()=>{
+   const previous=at;try{await assertNativeResultReportWitness({services:()=>services,tenantKey:tenant.tenantKey,setNow:value=>{at=value;},reopen,witness:'observations-collation.json',workspaceKey:'source-wire-collation'});}finally{at=previous;}
   });
  }finally{await storage?.shutdown();if(admin){await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);await admin.end();}await rm(directory,{recursive:true,force:true});}
 });

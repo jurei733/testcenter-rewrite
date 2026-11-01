@@ -1,5 +1,7 @@
+import {createOriginalReportTextComparator} from './original-report-collation.js';
 import {readOriginalReviewReports,type OriginalReviewReportProjection} from './original-review-report.js';
-import {originalReviewReportCategoryKeys,encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {originalReviewReportCategoryKeys,encodeOriginalReportJson,formatOriginalResponseReport,formatOriginalUnitStateReport} from './original-workspace-report-wire.js';
+import {originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix} from '@testcenter-rewrite-app/domain';
 import {originalReviewHistoryUnavailable} from './original-review-record.js';
 import {createOriginalReviewPort} from './original-review.js';
 export * from './original-review.js';
@@ -1701,9 +1703,11 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   /** Activate the current parent under the same lock as Run eligibility; preserve its other fields. */
   activateParticipantController(input: ParticipantControllerActivationInput): Promise<ParticipantControllerActivationResult | null>;
   deleteTestRunsByIds(testRunIds: string[]): Promise<number>;
+  /** Native reports consume stored collection order, without the UI timestamp sort. */
   listParticipantTestLogsByWorkspace(
     tenantId: string,
-    workspaceId: string
+    workspaceId: string,
+    options?: { order: "collection" }
   ): Promise<ParticipantTestLog[]>;
   listLatestParticipantTestStateLogsByWorkspace(
     tenantId: string,
@@ -16106,7 +16110,7 @@ type OriginalLogReportRow = {
   bookletname: string;
   unitname: string;
   originalUnitId: string;
-  timestamp: string;
+  timestamp: string | {readonly rawJSON:string};
   logentry: string;
 };
 
@@ -16116,7 +16120,7 @@ const formatOriginalLogReportCsv = (
   columns: string[],
   rows: OriginalLogReportRow[]
 ): string =>
-  formatOriginalReportCsv(columns, rows);
+  formatOriginalReportCsv(columns, rows.map(row=>({...row,timestamp:typeof row.timestamp==='object'?row.timestamp.rawJSON:row.timestamp})));
 
 const formatOriginalReviewReportCsv = (
   columns: string[],
@@ -16172,6 +16176,7 @@ const buildOriginalResponseReportRows = (input: {
   groupKeys: string[];
   nativeUnits: import("@testcenter-rewrite-app/domain").OriginalNativeUnit[];
 }): OriginalResponseReportRow[] => {
+  const nativeCompare=input.nativeUnits.length?createOriginalReportTextComparator():null;
   const sessionsById = new Map(
     input.participantSessions.map(session => [session.participantSessionId, session])
   );
@@ -16210,8 +16215,8 @@ const buildOriginalResponseReportRows = (input: {
           code:participantSession.originalNameSuffix ?? participantSession.participantCode ?? "",
           bookletname:testRun.originalResultState?.bookletName ?? testRun.bookletAssignmentKey ?? testRun.bookletKey,
           unitname:native.unitName, originalUnitId:native.originalUnitId,
-          responses:native.parts.map(part => ({...part})),
-          laststate:Object.keys(native.state).length ? JSON.stringify(native.state) : null
+          responses:[...native.parts].sort((a,b)=>nativeCompare!(a.id,b.id)).map(part => ({...part})),
+          laststate:Object.keys(native.state).length ? formatOriginalUnitStateReport(native.state) : null
         };
         const response = Object.hasOwn(testRun.unitResponses, unitKey) ? testRun.unitResponses[unitKey] : undefined;
         const unit = resolveOriginalReportUnit({
@@ -16252,6 +16257,7 @@ const buildOriginalResponseReportRows = (input: {
     })
     .sort(
       (left, right) =>
+        nativeCompare ? nativeCompare(left.groupname,right.groupname)||nativeCompare(left.loginname,right.loginname)||nativeCompare(left.code,right.code)||nativeCompare(left.bookletname,right.bookletname)||nativeCompare(left.unitname,right.unitname)||nativeCompare(left.originalUnitId,right.originalUnitId) :
         left.groupname.localeCompare(right.groupname) ||
         left.loginname.localeCompare(right.loginname) ||
         left.bookletname.localeCompare(right.bookletname) ||
@@ -16264,32 +16270,37 @@ const buildOriginalLogReportRows = (input: {
   testRuns: TestRun[];
   testLogs: ParticipantTestLog[];
   groupKeys: string[];
-}): OriginalLogReportRow[] =>
-  listParticipantTestLogsForWorkspace({
-    tenantKey: "",
-    workspaceKey: "",
-    participantSessions: input.participantSessions,
-    testRuns: input.testRuns,
-    testLogs: input.testLogs,
-    groupKeys: input.groupKeys,
-    limit: 50_001
-  })
-    .map(item => ({
-      groupname: item.groupKey,
-      loginname: item.loginKey,
-      code: item.participantCode,
-      bookletname: item.bookletAssignmentKey,
-      unitname: item.testLog.unitKey ?? "",
-      originalUnitId: item.testLog.originalUnitId ?? "",
-      timestamp: String(item.testLog.originalTimestamp ?? exactParticipantTestLogTimestamp(item.testLog)),
-      logentry: formatOriginalParticipantLogEntry(item.testLog)
-    }))
-    .sort(
-      (left, right) =>
-        Number(left.timestamp) - Number(right.timestamp) ||
-        left.groupname.localeCompare(right.groupname) ||
-        left.loginname.localeCompare(right.loginname)
-    );
+}): OriginalLogReportRow[] => {
+  const people=new Map(input.participantSessions.map(person=>[person.participantSessionId,person]));
+  const runs=new Map(input.testRuns.map(run=>[run.testRunId,run]));
+  const native=(log:ParticipantTestLog)=>typeof people.get(log.participantSessionId)?.originalLoginKey==='string'&&
+    [originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix].some(prefix=>log.participantTestLogId.startsWith(prefix));
+  // AdminDAO UNION ALL emits Unit logs then Test logs, without a branch ORDER BY.
+  // Keep the supplied raw collection rank; do not inherit UI timestamp/UUID order.
+  const raw=input.testLogs.filter(native);
+  const ranks=new Map([...raw.filter(log=>log.unitKey!==null),...raw.filter(log=>log.unitKey===null)].map((log,i)=>[log.participantTestLogId,i]));
+  const items=listParticipantTestLogsForWorkspace({tenantKey:'',workspaceKey:'',...input,limit:50_001});
+  items.sort((left,right)=>{
+    const a=ranks.get(left.testLog.participantTestLogId),b=ranks.get(right.testLog.participantTestLogId);
+    if(a!==undefined||b!==undefined)return a===undefined?1:b===undefined?-1:a-b;
+    return Number(exactParticipantTestLogTimestamp(left.testLog))-Number(exactParticipantTestLogTimestamp(right.testLog))||
+      left.groupKey.localeCompare(right.groupKey)||left.loginKey.localeCompare(right.loginKey);
+  });
+  return items.map(item=>{
+    const person=people.get(item.testLog.participantSessionId)!,run=runs.get(item.testLog.testRunId)!,isNative=ranks.has(item.testLog.participantTestLogId);
+    if(isNative&&(typeof person.originalNameSuffix!=='string'||typeof run.originalResultState?.bookletName!=='string'))throw new FirstSliceError(409,'original_log_history_unknown','The historical native log identity is unavailable.');
+    return {
+      groupname:item.groupKey,
+      loginname:isNative?person.originalLoginKey!:item.loginKey,
+      code:isNative?person.originalNameSuffix??'':item.participantCode,
+      bookletname:isNative?run.originalResultState?.bookletName??item.bookletAssignmentKey:item.bookletAssignmentKey,
+      unitname:item.testLog.unitKey??'',originalUnitId:item.testLog.originalUnitId??'',
+      timestamp:isNative?(JSON as unknown as {rawJSON:(value:string)=>{readonly rawJSON:string}}).rawJSON(exactParticipantTestLogTimestamp(item.testLog)):
+        String(item.testLog.originalTimestamp??exactParticipantTestLogTimestamp(item.testLog)),
+      logentry:formatOriginalParticipantLogEntry(item.testLog)
+    };
+  });
+};
 
 const buildOriginalReviewReportRows = (input: {
   participantSessions: ParticipantSession[];
@@ -16530,9 +16541,9 @@ const createOriginalResultArchive = (input: {
   };
   const textEntries = [
     ["manifest.json", `${JSON.stringify(manifest, null, 2)}\n`],
-    ["responses.json", JSON.stringify(responseRows)],
-    ["responses.csv", formatOriginalReportCsv(responseColumns, responsesCsvRows)],
-    ["logs.json", JSON.stringify(logRows)],
+    ["responses.json", input.nativeUnits.length&&responseRows.length ? formatOriginalResponseReport(responseRows,"json") : JSON.stringify(responseRows)],
+    ["responses.csv", input.nativeUnits.length&&responseRows.length ? formatOriginalResponseReport(responseRows,"csv") : formatOriginalReportCsv(responseColumns, responsesCsvRows)],
+    ["logs.json", logRows.some(row=>typeof row.timestamp==='object') ? encodeOriginalReportJson(logRows) : JSON.stringify(logRows)],
     ["logs.csv", formatOriginalLogReportCsv(logColumns, logRows)],
     ["reviews.json", input.nativeReviews.length ? encodeOriginalReportJson(reviewReport.rows) : JSON.stringify(reviewReport.rows)],
     ["reviews.csv", formatOriginalReviewReportCsv(reviewColumns, reviewCsvRows)]
@@ -31329,7 +31340,8 @@ export const createFirstSliceServices = (
           ),
           repository.listParticipantTestLogsByWorkspace(
             workspace.tenantId,
-            workspace.workspaceId
+            workspace.workspaceId,
+            {order:"collection"}
           ),
           repository.listContentReleasesByWorkspace(
             workspace.tenantId,

@@ -3948,12 +3948,12 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
       return result.rowCount ?? 0;
     },
-    async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
+    async listParticipantTestLogsByWorkspace(tenantId, workspaceId, options) {
       return many(
         `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
          FROM participant_test_logs
          WHERE tenant_id = $1 AND workspace_id = $2
-         ORDER BY timestamp DESC, recorded_at DESC`,
+         ${options?.order==="collection"?"":"ORDER BY timestamp DESC, recorded_at DESC"}`,
         [tenantId, workspaceId],
         mapParticipantTestLog
       );

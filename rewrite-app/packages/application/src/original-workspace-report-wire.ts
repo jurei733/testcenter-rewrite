@@ -5,7 +5,7 @@ import {formatOriginalReportCsv} from './original-report-csv.js';
 type Identity = {groupname:string; loginname:string; code:string; bookletname:string; unitname:string};
 export type OriginalResponseReportRecord = Identity & {
   laststate:string|null; originalUnitId:string;
-  responses:Array<{id:string; content:string; ts:number; responseType:string}>;
+  responses:Array<{id:string; content:string|null; ts:number; responseType:string}>;
 };
 export type OriginalLogReportRecord = Identity & {originalUnitId:string; timestamp:number; originalClientTimestamp?:string; logentry:string};
 /** DAO-shaped data: code is the stored person suffix, and reviewtime has
@@ -47,6 +47,12 @@ const render = (format:OriginalReportFormat, rows:Record<string,unknown>[], colu
   for (const row of rows) for (const value of Object.values(row)) if (typeof value==='string') requireUnicode(value);
   return formatOriginalReportCsv(names, rows);
 };
+
+/** PostgreSQL jsonb text returned by Source PDO, before the outer report JSON. */
+export function formatOriginalUnitStateReport(state:Record<string,string>):string {
+ const keys=Object.keys(state).sort((a,b)=>Buffer.byteLength(a)-Buffer.byteLength(b)||Buffer.compare(Buffer.from(a),Buffer.from(b)));
+ return '{'+keys.map(key=>JSON.stringify(key)+': '+JSON.stringify(state[key])).join(', ')+'}';
+}
 
 export function formatOriginalResponseReport(rows:OriginalResponseReportRecord[], format:OriginalReportFormat):string {
   const records = rows.map(row => ({...identity(row), laststate:row.laststate,
