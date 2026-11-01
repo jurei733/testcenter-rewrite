@@ -2,11 +2,13 @@ import './source-native-test-administration-evidence.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {randomUUID} from 'node:crypto';
-import {readFile,mkdtemp,rm} from 'node:fs/promises';
+import {readFile,mkdtemp,rm,rename,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
-import {Pool} from 'pg';
-import {createFirstSliceServices,projectOriginalTestAdministration,formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/application';
+import {Pool,Client} from 'pg';
+import {DatabaseSync} from 'node:sqlite';
+import {setTimeout as delay} from 'node:timers/promises';
+import {createFirstSliceServices,projectOriginalTestAdministration,formatOriginalTestAdministrationJson,prepareOriginalTestSelection,selectOriginalTestDeletion} from '@testcenter-rewrite-app/application';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
@@ -15,6 +17,9 @@ import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/pa
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
 const evidence=JSON.parse(await readFile(new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-administration-http/observations.json',import.meta.url),'utf8'));
 const sourceRow=label=>evidence.rows.find(r=>r.label===label),flatten=value=>Object.values(value).flat();
+function storedZipEntry(body,name){
+ let offset=0;while(body.readUInt32LE(offset)===0x04034b50){assert.equal(body.readUInt16LE(offset+8),0);const size=body.readUInt32LE(offset+18),length=body.readUInt16LE(offset+26),extra=body.readUInt16LE(offset+28),start=offset+30+length+extra,key=body.subarray(offset+30,offset+30+length).toString();if(key===name)return body.subarray(start,start+size).toString();offset=start+size;}assert.fail('Missing owned ZIP entry '+name);
+}
 const error=e=>e.statusCode===409&&e.errorCode==='original_test_administration_history_unknown';
 const privateState='OWNED_PRIVATE_NATIVE_TEST_STATE';
 function inventory(){
@@ -62,6 +67,19 @@ test('canonical extensions and foreign metadata cannot manufacture native Test r
  input.runs.push({...input.runs[0],participantSessionId:'canonical',testRunId:'canonical',hasTestState:undefined},{...input.runs[0],workspaceId:'foreign',testRunId:'alien'});
  input.people.push({...input.people[0],workspaceId:'foreign'});input.bindings.push({...input.bindings[0],workspaceId:'foreign'});input.groups.push({...input.groups[0],workspaceId:'foreign',groupLabel:'Alien label'});
  input.numbers.push({...input.numbers[0],workspaceId:'foreign',testRunId:'alien'});assert.deepEqual(projectOriginalTestAdministration(input),before);
+});
+test('selected native Test tuples preserve empty/default values and exact binary Login identity without PUT normalization',()=>{
+ const d=inventory(),row=d.people[0],run=d.runs.find(r=>r.participantSessionId===row.participantSessionId);
+ const select=personSessions=>selectOriginalTestDeletion({...d,personSessions:prepareOriginalTestSelection(personSessions)},d);
+ const tuple={loginName:row.originalLoginKey,code:row.participantCode,nameSuffix:row.originalNameSuffix,bookletName:run.bookletName};
+ run.hasTestState=false;
+ assert.deepEqual(select([tuple,tuple]).testRunIds,[run.testRunId]);
+ assert.deepEqual(select([{...tuple,loginName:tuple.loginName.toUpperCase()}]).testRunIds,[]);
+ assert.deepEqual(select([{...tuple,bookletName:' '+tuple.bookletName}]).testRunIds,[]);
+ assert.deepEqual(select([{...tuple,code:tuple.code.toUpperCase(),nameSuffix:tuple.nameSuffix.toUpperCase(),bookletName:tuple.bookletName.toLowerCase()}]).testRunIds,[run.testRunId]);
+ assert.deepEqual(prepareOriginalTestSelection([{loginName:'',bookletName:'',code:null,nameSuffix:null}]),[{loginName:'',bookletName:'',code:'',nameSuffix:''}]);
+ for(const body of [undefined,null,[],{},[null],[{}],[{loginName:null,bookletName:'A'}],[{loginName:'A'}]])assert.throws(()=>prepareOriginalTestSelection(body),e=>e.statusCode===400);
+ const body=[tuple],owned=prepareOriginalTestSelection(body);body[0].bookletName='elsewhere';assert.equal(owned[0].bookletName,run.bookletName);
 });
 const validator=await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE||'.data/original-xml-schemas'),process.env.FIRST_SLICE_XML_SCHEMA_DOWNLOAD!=='false');
 const kinds=['memory','file','sqlite'];if(process.env.FIRST_SLICE_STORE==='postgres'){assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);kinds.push('postgres');}
@@ -122,13 +140,157 @@ for(const kind of kinds)test(kind+': native Test read has a durable private cons
   });
   if(kind==='sqlite'||kind==='postgres')await t.test('real protected HTTP returns Source-shaped JSON only to an authorized scoped reader',async()=>{
    const administration=createFirstSliceServices({repository}),password='Owned-test-admin-reader-secret',initial=await administration.adminAuth.bootstrapAdminUser({username:'owned-admin',password}),foreign=await services.platform.createWorkspace({tenantKey:scope.tenantKey,workspaceKey:'foreign',displayName:'Owned foreign'}),tokens={};
-   for(const [name,workspaceId]of [['reader',ids.workspaceId],['foreign',foreign.workspaceId]]){const id=randomUUID();await repository.saveAdminUser({...initial.adminUser,adminUserId:id,username:name});await repository.saveAdminRoleAssignment({roleAssignmentId:randomUUID(),adminUserId:id,role:'workspace_admin',accessMode:'read_only',tenantId:ids.tenantId,workspaceId,groupKey:null,monitorProfiles:[],monitorBookletVisibility:'visible',createdAt:new Date().toISOString()});tokens[name]=(await administration.adminAuth.signIn({username:name,password})).adminSession.token;}
+   for(const [name,workspaceId]of [['reader',ids.workspaceId],['writer',ids.workspaceId],['foreign',foreign.workspaceId]]){const id=randomUUID();await repository.saveAdminUser({...initial.adminUser,adminUserId:id,username:name});await repository.saveAdminRoleAssignment({roleAssignmentId:randomUUID(),adminUserId:id,role:'workspace_admin',accessMode:name==='writer'?'read_write':'read_only',tenantId:ids.tenantId,workspaceId,groupKey:null,monitorProfiles:[],monitorBookletVisibility:'visible',createdAt:new Date().toISOString()});tokens[name]=(await administration.adminAuth.signIn({username:name,password})).adminSession.token;}
    const environment={FIRST_SLICE_STORE:kind,FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',...(url?{FIRST_SLICE_POSTGRES_URL:url.toString()}:{})},previous=new Map(Object.keys(environment).map(k=>[k,process.env[k]]));let server;
    try{
     try{Object.assign(process.env,environment);server=await createProductionApiServer();}finally{for(const[k,v]of previous){if(v===undefined)delete process.env[k];else process.env[k]=v;}}
     await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port,path='/api/v1/tenants/'+scope.tenantKey+'/workspaces/'+scope.workspaceKey+'/results/original-tests';
     for(const[token,status]of [[undefined,401],['invalid-owned-token',401],[tokens.foreign,403],[tokens.reader,200]]){const r=await fetch(base+path,{headers:token?{authorization:'Bearer '+token}:{},signal:AbortSignal.timeout(15000)});assert.equal(r.status,status);if(status===200){assert.equal(r.headers.get('cache-control'),'private, no-store');assert.equal(await r.text(),await read());}}
+    const before=await read(),deletionBody={personSessions:[{loginName:'unknown-owned',bookletName:'OWNED.ADM.A'}]};
+    for(const[token,status]of [[undefined,401],['invalid-owned-token',401],[person.token,401],[tokens.foreign,403],[tokens.reader,403],[tokens.writer,200]]){
+     const r=await fetch(base+path,{method:'DELETE',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(deletionBody),signal:AbortSignal.timeout(15000)});assert.equal(r.status,status,token===person.token?'participant cannot administer Tests':String(status));if(status===200){assert.equal(await r.text(),'');assert.equal(r.headers.get('cache-control'),'private, no-store');}
+    }
+    const ephemeral=await auth(peers.at(-1)),ephemeralNumber=await services.originalTest.create({token:ephemeral.token,bookletName:'OWNED.ADM.B'});
+    const matched=await fetch(base+path,{method:'DELETE',headers:{authorization:'Bearer '+tokens.writer,'content-type':'application/json'},body:JSON.stringify({personSessions:[{loginName:peers.at(-1),bookletName:'OWNED.ADM.B'}]}),signal:AbortSignal.timeout(15000)});assert.equal(matched.status,200);assert.equal(await matched.text(),'');
+    await assert.rejects(services.originalTest.read({token:ephemeral.token,testNumber:ephemeralNumber}),e=>e.statusCode===403);
+    assert.equal(await read(),before);
+    for(const personSessions of [[],[{bookletName:'OWNED.ADM.A'}],[{loginName:'owned-adm-r53-code'}]]){
+     const r=await fetch(base+path,{method:'DELETE',headers:{authorization:'Bearer '+tokens.writer,'content-type':'application/json'},body:JSON.stringify({personSessions}),signal:AbortSignal.timeout(15000)});assert.equal(r.status,400);
+    }
    }finally{if(server)await new Promise((done,reject)=>server.close(e=>e&&e.code!=='ERR_SERVER_NOT_RUNNING'?reject(e):done()));}
+  });
+  let retainedResponseWire;const attachmentByRun=new Map();
+  const selection={loginName:'owned-adm-r53-code',code:'ABC',nameSuffix:'ABC',bookletName:'owned.adm.a'};
+  const removeA=()=>services.originalTestAdministration.delete({...scope,personSessions:[selection]});
+  const snapshot=async()=>({
+   runs:await repository.listTestRunsByWorkspace(ids.tenantId,ids.workspaceId),groups:await repository.listOriginalParticipantGroupsByWorkspace(ids.tenantId,ids.workspaceId),
+   people:await repository.listParticipantSessionsByWorkspace(ids.tenantId,ids.workspaceId),bindings:await repository.listOriginalLoginBindingsByWorkspace(ids.tenantId,ids.workspaceId),
+   units:await repository.listOriginalUnitsByWorkspace(ids.tenantId,ids.workspaceId),reviews:await repository.listWorkspaceReviewsByWorkspace(ids.tenantId,ids.workspaceId),
+   logs:await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),events:await repository.listWorkspaceActivityEventsByWorkspace(ids.tenantId,ids.workspaceId),
+   files:await repository.listAttachmentFilesByWorkspace(ids.tenantId,ids.workspaceId),credential:await repository.getParticipantAccessCredential(person.participantSession.participantSessionId),
+   roster:await repository.listParticipantRosterEntriesByWorkspace(ids.tenantId,ids.workspaceId)
+  });
+  await t.test('unknown, empty-string, binary Login and untrimmed Booklet selections leave every byte and group clock intact',async()=>{
+   const before=await snapshot();
+   for(const row of [{...selection,code:'wrong'},{...selection,loginName:selection.loginName.toUpperCase()},{...selection,bookletName:' '+selection.bookletName},{loginName:'',bookletName:''}])await services.originalTestAdministration.delete({...scope,personSessions:[row]});
+   assert.deepEqual(await snapshot(),before);
+  });
+  await t.test('caller-owned tuple changes during workspace resolution cannot change the authorized selection',async()=>{
+   const before=await snapshot(),tuple={...selection,code:'unknown-owned'},personSessions=[tuple];let entered,release;const entry=new Promise(r=>entered=r),gate=new Promise(r=>release=r);
+   const delayed=new Proxy(repository,{get(target,key){if(key==='getWorkspaceByScope')return async(...args)=>{const value=await target[key](...args);entered();await gate;return value;};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+   const pending=createFirstSliceServices({repository:delayed}).originalTestAdministration.delete({...scope,personSessions});
+   try{await entry;tuple.code=selection.code;personSessions.push(selection);}finally{release();}
+   await pending;assert.deepEqual(await snapshot(),before);
+  });
+  await t.test('seed real selected and retained Unit answers, descendant artifacts and a durable delivery receipt',async()=>{
+   for(const[number,key]of [[b,'retained'],[a,'selected']]){
+    await services.originalUnit.patchState({token:person.token,testNumber:number,unitName:'OWNED.ADM.UNIT',body:{originalUnitId:'OWNED.ORIGINAL.'+(number===a?'A':'B'),newState:[{key:'PRESENTATION_PROGRESS',content:'some',timeStamp:++clock}]}});
+    await services.originalUnit.putResponse({token:person.token,testNumber:number,unitName:'OWNED.ADM.UNIT',body:{timeStamp:++clock,dataParts:{owned:JSON.stringify({[key]:'Owned '+(number===a?'A':'B')+' answer Ω'})},responseType:'owned'}});
+    if(number===b)retainedResponseWire=storedZipEntry((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.ADM.ZULU']})).body,'responses.json');
+    const n=await repository.findOriginalTestNumber({testNumber:number,...ids,participantSessionId:person.participantSession.participantSessionId}),run=await repository.getTestRunById(n.testRunId),stamp=new Date().toISOString(),deliveryId=randomUUID();
+    if(number===a)await services.workspaceReview.createReview({...scope,participantSessionId:run.participantSessionId,testRunId:run.testRunId,unitKey:'OWNED.ADM.UNIT',reviewerId:'Owned',category:'owned',comment:'Owned selected-Test comment'});
+    assert.ok(await repository.appendParticipantRunCommand({...run,commandId:randomUUID(),commandType:'pause',actorId:null,targetUnitKey:null,remainingSeconds:null,issuedAt:stamp}));
+    await repository.mutateParticipantRun({...run,deliveryId},()=>({testRun:{...run,status:'running'},originalTestState:run.originalTestState,testLogs:[],activityEvents:[],progressDelivery:{...ids,participantSessionId:run.participantSessionId,testRunId:run.testRunId,contentReleaseId:run.contentReleaseId,deliveryId,payloadSha256:'0'.repeat(64),acceptedAt:stamp}}));
+    assert.equal((await repository.updateParticipantPresence({testRunId:run.testRunId,participantSessionId:run.participantSessionId,action:'poll',timestamp:Date.now()})).accepted,true);
+    const attachmentFileId=randomUUID();attachmentByRun.set(run.testRunId,attachmentFileId);
+    await repository.saveAttachmentFile({...ids,attachmentFileId,attachmentId:'att-'+Buffer.from(JSON.stringify([run.testRunId,'OWNED.ADM.UNIT','owned'])).toString('base64url'),fileName:'owned.png',mediaType:'image/png',dataBase64:Buffer.from(privateState).toString('base64'),createdAt:stamp});
+   }
+  });
+  await t.test('an unrelated group Review remains outside the selected Test and retained raw response export',async()=>{
+   const alpha=(await repository.listParticipantSessionsByWorkspace(ids.tenantId,ids.workspaceId)).find(p=>p.originalLoginKey==='owned-adm-r53-alpha'),run=(await repository.listTestRunsByParticipantSessionId(alpha.participantSessionId))[0];
+   await services.workspaceReview.createReview({...scope,participantSessionId:alpha.participantSessionId,testRunId:run.testRunId,unitKey:'OWNED.ADM.UNIT',reviewerId:'Owned',category:'owned',comment:'Retained independent group Review'});
+  });
+  if(kind!=='memory')await t.test('failure after selected descendants are removed rolls back clocks, answers and capabilities through reopen',async()=>{
+   const before=await snapshot();let control;
+   if(kind==='file'){await rename(file,file+'.owned-backup');await mkdir(file);}
+   else if(kind==='sqlite'){control=new DatabaseSync(file);control.exec("CREATE TRIGGER owned_selected_test_failure BEFORE UPDATE ON original_participant_groups BEGIN SELECT RAISE(ABORT,'owned final clock failure'); END");}
+   else{control=new Pool({connectionString:url.toString()});await control.query("CREATE FUNCTION owned_selected_test_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned final clock failure'; END; $$; CREATE TRIGGER owned_selected_test_failure BEFORE UPDATE ON original_participant_groups FOR EACH ROW EXECUTE FUNCTION owned_selected_test_failure()");}
+   try{await assert.rejects(removeA(),kind==='file'?/directory|EISDIR|ENOTEMPTY/:/owned final clock failure/);}
+   finally{
+    if(kind==='file'){await rm(file,{recursive:true});await rename(file+'.owned-backup',file);}
+    else if(kind==='sqlite'){control.exec('DROP TRIGGER owned_selected_test_failure');control.close();}
+    else{await control.query('DROP TRIGGER owned_selected_test_failure ON original_participant_groups; DROP FUNCTION owned_selected_test_failure()');await control.end();}
+   }
+   assert.deepEqual(await snapshot(),before);await close();await open();assert.deepEqual(await snapshot(),before);
+  });
+  await t.test('exact selected deletion keeps every other Test, raw B answers, current person/capabilities and assignments',async()=>{
+   const before=await snapshot(),mapping=await repository.findOriginalTestNumber({testNumber:a,...ids,participantSessionId:person.participantSession.participantSessionId}),runId=mapping.testRunId,keptId=(await repository.findOriginalTestNumber({testNumber:b,...ids,participantSessionId:person.participantSession.participantSessionId})).testRunId;
+   const parser=JSON.parse;if(kind==='sqlite'||kind==='postgres')JSON.parse=(...args)=>{if(typeof args[0]==='string'&&args[0].includes(privateState))throw Error('Owned selected-Test private decoder fence');return parser(...args);};
+   try{if(kind==='sqlite'||kind==='postgres')await assert.rejects(repository.getTestRunById(runId),/Owned selected-Test private decoder fence/);await services.originalTestAdministration.delete({...scope,personSessions:[selection,selection]});}finally{JSON.parse=parser;}
+   const after=await snapshot();
+   assert.deepEqual(after.runs,before.runs.filter(r=>r.testRunId!==runId));assert.equal(await repository.getTestRunById(runId),null);
+   for(const key of ['people','bindings','credential','roster'])assert.deepEqual(after[key],before[key],key);
+   for(const key of ['units','reviews','logs'])assert.deepEqual(after[key],before[key].filter(r=>r.testRunId!==runId),key);
+   assert.deepEqual(after.units.find(r=>r.testRunId===keptId),before.units.find(r=>r.testRunId===keptId));
+   assert.equal(storedZipEntry((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.ADM.ZULU']})).body,'responses.json'),retainedResponseWire);
+   assert.deepEqual(after.files,before.files.filter(f=>f.attachmentFileId!==attachmentByRun.get(runId)));
+   const removedReviews=new Set(before.reviews.filter(r=>r.testRunId===runId).map(r=>r.reviewId));
+   assert.deepEqual(after.events,before.events.filter(e=>!(e.subjectType==='test_run'&&e.subjectId===runId||e.details.testRunId===runId||removedReviews.has(e.details.reviewId))));
+   await assert.rejects(repository.listOriginalReviews({...mapping,unitName:null}),e=>e.statusCode===409);
+   for(const row of before.groups){const updated=after.groups.find(g=>g.groupKey===row.groupKey);if(row.groupKey==='OWNED.ADM.ZULU'){assert.deepEqual({...updated,lastModifiedAt:row.lastModifiedAt},row);assert.ok(Date.parse(updated.lastModifiedAt)>=Date.parse(row.lastModifiedAt));}else assert.deepEqual(updated,row);}
+   assert.equal((await services.originalAuthentication.read({token:person.token})).participantSession.participantSessionId,person.participantSession.participantSessionId);
+   await assert.rejects(services.originalTest.read({token:person.token,testNumber:a}),e=>e.statusCode===403);assert.ok(await services.originalTest.read({token:person.token,testNumber:b}));
+   assert.equal(await repository.findOriginalTestNumber({testNumber:a,...ids,participantSessionId:person.participantSession.participantSessionId}),null);
+   assert.deepEqual(await repository.listPendingParticipantRunCommands({testRunId:runId,...ids,participantSessionId:person.participantSession.participantSessionId}),[]);
+   if(kind==='file'){
+    const doc=JSON.parse(await readFile(file,'utf8'));for(const key of ['participantRunCommands','participantProgressDeliveries','participantPresence','originalNativeReviews'])assert.ok(Object.values(doc[key]).every(row=>row.testRunId!==runId),key);
+   }else if(kind==='sqlite'||kind==='postgres'){
+    const control=kind==='sqlite'?new DatabaseSync(file):new Pool({connectionString:url.toString()});
+    try{for(const table of ['participant_run_commands','participant_progress_deliveries','participant_connection_presence','original_native_reviews','original_native_units','original_test_numbers']){
+     const count=kind==='sqlite'?control.prepare('SELECT count(*) AS count FROM '+table+' WHERE test_run_id=?').get(runId).count:(await control.query('SELECT count(*) AS count FROM '+table+' WHERE test_run_id=$1',[runId])).rows[0].count;assert.equal(Number(count),0,table);
+    }}finally{if(kind==='sqlite')control.close();else await control.end();}
+   }
+   await close();await open();assert.equal(await repository.getTestRunById(runId),null);assert.deepEqual((await snapshot()).units.find(r=>r.testRunId===keptId),before.units.find(r=>r.testRunId===keptId));
+   const fresh=await services.originalTest.create({token:person.token,bookletName:'OWNED.ADM.A'});assert.notEqual(fresh,a);a=fresh;await patch(person.token,a);
+   assert.equal(flatten(JSON.parse(await read())).find(r=>r.loginName===selection.loginName&&r.bookletName==='OWNED.ADM.A').bookletLabel,'Changed current Booklet A β');
+  });
+  await t.test('empty and unopened Tests can be selected even when absent from the administration list',async()=>{
+   const p=await auth(peers[0]),old=await services.originalTest.create({token:p.token,bookletName:'OWNED.ADM.B'});
+   assert.ok(!flatten(JSON.parse(await read())).some(r=>r.loginName===peers[0]&&r.bookletName==='OWNED.ADM.B'));
+   await services.originalTestAdministration.delete({...scope,personSessions:[{loginName:peers[0],bookletName:'OWNED.ADM.B',code:null,nameSuffix:null}]});
+   await assert.rejects(services.originalTest.read({token:p.token,testNumber:old}),e=>e.statusCode===403);
+   assert.equal((await services.originalAuthentication.read({token:p.token})).participantSession.participantSessionId,p.participantSession.participantSessionId);
+  });
+  await t.test('real in-flight Test and Unit state, answer and log requests cannot restore a selected Test',async()=>{
+   for(const operation of ['test-state','unit-state','unit-response','test-log']){
+    a=await services.originalTest.create({token:person.token,bookletName:'OWNED.ADM.A'});await patch(person.token,a);
+    const mapping=await repository.findOriginalTestNumber({testNumber:a,...ids,participantSessionId:person.participantSession.participantSessionId});
+    const method=operation==='test-state'?'mutateParticipantRun':operation==='test-log'?'appendOriginalTestLogs':'mutateOriginalUnit';
+    let release,entered;const gate=new Promise(r=>release=r),entry=new Promise(r=>entered=r);
+    const delayed=new Proxy(repository,{get(target,key){if(key===method)return async(...args)=>{entered();await gate;return target[key](...args);};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+    const runtime=createFirstSliceServices({repository:delayed,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'}),request={token:person.token,testNumber:a,unitName:'OWNED.ADM.UNIT'};
+    const pending=(operation==='test-state'?runtime.originalTest.patchState({...request,patch:[{key:'LATE',content:privateState,timeStamp:++clock}]})
+     :operation==='test-log'?runtime.originalTest.putLog({...request,body:[{key:'LATE',content:privateState,timeStamp:++clock}]})
+     :operation==='unit-state'?runtime.originalUnit.patchState({...request,body:{newState:[{key:'LATE',content:privateState,timeStamp:++clock}]}})
+     :runtime.originalUnit.putResponse({...request,body:{timeStamp:++clock,dataParts:{owned:privateState}}})).then(value=>({value}),error=>({error}));
+    try{await Promise.race([entry,pending.then(r=>{throw r.error??Error('Request missed its real durable writer');})]);await removeA();}finally{release();}
+    const result=await pending;assert.ok(result.error,operation);assert.ok([403,409,410].includes(result.error.statusCode),operation);
+    assert.equal(await repository.getTestRunById(mapping.testRunId),null);assert.ok(!(await repository.listOriginalUnitsByWorkspace(ids.tenantId,ids.workspaceId)).some(r=>r.testRunId===mapping.testRunId));assert.ok(!(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId)).some(r=>r.testRunId===mapping.testRunId));
+   }
+   a=await services.originalTest.create({token:person.token,bookletName:'OWNED.ADM.A'});await patch(person.token,a);
+  });
+  if(kind==='postgres')await t.test('independent native Unit writer actually waits on selected deletion and cannot recreate its removed parent',{timeout:30000},async race=>{
+   const old=a,mapping=await repository.findOriginalTestNumber({testNumber:a,...ids,participantSessionId:person.participantSession.participantSessionId}),other=await createPostgresFirstSliceStorage(url.toString()),observer=new Pool({connectionString:url.toString()});
+   let allowNativeWrite,reachedNativeWrite;const nativeGate=new Promise(r=>allowNativeWrite=r),nativeEntry=new Promise(r=>reachedNativeWrite=r);
+   const pausedRepository=new Proxy(other.repository,{get(target,key){if(key==='mutateOriginalUnit')return async(...args)=>{reachedNativeWrite();await nativeGate;return target[key](...args);};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}}),runtime=createFirstSliceServices({repository:pausedRepository});
+   let release,entered,writerEntered,deletionPid,writerPid,paused=false;const gate=new Promise(r=>release=r),entry=new Promise(r=>entered=r),writerEntry=new Promise(r=>writerEntered=r),query=Client.prototype.query;
+   const hook=race.mock.method(Client.prototype,'query',function(...args){
+    const text=typeof args[0]==='string'?args[0]:args[0]?.text??'';
+    if(!paused&&text.startsWith('UPDATE original_participant_groups SET last_modified_at')){paused=true;deletionPid=this.processID;entered();return gate.then(()=>query.apply(this,args));}
+    if(paused&&this.processID!==deletionPid&&!writerPid&&/FOR (?:KEY SHARE|NO KEY UPDATE|UPDATE)/.test(text)){writerPid=this.processID;writerEntered();}
+    return query.apply(this,args);
+   });
+   const writing=runtime.originalUnit.patchState({token:person.token,testNumber:old,unitName:'OWNED.ADM.UNIT',body:{newState:[{key:'RACE',content:privateState,timeStamp:++clock}]}}).then(value=>({value}),error=>({error}));let deletion;
+   try{
+    await Promise.race([nativeEntry,writing.then(r=>{throw r.error??Error('Native request did not reach durable Unit writer');})]);
+    deletion=removeA().then(value=>({value}),error=>({error}));
+    await Promise.race([entry,deletion.then(r=>{throw r.error??Error('Deletion did not reach final clock write');})]);allowNativeWrite();
+    await Promise.race([writerEntry,writing.then(r=>{throw r.error??Error('Writer did not reach actual lock');})]);
+    let locked=false;const deadline=Date.now()+5000;while(Date.now()<deadline){if((await observer.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1',[writerPid])).rows[0]?.wait_event_type==='Lock'){locked=true;break;}await delay(10);}assert.equal(locked,true);
+    release();assert.equal((await deletion).error,undefined);const result=await writing;assert.ok(result.error&&result.error.statusCode===409);
+    assert.equal(await repository.getTestRunById(mapping.testRunId),null);assert.equal((await services.originalAuthentication.read({token:person.token})).participantSession.participantSessionId,person.participantSession.participantSessionId);
+   }finally{release();allowNativeWrite();await Promise.allSettled([...(deletion?[deletion]:[]),writing]);hook.mock.restore();await other.shutdown();await observer.end();}
+   a=await services.originalTest.create({token:person.token,bookletName:'OWNED.ADM.A'});await patch(person.token,a);
   });
   await t.test('completed snapshot remains fixed while actual Login move overtakes its projection',async()=>{
    const before=await read();let release,entered;const gate=new Promise(r=>release=r),entry=new Promise(r=>entered=r),delayed=new Proxy(repository,{get(target,key){if(key==='getOriginalTestAdministrationInventory')return async(...args)=>{const v=await target[key](...args);entered();await gate;return v;};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});

@@ -1,3 +1,4 @@
+import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalTestAdministrationCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalReviewCollection,mutateOriginalReviewCollection,readOriginalReviewPersonCollection,validateOriginalReviewCollections,synchronizeOriginalReviewCollection,deleteOriginalReviewCollection,type OriginalNativeReview} from '@testcenter-rewrite-app/application';
 import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
@@ -1856,6 +1857,13 @@ const createFileRepository = (
     async getTestRunById(testRunId) {
       const state = await getState();
       return state.testRuns[testRunId] ?? null;
+    },
+    async deleteOriginalSelectedTests(raw) {
+      const input=prepareOriginalTestDeletionInput(raw);
+      return mutate(state=>{
+        if(!Object.values(state.workspacesByScope).some(row=>row.tenantId===input.tenantId&&row.workspaceId===input.workspaceId))return null;
+        return deleteOriginalSelectedTestsFromCollections(state,input);
+      });
     },
     async deleteOriginalGroupResults(raw) {
       const input = prepareOriginalGroupDeletionInput(raw);

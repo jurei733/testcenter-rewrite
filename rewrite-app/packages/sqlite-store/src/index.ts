@@ -1,3 +1,4 @@
+import {deleteOriginalSelectedTests} from './original-test-deletion.js';
 import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
 import {listOriginalNativeReviews,mutateOriginalNativeReview,listOriginalNativeReviewsByPerson,synchronizeOriginalNativeReview} from './original-native-review.js';
 import {changeOriginalMonitorTestLock} from './original-monitor-lock.js';
@@ -3815,6 +3816,7 @@ export const createSqliteFirstSliceStorage = (
         .get(testRunId) as Record<string, unknown> | undefined;
       return mapTestRun(row);
     },
+    async deleteOriginalSelectedTests(input){return deleteOriginalSelectedTests(database,input);},
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(database, input);},
     async listOriginalUnitsByWorkspace(tenantId,workspaceId){return database.prepare('SELECT unit_json FROM original_native_units WHERE tenant_id=? AND workspace_id=?').all(tenantId,workspaceId).map(row=>JSON.parse(String(row.unit_json)));},
     async getOriginalUnit(input){return readOriginalNativeUnit(database,input);},

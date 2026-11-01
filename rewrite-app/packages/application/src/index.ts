@@ -65,6 +65,8 @@ export type {OriginalGroupResultInventory} from './original-group-results.js';
 export {projectOriginalResultTest} from './original-group-results.js';
 export type {OriginalResultTest} from './original-group-results.js';
 import {createOriginalGroupResultsPort} from './original-group-results.js';
+export {prepareOriginalTestSelection,prepareOriginalTestDeletionInput,selectOriginalTestDeletion,deleteOriginalSelectedTestsFromCollections} from './original-test-deletion.js';
+export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletionResult} from './original-test-deletion.js';
 import {createOriginalTestAdministrationPort} from './original-test-administration.js';
 export {projectOriginalTestAdministrationRun,projectOriginalTestAdministrationInventory,readOriginalTestAdministrationCollections,projectOriginalTestAdministration,formatOriginalTestAdministrationJson} from './original-test-administration.js';
 export type {OriginalTestAdministrationInventory,OriginalTestAdministrationGroup} from './original-test-administration.js';
@@ -1666,6 +1668,7 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   listOriginalReviewsByPerson(scope:{participantSessionId:string;tenantId:string;workspaceId:string}):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
   getOriginalGroupResultInventory(tenantId: string, workspaceId: string): Promise<import('./original-group-results.js').OriginalGroupResultInventory>;
   getOriginalTestAdministrationInventory(tenantId:string,workspaceId:string):Promise<import('./original-test-administration.js').OriginalTestAdministrationInventory>;
+  deleteOriginalSelectedTests(input:import('./original-test-deletion.js').OriginalTestDeletionInput):Promise<import('./original-test-deletion.js').OriginalTestDeletionResult|null>;
   /** Atomically delete native group snapshots, current session descendants and capabilities. */
   deleteOriginalGroupResults(input: import('./original-group-deletion.js').OriginalGroupDeletionInput): Promise<import('./original-group-deletion.js').OriginalGroupDeletionResult | null>;
   listTestRunsByParticipantSessionId(

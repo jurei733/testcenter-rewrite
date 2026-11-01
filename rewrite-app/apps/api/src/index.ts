@@ -2719,6 +2719,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", groupResultsPattern],
   ["GET", originalGroupResultsPattern],
   ["GET", originalTestSessionsPattern],
+  ["DELETE", originalTestSessionsPattern],
   ["DELETE", originalGroupResultsPattern],
   ["DELETE", groupResultsPattern],
   ["GET", reviewListPattern],
@@ -3705,6 +3706,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     ["GET", originalGroupResultsPattern, productionApiRoutes.workspace.listOriginalGroupResults],
     ["GET", originalTestSessionsPattern, productionApiRoutes.workspace.listOriginalTestSessions],
+    ["DELETE", originalTestSessionsPattern, productionApiRoutes.workspace.deleteOriginalTestSessions],
     ["DELETE", originalGroupResultsPattern, productionApiRoutes.workspace.deleteOriginalGroupResults],
     [
       "DELETE",
@@ -7657,6 +7659,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const groups=await services.originalTestAdministration.list({tenantKey,workspaceKey});
         response.setHeader('cache-control','private, no-store');response.setHeader('content-type','application/json; charset=utf-8');
         response.statusCode=200;response.end(formatOriginalTestAdministrationJson(groups));return;
+      }
+
+      if(request.method==="DELETE"&&originalTestSessions?.groups){
+        const tenantKey=decodeRouteGroup(originalTestSessions.groups.tenantKey),workspaceKey=decodeRouteGroup(originalTestSessions.groups.workspaceKey);
+        if(!tenantKey||!workspaceKey){sendError(response,400,'invalid_workspace_scope','tenantKey and workspaceKey are required.');return;}
+        const body=await readRequestJsonBody<unknown>();
+        const personSessions=body&&typeof body==='object'&&!Array.isArray(body)&&'personSessions' in body?body.personSessions:undefined;
+        await services.originalTestAdministration.delete({tenantKey,workspaceKey,personSessions});
+        response.setHeader('cache-control','private, no-store');response.statusCode=200;response.end();return;
       }
 
       const originalGroups = originalGroupResultsPattern.exec(pathname);

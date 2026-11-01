@@ -1,6 +1,7 @@
 import type {OriginalAdminTestSession} from '@testcenter-rewrite-app/contracts';
 import type {OriginalLoginBinding,OriginalParticipantGroup,ParticipantSession,TestRun} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
+import {prepareOriginalTestSelection} from './original-test-deletion.js';
 import type {OriginalTestNumberRecord} from './original-test-number.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {compareOriginalParticipantGroupKeys,originalParticipantGroupKeysEqual} from './original-participant-group.js';
@@ -91,8 +92,8 @@ export function projectOriginalTestAdministration(input:Scope&OriginalTestAdmini
 export function formatOriginalTestAdministrationJson(groups:OriginalTestAdministrationGroup[]):string{
  return originalPhpMap(groups.map(group=>[group.name,group.sessions]));
 }
-export type OriginalTestAdministrationPort={list(input:{tenantKey:string;workspaceKey:string}):Promise<OriginalTestAdministrationGroup[]>};
+export type OriginalTestAdministrationPort={list(input:{tenantKey:string;workspaceKey:string}):Promise<OriginalTestAdministrationGroup[]>;delete(input:{tenantKey:string;workspaceKey:string;personSessions:unknown}):Promise<void>};
 export function createOriginalTestAdministrationPort(repository:FirstSliceRepository,workspace:(tenantKey:string,workspaceKey:string)=>Promise<Scope>):OriginalTestAdministrationPort{
- return {async list(input){const scope=await workspace(input.tenantKey,input.workspaceKey),snapshot=await repository.getOriginalTestAdministrationInventory(scope.tenantId,scope.workspaceId);return projectOriginalTestAdministration({...scope,...snapshot});}};
+ return {async list(input){const scope=await workspace(input.tenantKey,input.workspaceKey),snapshot=await repository.getOriginalTestAdministrationInventory(scope.tenantId,scope.workspaceId);return projectOriginalTestAdministration({...scope,...snapshot});},async delete(input){const personSessions=prepareOriginalTestSelection(input.personSessions),scope=await workspace(input.tenantKey,input.workspaceKey);if(!await repository.deleteOriginalSelectedTests({...scope,personSessions}))throw new FirstSliceError(404,'workspace_not_found','Workspace not found.');}};
 }
 

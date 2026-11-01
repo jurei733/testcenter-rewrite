@@ -1,3 +1,4 @@
+import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalTestAdministrationCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalReviewCollection,mutateOriginalReviewCollection,readOriginalReviewPersonCollection,validateOriginalReviewCollections,synchronizeOriginalReviewCollection,deleteOriginalReviewCollection,type OriginalNativeReview} from '@testcenter-rewrite-app/application';
 import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
@@ -998,6 +999,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async getTestRunById(testRunId) {
       return state.testRuns.get(testRunId) ?? null;
+    },
+    async deleteOriginalSelectedTests(raw) {
+      const input=prepareOriginalTestDeletionInput(raw);
+      if(![...state.workspacesByScope.values()].some(row=>row.tenantId===input.tenantId&&row.workspaceId===input.workspaceId))return null;
+      return deleteOriginalSelectedTestsFromCollections(state,input);
     },
     async deleteOriginalGroupResults(raw) {
       const input = prepareOriginalGroupDeletionInput(raw);

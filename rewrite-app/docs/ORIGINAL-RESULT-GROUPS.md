@@ -1,5 +1,42 @@
 # Original participant group snapshots
 
+## Native selected-Test deletion foundation (2026-11-01)
+
+The protected versioned `DELETE /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-tests`
+accepts `{personSessions:[{loginName,code,nameSuffix,bookletName}]}`. It copies the
+non-empty selection before asynchronous scope resolution, preserves explicit empty
+required strings and defaults missing/null optional code and suffix to empty.
+Login comparison is binary; the other stored identity fields use the existing
+native German collation. No Test PUT normalization or trimming is applied.
+Empty and unopened Tests are selectable independently of the listing predicate.
+Unknown tuples return private empty HTTP200 without changing data or group clocks.
+
+All four stores select from one owned metadata inventory and delete only selected
+Runs and their descendant results, logs, reviews, delivery receipts, commands,
+presence and encoded attachments. Person/Login/group capabilities, roster,
+assignments, unrelated Tests and other groups survive. Affected snapshot clocks
+advance after deletion inside the same boundary. File uses its durable writer
+queue; SQLite uses BEGIN IMMEDIATE; PostgreSQL locks workspace, ordered people,
+then ordered selected Runs. No schema or permission change is required.
+
+The focused66 controls include protected SQLite/PG anonymous, invalid-token,
+participant, foreign-workspace and RO denials plus actual RW deletion; a final
+clock-update/manifest failure rolls back every preceding deletion through reopen.
+The retained Booklet response export is byte-identical to its earlier B-only ZIP
+entry. Current bearer remains valid; the old Test number is denied and recreation
+gets a new number/current label. Real Test-state/Unit-state/Unit-answer/Test-log
+requests paused at their durable writers cannot restore the deleted parent. An
+independent PG Unit writer demonstrably waits on a real database Lock and fails
+after commit. Current strict history gates also apply to test artifact setup;
+canonical Review provenance cannot be invented to make an archive pass.
+
+This implements the scoped read/delete foundation. Literal numeric Original
+administration routes, explicit native grants and request-coercion edges, four
+native downloads, actual Results/Tests pages and paired full-viewport visual
+proof remain required. The complete49-requirement goal and all eight broad
+visual surfaces retain their full acceptance scope.
+
+
 ## Native Test-list read foundation (2026-11-01)
 
 The protected versioned
