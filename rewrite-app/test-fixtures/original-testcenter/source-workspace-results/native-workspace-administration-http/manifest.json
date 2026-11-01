@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "SourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "actualHTTPRequests": 197,
+  "newObservedSourceInputs": 81,
+  "SourceFilesBeforeAndAfter": 137,
+  "lockedComposerPackages": 19,
+  "runtime": {
+    "postgres": "PostgreSQL 18.4 (Debian 18.4-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "redis": "Redis server v=8.0.6 sha=00000000:1 malloc=jemalloc-5.3.0 bits=64 build=811b7822f01653c5",
+    "php": "PHP 8.3.36 (cli) (built: Oct 28 2026 01:29:14) (NTS)"
+  },
+  "productionImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "XMLSchemaValidation": true,
+  "testModeAllowed": false,
+  "SQLSeedsOrDAOStubs": false,
+  "files": {
+    "capture.mjs": "d7b22b8d2e8216c34afb9738cc21b3fde159ac233c01f32961f798e98a246a10",
+    "compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    "observations.json": "4db24eda0605431098e30e154cc83cb35a032beb4a0022c41110d3f45cb8ba48",
+    "php-workspace-casts.json": "afe720a3ca3b36cb240c5e7d66f3183dcc8ef8c01763d3af9c9f835e5a7e0d73",
+    "php-field-extraction.php": "ee8f560988c5155c827e050163a3db8dcf49ab51df1cba7b6d529b025a65c082",
+    "php-field-extraction.json": "fa47c9985854779fc42242a6f74c1800f8faffb46bd5cc87f8fceb5a0b236e58"
+  },
+  "bodyDigestsBeforeTokenRedaction": true,
+  "negativeFixtureAttemptRetained": "work/round56-source-native-workspace-invalid-superadmin-field-negative/failure.json",
+  "wholeOriginalParityProven": false,
+  "all116PriorHTTPCaseLabelsRetained": true,
+  "actualAdditionalReadOnlyPHPFieldExtractionCases": 2,
+  "readOnlyPHPProbeUsesNetwork": false
+}

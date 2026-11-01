@@ -1,3 +1,4 @@
+import {readOriginalWorkspaceAdministrationCollection} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalTestAdministrationCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalReviewCollection,mutateOriginalReviewCollection,readOriginalReviewPersonCollection,validateOriginalReviewCollections,synchronizeOriginalReviewCollection,deleteOriginalReviewCollection,type OriginalNativeReview} from '@testcenter-rewrite-app/application';
@@ -1831,6 +1832,7 @@ const createFileRepository = (
       if(!result.changed)return result.record.workspaceNumber;
       const next={...current,originalWorkspaceNumbers:{...current.originalWorkspaceNumbers,[input.workspaceId]:result.record},originalWorkspaceNumberCounter:result.counter};await persistState(next);cachePromise=Promise.resolve(next);return result.record.workspaceNumber;
     });},
+    async findOriginalWorkspaceAdministrationScope(workspaceNumber){return readOriginalWorkspaceAdministrationCollection(await getState(),workspaceNumber);},
     async matchesOriginalWorkspaceNumber(input){const current=await getState(),row=current.originalWorkspaceNumbers?.[input.workspaceId];return row?.tenantId===input.tenantId&&row.workspaceNumber===input.workspaceNumber&&Object.values(current.workspacesByScope).some(w=>w.workspaceId===input.workspaceId&&w.tenantId===input.tenantId&&w.status==='active')&&Object.values(current.tenants).some(t=>t.tenantId===input.tenantId&&t.status==='active');},
     async findOriginalTestNumber(input){const current=await getState(),id=current.originalTestRunsByNumber[input.testNumber],row=id?current.originalTestNumbers?.[id]:undefined;
       return selectOwnedOriginalTestNumber(input,row,id?current.testRuns[id]??null:null,current.participantSessions[input.participantSessionId]??null);

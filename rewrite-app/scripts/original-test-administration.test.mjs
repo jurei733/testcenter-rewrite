@@ -1,3 +1,5 @@
+import './source-native-workspace-administration-evidence.mjs';
+import {actualSourceFieldExtraction,actualSourceWorkspaceCasts,nativeWorkspaceSource,nativeWorkspaceSourceRow} from './source-native-workspace-administration-evidence.mjs';
 import './source-native-test-administration-evidence.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -8,7 +10,7 @@ import {join,resolve} from 'node:path';
 import {Pool,Client} from 'pg';
 import {DatabaseSync} from 'node:sqlite';
 import {setTimeout as delay} from 'node:timers/promises';
-import {createFirstSliceServices,projectOriginalTestAdministration,formatOriginalTestAdministrationJson,prepareOriginalTestSelection,selectOriginalTestDeletion} from '@testcenter-rewrite-app/application';
+import {createFirstSliceServices,projectOriginalTestAdministration,formatOriginalTestAdministrationJson,prepareOriginalTestSelection,selectOriginalTestDeletion,parseOriginalWorkspaceNumber,originalExplicitWorkspaceAccess,prepareOriginalNativeTestSelection,readOriginalWorkspaceAdministrationCollection,decodeOriginalTestLogJson} from '@testcenter-rewrite-app/application';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
@@ -81,6 +83,24 @@ test('selected native Test tuples preserve empty/default values and exact binary
  for(const body of [undefined,null,[],{},[null],[{}],[{loginName:null,bookletName:'A'}],[{loginName:'A'}]])assert.throws(()=>prepareOriginalTestSelection(body),e=>e.statusCode===400);
  const body=[tuple],owned=prepareOriginalTestSelection(body);body[0].bookletName='elsewhere';assert.equal(owned[0].bookletName,run.bookletName);
 });
+test('native workspace path parsing matches all actual pinned PHP cast observations',()=>{
+ for(const[raw,value]of actualSourceWorkspaceCasts)assert.equal(parseOriginalWorkspaceNumber(raw),BigInt(value)>0n?value:null,raw);
+});
+test('native workspace grant mapping cannot inherit platform/tenant/monitor scope or foreign ownership',()=>{
+ const scope={tenantId:'t',workspaceId:'w',tenantKey:'t-key',workspaceKey:'w-key'},user='owned',role={adminUserId:user,role:'workspace_admin',tenantId:'t',workspaceId:'w',accessMode:'read_only'};
+ assert.equal(originalExplicitWorkspaceAccess([role],user,scope),'RO');assert.equal(originalExplicitWorkspaceAccess([{...role,accessMode:'read_write'}],user,scope),'RW');
+ for(const change of [{role:'platform_admin'},{role:'tenant_admin'},{role:'group_monitor'},{tenantId:'alien'},{workspaceId:'alien'},{adminUserId:'alien'}])assert.equal(originalExplicitWorkspaceAccess([{...role,...change}],user,scope),null);
+ const state={tenants:new Map([['t',{tenantId:'t',tenantKey:'t-key',status:'active'}]]),workspacesByScope:new Map([['w',{tenantId:'t',workspaceId:'w',workspaceKey:'w-key',status:'active'}]]),originalWorkspaceNumbers:new Map([['w',{tenantId:'t',workspaceId:'w',workspaceNumber:'9007199254740993'}]])};
+ assert.deepEqual(readOriginalWorkspaceAdministrationCollection(state,'9007199254740993'),scope);assert.equal(readOriginalWorkspaceAdministrationCollection(state,'1'),null);state.tenants.get('t').status='suspended';assert.equal(readOriginalWorkspaceAdministrationCollection(state,'9007199254740993'),null);
+});
+test('native selected tuple extraction follows actual Source197 PHP fields and preserves unsafe integer tokens',()=>{
+ const native=value=>prepareOriginalNativeTestSelection(decodeOriginalTestLogJson(JSON.stringify(value)));
+ for(const row of nativeWorkspaceSource.rows.filter(r=>r.label.startsWith('selection-coercion-'))){
+  if(row.status>=400)assert.throws(()=>native(row.requestBody),e=>e.statusCode===row.status,row.label);else assert.ok(native(row.requestBody).length);
+ }
+ for(let i=0;i<actualSourceFieldExtraction.inputs.length;i++){const expected=actualSourceFieldExtraction.observations[i];assert.throws(()=>native(actualSourceFieldExtraction.inputs[i]),e=>e.statusCode===expected.status&&e.message===expected.message);}
+ const value=prepareOriginalNativeTestSelection(decodeOriginalTestLogJson('{"personSessions":[{"loginName":9007199254740993,"bookletName":"A","code":1.0,"nameSuffix":false}]}'))[0];assert.deepEqual(value,{loginName:'9007199254740993',bookletName:'A',code:'1',nameSuffix:''});
+});
 const validator=await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE||'.data/original-xml-schemas'),process.env.FIRST_SLICE_XML_SCHEMA_DOWNLOAD!=='false');
 const kinds=['memory','file','sqlite'];if(process.env.FIRST_SLICE_STORE==='postgres'){assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);kinds.push('postgres');}
 const xml=(type,text)=>'<'+type+' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/'+({Unit:'unit-xml/17.6',Booklet:'testcenter-booklet-xml/18.0',Testtakers:'testcenter-testtaker-xml/18.0'}[type])+'">'+text+'</'+type+'>';
@@ -88,7 +108,7 @@ const booklet=(id,label)=>xml('Booklet','<Metadata><Id>'+id+'</Id><Label>'+label
 for(const kind of kinds)test(kind+': native Test read has a durable private consistent snapshot and real protected transport',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'owned-test-admin-')),file=join(directory,kind==='file'?'state.json':'state.sqlite'),schema='owned_test_admin_'+randomUUID().replaceAll('-','');
  const url=kind==='postgres'?new URL(process.env.FIRST_SLICE_POSTGRES_URL):null;url?.searchParams.set('options','-c search_path='+schema);url?.searchParams.set('application_name',schema);
- let storage,repository,services,admin,created=false,scope,ids,person,a,b,clock=1793530200000;
+ let storage,repository,services,admin,created=false,scope,ids,person,a,b,clock=1793530200000,nativeBoot,nativeForeign,nativeWorkspaceNumber,nativeTokens={},nativeRoles={};
  const open=async()=>{storage=kind==='memory'?storage??{repository:createInMemoryFirstSliceRepository(),shutdown:async()=>{}}:kind==='file'?await createFileFirstSliceStorage(file):kind==='sqlite'?createSqliteFirstSliceStorage(file):await createPostgresFirstSliceStorage(url.toString());repository=storage.repository;services=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});};
  const close=async()=>{const own=storage;if(kind!=='memory')storage=undefined;await own?.shutdown();};
  try{
@@ -126,6 +146,33 @@ for(const kind of kinds)test(kind+': native Test read has a durable private cons
    generated.forEach((r,i)=>{assert.match(r.nameSuffix,/^AbC\/[a-z0-9_-]{8}$/);expected['OWNED.ADM.ZULU'].filter(r=>r.loginName==='owned-adm-r53-restart')[i].nameSuffix=r.nameSuffix;});
    assert.deepEqual(actual,expected);
   });
+  await t.test('native numeric scope uses current explicit grants, password policy and durable reverse lookup on every store',async()=>{
+   const password='Owned-test-admin-reader-secret';nativeBoot=await services.adminAuth.bootstrapAdminUser({username:'owned-admin',password});
+   nativeTokens.root=(await services.adminAuth.signIn({username:'owned-admin',password})).adminSession.token;
+   nativeForeign=await services.platform.createWorkspace({tenantKey:scope.tenantKey,workspaceKey:'foreign',displayName:'Owned foreign'});
+   nativeWorkspaceNumber=await repository.getOrCreateOriginalWorkspaceNumber(ids);
+   assert.deepEqual(await repository.findOriginalWorkspaceAdministrationScope(nativeWorkspaceNumber),{...scope,...ids});
+   assert.equal(await repository.findOriginalWorkspaceAdministrationScope('9223372036854775807'),null);
+   for(const[name,role,workspaceId,accessMode,needsChange]of [['reader','workspace_admin',ids.workspaceId,'read_only',false],['writer','workspace_admin',ids.workspaceId,'read_write',false],['foreign','workspace_admin',nativeForeign.workspaceId,'read_only',false],['tenant-only','tenant_admin',null,'read_write',false],['needs-change','workspace_admin',ids.workspaceId,'read_only',true],['revoked','workspace_admin',ids.workspaceId,'read_only',false],['expired','workspace_admin',ids.workspaceId,'read_only',false],['signed-out','workspace_admin',ids.workspaceId,'read_only',false],['disabled','workspace_admin',ids.workspaceId,'read_only',false]]){
+    const id=randomUUID();await repository.saveAdminUser({...nativeBoot.adminUser,adminUserId:id,username:name,passwordChangeRequired:needsChange});
+    const assignment={roleAssignmentId:randomUUID(),adminUserId:id,role,accessMode,tenantId:ids.tenantId,workspaceId,groupKey:null,monitorProfiles:[],monitorBookletVisibility:'visible',createdAt:new Date().toISOString()};await repository.saveAdminRoleAssignment(assignment);nativeRoles[name]=assignment;nativeTokens[name]=(await services.adminAuth.signIn({username:name,password})).adminSession.token;
+   }
+   const resolve=(token,write=false,raw=nativeWorkspaceNumber)=>services.originalWorkspaceAdministration.resolve({token,write,workspacePathSegment:encodeURIComponent(raw)});
+   for(const name of ['root','foreign','tenant-only'])await assert.rejects(resolve(nativeTokens[name]),e=>e.statusCode===404,name);
+   for(const token of ['owned-invalid-token',person.token])await assert.rejects(resolve(token),e=>e.statusCode===403&&!e.message.includes(token));
+   await assert.rejects(resolve(nativeTokens['needs-change']),e=>e.errorCode==='admin_password_change_required');
+   assert.deepEqual(await resolve(nativeTokens.reader),{...scope,...ids});assert.deepEqual(await resolve(nativeTokens.writer,true),{...scope,...ids});
+   await assert.rejects(resolve(nativeTokens.reader,true),e=>e.statusCode===403&&e.errorCode==='original_workspace_read_only');
+   for(const raw of [nativeWorkspaceNumber.padStart(2,'0'),' +'+nativeWorkspaceNumber,nativeWorkspaceNumber+'abc',nativeWorkspaceNumber+'.9',nativeWorkspaceNumber+'e0'])assert.deepEqual(await resolve(nativeTokens.reader,false,raw),{...scope,...ids});
+   for(const raw of ['0','-1','text','2147483648','9223372036854775808'])await assert.rejects(resolve(nativeTokens.reader,false,raw),e=>e.statusCode===404,raw);
+   const expired=await repository.getAdminSessionByToken(nativeTokens.expired);await repository.saveAdminSession({...expired,expiresAt:new Date(Date.now()-1000).toISOString()});
+   await services.adminAuth.signOut({sessionToken:nativeTokens['signed-out']});
+   const disabled=await repository.getAdminUserById(nativeRoles.disabled.adminUserId);await repository.saveAdminUser({...disabled,status:'disabled'});
+   for(const name of ['expired','signed-out','disabled'])await assert.rejects(resolve(nativeTokens[name]),e=>e.statusCode===403,name);
+   await repository.saveTenant({...tenant,status:'suspended'});await assert.rejects(resolve(nativeTokens.reader),e=>e.statusCode===404);await repository.saveTenant(tenant);
+   await repository.deleteAdminRoleAssignment(nativeRoles.revoked.roleAssignmentId);await assert.rejects(resolve(nativeTokens.revoked),e=>e.statusCode===404);
+   await close();await open();assert.deepEqual(await resolve(nativeTokens.reader),{...scope,...ids});
+  });
   await t.test('one metadata snapshot excludes private values and survives store reopen',async()=>{
    if(kind==='file'){await close();await open();}
    const before=await read(),forbidden=new Proxy(repository,{get(target,key){if(['listTestRunsByWorkspace','listParticipantSessionsByWorkspace','listOriginalLoginBindingsByWorkspace','listOriginalParticipantGroupsByWorkspace'].includes(key))return()=>assert.fail('Independent collection reads cannot constitute one Test snapshot');const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
@@ -139,13 +186,37 @@ for(const kind of kinds)test(kind+': native Test read has a durable private cons
    await close();await open();assert.equal(await read(),before);
   });
   if(kind==='sqlite'||kind==='postgres')await t.test('real protected HTTP returns Source-shaped JSON only to an authorized scoped reader',async()=>{
-   const administration=createFirstSliceServices({repository}),password='Owned-test-admin-reader-secret',initial=await administration.adminAuth.bootstrapAdminUser({username:'owned-admin',password}),foreign=await services.platform.createWorkspace({tenantKey:scope.tenantKey,workspaceKey:'foreign',displayName:'Owned foreign'}),tokens={};
-   for(const [name,workspaceId]of [['reader',ids.workspaceId],['writer',ids.workspaceId],['foreign',foreign.workspaceId]]){const id=randomUUID();await repository.saveAdminUser({...initial.adminUser,adminUserId:id,username:name});await repository.saveAdminRoleAssignment({roleAssignmentId:randomUUID(),adminUserId:id,role:'workspace_admin',accessMode:name==='writer'?'read_write':'read_only',tenantId:ids.tenantId,workspaceId,groupKey:null,monitorProfiles:[],monitorBookletVisibility:'visible',createdAt:new Date().toISOString()});tokens[name]=(await administration.adminAuth.signIn({username:name,password})).adminSession.token;}
+   const tokens=nativeTokens;
    const environment={FIRST_SLICE_STORE:kind,FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',...(url?{FIRST_SLICE_POSTGRES_URL:url.toString()}:{})},previous=new Map(Object.keys(environment).map(k=>[k,process.env[k]]));let server;
    try{
     try{Object.assign(process.env,environment);server=await createProductionApiServer();}finally{for(const[k,v]of previous){if(v===undefined)delete process.env[k];else process.env[k]=v;}}
     await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port,path='/api/v1/tenants/'+scope.tenantKey+'/workspaces/'+scope.workspaceKey+'/results/original-tests';
     for(const[token,status]of [[undefined,401],['invalid-owned-token',401],[tokens.foreign,403],[tokens.reader,200]]){const r=await fetch(base+path,{headers:token?{authorization:'Bearer '+token}:{},signal:AbortSignal.timeout(15000)});assert.equal(r.status,status);if(status===200){assert.equal(r.headers.get('cache-control'),'private, no-store');assert.equal(await r.text(),await read());}}
+    const native='/workspace/'+nativeWorkspaceNumber+'/responses/detailed';
+    const nativeRequest=async(token,method='GET',value,segment=nativeWorkspaceNumber,suffix='responses/detailed')=>{
+     const r=await fetch(base+'/workspace/'+encodeURIComponent(segment)+'/'+suffix,{method,headers:{...(token===undefined?{}:{AuthToken:token}),...(value===undefined?{}:{'content-type':'application/json'})},...(value===undefined?{}:{body:JSON.stringify(value)}),signal:AbortSignal.timeout(15000)});return {response:r,text:await r.text()};
+    };
+    for(const[token,status]of [[undefined,401],['',401],['invalid-owned-token',403],[person.token,403],[tokens.root,404],[tokens.foreign,404],[tokens['tenant-only'],404],[tokens['needs-change'],403],[tokens.revoked,404],[tokens.expired,403],[tokens['signed-out'],403],[tokens.disabled,403],[tokens.reader,200],[tokens.writer,200]]){
+     const {response:r,text}=await nativeRequest(token);assert.equal(r.status,status,'native capability boundary '+status);assert.equal(r.headers.get('cache-control'),'private, no-store');if(status===200)assert.equal(text,await read());else{assert.ok(r.headers.get('error-id'));assert.equal(r.headers.get('test-mode'),'NO');}
+    }
+    const bearerOnly=await fetch(base+native,{headers:{authorization:'Bearer '+tokens.reader},signal:AbortSignal.timeout(15000)});assert.equal(bearerOnly.status,401);
+    for(const raw of [nativeWorkspaceNumber.padStart(2,'0'),' +'+nativeWorkspaceNumber,nativeWorkspaceNumber+'abc',nativeWorkspaceNumber+'.9',nativeWorkspaceNumber+'e0']){const r=await nativeRequest(tokens.reader,'GET',undefined,raw);assert.equal(r.response.status,200);assert.equal(r.text,await read());}
+    const stats=await nativeRequest(tokens.reader,'GET',undefined,nativeWorkspaceNumber,'results');assert.equal(stats.response.status,200);assert.deepEqual(JSON.parse(stats.text),await services.originalGroupResults.list(scope));
+    const nativeBefore=await read();
+    for(const[token,status]of [[tokens.root,404],[tokens.foreign,404],[tokens.reader,403],[tokens.writer,200]]){
+     const r=await nativeRequest(token,'DELETE',{personSessions:[{loginName:'unknown-owned',bookletName:'OWNED.ADM.A'}]});assert.equal(r.response.status,status);if(status===200){assert.equal(r.text,'');assert.equal(r.response.headers.get('content-type'),'text/html; charset=UTF-8');}
+    }
+    for(const row of nativeWorkspaceSource.rows.filter(r=>r.label.startsWith('selection-coercion-'))){const r=await nativeRequest(tokens.writer,'DELETE',row.requestBody);assert.equal(r.response.status,row.status,row.label);}
+    assert.equal(await read(),nativeBefore);
+    const nativePerson=await auth(peers.at(-2)),nativeNumber=await services.originalTest.create({token:nativePerson.token,bookletName:'OWNED.ADM.B'});
+    const selected=await nativeRequest(tokens.writer,'DELETE',{personSessions:[{loginName:peers.at(-2),bookletName:'OWNED.ADM.B',code:null,nameSuffix:null}]});assert.equal(selected.response.status,200);assert.equal(selected.text,'');
+    await assert.rejects(services.originalTest.read({token:nativePerson.token,testNumber:nativeNumber}),e=>e.statusCode===403);assert.equal((await services.originalAuthentication.read({token:nativePerson.token})).participantSession.participantSessionId,nativePerson.participantSession.participantSessionId);
+    assert.equal(await read(),nativeBefore);
+    const emptyGroup='OWNED.NATIVE.EMPTY';await repository.getOrCreateOriginalParticipantGroup({...ids,groupKey:emptyGroup,groupLabel:'Owned native empty snapshot',createdAt:new Date().toISOString()});
+    assert.ok((await repository.listOriginalParticipantGroupsByWorkspace(ids.tenantId,ids.workspaceId)).some(g=>g.groupKey===emptyGroup));
+    const deniedGroup=await nativeRequest(tokens.reader,'DELETE',{groups:[emptyGroup]},nativeWorkspaceNumber,'responses');assert.equal(deniedGroup.response.status,403);
+    const deletedGroup=await nativeRequest(tokens.writer,'DELETE',{groups:[emptyGroup.toLowerCase()]},nativeWorkspaceNumber,'responses');assert.equal(deletedGroup.response.status,200);assert.equal(deletedGroup.text,'');
+    assert.ok(!(await repository.listOriginalParticipantGroupsByWorkspace(ids.tenantId,ids.workspaceId)).some(g=>g.groupKey===emptyGroup));assert.equal(await read(),nativeBefore);
     const before=await read(),deletionBody={personSessions:[{loginName:'unknown-owned',bookletName:'OWNED.ADM.A'}]};
     for(const[token,status]of [[undefined,401],['invalid-owned-token',401],[person.token,401],[tokens.foreign,403],[tokens.reader,403],[tokens.writer,200]]){
      const r=await fetch(base+path,{method:'DELETE',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(deletionBody),signal:AbortSignal.timeout(15000)});assert.equal(r.status,status,token===person.token?'participant cannot administer Tests':String(status));if(status===200){assert.equal(await r.text(),'');assert.equal(r.headers.get('cache-control'),'private, no-store');}

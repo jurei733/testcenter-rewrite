@@ -143,15 +143,29 @@ try {
   mark("reload-after-committed-lost-receipt-is-idempotent");
 
   await page.evaluate(() => { window.ownedRouteDocument = "same document Ω"; localStorage.setItem("owned-native-route-unrelated", "retained"); });
-  await page.route("**/native-commands", unavailable);
+  // Preparation is a durable journal marker, not a Node request-observation
+  // barrier. Hold the real first attempt so a slow route transition cannot
+  // legitimately retry before its controller is destroyed.
+  let releaseUnavailableResume;
+  const unavailableResumeGate = new Promise(done => { releaseUnavailableResume = done; }); releases.push(releaseUnavailableResume);
+  const heldUnavailableResume = async route => {
+    await unavailableResumeGate;
+    try { await unavailable(route); } catch { /* Destruction may already abort this owned request. */ }
+  };
+  const beforeResume = nativeRequests.length;
+  await page.route("**/native-commands", heldUnavailableResume);
   await native("resume"); await poll(async () => (await journal()).some(entry => entry.prepared), "Route test never queued resume");
-  const canceled = (await journal())[0], beforeLeave = nativeRequests.length;
+  const canceled = (await journal())[0];
+  await poll(() => Promise.resolve(nativeRequests.some(request => request.deliveryId === canceled.id)), "The owned resume never reached its actual first request");
+  assert.equal(nativeRequests.filter(request => request.deliveryId === canceled.id).length, 1);
+  assert.equal(nativeRequests.length, beforeResume + 1);
+  const beforeLeave = nativeRequests.length;
   await page.goBack(); await page.getByRole("heading", { name: "Privacy", exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.ownedRouteDocument), "same document Ω");
   assert.equal(await page.evaluate(() => ["debug", "pause", "resume", "terminate", "goto"].every(key => typeof window.tc?.[key] !== "function")), true);
   assert.equal((await journal()).length, 0, "Angular route destruction retained an effectful command");
   assert.equal(await page.evaluate(() => localStorage.getItem("owned-native-route-unrelated")), "retained");
-  await page.unroute("**/native-commands", unavailable); await page.goForward(); await methods();
+  releaseUnavailableResume(); await page.unroute("**/native-commands", heldUnavailableResume); await page.goForward(); await methods();
   await page.locator("#participantRoutePausedState").waitFor();
   await page.evaluate(() => dispatchEvent(new Event("online"))); await delay(1200);
   assert.equal(nativeRequests.length, beforeLeave); assert.equal((await read(first.testRunId)).status, "paused");

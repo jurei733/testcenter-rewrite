@@ -1,5 +1,63 @@
 # Original participant group snapshots
 
+## Native numeric workspace administration (2026-11-01)
+
+The native `GET /workspace/{ws_id}/results`,
+`GET/DELETE /workspace/{ws_id}/responses/detailed` and
+`DELETE /workspace/{ws_id}/responses` now connect to the existing native
+projections and atomic delete ports. They always require `AuthToken` carrying a
+current admin session. The canonical sign-in can provide that capability; the
+literal Source admin session/login/challenge contract remains to be connected.
+Native routes preserve canonical expiry, revocation, disabled-user and required
+password-change gates independently of the operator-demo flag. Missing/empty
+headers return401, invalid/non-admin tokens403, absent explicit workspace grants404
+and RO mutation attempts403. Platform/tenant/monitor inheritance supplies no
+native workspace permission. Bearer contents are kept out of error messages.
+
+Reverse numeric lookup uses one owned Memory/File state or one SQL join of the
+server-owned number, active workspace and active tenant. It never creates a
+mapping or infers IDs from UUIDs/slugs. Existing number allocation is unchanged;
+full native admin directory/session and workspace creation must expose/allocate
+these IDs before actual workspace-page adoption. Source PHP path conversion,
+including numeric prefixes/exponents, exact signed64 integers and saturation,
+reuses the previously qualified Zend conversion. Literal Test deletion preserves
+Source null/default/scalar/array text extraction and lexical integer tokens;
+objects fail before mutation. Required fields in all rows are extracted before
+PDO-style text conversion, so a later missing required field returns Source400
+before an earlier object conversion could return500. Two additional cases run
+the unchanged Source RequestHelper method in its read-only production image.
+Canonical versioned input contracts stay strict.
+
+An unchanged production Source reference retains197 actual HTTP requests:
+all116 previous Test-administration cases plus81 additional grant, numeric,
+coercion, report-format and group-filter observations. All137 Source files are
+verified before/after,19 Composer packages match the lock, and actual PHP8.3.36,
+PostgreSQL18.4 and Redis8.0.6 are independently recorded. XSD stays enabled,
+TestMode disabled, and no SQL seed or DAO stub supplies the result. Seventeen
+additional real PHP CLI casts retain exact decimal strings. The owned Source
+stack/volume has been retired. A failed probe that expected the nonexistent
+isSuperadmin DTO property is retained redacted; Source represents that capability
+through the superAdmin claims key.
+
+Seven frozen Source controls and three conversion/grant/coercion controls join
+the existing mandatory Test-administration suite. Focused80 pass on all four
+stores without failures/skips, including actual native RW Test/group deletion,
+Source-shaped JSON, hidden-scope404, RO403, persisted reverse lookup, revoked
+grants and the existing late-writer/rollback/retained-answer controls. Native
+request errors retain the credential-redaction boundary while exposing Source
+statuses and content types.
+
+The reference also establishes the next four independent downloads: response,
+log, legacy comments and enhanced comments. First supported Accept type wins
+(even q=0), empty bodies are zero bytes, dataIds splits without trimming and
+uses native case comparison, and only exact true selects enhanced comments.
+The canonical ZIP normalizes selections and materializes every report family;
+its unrelated Review history must not gate an individual response download.
+Those four routes, native admin session/directory discovery, actual Results/Tests
+components and paired visuals remain required. All49 requirements and all eight
+broad visual surfaces retain their full scope.
+
+
 ## Native selected-Test deletion foundation (2026-11-01)
 
 The protected versioned `DELETE /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-tests`
