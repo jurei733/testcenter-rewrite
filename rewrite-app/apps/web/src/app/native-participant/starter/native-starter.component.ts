@@ -64,6 +64,6 @@ export class NativeStarterComponent implements AfterViewInit {
  }
  async monitor(group:OriginalTestGroupMonitorAccess){if(!this.current||this.groupDisabled(group))return;const profile=Array.isArray(group.flags)?'':group.flags.profile;await this.router.navigate(['/group-monitor',group.id,...(profile?[profile]:[])]);}
  ngAfterViewInit(){this.observer.observe(this.bottom.nativeElement);}
- scrollDown(){this.element.nativeElement.closest<HTMLElement>('.page')?.scrollBy({top:300,behavior:'smooth'});}
+ scrollDown(){if(this.current)this.element.nativeElement.parentElement?.scrollBy({top:300,behavior:'smooth'});}
  ngOnDestroy(){this.scope.removeEventListener('abort',this.retire);this.observer.disconnect();this.retire();}
 }
