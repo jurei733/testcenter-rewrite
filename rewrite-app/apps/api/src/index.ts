@@ -1,3 +1,4 @@
+import {handleOriginalAdminHttp,originalAdminRouteLabel} from './original-admin-http.js';
 import {handleOriginalWorkspaceHttp,originalWorkspaceRouteLabel} from './original-workspace-http.js';
 import {formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/application';
 import {handleOriginalReviewHttp,originalReviewRouteLabel} from './original-review-http.js';
@@ -3340,6 +3341,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /system-check";
   }
 
+  const adminLabel=originalAdminRouteLabel(method,pathname);if(adminLabel)return adminLabel;
   const workspaceLabel=originalWorkspaceRouteLabel(method,pathname);if(workspaceLabel)return workspaceLabel;
   const monitorLabel=originalMonitorRouteLabel(method,pathname);if(monitorLabel)return monitorLabel;
   const reviewLabel=originalReviewRouteLabel(method,pathname);if(reviewLabel)return reviewLabel;
@@ -4997,6 +4999,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      if(await handleOriginalAdminHttp({request,pathname,services,reportError:receipt=>{
+        if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
+        logStructured(receipt.statusCode>=500?'error':'info','native_administration_error',{requestId,route:originalAdminRouteLabel(request.method??'',pathname),...receipt});
+      },readBody:()=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,true),
+        propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
+        header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
       if(await handleOriginalWorkspaceHttp({request,pathname,searchParams:url.searchParams,services,readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,false,decode),
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
         header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;

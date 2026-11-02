@@ -13,7 +13,7 @@ import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '
 import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
-import {prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
+import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {mutateOriginalAdminSession} from './original-admin-session.js';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
@@ -2404,6 +2404,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       try {
       await client.query('BEGIN');
       const counter=(await client.query('SELECT last_number FROM original_admin_number_counter WHERE singleton=1 FOR UPDATE')).rows[0];
+      const names=(await client.query('SELECT admin_user_id,username FROM admin_users')).rows.map(r=>({adminUserId:String(r.admin_user_id),username:String(r.username)}));
+      assertOriginalAdminNameAvailable(adminUser,names.find(u=>u.adminUserId===adminUser.adminUserId)??null,names);
       await client.query(
         `INSERT INTO admin_users (
           admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at

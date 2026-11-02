@@ -7,16 +7,22 @@ import {prepareOriginalWorkspaceNumber, type OriginalWorkspaceNumberRecord} from
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 
 export type OriginalAdminNumber = {adminUserId: string; adminNumber: string};
-export type OriginalAdminSelector = {name: string} | {token: string};
+export type OriginalAdminSelector = {name: string} | {token: string; at?: string; directory?: 'users' | 'workspaces'; targetAdminNumber?: string};
+export type OriginalAdminDirectoryUser = {adminUserId:string;username:string;adminNumber:string|null;isSuperadmin:boolean};
+export type OriginalAdminDirectoryWorkspace = {workspace:Workspace;workspaceNumber:string|null;latestModificationAt:string|null};
 export type OriginalAdminSessionSnapshot = {
   user: AdminUser | null; sessions: AdminSession[]; roles: AdminRoleAssignment[];
   workspaces: Workspace[]; tenants: Tenant[]; attempt: AdminLoginAttempt | null;
   number: OriginalAdminNumber | null; counter: string;
+  directory?: {users?:OriginalAdminDirectoryUser[];workspaces?:OriginalAdminDirectoryWorkspace[]};
+  target?: {user:AdminUser;sessions:AdminSession[];number:OriginalAdminNumber};
   workspaceNumbers: OriginalWorkspaceNumberRecord[]; workspaceCounter: string;
 };
 export type OriginalAdminSessionEffect = {
   value?: OriginalAdminAccessSet; error?: FirstSliceError;
-  user?: AdminUser; sessions?: AdminSession[]; attempt?: AdminLoginAttempt; audit?: AdminAuditEvent;
+  user?: AdminUser; sessions?: AdminSession[];
+  createdUser?:AdminUser; adminNumbers?:OriginalAdminNumber[]; directoryJson?:string;
+  targetUser?:AdminUser; targetSessions?:AdminSession[]; attempt?: AdminLoginAttempt; audit?: AdminAuditEvent;
   number?: OriginalAdminNumber; counter?: string;
   workspaceNumbers?: OriginalWorkspaceNumberRecord[]; workspaceCounter?: string;
 };
@@ -31,6 +37,8 @@ export type OriginalAdminSessionPort = {
   read(input: {token: string}): Promise<OriginalAdminAccessSet>;
   logout(input: {token: string}): Promise<void>;
   recognizes(token: string): Promise<boolean>;
+  authorize(input:{token:string;superAdmin?:boolean;adminNumber?:string}):Promise<void>;
+  changePassword(input:{token:string;adminNumber:string;password:string;oldPassword?:string}):Promise<OriginalAdminAccessSet|undefined>;
 };
 
 const invalid = () => new FirstSliceError(403, 'original_admin_session_invalid', 'Invalid token.');
@@ -39,16 +47,28 @@ export function selectOriginalAdminIdentity(names: Array<{adminUserId: string; u
   if (matches.length > 1) throw new FirstSliceError(409, 'original_admin_identity_ambiguous', 'The native administrator identity is ambiguous.');
   return matches[0]?.adminUserId ?? null;
 }
+export function assertOriginalAdminNameAvailable(user:Pick<AdminUser,'adminUserId'|'username'>,previous:Pick<AdminUser,'username'>|null,names:Array<Pick<AdminUser,'adminUserId'|'username'>>):void {
+  // Historical ambiguous names remain editable; new names cannot create a
+  // collision between canonical normalization and native stored spelling.
+  if(previous?.username===user.username)return;
+  if(names.some(other=>other.adminUserId!==user.adminUserId&&originalParticipantGroupKeysEqual(other.username,user.username)))throw new FirstSliceError(409,'admin_username_conflict',`Admin username '${user.username}' already exists.`);
+}
 // All case/collation aliases of a real account share its existing canonical
 // failure bucket; a native spelling must not bypass canonical failure limits.
 export const originalAdminFailureBucket = (name: string): string => name.trim().toLowerCase();
+export function originalAdminMetadataAllowed(s:Pick<OriginalAdminSessionSnapshot,'user'|'sessions'|'roles'>,selector:OriginalAdminSelector):boolean {
+  if(!('token' in selector)||!selector.at||!s.user||s.user.status!=='active')return false;
+  const at=Date.parse(selector.at),session=s.sessions.find(row=>row.token===selector.token&&row.adminUserId===s.user!.adminUserId);
+  const limits=[s.user.validTo?Date.parse(s.user.validTo):Infinity,s.user.validForMinutes&&s.user.firstSignedInAt?Date.parse(s.user.firstSignedInAt)+s.user.validForMinutes*60_000:Infinity];
+  return Number.isFinite(at)&&Boolean(session&&session.revokedAt===null&&Date.parse(session.expiresAt)>at)&&(!s.user.validFrom||Date.parse(s.user.validFrom)<=at)&&limits.every(limit=>limit>at);
+}
 export function originalAdminNumber(value: string, zero = false): bigint {
   if (typeof value !== 'string' || !/^(?:0|[1-9][0-9]{0,18})$/.test(value)) throw Error('Invalid native administrator number.');
   const number = BigInt(value);
   if (number > 9223372036854775807n || (!zero && number === 0n)) throw Error('Invalid native administrator number.');
   return number;
 }
-export function prepareOriginalAdminNumber(user: AdminUser, previous: OriginalAdminNumber | null, counter: string): {number: OriginalAdminNumber; counter: string} {
+export function prepareOriginalAdminNumber(user: Pick<AdminUser,'adminUserId'>, previous: OriginalAdminNumber | null, counter: string): {number: OriginalAdminNumber; counter: string} {
   const current = originalAdminNumber(counter, true);
   if (previous) {
     if (previous.adminUserId !== user.adminUserId || originalAdminNumber(previous.adminNumber) > current) throw Error('Invalid native administrator number ownership.');
@@ -71,6 +91,7 @@ export function createOriginalAdminSessionPort(input: {
   accessFailure: (user: AdminUser, now: string) => string | null;
   accessUntil: (user: AdminUser) => string | null;
   sessionTtlMs: number; maxFailures: number; failureWindowMs: number;
+  validatePassword:(password:string)=>string;hashPassword:(password:string)=>string;
 }): OriginalAdminSessionPort {
   const audit = (eventType: AdminAuditEvent['eventType'], user: AdminUser | null, timestamp: string, details: Record<string, unknown>): AdminAuditEvent => ({
     adminAuditEventId: input.id(), eventType, actorAdminUserId: eventType === 'admin_sign_in_failed' ? null : user?.adminUserId ?? null,
@@ -81,6 +102,12 @@ export function createOriginalAdminSessionPort(input: {
     if (!s.user || s.user.status !== 'active' || !session || session.adminUserId !== s.user.adminUserId ||
       session.revokedAt !== null || Date.parse(session.expiresAt) <= Date.parse(timestamp) || input.accessFailure(s.user, timestamp)) throw invalid();
     return session;
+  };
+  const superAdmin=(s:OriginalAdminSessionSnapshot)=>s.roles.some(r=>r.adminUserId===s.user?.adminUserId&&r.role==='platform_admin');
+  const authorize=(s:OriginalAdminSessionSnapshot,request:{token:string;superAdmin?:boolean;adminNumber?:string})=>{
+    active(s,request.token,input.now());
+    if(request.superAdmin&&!superAdmin(s))throw new FirstSliceError(403,'original_super_admin_required','Only SuperAdmins can do that!');
+    if(request.adminNumber!==undefined&&request.adminNumber!==s.number?.adminNumber&&!superAdmin(s))throw new FirstSliceError(500,'original_admin_not_self','User is neither owner nor super admin');
   };
   const expires = (user: AdminUser, timestamp: string): string => new Date(Math.min(
     Date.parse(timestamp) + Math.min(input.sessionTtlMs, 600 * 60_000),
@@ -117,6 +144,27 @@ export function createOriginalAdminSessionPort(input: {
   };
   return {
     recognizes: async token => (await input.repository.getAdminSessionByToken(token)) !== null,
+    async authorize(request){await mutate({token:request.token,at:input.now()},s=>{authorize(s,request);return{};});},
+    async changePassword(request){
+      return mutate({token:request.token,at:input.now(),targetAdminNumber:request.adminNumber},s=>{
+        authorize(s,request);const self=s.number?.adminNumber===request.adminNumber,timestamp=input.now();
+        if(self){
+          if(request.oldPassword===undefined)throw new FirstSliceError(400,'original_old_password_required','Provide your current password (oldPassword) for security reasons!');
+          if(typeof request.oldPassword!=='string')throw new FirstSliceError(500,'original_password_malformed','Internal error.');
+          if(!input.verifyPassword(request.oldPassword,s.user!.passwordHash))throw new FirstSliceError(403,'original_old_password_invalid','Invalid current password for user '+request.adminNumber);
+        }
+        if(typeof request.password!=='string')throw new FirstSliceError(500,'original_password_malformed','Internal error.');
+        const password=input.validatePassword(request.password);
+        if(Buffer.byteLength(password)>60)throw new FirstSliceError(400,'original_password_too_long','Password too long');
+        if(!s.target)return{};
+        const updated={...s.target.user,passwordHash:input.hashPassword(password),passwordChangeRequired:!self||superAdmin(s)};
+        const revoked=s.target.sessions.map(row=>row.revokedAt===null?{...row,revokedAt:timestamp}:row);
+        const event=audit(self?'admin_password_changed':'admin_password_reset',s.user,timestamp,{native:true,targetAdminNumber:request.adminNumber});event.subjectAdminUserId=updated.adminUserId;
+        if(!self)return{targetUser:updated,targetSessions:revoked,audit:event};
+        const token=createOriginalSessionToken(),session:AdminSession={adminSessionId:input.id(),adminUserId:updated.adminUserId,token,createdAt:timestamp,expiresAt:expires(updated,timestamp),revokedAt:null};
+        return{...accessSet(s,updated,token),user:updated,sessions:[...revoked,session],audit:event};
+      });
+    },
     async login(request) {
       if (typeof request.name !== 'string' || Buffer.byteLength(request.name) === 0 || Buffer.byteLength(request.name) > 50 || typeof request.password !== 'string') {
         throw new FirstSliceError(500, 'original_admin_credentials_malformed', 'Internal error.');

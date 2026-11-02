@@ -14,7 +14,7 @@ import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testc
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
-import {prepareOriginalAdminNumber,mutateOriginalAdminCollections,type OriginalAdminNumber} from '@testcenter-rewrite-app/application';
+import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber,mutateOriginalAdminCollections,type OriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
@@ -333,7 +333,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async mutateOriginalAdminSession(selector,transform) {
       const effect=mutateOriginalAdminCollections(state,state.adminSessionsByToken,'token',selector,transform);
-      if(effect.user)state.adminUsersByUsername.set(effect.user.username,effect.user);
+      for(const user of [effect.user,effect.targetUser,effect.createdUser])if(user)state.adminUsersByUsername.set(user.username,user);
       return effect;
     },
     async listAdminUsers() {
@@ -379,6 +379,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveAdminUser(adminUser) {
       const previous=state.adminUsers.get(adminUser.adminUserId);
+      assertOriginalAdminNameAvailable(adminUser,previous??null,Array.from(state.adminUsers.values()));
       const identity=prepareOriginalAdminNumber(adminUser,state.originalAdminNumbers.get(adminUser.adminUserId)??null,state.originalAdminNumberCounter);
       state.originalAdminNumbers.set(adminUser.adminUserId,identity.number);state.originalAdminNumberCounter=identity.counter;
       if(previous&&previous.username!==adminUser.username)state.adminUsersByUsername.delete(previous.username);

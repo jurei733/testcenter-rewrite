@@ -14,7 +14,7 @@ import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testc
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
-import {prepareOriginalAdminNumber,mutateOriginalAdminCollections,type OriginalAdminNumber} from '@testcenter-rewrite-app/application';
+import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber,mutateOriginalAdminCollections,type OriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
@@ -1105,6 +1105,7 @@ const createFileRepository = (
     },
     async saveAdminUser(adminUser) {
       await mutate(state => {
+        assertOriginalAdminNameAvailable(adminUser,state.adminUsers[adminUser.adminUserId]??null,Object.values(state.adminUsers));
         const identity=prepareOriginalAdminNumber(adminUser,state.originalAdminNumbers?.[adminUser.adminUserId]??null,state.originalAdminNumberCounter??'0');
         state.originalAdminNumbers={...state.originalAdminNumbers,[adminUser.adminUserId]:identity.number};state.originalAdminNumberCounter=identity.counter;
         state.adminUsers[adminUser.adminUserId] = adminUser;

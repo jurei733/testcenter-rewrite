@@ -13,7 +13,7 @@ import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '
 import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
-import {prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
+import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {mutateOriginalAdminSession} from './original-admin-session.js';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
@@ -2506,6 +2506,8 @@ export const createSqliteFirstSliceStorage = (
     async saveAdminUser(adminUser) {
       database.exec("BEGIN IMMEDIATE");
       try {
+      const names=database.prepare('SELECT admin_user_id,username FROM admin_users').all().map(r=>({adminUserId:String(r.admin_user_id),username:String(r.username)}));
+      assertOriginalAdminNameAvailable(adminUser,names.find(u=>u.adminUserId===adminUser.adminUserId)??null,names);
       database
         .prepare(
           `INSERT INTO admin_users (
