@@ -1,3 +1,4 @@
+import {readOriginalWorkspaceReportSnapshot} from './original-workspace-reports.js';
 import {deleteOriginalSelectedTests} from './original-test-deletion.js';
 import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
 import {listOriginalNativeReviews,mutateOriginalNativeReview,listOriginalNativeReviewsByPerson,synchronizeOriginalNativeReview} from './original-native-review.js';
@@ -3632,6 +3633,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async getOrCreateOriginalWorkspaceNumber(input){return withWorkspaceMutationLock(input.tenantId,input.workspaceId,async client=>{
       const row=mapWorkspace((await client.query('SELECT * FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2',[input.tenantId,input.workspaceId])).rows[0]);return allocateOriginalWorkspaceNumber(client,input,row);
     });},
+    async getOriginalWorkspaceReportSnapshot(input){return readOriginalWorkspaceReportSnapshot(pool,input);},
     async findOriginalWorkspaceAdministrationScope(workspaceNumber){const row=(await pool.query('SELECT n.tenant_id AS "tenantId",n.workspace_id AS "workspaceId",v.tenant_key AS "tenantKey",w.workspace_key AS "workspaceKey" FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_number=$1 AND w.status=\'active\' AND v.status=\'active\'',[workspaceNumber])).rows[0];return row?{tenantId:String(row.tenantId),workspaceId:String(row.workspaceId),tenantKey:String(row.tenantKey),workspaceKey:String(row.workspaceKey)}:null;},
     async matchesOriginalWorkspaceNumber(input){return (await pool.query('SELECT 1 FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_id=$1 AND n.tenant_id=$2 AND n.workspace_number=$3 AND w.status=$4 AND v.status=$5',[input.workspaceId,input.tenantId,input.workspaceNumber,'active','active'])).rowCount===1;},
     async findOriginalTestNumber(input){const row=(await pool.query(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id

@@ -1,3 +1,4 @@
+import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceAdministrationCollection} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalTestAdministrationCollections} from '@testcenter-rewrite-app/application';
@@ -984,6 +985,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const result=prepareOriginalWorkspaceNumber(input,workspace,state.originalWorkspaceNumbers.get(input.workspaceId),state.originalWorkspaceNumberCounter);
       if(result.changed){state.originalWorkspaceNumbers.set(input.workspaceId,result.record);state.originalWorkspaceNumberCounter=result.counter;}return result.record.workspaceNumber;
     },
+    async getOriginalWorkspaceReportSnapshot(input){return readOriginalWorkspaceReportCollections(state,input);},
     async findOriginalWorkspaceAdministrationScope(workspaceNumber){return readOriginalWorkspaceAdministrationCollection(state,workspaceNumber);},
     async matchesOriginalWorkspaceNumber(input){const row=state.originalWorkspaceNumbers.get(input.workspaceId);return row?.tenantId===input.tenantId&&row.workspaceNumber===input.workspaceNumber&&Array.from(state.workspacesByScope.values()).some(w=>w.workspaceId===input.workspaceId&&w.tenantId===input.tenantId&&w.status==='active')&&Array.from(state.tenants.values()).some(t=>t.tenantId===input.tenantId&&t.status==='active');},
     async findOriginalTestNumber(input){

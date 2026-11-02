@@ -1,3 +1,4 @@
+import {verifyOriginalWorkspaceReports,verifyOriginalWorkspaceReportHttp} from './original-workspace-reports-checks.mjs';
 import './source-native-workspace-administration-evidence.mjs';
 import {actualSourceFieldExtraction,actualSourceWorkspaceCasts,nativeWorkspaceSource,nativeWorkspaceSourceRow} from './source-native-workspace-administration-evidence.mjs';
 import './source-native-test-administration-evidence.mjs';
@@ -108,7 +109,7 @@ const booklet=(id,label)=>xml('Booklet','<Metadata><Id>'+id+'</Id><Label>'+label
 for(const kind of kinds)test(kind+': native Test read has a durable private consistent snapshot and real protected transport',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'owned-test-admin-')),file=join(directory,kind==='file'?'state.json':'state.sqlite'),schema='owned_test_admin_'+randomUUID().replaceAll('-','');
  const url=kind==='postgres'?new URL(process.env.FIRST_SLICE_POSTGRES_URL):null;url?.searchParams.set('options','-c search_path='+schema);url?.searchParams.set('application_name',schema);
- let storage,repository,services,admin,created=false,scope,ids,person,a,b,clock=1793530200000,nativeBoot,nativeForeign,nativeWorkspaceNumber,nativeTokens={},nativeRoles={};
+ let storage,repository,services,admin,created=false,scope,ids,person,a,b,clock=1793530200000,nativeBoot,nativeForeign,nativeWorkspaceNumber,nativeTokens={},nativeRoles={},reportsProof;
  const open=async()=>{storage=kind==='memory'?storage??{repository:createInMemoryFirstSliceRepository(),shutdown:async()=>{}}:kind==='file'?await createFileFirstSliceStorage(file):kind==='sqlite'?createSqliteFirstSliceStorage(file):await createPostgresFirstSliceStorage(url.toString());repository=storage.repository;services=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});};
  const close=async()=>{const own=storage;if(kind!=='memory')storage=undefined;await own?.shutdown();};
  try{
@@ -185,13 +186,15 @@ for(const kind of kinds)test(kind+': native Test read has a durable private cons
    const snapshot=await repository.getOriginalTestAdministrationInventory(ids.tenantId,ids.workspaceId);assert.ok(!JSON.stringify(snapshot).includes(privateState));assert.ok(snapshot.runs.every(r=>!('unitResponses'in r)&&!('originalTestState'in r)&&!('testletTimers'in r)));
    await close();await open();assert.equal(await read(),before);
   });
-  if(kind==='sqlite'||kind==='postgres')await t.test('real protected HTTP returns Source-shaped JSON only to an authorized scoped reader',async()=>{
+  reportsProof=await verifyOriginalWorkspaceReports(t,{services,repository,scope,ids,xml,booklet,nativeRoles,nativeTokens,kind,file,connectionString:url?.toString()});
+  if(kind==='sqlite'||kind==='postgres')await t.test('real protected HTTP returns Source-shaped JSON only to an authorized scoped reader',async http=>{
    const tokens=nativeTokens;
    const environment={FIRST_SLICE_STORE:kind,FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',...(url?{FIRST_SLICE_POSTGRES_URL:url.toString()}:{})},previous=new Map(Object.keys(environment).map(k=>[k,process.env[k]]));let server;
    try{
     try{Object.assign(process.env,environment);server=await createProductionApiServer();}finally{for(const[k,v]of previous){if(v===undefined)delete process.env[k];else process.env[k]=v;}}
     await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port,path='/api/v1/tenants/'+scope.tenantKey+'/workspaces/'+scope.workspaceKey+'/results/original-tests';
     for(const[token,status]of [[undefined,401],['invalid-owned-token',401],[tokens.foreign,403],[tokens.reader,200]]){const r=await fetch(base+path,{headers:token?{authorization:'Bearer '+token}:{},signal:AbortSignal.timeout(15000)});assert.equal(r.status,status);if(status===200){assert.equal(r.headers.get('cache-control'),'private, no-store');assert.equal(await r.text(),await read());}}
+    await verifyOriginalWorkspaceReportHttp(http,{base,proof:reportsProof,tokens});
     const native='/workspace/'+nativeWorkspaceNumber+'/responses/detailed';
     const nativeRequest=async(token,method='GET',value,segment=nativeWorkspaceNumber,suffix='responses/detailed')=>{
      const r=await fetch(base+'/workspace/'+encodeURIComponent(segment)+'/'+suffix,{method,headers:{...(token===undefined?{}:{AuthToken:token}),...(value===undefined?{}:{'content-type':'application/json'})},...(value===undefined?{}:{body:JSON.stringify(value)}),signal:AbortSignal.timeout(15000)});return {response:r,text:await r.text()};

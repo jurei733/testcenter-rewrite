@@ -1,25 +1,30 @@
 import {randomUUID} from 'node:crypto';
 import type {IncomingMessage} from 'node:http';
-import {FirstSliceError,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
+import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
 
-const route=/^\/workspace\/([^/]+)\/(results|responses(?:\/detailed)?)$/;
+const route=/^\/workspace\/([^/]+)\/(results|responses(?:\/detailed)?|report\/([^/]+))$/;
 export function originalWorkspaceRouteLabel(method:string,pathname:string):string|null {
-  const match=route.exec(pathname);return match?method+' /workspace/:workspaceId/'+match[2]:null;
+  const match=route.exec(pathname);return match?method+' /workspace/:workspaceId/'+(match[3]?'report/:reportType':match[2]):null;
 }
 /** Native routes always require a current admin capability, independently of
  * canonical operator-demo configuration and its inherited role model. */
-export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;
+export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage;pathname:string;searchParams?:URLSearchParams;services:FirstSliceServices;
   readBody:(decode:(payload:Uint8Array)=>unknown)=>Promise<unknown>;
   propagateError:(error:unknown)=>boolean;
   header:(name:string,value:string)=>void;raw:(status:number,text:string,contentType:string)=>void}):Promise<boolean> {
   const match=route.exec(input.pathname);if(!match)return false;
-  input.header('cache-control','private, no-store');const methods=match[2]==='results'?['GET']:match[2]==='responses'?['DELETE']:['GET','DELETE'];
+  input.header('cache-control','private, no-store');const methods=match[2]==='results'||match[3]?['GET']:match[2]==='responses'?['DELETE']:['GET','DELETE'];
   try {
     if(!methods.includes(input.request.method??'')){input.header('allow',methods.join(', '));throw new FirstSliceError(405,'original_method_not_allowed','Method not allowed. Must be one of: '+methods.join(', '));}
     const token=input.request.headers.authtoken;
     if(typeof token!=='string'||!token)throw new FirstSliceError(401,'original_token_missing','Auth Header not sufficient: '+(token===''?'empty':'missing'));
     const scope=await input.services.originalWorkspaceAdministration.resolve({token,workspacePathSegment:match[1]!,write:input.request.method==='DELETE'});
     if(input.request.method==='GET'){
+      if(match[3]){
+        const type=match[3];if(type!=='response'&&type!=='log'&&type!=='review')throw new FirstSliceError(404,'original_report_type_missing',"Report type '"+type+"' not found.");
+        const params=input.searchParams??new URLSearchParams(),result=await input.services.originalWorkspaceReport.read({...scope,type,dataIds:originalReportQuery(params,'dataIds'),accept:input.request.headers.accept??'',useNewVersion:originalReportQuery(params,'useNewVersion')==='true'});
+        input.raw(200,result.body,result.contentType);return true;
+      }
       const body=match[2]==='results'?encodeOriginalReportJson(await input.services.originalGroupResults.list(scope)):formatOriginalTestAdministrationJson(await input.services.originalTestAdministration.list(scope));
       input.raw(200,body,'application/json');return true;
     }

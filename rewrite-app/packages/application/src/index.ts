@@ -67,6 +67,9 @@ export type {OriginalResultTest} from './original-group-results.js';
 import {createOriginalGroupResultsPort} from './original-group-results.js';
 export {prepareOriginalTestSelection,prepareOriginalTestDeletionInput,selectOriginalTestDeletion,deleteOriginalSelectedTestsFromCollections} from './original-test-deletion.js';
 export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletionResult} from './original-test-deletion.js';
+import {createOriginalWorkspaceReportPort} from './original-workspace-reports.js';
+export {selectOriginalReportParents,projectOriginalWorkspaceReport,assertOriginalReportRowCount,readOriginalWorkspaceReportCollections,originalReportUnitIdentity,originalReportFormat,originalReportQuery} from './original-workspace-reports.js';
+export type {OriginalReportMetadata,OriginalReportParent,OriginalReportRun,OriginalReportFamily,OriginalReportRequest,OriginalWorkspaceReportSnapshot,OriginalReportStoredUnit,OriginalReportStoredReview} from './original-workspace-reports.js';
 import {createOriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
 export {readOriginalWorkspaceAdministrationCollection,parseOriginalWorkspaceNumber,originalExplicitWorkspaceAccess,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection} from './original-workspace-administration.js';
 export type {OriginalWorkspaceAdministrationScope,OriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
@@ -1335,6 +1338,7 @@ export type FirstSlicePorts = {
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
   originalWorkspaceAdministration: import('./original-workspace-administration.js').OriginalWorkspaceAdministrationPort;
+  originalWorkspaceReport:ReturnType<typeof createOriginalWorkspaceReportPort>;
   originalTestAdministration: import('./original-test-administration.js').OriginalTestAdministrationPort;
   monitorRead: MonitorReadPort;
   monitorControl: MonitorControlPort;
@@ -1684,6 +1688,7 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   /** Allocate/reuse an Original decimal Test number inside the current parent's write boundary. */
   getOrCreateOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope): Promise<string>;
+  getOriginalWorkspaceReportSnapshot(input:import('./original-workspace-reports.js').OriginalReportRequest):Promise<import('./original-workspace-reports.js').OriginalWorkspaceReportSnapshot>;
   findOriginalWorkspaceAdministrationScope(workspaceNumber:string):Promise<import('./original-workspace-administration.js').OriginalWorkspaceAdministrationScope|null>;
   matchesOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope & {workspaceNumber:string}): Promise<boolean>;
   findOriginalTestNumber(input: {testNumber:string;tenantId:string;workspaceId:string;participantSessionId:string}): Promise<import('./original-test-number.js').OriginalTestNumberRecord|null>;
@@ -32699,6 +32704,7 @@ export const createFirstSliceServices = (
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
     originalWorkspaceAdministration: createOriginalWorkspaceAdministrationPort({repository,admin:token=>requireActiveAdminSession(repository,token,now())}),
+    originalWorkspaceReport:createOriginalWorkspaceReportPort({repository,workspace:(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey),timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
     originalTestAdministration: createOriginalTestAdministrationPort(repository,(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey)),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,

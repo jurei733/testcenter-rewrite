@@ -1,3 +1,4 @@
+import {readOriginalWorkspaceReportSnapshot} from './original-workspace-reports.js';
 import {deleteOriginalSelectedTests} from './original-test-deletion.js';
 import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
 import {listOriginalNativeReviews,mutateOriginalNativeReview,listOriginalNativeReviewsByPerson,synchronizeOriginalNativeReview} from './original-native-review.js';
@@ -3792,6 +3793,7 @@ export const createSqliteFirstSliceStorage = (
       const row=mapWorkspace(database.prepare('SELECT * FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(input.tenantId,input.workspaceId) as Record<string,unknown>|undefined);
       const number=allocateOriginalWorkspaceNumber(database,input,row);database.exec("COMMIT");return number;
     }catch(error){return rollbackAfterFailure(database,error);}},
+    async getOriginalWorkspaceReportSnapshot(input){return readOriginalWorkspaceReportSnapshot(database,input);},
     async findOriginalWorkspaceAdministrationScope(workspaceNumber){const row=database.prepare("SELECT n.tenant_id AS tenantId,n.workspace_id AS workspaceId,v.tenant_key AS tenantKey,w.workspace_key AS workspaceKey FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_number=? AND w.status='active' AND v.status='active'").get(workspaceNumber);return row?{tenantId:String(row.tenantId),workspaceId:String(row.workspaceId),tenantKey:String(row.tenantKey),workspaceKey:String(row.workspaceKey)}:null;},
     async matchesOriginalWorkspaceNumber(input){return Boolean(database.prepare('SELECT 1 FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_id=? AND n.tenant_id=? AND n.workspace_number=? AND w.status=? AND v.status=?').get(input.workspaceId,input.tenantId,input.workspaceNumber,'active','active'));},
     async findOriginalTestNumber(input){const row=database.prepare(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id
