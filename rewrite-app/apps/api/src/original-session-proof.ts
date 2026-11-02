@@ -2,7 +2,7 @@ import {createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, r
 import {FirstSliceError, type FirstSliceRepository} from '@testcenter-rewrite-app/application';
 import type {ProofOfWorkConfig} from './proof-of-work.js';
 
-export type OriginalProofTarget = {kind: 'login'; name: string; password: string} | {kind: 'person'; code: string; tokenHash: string};
+export type OriginalProofTarget = {kind: 'login'; name: string; password: string} | {kind: 'admin'; name: string; password: string} | {kind: 'person'; code: string; tokenHash: string};
 import type {OriginalWorkChallenge} from '@testcenter-rewrite-app/contracts/original-session';
 export type {OriginalWorkChallenge} from '@testcenter-rewrite-app/contracts/original-session';
 type Ticket = OriginalProofTarget & {version: 1; challengeId: string; issuedAt: number; expiresAt: number; maxNumber: number};
@@ -16,7 +16,7 @@ const sealKey = (secret: string) => createHash('sha256').update('testcenter-orig
 const aad = Buffer.from('testcenter-original-session-ticket:v1');
 const invalid = () => new FirstSliceError(400, 'original_work_invalid', 'Wrong challenge response');
 const targetValid = (value: unknown, maximum: number): value is OriginalProofTarget => record(value) &&
-  (value.kind === 'login' ? bounded(value.name, maximum) && value.name.length > 0 && bounded(value.password, maximum)
+  (value.kind === 'login' || value.kind === 'admin' ? bounded(value.name, maximum) && value.name.length > 0 && bounded(value.password, maximum)
     : value.kind === 'person' && bounded(value.code, maximum) && typeof value.tokenHash === 'string' && /^[0-9a-f]{64}$/.test(value.tokenHash));
 const ticketValid = (value: unknown, maximum: number): value is Ticket => record(value) && value.version === 1 &&
   typeof value.challengeId === 'string' && /^[0-9a-f-]{36}$/.test(value.challengeId) &&
@@ -38,10 +38,10 @@ export class OriginalSessionProof {
     for (const secret of [config.currentSecret, config.previousSecret]) if (secret) this.keys.set(keyId(secret), secret);
   }
   static tokenHash(token: string): string { return hash(token); }
-  directAllowed(kind: 'login' | 'person', protectedInput: string): void {
-    const scope = kind === 'login' ? 'participant' : 'second_code';
-    if (this.config.enabledScopes.includes(scope) && protectedInput !== '') {
-      throw new FirstSliceError(400, 'original_work_required', `Brute Force protection active. Challenge for this ${kind === 'login' ? 'password' : 'code'} must be solved to create a session`);
+  directAllowed(kind: 'login' | 'person' | 'admin', protectedInput: string): void {
+    const scope = kind === 'admin' ? 'admin' : kind === 'login' ? 'participant' : 'second_code';
+    if (this.config.enabledScopes.includes(scope) && (kind === 'admin' || protectedInput !== '')) {
+      throw new FirstSliceError(400, 'original_work_required', `Brute Force protection active. Challenge for this ${kind === 'person' ? 'code' : 'password'} must be solved to create a session`);
     }
   }
   create(target: OriginalProofTarget): OriginalWorkChallenge {
@@ -90,7 +90,7 @@ export class OriginalSessionProof {
     const accepted = await this.repository.consumeProofOfWorkChallenge({challengeId: 'original:' + ticket.challengeId,
       consumedAt: new Date(this.now()).toISOString(), expiresAt: new Date(Number(ticket.expiresAt)).toISOString()});
     if (!accepted) throw new FirstSliceError(409, 'original_work_replayed', 'Challenge has already been used.');
-    return ticket.kind === 'login' ? {kind: 'login', name: ticket.name, password: ticket.password} : {kind: 'person', code: ticket.code, tokenHash: ticket.tokenHash};
+    return ticket.kind === 'login' || ticket.kind === 'admin' ? {kind: ticket.kind, name: ticket.name, password: ticket.password} : {kind: 'person', code: ticket.code, tokenHash: ticket.tokenHash};
   }
   private signature(secret: string, salt: string, challenge: string): string {
     return createHmac('sha256', secret).update('testcenter-original-session-work:v1\0')

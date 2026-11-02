@@ -13,6 +13,8 @@ import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '
 import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
+import {mutateOriginalAdminSession} from './original-admin-session.js';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
 import {allocateOriginalTestNumber} from './original-test-number.js';
@@ -1826,6 +1828,9 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
  tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_release_id TEXT NOT NULL,review_json TEXT NOT NULL,
  PRIMARY KEY(kind,review_number));
  CREATE INDEX original_native_reviews_scope ON original_native_reviews(test_run_id,participant_session_id);`}
+,{version:81,name:'original_native_admin_numbers',sql:`CREATE TABLE original_admin_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+ INSERT INTO original_admin_number_counter(singleton,last_number) VALUES(1,'0');
+ CREATE TABLE original_admin_numbers(admin_number TEXT PRIMARY KEY,admin_user_id TEXT NOT NULL UNIQUE REFERENCES admin_users(admin_user_id) ON DELETE CASCADE);`}
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -2408,6 +2413,9 @@ export const createSqliteFirstSliceStorage = (
           .run(attachmentFileId).changes > 0
       );
     },
+    async mutateOriginalAdminSession(selector,transform) {
+      return mutateOriginalAdminSession(database, {user:mapAdminUser,session:mapAdminSession,role:mapAdminRoleAssignment,attempt:mapAdminLoginAttempt,workspace:mapWorkspace,tenant:mapTenant}, selector,transform);
+    },
     async listAdminUsers() {
       const rows = database
         .prepare(
@@ -2496,6 +2504,8 @@ export const createSqliteFirstSliceStorage = (
       }
     },
     async saveAdminUser(adminUser) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
       database
         .prepare(
           `INSERT INTO admin_users (
@@ -2528,6 +2538,13 @@ export const createSqliteFirstSliceStorage = (
           adminUser.firstSignedInAt,
           adminUser.createdAt
         );
+      const previous=database.prepare('SELECT * FROM original_admin_numbers WHERE admin_user_id=?').get(adminUser.adminUserId);
+      const counter=database.prepare('SELECT last_number FROM original_admin_number_counter WHERE singleton=1').get();
+      const identity=prepareOriginalAdminNumber(adminUser,previous?{adminUserId:String(previous.admin_user_id),adminNumber:String(previous.admin_number)}:null,String(counter?.last_number));
+      if(!previous)database.prepare('INSERT INTO original_admin_numbers(admin_number,admin_user_id) VALUES(?,?)').run(identity.number.adminNumber,adminUser.adminUserId);
+      database.prepare('UPDATE original_admin_number_counter SET last_number=? WHERE singleton=1').run(identity.counter);
+      database.exec('COMMIT');
+      }catch(error){rollbackAfterFailure(database,error);}
     },
     async deleteAdminUser(adminUserId) {
       database.exec("BEGIN IMMEDIATE");

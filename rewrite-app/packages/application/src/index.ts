@@ -80,6 +80,10 @@ export {projectOriginalSessionTest} from './original-session.js';
 export type {OriginalSessionTest} from './original-session.js';
 import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
 import {createOriginalSessionPort} from './original-session.js';
+import {createOriginalAdminSessionPort} from './original-admin-session.js';
+export {selectOriginalAdminIdentity,originalAdminFailureBucket,prepareOriginalAdminNumber,originalAdminNumber,formatOriginalAdminAccessSet} from './original-admin-session.js';
+export type {OriginalAdminNumber,OriginalAdminSelector,OriginalAdminSessionSnapshot,OriginalAdminSessionEffect,OriginalAdminSessionRepository,OriginalAdminSessionPort} from './original-admin-session.js';
+export {mutateOriginalAdminCollections} from './original-admin-collection.js';
 export type {OriginalSessionPort, OriginalAccessSet} from './original-session.js';
 import {createOriginalPersonNameSuffix,OriginalPersonIdentityConflictError} from './original-person-identity.js';
 export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix,resolveOriginalPerson,assertOriginalPersonUnique,projectOriginalPersonSessions,projectOriginalPersonRuns,projectOriginalLoginMode,withOriginalTestRunMode,OriginalPersonIdentityConflictError} from './original-person-identity.js';
@@ -1336,6 +1340,7 @@ export type FirstSlicePorts = {
   originalUnit:import('./original-unit.js').OriginalUnitPort;
   originalReview:import('./original-review.js').OriginalReviewPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
+  originalAdminSession: import('./original-admin-session.js').OriginalAdminSessionPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
   originalWorkspaceAdministration: import('./original-workspace-administration.js').OriginalWorkspaceAdministrationPort;
   originalWorkspaceReport:ReturnType<typeof createOriginalWorkspaceReportPort>;
@@ -1473,7 +1478,7 @@ export type FirstSliceServices = FirstSlicePorts & {
   }): Promise<CreateImportJobResult>;
 };
 
-export type FirstSliceRepository = import('./original-monitor-store.js').OriginalMonitorRepository & import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
+export type FirstSliceRepository = import('./original-admin-session.js').OriginalAdminSessionRepository & import('./original-monitor-store.js').OriginalMonitorRepository & import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
@@ -5431,7 +5436,7 @@ const requireActiveAdminSession = async (
   repository: FirstSliceRepository,
   sessionToken: string,
   nowIso: string,
-  options: { allowPasswordChangeRequired?: boolean } = {}
+  options: { allowPasswordChangeRequired?: boolean; enforceAccessWindow?: boolean } = {}
 ): Promise<{
   adminUser: AdminUser;
   adminSession: AdminSession;
@@ -5466,6 +5471,8 @@ const requireActiveAdminSession = async (
       "Admin session is invalid or expired."
     );
   }
+
+  if(options.enforceAccessWindow && resolveAdminAccessFailureReason(adminUser,nowIso))throw new FirstSliceError(401,'admin_session_invalid','Admin session is invalid or expired.');
 
   const roleAssignments = await listAdminRoleAssignmentsForUser(
     repository,
@@ -32703,9 +32710,10 @@ export const createFirstSliceServices = (
       currentBooklet:currentOriginalBooklet
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
-    originalWorkspaceAdministration: createOriginalWorkspaceAdministrationPort({repository,admin:token=>requireActiveAdminSession(repository,token,now())}),
+    originalWorkspaceAdministration: createOriginalWorkspaceAdministrationPort({repository,admin:token=>requireActiveAdminSession(repository,token,now(),{enforceAccessWindow:true})}),
     originalWorkspaceReport:createOriginalWorkspaceReportPort({repository,workspace:(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey),timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
     originalTestAdministration: createOriginalTestAdministrationPort(repository,(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey)),
+    originalAdminSession: createOriginalAdminSessionPort({repository,now,id:idGenerator,verifyPassword:verifyAdminPassword,accessFailure:resolveAdminAccessFailureReason,accessUntil:resolveAdminAccessValidUntil,sessionTtlMs:adminSessionTtlMs,maxFailures:adminLoginMaxFailures,failureWindowMs:adminLoginFailureWindowMs}),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,
       async monitorAssignments(entry){

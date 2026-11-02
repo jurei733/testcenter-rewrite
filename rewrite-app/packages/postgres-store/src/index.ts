@@ -13,6 +13,8 @@ import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '
 import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
+import {mutateOriginalAdminSession} from './original-admin-session.js';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
 import {allocateOriginalTestNumber} from './original-test-number.js';
@@ -1758,6 +1760,9 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
  tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_release_id TEXT NOT NULL,review_json TEXT NOT NULL,
  PRIMARY KEY(kind,review_number));
  CREATE INDEX original_native_reviews_scope ON original_native_reviews(test_run_id,participant_session_id);`}
+,{version:75,name:'original_native_admin_numbers',sql:`CREATE TABLE original_admin_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+ INSERT INTO original_admin_number_counter(singleton,last_number) VALUES(1,'0');
+ CREATE TABLE original_admin_numbers(admin_number TEXT PRIMARY KEY,admin_user_id TEXT NOT NULL UNIQUE REFERENCES admin_users(admin_user_id) ON DELETE CASCADE);`}
 ];
 
 export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
@@ -2318,6 +2323,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
       return (result.rowCount ?? 0) > 0;
     },
+    async mutateOriginalAdminSession(selector,transform) {
+      return mutateOriginalAdminSession(pool, {user:mapAdminUser,session:mapAdminSession,role:mapAdminRoleAssignment,attempt:mapAdminLoginAttempt,workspace:mapWorkspace,tenant:mapTenant}, selector,transform);
+    },
     async listAdminUsers() {
       return many(
         `SELECT admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
@@ -2392,7 +2400,11 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       return result.rowCount === 1;
     },
     async saveAdminUser(adminUser) {
-      await pool.query(
+      const client=await pool.connect();
+      try {
+      await client.query('BEGIN');
+      const counter=(await client.query('SELECT last_number FROM original_admin_number_counter WHERE singleton=1 FOR UPDATE')).rows[0];
+      await client.query(
         `INSERT INTO admin_users (
           admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)
@@ -2423,6 +2435,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           adminUser.createdAt
         ]
       );
+      const previous=(await client.query('SELECT * FROM original_admin_numbers WHERE admin_user_id=$1',[adminUser.adminUserId])).rows[0];
+      const identity=prepareOriginalAdminNumber(adminUser,previous?{adminUserId:String(previous.admin_user_id),adminNumber:String(previous.admin_number)}:null,String(counter?.last_number));
+      if(!previous)await client.query('INSERT INTO original_admin_numbers(admin_number,admin_user_id) VALUES($1,$2)',[identity.number.adminNumber,adminUser.adminUserId]);
+      await client.query('UPDATE original_admin_number_counter SET last_number=$1 WHERE singleton=1',[identity.counter]);
+      await client.query('COMMIT');
+      }catch(error){
+        try{await client.query('ROLLBACK');}catch(rollback){throw new AggregateError([error,rollback],'Native administrator identity rollback failed.');}
+        throw error;
+      }finally{client.release();}
     },
     async deleteAdminUser(adminUserId) {
       const client = await pool.connect();

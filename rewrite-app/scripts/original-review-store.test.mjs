@@ -59,7 +59,7 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
    const rows=sql=>kind==='sqlite'?Promise.resolve(control.prepare(sql).all()):control.query(sql).then(r=>r.rows);
    const version=Number((await rows("SELECT version FROM schema_migrations WHERE name='original_native_reviews'"))[0].version);
    try{
-    await exec('DROP TABLE original_native_reviews; DROP TABLE original_native_review_counters; DELETE FROM schema_migrations WHERE version='+version);
+    await exec('DROP TABLE IF EXISTS original_admin_numbers; DROP TABLE IF EXISTS original_admin_number_counter; DROP TABLE original_native_reviews; DROP TABLE original_native_review_counters; DELETE FROM schema_migrations WHERE version>='+version);
     await exec(kind==='sqlite'?`CREATE TRIGGER owned_review_migration_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned Review migration failure'); END`:
      `CREATE FUNCTION owned_review_migration_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned Review migration failure'; END $$; CREATE TRIGGER owned_review_migration_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_review_migration_failure()`);
     await assert.rejects(()=>open(),/owned Review migration failure/);

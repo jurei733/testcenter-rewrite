@@ -14,6 +14,7 @@ import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testc
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {prepareOriginalAdminNumber,mutateOriginalAdminCollections,type OriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
@@ -149,6 +150,8 @@ type PersistedFirstSliceState = {
   originalTestRunsByNumber: Record<string,string>;
   originalWorkspaceNumbers: Record<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
+  originalAdminNumbers: Record<string,OriginalAdminNumber>;
+  originalAdminNumberCounter: string;
   originalNativeCommands: Record<string,OriginalCommandDelivery>;
   originalNativeCommandCounter: string;
   participantRunCommands: Record<string, ParticipantRunCommand>;
@@ -217,6 +220,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   originalPersonNumbers: {},
   originalPersonNumberCounter: "0",
   originalTestRunsByNumber: {},
+  originalAdminNumbers: {},
+  originalAdminNumberCounter: '0',
   originalWorkspaceNumbers: {},
   originalWorkspaceNumberCounter: "0",
   originalNativeCommands: {},
@@ -1034,6 +1039,9 @@ const createFileRepository = (
         return true;
       });
     },
+    async mutateOriginalAdminSession(selector,transform) {
+      return mutate(state=>mutateOriginalAdminCollections(state,state.adminSessions,'adminSessionId',selector,transform));
+    },
     async listAdminUsers() {
       const state = await getState();
       return Object.values(state.adminUsers);
@@ -1097,12 +1105,15 @@ const createFileRepository = (
     },
     async saveAdminUser(adminUser) {
       await mutate(state => {
+        const identity=prepareOriginalAdminNumber(adminUser,state.originalAdminNumbers?.[adminUser.adminUserId]??null,state.originalAdminNumberCounter??'0');
+        state.originalAdminNumbers={...state.originalAdminNumbers,[adminUser.adminUserId]:identity.number};state.originalAdminNumberCounter=identity.counter;
         state.adminUsers[adminUser.adminUserId] = adminUser;
       });
     },
     async deleteAdminUser(adminUserId) {
       return mutate(state => {
         delete state.adminUsers[adminUserId];
+        if(state.originalAdminNumbers)delete state.originalAdminNumbers[adminUserId];
         let deletedRoleAssignmentCount = 0;
         for (const [roleAssignmentId, roleAssignment] of Object.entries(
           state.adminRoleAssignments

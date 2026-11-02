@@ -14,6 +14,7 @@ import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testc
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {prepareOriginalAdminNumber,mutateOriginalAdminCollections,type OriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
@@ -131,6 +132,8 @@ type InMemoryFirstSliceState = {
   originalTestRunsByNumber: Map<string,string>;
   originalWorkspaceNumbers: Map<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
+  originalAdminNumbers: Map<string,OriginalAdminNumber>;
+  originalAdminNumberCounter: string;
   originalNativeCommands: Map<string,OriginalCommandDelivery>;
   originalNativeCommandCounter: string;
   participantRunCommands: Map<string, ParticipantRunCommand>;
@@ -177,6 +180,8 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   originalPersonNumbers: new Map(),
   originalPersonNumberCounter: "0",
   originalTestRunsByNumber: new Map(),
+  originalAdminNumbers: new Map(),
+  originalAdminNumberCounter: '0',
   originalWorkspaceNumbers: new Map(),
   originalWorkspaceNumberCounter: "0",
   originalNativeCommands: new Map(),
@@ -326,6 +331,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async deleteAttachmentFile(attachmentFileId) {
       return state.attachmentFiles.delete(attachmentFileId);
     },
+    async mutateOriginalAdminSession(selector,transform) {
+      const effect=mutateOriginalAdminCollections(state,state.adminSessionsByToken,'token',selector,transform);
+      if(effect.user)state.adminUsersByUsername.set(effect.user.username,effect.user);
+      return effect;
+    },
     async listAdminUsers() {
       return Array.from(state.adminUsers.values());
     },
@@ -368,11 +378,16 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return true;
     },
     async saveAdminUser(adminUser) {
+      const previous=state.adminUsers.get(adminUser.adminUserId);
+      const identity=prepareOriginalAdminNumber(adminUser,state.originalAdminNumbers.get(adminUser.adminUserId)??null,state.originalAdminNumberCounter);
+      state.originalAdminNumbers.set(adminUser.adminUserId,identity.number);state.originalAdminNumberCounter=identity.counter;
+      if(previous&&previous.username!==adminUser.username)state.adminUsersByUsername.delete(previous.username);
       state.adminUsers.set(adminUser.adminUserId, adminUser);
       state.adminUsersByUsername.set(adminUser.username, adminUser);
     },
     async deleteAdminUser(adminUserId) {
       const adminUser = state.adminUsers.get(adminUserId);
+      state.originalAdminNumbers.delete(adminUserId);
       if (adminUser) {
         state.adminUsers.delete(adminUserId);
         state.adminUsersByUsername.delete(adminUser.username);
