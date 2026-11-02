@@ -1,3 +1,4 @@
+import {verifyNativeWorkspaceWrite} from './native-workspace-write-controls.mjs';
 import {verifyOriginalWorkspaceReports,verifyOriginalWorkspaceReportHttp} from './original-workspace-reports-checks.mjs';
 import './source-native-workspace-administration-evidence.mjs';
 import {actualSourceFieldExtraction,actualSourceWorkspaceCasts,nativeWorkspaceSource,nativeWorkspaceSourceRow} from './source-native-workspace-administration-evidence.mjs';
@@ -372,6 +373,7 @@ for(const kind of kinds)test(kind+': native Test read has a durable private cons
    try{await entry;await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:roster('OWNED.ADM.MOVED')});await services.originalAuthentication.login({name:'owned-adm-r53-code',password:''});}finally{release();}
    assert.equal(formatOriginalTestAdministrationJson(await pending),before);const current=JSON.parse(await read());assert.ok(current['OWNED.ADM.MOVED']);assert.equal(current['OWNED.ADM.MOVED'].length,2);
   });
+  await verifyNativeWorkspaceWrite(t,{repository,services,scope,ids,auth,loginName:peers.at(-1),role:nativeRoles.writer,workspaceNumber:nativeWorkspaceNumber,connectionString:url?.toString()});
  }finally{await close();if(created){assert.equal(Number((await admin.query('SELECT count(*) AS count FROM pg_stat_activity WHERE application_name=$1',[schema])).rows[0].count),0);await admin.query('DROP SCHEMA "'+schema+'" CASCADE');}await admin?.end();await rm(directory,{recursive:true,force:true});}
 });
 

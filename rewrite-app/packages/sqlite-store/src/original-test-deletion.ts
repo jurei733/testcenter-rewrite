@@ -1,3 +1,4 @@
+import {guardOriginalWorkspaceWrite} from './original-workspace-write.js';
 import type {DatabaseSync} from 'node:sqlite';
 import {prepareOriginalTestDeletionInput,selectOriginalTestDeletion,attachmentTestRunId,type OriginalTestDeletionInput,type OriginalTestDeletionResult} from '@testcenter-rewrite-app/application';
 import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
@@ -8,6 +9,7 @@ export function deleteOriginalSelectedTests(database:DatabaseSync,raw:OriginalTe
   try {
     const scope=[input.tenantId,input.workspaceId];
     if(!database.prepare('SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(...scope)){database.exec('ROLLBACK');return null;}
+    guardOriginalWorkspaceWrite(database,input);
     const selected=selectOriginalTestDeletion(input,readOriginalTestAdministrationInventory(database,input.tenantId,input.workspaceId));
     const runs=new Set(selected.testRunIds),parameters=[...scope,JSON.stringify(selected.testRunIds)];
     const descendants='tenant_id=? AND workspace_id=? AND test_run_id IN (SELECT value FROM json_each(?))';

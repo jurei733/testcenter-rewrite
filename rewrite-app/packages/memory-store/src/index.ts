@@ -1,3 +1,4 @@
+import {guardOriginalWorkspaceWriteCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceAdministrationCollection} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
@@ -1023,11 +1024,13 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async deleteOriginalSelectedTests(raw) {
       const input=prepareOriginalTestDeletionInput(raw);
       if(![...state.workspacesByScope.values()].some(row=>row.tenantId===input.tenantId&&row.workspaceId===input.workspaceId))return null;
+      guardOriginalWorkspaceWriteCollections(state,state.adminSessionsByToken,input);
       return deleteOriginalSelectedTestsFromCollections(state,input);
     },
     async deleteOriginalGroupResults(raw) {
       const input = prepareOriginalGroupDeletionInput(raw);
       if (![...state.workspacesByScope.values()].some(row => row.tenantId === input.tenantId && row.workspaceId === input.workspaceId)) return null;
+      guardOriginalWorkspaceWriteCollections(state,state.adminSessionsByToken,input);
       return deleteOriginalGroupsFromCollections(state, input);
     },
     async listOriginalUnitsByWorkspace(tenantId,workspaceId){return structuredClone(Array.from(state.originalNativeUnits.values()).filter(unit=>unit.tenantId===tenantId&&unit.workspaceId===workspaceId));},

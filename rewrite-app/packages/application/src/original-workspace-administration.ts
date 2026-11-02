@@ -7,7 +7,7 @@ import {originalCommandInteger,originalCommandFloatString} from './original-comm
 import {OriginalPhpNumber,OriginalPhpObject} from './original-test-log-json.js';
 
 export type OriginalWorkspaceAdministrationScope={tenantId:string;workspaceId:string;tenantKey:string;workspaceKey:string};
-export type OriginalWorkspaceAdministrationPort={resolve(input:{token:string;workspacePathSegment:string;write:boolean}):Promise<OriginalWorkspaceAdministrationScope>};
+export type OriginalWorkspaceAdministrationPort={resolve(input:{token:string;workspacePathSegment:string;write:boolean}):Promise<OriginalWorkspaceAdministrationScope>;delete(input:{token:string;workspacePathSegment:string;kind:'groups'|'tests';body:unknown}):Promise<void>};
 type Collection<T>=Map<string,T>|Record<string,T>;
 const values=<T>(rows:Collection<T>):T[]=>rows instanceof Map?[...rows.values()]:Object.values(rows);
 const internal=()=>new FirstSliceError(500,'original_workspace_request_invalid','Internal error.');
@@ -26,13 +26,13 @@ export function readOriginalWorkspaceAdministrationCollection(state:{originalWor
 export function parseOriginalWorkspaceNumber(reference:string):string|null {
   const value=originalCommandInteger(reference);return value>0n?value.toString():null;
 }
-export function originalExplicitWorkspaceAccess(roles:AdminRoleAssignment[],adminUserId:string,scope:OriginalWorkspaceAdministrationScope):'RO'|'RW'|null {
+export function originalExplicitWorkspaceAccess(roles:Array<Pick<AdminRoleAssignment,'adminUserId'|'role'|'tenantId'|'workspaceId'|'accessMode'>>,adminUserId:string,scope:OriginalWorkspaceAdministrationScope):'RO'|'RW'|null {
   const selected=roles.filter(r=>r.adminUserId===adminUserId&&r.role==='workspace_admin'&&r.tenantId===scope.tenantId&&r.workspaceId===scope.workspaceId);
   if(selected.some(r=>r.accessMode===undefined||r.accessMode==='read_write'))return 'RW';
   return selected.some(r=>r.accessMode==='read_only')?'RO':null;
 }
-export function createOriginalWorkspaceAdministrationPort(input:{repository:FirstSliceRepository;admin:(token:string)=>ReturnType<AdminAuthPort['getCurrentSession']>}):OriginalWorkspaceAdministrationPort {
-  return {async resolve(request){
+export function createOriginalWorkspaceAdministrationPort(input:{repository:FirstSliceRepository;now:()=>string;admin:(token:string)=>ReturnType<AdminAuthPort['getCurrentSession']>}):OriginalWorkspaceAdministrationPort {
+  const port:OriginalWorkspaceAdministrationPort={async resolve(request){
     let actor:Awaited<ReturnType<AdminAuthPort['getCurrentSession']>>;
     try{actor=await input.admin(request.token);}catch(error){
       if(error instanceof FirstSliceError&&error.statusCode===401)throw new FirstSliceError(403,'original_admin_token_invalid','Invalid admin token.');
@@ -46,7 +46,13 @@ export function createOriginalWorkspaceAdministrationPort(input:{repository:Firs
     if(!scope||!role)throw new FirstSliceError(404,'original_workspace_not_found','Workspace `'+reference+'` not found.');
     if(request.write&&role!=='RW')throw new FirstSliceError(403,'original_workspace_read_only','Access Denied: Role `RW` on workspace `ws_'+reference+'`, needed. Only `RO` provided.');
     return scope;
+  },async delete(request){
+    const scope=await port.resolve({...request,write:true}),authority={token:request.token,tenantId:scope.tenantId,workspaceId:scope.workspaceId,now:input.now};
+    const result=request.kind==='groups'?await input.repository.deleteOriginalGroupResults({...scope,groups:prepareOriginalNativeGroupSelection(request.body),authority})
+      :await input.repository.deleteOriginalSelectedTests({...scope,personSessions:prepareOriginalNativeTestSelection(request.body),authority});
+    if(!result)throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
   }};
+  return port;
 }
 const field=(body:unknown,key:string):unknown=>body instanceof OriginalPhpObject?body.fields.get(key):body&&typeof body==='object'&&!Array.isArray(body)&&Object.hasOwn(body,key)?(body as Record<string,unknown>)[key]:undefined;
 const required=(body:unknown,key:string):unknown=>{const value=field(body,key);if(value==null)throw new FirstSliceError(400,'original_request_invalid','Required body-parameter is missing: `'+key+'`');return value;};

@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import type {IncomingMessage} from 'node:http';
-import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
+import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,type FirstSliceServices} from '@testcenter-rewrite-app/application';
 
 const route=/^\/workspace\/([^/]+)\/(results|responses(?:\/detailed)?|report\/([^/]+))$/;
 export function originalWorkspaceRouteLabel(method:string,pathname:string):string|null {
@@ -29,8 +29,7 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
       input.raw(200,body,'application/json');return true;
     }
     let body:unknown;try{body=await input.readBody(decodeOriginalTestLogJson);}catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_workspace_json_invalid','Internal error.');throw error;}
-    if(match[2]==='responses')await input.services.originalGroupResults.delete({...scope,groups:prepareOriginalNativeGroupSelection(body)});
-    else await input.services.originalTestAdministration.delete({...scope,personSessions:prepareOriginalNativeTestSelection(body)});
+    await input.services.originalWorkspaceAdministration.delete({token,workspacePathSegment:match[1]!,kind:match[2]==='responses'?'groups':'tests',body});
     input.raw(200,'','text/html; charset=UTF-8');
   }catch(error){
     if(input.propagateError(error))throw error;

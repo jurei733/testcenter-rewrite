@@ -1,5 +1,37 @@
 # Original participant group snapshots
 
+
+## Current native deletion authorization (2026-11-02)
+
+Native group and selected-Test DELETE requests retain their initial Source
+middleware check before reading an untrusted body. After the complete body,
+the native administration port resolves the current credential and explicit RW
+scope again and carries that server-owned authority into the actual deletion.
+Memory validates it in the synchronous mutation; File validates it inside its
+exclusive durable writer; SQLite validates it after BEGIN IMMEDIATE. PostgreSQL
+locks the Workspace parent, current user/session/Tenant and explicit grants in
+the same transaction, rechecking time after child-lock waits before deletion.
+Those actor/grant rows remain locked through commit. No platform/tenant role
+inherits a native Workspace grant. The existing required-password-change gate
+and the server clock remain binding. No schema or browser-policy change is used.
+
+The mandatory Test-administration suite includes real native HTTP requests held
+at the request body and immediately before the durable writer. Both DELETE
+families retain their actual selected group and Test after logout, grant removal,
+RW-to-RO change, account disablement, required password change, expired account
+window/session, suspended Tenant or archived Workspace. Positive controls still
+delete authorized selections. Independent PostgreSQL connections additionally
+prove a real parent-lock wait, current clock/session revalidation after that
+wait, and session/grant revocation waiting for an already-authorized deletion to
+commit. These are bounded authorization controls, not full parity acceptance.
+
+Native Admin sessions and the users/workspaces directories are now implemented;
+individual response/log/legacy/enhanced Review downloads are also connected.
+Actual Original Admin/Results/Tests UI adoption, further native management
+operations and complete functional/visual parity remain open. The historical
+qualification notes below do not replace that current scope.
+
+
 ## Native numeric workspace administration (2026-11-01)
 
 The native `GET /workspace/{ws_id}/results`,
@@ -7,7 +39,7 @@ The native `GET /workspace/{ws_id}/results`,
 `DELETE /workspace/{ws_id}/responses` now connect to the existing native
 projections and atomic delete ports. They always require `AuthToken` carrying a
 current admin session. The canonical sign-in can provide that capability; the
-literal Source admin session/login/challenge contract remains to be connected.
+literal Source admin session/login/challenge contract is also implemented.
 Native routes preserve canonical expiry, revocation, disabled-user and required
 password-change gates independently of the operator-demo flag. Missing/empty
 headers return401, invalid/non-admin tokens403, absent explicit workspace grants404

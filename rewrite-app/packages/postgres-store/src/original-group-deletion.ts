@@ -1,3 +1,4 @@
+import {guardOriginalWorkspaceWrite} from './original-workspace-write.js';
 import type {Pool} from 'pg';
 import {prepareOriginalGroupDeletionInput, selectOriginalGroupDeletionKeys, attachmentTestRunId, type OriginalGroupDeletionInput, type OriginalGroupDeletionResult} from '@testcenter-rewrite-app/application';
 
@@ -10,6 +11,7 @@ export async function deleteOriginalGroupResults(pool: Pool, raw: OriginalGroupD
     const parent = await client.query('SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR NO KEY UPDATE', [input.tenantId, input.workspaceId]);
     if (!parent.rowCount) {await client.query('ROLLBACK'); return null;}
     const scope = [input.tenantId, input.workspaceId];
+    await guardOriginalWorkspaceWrite(client,input);
     const groupKeys = selectOriginalGroupDeletionKeys(input, (await client.query('SELECT group_key AS "groupKey" FROM original_participant_groups WHERE tenant_id=$1 AND workspace_id=$2', scope)).rows);
     const logins = (await client.query('SELECT login_key FROM original_login_bindings WHERE tenant_id=$1 AND workspace_id=$2 AND group_snapshot_key=ANY($3::text[])', [...scope, groupKeys])).rows.map(row => String(row.login_key));
     const people = (await client.query('SELECT participant_session_id FROM participant_sessions WHERE tenant_id=$1 AND workspace_id=$2 AND original_login_key=ANY($3::text[]) ORDER BY participant_session_id FOR UPDATE', [...scope, logins])).rows.map(row => String(row.participant_session_id));
@@ -20,6 +22,7 @@ export async function deleteOriginalGroupResults(pool: Pool, raw: OriginalGroupD
     const runSet = new Set(runs);
     const attachments = (await client.query('SELECT attachment_file_id,attachment_id FROM attachment_files WHERE tenant_id=$1 AND workspace_id=$2', scope)).rows
       .filter(row => runSet.has(attachmentTestRunId(String(row.attachment_id)) ?? '')).map(row => String(row.attachment_file_id));
+    await guardOriginalWorkspaceWrite(client,input);
     const deletedAttachmentFileCount = (await client.query('DELETE FROM attachment_files WHERE tenant_id=$1 AND workspace_id=$2 AND attachment_file_id=ANY($3::text[])', [...scope, attachments])).rowCount ?? 0;
     await client.query(`DELETE FROM workspace_activity_events WHERE tenant_id=$1 AND workspace_id=$2 AND (
       subject_type='participant_session' AND subject_id=ANY($3::text[]) OR subject_type='test_run' AND subject_id=ANY($4::text[]) OR

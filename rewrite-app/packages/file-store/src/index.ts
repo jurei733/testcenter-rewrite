@@ -1,3 +1,4 @@
+import {guardOriginalWorkspaceWriteCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceAdministrationCollection} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
@@ -1878,6 +1879,7 @@ const createFileRepository = (
       const input=prepareOriginalTestDeletionInput(raw);
       return mutate(state=>{
         if(!Object.values(state.workspacesByScope).some(row=>row.tenantId===input.tenantId&&row.workspaceId===input.workspaceId))return null;
+        guardOriginalWorkspaceWriteCollections(state,state.adminSessions,input);
         return deleteOriginalSelectedTestsFromCollections(state,input);
       });
     },
@@ -1885,6 +1887,7 @@ const createFileRepository = (
       const input = prepareOriginalGroupDeletionInput(raw);
       return mutate(state => {
         if (!Object.values(state.workspacesByScope).some(row => row.tenantId === input.tenantId && row.workspaceId === input.workspaceId)) return null;
+        guardOriginalWorkspaceWriteCollections(state,state.adminSessions,input);
         return deleteOriginalGroupsFromCollections(state, input);
       });
     },

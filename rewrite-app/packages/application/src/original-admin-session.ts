@@ -56,7 +56,7 @@ export function assertOriginalAdminNameAvailable(user:Pick<AdminUser,'adminUserI
 // All case/collation aliases of a real account share its existing canonical
 // failure bucket; a native spelling must not bypass canonical failure limits.
 export const originalAdminFailureBucket = (name: string): string => name.trim().toLowerCase();
-export function originalAdminMetadataAllowed(s:Pick<OriginalAdminSessionSnapshot,'user'|'sessions'|'roles'>,selector:OriginalAdminSelector):boolean {
+export function originalAdminMetadataAllowed(s:{user:Pick<AdminUser,'adminUserId'|'status'|'validFrom'|'validTo'|'validForMinutes'|'firstSignedInAt'>|null;sessions:Array<Pick<AdminSession,'token'|'adminUserId'|'revokedAt'|'expiresAt'>>},selector:OriginalAdminSelector):boolean {
   if(!('token' in selector)||!selector.at||!s.user||s.user.status!=='active')return false;
   const at=Date.parse(selector.at),session=s.sessions.find(row=>row.token===selector.token&&row.adminUserId===s.user!.adminUserId);
   const limits=[s.user.validTo?Date.parse(s.user.validTo):Infinity,s.user.validForMinutes&&s.user.firstSignedInAt?Date.parse(s.user.firstSignedInAt)+s.user.validForMinutes*60_000:Infinity];

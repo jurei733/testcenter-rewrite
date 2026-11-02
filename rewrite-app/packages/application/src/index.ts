@@ -70,6 +70,8 @@ export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletio
 import {createOriginalWorkspaceReportPort} from './original-workspace-reports.js';
 export {selectOriginalReportParents,projectOriginalWorkspaceReport,assertOriginalReportRowCount,readOriginalWorkspaceReportCollections,originalReportUnitIdentity,originalReportFormat,originalReportQuery} from './original-workspace-reports.js';
 export type {OriginalReportMetadata,OriginalReportParent,OriginalReportRun,OriginalReportFamily,OriginalReportRequest,OriginalWorkspaceReportSnapshot,OriginalReportStoredUnit,OriginalReportStoredReview} from './original-workspace-reports.js';
+export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,originalWorkspaceWriteSqlSnapshot} from './original-workspace-write.js';
+export type {OriginalWorkspaceWriteAuthority,OriginalWorkspaceWriteSnapshot} from './original-workspace-write.js';
 import {createOriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
 export {readOriginalWorkspaceAdministrationCollection,parseOriginalWorkspaceNumber,originalExplicitWorkspaceAccess,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection} from './original-workspace-administration.js';
 export type {OriginalWorkspaceAdministrationScope,OriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
@@ -32714,7 +32716,7 @@ export const createFirstSliceServices = (
       currentBooklet:currentOriginalBooklet
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
-    originalWorkspaceAdministration: createOriginalWorkspaceAdministrationPort({repository,admin:token=>requireActiveAdminSession(repository,token,now(),{enforceAccessWindow:true})}),
+    originalWorkspaceAdministration: createOriginalWorkspaceAdministrationPort({repository,now,admin:token=>requireActiveAdminSession(repository,token,now(),{enforceAccessWindow:true})}),
     originalWorkspaceReport:createOriginalWorkspaceReportPort({repository,workspace:(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey),timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
     originalTestAdministration: createOriginalTestAdministrationPort(repository,(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey)),
     originalAdminSession: createOriginalAdminSessionPort({repository,now,id:idGenerator,verifyPassword:verifyAdminPassword,accessFailure:resolveAdminAccessFailureReason,accessUntil:resolveAdminAccessValidUntil,sessionTtlMs:adminSessionTtlMs,maxFailures:adminLoginMaxFailures,failureWindowMs:adminLoginFailureWindowMs,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),

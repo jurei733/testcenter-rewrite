@@ -1,5 +1,33 @@
 # Native participant Session boundary
 
+
+## Native Admin sessions and directory/password routes (2026-11-02)
+
+PUT /session/admin, protected Admin challenges and GET/DELETE /session use the
+measured Source AccessSet. User and Workspace numbers are durable exact int64
+identities. Native login retains untrimmed stored spelling/German2 lookup and
+rejects historical ambiguity. Current explicit workspace grants, active scopes,
+account windows, password-change gates and token revocation remain binding.
+All four stores atomically verify credentials, rotate/refresh/revoke sessions,
+allocate identities and record audit effects. Source replay/rate/session
+weaknesses are not copied; proof tickets remain encrypted, expiring and one-use.
+
+GET /users and /workspaces are Root-only and project Source metadata DTOs,
+ordering and physical-file modification timestamps. PUT /user accepts literal
+{n,p} and returns a raw numeric201 identity; native and canonical creation share
+the same collation-collision boundary. PATCH /user/{id}/password accepts {p}
+and requires oldPassword for self changes, including administrator-set passwords.
+Own changes revoke previous sessions and return a fresh capability in AuthToken
+while preserving Source's empty200 body. Root resets revoke only target sessions,
+mark that target for a password change and issue no impersonation capability.
+Configured password strength and Source's60-byte ceiling remain enforced.
+
+Current regular Admin screens still use the canonical bridge. Workspace CRUD,
+rights management, other native Admin operations and actual Original
+Admin/Results/Tests UI adoption remain required. These implemented backend routes
+alone do not prove full functional or visual Original parity.
+
+
 ### Native Unit report state provenance (2026-11-01)
 
 A Unit created by a Review has SQL NULL `laststate` in the pinned Original.
@@ -33,9 +61,9 @@ whole-project visual parity remain open.
 The participant boundary implements the Original paths `PUT /session/login`,
 `PUT /session/person`, `GET|PUT|DELETE /session`, `POST /session/challenge` and
 `POST /session/person/challenge`. It uses `AuthToken` and the Original participant
-AccessSet shape. Canonical RPC authentication remains available. Native admin and
-operational AccessSets, `/session/admin`, numeric administration and
-production native-transport adoption are still outstanding. Unit transport is
+AccessSet shape. Canonical RPC authentication remains available. Native Admin and operational AccessSets, `/session/admin` and participant
+native transport are implemented; actual Original Admin UI adoption and broader
+native management operations remain outstanding. Unit transport is
 implemented in the candidate described below. This does not establish
 paired visual parity.
 

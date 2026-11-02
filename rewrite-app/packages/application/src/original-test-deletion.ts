@@ -1,3 +1,4 @@
+import type {OriginalWorkspaceWriteAuthority} from './original-workspace-write.js';
 import type {OriginalGroupDeletionCollections} from './original-group-deletion.js';
 import type {OriginalTestAdministrationInventory} from './original-test-administration.js';
 import {readOriginalTestAdministrationCollections} from './original-test-administration.js';
@@ -6,7 +7,7 @@ import {originalParticipantGroupKeysEqual} from './original-participant-group.js
 import {FirstSliceError} from './first-slice-error.js';
 
 export type OriginalTestSelection = {loginName:string; code:string; nameSuffix:string; bookletName:string};
-export type OriginalTestDeletionInput = {tenantId:string; workspaceId:string; personSessions:OriginalTestSelection[]};
+export type OriginalTestDeletionInput = {tenantId:string; workspaceId:string; personSessions:OriginalTestSelection[];authority?:OriginalWorkspaceWriteAuthority};
 export type OriginalTestDeletionResult = {deletedTestCount:number; deletedReviewCount:number; deletedLogCount:number; deletedAttachmentFileCount:number};
 const invalid = () => new FirstSliceError(400,'original_test_selection_invalid','personSessions must be a non-empty array of Test selections with Login and Booklet names.');
 const unknown = () => new FirstSliceError(409,'original_test_administration_history_unknown','The native Test administration history is unavailable or ambiguous.');
@@ -23,7 +24,7 @@ export function prepareOriginalTestSelection(value:unknown):OriginalTestSelectio
 }
 export function prepareOriginalTestDeletionInput(input:OriginalTestDeletionInput):OriginalTestDeletionInput {
   if(![input.tenantId,input.workspaceId].every(value=>typeof value==='string'&&value.length))throw new TypeError('Native Test deletion requires workspace scope.');
-  return {tenantId:input.tenantId,workspaceId:input.workspaceId,personSessions:prepareOriginalTestSelection(input.personSessions)};
+  return {tenantId:input.tenantId,workspaceId:input.workspaceId,personSessions:prepareOriginalTestSelection(input.personSessions),...(input.authority?{authority:{...input.authority}}:{})};
 }
 
 /** Includes empty/unopened Tests. Listing's saved-state predicate is irrelevant. */

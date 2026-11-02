@@ -1,3 +1,4 @@
+import {guardOriginalWorkspaceWrite} from './original-workspace-write.js';
 import {rollbackAfterFailure} from './transaction-rollback.js';
 import type {DatabaseSync} from 'node:sqlite';
 import {prepareOriginalGroupDeletionInput, selectOriginalGroupDeletionKeys, attachmentTestRunId, type OriginalGroupDeletionInput, type OriginalGroupDeletionResult} from '@testcenter-rewrite-app/application';
@@ -8,6 +9,7 @@ export function deleteOriginalGroupResults(database: DatabaseSync, raw: Original
   try {
     const scope = [input.tenantId, input.workspaceId];
     if (!database.prepare('SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(...scope)) {database.exec('ROLLBACK'); return null;}
+    guardOriginalWorkspaceWrite(database,input);
     const groupKeys = selectOriginalGroupDeletionKeys(input, database.prepare('SELECT group_key AS groupKey FROM original_participant_groups WHERE tenant_id=? AND workspace_id=?').all(...scope) as Array<{groupKey:string}>);
     // JSON membership parameters keep parameter counts bounded for large groups.
     const logins = database.prepare('SELECT login_key FROM original_login_bindings WHERE tenant_id=? AND workspace_id=? AND group_snapshot_key IN (SELECT value FROM json_each(?))').all(...scope, JSON.stringify(groupKeys)).map(row => String(row.login_key));
