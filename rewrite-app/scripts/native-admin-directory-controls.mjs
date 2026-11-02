@@ -1,3 +1,4 @@
+import {verifyNativeAdminGrantLocks} from './native-admin-grant-lock-controls.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {randomUUID} from 'node:crypto';
@@ -110,6 +111,7 @@ for(const kind of kinds)test(`${kind}: native directory, exact creation and pass
    const high=await services.originalAdminSession.login({name:'OwnedHighDirectory',password}),fresh=await services.originalAdminSession.changePassword({token:high.token,adminNumber:id,password:changed,oldPassword:password});
    assert.equal(fresh.id,id);await reopen();assert.equal((await services.originalAdminSession.read({token:fresh.token})).id,id);
   });
+  if(url)await verifyNativeAdminGrantLocks(t,{repository,services,root,password,connectionString:url.toString()});
  }finally{await storage?.shutdown();if(created)await pool.query(`DROP SCHEMA "${schema}" CASCADE`);await pool?.end();await rm(dir,{recursive:true,force:true});}
 });
 

@@ -22,7 +22,10 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
         ({adminUserId: String(row.admin_user_id), username: String(row.username)})), selector.name)
         : (await client.query('SELECT admin_user_id FROM admin_sessions WHERE session_token=$1', [selector.token])).rows[0]?.admin_user_id;
       const user = id ? map.user((await client.query('SELECT * FROM admin_users WHERE admin_user_id=$1 FOR UPDATE', [id])).rows[0]) : null;
-      const roles = user ? (await client.query('SELECT * FROM admin_role_assignments WHERE admin_user_id=$1 ORDER BY created_at', [user.adminUserId])).rows.map(map.role).filter(present) : [];
+      // A grant changed after the RR snapshot must cause40001 and a complete
+      // retry, rather than authorize a post-wait effect from its old Root row.
+      // The selected grants stay locked until every effect/audit commits.
+      const roles = user ? (await client.query('SELECT * FROM admin_role_assignments WHERE admin_user_id=$1 ORDER BY created_at FOR SHARE', [user.adminUserId])).rows.map(map.role).filter(present) : [];
       const workspaces = user ? (await client.query(`SELECT w.* FROM workspaces w WHERE EXISTS
         (SELECT 1 FROM admin_role_assignments r WHERE r.admin_user_id=$1 AND r.role='workspace_admin' AND r.workspace_id=w.workspace_id AND r.tenant_id=w.tenant_id)`, [user.adminUserId])).rows.map(map.workspace).filter(present) : [];
       const tenants = workspaces.length ? (await client.query('SELECT * FROM tenants WHERE tenant_id=ANY($1::text[])', [workspaces.map(w => w.tenantId)])).rows.map(map.tenant).filter(present) : [];

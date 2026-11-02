@@ -3,6 +3,20 @@
 
 ## Native Admin sessions and directory/password routes (2026-11-02)
 
+
+PostgreSQL retains REPEATABLE READ and now locks the actor's selected grant rows
+through the complete native Admin transaction. A grant updated/deleted after the
+snapshot, including during the global counter wait, triggers PostgreSQL40001
+and the existing complete-transaction retry. The retried operation sees current
+Root authority; privileged effects cannot use the old grant. A later revocation
+waits for an already-authorized user/audit commit. Eleven mandatory independent
+connection controls cover user creation, target password reset, both directories
+and current Session claims after grant deletion/update, including actual
+password-confirmed revocation by another Root. Denials retain target hashes,
+sessions, counters and unrelated audit state. This closes the specific observed
+snapshot gap; it does not establish whole UI/visual parity.
+
+
 PUT /session/admin, protected Admin challenges and GET/DELETE /session use the
 measured Source AccessSet. User and Workspace numbers are durable exact int64
 identities. Native login retains untrimmed stored spelling/German2 lookup and
