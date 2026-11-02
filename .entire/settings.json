@@ -5,5 +5,12 @@
     "primary": {
       "type": "git-refs"
     }
+  },
+  "strategy_options": {
+    "checkpoint_remote": {
+      "provider": "github",
+      "repo": "jurei733/testcenter-rewrite-checkpoints"
+    },
+    "push_sessions": true
   }
 }
