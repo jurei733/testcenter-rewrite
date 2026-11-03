@@ -1,5 +1,35 @@
 # Testcenter parity checklist
 
+### Exact November runner certificate and participant entry readiness (2026-11-03)
+
+Two independent workers in run 41634733039 measured the actual hosted image
+`20261101.360.1`, with initial inventory SHA256
+`2b84303175eb3b570e0e84acaa1ba8f9328f765e04abde8d29daf8b37c334b2d`.
+Their initial browser routes correctly failed because this image was unknown.
+The separate measurement phases each passed all 368 native policy checks,
+four Debian archive controls, zero-vulnerability locked audit and actual owned
+Node-mode normalization. Both measured the same native material and unchanged
+Source pixel/font/browser family. Before this explicit manual certificate
+addition, both raw ZIPs, manifests, all nine Debian archive hashes, and the actual
+eight visible PNGs plus 24 white frames per worker were independently checked.
+Artifacts 13230948407 (job 125916607651) and 13231880727 (job 125916607915)
+retain the original failed-job provenance; `nativeQualification.conclusion`
+describes their successful complete native measurement phases, not overall job
+or application acceptance. The existing two current-lock records remain byte
+equivalent. Only the exact new image, inventory and verified runtime graph are
+admitted; unknown labels or altered inventory remain rejected. No historical
+Source pixels, fonts, browser policy or certificate validation is changed.
+
+The same run's participant-console owner timed out at a `networkidle` navigation
+while exercising a second active participant page. The entry now waits for the
+document, existing native API and actual Player controls; live runtime traffic
+does not have to become idle. All subsequent command, durable-state, response,
+clock, sibling and acknowledgement assertions and all deadlines remain intact.
+The complete actual local Chrome loading journey passes all 43 checks. Current
+local policy passes 366 checks, with four Linux-only checks skipped on macOS.
+A fresh complete CI of the final combined commit is still mandatory for merge;
+run 41634733039 remains failed and is not admitted as application acceptance.
+
 ### CI browser-admission ownership (2026-11-03, PR16 merge review)
 
 Run 41634733039 rejected the non-browser SQLite shutdown owner during runtime
@@ -11,7 +41,7 @@ records that mismatch; its ZIP SHA256 is
 The preflight, route-selection and associated rejection-evidence predicates now
 require an explicit browser owner. Actual browser jobs keep their previous
 inventory, certificate, archive, native material and failure checks unchanged;
-no cohort is newly admitted and the historical qualified action fixture is
+this guard correction admits no cohort, and the historical qualified action fixture is
 unchanged. A regression using the actual workflow's non-browser matrix rows
 fails against the old action and passes with this correction, with positive
 controls requiring both browser admission routes. The complete local policy
@@ -73,8 +103,8 @@ No schema, dependency, browser-policy, input, visual tolerance or authorization
 gate is weakened. Source's measured destructive partial effects on an invalid
 write remain recorded; Rewrite preserves the required atomic rollback gate.
 PR16 is ready for review under the user's explicit merge request; a merge still requires its current-head qualification and normal Entire gates.
-its actual Verona job 125888005853 has passed, but that is not a qualification
-of this unpublished R66 tree. The full 49 functional / eight visual Goal remains
+its older Verona job 125888005853 has passed, but that does not qualify the
+final combined tree. The full 49 functional / eight visual Goal remains
 active. Native administration UI adoption, exact identity binding and remaining
 workspace/user CRUD still require implementation and functional/visual evidence.
 
