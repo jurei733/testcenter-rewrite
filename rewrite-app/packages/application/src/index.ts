@@ -83,6 +83,8 @@ export type {OriginalSessionTest} from './original-session.js';
 import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
 import {createOriginalSessionPort} from './original-session.js';
 import {createOriginalAdminDirectoryPort} from './original-admin-directory.js';
+import {createOriginalAdminPermissionsPort} from './original-admin-permissions.js';
+export {validateOriginalAdminRoleChanges} from './original-admin-permissions.js';
 export {originalDirectoryModification} from './original-admin-directory.js';
 export type {OriginalDirectoryFile,OriginalDirectoryFileEvent,OriginalAdminDirectoryPort} from './original-admin-directory.js';
 import {createOriginalAdminSessionPort} from './original-admin-session.js';
@@ -1347,6 +1349,7 @@ export type FirstSlicePorts = {
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalAdminSession: import('./original-admin-session.js').OriginalAdminSessionPort;
   originalAdminDirectory: import('./original-admin-directory.js').OriginalAdminDirectoryPort;
+  originalAdminPermissions: import('./original-admin-permissions.js').OriginalAdminPermissionsPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
   originalWorkspaceAdministration: import('./original-workspace-administration.js').OriginalWorkspaceAdministrationPort;
   originalWorkspaceReport:ReturnType<typeof createOriginalWorkspaceReportPort>;
@@ -32721,6 +32724,7 @@ export const createFirstSliceServices = (
     originalTestAdministration: createOriginalTestAdministrationPort(repository,(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey)),
     originalAdminSession: createOriginalAdminSessionPort({repository,now,id:idGenerator,verifyPassword:verifyAdminPassword,accessFailure:resolveAdminAccessFailureReason,accessUntil:resolveAdminAccessValidUntil,sessionTtlMs:adminSessionTtlMs,maxFailures:adminLoginMaxFailures,failureWindowMs:adminLoginFailureWindowMs,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),
     originalAdminDirectory:createOriginalAdminDirectoryPort({repository,now,id:idGenerator,timeZone:participantAccessTimeZone,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),
+    originalAdminPermissions:createOriginalAdminPermissionsPort({repository,now,id:idGenerator}),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,
       async monitorAssignments(entry){

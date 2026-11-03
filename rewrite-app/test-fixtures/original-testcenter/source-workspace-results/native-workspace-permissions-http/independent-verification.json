@@ -1,0 +1,27 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "exactImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceFilesReverified": 137,
+  "lockedProductionComposerPackages": 19,
+  "actualHttpExchanges": 112,
+  "sourceOriginalReadOnly": true,
+  "sqlSeedsOrDaoStubs": false,
+  "runtime": {
+    "php": "8.3.36",
+    "postgres": "PostgreSQL 18.4 (Debian 18.4-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+  },
+  "configuration": {
+    "version": "19.0.0",
+    "xmlSchemaValidation": true,
+    "allowTestMode": false,
+    "staticTime": "now",
+    "staticTokens": false,
+    "insecurePasswords": false,
+    "protection": [
+      "login",
+      "person"
+    ]
+  },
+  "observationSha256": "32808d788575b0a5f8fae8a28db809b34755419185b8bba803001e6e2e02e17f"
+}

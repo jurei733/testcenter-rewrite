@@ -1,5 +1,74 @@
 # Testcenter parity checklist
 
+### Native workspace permission matrices (2026-11-03, R65; incomplete)
+
+The native Root-only permission API now implements `GET` and `PATCH` for
+`/workspace/{id}/users` and `/user/{id}/workspaces`. The actual production API
+at the preceding main-equivalent tree returned404 on all four operations.
+The new implementation returns the pinned Source's name-sorted matrices,
+exact signed64-bit numeric identifiers, `selected` flags and `RO`/`RW` roles.
+A PATCH replaces the complete explicit grant set of its selected owner;
+the request's `selected` field does not determine permissions. Clearing one
+workspace preserves grants in another. Root, tenant, group-monitor and hidden
+workspace assignments are preserved rather than becoming native membership.
+
+The frozen [112 actual Source HTTP exchanges](../test-fixtures/original-testcenter/source-workspace-results/native-workspace-permissions-http/observations.json)
+were captured with Original `eedae418`, PHP8.3.36/PostgreSQL18.4 and the exact
+`d7045f22` backend image. The independent read-only `verify.mjs` rechecks the
+actual image, all137 Source files in both checkout and container, all19 locked
+production Composer packages and the effective runtime configuration. Source
+test mode, static tokens, static time and insecure passwords remain disabled;
+XML validation and login/person protection remain enabled. The original112
+exchanges are retained unchanged; revalidation does not replay their mutations.
+
+Grant changes and audit events commit atomically in Memory, File, SQLite and
+PostgreSQL. Authorization is checked again after body completion and at the
+durable writer using the current clock, session, account and Root assignment.
+PostgreSQL permission replacements use READ COMMITTED after the native counter
+wait and hold a SHARE ROW EXCLUSIVE role-table lock through their commit. This
+includes newly committed canonical grants in a complete replacement and fences
+canonical Root revocation. The other native Admin actions retain their existing
+REPEATABLE READ transactions and current-grant locks. The rights projection
+does not decode Source-package contents or another administrator's custom text.
+
+The mandatory native Session suites import the new regression controls. Current
+focused evidence passes155 checks without skips across all four stores, real
+SQLite/PostgreSQL HTTP,112 body/writer invalidation cases and five independent
+PostgreSQL lock interleavings. Checks include numeric identifiers above2^53,
+unknown/alias targets, full replacement, live-session revocation, protected-role
+ID collisions, audit-failure rollback and durable reopen. Typechecking and the
+production build pass; the entry bundle remains419.45kB under the unchanged470kB
+gate. The broader Unit and PostgreSQL results are recorded separately from
+these focused checks and must be bound to their actual tested state.
+
+The broader local suites passed5627 Unit checks and3734 PostgreSQL checks,
+without failures or skips. They started before the last protected-ID and
+high-workspace-number test additions. The final actual native Session suite
+passes290 checks, all-store permission controls pass155, and two additional
+production HTTP runs prove both user and workspace IDs9007199254740993 without
+rounding either adjacent ID9007199254740992. These final targeted controls
+exercise the current test additions; no earlier whole-suite receipt is relabeled.
+
+This does not close the platform/admin requirement or any of the eight broad
+visual surfaces. The existing administration UI still uses canonical per-row
+permission requests; native endpoint adoption, workspace CRUD and remaining
+user-management operations are open. Source also accepts opaque role strings
+such as `XX`; this increment rejects roles outside RO/RW, which is an explicit
+remaining observable API parity gap. Source's measured partial deletion on a
+failed foreign key or duplicate is recorded, while Rewrite preserves its
+mandatory atomic rollback gate. The full49-functional/eight-visual scope remains.
+
+The separate post-merge main run41617941812 failed its `publish-red` native-click
+witness (zero events);120 jobs passed and acceptance failed dependently. The
+smoke's readiness selector referenced outer content instead of the actual inert
+frame host. It now waits on that host and also requires the click witness to
+belong to the same Player document. The unchanged trusted-once assertion remains.
+Actual local Chrome156.0.8078.80 passes both blue/red native clicks and the full
+requested Verona smoke. A permanently inert counterexample correctly times out
+in Chrome; therefore the selector defect alone is not asserted as the proven
+cause of the historical CI failure. No unchanged CI rerun or browser-input bypass
+is admitted, and a current qualified CI result is still required.
+
 ### Native null versus explicit empty Unit state (2026-11-01)
 
 The unchanged production Source68 HTTP witness distinguishes Review-only NULL

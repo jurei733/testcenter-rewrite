@@ -5002,7 +5002,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       if(await handleOriginalAdminHttp({request,pathname,services,reportError:receipt=>{
         if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
         logStructured(receipt.statusCode>=500?'error':'info','native_administration_error',{requestId,route:originalAdminRouteLabel(request.method??'',pathname),...receipt});
-      },readBody:()=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,true),
+      },readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,true,decode),
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
         header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
       if(await handleOriginalWorkspaceHttp({request,pathname,searchParams:url.searchParams,services,readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,false,decode),

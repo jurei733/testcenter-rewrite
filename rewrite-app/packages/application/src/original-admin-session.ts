@@ -7,14 +7,14 @@ import {prepareOriginalWorkspaceNumber, type OriginalWorkspaceNumberRecord} from
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 
 export type OriginalAdminNumber = {adminUserId: string; adminNumber: string};
-export type OriginalAdminSelector = {name: string} | {token: string; at?: string; directory?: 'users' | 'workspaces'; targetAdminNumber?: string};
+export type OriginalAdminSelector = {name: string} | {token: string; at?: string; directory?: 'users' | 'workspaces' | 'rights'; rightsWrite?: boolean; targetAdminNumber?: string};
 export type OriginalAdminDirectoryUser = {adminUserId:string;username:string;adminNumber:string|null;isSuperadmin:boolean};
 export type OriginalAdminDirectoryWorkspace = {workspace:Workspace;workspaceNumber:string|null;latestModificationAt:string|null};
 export type OriginalAdminSessionSnapshot = {
   user: AdminUser | null; sessions: AdminSession[]; roles: AdminRoleAssignment[];
   workspaces: Workspace[]; tenants: Tenant[]; attempt: AdminLoginAttempt | null;
   number: OriginalAdminNumber | null; counter: string;
-  directory?: {users?:OriginalAdminDirectoryUser[];workspaces?:OriginalAdminDirectoryWorkspace[]};
+  directory?: {users?:OriginalAdminDirectoryUser[];workspaces?:OriginalAdminDirectoryWorkspace[];roles?:AdminRoleAssignment[]};
   target?: {user:AdminUser;sessions:AdminSession[];number:OriginalAdminNumber};
   workspaceNumbers: OriginalWorkspaceNumberRecord[]; workspaceCounter: string;
 };
@@ -25,6 +25,8 @@ export type OriginalAdminSessionEffect = {
   targetUser?:AdminUser; targetSessions?:AdminSession[]; attempt?: AdminLoginAttempt; audit?: AdminAuditEvent;
   number?: OriginalAdminNumber; counter?: string;
   workspaceNumbers?: OriginalWorkspaceNumberRecord[]; workspaceCounter?: string;
+  roleChanges?: {scope:{kind:'user';adminUserId:string}|{kind:'workspace';tenantId:string;workspaceId:string};removeIds:string[];assignments:AdminRoleAssignment[]};
+  audits?:AdminAuditEvent[];
 };
 export type OriginalAdminSessionRepository = {
   /** The callback is synchronous and receives only this actor's metadata.

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "actualSourceHttpRequests": 112,
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "lockedProductionComposerPackages": 19,
+  "testModeAllowed": false,
+  "xmlSchemaValidation": true,
+  "files": {
+    "independent-verification.json": "9b76eb345b78354f5f2c170e71cce8372b81013e3fcda22d7e22761460b59071",
+    "capture.mjs": "99c5e68f51dff7fbf4284f8d1b2be4f97976a30594cbb56292276cd0c8ccdf33",
+    "observations.json": "32808d788575b0a5f8fae8a28db809b34755419185b8bba803001e6e2e02e17f",
+    "compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    "verify.mjs": "95aeaba37978c1091edb06715943d3f9214b6b490ca944de89f379ed09265f49"
+  },
+  "scope": "Actual Source workspace/user permission matrices, replacement, explicit role revocation, auth/malformed fields and observed nontransactional failures. Does not qualify Rewrite implementation, native management UI, full Workspace CRUD or complete Original parity."
+}
