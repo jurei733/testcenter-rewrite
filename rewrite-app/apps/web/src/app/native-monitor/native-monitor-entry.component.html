@@ -28,7 +28,7 @@
   @if(hasChild){<p role="alert">Bitte eine freigegebene Gruppenmonitor-Sitzung auswählen.</p>}
   @if(starterRefreshing()){<p role="status">Sitzung wird geprüft …</p>}
   @else if(starterRefreshFailed()){<button matButton="filled" (click)="refreshStarter()">Übersicht erneut laden</button>}
-  @else{@for(owner of starterOwners;track owner){<app-native-starter />}}
+  @else{<div class="native-login-outlet">@for(owner of starterOwners;track owner){<app-native-starter />}</div>}
  }
 }
 
