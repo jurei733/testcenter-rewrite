@@ -1,5 +1,29 @@
 # Testcenter parity checklist
 
+### Exact second November runner variant (2026-11-03)
+
+Current-head run 41640942834 correctly rejected actual `20261101.114.1` before
+the Player-version and login-rate-limit tests. Two separate rejection-measurement
+phases on jobs 125938960716 and 125938960659 then each passed the complete 370
+native policy checks, four Debian controls, zero-vulnerability locked audit and
+actual Node-mode normalization. Both actual job headers match their unchanged
+native manifests; both initial inventories have SHA256
+`d35c06b98bb4d11730bd2f1ad1f2a512952d45e364d971c443afc23afa95d66d`.
+Raw artifacts 13235191255 and 13235420396 were independently verified by their
+GitHub ZIP digests/CRC, all nine actual Debian archive digests, eight decoded
+visible PNG hashes and 24 actual white frames per worker. The unchanged Source
+pixel/font/browser family matches all prior cohorts exactly.
+
+Only that exact image, inventory and native runtime graph is now manually added
+as a fourth current-lock certificate. All three previous certificate records
+stay byte equivalent. No validator, unknown-image rejection, browser policy,
+Source oracle, timeout, input assertion or installation gate changes. Original
+measurement receipts remain `measurementOnly:true, productionAdmission:false`;
+the successful native phases do not turn their failed application jobs/run into
+passing acceptance. The new exact-selection regression fails against the old
+three-record registry. The final combined head still needs a fresh complete CI
+and all normal merge gates; the full parity Goal remains active.
+
 ### Exact November runner certificate and participant entry readiness (2026-11-03)
 
 Two independent workers in run 41634733039 measured the actual hosted image
