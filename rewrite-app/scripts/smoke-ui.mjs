@@ -23,6 +23,8 @@ import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
   assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
 import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 import { runParticipantUnitLabelSmoke } from "./participant-unit-label-smoke.mjs";
+import { matchesMergedReturnBaseline } from "./merged-return-baseline.mjs";
+import { smokeCaseFailures } from "./smoke-case-failure.mjs";
 import { runCurrentOriginalBookletConfigSmoke } from "./current-original-booklet-config-smoke.mjs";
 import { setWorkspaceAutoRefreshEnabled } from "./workspace-auto-refresh-smoke.mjs";
 import { createAttachmentQrCameraVideo } from "./attachment-camera-fixture.mjs";
@@ -2901,6 +2903,50 @@ try {
         if (typeof answers === "string") window.__originalSystemCheckReportedAnswers = JSON.parse(answers);
       });
     });
+    // Source's per-toggle click emits a command even for the selected page.
+    // Observe real commands inside the existing isolated Player; do not assign
+    // either controller or Material selection state to manufacture a retry.
+    await page.waitForFunction(() => document.querySelector("#participantVeronaPlayerStatus")?.textContent?.trim() === "running");
+    const pageCommandPrefix = "OWNED_SYSTEMCHECK_PAGE_COMMAND ";
+    const pageCommands = [];
+    const collectPageCommand = message => {
+      if (message.text().startsWith(pageCommandPrefix)) pageCommands.push(JSON.parse(message.text().slice(pageCommandPrefix.length)));
+    };
+    page.on("console", collectPageCommand);
+    const pageCommandObserver = await originalUnitFrame.locator("body").evaluateHandle(body => {
+      const listener = event => {
+        if (event.data?.type === "vopPageNavigationCommand") console.log("OWNED_SYSTEMCHECK_PAGE_COMMAND " + JSON.stringify({target:event.data.target}));
+      };
+      body.ownerDocument.defaultView.addEventListener("message", listener);
+      return listener;
+    });
+    const assertPageActivation = async (label, target, activate) => {
+      const before = pageCommands.length;
+      const command = page.waitForEvent("console", {predicate:message => message.text().startsWith(pageCommandPrefix) && JSON.parse(message.text().slice(pageCommandPrefix.length)).target === target});
+      void command.catch(() => {});
+      await activate();
+      try {await command;} catch (error) {throw new Error(label + " did not reach the real Player", {cause:error});}
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      assert.equal(pageCommands.length - before, 1, label + " sends exactly one real Player command");
+      console.log("ui_smoke_page_activation=" + label + ":passed");
+    };
+    try {
+      await assertPageActivation("Changed numbered-page click", "2", () => page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-1'] button").click());
+      await originalUnitFrame.getByRole("textbox", {name:"Second page answer"}).waitFor();
+      await assertPageActivation("Changed first-page click", "1", () => page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").click());
+      await originalUnitFrame.locator("#var1").waitFor();
+      await assertPageActivation("Selected numbered-page click", "1", () => page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").click());
+      await assertPageActivation("Selected numbered-page Enter", "1", async () => {await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").focus();await page.keyboard.press("Enter");});
+      await assertPageActivation("Selected numbered-page Space", "1", async () => {await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").focus();await page.keyboard.press("Space");});
+      await assertPageActivation("Numbered-page ArrowRight", "2", async () => {await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").focus();await page.keyboard.press("ArrowRight");});
+      await originalUnitFrame.getByRole("textbox", {name:"Second page answer"}).waitFor();
+      await assertPageActivation("Numbered-page ArrowLeft", "1", async () => {await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-1'] button").focus();await page.keyboard.press("ArrowLeft");});
+      await originalUnitFrame.locator("#var1").waitFor();
+    } finally {
+      page.off("console", collectPageCommand);
+      await pageCommandObserver.evaluate(listener => window.removeEventListener("message", listener));
+      await pageCommandObserver.dispose();
+    }
     await originalUnitFrame.locator("#var1").fill("Original Systemcheck Unit answer");
     await originalUnitFrame.locator("#var1").blur();
     assert.equal(await originalUnitFrame.locator("body").evaluate(() => window.__systemCheckLogPolicy), "disabled");
@@ -10905,8 +10951,8 @@ try {
   await mergedReturnFrame.locator("#playerAnswer").fill(mergedReturnAnswer);
   const mergedReturnBefore = (
     await pollJsonWithPredicate(mergedReturnStateUrl, payload =>
-      payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey]?.includes(
-        mergedReturnAnswer
+      matchesMergedReturnBaseline(
+        payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey], mergedReturnAnswer
       )
     )
   ).currentRunState;
@@ -18755,9 +18801,43 @@ try {
   await originalSidebar.waitFor({ state: "detached" });
   assert.equal(await page.locator('[data-cy="send-comments"]').evaluate(element => element === document.activeElement), true);
   await page.locator('[data-cy="send-comments"]').click();
+  await page.evaluate(() => {
+    const records = [], identities = new WeakMap(); let nextIdentity = 0, lastState = '';
+    const record = (event = {}) => {
+      const host = document.querySelector('app-original-review-panel');
+      if (host && !identities.has(host)) identities.set(host, ++nextIdentity);
+      const form = host?.querySelector('form'), list = host?.querySelector('.review-list');
+      const state = {host: host ? identities.get(host) : null, heading: host?.querySelector('h2')?.textContent,
+        formHidden: form?.hidden, listHidden: list?.hidden, activeTag: document.activeElement?.tagName};
+      const serialized = JSON.stringify(state);
+      if (records.length < 64 && (serialized !== lastState || Object.keys(event).length)) {
+        records.push({at: performance.now(), ...state, ...event}); lastState = serialized;
+      }
+    };
+    const observer = new MutationObserver(() => record());
+    observer.observe(document.documentElement, {subtree: true, childList: true, attributes: true, attributeFilter: ['hidden']});
+    const click = event => {
+      const button = event.target.closest?.('button');
+      if (button?.getAttribute('data-cy')?.startsWith('comment-')) {
+        record({event: 'click', button: button.getAttribute('data-cy'), trusted: event.isTrusted});
+        queueMicrotask(() => record({event: 'after-click'}));
+      }
+    };
+    document.addEventListener('click', click, true); record({event: 'start'});
+    window.__ownedReviewVisibility = {records, stop: () => {observer.disconnect(); document.removeEventListener('click', click, true);}};
+  });
   await page.locator('[data-cy="comment-toolbar-show-list"]').click();
   const originalSavedReview = page.locator('[data-cy="comment-list-unit-comments"]').filter({ hasText: originalSurfaceComment });
-  await originalSavedReview.waitFor();
+  try { await originalSavedReview.waitFor(); }
+  catch (error) {
+    const diagnostic = await page.evaluate(() => ({records: window.__ownedReviewVisibility?.records,
+      panel: document.querySelector('app-original-review-panel')?.outerHTML}));
+    if (failureArtifactDirectory) await writeFile(resolve(failureArtifactDirectory, 'original-review-visibility.json'), JSON.stringify(diagnostic, null, 2));
+    throw error;
+  } finally {
+    const record = await page.evaluate(() => {const trace = window.__ownedReviewVisibility; trace?.stop(); return trace?.records;});
+    if (artifactDirectory) await writeFile(resolve(artifactDirectory, 'original-review-visibility-events.json'), JSON.stringify(record, null, 2));
+  }
   assert.equal(await originalSavedReview.textContent(), originalSurfaceComment);
   await originalSavedReview.click();
   await page.waitForFunction(comment =>
@@ -19026,6 +19106,22 @@ try {
     // and immediate radio click. Keep the checked-state assertion unchanged.
     await page.locator("#participantVeronaPlayerFrame").scrollIntoViewIfNeeded();
     await page.locator("#participantVeronaPlayerFrame").screenshot();
+    // Painting the owner does not ensure that its embedded document has had
+    // a render opportunity. Keep the first native click inside the child;
+    // no input retry, forced action or DOM-dispatched event is used.
+    let childPaintTimer;
+    try {
+      await Promise.race([
+        frame.locator('[data-cy="TestController-radio1-Aufg1"]').evaluate(
+          () => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))
+        ),
+        new Promise((_, reject) => {
+          childPaintTimer = setTimeout(() => reject(
+            new Error("Original Player did not render before native radio input.")
+          ), 2_000);
+        })
+      ]);
+    } finally { clearTimeout(childPaintTimer); }
     await frame
       .locator('[data-cy="TestController-radio1-Aufg1"]')
       .check();
@@ -26470,9 +26566,11 @@ try {
           }), undefined, { timeout: 2_000 });
         } catch (captureError) { navigation = { unavailable: String(captureError).split("\nCall log:")[0] }; }
         await writeFile(resolve(failureDirectory, "failure.json"), JSON.stringify({
-          error: String(error?.message ?? error).split("\nCall log:")[0], navigation
+          error: String(error?.message ?? error).split("\nCall log:")[0], navigation, ownedCases: smokeCaseFailures(error).map(item => item.evidence)
         }, null, 2) + "\n");
-        await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true });
+        const childFailure = smokeCaseFailures(error).find(item => item.screenshot);
+        if (childFailure) await writeFile(resolve(failureDirectory, "failure.png"), childFailure.screenshot);
+        else await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true });
         process.stderr.write(`UI smoke failure screenshot: ${failureDirectory}/failure.png\n`);
       } catch (captureError) {
         // A full disk or a closed browser must not replace the actual test failure.

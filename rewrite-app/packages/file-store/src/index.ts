@@ -1,3 +1,9 @@
+import {guardOriginalWorkspaceWriteCollections} from '@testcenter-rewrite-app/application';
+import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
+import {readOriginalWorkspaceAdministrationCollection} from '@testcenter-rewrite-app/application';
+import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
+import {readOriginalTestAdministrationCollections} from '@testcenter-rewrite-app/application';
+import {readOriginalReviewCollection,mutateOriginalReviewCollection,readOriginalReviewPersonCollection,validateOriginalReviewCollections,synchronizeOriginalReviewCollection,deleteOriginalReviewCollection,type OriginalNativeReview} from '@testcenter-rewrite-app/application';
 import {changeOriginalMonitorLockCollection} from '@testcenter-rewrite-app/application';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {readOriginalMonitorCollections} from '@testcenter-rewrite-app/application';
@@ -9,6 +15,7 @@ import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testc
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber,mutateOriginalAdminCollections,type OriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestNumber, assertOriginalTestCreationCandidate, type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactCollections, activityResultParent, attachmentResultParent} from '@testcenter-rewrite-app/application';
@@ -135,6 +142,8 @@ type PersistedFirstSliceState = {
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
   originalNativeUnits: Record<string,OriginalNativeUnit>;
+  originalNativeReviews:Record<string,OriginalNativeReview>;
+  originalUnitReviewCounter:string;originalTestReviewCounter:string;
   originalTestNumbers: Record<string, OriginalTestNumberRecord>;
   originalTestNumberCounter: string;
   originalPersonNumbers: Record<string, OriginalPersonNumberRecord>;
@@ -142,6 +151,8 @@ type PersistedFirstSliceState = {
   originalTestRunsByNumber: Record<string,string>;
   originalWorkspaceNumbers: Record<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
+  originalAdminNumbers: Record<string,OriginalAdminNumber>;
+  originalAdminNumberCounter: string;
   originalNativeCommands: Record<string,OriginalCommandDelivery>;
   originalNativeCommandCounter: string;
   participantRunCommands: Record<string, ParticipantRunCommand>;
@@ -203,11 +214,15 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantLoginAttempts: {},
   testRuns: {},
   originalNativeUnits: {},
+  originalNativeReviews:{},
+  originalUnitReviewCounter:"0",originalTestReviewCounter:"0",
   originalTestNumbers: {},
   originalTestNumberCounter: "0",
   originalPersonNumbers: {},
   originalPersonNumberCounter: "0",
   originalTestRunsByNumber: {},
+  originalAdminNumbers: {},
+  originalAdminNumberCounter: '0',
   originalWorkspaceNumbers: {},
   originalWorkspaceNumberCounter: "0",
   originalNativeCommands: {},
@@ -777,6 +792,7 @@ const createFileRepository = (
       {const entries=Object.values(loaded.state.originalTestNumbers??{});const index=Object.fromEntries(entries.map(row=>[row.testNumber,row.testRunId]));if(Object.keys(index).length!==entries.length)throw Error('Duplicate native Test number.');loaded.state.originalTestRunsByNumber=index;}
 
       validateOriginalPersonNumbers(loaded.state.originalPersonNumbers,loaded.state.originalPersonNumberCounter,loaded.state.participantSessions);
+      validateOriginalReviewCollections(loaded.state);
       return loaded.state;
     });
     return cachePromise;
@@ -1024,6 +1040,9 @@ const createFileRepository = (
         return true;
       });
     },
+    async mutateOriginalAdminSession(selector,transform) {
+      return mutate(state=>mutateOriginalAdminCollections(state,state.adminSessions,'adminSessionId',selector,transform));
+    },
     async listAdminUsers() {
       const state = await getState();
       return Object.values(state.adminUsers);
@@ -1087,12 +1106,16 @@ const createFileRepository = (
     },
     async saveAdminUser(adminUser) {
       await mutate(state => {
+        assertOriginalAdminNameAvailable(adminUser,state.adminUsers[adminUser.adminUserId]??null,Object.values(state.adminUsers));
+        const identity=prepareOriginalAdminNumber(adminUser,state.originalAdminNumbers?.[adminUser.adminUserId]??null,state.originalAdminNumberCounter??'0');
+        state.originalAdminNumbers={...state.originalAdminNumbers,[adminUser.adminUserId]:identity.number};state.originalAdminNumberCounter=identity.counter;
         state.adminUsers[adminUser.adminUserId] = adminUser;
       });
     },
     async deleteAdminUser(adminUserId) {
       return mutate(state => {
         delete state.adminUsers[adminUserId];
+        if(state.originalAdminNumbers)delete state.originalAdminNumbers[adminUserId];
         let deletedRoleAssignmentCount = 0;
         for (const [roleAssignmentId, roleAssignment] of Object.entries(
           state.adminRoleAssignments
@@ -1229,6 +1252,7 @@ const createFileRepository = (
         deleteMatching(state.originalSessionTokens, workspaceMatches);
         deleteMatching(state.originalParticipantGroups, workspaceMatches);
         deleteMatching(state.originalNativeUnits,workspaceMatches);
+        deleteMatching(state.originalNativeReviews,workspaceMatches);
         deleteMatching(state.originalPersonNumbers,workspaceMatches);
         if(state.originalTestNumbers)deleteMatching(state.originalTestNumbers,row=>{if(!workspaceMatches(row))return false;delete state.originalTestRunsByNumber[row.testNumber];return true;});
         if(state.originalWorkspaceNumbers)deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
@@ -1822,6 +1846,8 @@ const createFileRepository = (
       if(!result.changed)return result.record.workspaceNumber;
       const next={...current,originalWorkspaceNumbers:{...current.originalWorkspaceNumbers,[input.workspaceId]:result.record},originalWorkspaceNumberCounter:result.counter};await persistState(next);cachePromise=Promise.resolve(next);return result.record.workspaceNumber;
     });},
+    async getOriginalWorkspaceReportSnapshot(input){return readOriginalWorkspaceReportCollections(await getState(),input);},
+    async findOriginalWorkspaceAdministrationScope(workspaceNumber){return readOriginalWorkspaceAdministrationCollection(await getState(),workspaceNumber);},
     async matchesOriginalWorkspaceNumber(input){const current=await getState(),row=current.originalWorkspaceNumbers?.[input.workspaceId];return row?.tenantId===input.tenantId&&row.workspaceNumber===input.workspaceNumber&&Object.values(current.workspacesByScope).some(w=>w.workspaceId===input.workspaceId&&w.tenantId===input.tenantId&&w.status==='active')&&Object.values(current.tenants).some(t=>t.tenantId===input.tenantId&&t.status==='active');},
     async findOriginalTestNumber(input){const current=await getState(),id=current.originalTestRunsByNumber[input.testNumber],row=id?current.originalTestNumbers?.[id]:undefined;
       return selectOwnedOriginalTestNumber(input,row,id?current.testRuns[id]??null:null,current.participantSessions[input.participantSessionId]??null);
@@ -1849,16 +1875,29 @@ const createFileRepository = (
       const state = await getState();
       return state.testRuns[testRunId] ?? null;
     },
+    async deleteOriginalSelectedTests(raw) {
+      const input=prepareOriginalTestDeletionInput(raw);
+      return mutate(state=>{
+        if(!Object.values(state.workspacesByScope).some(row=>row.tenantId===input.tenantId&&row.workspaceId===input.workspaceId))return null;
+        guardOriginalWorkspaceWriteCollections(state,state.adminSessions,input);
+        return deleteOriginalSelectedTestsFromCollections(state,input);
+      });
+    },
     async deleteOriginalGroupResults(raw) {
       const input = prepareOriginalGroupDeletionInput(raw);
       return mutate(state => {
         if (!Object.values(state.workspacesByScope).some(row => row.tenantId === input.tenantId && row.workspaceId === input.workspaceId)) return null;
+        guardOriginalWorkspaceWriteCollections(state,state.adminSessions,input);
         return deleteOriginalGroupsFromCollections(state, input);
       });
     },
     async listOriginalUnitsByWorkspace(tenantId,workspaceId){return structuredClone(Object.values((await getState()).originalNativeUnits).filter(unit=>unit.tenantId===tenantId&&unit.workspaceId===workspaceId));},
     async getOriginalUnit(input){return readOriginalUnitCollection(await getState(),input);},
     async mutateOriginalUnit(input,transform){return mutate(state=>mutateOriginalUnitCollection(state,input,transform));},
+    async listOriginalReviews(scope){return readOriginalReviewCollection(await getState(),scope);},
+    async mutateOriginalReview(scope,operation){return mutate(state=>mutateOriginalReviewCollection(state,scope,operation));},
+    async listOriginalReviewsByPerson(scope){return readOriginalReviewPersonCollection(await getState(),scope);},
+    async getOriginalTestAdministrationInventory(tenantId,workspaceId){const owned=await getState();return readOriginalTestAdministrationCollections(owned,{tenantId,workspaceId});},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       const state = await getState();
       const scoped = (row: {tenantId:string;workspaceId:string}) => row.tenantId === tenantId && row.workspaceId === workspaceId;
@@ -2036,6 +2075,7 @@ const createFileRepository = (
             if (receipt.testRunId === testRunId) delete state.participantProgressDeliveries[key];
           }
           for(const[key,row]of Object.entries(state.originalNativeUnits))if(row.testRunId===testRunId)delete state.originalNativeUnits[key];
+          deleteOriginalReviewCollection(state,row=>row.testRunId===testRunId);
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
             const nativeNumber=state.originalTestNumbers?.[testRunId];if(nativeNumber)delete state.originalTestRunsByNumber[nativeNumber.testNumber];
@@ -2124,6 +2164,7 @@ const createFileRepository = (
     async saveWorkspaceReview(review) {
       await mutate(state => {
         guardResultArtifactCollections(state, review);
+        synchronizeOriginalReviewCollection(state,review);
         state.workspaceReviews[review.reviewId] = review;
       });
     },
@@ -2131,6 +2172,7 @@ const createFileRepository = (
       let deleted = false;
       await mutate(state => {
         deleted = Boolean(state.workspaceReviews[reviewId]);
+        deleteOriginalReviewCollection(state,row=>row.reviewId===reviewId);
         delete state.workspaceReviews[reviewId];
       });
       return deleted;
@@ -2141,6 +2183,7 @@ const createFileRepository = (
       await mutate(state => {
         for (const review of Object.values(state.workspaceReviews)) {
           if (testRunIdSet.has(review.testRunId)) {
+            deleteOriginalReviewCollection(state,row=>row.reviewId===review.reviewId);
             delete state.workspaceReviews[review.reviewId];
             deletedCount += 1;
           }

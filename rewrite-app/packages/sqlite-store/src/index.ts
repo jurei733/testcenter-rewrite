@@ -1,3 +1,7 @@
+import {readOriginalWorkspaceReportSnapshot} from './original-workspace-reports.js';
+import {deleteOriginalSelectedTests} from './original-test-deletion.js';
+import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
+import {listOriginalNativeReviews,mutateOriginalNativeReview,listOriginalNativeReviewsByPerson,synchronizeOriginalNativeReview} from './original-native-review.js';
 import {changeOriginalMonitorTestLock} from './original-monitor-lock.js';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {createOriginalMonitorRepository} from './original-monitor-session.js';
@@ -9,6 +13,8 @@ import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '
 import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
+import {mutateOriginalAdminSession} from './original-admin-session.js';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
 import {allocateOriginalTestNumber} from './original-test-number.js';
@@ -1813,6 +1819,18 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
         tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,original_login_key TEXT NOT NULL,original_name_suffix TEXT NOT NULL,
         FOREIGN KEY(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix)
           REFERENCES participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) ON DELETE CASCADE);`}
+,{version:80,name:"original_native_reviews",sql:`CREATE TABLE original_native_review_counters(kind TEXT PRIMARY KEY CHECK(kind IN ('unit','test')),last_number TEXT NOT NULL);
+ INSERT INTO original_native_review_counters(kind,last_number) VALUES('unit','0'),('test','0');
+ CREATE TABLE original_native_reviews(kind TEXT NOT NULL CHECK(kind IN ('unit','test')),review_number TEXT NOT NULL,
+ review_id TEXT NOT NULL UNIQUE REFERENCES workspace_reviews(review_id) ON DELETE CASCADE,
+ test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+ participant_session_id TEXT NOT NULL REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE,
+ tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_release_id TEXT NOT NULL,review_json TEXT NOT NULL,
+ PRIMARY KEY(kind,review_number));
+ CREATE INDEX original_native_reviews_scope ON original_native_reviews(test_run_id,participant_session_id);`}
+,{version:81,name:'original_native_admin_numbers',sql:`CREATE TABLE original_admin_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+ INSERT INTO original_admin_number_counter(singleton,last_number) VALUES(1,'0');
+ CREATE TABLE original_admin_numbers(admin_number TEXT PRIMARY KEY,admin_user_id TEXT NOT NULL UNIQUE REFERENCES admin_users(admin_user_id) ON DELETE CASCADE);`}
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -2395,6 +2413,9 @@ export const createSqliteFirstSliceStorage = (
           .run(attachmentFileId).changes > 0
       );
     },
+    async mutateOriginalAdminSession(selector,transform) {
+      return mutateOriginalAdminSession(database, {user:mapAdminUser,session:mapAdminSession,role:mapAdminRoleAssignment,attempt:mapAdminLoginAttempt,workspace:mapWorkspace,tenant:mapTenant}, selector,transform);
+    },
     async listAdminUsers() {
       const rows = database
         .prepare(
@@ -2483,6 +2504,10 @@ export const createSqliteFirstSliceStorage = (
       }
     },
     async saveAdminUser(adminUser) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+      const names=database.prepare('SELECT admin_user_id,username FROM admin_users').all().map(r=>({adminUserId:String(r.admin_user_id),username:String(r.username)}));
+      assertOriginalAdminNameAvailable(adminUser,names.find(u=>u.adminUserId===adminUser.adminUserId)??null,names);
       database
         .prepare(
           `INSERT INTO admin_users (
@@ -2515,6 +2540,13 @@ export const createSqliteFirstSliceStorage = (
           adminUser.firstSignedInAt,
           adminUser.createdAt
         );
+      const previous=database.prepare('SELECT * FROM original_admin_numbers WHERE admin_user_id=?').get(adminUser.adminUserId);
+      const counter=database.prepare('SELECT last_number FROM original_admin_number_counter WHERE singleton=1').get();
+      const identity=prepareOriginalAdminNumber(adminUser,previous?{adminUserId:String(previous.admin_user_id),adminNumber:String(previous.admin_number)}:null,String(counter?.last_number));
+      if(!previous)database.prepare('INSERT INTO original_admin_numbers(admin_number,admin_user_id) VALUES(?,?)').run(identity.number.adminNumber,adminUser.adminUserId);
+      database.prepare('UPDATE original_admin_number_counter SET last_number=? WHERE singleton=1').run(identity.counter);
+      database.exec('COMMIT');
+      }catch(error){rollbackAfterFailure(database,error);}
     },
     async deleteAdminUser(adminUserId) {
       database.exec("BEGIN IMMEDIATE");
@@ -3780,6 +3812,8 @@ export const createSqliteFirstSliceStorage = (
       const row=mapWorkspace(database.prepare('SELECT * FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(input.tenantId,input.workspaceId) as Record<string,unknown>|undefined);
       const number=allocateOriginalWorkspaceNumber(database,input,row);database.exec("COMMIT");return number;
     }catch(error){return rollbackAfterFailure(database,error);}},
+    async getOriginalWorkspaceReportSnapshot(input){return readOriginalWorkspaceReportSnapshot(database,input);},
+    async findOriginalWorkspaceAdministrationScope(workspaceNumber){const row=database.prepare("SELECT n.tenant_id AS tenantId,n.workspace_id AS workspaceId,v.tenant_key AS tenantKey,w.workspace_key AS workspaceKey FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_number=? AND w.status='active' AND v.status='active'").get(workspaceNumber);return row?{tenantId:String(row.tenantId),workspaceId:String(row.workspaceId),tenantKey:String(row.tenantKey),workspaceKey:String(row.workspaceKey)}:null;},
     async matchesOriginalWorkspaceNumber(input){return Boolean(database.prepare('SELECT 1 FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_id=? AND n.tenant_id=? AND n.workspace_number=? AND w.status=? AND v.status=?').get(input.workspaceId,input.tenantId,input.workspaceNumber,'active','active'));},
     async findOriginalTestNumber(input){const row=database.prepare(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id
       JOIN participant_sessions p ON p.participant_session_id=m.participant_session_id AND p.tenant_id=m.tenant_id AND p.workspace_id=m.workspace_id AND p.content_release_id=m.content_release_id
@@ -3804,10 +3838,15 @@ export const createSqliteFirstSliceStorage = (
         .get(testRunId) as Record<string, unknown> | undefined;
       return mapTestRun(row);
     },
+    async deleteOriginalSelectedTests(input){return deleteOriginalSelectedTests(database,input);},
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(database, input);},
     async listOriginalUnitsByWorkspace(tenantId,workspaceId){return database.prepare('SELECT unit_json FROM original_native_units WHERE tenant_id=? AND workspace_id=?').all(tenantId,workspaceId).map(row=>JSON.parse(String(row.unit_json)));},
     async getOriginalUnit(input){return readOriginalNativeUnit(database,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(database,input,transform);},
+    async listOriginalReviews(scope){return listOriginalNativeReviews(database,scope);},
+    async mutateOriginalReview(scope,operation){return mutateOriginalNativeReview(database,scope,operation);},
+    async listOriginalReviewsByPerson(scope){return listOriginalNativeReviewsByPerson(database,scope);},
+    async getOriginalTestAdministrationInventory(tenantId,workspaceId){return readOriginalTestAdministrationInventory(database,tenantId,workspaceId);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(database, tenantId, workspaceId);
     },
@@ -4086,13 +4125,13 @@ export const createSqliteFirstSliceStorage = (
         .run(...testRunIds);
       return Number(result.changes);
     },
-    async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
+    async listParticipantTestLogsByWorkspace(tenantId, workspaceId, options) {
       const rows = database
         .prepare(
           `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, CAST(timestamp AS TEXT) AS timestamp, recorded_at, original_timestamp
-           FROM participant_test_logs
+           FROM participant_test_logs${options?.order==="collection"?" NOT INDEXED":""}
            WHERE tenant_id = ? AND workspace_id = ?
-           ORDER BY participant_test_logs.timestamp DESC, recorded_at DESC`
+           ${options?.order==="collection"?"":"ORDER BY participant_test_logs.timestamp DESC, recorded_at DESC"}`
         )
         .all(tenantId, workspaceId) as Record<string, unknown>[];
       return rows
@@ -4257,6 +4296,7 @@ export const createSqliteFirstSliceStorage = (
     },
     async saveWorkspaceReview(review) {
       withResultArtifactParent(database, review, () => {
+        synchronizeOriginalNativeReview(database,review);
         database
           .prepare(
             `INSERT INTO workspace_reviews (

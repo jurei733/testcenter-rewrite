@@ -1,11 +1,83 @@
 # Native participant Session boundary
 
+
+## Native Admin sessions and directory/password routes (2026-11-02)
+
+
+PostgreSQL retains REPEATABLE READ and now locks the actor's selected grant rows
+through the complete native Admin transaction. A grant updated/deleted after the
+snapshot, including during the global counter wait, triggers PostgreSQL40001
+and the existing complete-transaction retry. The retried operation sees current
+Root authority; privileged effects cannot use the old grant. A later revocation
+waits for an already-authorized user/audit commit. Eleven mandatory independent
+connection controls cover user creation, target password reset, both directories
+and current Session claims after grant deletion/update, including actual
+password-confirmed revocation by another Root. Denials retain target hashes,
+sessions, counters and unrelated audit state. This closes the specific observed
+snapshot gap; it does not establish whole UI/visual parity.
+
+
+PUT /session/admin, protected Admin challenges and GET/DELETE /session use the
+measured Source AccessSet. User and Workspace numbers are durable exact int64
+identities. Native login retains untrimmed stored spelling/German2 lookup and
+rejects historical ambiguity. Current explicit workspace grants, active scopes,
+account windows, password-change gates and token revocation remain binding.
+All four stores atomically verify credentials, rotate/refresh/revoke sessions,
+allocate identities and record audit effects. Source replay/rate/session
+weaknesses are not copied; proof tickets remain encrypted, expiring and one-use.
+
+GET /users and /workspaces are Root-only and project Source metadata DTOs,
+ordering and physical-file modification timestamps. PUT /user accepts literal
+{n,p} and returns a raw numeric201 identity; native and canonical creation share
+the same collation-collision boundary. PATCH /user/{id}/password accepts {p}
+and requires oldPassword for self changes, including administrator-set passwords.
+Own changes revoke previous sessions and return a fresh capability in AuthToken
+while preserving Source's empty200 body. Root resets revoke only target sessions,
+mark that target for a password change and issue no impersonation capability.
+Configured password strength and Source's60-byte ceiling remain enforced.
+
+Current regular Admin screens still use the canonical bridge. Workspace CRUD,
+rights management, other native Admin operations and actual Original
+Admin/Results/Tests UI adoption remain required. These implemented backend routes
+alone do not prove full functional or visual Original parity.
+
+
+### Native Unit report state provenance (2026-11-01)
+
+A Unit created by a Review has SQL NULL `laststate` in the pinned Original.
+An actual `PATCH /test/{id}/unit/{name}/state` with `newState: []` writes the
+JSONB object `{}`. A patch at timestamp zero also writes that object, even
+though its field is rejected. The public Unit GET is byte-identical in all
+three states; the operator response JSON and CSV distinguish null from `{}`.
+The Source68 witness in `source-workspace-results/native-result-report-http`
+retains these actual Apache/PHP/PostgreSQL18/Redis8 HTTP exchanges, with 137
+Source files and 19 locked production Composer packages independently checked.
+XML validation is enabled and test mode disabled; no SQL seeds or DAO stubs.
+The metadata-valid fixture player is not a rendered-player qualification.
+
+The private native Unit row now records `stateInitialized`: a Review-only
+creation stores false, and every accepted state-patch operation stores true.
+The existing durable Unit JSON retains that marker in all four stores without
+changing their schemas. This marker is not accepted as public write authority.
+Legacy nonempty state or even a zero-valued state-clock entry proves a previous
+state write and remains reportable. A legacy empty row with neither state-clock
+nor initialization evidence returns `original_unit_history_unknown` (409),
+instead of fabricating a null value. A real new patch establishes current
+provenance. Replays compare actual Source response/log bytes after reopening
+the stores and remove only the marker from a real zero-clock write to check
+legacy recovery. Unknown empty history remains a separate fail-closed control.
+
+This closes this bounded report-state distinction. Literal operator report
+routes, the native Results/Tests pages, broader report/history semantics and
+whole-project visual parity remain open.
+
+
 The participant boundary implements the Original paths `PUT /session/login`,
 `PUT /session/person`, `GET|PUT|DELETE /session`, `POST /session/challenge` and
 `POST /session/person/challenge`. It uses `AuthToken` and the Original participant
-AccessSet shape. Canonical RPC authentication remains available. Native admin and
-operational AccessSets, `/session/admin`, numeric administration and
-production native-transport adoption are still outstanding. Unit transport is
+AccessSet shape. Canonical RPC authentication remains available. Native Admin and operational AccessSets, `/session/admin` and participant
+native transport are implemented; actual Original Admin UI adoption and broader
+native management operations remain outstanding. Unit transport is
 implemented in the candidate described below. This does not establish
 paired visual parity.
 
@@ -434,3 +506,14 @@ foreign workspace denial, SQL decoder guards over private answers/state, lossles
 64-bit IDs and configured proof-of-work production HTTP. These endpoints support
 the forthcoming literal native Monitor frontend. Their backend qualification does
 not close the visible Monitor or broad visual parity requirements.
+
+
+### Native Monitor frontend integration (2026-10-28)
+
+`/app/group-monitor` now opens a native monitor session, including the production ALTCHA challenge and attached profile choices. Its group/profile routes use native `AuthToken` requests for snapshots, Booklet XML, profiles, commands and selected unlocks. Signed-int64 JSON IDs stay exact strings in the view and are serialized as numeric tokens for native selection bodies. Dotted group/profile IDs also resolve to the production browser entry on reload.
+
+The Source Monitor views, Booklet parser, filters, selection and controls are adapted to standalone Angular components, built-in control flow, ordinary Source view computations and signal updates. Fixed SVG glyphs retain the pinned Source paths. Private Booklet caches change with the current access object; group changes, empty snapshots and revoked native roles clear prior monitor data. Source provenance and limitations are recorded in `NATIVE-MONITOR-SOURCE.json`.
+
+The mandatory native Monitor browser gate exercises real protected login, two profile choices, IDs beyond JavaScript safe integers, actual pause/resume queues, owner state changes, selected unlock, quick filtering, reload, confirmed logout, another workspace with the same physical Booklet ID, empty snapshots after a real membership move, and current-role revocation. It preserves the visible Quick browser mode. The existing operator account details retain their DOM and styles in a deferred component to keep the initial bundle below the unchanged 470 kB hard limit.
+
+This integration is not a measured visual-parity qualification. Broader control/profile/layout coverage, native WebSocket transport and native participant poll/apply/empty-ACK adoption remain open.

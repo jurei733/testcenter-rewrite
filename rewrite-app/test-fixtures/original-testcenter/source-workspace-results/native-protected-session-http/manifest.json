@@ -1,0 +1,36 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "vendor": {
+    "sourceComposerLockSha256": "47c7dda51f6d27fbbc93aaedc99d364b9eeb299d80f92d68226b0218a436b708",
+    "installedMetadataSha256": "a36c0ba39721cefd2628912f2e5213a197e4ee86c0eb4b354ecf33be248d64b4",
+    "installedPackages": 19,
+    "requiredProductionPackages": 19,
+    "allInstalledVersionsAndSourceReferencesMatchPinnedLock": true
+  },
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "configuration": {
+    "bruteForceProtection": [
+      "login",
+      "person"
+    ],
+    "testMode": false,
+    "ownedDedicatedStack": true
+  },
+  "testMode": false,
+  "cases": 41,
+  "sourceBackendHttpCaptured": true,
+  "sourceCodeAndVendorUnmodified": true,
+  "actualPostgresAndRedis": true,
+  "actualAltchaSolutions": true,
+  "sqlSeedsOrDaoStubs": false,
+  "adminWorkspacePlayerUnitBookletRosterUploadedOverHttp": true,
+  "files": {
+    "capture.mjs": "e19c478d26e975187520fc24819f268b96f50871a80ee5f612eaa07351f02571",
+    "observations.json": "a5947356a5c0d998f2b6683b39c301234e56b843ad88ede0d47e844387a6808a"
+  },
+  "scope": "Actual protected login/person HTTP capture; stronger local sealed credentials, proof one-use and bearer/code redaction remain required. No whole Original parity claim.",
+  "httpExchanges": 41,
+  "nativeSessionExchanges": 33,
+  "setupExchanges": 8
+}

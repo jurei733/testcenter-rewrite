@@ -1,7 +1,7 @@
 import type {ParticipantViewSettings} from '@testcenter-rewrite-app/domain';
 
 export const originalSessionPaths = {
-  session: '/session', login: '/session/login', person: '/session/person',
+  session: '/session', login: '/session/login', person: '/session/person', admin: '/session/admin',
   challenge: '/session/challenge', personChallenge: '/session/person/challenge'
 } as const;
 export type OriginalTestAccess = {id: string; type: 'test'; label: string; flags: {locked: boolean; running: boolean}};
@@ -14,3 +14,13 @@ export type OriginalAccessSet = {
 };
 export type OriginalWorkChallenge = {algorithm: 'SHA-256'; challenge: string; maxNumber: number; salt: string; signature: string};
 export type OriginalWorkSolution = Omit<OriginalWorkChallenge, 'maxNumber'> & {number: number};
+
+export type OriginalWorkspaceAdminAccess = {id: string; type: 'workspaceAdmin'; label: string; flags: {mode: 'RO' | 'RW'}};
+/** Server-side exact decimal ID. The native formatter emits id as a PHP int64
+ * JSON number; workspace claim IDs remain decimal strings. */
+export type OriginalAdminAccessSet = {
+  token: string; displayName: string; loginName: string; groupLabel: null; id: string; pwSetByAdmin: boolean;
+  customTexts: Record<string, string>; flags: []; groupToken: null; viewSettings: [];
+  claims: {workspaceAdmin: OriginalWorkspaceAdminAccess[]; superAdmin?: []};
+  access: {workspaceAdmin: string[]; superAdmin?: []};
+};

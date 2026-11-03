@@ -1,0 +1,8 @@
+{
+  "actualUnchangedSourceMethod": "AccessSet::createFromAdminToken",
+  "actualPhpInvocation": "define('ROOT_DIR','/var/www/testcenter');require ROOT_DIR.'/backend/vendor/autoload.php';echo json_encode(AccessSet::createFromAdminToken(new Admin(9007199254740993,'Owned Native Ω','',true,'owned-method-only',true),new WorkspaceData(9007199254740995,'Owned Workspace β','RO')));",
+  "rawText": "{\"token\":\"owned-method-only\",\"displayName\":\"Owned Native \\u03a9\",\"loginName\":\"Owned Native \\u03a9\",\"groupLabel\":null,\"id\":9007199254740993,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[{\"id\":\"9007199254740995\",\"type\":\"workspaceAdmin\",\"label\":\"Owned Workspace \\u03b2\",\"flags\":{\"mode\":\"RO\"}}],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[\"9007199254740995\"],\"superAdmin\":[]}}",
+  "sha256": "fdbe20a034eaba0f8d2d758b2e6f21882e9ea6d5f0580d7b8af8ce14970758ca",
+  "noSqlOrHttpRequest": true,
+  "scope": "Pure Source serializer witness for unsafe int64 User ID and decimal-string Workspace claim ID; not real high-ID database history."
+}

@@ -279,6 +279,12 @@ type SettledVeronaResponse = Pick<
   "testRunId" | "unitKey" | "response"
 >;
 
+export type ParticipantNavigationToast = {
+  text: string;
+  additionalTexts?: readonly string[];
+  previous?: ParticipantNavigationToast | null;
+};
+
 export type ParticipantConfirmationDialog = {
   kind?: "information";
   title: string;
@@ -376,6 +382,7 @@ export class ParticipantViewFacade {
     | "save_failed" = "not_saved";
   testletUnlockCode = "";
   participantReviews: WorkspaceReview[] = [];
+  private participantReviewReadSequence = 0;
   reviewTarget: "unit" | "test" | "task" = "unit";
   reviewPageLabel = "";
   reviewerId = "";
@@ -480,7 +487,7 @@ export class ParticipantViewFacade {
     null
   );
   // Each attempt has its own identity, including repeated blocked clicks.
-  readonly originalNavigationToast = signal<{ text: string; additionalTexts?: readonly string[] } | null>(null);
+  readonly originalNavigationToast = signal<ParticipantNavigationToast | null>(null);
   private confirmationResolver: ((confirmed: boolean) => void) | null = null;
   private navigationAdvisoryTimeout: number | null = null;
   private readonly fullscreenChangeListener = (): void => {
@@ -2231,6 +2238,15 @@ export class ParticipantViewFacade {
     this.navigationAdvisory.set(null);
   }
 
+  private publishOriginalNavigationNotices(texts: readonly string[]): void {
+    if (!texts.length) return;
+    // An awaited API response can finish before Angular's next render. Retain
+    // each event in this action, including batches already shown by the view.
+    this.originalNavigationToast.set({
+      text: texts[0], additionalTexts: texts.slice(1), previous: this.originalNavigationToast()
+    });
+  }
+
   private startTimerTicker(): void {
     if (this.timerTickerHandle != null || !globalThis.window) {
       return;
@@ -2706,32 +2722,37 @@ export class ParticipantViewFacade {
     this.reviewFeedback = "Comment changes discarded.";
   }
 
-  saveReview(onSaved?: () => void, onSettled?: () => void): void {
+  saveReview(onSaved?: () => void, onSettled?: () => void, ownsEditor: () => boolean = () => true): void {
     if (!this.canSubmitReview) {
       onSettled?.();
       return;
     }
-    this.viewState.onActionAsync(() => this.saveReviewInternal()
-      .then(() => onSaved?.()).finally(() => onSettled?.()));
+    const runId = this.runtime.testRunId, unitKey = this.player.unitKey;
+    const isCurrent = () => ownsEditor() && this.runtime.testRunId === runId && this.player.unitKey === unitKey;
+    if (!isCurrent()) { onSettled?.(); return; }
+    this.viewState.onActionAsync(() => this.saveReviewInternal(isCurrent)
+      .then(() => { if (isCurrent()) onSaved?.(); }).finally(() => onSettled?.()));
   }
 
-  async deleteReview(review: WorkspaceReview, onDeleted?: () => void, onSettled?: () => void): Promise<void> {
+  async deleteReview(review: WorkspaceReview, onDeleted?: () => void, onSettled?: () => void, ownsEditor: () => boolean = () => true): Promise<void> {
     if (!this.player.canReview) {
       onSettled?.();
       return;
     }
+    const runId = this.runtime.testRunId, unitKey = this.player.unitKey;
+    const isCurrent = () => ownsEditor() && this.runtime.testRunId === runId && this.player.unitKey === unitKey;
     const accepted = await this.requestConfirmation({
       title: "Delete comment?",
       message: "Delete this participant comment permanently?",
       cancelLabel: "Keep comment",
       confirmLabel: "Delete comment"
     });
-    if (!accepted || !this.player.canReview) {
+    if (!accepted || !this.player.canReview || !isCurrent()) {
       onSettled?.();
       return;
     }
     this.viewState.onActionAsync(() =>
-      this.deleteReviewInternal(review.reviewId).then(() => onDeleted?.()).finally(() => onSettled?.())
+      this.deleteReviewInternal(review.reviewId, isCurrent).then(() => { if (isCurrent()) onDeleted?.(); }).finally(() => onSettled?.())
     );
   }
 
@@ -3319,9 +3340,7 @@ export class ParticipantViewFacade {
       response: this.runtime.currentUnitResponse, timer: this.player.testletTimer,
       lock: this.player.leaveLock, customText: this.customTextValue.bind(this) });
     this.clearNavigationAdvisory();
-    if (plan.originalNotices.length) this.originalNavigationToast.set({
-      text: plan.originalNotices[0], additionalTexts: plan.originalNotices.slice(1)
-    });
+    this.publishOriginalNavigationNotices(plan.originalNotices);
     if (plan.information) {
       await this.requestConfirmation(plan.information);
       return;
@@ -3335,17 +3354,12 @@ export class ParticipantViewFacade {
     if (this.viewLifecycleSequence !== viewLifecycleSequence ||
         this.readCurrentRunState()?.testRun.testRunId !== testRunId ||
         this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey || this.readCurrentRunState()?.testRun.status !== runStatus) return;
-    if (plan.afterTimerNotices.length) {
-      const notices = plan.prepareTimer ? plan.afterTimerNotices : [...plan.originalNotices, ...plan.afterTimerNotices];
-      this.originalNavigationToast.set({text: notices[0], additionalTexts: notices.slice(1)});
-    }
+    this.publishOriginalNavigationNotices(plan.afterTimerNotices);
     if (plan.confirmation && !(await this.requestConfirmation(plan.confirmation))) return;
     if (this.viewLifecycleSequence !== viewLifecycleSequence ||
         this.readCurrentRunState()?.testRun.testRunId !== testRunId ||
         this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey || this.readCurrentRunState()?.testRun.status !== runStatus) return;
-    if (plan.confirmedNotices.length) this.originalNavigationToast.set({
-      text: plan.confirmedNotices[0], additionalTexts: plan.confirmedNotices.slice(1)
-    });
+    this.publishOriginalNavigationNotices(plan.confirmedNotices);
     await this.returnToStarterInternal(plan.confirmTestletTimeLeave, plan.confirmTestletLeaveLock);
   }
 
@@ -4592,8 +4606,11 @@ export class ParticipantViewFacade {
 
   private async refreshParticipantReviewsInternal(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"],
-    quiet: boolean
+    quiet: boolean,
+    isCurrent: () => boolean
   ): Promise<void> {
+    if (!isCurrent()) return;
+    const sequence = ++this.participantReviewReadSequence;
     if (!currentState.executionMode.canReview) {
       this.participantReviews = [];
       this.resetReviewEditor();
@@ -4612,7 +4629,7 @@ export class ParticipantViewFacade {
         undefined,
         { quiet }
       );
-    this.participantReviews = payload.items;
+    if (sequence === this.participantReviewReadSequence && isCurrent()) this.participantReviews = payload.items;
   }
 
   private async selectAdaptiveStateInternal(
@@ -4650,7 +4667,7 @@ export class ParticipantViewFacade {
     }
   }
 
-  private async saveReviewInternal(): Promise<void> {
+  private async saveReviewInternal(isCurrent: () => boolean): Promise<void> {
     const currentState = this.readCurrentRunState();
     if (!currentState || !currentState.executionMode.canReview) {
       return;
@@ -4686,6 +4703,7 @@ export class ParticipantViewFacade {
           comment: this.reviewComment
         } satisfies UpdateParticipantReviewRequest
       );
+      if (!isCurrent()) return;
       this.reviewFeedback = "Comment updated.";
     } else {
       await this.requestState.request<ParticipantReviewResponse>(
@@ -4704,13 +4722,14 @@ export class ParticipantViewFacade {
           comment: this.reviewComment
         } satisfies CreateParticipantReviewRequest
       );
+      if (!isCurrent()) return;
       this.reviewFeedback = "Comment saved.";
     }
     this.resetReviewEditor();
-    await this.refreshParticipantReviewsInternal(currentState, true);
+    await this.refreshParticipantReviewsInternal(currentState, true, isCurrent);
   }
 
-  private async deleteReviewInternal(reviewId: string): Promise<void> {
+  private async deleteReviewInternal(reviewId: string, isCurrent: () => boolean): Promise<void> {
     const currentState = this.readCurrentRunState();
     if (!currentState || !currentState.executionMode.canReview) {
       return;
@@ -4723,11 +4742,12 @@ export class ParticipantViewFacade {
         reviewId
       })
     );
+    if (!isCurrent()) return;
     if (this.editingReviewId === reviewId) {
       this.resetReviewEditor();
     }
     this.reviewFeedback = "Comment deleted.";
-    await this.refreshParticipantReviewsInternal(currentState, true);
+    await this.refreshParticipantReviewsInternal(currentState, true, isCurrent);
   }
 
   private async refreshCurrentStateInternal(
@@ -4844,7 +4864,9 @@ export class ParticipantViewFacade {
       if (payload.currentRunState.booklet.policy.player.loadingMode !== "eager") {
         this.loadBookletAssetsInBackground(payload);
       }
-      await this.refreshParticipantReviewsInternal(payload.currentRunState, true);
+      await this.refreshParticipantReviewsInternal(payload.currentRunState, true, () =>
+        refreshSequence >= this.currentStateAppliedRefreshSequence && expectedSessionId === this.runtime.participantSessionId.trim() &&
+        expectedRunId === this.runtime.testRunId && this.readCurrentRunState()?.currentUnit.unitKey === payload.currentRunState.currentUnit.unitKey);
       if (refreshSequence < this.currentStateAppliedRefreshSequence) {
         return;
       }
@@ -5169,6 +5191,13 @@ export class ParticipantViewFacade {
       this.loadedBookletAssets.set(null);
     }
     this.captureTimerLifecycleTransitions(currentState.testRun);
+    if (this.currentRunState && (this.currentRunState.testRun.testRunId !== currentState.testRun.testRunId ||
+        this.currentRunState.currentUnit.unitKey !== currentState.currentUnit.unitKey)) {
+      // Source starts a clean Review when its Unit sequence changes. Reset at
+      // the accepted state transition so an old drawer cannot clear a newer
+      // editor, including one opened through the other interface.
+      this.resetReviewEditor();
+    }
     this.currentRunState = currentState;
     this.syncParticipantHeaderVisibility();
     this.workspace.tenantKey = currentState.scope.tenantKey;

@@ -48645,6 +48645,23 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assertSecurityHeaders(appFetchResponse);
   assert.match(appFetchResponse.headers.get("cache-control") ?? "", /no-cache/);
 
+  for (const path of ["/app/group-monitor/OWNED.UI.GROUP/full", "/app/group-monitor/OWNED.UI.GROUP/profile.7", "/app/group-monitor/owned%2Fgroup/profile.7"]) {
+    for (const method of ["GET", "HEAD"]) {
+      const nativeEntry = await fetch(baseUrl + path, { method });
+      assert.equal(nativeEntry.status, 200);
+      assert.match(nativeEntry.headers.get("content-type") ?? "", /text\/html/);
+      assertSecurityHeaders(nativeEntry);
+      assert.match(nativeEntry.headers.get("cache-control") ?? "", /no-cache/);
+      if (method === "HEAD") assert.equal(await nativeEntry.text(), "");
+      else assert.match(await nativeEntry.text(), /<app-root><\/app-root>/);
+    }
+  }
+  for (const path of ["/app/missing-native-test.js", "/app/group-monitor/owned/profile/unknown.js"]) {
+    const missingAsset = await fetch(baseUrl + path);
+    assert.equal(missingAsset.status, 404);
+    assert.match(missingAsset.headers.get("content-type") ?? "", /application\/json/);
+  }
+
   const participantEntryResponse = await fetch(
     `${baseUrl}/participant?workspaceKey=demo-workspace`,
     { redirect: "manual" }

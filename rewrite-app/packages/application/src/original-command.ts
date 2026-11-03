@@ -3,13 +3,15 @@ import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import type {OriginalCommandActor} from './original-command-queue.js';
 import {parseOriginalCommandFields,prepareOriginalCommandInsert,readOriginalLastCommandId,formatOriginalCommandsJson,originalCommandInteger} from './original-command-codec.js';
-import {resolveOriginalOwnedTestScope} from './original-test-access.js';
+import {resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
 import {FirstSliceError} from './first-slice-error.js';
 export type OriginalCommandPort={
  requireMonitor(input:{token:string}):Promise<void>;
  requireOwner(input:{token:string;testNumber:string}):Promise<void>;
  send(input:{token:string;body:unknown}):Promise<void>;
  poll(input:{token:string;testNumber:string;body:unknown}):Promise<string>;
+ pending(input:{token:string;testNumber:string}):Promise<string>;
+ connectionLost(input:{token:string;testNumber:string;stillDisconnected:()=>boolean}):Promise<void>;
  acknowledge(input:{token:string;testNumber:string;commandNumber:string}):Promise<'OK'|'OK, was already marked as executed'>;
 };
 export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort;repository:FirstSliceRepository;now:()=>string;id:()=>string}):OriginalCommandPort{
@@ -25,6 +27,26 @@ export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort
    // all-recipient INSERT may refund this globally reserved ID.
    const id=await input.repository.reserveOriginalCommandNumber(),stored=prepareOriginalCommandInsert(fields);
    await input.repository.appendOriginalCommand(actor,{id,...stored},targets);
+  },
+  async connectionLost({token,testNumber,stillDisconnected}){
+   const {run}=await resolveOriginalOwnedTest(input,token,testNumber);
+   await input.repository.mutateParticipantRun(run,context=>{
+    if(!stillDisconnected())return null;
+    const state=context.testRun.originalTestState;
+    if(!state||typeof state!=='object'||Array.isArray(state))throw new FirstSliceError(409,'original_test_state_unknown','The historical saved Test state is unavailable.');
+    if(state.CONNECTION==='LOST'||state.CONNECTION===true)return null;
+    const recordedAt=input.now();
+    // Source's zero-clock notification logs/modifies metadata without replacing
+    // the independently clocked CONNECTION state. Do not invent a LOST write.
+    return{testRun:{...context.testRun,updatedAt:recordedAt},originalResultModifiedAt:recordedAt,testLogs:[{
+     participantTestLogId:originalTestLogIdPrefix+input.id(),tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,testRunId:run.testRunId,
+     unitKey:null,originalUnitId:null,logKey:'"CONNECTION"',logContent:'LOST',timestamp:0,recordedAt
+    }],activityEvents:[]};
+   });
+  },
+  async pending({token,testNumber}){
+   const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber);
+   return formatOriginalCommandsJson(await input.repository.listOriginalCommands(scope,null));
   },
   async poll({token,testNumber,body}){
    const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber),last=readOriginalLastCommandId(body);

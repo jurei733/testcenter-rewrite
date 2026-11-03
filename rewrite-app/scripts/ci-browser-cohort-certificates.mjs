@@ -70,26 +70,55 @@ export function validateCohortCertificate(record,{bindings,context,before,requir
   return record;
 }
 
-export function validateCohortRegistry(value,bindings){
-  exactKeys(value,['version','records'],'cohort registry');assert.equal(value.version,1);
-  assert.ok(Array.isArray(value.records)&&value.records.length>0&&value.records.length<=16,'Invalid native cohort registry size');
-  const ids=new Set();let reference;
-  for(const record of value.records){
-    validateCohortCertificate(record,{bindings});assert.ok(!ids.has(record.id),'Duplicate native cohort certificate');ids.add(record.id);
+const requireIdenticalSourceInputs=records=>{
+  let reference;
+  for(const record of records){
     const material=record.nativeOracle.runtimeMaterial.material;
     const comparable={source:material.source,collector:material.scriptSha256,node:material.nodeVersion,
       browser:material.browserVersion,fonts:material.fontCatalogSha256,screen:material.screen,views:material.views};
     if(reference)assert.deepEqual(comparable,reference,'Qualified cohorts must retain identical Source pixels, fonts and browser inputs');
     else reference=comparable;
   }
+};
+
+export function validateCohortRegistry(value,bindings){
+  exactKeys(value,['version','records'],'cohort registry');assert.equal(value.version,1);
+  assert.ok(Array.isArray(value.records)&&value.records.length>0&&value.records.length<=16,'Invalid native cohort registry size');
+  const ids=new Set();
+  for(const record of value.records){
+    validateCohortCertificate(record,{bindings});assert.ok(!ids.has(record.id),'Duplicate native cohort certificate');ids.add(record.id);
+  }
+  requireIdenticalSourceInputs(value.records);
   return value.records;
 }
 
-export async function loadCohortCertificates(root){
-  const path=join(root,'scripts/fixtures/ci-browser-native-cohorts.json'),info=await lstat(path);
+export function validateCohortFamily(historical,qualified,bindings){
+  const reference=validateCohortRegistry(historical),records=validateCohortRegistry(qualified,bindings);
+  // Separate locks need their own actual qualification. They must still agree
+  // with the historical Source views, fonts, browser and measurement inputs.
+  requireIdenticalSourceInputs([...reference,...records]);
+  return records;
+}
+
+const readRegistry=async path=>{
+  const info=await lstat(path);
   assert.ok(info.isFile()&&!info.isSymbolicLink()&&info.size<=3*1024*1024,'Unsafe native cohort registry');
-  const value=JSON.parse(await readFile(path,'utf8'));
-  const records=validateCohortRegistry(value,await readCohortBindings(root));
+  return JSON.parse(await readFile(path,'utf8'));
+};
+
+export async function loadCohortCertificates(root){
+  const historical=await readRegistry(join(root,'scripts/fixtures/ci-browser-native-cohorts.json'));
+  const bindings=await readCohortBindings(root);
+  let qualified;
+  try{
+    qualified=await readRegistry(join(root,'scripts/fixtures/ci-browser-native-cohorts-'+bindings.lockSha256+'.json'));
+  }catch(error){
+    // Only an absent exact-lock file may use the legacy registry, which must
+    // independently satisfy the actual current bindings. Invalid files reject.
+    if(error.code!=='ENOENT')throw error;
+    qualified=historical;
+  }
+  const records=validateCohortFamily(historical,qualified,bindings);
   const freeze=value=>{
     if(value&&typeof value==='object'&&!Object.isFrozen(value)){
       Object.values(value).forEach(freeze);Object.freeze(value);

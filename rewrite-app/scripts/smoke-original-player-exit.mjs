@@ -426,6 +426,8 @@ try {
     const logo=page.locator("#participantApplicationLogoButton");await logo.click();
     await page.getByRole("alertdialog",{name:"Return to test selection?",exact:true}).waitFor();
     assert.ok(blocked>0);assert.equal(await page.locator("mat-dialog-container").count(),0);
+    await page.waitForFunction(()=>document.querySelector('#participantConfirmationBackdrop')?.matches(':modal'));
+    await page.screenshot({path:join(artifacts,'native-dialog-fallback.png')});
     const playerHost=page.locator("app-verona-player-host");
     assert.equal(await playerHost.evaluate(host=>host.inert),true,"The live Player must be inert behind a confirmation, including a failed lazy dialog import.");
     const playerFrame=page.frames().find(frame=>frame.parentFrame()===page.mainFrame());assert.ok(playerFrame);

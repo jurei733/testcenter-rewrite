@@ -1,0 +1,2790 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceHashes": {
+    "backend/index.php": "a4152e0457971f2047200478114e313a7a80ec58b37540baeaa8e18a0ab247d5",
+    "backend/initialize.php": "5c4c28147e1665f1ad430f1829423654fd9a0e5afbe7caf211f870d64f0656ef",
+    "backend/routes.php": "8ecafc8e25edaf2cd0453c180a23be8a8d0568f048000eb033d7772af1b3a213",
+    "backend/src/controller/AssetAssignmentController.class.php": "e307afb12e1df37a6580f14ca4fdcf02980ae022f0c35e5cb8138f95400126db",
+    "backend/src/controller/AssetController.class.php": "076a80c5d748228b81cdde4ad4241d47f951fb68fd6c963edba65b89edb7db74",
+    "backend/src/controller/AttachmentController.class.php": "9cd7d14166925fc342f31a0269e601ba7dba719717a4eee85d332f54022003fd",
+    "backend/src/controller/BookletController.class.php": "17c269fe37d01c1fc0aff7e5b0c76edb9026c9603ccedb9956d14446aca52661",
+    "backend/src/controller/Controller.class.php": "5737a5309104cdd8c38f581b8126cffe60a7c455dbd275ee950fa6d28669930b",
+    "backend/src/controller/MonitorController.class.php": "6cbde3f3eb4c7eec6f38aa1e6c2012488f46614e69fa688e81ad0411af92fc44",
+    "backend/src/controller/ReviewController.class.php": "29aeebea8fa3edecbfc471d4ca9e14ceadb64e9b9852cfa76fe39d20e96bad3a",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/controller/SpeedtestController.class.php": "2cc8b0b62510e1c9f39cc3b86dec2fe6134aedc0e948af04e2f01568bceb90c3",
+    "backend/src/controller/SystemController.class.php": "ef72f6dc675ba3962243bcddd11a41acca0085b70969700996e6bfeba62327a9",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/controller/UserController.class.php": "4db2b090b786c61801e589a3c984f98d06cdd46198d29e9120bddb386ca359db",
+    "backend/src/controller/WorkspaceController.class.php": "f9cb336fc05ad115d1ebfca923d48eb397ed94cd065ccbdd83c359849233a6b4",
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/AssetDAO.class.php": "68523d5f3133ae70c6c528ff34ddd37f963b83f35325f15716d7821fe78b2481",
+    "backend/src/dao/DAO.class.php": "76eea068ed1a0a4f98bfbcc78f063432b5af6ed122de8fa5b098076f500c8fe0",
+    "backend/src/dao/InitDAO.class.php": "dccb2452cc7768e767ce59d525339d1c7af11e0be3a8627f00e5f77e68cfb67d",
+    "backend/src/dao/ReviewDAO.class.php": "4dd27f0f2790ef50f8a02ad76ab6300ede0ecb79690eea357e2bc734eafdb3bb",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/dao/SuperAdminDAO.class.php": "9df7e3672e8fbb84a568e77ff5660737bd0f664a6de43918f78bbe727b1f8f18",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/dao/WorkspaceDAO.class.php": "74e8df283418921640d4e4ddb780ce95483f319bca974b7464a17f5d1bb341f4",
+    "backend/src/data-collection/AccessObject.class.php": "c4f0ce85985a62ce07a20de5bb2e88b7304103de2dfbb9f77897cde2522efa05",
+    "backend/src/data-collection/AccessObjectType.enum.php": "755f588bcf2777b64242d1cf9d865552f1ea4b644f54549eb0b1e51edfa57470",
+    "backend/src/data-collection/AccessSet.class.php": "e76d5c03c642a8d178c583766ffc66b27355c3606bb34add287e55ccb6cdca6c",
+    "backend/src/data-collection/Admin.class.php": "7a4591b4f0cfea0a77077ca0a712642145f1bf56de545610b610672e70dbd5b8",
+    "backend/src/data-collection/Attachment.class.php": "b5cd413287ce9ed7f494660fa053d8e115f80a3996a67764ca63cb2aad877bd4",
+    "backend/src/data-collection/AuthToken.class.php": "490b1bb7c8e2ec222b4575093eacedfb03065cad60f82ed7961110de4c736757",
+    "backend/src/data-collection/Command.class.php": "ad229250685b1219c8e30a85abab4f62c75c19da5d89f36fa35adef953cbf742",
+    "backend/src/data-collection/DataCollection.class.php": "7405639c008e69237aa61469d537d65a9c33390d3b8171fe9ab421ac2f81a593",
+    "backend/src/data-collection/DataCollectionTypeSafe.class.php": "6ccc2c21ceac3a43f52fd4a7463b9207c2115c3bcd3152eb8c9a667b1a1a0ec8",
+    "backend/src/data-collection/ExpirationState.class.php": "3b2358989cc58677e9fc28eb459dec5726d940c426ac382c413b839a16c2d96a",
+    "backend/src/data-collection/ExpirationStateType.enum.php": "6721b483572334023ec9b766cb1f0b6c290151da4f676746bc5e030768964afb",
+    "backend/src/data-collection/FailedLogin.enum.php": "0ef2529cb59a72ed130184c38d36262fa1158dfc9e868f5563fef57032ad153e",
+    "backend/src/data-collection/FileData.class.php": "b74f6346353ea262a0c94fb51d36759442a59da6bba4d55a9d9105b62a5742c0",
+    "backend/src/data-collection/FileDeletionReport.php": "d59827f9ad3b1a50f986573f79ecea3194f2c5bb23461aa4fb6b4ded9e4699d2",
+    "backend/src/data-collection/FileRelation.class.php": "2f4212cb1c4fcfb50ebcc014175a96767a3dc540487031e444295696d77a54e1",
+    "backend/src/data-collection/FileRelationshipType.class.php": "6a19b6def6f8c56916a6da4ad0761ff5693ad2ae93d175d82f69bfb89efec623",
+    "backend/src/data-collection/FileType.enum.php": "3363f79ab4c02c9f1ad6c21c3a22df7e107218fc4b116ee99dfb5eac9f6dffd2",
+    "backend/src/data-collection/Group.class.php": "a7f72e4e18ab1853512f902ecf52a44bda30305efe6a6b7bdae02ae38669d067",
+    "backend/src/data-collection/GroupResultStats.class.php": "79afaea436ee3a283e95e1ba37b244eb6e0224523888962de7cd7fd7769e1e33",
+    "backend/src/data-collection/InstallationArguments.class.php": "32518b1003a56e4117eb45a132eccff4c38ee6276d23b3ac49cbc5d5bac9bc3e",
+    "backend/src/data-collection/Login.class.php": "e33fdd4458b8d429b93341bb1294931415cfe3004f3ca3610af9ccbc8affda3c",
+    "backend/src/data-collection/LoginArray.class.php": "98b67dfe641d39e1ffe34ed9845541d3f3ec059ede0b86bd418d6e97545ae0be",
+    "backend/src/data-collection/LoginSession.class.php": "b4dccca03d7cc8241ceef4061550cd315d5cf1b68670c39a47ba66fd21c847c5",
+    "backend/src/data-collection/ModeCapability.enum.php": "4f89ea43dc814aa134f0bd31ba0ceecfe3fd6216b84108311a0b309b9198a8b3",
+    "backend/src/data-collection/Person.class.php": "d6d6dd0ece78a171e330c9258a7313ce77a25b95e36b958116a4f1a7bb83882f",
+    "backend/src/data-collection/PersonSession.class.php": "e1b577384df193b147dec4ed39c6430f16a93f7d91ff1f99e09fa1e835fd4926",
+    "backend/src/data-collection/ReportFormat.php": "3fb41e925c59daf7800a132187fb324f31a20562fbadd5932e464d90ea180f94",
+    "backend/src/data-collection/ReportType.php": "e6ca8b7b6a202f1348f2fb6f663de126ff4e03d8b7ef2aa99daec01f6488e69e",
+    "backend/src/data-collection/RequestedAttachment.class.php": "2f5fbc026e866c61ef811c2a22148dd355487973a9fb82db572c1854aa52bd20",
+    "backend/src/data-collection/SessionChangeMessage.class.php": "f73461197c01ee1f074c2b059b28d395b726f8fbc5c9fd0584a7d3cd2f3111f1",
+    "backend/src/data-collection/SessionChangeMessageArray.class.php": "9cbb9ee45e64272c3e236e3d29f5a45d0d32b3ccb7489beed1fced160091617c",
+    "backend/src/data-collection/SysCheckMode.php": "6ed3dc350af687ec1de0f12b455c18ee10e9a2810f9d6231bf3366b0e1f647b4",
+    "backend/src/data-collection/SysCheckReport.class.php": "a7321fe98b9535cca435d3df12276ecd210ed343de56e2a9742b74efba0b95ba",
+    "backend/src/data-collection/SystemCheck.php": "11f966345af3357d2763eaa7de7833b94a5e424b109c5ab5983a2c82052723c8",
+    "backend/src/data-collection/SystemCheckAccessObject.class.php": "7d5e973c7d7a8591437acc0041f82f101071d4fcc602683a9aa0be22c992f4af",
+    "backend/src/data-collection/TestData.class.php": "e7dbcd111dbd1b5287edc7122948965ce2db74ed5df865f2aa0eef983113faec",
+    "backend/src/data-collection/TestLog.class.php": "a7d19bd78ee744ebe26d41b3034d48b2ef80d637d7a5c560a22e875cde82574a",
+    "backend/src/data-collection/TestName.class.php": "9cc3de2c85f03ab3464cda4b2b1fa5539f4675cc86c418df068fefd6ced6922e",
+    "backend/src/data-collection/TestSession.class.php": "a7beb6d00a1a05ce03c8bdca62ae6e4a888bedac041326a6a15bdcffad1dc5eb",
+    "backend/src/data-collection/UnitLog.php": "351139441c71cd3dd29597383f656abe7e77875873b5ce27104f9725b60449db",
+    "backend/src/data-collection/WorkspaceData.class.php": "44d8e40be003b5c6a129368170dac233bb0db17eb812007aa79665f43b4db3f3",
+    "backend/src/data-collection/WorkspaceRole.enum.php": "54ba8baef3b71f91f6bc17ba01c699a5498eb73439d29d3bbb7862925c969cb8",
+    "backend/src/exception/DbConnectionException.class.php": "caea94e9e78998b723b954164ac9ee35090a9b7661d98b654b5884d3d674507f",
+    "backend/src/exception/HttpError.class.php": "9afa5b6ecdb2b116b96926d228eea0789339737a3a81ce8293e94ebbb0a5e0c7",
+    "backend/src/files/File.class.php": "f1628add4bad358e9e5f3cc2cf8110bde426dfdb595504ec6991e70ca9a976e5",
+    "backend/src/files/ResourceFile.class.php": "519d5cd82482f936af87ccfa394ea139a3085d089e80ea38f8f894a803693d8e",
+    "backend/src/files/SysCheckReportFile.class.php": "1dc05fadecedd8ee23e75cab3249fbd7b72f4a3a44d532044a0bff00e822e5d3",
+    "backend/src/files/XMLFile.class.php": "517dc5ca052e52bcc569c9c4f974240094647eaaf3758125c0a0eb702ff70c61",
+    "backend/src/files/XMLFileBooklet.class.php": "95cefab11030f5aa237941311874f46b4def068bcdd009638dfaec01b151bfa1",
+    "backend/src/files/XMLFileSysCheck.class.php": "d7857437a97847d01c6054bda9fd3bbe1580c2cb6a8b561aac3a738fc747626e",
+    "backend/src/files/XMLFileTesttakers.class.php": "20bd5e27314507982ba81f9f947b488ab86655290d8bf714c6ab7a9f8ba221f7",
+    "backend/src/files/XMLFileUnit.class.php": "56e42c9860d562f94d317e3c32c5a66b1cf62a9b2b378a7926df1cf5ab7ed017",
+    "backend/src/helper/AssetStorage.class.php": "353420c059912ee6d40137ef63c4f0cfa221c97f6450888ad1fc58589dbc864d",
+    "backend/src/helper/AttachmentFiles.class.php": "76d467373fbcb24a282034fcabab4aaadeb4cf4fe3a0caf6df89302425e9f0d5",
+    "backend/src/helper/AttachmentTemplate.class.php": "df91b9d6ac59440d366dca837681394b504a6ca911e57fb71b2deb293c01d4b2",
+    "backend/src/helper/BroadcastService.class.php": "874facc8417cb24276e3e9997ea76aad5dfba473f7c46da3f3f0cc7b4a300a55",
+    "backend/src/helper/CLI.class.php": "5be4fffdb473d5b104c9a630b5f7b6dacdf35abe837839a7f1675b136cd6f635",
+    "backend/src/helper/CSV.class.php": "77d3e0cfca1a99e37efccb49480b68d1737ea63ead252f25d18662ebe997bb84",
+    "backend/src/helper/CacheService.class.php": "0b793acfe34a6bdb20729e2c76dc95c186103553406aba3f9ec29aaa06a0cdbd",
+    "backend/src/helper/DB.class.php": "ce53c415910ee5c51141fde64fb109e44479d78337f1b89e6ff952c6c23028c5",
+    "backend/src/helper/DBSchema.class.php": "d4da64210ef5358a893a065893d719e2ff00d4ede2446e6a73e054206999b45e",
+    "backend/src/helper/ExternalFile.class.php": "3aaf2d056b318d06357fe1e9122a5a1638f3f5e87b36ef80724620911c711eae",
+    "backend/src/helper/FileExt.class.php": "6babc2ccdb0f4a05b379876cb7100629e61e456ecea05fa8f57c325a1ce27156",
+    "backend/src/helper/FileID.class.php": "8c490045d4e1af66639e2af191502a87f6062fada54d1ef57c523a7fe806214e",
+    "backend/src/helper/FileResponse.class.php": "1896bc0a2822d324a7a424fc744ab8d296aac1220fa2ee013e5183db9524bdb2",
+    "backend/src/helper/FileService.class.php": "6ff5eb664f975befc6b498b85a727ed11792d6cf2ac1e397482ce00f89312b28",
+    "backend/src/helper/FileSize.class.php": "020f42d9559680afa675b82a7893086a6a43cd0ea7f8cabe3bb8897af525b70d",
+    "backend/src/helper/FileTime.class.php": "ac428d00e95b5ab08253e492347afcde143b3ef715991fd15f8ad2c849c142f5",
+    "backend/src/helper/Folder.class.php": "d3e1d59460ab519bfa299992a5e12458d17a0ccbed8e7a8ccdcbbd4a1114b9f7",
+    "backend/src/helper/JSON.class.php": "bb2a79d8853f35a82c80b71ab769f857ae03d268ae1a5919dab72f14000bfeda",
+    "backend/src/helper/Mode.class.php": "bacc300340201d9698bb7a8fe96588403a8ac490dbb9c73677954a1a4d2a2b85",
+    "backend/src/helper/Password.class.php": "6f807473c2014ad8ece505448cea1375a9cce6fc8c688a1b9892676c8a016643",
+    "backend/src/helper/Random.class.php": "d36a65e5c516e5238229b16ab08c26e788f800a350283379e79a7ab387dfca7d",
+    "backend/src/helper/RequestHelper.class.php": "c5aab20fff896d13afb2c969346d91c3749e40936849e6d4d51ba74e0d2ab57f",
+    "backend/src/helper/ReviewCSVFormatter.php": "5db29ee7680ffa8ddf01febe71a95c0d5fc580091a4f5111ba819cc37123df2e",
+    "backend/src/helper/Server.class.php": "f173d96749355ed7aaf307f2fcb4d76ad948533964e31250eedb84de0d0e0835",
+    "backend/src/helper/State.class.php": "62475f6edc2adda96097658c33e67e2c5a7ad534ed5addb9d9a57b638e329c91",
+    "backend/src/helper/SystemConfig.class.php": "2f97c265453d34d1d7be465afd2b58ac2422f60fbdcf7e970352b60bc23e957d",
+    "backend/src/helper/TestEnvironment.class.php": "8f6262e0fcbd78d0693a3de98189b8368f6fa24f45b504958060e59b6970b70b",
+    "backend/src/helper/TimeStamp.class.php": "eba4eb49ca3dbe8aa99733a55b40b9259823edb05e0f67267e946c8bcac87a7d",
+    "backend/src/helper/Token.class.php": "d57516492d6f68fecfb070d3a9fd81edb245bd7c365c389c419504bcbaa87cf9",
+    "backend/src/helper/Version.class.php": "d5757233ce2a70919b005d1292201219d9bee5527639c0fc91c8d67de502878b",
+    "backend/src/helper/XMLSchema.class.php": "dd20acac130fa86736d8cb68238ea65b3d23f438be3126ade14226017d26a20b",
+    "backend/src/helper/ZIP.class.php": "a072bd47e570174bc501d0634ad6ab29ccf6accc45e0f0b1e5a654a083557069",
+    "backend/src/middleware/ErrorHandler.class.php": "94f8fd5a5a501ff03fb440f5201230b92e22224f59a0cabf7d4fc0dbc045965f",
+    "backend/src/middleware/HandleCorsPreflight.class.php": "074e0c47627ea9f67ecf5cc0e218b942d26e173f25ac91c2e69bfae68535c7fb",
+    "backend/src/middleware/HandleOptionalToken.class.php": "e30ee7e4365cb145b14bf45c34413564f6fe7257a5b05da152a19e2aef2d9537",
+    "backend/src/middleware/IsGroupMonitor.class.php": "49a0b75d3efaac0a3ad10d0dec9577b2ef54d319727ccaaaf573c5a065f1031a",
+    "backend/src/middleware/IsSuperAdmin.class.php": "68f1e80cdbed7970f9f4cc0303cba0f453a4175d8619808c1d10978bffa07739",
+    "backend/src/middleware/IsSuperAdminOrSelf.php": "143d9d19942c2ed34506db97eaec9090591155e666ca8095a0a6fbcf04ef6fd5",
+    "backend/src/middleware/IsTestOwner.class.php": "f2b8f79c3588801f0ddd057027682e2a554c791cae05cdf5242519a9b3b26316",
+    "backend/src/middleware/IsWorkspaceBlocked.class.php": "be88cd772f3459d3c5fdce17d08f051ae3868442f0a35321926752769d5789f4",
+    "backend/src/middleware/IsWorkspacePermitted.class.php": "c9db6d848266796d6bf29ed4468425a89db08c34278d947c110ecd9d2119c569",
+    "backend/src/middleware/MayModifyAttachments.class.php": "4e1f434570aa0ef71be83ffe7157ab6879e17a6be6ac5f840553600f48aeab5c",
+    "backend/src/middleware/MayReview.class.php": "7612d5376f23b89c6c4db859fe6644fd88e74e779907d684ad516fd8ea3823f2",
+    "backend/src/middleware/RequireToken.class.php": "f2d19714051837e46c07adec45bc1c52205cc9a282b37441a248bf9916f3c35a",
+    "backend/src/workspace/LogReportOutput.php": "cfcb2fd3418195fdac8bc6b7dcfeafeb53da36745c7fa1f37194e9fbf9da8b86",
+    "backend/src/workspace/Report.php": "f81129e75bfb3550205d3668fb2de1821967f20994c604cc0d41b380a13e543f",
+    "backend/src/workspace/ReportOutputFactory.php": "a94287404a75d0c933cd726c0b5a714503d7bd91dbaf56c416d1d20b63380f1a",
+    "backend/src/workspace/ResponseReportOutput.php": "0c88a1742d3e321cccb4c62c6fc34ca1627faa9b9e2763227310dc2dd1187466",
+    "backend/src/workspace/ReviewReportOutput.php": "d1f39523e236b0f2265da3a1892775f1bd5977fdc50da4c2091afab48282ba59",
+    "backend/src/workspace/SysCheckReportOutput.php": "a95e341b85194ddf65256cd33889925b680e249d246c669b23ade1b7862eb3da",
+    "backend/src/workspace/SysChecksFolder.class.php": "d5aa8f49861b6d36184de3c377d969312d65655a10daf15be570054141c0085e",
+    "backend/src/workspace/UploadedFilesHandler.class.php": "a7e4a8f062059ea7b49f5eb1dde4028edfc5120b3e399ef9b7686bf04dbe89e4",
+    "backend/src/workspace/Workspace.class.php": "5866681acead26a9dc570e0fd50a32a963e6e8f1b4098b98f3803d3d5a378ac0",
+    "backend/src/workspace/WorkspaceCache.class.php": "d4145a784fbb1397adb609380a9c1b10beaef371850ac7f537f2624d9fc5c4ac",
+    "backend/src/workspace/WorkspaceInitializer.class.php": "62343bd5e53ec4aefe8725438fb44f0bd2a658e9f5f9320c0d3af1655796c340",
+    "definitions/testtaker/custom-texts.json": "201f23fa1140265e84b47da978881269e4583c01a8e52dee22a731dc5af96edc",
+    "definitions/testtaker/mode-options.json": "4ad95c15ee7bbe78e475a03a4b37c6a86e102f7b26d83429536e6c37d854d339",
+    "definitions/testtaker/test-mode.json": "abbd8746a1f304b5ea6f01177a297b27fbd7c04742b687cfd13bffea1658619e",
+    "definitions/testtaker/testtaker.json": "eeb5ce41bedd00f4e91d1adfe3e90e187f3a798c290a6944cdb7593907188f34",
+    "scripts/database/full.sql": "9ac4b941ba40d75a563cbe4fb9d55075f27e46894902eb50100eb7263594ed08"
+  },
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "sourceComposerLockSha256": "47c7dda51f6d27fbbc93aaedc99d364b9eeb299d80f92d68226b0218a436b708",
+  "vendors": [
+    {
+      "containerRole": "open",
+      "installedPackages": 19,
+      "requiredProductionPackages": 19,
+      "installedMetadataSha256": "a36c0ba39721cefd2628912f2e5213a197e4ee86c0eb4b354ecf33be248d64b4"
+    },
+    {
+      "containerRole": "protected",
+      "installedPackages": 19,
+      "requiredProductionPackages": 19,
+      "installedMetadataSha256": "a36c0ba39721cefd2628912f2e5213a197e4ee86c0eb4b354ecf33be248d64b4"
+    }
+  ],
+  "phpVersions": {
+    "open": "8.3.36",
+    "protected": "8.3.36"
+  },
+  "actualPostgres": "PostgreSQL 18.4 (Debian 18.4-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "actualRedis": "# Server\r\nredis_version:8.0.6\r\nredis_git_sha1:00000000\r\nredis_git_dirty:1\r\nredis_build_id:811b7822f01653c5\r\nredis_mode:standalone\r\nos:Linux 6.8.0-117-generic aarch64\r\narch_bits:64\r\nmonotonic_clock:POSIX clock_gettime\r\nmultiplexing_api:epoll\r\natomicvar_api:c11-builtin\r\ngcc_version:12.2.0\r\nprocess_id:1\r\nprocess_supervised:no\r\nrun_id:78a2567c49448dde2ed7f055991188a8c0c4a8db\r\ntcp_port:6379\r\nserver_time_usec:1793632879042322\r\nuptime_in_seconds:64\r\nuptime_in_days:0\r\nhz:10\r\nconfigured_hz:10\r\nlru_clock:15247982\r\nexecutable:/data/redis-server\r\nconfig_file:\r\nio_threads_active:0\r\nlistener0:name=tcp,bind=*,bind=-::*,port=6379",
+  "configuration": {
+    "ownedDedicatedStack": true,
+    "testMode": false,
+    "xmlSchemaValidation": true,
+    "unprotectedAdminEndpoint": [
+      "login",
+      "person"
+    ],
+    "protectedAdminEndpoint": [
+      "admin",
+      "login",
+      "person"
+    ]
+  },
+  "mutationsOverActualHttp": true,
+  "sqlReadsOnly": [
+    {
+      "label": "admin-expiry-before-refresh",
+      "query": "SELECT extract(epoch FROM valid_until)::bigint FROM admin_sessions WHERE user_id=2",
+      "rawText": "1793668866"
+    },
+    {
+      "label": "admin-expiry-after-refresh",
+      "query": "SELECT extract(epoch FROM valid_until)::bigint FROM admin_sessions WHERE user_id=2",
+      "rawText": "1793668867"
+    },
+    {
+      "label": "admin-expiry-minutes",
+      "query": "SELECT round(extract(epoch FROM valid_until-current_timestamp)/60) FROM admin_sessions WHERE user_id=2",
+      "rawText": "600"
+    },
+    {
+      "label": "runtime-postgres",
+      "query": "SELECT version()",
+      "rawText": "PostgreSQL 18.4 (Debian 18.4-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+    }
+  ],
+  "sqlSeedsOrDaoStubs": false,
+  "rows": [
+    {
+      "label": "config-open",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/system/config",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 68,
+      "value": {
+        "version": "19.0.0",
+        "customTexts": {},
+        "appConfig": {},
+        "baseUrl": "http://127.0.0.1:32772",
+        "bruteForceProtection": [
+          "login",
+          "person"
+        ],
+        "veronaPlayerApiVersionMin": 2,
+        "veronaPlayerApiVersionMax": 6,
+        "iqbStandardResponseTypeMin": 1,
+        "iqbStandardResponseTypeMax": 1,
+        "xmlSchemaVersions": {
+          "Booklet": {
+            "repo": "testcenter-booklet-xml",
+            "min": 18,
+            "max": 18
+          },
+          "Testtakers": {
+            "repo": "testcenter-testtaker-xml",
+            "min": 17,
+            "max": 18
+          },
+          "Unit": {
+            "repo": "unit-xml",
+            "min": 17,
+            "max": 17
+          },
+          "SysCheck": {
+            "repo": "testcenter-syscheck-xml",
+            "min": 18,
+            "max": 18
+          }
+        },
+        "fileServiceUri": "",
+        "broadcastingServiceUri": "",
+        "supportedBrowsers": [
+          "chrome 154",
+          "chrome 153",
+          "edge 154",
+          "edge 153",
+          "firefox 157",
+          "firefox 156",
+          "firefox 140",
+          "ios_saf 27.0",
+          "ios_saf 26.6",
+          "safari 27",
+          "safari 26.6"
+        ],
+        "passwordMinLength": 8,
+        "passwordPattern": ".*"
+      },
+      "rawText": "{\"version\":\"19.0.0\",\"customTexts\":{},\"appConfig\":{},\"baseUrl\":\"http:\\/\\/127.0.0.1:32772\",\"bruteForceProtection\":[\"login\",\"person\"],\"veronaPlayerApiVersionMin\":2,\"veronaPlayerApiVersionMax\":6,\"iqbStandardResponseTypeMin\":1,\"iqbStandardResponseTypeMax\":1,\"xmlSchemaVersions\":{\"Booklet\":{\"repo\":\"testcenter-booklet-xml\",\"min\":18,\"max\":18},\"Testtakers\":{\"repo\":\"testcenter-testtaker-xml\",\"min\":17,\"max\":18},\"Unit\":{\"repo\":\"unit-xml\",\"min\":17,\"max\":17},\"SysCheck\":{\"repo\":\"testcenter-syscheck-xml\",\"min\":18,\"max\":18}},\"fileServiceUri\":\"\",\"broadcastingServiceUri\":\"\",\"supportedBrowsers\":[\"chrome 154\",\"chrome 153\",\"edge 154\",\"edge 153\",\"firefox 157\",\"firefox 156\",\"firefox 140\",\"ios_saf 27.0\",\"ios_saf 26.6\",\"safari 27\",\"safari 26.6\"],\"passwordMinLength\":8,\"passwordPattern\":\".*\"}",
+      "unredactedBodySha256": "a45bab8a3c548487d92104ef4b242047cc20b319fb1df5f26463b9222d2900a6",
+      "redactedBodySha256": "a45bab8a3c548487d92104ef4b242047cc20b319fb1df5f26463b9222d2900a6"
+    },
+    {
+      "label": "config-protected",
+      "endpoint": "protected",
+      "method": "GET",
+      "path": "/system/config",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 37,
+      "value": {
+        "version": "19.0.0",
+        "customTexts": {},
+        "appConfig": {},
+        "baseUrl": "http://127.0.0.1:32771",
+        "bruteForceProtection": [
+          "admin",
+          "login",
+          "person"
+        ],
+        "veronaPlayerApiVersionMin": 2,
+        "veronaPlayerApiVersionMax": 6,
+        "iqbStandardResponseTypeMin": 1,
+        "iqbStandardResponseTypeMax": 1,
+        "xmlSchemaVersions": {
+          "Booklet": {
+            "repo": "testcenter-booklet-xml",
+            "min": 18,
+            "max": 18
+          },
+          "Testtakers": {
+            "repo": "testcenter-testtaker-xml",
+            "min": 17,
+            "max": 18
+          },
+          "Unit": {
+            "repo": "unit-xml",
+            "min": 17,
+            "max": 17
+          },
+          "SysCheck": {
+            "repo": "testcenter-syscheck-xml",
+            "min": 18,
+            "max": 18
+          }
+        },
+        "fileServiceUri": "",
+        "broadcastingServiceUri": "",
+        "supportedBrowsers": [
+          "chrome 154",
+          "chrome 153",
+          "edge 154",
+          "edge 153",
+          "firefox 157",
+          "firefox 156",
+          "firefox 140",
+          "ios_saf 27.0",
+          "ios_saf 26.6",
+          "safari 27",
+          "safari 26.6"
+        ],
+        "passwordMinLength": 8,
+        "passwordPattern": ".*"
+      },
+      "rawText": "{\"version\":\"19.0.0\",\"customTexts\":{},\"appConfig\":{},\"baseUrl\":\"http:\\/\\/127.0.0.1:32771\",\"bruteForceProtection\":[\"admin\",\"login\",\"person\"],\"veronaPlayerApiVersionMin\":2,\"veronaPlayerApiVersionMax\":6,\"iqbStandardResponseTypeMin\":1,\"iqbStandardResponseTypeMax\":1,\"xmlSchemaVersions\":{\"Booklet\":{\"repo\":\"testcenter-booklet-xml\",\"min\":18,\"max\":18},\"Testtakers\":{\"repo\":\"testcenter-testtaker-xml\",\"min\":17,\"max\":18},\"Unit\":{\"repo\":\"unit-xml\",\"min\":17,\"max\":17},\"SysCheck\":{\"repo\":\"testcenter-syscheck-xml\",\"min\":18,\"max\":18}},\"fileServiceUri\":\"\",\"broadcastingServiceUri\":\"\",\"supportedBrowsers\":[\"chrome 154\",\"chrome 153\",\"edge 154\",\"edge 153\",\"firefox 157\",\"firefox 156\",\"firefox 140\",\"ios_saf 27.0\",\"ios_saf 26.6\",\"safari 27\",\"safari 26.6\"],\"passwordMinLength\":8,\"passwordPattern\":\".*\"}",
+      "unredactedBodySha256": "cd5e09c61309102ca324a719a5d4d5075daa0c5b26e66da50c94a485176e09dd",
+      "redactedBodySha256": "cd5e09c61309102ca324a719a5d4d5075daa0c5b26e66da50c94a485176e09dd"
+    },
+    {
+      "label": "root-first",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 619,
+      "value": {
+        "token": "[owned-token-3]",
+        "displayName": "super",
+        "loginName": "super",
+        "groupLabel": null,
+        "id": 1,
+        "pwSetByAdmin": false,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-3]\",\"displayName\":\"super\",\"loginName\":\"super\",\"groupLabel\":null,\"id\":1,\"pwSetByAdmin\":false,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[],\"superAdmin\":[]}}",
+      "unredactedBodySha256": "03b8aad5d411f1bdf9cf61d552391daa7a722553dd4feee007234e7f39c97f1c",
+      "requestBody": {
+        "name": "super",
+        "password": "[owned-root-password]"
+      },
+      "redactedBodySha256": "3cfc418eecdd735b1b44caf83f31d96175003cd09fa74215d1141faff8442bd5"
+    },
+    {
+      "label": "root-get-initial",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 31,
+      "value": {
+        "token": "[owned-token-3]",
+        "displayName": "super",
+        "loginName": "super",
+        "groupLabel": null,
+        "id": 1,
+        "pwSetByAdmin": false,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-3]\",\"displayName\":\"super\",\"loginName\":\"super\",\"groupLabel\":null,\"id\":1,\"pwSetByAdmin\":false,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[],\"superAdmin\":[]}}",
+      "unredactedBodySha256": "03b8aad5d411f1bdf9cf61d552391daa7a722553dd4feee007234e7f39c97f1c",
+      "redactedBodySha256": "3cfc418eecdd735b1b44caf83f31d96175003cd09fa74215d1141faff8442bd5"
+    },
+    {
+      "label": "direct-missing-body",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5cb96a88.11164545",
+      "testMode": "NO",
+      "elapsedMs": 20,
+      "value": "Required body-parameter is missing: `name`",
+      "rawText": "Required body-parameter is missing: `name`",
+      "unredactedBodySha256": "df26252be72e560934e4765cc089095df0bb28819391b90dee81efd65829a3f7",
+      "redactedBodySha256": "df26252be72e560934e4765cc089095df0bb28819391b90dee81efd65829a3f7"
+    },
+    {
+      "label": "direct-missing-name",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5cbda745.87924886",
+      "testMode": "NO",
+      "elapsedMs": 15,
+      "value": "Required body-parameter is missing: `name`",
+      "rawText": "Required body-parameter is missing: `name`",
+      "unredactedBodySha256": "df26252be72e560934e4765cc089095df0bb28819391b90dee81efd65829a3f7",
+      "requestBody": {
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "df26252be72e560934e4765cc089095df0bb28819391b90dee81efd65829a3f7"
+    },
+    {
+      "label": "direct-missing-password",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5cc1d7f1.23490654",
+      "testMode": "NO",
+      "elapsedMs": 17,
+      "value": "Required body-parameter is missing: `password`",
+      "rawText": "Required body-parameter is missing: `password`",
+      "unredactedBodySha256": "5eb8f1730dd60d15ccca9bf4e6affd47b7c5f8c6389cc49748388f113bd96a13",
+      "requestBody": {
+        "name": "super"
+      },
+      "redactedBodySha256": "5eb8f1730dd60d15ccca9bf4e6affd47b7c5f8c6389cc49748388f113bd96a13"
+    },
+    {
+      "label": "direct-null-name",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5cc59040.98868738",
+      "testMode": "NO",
+      "elapsedMs": 15,
+      "value": "Required body-parameter is missing: `name`",
+      "rawText": "Required body-parameter is missing: `name`",
+      "unredactedBodySha256": "df26252be72e560934e4765cc089095df0bb28819391b90dee81efd65829a3f7",
+      "requestBody": {
+        "name": null,
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "df26252be72e560934e4765cc089095df0bb28819391b90dee81efd65829a3f7"
+    },
+    {
+      "label": "direct-null-password",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5cca09a6.87480515",
+      "testMode": "NO",
+      "elapsedMs": 19,
+      "value": "Required body-parameter is missing: `password`",
+      "rawText": "Required body-parameter is missing: `password`",
+      "unredactedBodySha256": "5eb8f1730dd60d15ccca9bf4e6affd47b7c5f8c6389cc49748388f113bd96a13",
+      "requestBody": {
+        "name": "super",
+        "password": null
+      },
+      "redactedBodySha256": "5eb8f1730dd60d15ccca9bf4e6affd47b7c5f8c6389cc49748388f113bd96a13"
+    },
+    {
+      "label": "direct-name-empty",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5d55e493.76256924",
+      "testMode": "NO",
+      "elapsedMs": 524,
+      "value": "Internal error.",
+      "rawText": "Internal error.",
+      "unredactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "requestBody": {
+        "name": "",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "direct-name-over50",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5dd62812.18985118",
+      "testMode": "NO",
+      "elapsedMs": 527,
+      "value": "Internal error.",
+      "rawText": "Internal error.",
+      "unredactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "requestBody": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "direct-name-number",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5ddbc827.23253529",
+      "testMode": "NO",
+      "elapsedMs": 21,
+      "value": "Internal error.",
+      "rawText": "Internal error.",
+      "unredactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "requestBody": {
+        "name": 7,
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "direct-name-array",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5ddfa3c0.28559103",
+      "testMode": "NO",
+      "elapsedMs": 16,
+      "value": "Internal error.",
+      "rawText": "Internal error.",
+      "unredactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "requestBody": {
+        "name": [],
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "direct-name-object",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5de34052.29043391",
+      "testMode": "NO",
+      "elapsedMs": 14,
+      "value": "Internal error.",
+      "rawText": "Internal error.",
+      "unredactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "requestBody": {
+        "name": {},
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "direct-password-empty",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5e7d1ca1.15784169",
+      "testMode": "NO",
+      "elapsedMs": 582,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": "not-a-real-user-empty",
+        "password": ""
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "direct-password-number",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5e809867.78135367",
+      "testMode": "NO",
+      "elapsedMs": 14,
+      "value": "Internal error.",
+      "rawText": "Internal error.",
+      "unredactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "requestBody": {
+        "name": "not-a-real-user-number",
+        "password": 7
+      },
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "direct-password-array",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5e83ad55.65676755",
+      "testMode": "NO",
+      "elapsedMs": 13,
+      "value": "Internal error.",
+      "rawText": "Internal error.",
+      "unredactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "requestBody": {
+        "name": "not-a-real-user-array",
+        "password": []
+      },
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "direct-password-object",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5e869317.79506098",
+      "testMode": "NO",
+      "elapsedMs": 12,
+      "value": "Internal error.",
+      "rawText": "Internal error.",
+      "unredactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "requestBody": {
+        "name": "not-a-real-user-object",
+        "password": {}
+      },
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "protected-direct-empty-name",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5e89ab07.49179535",
+      "testMode": "NO",
+      "elapsedMs": 13,
+      "value": "Brute Force protection active. Challenge for this password must be solved to create a session",
+      "rawText": "Brute Force protection active. Challenge for this password must be solved to create a session",
+      "unredactedBodySha256": "de9fc11a4d628d3cefe8e7811056ec194ae39484f818b64bc01dad4a3ba46bef",
+      "requestBody": {
+        "name": "",
+        "password": ""
+      },
+      "redactedBodySha256": "de9fc11a4d628d3cefe8e7811056ec194ae39484f818b64bc01dad4a3ba46bef"
+    },
+    {
+      "label": "protected-direct-valid-name",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5e8d1ac0.14198695",
+      "testMode": "NO",
+      "elapsedMs": 14,
+      "value": "Brute Force protection active. Challenge for this password must be solved to create a session",
+      "rawText": "Brute Force protection active. Challenge for this password must be solved to create a session",
+      "unredactedBodySha256": "de9fc11a4d628d3cefe8e7811056ec194ae39484f818b64bc01dad4a3ba46bef",
+      "requestBody": {
+        "name": "super",
+        "password": "[owned-root-password]"
+      },
+      "redactedBodySha256": "de9fc11a4d628d3cefe8e7811056ec194ae39484f818b64bc01dad4a3ba46bef"
+    },
+    {
+      "label": "protected-direct-missing-password",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5e908cb4.15866279",
+      "testMode": "NO",
+      "elapsedMs": 14,
+      "value": "Required body-parameter is missing: `password`",
+      "rawText": "Required body-parameter is missing: `password`",
+      "unredactedBodySha256": "5eb8f1730dd60d15ccca9bf4e6affd47b7c5f8c6389cc49748388f113bd96a13",
+      "requestBody": {
+        "name": "super"
+      },
+      "redactedBodySha256": "5eb8f1730dd60d15ccca9bf4e6affd47b7c5f8c6389cc49748388f113bd96a13"
+    },
+    {
+      "label": "create-user-OwnedÄdmin",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 77,
+      "value": 2,
+      "rawText": "2",
+      "unredactedBodySha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+      "requestBody": {
+        "n": "OwnedÄdmin",
+        "p": "[owned-password]"
+      },
+      "redactedBodySha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+    },
+    {
+      "label": "create-user-NoWorkspaces",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 75,
+      "value": 3,
+      "rawText": "3",
+      "unredactedBodySha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+      "requestBody": {
+        "n": "NoWorkspaces",
+        "p": "[owned-password]"
+      },
+      "redactedBodySha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+    },
+    {
+      "label": "create-user-RateOwned",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 74,
+      "value": 4,
+      "rawText": "4",
+      "unredactedBodySha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "requestBody": {
+        "n": "RateOwned",
+        "p": "[owned-password]"
+      },
+      "redactedBodySha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+    },
+    {
+      "label": "create-user-R58Observer",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 74,
+      "value": 5,
+      "rawText": "5",
+      "unredactedBodySha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+      "requestBody": {
+        "n": "R58Observer",
+        "p": "[owned-password]"
+      },
+      "redactedBodySha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d"
+    },
+    {
+      "label": "create-workspace-Zulu Ω",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 19,
+      "value": 1,
+      "rawText": "1",
+      "unredactedBodySha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "requestBody": {
+        "name": "Zulu Ω"
+      },
+      "redactedBodySha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "label": "create-workspace-Alpha Ä",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": 2,
+      "rawText": "2",
+      "unredactedBodySha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+      "requestBody": {
+        "name": "Alpha Ä"
+      },
+      "redactedBodySha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+    },
+    {
+      "label": "root-users",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 17,
+      "value": [
+        {
+          "name": "NoWorkspaces",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "OwnedÄdmin",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "R58Observer",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "RateOwned",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "rawText": "[{\"name\":\"NoWorkspaces\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned\\u00c4dmin\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"R58Observer\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"RateOwned\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "unredactedBodySha256": "0d9af821a00e5d973c2df5c0670364cc5f78c1e93c4f581af56a8b4ea029aa0e",
+      "redactedBodySha256": "0d9af821a00e5d973c2df5c0670364cc5f78c1e93c4f581af56a8b4ea029aa0e"
+    },
+    {
+      "label": "root-workspaces",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": [
+        {
+          "id": 2,
+          "name": "Alpha Ä",
+          "latest_modification_ts": null
+        },
+        {
+          "id": 1,
+          "name": "Zulu Ω",
+          "latest_modification_ts": null
+        }
+      ],
+      "rawText": "[{\"id\":2,\"name\":\"Alpha \\u00c4\",\"latest_modification_ts\":null},{\"id\":1,\"name\":\"Zulu \\u03a9\",\"latest_modification_ts\":null}]",
+      "unredactedBodySha256": "2d7c2e66654155ae7210e04cc1a289b75864dfc4b824250ee795388a227f19c7",
+      "redactedBodySha256": "2d7c2e66654155ae7210e04cc1a289b75864dfc4b824250ee795388a227f19c7"
+    },
+    {
+      "label": "user-no-workspaces",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 611,
+      "value": {
+        "token": "[owned-token-4]",
+        "displayName": "NoWorkspaces",
+        "loginName": "NoWorkspaces",
+        "groupLabel": null,
+        "id": 3,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-4]\",\"displayName\":\"NoWorkspaces\",\"loginName\":\"NoWorkspaces\",\"groupLabel\":null,\"id\":3,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "f9ce830e8a7cf8f9ee18c615c8bd5c117ba8ef0eed5b5f79b8616c7624c883cf",
+      "requestBody": {
+        "name": "NoWorkspaces",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "80845a46db05e9b3063ab1c84965b7ff3e73ff9e32616c6b2e218ba89f2ccc47"
+    },
+    {
+      "label": "regular-users-denied",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/users",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5f91b925.06144067",
+      "testMode": "NO",
+      "elapsedMs": 21,
+      "value": "Only SuperAdmins can do that!",
+      "rawText": "Only SuperAdmins can do that!",
+      "unredactedBodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90",
+      "redactedBodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90"
+    },
+    {
+      "label": "regular-workspaces-denied",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa5f961fc8.63226605",
+      "testMode": "NO",
+      "elapsedMs": 18,
+      "value": "Only SuperAdmins can do that!",
+      "rawText": "Only SuperAdmins can do that!",
+      "unredactedBodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90",
+      "redactedBodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90"
+    },
+    {
+      "label": "admin-no-grants",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 603,
+      "value": {
+        "token": "[owned-token-5]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-5]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "c2de4b8f799eef12bb78e2ab9b6bcb26876fabdc61fd2f3e1147e9d7143c041f",
+      "requestBody": {
+        "name": "OwnedÄdmin",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "5f491bf17dec5da6a82a964df6e2df02164a26811124651eb2a98e967773745c"
+    },
+    {
+      "label": "admin-case-folded-name",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 609,
+      "value": {
+        "token": "[owned-token-6]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-6]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "e4624c8d5b2035158f7fa02d90b4cdf0bf6fddc25f8c0581f2389ef4a54703b7",
+      "requestBody": {
+        "name": "OWNEDÄDMIN",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "b7b6100cf84cd94d6183a73170e8d86d4c7c356f9a63231d95d3df5afc6493fc"
+    },
+    {
+      "label": "old-admin-token-rotated",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa60cf1aa9.68338974",
+      "testMode": "NO",
+      "elapsedMs": 21,
+      "value": "Invalid token: `[owned-token-5]`",
+      "rawText": "Invalid token: `[owned-token-5]`",
+      "unredactedBodySha256": "ece48184fc345843dd276e1fb35512eeb830dac0b9f9c7a6b158ee1d6e3c99ee",
+      "redactedBodySha256": "12fb15b0f0254a67afc037e530d3328a22f8d4e5bc45dbfda670df9bbea84999"
+    },
+    {
+      "label": "admin-leading-space-name",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa615bc651.37210700",
+      "testMode": "NO",
+      "elapsedMs": 527,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": " OwnedÄdmin",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "admin-trailing-space-name",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa61e7d250.35126385",
+      "testMode": "NO",
+      "elapsedMs": 573,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": "OwnedÄdmin ",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "session-get-missing",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 401,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa61eb1371.54985698",
+      "testMode": "NO",
+      "elapsedMs": 13,
+      "value": "Auth Header not sufficient: missing",
+      "rawText": "Auth Header not sufficient: missing",
+      "unredactedBodySha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+      "redactedBodySha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd"
+    },
+    {
+      "label": "session-delete-missing",
+      "endpoint": "open",
+      "method": "DELETE",
+      "path": "/session",
+      "status": 401,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa61ee3176.37122818",
+      "testMode": "NO",
+      "elapsedMs": 13,
+      "value": "Auth Header not sufficient: missing",
+      "rawText": "Auth Header not sufficient: missing",
+      "unredactedBodySha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+      "redactedBodySha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd"
+    },
+    {
+      "label": "session-get-empty",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 401,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa61f123c2.83550783",
+      "testMode": "NO",
+      "elapsedMs": 12,
+      "value": "Auth Header not sufficient: empty",
+      "rawText": "Auth Header not sufficient: empty",
+      "unredactedBodySha256": "c5fff6e237a207d233f5d04a5b7b7d697fcd0f068ecda09ac7604be46131c852",
+      "redactedBodySha256": "c5fff6e237a207d233f5d04a5b7b7d697fcd0f068ecda09ac7604be46131c852"
+    },
+    {
+      "label": "session-delete-empty",
+      "endpoint": "open",
+      "method": "DELETE",
+      "path": "/session",
+      "status": 401,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa61f40692.94396701",
+      "testMode": "NO",
+      "elapsedMs": 12,
+      "value": "Auth Header not sufficient: empty",
+      "rawText": "Auth Header not sufficient: empty",
+      "unredactedBodySha256": "c5fff6e237a207d233f5d04a5b7b7d697fcd0f068ecda09ac7604be46131c852",
+      "redactedBodySha256": "c5fff6e237a207d233f5d04a5b7b7d697fcd0f068ecda09ac7604be46131c852"
+    },
+    {
+      "label": "session-get-invalid",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6204d636.13181165",
+      "testMode": "NO",
+      "elapsedMs": 20,
+      "value": "Invalid token: `owned-invalid`",
+      "rawText": "Invalid token: `owned-invalid`",
+      "unredactedBodySha256": "6a95d18ad5958d79ab9f7bf585e20a0fa2f63b38493674cc46633a55af9ccda6",
+      "redactedBodySha256": "6a95d18ad5958d79ab9f7bf585e20a0fa2f63b38493674cc46633a55af9ccda6"
+    },
+    {
+      "label": "session-delete-invalid",
+      "endpoint": "open",
+      "method": "DELETE",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa62090e51.47004951",
+      "testMode": "NO",
+      "elapsedMs": 17,
+      "value": "Invalid token: `owned-invalid`",
+      "rawText": "Invalid token: `owned-invalid`",
+      "unredactedBodySha256": "6a95d18ad5958d79ab9f7bf585e20a0fa2f63b38493674cc46633a55af9ccda6",
+      "redactedBodySha256": "6a95d18ad5958d79ab9f7bf585e20a0fa2f63b38493674cc46633a55af9ccda6"
+    },
+    {
+      "label": "admin-get-method",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session/admin",
+      "status": 405,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa620bada8.28991464",
+      "testMode": "NO",
+      "elapsedMs": 10,
+      "value": "Method not allowed. Must be one of: PUT",
+      "rawText": "Method not allowed. Must be one of: PUT",
+      "unredactedBodySha256": "52bc5b2a8884539e7aed6cde5386a8f58b90ae9ddf034252fceb38d38279648e",
+      "redactedBodySha256": "52bc5b2a8884539e7aed6cde5386a8f58b90ae9ddf034252fceb38d38279648e"
+    },
+    {
+      "label": "session-post-method",
+      "endpoint": "open",
+      "method": "POST",
+      "path": "/session",
+      "status": 405,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa620e1477.31647731",
+      "testMode": "NO",
+      "elapsedMs": 10,
+      "value": "Method not allowed. Must be one of: GET, PUT, DELETE",
+      "rawText": "Method not allowed. Must be one of: GET, PUT, DELETE",
+      "unredactedBodySha256": "67fa25810438d96b29008bf5b60a4f8bcd65968596641f4ac2b65200774f5fc4",
+      "redactedBodySha256": "67fa25810438d96b29008bf5b60a4f8bcd65968596641f4ac2b65200774f5fc4"
+    },
+    {
+      "label": "set-admin-grants-45",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/2/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 19,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "ws": [
+          {
+            "id": 1,
+            "role": "RO"
+          },
+          {
+            "id": 2,
+            "role": "RW"
+          }
+        ]
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "session-live-explicit-grants",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 19,
+      "value": {
+        "token": "[owned-token-6]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [
+            {
+              "id": "1",
+              "type": "workspaceAdmin",
+              "label": "Zulu Ω",
+              "flags": {
+                "mode": "RO"
+              }
+            },
+            {
+              "id": "2",
+              "type": "workspaceAdmin",
+              "label": "Alpha Ä",
+              "flags": {
+                "mode": "RW"
+              }
+            }
+          ]
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [
+            "1",
+            "2"
+          ]
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-6]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[{\"id\":\"1\",\"type\":\"workspaceAdmin\",\"label\":\"Zulu \\u03a9\",\"flags\":{\"mode\":\"RO\"}},{\"id\":\"2\",\"type\":\"workspaceAdmin\",\"label\":\"Alpha \\u00c4\",\"flags\":{\"mode\":\"RW\"}}]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[\"1\",\"2\"]}}",
+      "unredactedBodySha256": "503e653e381b27e1dfe874e5c084aa3086f37b5809c7074db2be0020ed4aa7af",
+      "redactedBodySha256": "eb8a3b9a2475b2eee5c66d925e0d899ec6d0f431446c3b00dff8dd08a00bdcd8"
+    },
+    {
+      "label": "root-no-inherited-workspace",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/workspace/1/results",
+      "status": 404,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa621bd768.27294981",
+      "testMode": "NO",
+      "elapsedMs": 18,
+      "value": "Workspace `1` not found.",
+      "rawText": "Workspace `1` not found.",
+      "unredactedBodySha256": "d9a83815740e987948841dfd78dcf9fcfa784e9b5335dd4d65df2d305f7fe1c8",
+      "redactedBodySha256": "d9a83815740e987948841dfd78dcf9fcfa784e9b5335dd4d65df2d305f7fe1c8"
+    },
+    {
+      "label": "regular-RO-results",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/workspace/1/results",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 19,
+      "value": [],
+      "rawText": "[]",
+      "unredactedBodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "redactedBodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "label": "workspace-live-rename",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/workspace/1",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "name": "Changed current workspace β"
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "session-live-renamed-label",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 19,
+      "value": {
+        "token": "[owned-token-6]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [
+            {
+              "id": "1",
+              "type": "workspaceAdmin",
+              "label": "Changed current workspace β",
+              "flags": {
+                "mode": "RO"
+              }
+            },
+            {
+              "id": "2",
+              "type": "workspaceAdmin",
+              "label": "Alpha Ä",
+              "flags": {
+                "mode": "RW"
+              }
+            }
+          ]
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [
+            "1",
+            "2"
+          ]
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-6]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[{\"id\":\"1\",\"type\":\"workspaceAdmin\",\"label\":\"Changed current workspace \\u03b2\",\"flags\":{\"mode\":\"RO\"}},{\"id\":\"2\",\"type\":\"workspaceAdmin\",\"label\":\"Alpha \\u00c4\",\"flags\":{\"mode\":\"RW\"}}]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[\"1\",\"2\"]}}",
+      "unredactedBodySha256": "834b993815909f9a923cb0ab472634d3683ff63ee72c7e4bc7168731cfd7d984",
+      "redactedBodySha256": "6d66d0a6b706e5eb4ba237cc1969e3af08878b403e5add1dbe9eeaab5a24c6be"
+    },
+    {
+      "label": "session-refreshes-expiry",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 23,
+      "value": {
+        "token": "[owned-token-6]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [
+            {
+              "id": "1",
+              "type": "workspaceAdmin",
+              "label": "Changed current workspace β",
+              "flags": {
+                "mode": "RO"
+              }
+            },
+            {
+              "id": "2",
+              "type": "workspaceAdmin",
+              "label": "Alpha Ä",
+              "flags": {
+                "mode": "RW"
+              }
+            }
+          ]
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [
+            "1",
+            "2"
+          ]
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-6]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[{\"id\":\"1\",\"type\":\"workspaceAdmin\",\"label\":\"Changed current workspace \\u03b2\",\"flags\":{\"mode\":\"RO\"}},{\"id\":\"2\",\"type\":\"workspaceAdmin\",\"label\":\"Alpha \\u00c4\",\"flags\":{\"mode\":\"RW\"}}]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[\"1\",\"2\"]}}",
+      "unredactedBodySha256": "834b993815909f9a923cb0ab472634d3683ff63ee72c7e4bc7168731cfd7d984",
+      "redactedBodySha256": "6d66d0a6b706e5eb4ba237cc1969e3af08878b403e5add1dbe9eeaab5a24c6be"
+    },
+    {
+      "label": "set-admin-grants-52",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/2/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "ws": [
+          {
+            "id": 1,
+            "role": ""
+          },
+          {
+            "id": 2,
+            "role": ""
+          }
+        ]
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "session-live-all-grants-revoked",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": {
+        "token": "[owned-token-6]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-6]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "e4624c8d5b2035158f7fa02d90b4cdf0bf6fddc25f8c0581f2389ef4a54703b7",
+      "redactedBodySha256": "b7b6100cf84cd94d6183a73170e8d86d4c7c356f9a63231d95d3df5afc6493fc"
+    },
+    {
+      "label": "revoked-workspace-hidden",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/workspace/1/results",
+      "status": 404,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6393d701.65157655",
+      "testMode": "NO",
+      "elapsedMs": 18,
+      "value": "Workspace `1` not found.",
+      "rawText": "Workspace `1` not found.",
+      "unredactedBodySha256": "d9a83815740e987948841dfd78dcf9fcfa784e9b5335dd4d65df2d305f7fe1c8",
+      "redactedBodySha256": "d9a83815740e987948841dfd78dcf9fcfa784e9b5335dd4d65df2d305f7fe1c8"
+    },
+    {
+      "label": "promote-admin",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/2/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 74,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "session-live-promoted",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": {
+        "token": "[owned-token-6]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-6]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[],\"superAdmin\":[]}}",
+      "unredactedBodySha256": "78d79a6ba5f72a1915668c6cf24f39e4423a906eb08a921ed823b31c10756522",
+      "redactedBodySha256": "54614c7c734f2d66d0f875ebd1a7378bdd0b8a4cf300f285592306401adb9683"
+    },
+    {
+      "label": "promoted-directory-current-token",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 17,
+      "value": [
+        {
+          "name": "NoWorkspaces",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "OwnedÄdmin",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "R58Observer",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "RateOwned",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "rawText": "[{\"name\":\"NoWorkspaces\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned\\u00c4dmin\",\"id\":2,\"email\":null,\"isSuperadmin\":true},{\"name\":\"R58Observer\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"RateOwned\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "unredactedBodySha256": "9d0c06dccd62fcd2941a903e677c06db49446c325f492f782e134093711a7c21",
+      "redactedBodySha256": "9d0c06dccd62fcd2941a903e677c06db49446c325f492f782e134093711a7c21"
+    },
+    {
+      "label": "demote-admin",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/2/super-admin/off",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 74,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "session-live-demoted",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": {
+        "token": "[owned-token-6]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-6]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "e4624c8d5b2035158f7fa02d90b4cdf0bf6fddc25f8c0581f2389ef4a54703b7",
+      "redactedBodySha256": "b7b6100cf84cd94d6183a73170e8d86d4c7c356f9a63231d95d3df5afc6493fc"
+    },
+    {
+      "label": "demoted-directory-current-token-denied",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/users",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa63c967c0.29054088",
+      "testMode": "NO",
+      "elapsedMs": 17,
+      "value": "Only SuperAdmins can do that!",
+      "rawText": "Only SuperAdmins can do that!",
+      "unredactedBodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90",
+      "redactedBodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90"
+    },
+    {
+      "label": "self-password-missing-old",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/2/password",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa63cddc56.05139820",
+      "testMode": "NO",
+      "elapsedMs": 18,
+      "value": "Provide your current password (oldPassword) for security reasons!",
+      "rawText": "Provide your current password (oldPassword) for security reasons!",
+      "unredactedBodySha256": "147938681787d6e790c788b178026cbad75e1a0ca2723d14880d8147da6b87ba",
+      "requestBody": {
+        "p": "[owned-new-password]"
+      },
+      "redactedBodySha256": "147938681787d6e790c788b178026cbad75e1a0ca2723d14880d8147da6b87ba"
+    },
+    {
+      "label": "self-password-wrong-old",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/2/password",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa63dfbf36.87970209",
+      "testMode": "NO",
+      "elapsedMs": 73,
+      "value": "Invalid current password for user 2",
+      "rawText": "Invalid current password for user 2",
+      "unredactedBodySha256": "b34eabd95edb1c18f71237bd1ccd14444cba0e5587583497933fa2b9197014c7",
+      "requestBody": {
+        "p": "[owned-new-password]",
+        "oldPassword": "Owned wrong old password"
+      },
+      "redactedBodySha256": "b34eabd95edb1c18f71237bd1ccd14444cba0e5587583497933fa2b9197014c7"
+    },
+    {
+      "label": "self-password-change",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/2/password",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 130,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "p": "[owned-new-password]",
+        "oldPassword": "[owned-password]"
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "session-after-self-password-change",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": {
+        "token": "[owned-token-6]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": false,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-6]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":false,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "e8693ea85517c605b6c68ca20afea45c278e1e35de67076d2923911bb4e291c7",
+      "redactedBodySha256": "a980a3553f173cec5036d4d3cdc1fbeff9fd9b31b7d92db700c56e44dbc5c7c8"
+    },
+    {
+      "label": "old-password-after-change",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa64bc3be0.99676859",
+      "testMode": "NO",
+      "elapsedMs": 707,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": "OwnedÄdmin",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "new-password-after-change",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 605,
+      "value": {
+        "token": "[owned-token-7]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": false,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-7]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":false,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "053a187cdb4cb8e1c43136ac21a2e09d10db22d2995cc2abb0b891dbb192ee00",
+      "requestBody": {
+        "name": "OwnedÄdmin",
+        "password": "[owned-new-password]"
+      },
+      "redactedBodySha256": "88280adda4b362c877a9f1d8a830d6282b800bae9da6a9d7cd4ad329d6662b5f"
+    },
+    {
+      "label": "root-resets-user-password",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/2/password",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 77,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "p": "[owned-password]"
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "session-after-root-password-reset",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 21,
+      "value": {
+        "token": "[owned-token-7]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-7]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "eab98d3c3901c56c6a78152ae95f63b7aca09316db30caa8a306532445d16262",
+      "redactedBodySha256": "ca7dd72c3ed46562ab0d1cdb330eaa965033683dae799ad947325c594298f8c6"
+    },
+    {
+      "label": "root-reset-password-login",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 603,
+      "value": {
+        "token": "[owned-token-8]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-8]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "4b3656a6db9173dbd84fab31fe181069b4a06bbd5c79930aa1d5e07925a390ee",
+      "requestBody": {
+        "name": "OwnedÄdmin",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "a125c42b1ae7a92604f70403e4b36fd307fe9bdc5f464b0a1f357ca9246a66fa"
+    },
+    {
+      "label": "admin-logout",
+      "endpoint": "open",
+      "method": "DELETE",
+      "path": "/session",
+      "status": 205,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 18,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "logged-out-admin-read-denied",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa661c0403.62336938",
+      "testMode": "NO",
+      "elapsedMs": 17,
+      "value": "Invalid token: `[owned-token-8]`",
+      "rawText": "Invalid token: `[owned-token-8]`",
+      "unredactedBodySha256": "d20cb67ade701e5d7bb25d0d5d91786e2d8d31edf748e68fca4d7cbc3d46a807",
+      "redactedBodySha256": "573d7551fb0f60583eb65af4ba92d4ad25b2a48fffa01de15ae123e6316201a4"
+    },
+    {
+      "label": "logged-out-admin-delete-denied",
+      "endpoint": "open",
+      "method": "DELETE",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa66201d86.85950712",
+      "testMode": "NO",
+      "elapsedMs": 17,
+      "value": "Invalid token: `[owned-token-8]`",
+      "rawText": "Invalid token: `[owned-token-8]`",
+      "unredactedBodySha256": "d20cb67ade701e5d7bb25d0d5d91786e2d8d31edf748e68fca4d7cbc3d46a807",
+      "redactedBodySha256": "573d7551fb0f60583eb65af4ba92d4ad25b2a48fffa01de15ae123e6316201a4"
+    },
+    {
+      "label": "protected-admin-challenge",
+      "endpoint": "protected",
+      "method": "POST",
+      "path": "/session/challenge",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 16,
+      "value": {
+        "algorithm": "SHA-256",
+        "challenge": "07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb",
+        "maxNumber": 1000000,
+        "salt": "[owned-salt-9]",
+        "signature": "[owned-signature-10]"
+      },
+      "rawText": "{\"algorithm\":\"SHA-256\",\"challenge\":\"07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb\",\"maxNumber\":1000000,\"salt\":\"[owned-salt-9]\",\"signature\":\"[owned-signature-10]\"}",
+      "unredactedBodySha256": "a2f12d5a051ca00f355518d22403bde055bc944469bc9a2e6ec9312763b25cb7",
+      "requestBody": {
+        "loginType": "admin",
+        "name": "OwnedÄdmin",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "a4f99bdf947ab5b8d098a298e00aac3eb19f78c84c5a1e99f4b64b27fad220b8"
+    },
+    {
+      "label": "protected-admin-solution",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 606,
+      "value": {
+        "token": "[owned-token-11]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-11]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "a5c45a1d4a47a231ea654eb846ce713c722db3e256f22bc8a91e3dd3424ce943",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb",
+        "salt": "[owned-salt-9]",
+        "signature": "[owned-signature-10]",
+        "number": 413019
+      },
+      "redactedBodySha256": "180240b96c050b3e8cafbfc48cc7f51dc3ea9aa5ebc397769c14bac3e76346dc"
+    },
+    {
+      "label": "protected-admin-proof-replay",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 591,
+      "value": {
+        "token": "[owned-token-12]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-12]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "14861925999c9513b4d4570af19286d74c16921bccf27696c49a54f5fffd970e",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb",
+        "salt": "[owned-salt-9]",
+        "signature": "[owned-signature-10]",
+        "number": 413019
+      },
+      "redactedBodySha256": "f594c6861a5a25d84a734a751c809ba5b7fdfefb5ff3796083c570842175e2f6"
+    },
+    {
+      "label": "replay-rotates-previous-admin",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa678fe752.43964481",
+      "testMode": "NO",
+      "elapsedMs": 18,
+      "value": "Invalid token: `[owned-token-11]`",
+      "rawText": "Invalid token: `[owned-token-11]`",
+      "unredactedBodySha256": "f72c1f3ecd2acc94ccc711e593e0125bd292a97f1ef70a54761ef18142a2eee6",
+      "redactedBodySha256": "26b54a301a6d508e99f29f81ffe96f3e6b2b8765de1b108120b1391599d74762"
+    },
+    {
+      "label": "proof-mutated-signature",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa67929299.23975748",
+      "testMode": "NO",
+      "elapsedMs": 11,
+      "value": "Wrong challenge response",
+      "rawText": "Wrong challenge response",
+      "unredactedBodySha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb",
+        "salt": "[owned-salt-9]",
+        "signature": "0000000000000000000000000000000000000000000000000000000000000000",
+        "number": 413019
+      },
+      "redactedBodySha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd"
+    },
+    {
+      "label": "proof-mutated-challenge",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa67950be7.51358708",
+      "testMode": "NO",
+      "elapsedMs": 10,
+      "value": "Wrong challenge response",
+      "rawText": "Wrong challenge response",
+      "unredactedBodySha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "0000000000000000000000000000000000000000000000000000000000000000",
+        "salt": "[owned-salt-9]",
+        "signature": "[owned-signature-10]",
+        "number": 413019
+      },
+      "redactedBodySha256": "263bf44162d375528c8b9b0dd5a06c37b26a6980db7d67f64ce5a463f97f06bd"
+    },
+    {
+      "label": "proof-missing-algorithm",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa67980442.00972687",
+      "testMode": "NO",
+      "elapsedMs": 12,
+      "value": "Required body-parameter is missing: `algorithm`",
+      "rawText": "Required body-parameter is missing: `algorithm`",
+      "unredactedBodySha256": "bc0f39123660533447d385468079dc39671dc9ef93bbbd6ce038b36f52720182",
+      "requestBody": {
+        "challenge": "07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb",
+        "salt": "[owned-salt-9]",
+        "signature": "[owned-signature-10]",
+        "number": 413019
+      },
+      "redactedBodySha256": "bc0f39123660533447d385468079dc39671dc9ef93bbbd6ce038b36f52720182"
+    },
+    {
+      "label": "proof-missing-challenge",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa679aa5e1.49626707",
+      "testMode": "NO",
+      "elapsedMs": 11,
+      "value": "Required body-parameter is missing: `challenge`",
+      "rawText": "Required body-parameter is missing: `challenge`",
+      "unredactedBodySha256": "a8ef2967b81a6fd701bb24643acbff9ea0b5750a3442e07abfa484e0cc74841f",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "salt": "[owned-salt-9]",
+        "signature": "[owned-signature-10]",
+        "number": 413019
+      },
+      "redactedBodySha256": "a8ef2967b81a6fd701bb24643acbff9ea0b5750a3442e07abfa484e0cc74841f"
+    },
+    {
+      "label": "proof-missing-salt",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa679d20a6.30967028",
+      "testMode": "NO",
+      "elapsedMs": 10,
+      "value": "Required body-parameter is missing: `salt`",
+      "rawText": "Required body-parameter is missing: `salt`",
+      "unredactedBodySha256": "b2139a7aff4192ac3ae3d99fbb527ab06be0aa007d8eef590e35cb85eb792b11",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb",
+        "signature": "[owned-signature-10]",
+        "number": 413019
+      },
+      "redactedBodySha256": "b2139a7aff4192ac3ae3d99fbb527ab06be0aa007d8eef590e35cb85eb792b11"
+    },
+    {
+      "label": "proof-missing-signature",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa679fa4a8.12826926",
+      "testMode": "NO",
+      "elapsedMs": 10,
+      "value": "Required body-parameter is missing: `signature`",
+      "rawText": "Required body-parameter is missing: `signature`",
+      "unredactedBodySha256": "d20a4cb4d6cc35b859ea6bfab08024dad79332e48f75c485e33ad678a9b414f6",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb",
+        "salt": "[owned-salt-9]",
+        "number": 413019
+      },
+      "redactedBodySha256": "d20a4cb4d6cc35b859ea6bfab08024dad79332e48f75c485e33ad678a9b414f6"
+    },
+    {
+      "label": "proof-missing-number",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa67a2b291.78925474",
+      "testMode": "NO",
+      "elapsedMs": 13,
+      "value": "Required body-parameter is missing: `number`",
+      "rawText": "Required body-parameter is missing: `number`",
+      "unredactedBodySha256": "7f7fdcc6d5c928df8f36e828523dd8de314db316eedb5314deed4b3e5ebc90b0",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "07d2649284aa84276c050baef916ab13d3aff6a4573bffcfb6b9899a51a2c8eb",
+        "salt": "[owned-salt-9]",
+        "signature": "[owned-signature-10]"
+      },
+      "redactedBodySha256": "7f7fdcc6d5c928df8f36e828523dd8de314db316eedb5314deed4b3e5ebc90b0"
+    },
+    {
+      "label": "protected-wrong-password-challenge",
+      "endpoint": "protected",
+      "method": "POST",
+      "path": "/session/challenge",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 10,
+      "value": {
+        "algorithm": "SHA-256",
+        "challenge": "69aa997eca446cee86586d0a9681ba2f3bc84467bec82f8a2fd32ea4c4c06dd8",
+        "maxNumber": 1000000,
+        "salt": "[owned-salt-13]",
+        "signature": "[owned-signature-14]"
+      },
+      "rawText": "{\"algorithm\":\"SHA-256\",\"challenge\":\"69aa997eca446cee86586d0a9681ba2f3bc84467bec82f8a2fd32ea4c4c06dd8\",\"maxNumber\":1000000,\"salt\":\"[owned-salt-13]\",\"signature\":\"[owned-signature-14]\"}",
+      "unredactedBodySha256": "c06b3d3bc8f5e3e80c2f7c064e244b62be32b37b695defe2ab3c5b697ad027d4",
+      "requestBody": {
+        "loginType": "admin",
+        "name": "OwnedÄdmin",
+        "password": "Owned wrong password"
+      },
+      "redactedBodySha256": "4d204c70b4758f73e1a1b5170e5bd8be0ea57afaed8be3260bfe26dbe2a140ab"
+    },
+    {
+      "label": "protected-wrong-password-solved",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa68754186.08944365",
+      "testMode": "NO",
+      "elapsedMs": 679,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "69aa997eca446cee86586d0a9681ba2f3bc84467bec82f8a2fd32ea4c4c06dd8",
+        "salt": "[owned-salt-13]",
+        "signature": "[owned-signature-14]",
+        "number": 239411
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "protected-unknown-user-challenge",
+      "endpoint": "protected",
+      "method": "POST",
+      "path": "/session/challenge",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 14,
+      "value": {
+        "algorithm": "SHA-256",
+        "challenge": "2fa98d63835f27cb64fc08d6abaf42c1a69ee2b8b3f6eb30f3edf91ceb8c39c9",
+        "maxNumber": 1000000,
+        "salt": "[owned-salt-15]",
+        "signature": "[owned-signature-16]"
+      },
+      "rawText": "{\"algorithm\":\"SHA-256\",\"challenge\":\"2fa98d63835f27cb64fc08d6abaf42c1a69ee2b8b3f6eb30f3edf91ceb8c39c9\",\"maxNumber\":1000000,\"salt\":\"[owned-salt-15]\",\"signature\":\"[owned-signature-16]\"}",
+      "unredactedBodySha256": "6ccbec44a8046bb8fbab6e9eb3bac68352fb62b92b86a28c93d887aae0a96bdc",
+      "requestBody": {
+        "loginType": "admin",
+        "name": "Owned unknown admin",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "264f1c267f3c459c33809a1305d684f4af6fcbc50a100dd3cc4eab2b546df366"
+    },
+    {
+      "label": "protected-unknown-user-solved",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6929a058.21575769",
+      "testMode": "NO",
+      "elapsedMs": 601,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "2fa98d63835f27cb64fc08d6abaf42c1a69ee2b8b3f6eb30f3edf91ceb8c39c9",
+        "salt": "[owned-salt-15]",
+        "signature": "[owned-signature-16]",
+        "number": 150680
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "rate-wrong-0",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa69c03466.28372440",
+      "testMode": "NO",
+      "elapsedMs": 613,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": "RateOwned",
+        "password": "Owned wrong password"
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "rate-wrong-1",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6a70c641.19140394",
+      "testMode": "NO",
+      "elapsedMs": 675,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": "RateOwned",
+        "password": "Owned wrong password"
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "rate-wrong-2",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6b14cac2.62666261",
+      "testMode": "NO",
+      "elapsedMs": 623,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": "RateOwned",
+        "password": "Owned wrong password"
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "rate-wrong-3",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6bb333e0.23511833",
+      "testMode": "NO",
+      "elapsedMs": 649,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": "RateOwned",
+        "password": "Owned wrong password"
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "rate-wrong-4",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6c540e47.89523402",
+      "testMode": "NO",
+      "elapsedMs": 610,
+      "value": "No login with this password.",
+      "rawText": "No login with this password.",
+      "unredactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248",
+      "requestBody": {
+        "name": "RateOwned",
+        "password": "Owned wrong password"
+      },
+      "redactedBodySha256": "66a4deb66897c70553fde778de80e243f05c2c1234a1976ee83b34ba25711248"
+    },
+    {
+      "label": "rate-correct-still-denied",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 429,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6cd1e8f0.49215551",
+      "testMode": "NO",
+      "elapsedMs": 515,
+      "value": "Too many login attempts",
+      "rawText": "Too many login attempts",
+      "unredactedBodySha256": "ff8070d278fdc09d268f01308c5462a4f9cf4b20aa674e25bbf5b2c5203b6971",
+      "requestBody": {
+        "name": "RateOwned",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "ff8070d278fdc09d268f01308c5462a4f9cf4b20aa674e25bbf5b2c5203b6971"
+    },
+    {
+      "label": "case-variant-rate-bucket",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 610,
+      "value": {
+        "token": "[owned-token-17]",
+        "displayName": "RateOwned",
+        "loginName": "RateOwned",
+        "groupLabel": null,
+        "id": 4,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-17]\",\"displayName\":\"RateOwned\",\"loginName\":\"RateOwned\",\"groupLabel\":null,\"id\":4,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "8b23bed47cf8afe41054b7f8a5789ffeb7e37c2358e55e4704228457aa12ab0e",
+      "requestBody": {
+        "name": "RATEOWNED",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "ade801b7089f6303fe6aede47f1bcb0095fb1ef3888e890fd3738a143885b321"
+    },
+    {
+      "label": "observer-before-delete",
+      "endpoint": "open",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 601,
+      "value": {
+        "token": "[owned-token-18]",
+        "displayName": "R58Observer",
+        "loginName": "R58Observer",
+        "groupLabel": null,
+        "id": 5,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-18]\",\"displayName\":\"R58Observer\",\"loginName\":\"R58Observer\",\"groupLabel\":null,\"id\":5,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "1eca20294f1e59997620d04b29f4c0c592fe1501afb700ce8382f97067be3b04",
+      "requestBody": {
+        "name": "R58Observer",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "b218b2fb2f39bdc34835203f1b29527340beb100a4f255f1c674f51ae4250120"
+    },
+    {
+      "label": "delete-observer",
+      "endpoint": "open",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 76,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "u": [
+          5
+        ],
+        "p": "[owned-root-password]"
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "deleted-user-token-denied",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6e280522.29770448",
+      "testMode": "NO",
+      "elapsedMs": 17,
+      "value": "Invalid token: `[owned-token-18]`",
+      "rawText": "Invalid token: `[owned-token-18]`",
+      "unredactedBodySha256": "f8f5237a9fa51711f806e36795d4b49de0a6592b519b23082c52b395391933e9",
+      "redactedBodySha256": "af6060fcfbe747bfbb52741171e6224cf6320cdcb108ab68e5d4a69d0d00ba37"
+    },
+    {
+      "label": "root-grant-own-workspace",
+      "endpoint": "open",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 19,
+      "value": "",
+      "rawText": "",
+      "unredactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requestBody": {
+        "ws": [
+          {
+            "id": 1,
+            "role": "RW"
+          }
+        ]
+      },
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "upload-owned-tests-r53-player.html",
+      "endpoint": "open",
+      "method": "POST",
+      "path": "/workspace/1/file",
+      "status": 201,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 28,
+      "value": {
+        "owned-tests-r53-player.html": {
+          "warning": [
+            "Could not read metadata: $schema missing",
+            "Metadata missing. Version guessed from Filename.",
+            "Non-Standard-Filename: `owned-tests-r-53.0.html` expected.",
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"owned-tests-r53-player.html\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\",\"Non-Standard-Filename: `owned-tests-r-53.0.html` expected.\",\"Resource is never used\"]}}",
+      "unredactedBodySha256": "08638f83f30d623aa2b5295ac1db7a1976ea724f5494099de3581cd3b9d47ade",
+      "requestBody": "[actual multipart upload]",
+      "redactedBodySha256": "08638f83f30d623aa2b5295ac1db7a1976ea724f5494099de3581cd3b9d47ade"
+    },
+    {
+      "label": "upload-r58-unit.xml",
+      "endpoint": "open",
+      "method": "POST",
+      "path": "/workspace/1/file",
+      "status": 201,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 29,
+      "value": {
+        "r58-unit.xml": {
+          "warning": [
+            "Unit is never used"
+          ]
+        }
+      },
+      "rawText": "{\"r58-unit.xml\":{\"warning\":[\"Unit is never used\"]}}",
+      "unredactedBodySha256": "68f69b86c56832458247b44bf37b1b4b4d2b4a33ed88f10e1fed875f525ce3d1",
+      "requestBody": "[actual multipart upload]",
+      "redactedBodySha256": "68f69b86c56832458247b44bf37b1b4b4d2b4a33ed88f10e1fed875f525ce3d1"
+    },
+    {
+      "label": "upload-r58-booklet.xml",
+      "endpoint": "open",
+      "method": "POST",
+      "path": "/workspace/1/file",
+      "status": 201,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 30,
+      "value": {
+        "r58-booklet.xml": {
+          "warning": [
+            "Booklet is never used"
+          ]
+        }
+      },
+      "rawText": "{\"r58-booklet.xml\":{\"warning\":[\"Booklet is never used\"]}}",
+      "unredactedBodySha256": "c3717308adad5efa5cabd42d4ccd4690584e8d3dd890cd9f116a17e1f16668fb",
+      "requestBody": "[actual multipart upload]",
+      "redactedBodySha256": "c3717308adad5efa5cabd42d4ccd4690584e8d3dd890cd9f116a17e1f16668fb"
+    },
+    {
+      "label": "upload-r58-people.xml",
+      "endpoint": "open",
+      "method": "POST",
+      "path": "/workspace/1/file",
+      "status": 201,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 31,
+      "value": {
+        "r58-people.xml": []
+      },
+      "rawText": "{\"r58-people.xml\":[]}",
+      "unredactedBodySha256": "985224e9f04c634fea6481dd70559c5d53754556575b5205fbe858550c862267",
+      "requestBody": "[actual multipart upload]",
+      "redactedBodySha256": "985224e9f04c634fea6481dd70559c5d53754556575b5205fbe858550c862267"
+    },
+    {
+      "label": "same-name-participant-challenge",
+      "endpoint": "protected",
+      "method": "POST",
+      "path": "/session/challenge",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 12,
+      "value": {
+        "algorithm": "SHA-256",
+        "challenge": "aec0cab2ccf1238d94e5a219836d7ac32964534ad4b7d1bc8466ad96d0284aa4",
+        "maxNumber": 1000000,
+        "salt": "[owned-salt-19]",
+        "signature": "[owned-signature-20]"
+      },
+      "rawText": "{\"algorithm\":\"SHA-256\",\"challenge\":\"aec0cab2ccf1238d94e5a219836d7ac32964534ad4b7d1bc8466ad96d0284aa4\",\"maxNumber\":1000000,\"salt\":\"[owned-salt-19]\",\"signature\":\"[owned-signature-20]\"}",
+      "unredactedBodySha256": "26d466e7db6448f763ffd3a2eb8180c663e632dd401c9409efb9400def808a20",
+      "requestBody": {
+        "loginType": "login",
+        "name": "OwnedÄdmin",
+        "password": "[owned-password]"
+      },
+      "redactedBodySha256": "a9c525b1efdd23014da743ee1fa6b1a9e99b785d5fe249e3d02df3728cf45a63"
+    },
+    {
+      "label": "same-name-participant-solution",
+      "endpoint": "protected",
+      "method": "PUT",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 28,
+      "value": {
+        "token": "[owned-token-21]",
+        "displayName": "Owned/OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": "Owned",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "test": [
+            {
+              "id": "R58.BOOKLET",
+              "type": "test",
+              "label": "Owned",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            }
+          ]
+        },
+        "groupToken": "[owned-groupToken-22]",
+        "viewSettings": [],
+        "access": {
+          "test": [
+            "R58.BOOKLET"
+          ]
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-21]\",\"displayName\":\"Owned\\/Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":\"Owned\",\"id\":null,\"pwSetByAdmin\":null,\"customTexts\":{},\"flags\":[],\"claims\":{\"test\":[{\"id\":\"R58.BOOKLET\",\"type\":\"test\",\"label\":\"Owned\",\"flags\":{\"locked\":false,\"running\":false}}]},\"groupToken\":\"[owned-groupToken-22]\",\"viewSettings\":[],\"access\":{\"test\":[\"R58.BOOKLET\"]}}",
+      "unredactedBodySha256": "42c237f632e31abbb11d7f7df05483dde2de502ecb1dcfaf8a4bae042685eb30",
+      "requestBody": {
+        "algorithm": "SHA-256",
+        "challenge": "aec0cab2ccf1238d94e5a219836d7ac32964534ad4b7d1bc8466ad96d0284aa4",
+        "salt": "[owned-salt-19]",
+        "signature": "[owned-signature-20]",
+        "number": 485803
+      },
+      "redactedBodySha256": "632477274cadeb66359f09ec32704338d34845fc3e860a4ff47da8e351699b12"
+    },
+    {
+      "label": "participant-token-directory-denied",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/users",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "errorId": "error-6ae8aa6e93ec47.02754964",
+      "testMode": "NO",
+      "elapsedMs": 18,
+      "value": "Token `[owned-token-21]` of type `person` has wrong type - `admin` required.",
+      "rawText": "Token `[owned-token-21]` of type `person` has wrong type - `admin` required.",
+      "unredactedBodySha256": "d521cf2754014c4f2c3a00c389aad6aaca03a65d112da813c30850ea647ae830",
+      "redactedBodySha256": "cd73d7f6d20010a528b0f2e971f7df2d31a726fdac83da6a23bf42f8c62ce60f"
+    },
+    {
+      "label": "same-name-admin-refresh",
+      "endpoint": "open",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "errorId": null,
+      "testMode": null,
+      "elapsedMs": 19,
+      "value": {
+        "token": "[owned-token-12]",
+        "displayName": "OwnedÄdmin",
+        "loginName": "OwnedÄdmin",
+        "groupLabel": null,
+        "id": 2,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-12]\",\"displayName\":\"Owned\\u00c4dmin\",\"loginName\":\"Owned\\u00c4dmin\",\"groupLabel\":null,\"id\":2,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "unredactedBodySha256": "14861925999c9513b4d4570af19286d74c16921bccf27696c49a54f5fffd970e",
+      "redactedBodySha256": "f594c6861a5a25d84a734a751c809ba5b7fdfefb5ff3796083c570842175e2f6"
+    }
+  ],
+  "sourceCodeAndVendorUnmodified": true,
+  "securityDivergencesToPreserve": [
+    "Rewrite keeps encrypted credential tickets, durable one-use proof claims, normalized rate buckets and password-change session revocation; Source replay acceptance and retained old-password sessions must not weaken those gates."
+  ],
+  "fullOriginalParityProven": false
+}

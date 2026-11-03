@@ -157,8 +157,8 @@ for (const kind of kinds) test(`${kind}: actual native monitor materialization a
         const response = await fetch(base + path, {method, headers: {...headers, ...(token ? {AuthToken: token} : {}), ...(body === undefined ? {} : {'content-type': 'application/json'})}, ...(body === undefined ? {} : {body: JSON.stringify(body)}), signal: AbortSignal.timeout(15000)});
         const text = await response.text(); assert.equal(response.status, status, method + ' ' + path + ': ' + text);
         assert.equal(response.headers.get('cache-control'), 'private, no-store');
-        assert.equal(response.headers.get('content-type')?.split(';')[0], 'application/json');
-        return {value: text ? JSON.parse(text) : null, headers: response.headers, text};
+        assert.equal(response.headers.get('content-type')?.split(';')[0], path.startsWith('/session') && status >= 400 ? 'text/html' : 'application/json');
+        return {value: text ? (response.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : text) : null, headers: response.headers, text};
       };
       const path = '/monitor/group/' + encodeURIComponent(group) + '/test-sessions';
       await request('GET', path, {status: 401});

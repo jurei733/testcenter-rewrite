@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-31T23:47:54.167739+00:00",
+  "observationSha256": "6be7365054e54305d313b1883f8d7e59cd38cd3495f5fbea8bc59c25c4e1afef",
+  "sourceFilesReverified": 137,
+  "lockedProductionComposerPackagesReverified": 19,
+  "exactImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "actualContainerId": "0ccae62abe00e3053d49bb26b17387c6f40a3a905673cf983fc5a14dba446d91",
+  "allowTestMode": false,
+  "xmlSchemaValidation": true,
+  "databaseCollation": "en_US.utf8",
+  "databaseCType": "en_US.utf8",
+  "sourceCodeModified": false,
+  "sqlSeedsOrDaoStubs": false
+}

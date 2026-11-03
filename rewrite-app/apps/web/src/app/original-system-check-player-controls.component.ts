@@ -20,11 +20,10 @@ import type { VeronaPlayerHostComponent } from "./verona-player-host.component";
         [disabled]="!view.hasPreviousPage" (click)="view.goToRelativePage(-1)">
         <svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z" /></svg>
       </button>
-      <mat-button-toggle-group [value]="view.currentPageIndex" [hideSingleSelectionIndicator]="true" aria-label="Seite auswählen"
-        (change)="view.goToPage($event.value)">
+      <mat-button-toggle-group [value]="view.currentPageIndex" [hideSingleSelectionIndicator]="true" aria-label="Seite auswählen">
         @for (page of view.pages; track page.id; let index = $index) {
           <mat-button-toggle [class.selected-value]="view.currentPageIndex === index" [matTooltip]="page.label"
-            [attr.data-cy]="'page-navigation-' + index" [value]="index">{{ index + 1 }}</mat-button-toggle>
+            [attr.data-cy]="'page-navigation-' + index" [value]="index" (change)="view.goToPage(index)">{{ index + 1 }}</mat-button-toggle>
         }
       </mat-button-toggle-group>
       <button mat-stroked-button data-cy="page-navigation-forward" aria-label="Nächste Seite"
@@ -54,5 +53,8 @@ import type { VeronaPlayerHostComponent } from "./verona-player-host.component";
   styleUrl: "./original-login-theme.scss"
 })
 export class OriginalSystemCheckPlayerControlsComponent {
+  // Source emits navigation on every numbered-page click. An individual
+  // Material toggle also emits for an already-selected value and keyboard
+  // activation; the group's change event drops these selected-page retries.
   @Input({ required: true }) view!: VeronaPlayerHostComponent;
 }

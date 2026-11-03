@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-11-01T01:27:08.110109+00:00",
+  "observationSha256": "c1b9624021b9a9819d632159a5e45da6878e40bdfd38befca25e0e5a98a1968e",
+  "sourceFilesReverified": 137,
+  "lockedProductionComposerPackagesReverified": 19,
+  "exactImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "actualContainerId": "9a1b4b3b473c3a3215caa2e97860f377cf78e2402396a02e82cb6daa527b9b7e",
+  "allowTestMode": false,
+  "xmlSchemaValidation": true,
+  "sourceCodeModified": false,
+  "sqlSeedsOrDaoStubs": false
+}

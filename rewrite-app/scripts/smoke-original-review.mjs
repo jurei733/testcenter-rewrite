@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
+import {stopNativeSmokeServer} from "./native-monitor-smoke-io.mjs";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 
 // Own synthetic content, SQLite and protected API. No external response data.
@@ -13,14 +14,15 @@ await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
 const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR || await mkdtemp(join(tmpdir(), "testcenter-original-review-"));
 await mkdir(artifacts, { recursive: true });
 console.log(`owned_artifacts=${artifacts}`);
+const scratch = await mkdtemp(join(tmpdir(), "owned-original-review-state-"));
 const entry = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
 const server = spawn(process.execPath, ["--input-type=module", "-e", `
   import { createProductionApiServer } from ${JSON.stringify(entry)};
-  const server = await createProductionApiServer();
+  import {bindNativeSmokeServerOwner} from ${JSON.stringify(pathToFileURL(resolve("scripts/native-monitor-smoke-io.mjs")).href)};
+  const server = await createProductionApiServer();bindNativeSmokeServerOwner(server);
   server.listen(0, '127.0.0.1', () => process.send({port:server.address().port}));
-  process.once('SIGTERM',()=>server.close(()=>process.exit(0)));
 `], { cwd: frontendRoot, env: { ...process.env, FIRST_SLICE_STORE: "sqlite",
-  FIRST_SLICE_SQLITE_FILE: join(artifacts, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+  FIRST_SLICE_SQLITE_FILE: join(scratch, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
   FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", FIRST_SLICE_PROOF_OF_WORK_SCOPES: "",
   FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", REQUIRE_LOGIN_PASSWORD: "false" },
   stdio: ["ignore", "ignore", "inherit", "ipc"] });
@@ -58,7 +60,7 @@ try {
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, {activatedByActorId:"owned-review-smoke"});
   await api(workspace + "/participant-roster", {rosterText:["loginKey,groupKey,bookletKey,executionMode",
     "review-synthetic,owned-review,owned-review,run-trial", "review-other,owned-other,owned-other,run-trial"].join("\n")});
-  browser = await chromium.launch({headless:process.env.UI_SMOKE_HEADFUL !== "true"});
+  browser = await chromium.launch({channel:process.env.UI_SMOKE_BROWSER_CHANNEL?.trim() || undefined,headless:process.env.UI_SMOKE_HEADFUL !== "true"});
   const otherContext = await browser.newContext();
   const otherPage = await otherContext.newPage();
   await otherPage.goto(base + "/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=owned-original-review");
@@ -305,6 +307,47 @@ try {
       await context.close();
     }
   }
+  // Source retires its Review pane on a changed Unit sequence. Exercise the
+  // actual trusted header navigation and protected persisted review boundary.
+  const scopeWorkspace = "/api/v1/tenants/demo-tenant/workspaces/owned-review-unit-scope";
+  await api("/api/v1/tenants/demo-tenant/workspaces", {workspaceKey:"owned-review-unit-scope",displayName:"Owned Review Unit scope"});
+  const scopedContent = JSON.parse(localDemoSourcePackage.sourceDocument), scopedUnit = scopedContent.bookletEntries[0].unitEntries[0];
+  scopedContent.bookletEntries = [{...scopedContent.bookletEntries[0],bookletKey:"owned-unit-scope",displayLabel:"Owned Review Unit scope",
+    config:{navbar_unit_label:"INDEX",navbar_page_label:"HIDDEN",toolbar_show_unit_list:"TRUE",toolbar_show_fullscreen_button:"FALSE",toolbar_show_reload_button:"FALSE"},
+    unitEntries:[{...scopedUnit,unitKey:"scope-first",displayLabel:"Erste eigene Aufgabe"},{...scopedUnit,unitKey:"scope-second",displayLabel:"Zweite eigene Aufgabe"}]}];
+  const scopeSource = await api(scopeWorkspace+"/source-packages",{fileName:"owned-review-unit-scope.json",mediaType:"application/json",sourceDocument:JSON.stringify(scopedContent)});
+  const scopeImport = await api(scopeWorkspace+"/import-jobs",{sourcePackageId:scopeSource.sourcePackage.sourcePackageId});
+  await api(scopeWorkspace+`/content-releases/${scopeImport.stagedContentRelease.contentReleaseId}/activate`,{activatedByActorId:"owned-review-unit-scope"});
+  await api(scopeWorkspace+"/participant-roster",{rosterText:"loginKey,groupKey,bookletKey,executionMode\n"+[1280,390].map(width=>`review-unit-scope-${width},owned-unit-scope,owned-unit-scope,run-trial`).join("\n")});
+  const unitScopeChecks = [];
+  for (const width of [1280,390]) {
+    const context = await browser.newContext({viewport:{width,height:width===1280?720:844},locale:"de-DE"});
+    const page = await context.newPage();activePage=page;page.on("pageerror",error=>errors.push(String(error)));
+    await page.goto(base+"/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=owned-review-unit-scope");
+    await page.getByLabel("Anmeldename",{exact:true}).fill(`review-unit-scope-${width}`);
+    const [response] = await Promise.all([page.waitForResponse(r=>r.url().endsWith("/participant/auth/sign-in")&&r.request().method()==="POST"),page.getByRole("button",{name:"Weiter",exact:true}).click()]);
+    const identity = await response.json();await page.locator("#originalPlayerToolbar").waitFor();
+    const run = (await page.locator("#participantRouteRunId").textContent()).trim(), panel=page.locator("app-original-review-panel"),drawer=page.locator('app-original-player-sidebar [role="dialog"]');
+    await page.locator('[data-cy="unit-navigation-label"]').filter({hasText:"1/2"}).waitFor();
+    await page.locator('[data-cy="send-comments"]').click();await panel.locator('[data-cy="comment-diag-comment"]').fill("Entwurf nur für die erste Aufgabe");
+    await page.locator('[data-cy="unit-navigation-forward"]').click();await page.locator('[data-cy="unit-navigation-label"]').filter({hasText:"2/2"}).waitFor();await drawer.waitFor({state:"detached"});
+    await page.locator('[data-cy="send-comments"]').click();await panel.locator('[data-cy="comment-diag-comment"]').waitFor();
+    assert.equal(await panel.locator('[data-cy="comment-diag-comment"]').inputValue(),"");
+    assert.equal(await panel.locator('[data-cy="comment-diag-submit"]').isDisabled(),true);
+    const scopedComment="Gespeichert ausschließlich in der zweiten Aufgabe";
+    await panel.locator('[data-cy="comment-diag-comment"]').fill(scopedComment);
+    const [saved] = await Promise.all([page.waitForResponse(r=>r.url().endsWith(`/test-runs/${run}/reviews`)&&r.request().method()==="POST"),panel.locator('[data-cy="comment-diag-submit"]').click()]);
+    assert.equal(saved.status(),201);const persisted=(await saved.json()).review;assert.equal(persisted.unitKey,"scope-second");assert.equal(persisted.comment,scopedComment);await drawer.waitFor({state:"detached"});
+    await page.locator('[data-cy="send-comments"]').click();await panel.locator('[data-cy="comment-diag-comment"]').waitFor();
+    await page.locator('[data-cy="unit-navigation-backward"]').click();await page.locator('[data-cy="unit-navigation-label"]').filter({hasText:"1/2"}).waitFor();await drawer.waitFor({state:"detached"});
+    await page.locator('[data-cy="send-comments"]').click();await panel.locator('[data-cy="comment-diag-comment"]').waitFor();assert.equal(await panel.locator('[data-cy="comment-diag-comment"]').inputValue(),"");
+    await page.locator('[data-cy="comment-toolbar-show-list"]').click();await page.getByRole("heading",{name:"Kommentarübersicht",exact:true}).waitFor();assert.equal(await panel.locator('[data-cy="comment-list-unit-comments"]').count(),0);
+    const current = await fetch(base+`/api/v1/participant/test-runs/${run}/reviews`,{headers:{authorization:`Bearer ${identity.sessionToken}`}});assert.equal(current.status,200);const reviews=(await current.json()).items;
+    assert.equal(reviews.filter(review=>review.comment===scopedComment&&review.unitKey==="scope-second").length,1);assert.equal(reviews.some(review=>review.unitKey==="scope-first"),false);
+    unitScopeChecks.push({width,realTrustedUnitNavigation:true,oldDrawerClosed:true,newUnitDraftEmpty:true,realSaveOwnedBySecondUnit:true,returnToFirstUnitIsClean:true});
+    await context.close();
+  }
+  await writeFile(join(artifacts,"unit-scope-checks.json"),JSON.stringify(unitScopeChecks,null,2));
   assert.deepEqual(errors,[]);
   if(process.env.ORIGINAL_REVIEW_REFERENCE_METRICS) {
     const reference = JSON.parse(await readFile(process.env.ORIGINAL_REVIEW_REFERENCE_METRICS,"utf8"));
@@ -328,5 +371,6 @@ try {
   throw error;
 } finally {
   await browser?.close();
-  if(server.exitCode===null){server.kill("SIGTERM");await new Promise(r=>server.once("exit",r));}
+  await stopNativeSmokeServer(server);
+  await rm(scratch,{recursive:true,force:true});
 }

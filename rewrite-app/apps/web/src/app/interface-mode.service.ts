@@ -32,7 +32,7 @@ export class InterfaceModeService {
     }
     // An explicit switch supersedes a deep link's old selection on reload.
     const url = new URL(window.location.href);
-    if (url.searchParams.has("ui")) {
+    if (url.searchParams.has("ui") && url.searchParams.get("ui") !== mode) {
       url.searchParams.set("ui", mode);
       window.history.replaceState(window.history.state, "", url);
     }

@@ -15,6 +15,7 @@ import {
   RouterOutlet
 } from "@angular/router";
 
+import { OperatorAccountPanelComponent } from "./operator-account-panel.component";
 import { ActivityFeedComponent } from "./activity-feed.component";
 import { AdminPasswordDialogsComponent } from "./admin-password-dialogs.component";
 import { ApplicationSettingsService } from "./application-settings.service";
@@ -43,10 +44,11 @@ const routeViews: AppView[] = [
 ];
 
 @Component({
-  selector: "app-root",
+  selector: "app-canonical-shell",
   standalone: true,
   imports: [
     NgTemplateOutlet,
+    OperatorAccountPanelComponent,
     AdminPasswordDialogsComponent,
     RouterOutlet,
     RouterLink,
@@ -144,7 +146,9 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.interfaceMode.mode()==='original' && this.activeRouteView==='content' && this.app.hasAdminSession;
   }
 
-  get isOriginalNativeOperator(): boolean { return this.isOriginalAdministration || this.isOriginalWorkspaceFiles; }
+  get isNativeMonitorView(): boolean { return ['/group-monitor','/native-test','/native-start'].some(path=>this.router.url.split('?',1)[0].startsWith(path)); }
+
+  get isOriginalNativeOperator(): boolean { return this.isOriginalAdministration || this.isOriginalWorkspaceFiles || this.isNativeMonitorView; }
 
   get activeRouteView(): AppView {
     this.routeVersion();
@@ -461,13 +465,6 @@ export class AppComponent implements OnInit, OnDestroy {
       return `The new password must match the configured pattern ${this.adminPasswordPattern}.`;
     }
     return null;
-  }
-
-  trackOperatorAccountAccess(
-    _index: number,
-    access: { role: string; scope: string }
-  ): string {
-    return `${access.role}\u0000${access.scope}`;
   }
 
   private getInitialViewFromLocation(): AppView | null {

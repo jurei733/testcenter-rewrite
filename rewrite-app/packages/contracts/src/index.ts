@@ -256,6 +256,10 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/responses/detailed",
     listGroupResults:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups",
+    deleteOriginalTestSessions:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-tests",
+    listOriginalTestSessions:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-tests",
     listOriginalGroupResults:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-groups",
     deleteOriginalGroupResults:
@@ -1776,3 +1780,5 @@ export const resolveRoutePath = (
 };
 
 export type {OriginalMonitorProfile} from './original-monitor.js';
+
+export type {OriginalAdminTestSession} from './original-test-administration.js';

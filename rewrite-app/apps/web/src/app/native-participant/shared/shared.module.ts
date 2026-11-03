@@ -1,0 +1,10 @@
+export * from './interfaces/booklet.interfaces';
+export {BookletConfig} from './classes/booklet-config.class';
+export {TestMode} from './classes/test-mode.class';
+export {CustomtextService} from './services/customtext/customtext.service';
+export {CustomtextPipe} from './pipes/customtext/customtext.pipe';
+export {AlertComponent} from './components/alert/alert.component';
+export {MainDataService} from './services/maindata/maindata.service';
+export {WebsocketBackendService} from './services/websocket-backend.service';
+export {NativeSharedBackendService as BackendService} from '../native-shared-backend.service';
+export {UserAgentService} from './services/user-agent.service';

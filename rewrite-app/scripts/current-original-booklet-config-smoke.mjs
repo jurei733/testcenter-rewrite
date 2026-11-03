@@ -6,6 +6,7 @@ import { brotliDecompressSync } from "node:zlib";
 import { join } from "node:path";
 import { reloadParticipantUnitLabelPlayer } from "./participant-unit-label-smoke.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
+import { captureSmokeCaseFailure } from "./smoke-case-failure.mjs";
 import { runBoundedSmokeCases } from "./bounded-smoke-cases.mjs";
 
 const fixtureRoot = new URL("../test-fixtures/original-testcenter/", import.meta.url);
@@ -68,8 +69,10 @@ export async function runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
   // Within a group each case uses a different real participant account.
   for (const ui of ["rewrite", "original"]) for (const width of [1280, 390]) await runBoundedSmokeCases(cases,caseConcurrency,async item=>{
     const context = await browser.newContext({ viewport: { width, height: 900 } });
+    let page;
     try {
-      const page = await context.newPage(), errors = [];
+      page = await context.newPage();
+      const errors = [];
       let operatorLeaks = 0;
       page.on("pageerror", error => errors.push(String(error)));
       page.on("request", request => {
@@ -165,6 +168,7 @@ export async function runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
       passed++;
     } catch(error) {
       report(`current_original_booklet_config=${ui}/${width}/${item.number}:failed`);
+      await captureSmokeCaseFailure(error, page, {suite: "current-original-booklet-config", ui, width, number: item.number});
       throw error;
     } finally {
       await context.close();

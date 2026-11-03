@@ -5,14 +5,14 @@ import {formatOriginalReportCsv} from './original-report-csv.js';
 type Identity = {groupname:string; loginname:string; code:string; bookletname:string; unitname:string};
 export type OriginalResponseReportRecord = Identity & {
   laststate:string|null; originalUnitId:string;
-  responses:Array<{id:string; content:string; ts:number; responseType:string}>;
+  responses:Array<{id:string; content:string|null; ts:number; responseType:string}>;
 };
 export type OriginalLogReportRecord = Identity & {originalUnitId:string; timestamp:number; originalClientTimestamp?:string; logentry:string};
 /** DAO-shaped data: code is the stored person suffix, and reviewtime has
  * already been rendered in the configured system timezone. */
 export type OriginalReviewReportRecord = Identity & {
   priority:number; categories:string; reviewtime:string|null; entry:string;
-  page:number|null; pagelabel:string|null; originalUnitId:string; userAgent:string|null; reviewer:string|null;
+  page:number|{readonly rawJSON:string}|null; pagelabel:string|null; originalUnitId:string; userAgent:string|null; reviewer:string|null;
 };
 export type OriginalReportLabels = {unitlabel:string; bookletlabel:string};
 const requireUnicode = (text:string):void => {
@@ -47,6 +47,12 @@ const render = (format:OriginalReportFormat, rows:Record<string,unknown>[], colu
   for (const row of rows) for (const value of Object.values(row)) if (typeof value==='string') requireUnicode(value);
   return formatOriginalReportCsv(names, rows);
 };
+
+/** PostgreSQL jsonb text returned by Source PDO, before the outer report JSON. */
+export function formatOriginalUnitStateReport(state:Record<string,string>):string {
+ const keys=Object.keys(state).sort((a,b)=>Buffer.byteLength(a)-Buffer.byteLength(b)||Buffer.compare(Buffer.from(a),Buffer.from(b)));
+ return '{'+keys.map(key=>JSON.stringify(key)+': '+JSON.stringify(state[key])).join(', ')+'}';
+}
 
 export function formatOriginalResponseReport(rows:OriginalResponseReportRecord[], format:OriginalReportFormat):string {
   const records = rows.map(row => ({...identity(row), laststate:row.laststate,
@@ -100,7 +106,7 @@ const compareCategory = (left:string, right:string):number => {
   }
   return Buffer.compare(Buffer.from(left,'utf8'),Buffer.from(right,'utf8'));
 };
-const categoryKeys = (rows:OriginalReviewReportRecord[]):string[] => {
+export const originalReviewReportCategoryKeys = (rows:ReadonlyArray<Pick<OriginalReviewReportRecord,'categories'>>):string[] => {
   const keys:string[]=[];
   for (const row of rows) {
     // PHP empty('0') is true. Internal spaces still produce empty categories.
@@ -114,7 +120,7 @@ const categoryKeys = (rows:OriginalReviewReportRecord[]):string[] => {
 
 export function formatOriginalReviewReport(input:{rows:OriginalReviewReportRecord[]; format:OriginalReportFormat;
   useNewVersion:boolean; labels?:(bookletName:string,unitName:string)=>OriginalReportLabels}):string {
-  const keys=categoryKeys(input.rows);
+  const keys=originalReviewReportCategoryKeys(input.rows);
   const rows=input.rows.map(row => {
     const values=trim(row.categories).split(' ');
     const categories=Object.fromEntries(keys.map(key => {
@@ -123,7 +129,7 @@ export function formatOriginalReviewReport(input:{rows:OriginalReviewReportRecor
         : ['category: '+key,selected?'X':null];
     }));
     const record:Record<string,unknown>={...identity(row),priority:row.priority,...categories,
-      reviewtime:row.reviewtime,...(input.useNewVersion?{}:{entry:row.entry}),page:row.page,pagelabel:row.pagelabel,
+      reviewtime:row.reviewtime,...(input.useNewVersion?{}:{entry:row.entry}),page:row.page&&typeof row.page==='object'&&input.format==='csv'?row.page.rawJSON:row.page,pagelabel:row.pagelabel,
       originalUnitId:row.originalUnitId,userAgent:row.userAgent};
     if (input.useNewVersion) {
       const labels=row.bookletname && row.bookletname!=='0' ? input.labels?.(row.bookletname,row.unitname) : undefined;

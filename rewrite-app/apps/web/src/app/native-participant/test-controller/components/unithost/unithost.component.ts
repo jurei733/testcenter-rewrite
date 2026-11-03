@@ -1,0 +1,500 @@
+import type {NativePlayerLease} from '../../../native-player-channel';
+import {NATIVE_FILE_SERVER_URL} from '../../../native-tokens';
+import { merge, Subscription } from 'rxjs';
+import {
+  Component, type OnInit, type OnDestroy, ViewChild, ElementRef, Inject
+, inject } from '@angular/core';
+import { AsyncPipe, NgIf } from '@angular/common';
+import {MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle} from '@angular/material/card';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, type Params } from '@angular/router';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { distinctUntilChanged, map, withLatestFrom } from 'rxjs/operators';
+import { CustomtextPipe, MainDataService } from '../../../shared/shared.module';
+import { AppError, type AuthData, type CodeInputType } from '../../../app.interfaces';
+import { ThemeService } from '../../../shared/services/theme.service';
+import { CodeInputComponent } from '../../../shared/components/code-input/code-input.component';
+import { TestControllerService } from '../../services/test-controller.service';
+import { BackendService } from '../../services/backend.service';
+import { type NavigationState, isEqualNavigation } from '../../interfaces/test-controller.interfaces';
+import {
+  isVeronaNavigationTarget, type SharedParameter,
+  type VeronaNavigationDeniedReason,
+  type VeronaPlayerConfig,
+  VeronaPlayerRuntimeErrorCodes,
+  type VeronaUnitState,
+  type VopRuntimeErrorNotification,
+  type VopStartCommand,
+  type VopStateChangedNotification
+} from '../../interfaces/verona.interfaces';
+import { PageService } from '../../services/page.service';
+import { VeronaAPIService } from '../../services/verona-api.service';
+import { MessageService } from '../../../shared/services/message.service';
+
+@Component({
+  templateUrl: './unithost.component.html',
+  imports: [
+    AsyncPipe,
+    MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,
+    CustomtextPipe,
+    FormsModule,
+    NgIf,
+    CodeInputComponent
+  ],
+  styleUrls: ['./unithost.component.css']
+})
+
+export class UnithostComponent implements OnInit, OnDestroy {
+  @ViewChild('iframeHost') private iFrameHostElement!: ElementRef;
+  private iFrameItemplayer: HTMLIFrameElement | null = null;
+  private subscriptions: { [tag: string ]: Subscription } = {};
+  private destroyed=false;
+  private playerLease:NativePlayerLease|undefined;
+  private initialization:ReturnType<typeof setTimeout>|undefined;
+  clearCode: string = '';
+
+  codeInputMode: CodeInputType = 'text-field';
+  codeInputLength: number | undefined; // only used for keypad input
+  codeInputErrorText: string = '';
+
+  private readonly fileServerUrl=inject(NATIVE_FILE_SERVER_URL);
+  constructor(public tcs: TestControllerService, private mds: MainDataService, private pageService: PageService,
+              private apiService: VeronaAPIService,
+
+              public themeService: ThemeService,
+              private messageService: MessageService,
+              private bs: BackendService, private route: ActivatedRoute) { }
+
+  ngOnInit(): void {
+    this.iFrameItemplayer = null;
+    this.initialization=setTimeout(() => {
+      if(this.destroyed||!this.mds.http.isCurrent)return;
+      this.subscriptions.postMessage = this.mds.postMessage$
+        .subscribe(messageEvent => {void this.handleIncomingMessage(messageEvent);});
+      this.subscriptions.routing = merge(this.route.queryParamMap, this.route.params)
+        .subscribe((params: Params) => (params.u ? this.open(Number(<Params>params.u)) : this.reload()));
+      this.subscriptions.navigationDenial = this.tcs.navigationDenial$
+        .subscribe(navigationDenial => this.handleNavigationDenial(navigationDenial));
+      this.subscriptions.conditionsEvaluated = merge(
+        this.tcs.navigation$.pipe(distinctUntilChanged(isEqualNavigation)),
+        this.tcs.configChanged$.pipe(
+          withLatestFrom(this.tcs.navigation$),
+          map(([, navigationState]) => navigationState)
+        )
+      )
+        .subscribe(navigationState => this.updatePlayerConfig(navigationState));
+    });
+    const authData = this.mds.getAuthData();
+    this.codeInputMode = authData?.viewSettings.codeInput?.type || 'text-field';
+    this.codeInputLength = authData?.viewSettings.codeInput?.length;
+  }
+
+  holdPlayer():()=>void{return this.apiService.channel.hold();}
+
+  ngOnDestroy(): void {
+    this.destroyed=true;clearTimeout(this.initialization);if(this.playerLease)this.apiService.channel.clear(this.playerLease);this.playerLease=undefined;this.iFrameItemplayer=null;
+    Object.values(this.subscriptions).forEach(subscription => subscription.unsubscribe());
+  }
+
+  private async handleIncomingMessage(messageEvent: MessageEvent): Promise<void> {
+    if (!this.tcs.currentUnit) {
+      return;
+    }
+    const accepted=this.apiService.channel.receive(messageEvent);
+    if(!accepted)return;
+    const {message:msgData,lease}=accepted;
+    const msgType=msgData['type'];
+
+    try { switch (msgType) {
+    case 'vopReadyNotification':
+      if(this.apiService.channel.beginReady(lease))await this.handleReadyNotification(msgData,lease);
+      break;
+    case 'vopStateChangedNotification':
+      this.handleStateChangedNotification(msgData as VopStateChangedNotification);
+      break;
+    case 'vopUnitNavigationRequestedNotification':
+      this.handleUnitNavigationRequestedNotification(msgData);
+      break;
+    case 'vopWindowFocusChangedNotification':
+      this.handleWindowFocusChangedNotification(msgData);
+      break;
+    case 'vopRuntimeErrorNotification':
+      this.handleRuntimeError(msgData as VopRuntimeErrorNotification);
+      break;
+    default:
+      console.log(`processMessagePost ignored message: ${msgType}`);
+      break;
+    }}catch(error){
+      if(!this.destroyed&&this.mds.http.isCurrent&&this.apiService.channel.isCurrent(lease)){
+        this.mds.appError=error instanceof AppError?error:new AppError({type:'verona_player_runtime_error',label:'Playerfehler',description:String(error)});
+      }
+    }
+  }
+
+  private async handleReadyNotification(msgData: any,lease:NativePlayerLease): Promise<void> {
+    const ownedUnit=this.tcs.currentUnit;
+    const playerApiVersion = msgData.apiVersion || msgData.metadata?.specVersion;
+    if (typeof playerApiVersion !== 'string') {
+      throw new AppError({
+        description: 'Player did not report its Verona version (apiVersion or metadata.specVersion)',
+        label: 'Unbekannte Verona-Version',
+        type: 'verona_player_runtime_error'
+      });
+    }
+    const match=/^([0-9]{1,3})(?:\.[0-9]+){1,2}(?:-[a-z0-9.-]+)?$/i.exec(playerApiVersion);
+    const playerApiVersionMajor = match ? Number(match[1]) : NaN;
+
+    if (
+      !Number.isInteger(playerApiVersionMajor) || this.mds.appConfig && (
+        playerApiVersionMajor < this.mds.appConfig.veronaPlayerApiVersionMin ||
+        playerApiVersionMajor > this.mds.appConfig.veronaPlayerApiVersionMax
+      )
+    ) {
+      throw new AppError({
+        description: `Player uses Verona ${playerApiVersion}, but this testcenter only support 
+              ${this.mds.appConfig.veronaPlayerApiVersionMin} to ${this.mds.appConfig.veronaPlayerApiVersionMax}`,
+        label: 'Unpassende Verona-Version',
+        type: 'verona_player_runtime_error'
+      });
+    }
+
+    if (!this.tcs.currentUnit) {
+      throw new Error(`Could not start player, because Unit is missing (${this.tcs.currentUnitSequenceId})!`);
+    }
+
+    this.tcs.AddToUnitStateBuffer(
+      this.tcs.currentUnit.sequenceId,
+      [{ key: 'PLAYER', timeStamp: Date.now(), content: 'RUNNING' }]
+    );
+
+    const unitState: VeronaUnitState = {
+      dataParts: this.tcs.currentUnit.dataParts
+    };
+
+    if (this.tcs.currentUnit.state.PRESENTATION_PROGRESS) {
+      unitState.presentationProgress = this.tcs.currentUnit.state.PRESENTATION_PROGRESS;
+    }
+    if (this.tcs.currentUnit.state.RESPONSE_PROGRESS) {
+      unitState.responseProgress = this.tcs.currentUnit.state.RESPONSE_PROGRESS;
+    }
+
+    const navigation = await this.tcs.closeAllBuffers('handleReadyNotification');
+    if(this.destroyed||this.tcs.currentUnit!==ownedUnit||!this.apiService.channel.completeReady(lease))return;
+
+    const msg: VopStartCommand = {
+      type: 'vopStartCommand',
+      sessionId: this.tcs.currentUnit.alias,
+      unitDefinition: this.tcs.currentUnit.definition,
+      unitDefinitionType: this.tcs.currentUnit.unitDefinitionType,
+      unitState,
+      playerConfig: this.getPlayerConfig(navigation)
+    };
+    this.apiService.postMessageTarget.postMessage(msg, '*');
+  }
+
+  private handleStateChangedNotification(msg: VopStateChangedNotification): void {
+    const unit = this.tcs.getUnit(this.tcs.unitAliasMap[msg.sessionId]);
+    const playerState = msg.playerState;
+
+    if (playerState) {
+      if (unit.sequenceId === this.tcs.currentUnit?.sequenceId) {
+        this.pageService.updateValidPages(playerState.validPages || [], playerState.currentPage);
+      }
+
+      if (playerState.sharedParameters) {
+        this.tcs.addSharedParameters(playerState.sharedParameters);
+      }
+
+      this.tcs.AddToUnitStateBuffer(unit.sequenceId, [
+        { key: 'CURRENT_PAGE_NR', timeStamp: Date.now(), content: String(playerState.currentPage) },
+        { key: 'CURRENT_PAGE_ID', timeStamp: Date.now(), content: String(this.pageService.currentPageIndex) },
+        { key: 'PAGE_COUNT', timeStamp: Date.now(), content: this.pageService.pages.length.toString() }
+      ]);
+    }
+
+    if (msg.unitState) {
+      const timeStamp = Date.now();
+
+      this.tcs.AddToUnitStateBuffer(unit.sequenceId, [
+        { key: 'PRESENTATION_PROGRESS', timeStamp, content: msg.unitState.presentationProgress || '' },
+        { key: 'RESPONSE_PROGRESS', timeStamp, content: msg.unitState.responseProgress || '' }
+      ]);
+
+      if (msg.unitState.dataParts) {
+        // in pre-verona4-times it was not entirely clear if the stringification of the dataParts should be made
+        // by the player itself ot the host. To maintain backwards-compatibility we check this here.
+        Object.keys(msg.unitState.dataParts).forEach(dataPartId => {
+          if (!msg.unitState || !msg.unitState.dataParts) return;
+          if (typeof msg.unitState.dataParts[dataPartId] !== 'string') {
+            msg.unitState.dataParts[dataPartId] = JSON.stringify(msg.unitState.dataParts[dataPartId]);
+          }
+        });
+        this.tcs.AddToUnitStateDataPartsBuffer(
+          unit.sequenceId,
+          msg.unitState.dataParts,
+          msg.unitState.unitStateDataType || ''
+        );
+      }
+    }
+
+    if (msg.log) {
+      this.bs.addUnitLog(this.tcs.testId, unit.alias, unit.id, msg.log);
+    }
+  }
+
+  private handleUnitNavigationRequestedNotification(msgData: any): void {
+    // support Verona2 and Verona3 version
+    const target = msgData.target ? `#${msgData.target}` : msgData.targetRelative;
+    this.tcs.setUnitNavigationRequest(target);
+  }
+
+  private handleWindowFocusChangedNotification(msgData: any): void {
+    if (msgData.hasFocus) {
+      this.tcs.windowFocusState$.next('PLAYER');
+    } else if (document.hasFocus()) {
+      this.tcs.windowFocusState$.next('HOST');
+    } else {
+      this.tcs.windowFocusState$.next('UNKNOWN');
+    }
+  }
+
+  private handleRuntimeError(msg: VopRuntimeErrorNotification): void {
+    const unit = (msg.sessionId in this.tcs.unitAliasMap) ?
+      this.tcs.getUnit(this.tcs.unitAliasMap[msg.sessionId]) :
+      this.tcs.currentUnit;
+    if (this.tcs.testMode.saveResponses && unit) {
+      this.bs.addUnitLog(
+        this.tcs.testId,
+        unit.alias,
+        unit.id,
+        [
+          {
+            key: `Runtime Error: ${msg.code}`,
+            content: msg.message || '',
+            timeStamp: Date.now()
+          }
+        ]
+      );
+    }
+    // possible reactions on runtimeErrors
+    const reactions: { [key: string]: (code: string, message: string) => void } = {
+      raiseError: (errorCode, errorMessage) => {
+        throw new AppError({
+          label: 'Fehler beim Abspielen der Aufgabe',
+          description: errorMessage,
+          type: 'verona_player_runtime_error',
+          code: VeronaPlayerRuntimeErrorCodes.indexOf(errorCode)
+        });
+      }
+    };
+    const runTimeErrorReactionMap:
+    { [code in typeof VeronaPlayerRuntimeErrorCodes[number]]: keyof typeof reactions } = {
+      'session-id-missing': 'raiseError',
+      'unit-definition-missing': 'raiseError',
+      'wrong-session-id': 'raiseError',
+      'unit-definition-type-unsupported': 'raiseError',
+      'unit-state-type-unsupported': 'raiseError',
+      'runtime-error': 'raiseError'
+    };
+    reactions[runTimeErrorReactionMap[msg.code || 'runtime-error'] || 'raiseError'](msg.code || '', msg.message || '');
+  }
+
+  private open(unitSequenceId: number): void {
+    if(this.destroyed||!this.mds.http.isCurrent)return;
+    if(this.playerLease)this.apiService.channel.clear(this.playerLease);this.playerLease=undefined;
+    while (this.iFrameHostElement.nativeElement.hasChildNodes()) {
+      this.iFrameHostElement.nativeElement.removeChild(this.iFrameHostElement.nativeElement.lastChild);
+    }
+
+    this.pageService.updateValidPages([]);
+    this.tcs.currentUnitSequenceId = unitSequenceId;
+
+    if (!this.tcs.currentUnit) {
+      throw new Error(`No such unit: ${unitSequenceId}`);
+    }
+
+    this.mds.appSubTitle$.next(this.tcs.currentUnit.label);
+
+    if (this.subscriptions.loading) {
+      this.subscriptions.loading.unsubscribe();
+    }
+
+    // For the very first unit of a test, TestLoaderService.resumeTest() already waited for
+    // the block/testlet to be loaded before ever
+    // navigating here, so this resolves immediately in that case. It's still needed here for
+    // later, still-lazy-loading blocks reached during the test, where nothing waited beforehand.
+    //
+    // Only tell TestControllerComponent this unit isn't ready yet if the wait turns out to be
+    // real - i.e. only once we know subscribing didn't resolve it on the spot. subscribe() always
+    // calls back synchronously for an already-settled source, so `settledSynchronously` is set
+    // before this .subscribe() call itself returns.
+    let settledSynchronously = false;
+    this.subscriptions.loading = this.tcs.unitBlockResourcesLoaded$(unitSequenceId)
+      .subscribe({
+        error: err => {
+          settledSynchronously = true;
+          this.mds.appError = new AppError({
+            label: `Unit konnte nicht geladen werden. ${err.info}`,
+            description: (err.info) ? err.info : err,
+            type: 'network'
+          });
+        },
+        complete: () => {
+          settledSynchronously = true;
+          this.prepareUnit();
+        }
+      });
+    if (!settledSynchronously) {
+      this.tcs.unitContentReady$.next(false);
+    }
+  }
+
+  private prepareUnit(): void {
+    if (!this.tcs.currentUnit) {
+      throw new Error('Unit not loaded');
+    }
+    // This unit's resources finished loading (see open()'s combineLatest above) - reveal it.
+    this.tcs.unitContentReady$.next(true);
+
+    this.tcs.addToTestStateBuffer('CURRENT_UNIT_ID', this.tcs.currentUnit.alias);
+    this.tcs.AddToUnitStateBuffer(
+      this.tcs.currentUnit.sequenceId,
+      [{ key: 'PLAYER', timeStamp: Date.now(), content: 'LOADING' }]
+    );
+    this.runUnit();
+  }
+
+  private runUnit(): void {
+    if (this.tcs.currentUnit && this.tcs.currentUnit.parent.locked) {
+      if (this.tcs.testMode.showCode) {
+        this.messageService.showSnackbar(
+          [
+            'Das Freigabewort lautet ',
+            { emphasized: this.tcs.currentUnit.parent.locked?.through.restrictions.codeToEnter?.code ?? '' }
+          ],
+          'Schließen',
+          0
+        );
+      }
+      return;
+    }
+
+    this.startTimerIfNecessary();
+    this.prepareIframe();
+    this.tcs.updateNavigationState();
+  }
+
+  private startTimerIfNecessary(): void {
+    if (!this.tcs.currentUnit?.parent.timerId) {
+      return;
+    }
+    if (this.tcs.currentTimerId &&
+      (this.tcs.currentUnit.parent.timerId === this.tcs.currentTimerId)
+    ) {
+      return;
+    }
+    this.tcs.startTimer(this.tcs.testlets[this.tcs.currentUnit.parent.timerId]);
+  }
+
+  private prepareIframe(): void {
+    if (!this.tcs.currentUnit) {
+      return;
+    }
+    this.iFrameItemplayer = <HTMLIFrameElement>document.createElement('iframe');
+    if (!('srcdoc' in this.iFrameItemplayer)) {
+      this.mds.appError = new AppError({
+        label: 'Veralteter Browser',
+        description: 'Ihr browser is veraltet oder inkompatibel mit dieser Anwendung!',
+        type: 'general'
+      });
+      return;
+    }
+    this.iFrameItemplayer.setAttribute('class', 'unitHost');
+    this.iFrameItemplayer.setAttribute('sandbox','allow-scripts allow-forms allow-modals allow-downloads allow-popups');
+    this.iFrameItemplayer.setAttribute('referrerpolicy','no-referrer');
+    this.iFrameItemplayer.setAttribute('title',this.tcs.currentUnit.label);
+    this.iFrameHostElement.nativeElement.appendChild(this.iFrameItemplayer);
+    const unit=this.tcs.currentUnit;
+    this.playerLease=this.apiService.channel.bind(this.iFrameItemplayer,unit.alias,()=>!this.destroyed&&this.tcs.currentUnit===unit);
+    this.iFrameItemplayer.setAttribute('srcdoc', this.tcs.getPlayer(this.tcs.currentUnit.playerFileName));
+  }
+
+  private reload(): void {
+    if (!this.tcs.currentUnitSequenceId || !this.tcs.currentUnit) {
+      return;
+    }
+    this.open(this.tcs.currentUnitSequenceId);
+  }
+
+  private getPlayerConfig(navigationState: NavigationState): VeronaPlayerConfig {
+    if (!this.tcs.currentUnit) throw new Error('Unit not loaded');
+    if (!this.tcs.booklet) throw new Error('Booklet not loaded');
+    const groupToken = this.mds.getAuthData()?.groupToken;
+    const resourceUri = this.mds.appConfig?.fileServiceUri ? this.fileServerUrl : this.bs.backendUrl;
+    const playerConfig: VeronaPlayerConfig = {
+      enabledNavigationTargets: Object.keys(navigationState.targets)
+        .filter(isVeronaNavigationTarget)
+        .filter(t => !!navigationState.targets[t])
+        .filter(t => navigationState.targets[t] !== this.tcs.currentUnitSequenceId),
+      logPolicy: this.tcs.booklet.config.logPolicy,
+      pagingMode: this.tcs.booklet.config.pagingMode,
+      unitNumber: this.tcs.currentUnitSequenceId,
+      unitTitle: this.tcs.currentUnit.label,
+      unitId: this.tcs.currentUnit.alias,
+      stateReportPolicy: 'eager', // for pre-verona-4-players which does not report by default
+      directDownloadUrl: `${resourceUri}file/${groupToken}/ws_${this.tcs.workspaceId}/Resource`,
+      sharedParameters: this.tcs.sharedParameters
+    };
+    if (
+      this.tcs.currentUnit.state.CURRENT_PAGE_ID &&
+      (this.tcs.booklet.config.restore_current_page_on_return === 'ON')
+    ) {
+      playerConfig.startPage = this.tcs.currentUnit.state.CURRENT_PAGE_ID;
+    }
+    return playerConfig;
+  }
+
+  private handleNavigationDenial(
+    navigationDenial: { sourceUnitSequenceId: number; reason: VeronaNavigationDeniedReason[] }
+  ): void {
+    if (navigationDenial.sourceUnitSequenceId !== this.tcs.currentUnitSequenceId) {
+      return;
+    }
+
+    this.apiService.postMessageTarget.postMessage({
+      type: 'vopNavigationDeniedNotification',
+      sessionId: this.tcs.currentUnit?.alias,
+      reason: navigationDenial.reason
+    }, '*');
+  }
+
+  private updatePlayerConfig(navigationState: NavigationState): void {
+    this.apiService.postMessageTarget.postMessage({
+      type: 'vopPlayerConfigChangedNotification',
+      sessionId: this.tcs.currentUnit?.alias,
+      playerConfig: this.getPlayerConfig(navigationState)
+    }, '*');
+  }
+
+  protected onSubmitCode(code: string) {
+    if (!this.tcs.currentUnit?.parent.locked?.through.restrictions?.codeToEnter?.code) {
+      throw new Error('Freigabe-Code nicht gefunden.');
+    }
+    if (this.isValidCode(code)) {
+      this.tcs.clearCodeLock(this.tcs.currentUnit.parent.locked.through.id);
+      this.runUnit();
+    } else {
+      this.codeInputErrorText =
+        `Freigabewort '${code}' für '${this.tcs.currentUnit?.parent.locked?.through.label}' stimmt nicht.`;
+    }
+  }
+
+  private isValidCode(code: string): boolean {
+    if (!this.tcs.currentUnit?.parent.locked?.through.restrictions?.codeToEnter?.code) {
+      throw new Error('Freigabe-Code nicht gefunden.');
+    }
+    const requiredCode =
+      (this.tcs.currentUnit.parent.locked.through.restrictions.codeToEnter.code);
+    return requiredCode.toLowerCase() === code.toLowerCase();
+  }
+}

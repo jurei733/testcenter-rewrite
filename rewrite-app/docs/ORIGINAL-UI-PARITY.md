@@ -4350,3 +4350,48 @@ layouts did not change between the previous UI reference and this revision.
 The Original repository is MIT licensed (IQB). Retain the relevant copyright
 and license notices when copying layouts, styles or assets. Account for fonts
 and other assets' own license notices separately.
+
+
+### Native Monitor icon-button font boundary (2026-10-31)
+
+The native Monitor entry now reverts only the generic Rewrite `font-family`
+and `font-weight` overrides on Material icon buttons. The pinned Original
+inherits the browser's Arial/400 button font; the integration previously used
+Avenir Next/600. The Material icon size remains unchanged. Source-derived SVG
+paths, templates, button behavior and the Original checkout are unchanged.
+
+A controlled headed Chrome 156 diagnostic with `--disable-gpu-rasterization`
+first established zero-pixel Original self-control. Before this correction,
+all four animation phases then showed 53 differing desktop pixels and 34 mobile
+pixels at the search, settings and drawer glyphs. After the final correction,
+all eight complete Original-to-Rewrite viewport pairs are RGBA-identical.
+An independent PNG decoder verified those pairs, all 48 white repaint witnesses,
+and matching geometry plus font properties for all 28 icon instances
+across the two viewport sizes. This is controlled-rendering evidence, not a
+replacement browser configuration or whole-Monitor qualification.
+
+Default accelerated local Chrome still exhibits Original-vs-Original shadow
+variance. Disabling Graphite in a separate diagnostic also forced software
+rendering, so that experiment cannot isolate Graphite alone. Existing capture
+criteria, zero-pixel comparison, three consecutive complete frames, native
+browser modes and all broad visual acceptance rows remain unchanged. Full Monitor scenario
+qualification and fresh current-head reviews remain open.
+
+The separate native qualification at `c0634a0f` completed successfully in
+[run 41150306578](https://github.com/jurei733/testcenter-rewrite/actions/runs/41150306578).
+It used actual Ubuntu image `20261026.354.1`, Node `22.23.4`, locked Chromium
+`147.0.7727.15`, the normal headed browser arguments and the unchanged pinned
+Original. Independent archive verification confirmed all 80 Original build
+files, eight exact full-viewport Source self-control pairs, eight exact
+Source-to-Rewrite pairs, all 32 final visual PNGs and 96 complete white repaint
+witnesses. The separate qualified native material retained its 591 file records,
+eight visible PNGs, 24 white PNGs and nine authenticated Debian archives.
+All 349 native policy checks, four native Debian controls and nine real
+WebSocket browser cases passed without skips; dependency audit found zero
+vulnerabilities. Source and compiled API hashes match the local font correction.
+The artifact includes hidden files because the initial successful job's upload
+omitted `assets/.browserslistrc`; that earlier archive is incomplete evidence.
+
+This proves the two baseline Monitor viewport states at their four polling
+animation phases. Full Monitor scenarios, all eight broad visual acceptance
+rows, Source-backend equivalence and complete Original parity remain open.

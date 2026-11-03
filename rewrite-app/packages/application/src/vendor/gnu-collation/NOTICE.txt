@@ -1,0 +1,17 @@
+GNU libc Original report collation
+
+The collation algorithm in original-report-collation.ts is adapted from GNU libc2.41 locale/weight.h and string/strcoll_l.c. Copyright (C) Free Software Foundation, Inc. Distributed under GNU LGPL2.1-or-later; the complete license is COPYING.LIB in this directory. TypeScript adaptation copyright2026 Testcenter Rewrite contributors.
+
+The generated data is the actual GNU libc2.41 en_US.utf8 multibyte locale table captured from the independently verified Original PostgreSQL18 runtime. The source locale archive and extracted table hashes are recorded in original-report-collation-data.ts. Regeneration is explicit and rejects an unqualified archive.
+
+Primary sources and corresponding source release:
+https://sourceware.org/git/?p=glibc.git;a=tree;hb=glibc-2.41
+https://ftp.gnu.org/gnu/glibc/glibc-2.41.tar.xz
+https://sourceware.org/glibc/manual/2.41/html_node/Collation-Functions.html
+
+Layout references: locale/locarchive.h and locale/langinfo.h. Locale definitions: localedata/locales/en_US, localedata/locales/en_GB and localedata/locales/iso14651_t1_common. The algorithms and data remain separate replaceable Node modules and are supplied with their editable source in this repository.
+
+Reproduce the independent comparison corpus with an unchanged qualified Source container:
+  python3 scripts/capture-original-report-collation.py SOURCE_POSTGRES_CONTAINER FRESH_OUTPUT_DIRECTORY
+  node scripts/verify-original-report-collation.mjs FRESH_OUTPUT_DIRECTORY
+The capture uses only read-only SQL. It covers all1112063 valid non-NUL Unicode scalar characters and977895 compound strings, including all ASCII strings up to3 characters and reproducible Unicode strings up to50 characters. Application-level report parity is separately checked through the real Source HTTP fixtures. Neither corpus establishes whole-project or renderer parity.

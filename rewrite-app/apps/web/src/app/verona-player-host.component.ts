@@ -615,17 +615,17 @@ export class VeronaPlayerHostComponent
 
   @HostListener("window:focus")
   onWindowFocus(): void {
-    this.scheduleFocusLog();
+    this.scheduleFocusLog(document.hasFocus());
   }
 
   @HostListener("window:blur")
   onWindowBlur(): void {
-    this.scheduleFocusLog();
+    this.scheduleFocusLog(document.hasFocus());
   }
 
   @HostListener("document:visibilitychange")
   onVisibilityChange(): void {
-    this.scheduleFocusLog();
+    this.scheduleFocusLog(!document.hidden && document.hasFocus());
   }
 
   private mountPlayer(): void {

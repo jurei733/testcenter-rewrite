@@ -1,0 +1,47 @@
+{
+  "verified": true,
+  "actualSourceHttpRequests": 107,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceFilesBeforeAndAfter": 137,
+  "additionalSourceFilesVerifiedAfterCapture": 2,
+  "composerPackagesPerBackend": 19,
+  "backendCount": 2,
+  "runtime": {
+    "open": {
+      "version": "19.0.0",
+      "xmlSchemaValidation": true,
+      "allowTestMode": false,
+      "staticTime": "now",
+      "staticTokens": false,
+      "insecurePasswords": false,
+      "protection": [
+        "login",
+        "person"
+      ]
+    },
+    "protected": {
+      "version": "19.0.0",
+      "xmlSchemaValidation": true,
+      "allowTestMode": false,
+      "staticTime": "now",
+      "staticTokens": false,
+      "insecurePasswords": false,
+      "protection": [
+        "admin",
+        "login",
+        "person"
+      ]
+    }
+  },
+  "actualUnchangedPhpSerializerWitnesses": 1,
+  "mutationsOverHttp": true,
+  "sqlReadOnlyQueries": 4,
+  "noSqlSeedsOrDaoStubs": true,
+  "sourceOriginalReadOnly": true,
+  "files": {
+    "capture.mjs": "c730e382d0913bbaaa0a415c04fa6472761d6efa6e79e44aff1881a7c875e299",
+    "compose.yml": "d7d9063f1298f39b5e9ed89f18e4d144151f845c50c2ca1e57a9852d2605eb20",
+    "observations.json": "dbe4c8ba9c683fdc1f9ac176c8061c535868a2c7dddaa0e6ae6b17538ca1f3e0",
+    "php-access-set.json": "b2b14aa8709ceffe6f998b751a5f9360259b461d1cf9613e72ca26318ceb1a67"
+  }
+}

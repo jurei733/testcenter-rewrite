@@ -1,3 +1,12 @@
+import {createOriginalReportTextComparator} from './original-report-collation.js';
+import {readOriginalReviewReports,type OriginalReviewReportProjection} from './original-review-report.js';
+import {originalReviewReportCategoryKeys,encodeOriginalReportJson,formatOriginalResponseReport,formatOriginalUnitStateReport} from './original-workspace-report-wire.js';
+import {originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix} from '@testcenter-rewrite-app/domain';
+import {originalReviewHistoryUnavailable} from './original-review-record.js';
+import {createOriginalReviewPort} from './original-review.js';
+export * from './original-review.js';
+export * from './original-review-record.js';
+export * from './original-review-collections.js';
 export {prepareOriginalMonitorSelectedLock,changeOriginalMonitorLockCollection} from './original-monitor-lock.js';
 export type {OriginalMonitorLockResult,OriginalMonitorLockTarget} from './original-monitor-lock.js';
 import {collectOriginalMonitorProfiles} from './original-monitor-profile.js';
@@ -56,10 +65,30 @@ export type {OriginalGroupResultInventory} from './original-group-results.js';
 export {projectOriginalResultTest} from './original-group-results.js';
 export type {OriginalResultTest} from './original-group-results.js';
 import {createOriginalGroupResultsPort} from './original-group-results.js';
+export {prepareOriginalTestSelection,prepareOriginalTestDeletionInput,selectOriginalTestDeletion,deleteOriginalSelectedTestsFromCollections} from './original-test-deletion.js';
+export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletionResult} from './original-test-deletion.js';
+import {createOriginalWorkspaceReportPort} from './original-workspace-reports.js';
+export {selectOriginalReportParents,projectOriginalWorkspaceReport,assertOriginalReportRowCount,readOriginalWorkspaceReportCollections,originalReportUnitIdentity,originalReportFormat,originalReportQuery} from './original-workspace-reports.js';
+export type {OriginalReportMetadata,OriginalReportParent,OriginalReportRun,OriginalReportFamily,OriginalReportRequest,OriginalWorkspaceReportSnapshot,OriginalReportStoredUnit,OriginalReportStoredReview} from './original-workspace-reports.js';
+export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,originalWorkspaceWriteSqlSnapshot} from './original-workspace-write.js';
+export type {OriginalWorkspaceWriteAuthority,OriginalWorkspaceWriteSnapshot} from './original-workspace-write.js';
+import {createOriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
+export {readOriginalWorkspaceAdministrationCollection,parseOriginalWorkspaceNumber,originalExplicitWorkspaceAccess,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection} from './original-workspace-administration.js';
+export type {OriginalWorkspaceAdministrationScope,OriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
+import {createOriginalTestAdministrationPort} from './original-test-administration.js';
+export {projectOriginalTestAdministrationRun,projectOriginalTestAdministrationInventory,readOriginalTestAdministrationCollections,projectOriginalTestAdministration,formatOriginalTestAdministrationJson} from './original-test-administration.js';
+export type {OriginalTestAdministrationInventory,OriginalTestAdministrationGroup} from './original-test-administration.js';
 export {projectOriginalSessionTest} from './original-session.js';
 export type {OriginalSessionTest} from './original-session.js';
 import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
 import {createOriginalSessionPort} from './original-session.js';
+import {createOriginalAdminDirectoryPort} from './original-admin-directory.js';
+export {originalDirectoryModification} from './original-admin-directory.js';
+export type {OriginalDirectoryFile,OriginalDirectoryFileEvent,OriginalAdminDirectoryPort} from './original-admin-directory.js';
+import {createOriginalAdminSessionPort} from './original-admin-session.js';
+export {assertOriginalAdminNameAvailable,originalAdminMetadataAllowed,selectOriginalAdminIdentity,originalAdminFailureBucket,prepareOriginalAdminNumber,originalAdminNumber,formatOriginalAdminAccessSet} from './original-admin-session.js';
+export type {OriginalAdminNumber,OriginalAdminSelector,OriginalAdminSessionSnapshot,OriginalAdminSessionEffect,OriginalAdminSessionRepository,OriginalAdminSessionPort} from './original-admin-session.js';
+export {mutateOriginalAdminCollections} from './original-admin-collection.js';
 export type {OriginalSessionPort, OriginalAccessSet} from './original-session.js';
 import {createOriginalPersonNameSuffix,OriginalPersonIdentityConflictError} from './original-person-identity.js';
 export {prepareOriginalParticipantSession,createOriginalPersonNameSuffix,resolveOriginalPerson,assertOriginalPersonUnique,projectOriginalPersonSessions,projectOriginalPersonRuns,projectOriginalLoginMode,withOriginalTestRunMode,OriginalPersonIdentityConflictError} from './original-person-identity.js';
@@ -1314,8 +1343,14 @@ export type FirstSlicePorts = {
   originalCommand: import('./original-command.js').OriginalCommandPort;
   originalMonitor: import('./original-monitor.js').OriginalMonitorPort;
   originalUnit:import('./original-unit.js').OriginalUnitPort;
+  originalReview:import('./original-review.js').OriginalReviewPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
+  originalAdminSession: import('./original-admin-session.js').OriginalAdminSessionPort;
+  originalAdminDirectory: import('./original-admin-directory.js').OriginalAdminDirectoryPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
+  originalWorkspaceAdministration: import('./original-workspace-administration.js').OriginalWorkspaceAdministrationPort;
+  originalWorkspaceReport:ReturnType<typeof createOriginalWorkspaceReportPort>;
+  originalTestAdministration: import('./original-test-administration.js').OriginalTestAdministrationPort;
   monitorRead: MonitorReadPort;
   monitorControl: MonitorControlPort;
   systemCheck: SystemCheckPort;
@@ -1449,7 +1484,7 @@ export type FirstSliceServices = FirstSlicePorts & {
   }): Promise<CreateImportJobResult>;
 };
 
-export type FirstSliceRepository = import('./original-monitor-store.js').OriginalMonitorRepository & import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
+export type FirstSliceRepository = import('./original-admin-session.js').OriginalAdminSessionRepository & import('./original-monitor-store.js').OriginalMonitorRepository & import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
@@ -1647,7 +1682,12 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   getOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   mutateOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput, transform: import('./original-unit-record.js').OriginalUnitTransform): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   listOriginalUnitsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalNativeUnit[]>;
+  listOriginalReviews(scope:import('./original-review-record.js').OriginalReviewScope):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
+  mutateOriginalReview(scope:import('./original-review-record.js').OriginalReviewScope,operation:import('./original-review-record.js').OriginalReviewMutation):Promise<import('./original-review-record.js').OriginalNativeReview|null>;
+  listOriginalReviewsByPerson(scope:{participantSessionId:string;tenantId:string;workspaceId:string}):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
   getOriginalGroupResultInventory(tenantId: string, workspaceId: string): Promise<import('./original-group-results.js').OriginalGroupResultInventory>;
+  getOriginalTestAdministrationInventory(tenantId:string,workspaceId:string):Promise<import('./original-test-administration.js').OriginalTestAdministrationInventory>;
+  deleteOriginalSelectedTests(input:import('./original-test-deletion.js').OriginalTestDeletionInput):Promise<import('./original-test-deletion.js').OriginalTestDeletionResult|null>;
   /** Atomically delete native group snapshots, current session descendants and capabilities. */
   deleteOriginalGroupResults(input: import('./original-group-deletion.js').OriginalGroupDeletionInput): Promise<import('./original-group-deletion.js').OriginalGroupDeletionResult | null>;
   listTestRunsByParticipantSessionId(
@@ -1659,6 +1699,8 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   /** Allocate/reuse an Original decimal Test number inside the current parent's write boundary. */
   getOrCreateOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope): Promise<string>;
+  getOriginalWorkspaceReportSnapshot(input:import('./original-workspace-reports.js').OriginalReportRequest):Promise<import('./original-workspace-reports.js').OriginalWorkspaceReportSnapshot>;
+  findOriginalWorkspaceAdministrationScope(workspaceNumber:string):Promise<import('./original-workspace-administration.js').OriginalWorkspaceAdministrationScope|null>;
   matchesOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope & {workspaceNumber:string}): Promise<boolean>;
   findOriginalTestNumber(input: {testNumber:string;tenantId:string;workspaceId:string;participantSessionId:string}): Promise<import('./original-test-number.js').OriginalTestNumberRecord|null>;
   /** Append native Test logs under current metadata ownership, without rewriting its Run. */
@@ -1690,9 +1732,11 @@ export type FirstSliceRepository = import('./original-monitor-store.js').Origina
   /** Activate the current parent under the same lock as Run eligibility; preserve its other fields. */
   activateParticipantController(input: ParticipantControllerActivationInput): Promise<ParticipantControllerActivationResult | null>;
   deleteTestRunsByIds(testRunIds: string[]): Promise<number>;
+  /** Native reports consume stored collection order, without the UI timestamp sort. */
   listParticipantTestLogsByWorkspace(
     tenantId: string,
-    workspaceId: string
+    workspaceId: string,
+    options?: { order: "collection" }
   ): Promise<ParticipantTestLog[]>;
   listLatestParticipantTestStateLogsByWorkspace(
     tenantId: string,
@@ -5398,7 +5442,7 @@ const requireActiveAdminSession = async (
   repository: FirstSliceRepository,
   sessionToken: string,
   nowIso: string,
-  options: { allowPasswordChangeRequired?: boolean } = {}
+  options: { allowPasswordChangeRequired?: boolean; enforceAccessWindow?: boolean } = {}
 ): Promise<{
   adminUser: AdminUser;
   adminSession: AdminSession;
@@ -5433,6 +5477,8 @@ const requireActiveAdminSession = async (
       "Admin session is invalid or expired."
     );
   }
+
+  if(options.enforceAccessWindow && resolveAdminAccessFailureReason(adminUser,nowIso))throw new FirstSliceError(401,'admin_session_invalid','Admin session is invalid or expired.');
 
   const roleAssignments = await listAdminRoleAssignmentsForUser(
     repository,
@@ -16095,17 +16141,17 @@ type OriginalLogReportRow = {
   bookletname: string;
   unitname: string;
   originalUnitId: string;
-  timestamp: string;
+  timestamp: string | {readonly rawJSON:string};
   logentry: string;
 };
 
-type OriginalReviewReportRow = Record<string, string | number | boolean | null>;
+type OriginalReviewReportRow = Record<string, string | number | boolean | null | {readonly rawJSON:string}>;
 
 const formatOriginalLogReportCsv = (
   columns: string[],
   rows: OriginalLogReportRow[]
 ): string =>
-  formatOriginalReportCsv(columns, rows);
+  formatOriginalReportCsv(columns, rows.map(row=>({...row,timestamp:typeof row.timestamp==='object'?row.timestamp.rawJSON:row.timestamp})));
 
 const formatOriginalReviewReportCsv = (
   columns: string[],
@@ -16118,7 +16164,7 @@ const formatOriginalReviewReportCsv = (
         key,
         key.startsWith("category_") && typeof value === "boolean"
           ? (value ? "TRUE" : "FALSE")
-          : value
+          : key === "page" && value && typeof value === "object" && "rawJSON" in value ? value.rawJSON : value
       ])
     ))
   );
@@ -16161,6 +16207,7 @@ const buildOriginalResponseReportRows = (input: {
   groupKeys: string[];
   nativeUnits: import("@testcenter-rewrite-app/domain").OriginalNativeUnit[];
 }): OriginalResponseReportRow[] => {
+  const nativeCompare=input.nativeUnits.length?createOriginalReportTextComparator():null;
   const sessionsById = new Map(
     input.participantSessions.map(session => [session.participantSessionId, session])
   );
@@ -16194,14 +16241,17 @@ const buildOriginalResponseReportRows = (input: {
       const timestamp = Number.isFinite(responseTimestamp) ? responseTimestamp : 0;
       return [...(savedUnits.get(testRun.testRunId) ?? [])].map(unitKey => {
         const native = nativeByRun.get(testRun.testRunId)?.find(unit => archiveUnitNamesEqual(unit.unitName, unitKey));
-        if (native) return {
+        if (native) {
+          if (!Object.keys(native.state).length && !Object.keys(native.stateClocks).length && native.stateInitialized === undefined) throw new FirstSliceError(409, "original_unit_history_unknown", "The historical native Unit state initialization is unavailable.");
+          return {
           groupname:participantSession.groupKey, loginname:participantSession.originalLoginKey ?? participantSession.loginKey,
           code:participantSession.originalNameSuffix ?? participantSession.participantCode ?? "",
           bookletname:testRun.originalResultState?.bookletName ?? testRun.bookletAssignmentKey ?? testRun.bookletKey,
           unitname:native.unitName, originalUnitId:native.originalUnitId,
-          responses:native.parts.map(part => ({...part})),
-          laststate:Object.keys(native.state).length ? JSON.stringify(native.state) : null
-        };
+          responses:[...native.parts].sort((a,b)=>nativeCompare!(a.id,b.id)).map(part => ({...part})),
+          laststate:Object.keys(native.state).length || Object.keys(native.stateClocks).length || native.stateInitialized === true ? formatOriginalUnitStateReport(native.state) : null
+          };
+        }
         const response = Object.hasOwn(testRun.unitResponses, unitKey) ? testRun.unitResponses[unitKey] : undefined;
         const unit = resolveOriginalReportUnit({
           contentReleasesById,
@@ -16241,6 +16291,7 @@ const buildOriginalResponseReportRows = (input: {
     })
     .sort(
       (left, right) =>
+        nativeCompare ? nativeCompare(left.groupname,right.groupname)||nativeCompare(left.loginname,right.loginname)||nativeCompare(left.code,right.code)||nativeCompare(left.bookletname,right.bookletname)||nativeCompare(left.unitname,right.unitname)||nativeCompare(left.originalUnitId,right.originalUnitId) :
         left.groupname.localeCompare(right.groupname) ||
         left.loginname.localeCompare(right.loginname) ||
         left.bookletname.localeCompare(right.bookletname) ||
@@ -16253,32 +16304,37 @@ const buildOriginalLogReportRows = (input: {
   testRuns: TestRun[];
   testLogs: ParticipantTestLog[];
   groupKeys: string[];
-}): OriginalLogReportRow[] =>
-  listParticipantTestLogsForWorkspace({
-    tenantKey: "",
-    workspaceKey: "",
-    participantSessions: input.participantSessions,
-    testRuns: input.testRuns,
-    testLogs: input.testLogs,
-    groupKeys: input.groupKeys,
-    limit: 50_001
-  })
-    .map(item => ({
-      groupname: item.groupKey,
-      loginname: item.loginKey,
-      code: item.participantCode,
-      bookletname: item.bookletAssignmentKey,
-      unitname: item.testLog.unitKey ?? "",
-      originalUnitId: item.testLog.originalUnitId ?? "",
-      timestamp: String(item.testLog.originalTimestamp ?? exactParticipantTestLogTimestamp(item.testLog)),
-      logentry: formatOriginalParticipantLogEntry(item.testLog)
-    }))
-    .sort(
-      (left, right) =>
-        Number(left.timestamp) - Number(right.timestamp) ||
-        left.groupname.localeCompare(right.groupname) ||
-        left.loginname.localeCompare(right.loginname)
-    );
+}): OriginalLogReportRow[] => {
+  const people=new Map(input.participantSessions.map(person=>[person.participantSessionId,person]));
+  const runs=new Map(input.testRuns.map(run=>[run.testRunId,run]));
+  const native=(log:ParticipantTestLog)=>typeof people.get(log.participantSessionId)?.originalLoginKey==='string'&&
+    [originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix].some(prefix=>log.participantTestLogId.startsWith(prefix));
+  // AdminDAO UNION ALL emits Unit logs then Test logs, without a branch ORDER BY.
+  // Keep the supplied raw collection rank; do not inherit UI timestamp/UUID order.
+  const raw=input.testLogs.filter(native);
+  const ranks=new Map([...raw.filter(log=>log.unitKey!==null),...raw.filter(log=>log.unitKey===null)].map((log,i)=>[log.participantTestLogId,i]));
+  const items=listParticipantTestLogsForWorkspace({tenantKey:'',workspaceKey:'',...input,limit:50_001});
+  items.sort((left,right)=>{
+    const a=ranks.get(left.testLog.participantTestLogId),b=ranks.get(right.testLog.participantTestLogId);
+    if(a!==undefined||b!==undefined)return a===undefined?1:b===undefined?-1:a-b;
+    return Number(exactParticipantTestLogTimestamp(left.testLog))-Number(exactParticipantTestLogTimestamp(right.testLog))||
+      left.groupKey.localeCompare(right.groupKey)||left.loginKey.localeCompare(right.loginKey);
+  });
+  return items.map(item=>{
+    const person=people.get(item.testLog.participantSessionId)!,run=runs.get(item.testLog.testRunId)!,isNative=ranks.has(item.testLog.participantTestLogId);
+    if(isNative&&(typeof person.originalNameSuffix!=='string'||typeof run.originalResultState?.bookletName!=='string'))throw new FirstSliceError(409,'original_log_history_unknown','The historical native log identity is unavailable.');
+    return {
+      groupname:item.groupKey,
+      loginname:isNative?person.originalLoginKey!:item.loginKey,
+      code:isNative?person.originalNameSuffix??'':item.participantCode,
+      bookletname:isNative?run.originalResultState?.bookletName??item.bookletAssignmentKey:item.bookletAssignmentKey,
+      unitname:item.testLog.unitKey??'',originalUnitId:item.testLog.originalUnitId??'',
+      timestamp:isNative?(JSON as unknown as {rawJSON:(value:string)=>{readonly rawJSON:string}}).rawJSON(exactParticipantTestLogTimestamp(item.testLog)):
+        String(item.testLog.originalTimestamp??exactParticipantTestLogTimestamp(item.testLog)),
+      logentry:formatOriginalParticipantLogEntry(item.testLog)
+    };
+  });
+};
 
 const buildOriginalReviewReportRows = (input: {
   participantSessions: ParticipantSession[];
@@ -16287,6 +16343,7 @@ const buildOriginalReviewReportRows = (input: {
   reviews: WorkspaceReview[];
   contentReleases: ContentRelease[];
   groupKeys: string[];
+  nativeReviews?:OriginalReviewReportProjection[];
 }): { rows: OriginalReviewReportRow[]; categoryColumns: string[] } => {
   const contentReleasesById = new Map(
     input.contentReleases.map(release => [release.contentReleaseId, release])
@@ -16300,11 +16357,23 @@ const buildOriginalReviewReportRows = (input: {
     limit: 50_001,
     limitMaximum: 50_001
   });
-  const categories = Array.from(
+  const nativeById=new Map((input.nativeReviews??[]).map(row=>[row.reviewId,row]));
+  // Source AdminDAO emits the Unit branch then the Booklet branch. Native
+  // collection order must not inherit the canonical UI's latest-edit sort.
+  // Source has no within-branch ORDER BY; retain the supplied native order.
+  const nativeOrder=[...(input.nativeReviews??[]).filter(row=>row.record.unitname!==''),...(input.nativeReviews??[]).filter(row=>row.record.unitname==='')];
+  const nativeRank=new Map(nativeOrder.map((row,index)=>[row.reviewId,index]));
+  if(nativeRank.size)items.sort((left,right)=>{
+    const a=nativeRank.get(left.review.reviewId),b=nativeRank.get(right.review.reviewId);
+    return a===undefined?(b===undefined?0:1):b===undefined?-1:a-b;
+  });
+  const categories = items.some(item=>nativeById.has(item.review.reviewId)) ? originalReviewReportCategoryKeys(items.map(item=>({categories:nativeById.get(item.review.reviewId)?.record.categories??item.review.categories.join(' ')}))) : Array.from(
     new Set(items.flatMap(item => item.review.categories))
   ).sort();
   const categoryColumns = categories.map(category => `category_${category}`);
   const rows = items.map(item => {
+    const native=nativeById.get(item.review.reviewId);
+    const selectedCategories=native?native.record.categories.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g,'').split(' '):item.review.categories;
     const testRun = item.testRun ? normalizeTestRun(item.testRun) : null;
     const unit = testRun
       ? resolveOriginalReportUnit({
@@ -16329,7 +16398,7 @@ const buildOriginalReviewReportRows = (input: {
       ...Object.fromEntries(
         categories.map(category => [
           `category_${category}`,
-          item.review.categories.includes(category)
+          selectedCategories.includes(category)
         ])
       ),
       reviewtime: toOriginalReportDateTime(item.review.createdAt),
@@ -16340,7 +16409,9 @@ const buildOriginalReviewReportRows = (input: {
       reviewer: item.review.reviewerId,
       entry: item.review.comment,
       unitlabel: unit.unitLabel,
-      bookletlabel: unit.bookletLabel
+      bookletlabel: unit.bookletLabel,
+      ...(native?Object.fromEntries(Object.entries(native.record).filter(([key])=>key!=='categories')):{}),
+      ...(native?native.labels:{})
     } satisfies OriginalReviewReportRow;
   });
   return { rows, categoryColumns };
@@ -16414,6 +16485,7 @@ const createOriginalResultArchive = (input: {
   testLogs: ParticipantTestLog[];
   activityEvents: WorkspaceActivityEvent[];
   contentReleases: ContentRelease[];
+  nativeReviews:OriginalReviewReportProjection[];
   nativeUnits: import("@testcenter-rewrite-app/domain").OriginalNativeUnit[];
 }): WorkspaceOriginalResultArchive => {
   const responseRows = input.groupKeys.length ? buildOriginalResponseReportRows(input) : [];
@@ -16503,11 +16575,11 @@ const createOriginalResultArchive = (input: {
   };
   const textEntries = [
     ["manifest.json", `${JSON.stringify(manifest, null, 2)}\n`],
-    ["responses.json", JSON.stringify(responseRows)],
-    ["responses.csv", formatOriginalReportCsv(responseColumns, responsesCsvRows)],
-    ["logs.json", JSON.stringify(logRows)],
+    ["responses.json", input.nativeUnits.length&&responseRows.length ? formatOriginalResponseReport(responseRows,"json") : JSON.stringify(responseRows)],
+    ["responses.csv", input.nativeUnits.length&&responseRows.length ? formatOriginalResponseReport(responseRows,"csv") : formatOriginalReportCsv(responseColumns, responsesCsvRows)],
+    ["logs.json", logRows.some(row=>typeof row.timestamp==='object') ? encodeOriginalReportJson(logRows) : JSON.stringify(logRows)],
     ["logs.csv", formatOriginalLogReportCsv(logColumns, logRows)],
-    ["reviews.json", JSON.stringify(reviewReport.rows)],
+    ["reviews.json", input.nativeReviews.length ? encodeOriginalReportJson(reviewReport.rows) : JSON.stringify(reviewReport.rows)],
     ["reviews.csv", formatOriginalReviewReportCsv(reviewColumns, reviewCsvRows)]
   ] as const;
   return {
@@ -27548,7 +27620,7 @@ export const createFirstSliceServices = (
     // Original accepts the XML attribute but stores an empty label as NULL.
     // Its Login construction then fails before checking the password. Keep
     // that invalid stored metadata visible; never invent a group-key label.
-    if (rosterEntry?.groupLabel === "") {
+    if (!nativeFirstFactor && rosterEntry?.groupLabel === "") {
       assertParticipantAccessWindow(rosterEntry, signInTimestamp);
       throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
     }
@@ -27580,6 +27652,15 @@ export const createFirstSliceServices = (
             maxFailures: participantLoginMaxFailures
           }
         );
+      }
+      // Source SessionController checks the failure cache before SessionDAO;
+      // getLogin then checks the absolute window before verifying the password.
+      // Preserve canonical participant credential-first behavior separately.
+      if (nativeFirstFactor) {
+        assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+        if (rosterEntry?.groupLabel === "") {
+          throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
+        }
       }
       const passwordHash = nativeCredential === undefined ? await repository.getParticipantRosterPasswordHash(
         workspace.tenantId,
@@ -27914,8 +27995,12 @@ export const createFirstSliceServices = (
       !sameOriginalTestName(current.definition.groupKey,actor.groupKey)||!sameOriginalTestName(binding.groupKey,actor.groupKey)){
       throw new FirstSliceError(409,'original_login_scope_changed','The Original monitor scope changed during authentication.');
     }
+    // A reimport can retain an older ordinary roster entry for a current
+    // operational Login. Never materialize it as a dependent and demote its
+    // authenticated monitor person (including a different study monitor).
+    const operationalKeys=new Set((await repository.listOriginalOperationalLoginsByWorkspace(actor.tenantId,actor.workspaceId)).map(login=>login.loginKey));
     const members=(await repository.listParticipantRosterEntriesByWorkspace(actor.tenantId,actor.workspaceId)).filter(member=>
-      originalMonitorable(member)&&!participantExecutionModeDefinitions[member.executionMode!].alwaysNewSession&&
+      !operationalKeys.has(member.loginKey)&&originalMonitorable(member)&&!participantExecutionModeDefinitions[member.executionMode!].alwaysNewSession&&
       (actor.originalOperationalMode==='monitor-study'||sameOriginalTestName(member.groupKey,actor.groupKey)));
     for(const member of members){
       let memberBinding=(await repository.listOriginalLoginBindingsByWorkspace(actor.tenantId,actor.workspaceId)).find(row=>row.loginKey===member.loginKey);
@@ -31289,7 +31374,8 @@ export const createFirstSliceServices = (
           ),
           repository.listParticipantTestLogsByWorkspace(
             workspace.tenantId,
-            workspace.workspaceId
+            workspace.workspaceId,
+            {order:"collection"}
           ),
           repository.listContentReleasesByWorkspace(
             workspace.tenantId,
@@ -31303,7 +31389,16 @@ export const createFirstSliceServices = (
         const nativeUnits = await readOriginalArchiveNativeUnits(repository, {
           tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,testRuns,participantSessions,groupKeys
         });
+        const nativeReviews:OriginalReviewReportProjection[]=[];
+        for(const person of participantSessions){
+          if(person.tenantId!==workspace.tenantId||person.workspaceId!==workspace.workspaceId||typeof person.originalLoginKey!=='string'||!groupKeys.includes(person.groupKey))continue;
+          const reports=await readOriginalReviewReports({repository,timeZone:participantAccessTimeZone,
+            labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)},person);
+          if(reports.some(row=>!groupKeys.some(key=>archiveUnitNamesEqual(key,row.record.groupname))))throw originalReviewHistoryUnavailable();
+          nativeReviews.push(...reports);
+        }
         return createOriginalResultArchive({
+          nativeReviews,
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           groupKeys,
@@ -32605,6 +32700,7 @@ export const createFirstSliceServices = (
     participantAccess,
     originalAuthentication,
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
+    originalReview:createOriginalReviewPort({auth:originalAuthentication,repository,now,id:idGenerator,timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
     originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator}),
     originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository,now,id:idGenerator,
       async profiles(actor){const entry=(await operationalDefinition(actor,actor.originalLoginKey))?.definition;
@@ -32620,6 +32716,11 @@ export const createFirstSliceServices = (
       currentBooklet:currentOriginalBooklet
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
+    originalWorkspaceAdministration: createOriginalWorkspaceAdministrationPort({repository,now,admin:token=>requireActiveAdminSession(repository,token,now(),{enforceAccessWindow:true})}),
+    originalWorkspaceReport:createOriginalWorkspaceReportPort({repository,workspace:(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey),timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
+    originalTestAdministration: createOriginalTestAdministrationPort(repository,(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey)),
+    originalAdminSession: createOriginalAdminSessionPort({repository,now,id:idGenerator,verifyPassword:verifyAdminPassword,accessFailure:resolveAdminAccessFailureReason,accessUntil:resolveAdminAccessValidUntil,sessionTtlMs:adminSessionTtlMs,maxFailures:adminLoginMaxFailures,failureWindowMs:adminLoginFailureWindowMs,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),
+    originalAdminDirectory:createOriginalAdminDirectoryPort({repository,now,id:idGenerator,timeZone:participantAccessTimeZone,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,
       async monitorAssignments(entry){

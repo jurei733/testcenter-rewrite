@@ -1,5 +1,191 @@
 # Original participant group snapshots
 
+
+## Current native deletion authorization (2026-11-02)
+
+Native group and selected-Test DELETE requests retain their initial Source
+middleware check before reading an untrusted body. After the complete body,
+the native administration port resolves the current credential and explicit RW
+scope again and carries that server-owned authority into the actual deletion.
+Memory validates it in the synchronous mutation; File validates it inside its
+exclusive durable writer; SQLite validates it after BEGIN IMMEDIATE. PostgreSQL
+locks the Workspace parent, current user/session/Tenant and explicit grants in
+the same transaction, rechecking time after child-lock waits before deletion.
+Those actor/grant rows remain locked through commit. No platform/tenant role
+inherits a native Workspace grant. The existing required-password-change gate
+and the server clock remain binding. No schema or browser-policy change is used.
+
+The mandatory Test-administration suite includes real native HTTP requests held
+at the request body and immediately before the durable writer. Both DELETE
+families retain their actual selected group and Test after logout, grant removal,
+RW-to-RO change, account disablement, required password change, expired account
+window/session, suspended Tenant or archived Workspace. Positive controls still
+delete authorized selections. Independent PostgreSQL connections additionally
+prove a real parent-lock wait, current clock/session revalidation after that
+wait, and session/grant revocation waiting for an already-authorized deletion to
+commit. These are bounded authorization controls, not full parity acceptance.
+
+Native Admin sessions and the users/workspaces directories are now implemented;
+individual response/log/legacy/enhanced Review downloads are also connected.
+Actual Original Admin/Results/Tests UI adoption, further native management
+operations and complete functional/visual parity remain open. The historical
+qualification notes below do not replace that current scope.
+
+
+## Native numeric workspace administration (2026-11-01)
+
+The native `GET /workspace/{ws_id}/results`,
+`GET/DELETE /workspace/{ws_id}/responses/detailed` and
+`DELETE /workspace/{ws_id}/responses` now connect to the existing native
+projections and atomic delete ports. They always require `AuthToken` carrying a
+current admin session. The canonical sign-in can provide that capability; the
+literal Source admin session/login/challenge contract is also implemented.
+Native routes preserve canonical expiry, revocation, disabled-user and required
+password-change gates independently of the operator-demo flag. Missing/empty
+headers return401, invalid/non-admin tokens403, absent explicit workspace grants404
+and RO mutation attempts403. Platform/tenant/monitor inheritance supplies no
+native workspace permission. Bearer contents are kept out of error messages.
+
+Reverse numeric lookup uses one owned Memory/File state or one SQL join of the
+server-owned number, active workspace and active tenant. It never creates a
+mapping or infers IDs from UUIDs/slugs. Existing number allocation is unchanged;
+full native admin directory/session and workspace creation must expose/allocate
+these IDs before actual workspace-page adoption. Source PHP path conversion,
+including numeric prefixes/exponents, exact signed64 integers and saturation,
+reuses the previously qualified Zend conversion. Literal Test deletion preserves
+Source null/default/scalar/array text extraction and lexical integer tokens;
+objects fail before mutation. Required fields in all rows are extracted before
+PDO-style text conversion, so a later missing required field returns Source400
+before an earlier object conversion could return500. Two additional cases run
+the unchanged Source RequestHelper method in its read-only production image.
+Canonical versioned input contracts stay strict.
+
+An unchanged production Source reference retains197 actual HTTP requests:
+all116 previous Test-administration cases plus81 additional grant, numeric,
+coercion, report-format and group-filter observations. All137 Source files are
+verified before/after,19 Composer packages match the lock, and actual PHP8.3.36,
+PostgreSQL18.4 and Redis8.0.6 are independently recorded. XSD stays enabled,
+TestMode disabled, and no SQL seed or DAO stub supplies the result. Seventeen
+additional real PHP CLI casts retain exact decimal strings. The owned Source
+stack/volume has been retired. A failed probe that expected the nonexistent
+isSuperadmin DTO property is retained redacted; Source represents that capability
+through the superAdmin claims key.
+
+Seven frozen Source controls and three conversion/grant/coercion controls join
+the existing mandatory Test-administration suite. Focused80 pass on all four
+stores without failures/skips, including actual native RW Test/group deletion,
+Source-shaped JSON, hidden-scope404, RO403, persisted reverse lookup, revoked
+grants and the existing late-writer/rollback/retained-answer controls. Native
+request errors retain the credential-redaction boundary while exposing Source
+statuses and content types.
+
+The reference also establishes the next four independent downloads: response,
+log, legacy comments and enhanced comments. First supported Accept type wins
+(even q=0), empty bodies are zero bytes, dataIds splits without trimming and
+uses native case comparison, and only exact true selects enhanced comments.
+The canonical ZIP normalizes selections and materializes every report family;
+its unrelated Review history must not gate an individual response download.
+Those four routes, native admin session/directory discovery, actual Results/Tests
+components and paired visuals remain required. All49 requirements and all eight
+broad visual surfaces retain their full scope.
+
+
+## Native selected-Test deletion foundation (2026-11-01)
+
+The protected versioned `DELETE /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-tests`
+accepts `{personSessions:[{loginName,code,nameSuffix,bookletName}]}`. It copies the
+non-empty selection before asynchronous scope resolution, preserves explicit empty
+required strings and defaults missing/null optional code and suffix to empty.
+Login comparison is binary; the other stored identity fields use the existing
+native German collation. No Test PUT normalization or trimming is applied.
+Empty and unopened Tests are selectable independently of the listing predicate.
+Unknown tuples return private empty HTTP200 without changing data or group clocks.
+
+All four stores select from one owned metadata inventory and delete only selected
+Runs and their descendant results, logs, reviews, delivery receipts, commands,
+presence and encoded attachments. Person/Login/group capabilities, roster,
+assignments, unrelated Tests and other groups survive. Affected snapshot clocks
+advance after deletion inside the same boundary. File uses its durable writer
+queue; SQLite uses BEGIN IMMEDIATE; PostgreSQL locks workspace, ordered people,
+then ordered selected Runs. No schema or permission change is required.
+
+The focused66 controls include protected SQLite/PG anonymous, invalid-token,
+participant, foreign-workspace and RO denials plus actual RW deletion; a final
+clock-update/manifest failure rolls back every preceding deletion through reopen.
+The retained Booklet response export is byte-identical to its earlier B-only ZIP
+entry. Current bearer remains valid; the old Test number is denied and recreation
+gets a new number/current label. Real Test-state/Unit-state/Unit-answer/Test-log
+requests paused at their durable writers cannot restore the deleted parent. An
+independent PG Unit writer demonstrably waits on a real database Lock and fails
+after commit. Current strict history gates also apply to test artifact setup;
+canonical Review provenance cannot be invented to make an archive pass.
+
+This implements the scoped read/delete foundation. Literal numeric Original
+administration routes, explicit native grants and request-coercion edges, four
+native downloads, actual Results/Tests pages and paired full-viewport visual
+proof remain required. The complete49-requirement goal and all eight broad
+visual surfaces retain their full acceptance scope.
+
+
+## Native Test-list read foundation (2026-11-01)
+
+The protected versioned
+`GET /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/original-tests`
+now reads native Test administration across Memory, File, SQLite and PostgreSQL.
+Each adapter returns one consistent metadata snapshot; SQL selects no private
+Test state, answers or timers. Included rows require known saved-state evidence,
+first code/suffix and captured Test identity plus one exact scoped native Test
+number. Unknown legacy history returns409 instead of inferred labels or rows.
+
+The Source-shaped JSON preserves empty arrays, native row/key order and numeric
+Test IDs beyond JavaScript's safe integer range. Current case-equivalent Login
+bindings retain the original snapshot spelling in the listing. Explicit known
+no-code people use nullable internal codes and render Source's empty string;
+absent legacy code remains unknown. Frozen Source116 JSON, real native creation/
+writes, private SQL decoder fences, durable reopen, an actual Login-move snapshot
+race and protected SQLite/PostgreSQL HTTP pass the focused27/33 controls with no
+skips. The new suite is included in existing unit, results and PostgreSQL gates.
+
+This is the read foundation. The literal numeric Source admin route and explicit
+workspace-grant mapping, atomic selected-Test deletion and actual delayed-writer
+fences, all four native downloads, Results/Tests page adoption and paired visuals
+remain required. Parent people and capabilities must survive selected deletion;
+whole-group deletion cannot implement it. All49 requirements and all eight broad
+visual rows remain open to their complete acceptance evidence.
+
+
+## Native Test administration Source reference (2026-11-01)
+
+The unchanged production Original now has a retained [116-request reference](../test-fixtures/original-testcenter/source-workspace-results/native-test-administration-http/manifest.json) for
+`GET/DELETE /workspace/{id}/responses/detailed`. It verifies all137 pinned Source
+files before and after real Apache/PHP, PostgreSQL18.4, Redis8, XSD uploads and
+signed person work; all19 Composer packages match the pinned lock. Test mode stays
+disabled. No SQL seed, DAO stub or Source patch is used.
+
+The deletion list is independent of Results: persisted nonempty Test state
+qualifies an unopened Test, while an opened Booklet with empty Test state, Unit
+state or Unit answers alone does not qualify. The exact seven-field rows retain
+the first stored code/suffix and captured Test label after the live Booklet label
+changes. Actual Test IDs crossing9/10 establish numeric order within snapshot
+groups. Always-new people keep separate code-prefixed suffixes. Native person
+reentry rotates its token while preserving the person, Tests and first stored code.
+
+Read-only readers can list but cannot delete; anonymous/participant access,
+malformed selections and unknown tuples preserve every Test. Exact selected-Test
+deletion removes its answer/log rows, preserves every other Test and the other
+Booklet's raw answer-export bytes, and keeps the current person bearer. Relaunch
+creates a new empty Test with a new numeric ID and current Booklet label.
+
+Seven frozen-reference controls now run through the existing mandatory Original
+group-results suite. This is **Source evidence**, not a Rewrite Test-admin port,
+selected-Test transaction or native Results/Tests page. The existing group-only
+thin inventory lacks code/suffix, captured Test label, saved-state predicate and
+numeric Test order; it cannot be reused unchanged. Full native transport/admin
+permissions, all-store atomic deletion and writer fencing, four native downloads,
+the actual four-tab UI and paired visuals remain required. All49 requirements
+and all eight broad visual surfaces remain in scope.
+
+
 ## Native report serialization and remaining data history (2026-10-25)
 
 The separate [native report output component](ORIGINAL-REPORTS.md) matches 24

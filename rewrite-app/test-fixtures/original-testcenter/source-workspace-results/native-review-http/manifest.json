@@ -1,0 +1,14 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "httpObservations": 47,
+  "sourceFiles": 137,
+  "productionComposerPackages": 19,
+  "testMode": false,
+  "sqlSeedsOrDaoStubs": false,
+  "files": {
+    "capture.mjs": "5fe3d4e960a78a3f272c2330f3f4fcf07d027a54b1accd358e8483dec65bb1b6",
+    "compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    "observations.json": "8c68eecee5413101629d558848a77871b64d19a318424b5243335ac3a5dd6c5b"
+  }
+}

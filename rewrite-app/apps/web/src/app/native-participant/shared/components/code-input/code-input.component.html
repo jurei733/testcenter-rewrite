@@ -1,0 +1,36 @@
+<ng-template #projectedContent>
+  <ng-content></ng-content>
+</ng-template>
+
+@if (inputType === 'text-field') {
+  <tc-code-text-field-form [buttonLabel]="buttonLabel" [disabled]="disabled"
+                           (submitCode)="onSubmit($event)">
+    <ng-container *ngTemplateOutlet="projectedContent"></ng-container>
+  </tc-code-text-field-form>
+} @else {
+  <tc-code-keypad-form [visualMode]="inputType" [length]="length" [disabled]="disabled"
+                       (submitCode)="onSubmit($event)" (clearInput)="problemText = ''">
+    <ng-container *ngTemplateOutlet="projectedContent"></ng-container>
+  </tc-code-keypad-form>
+}
+
+<div class="companion error" [class.hidden]="problemText === ''">
+  <img [src]="companionImageSrc" alt="Helper character" class="companion-image">
+  <div class="companion-speech-bubble">
+    <p class="bubble-title" [attr.data-cy]="'login-code-problem'">
+      {{ 'Ups, falscher Code!' | customtext:'login_codeInputErrorHeading' | async }}
+    </p>
+    <p class="bubble-body" [attr.data-cy]="'login-code-problem-instruction'">
+      {{ 'Versuche es noch einmal.' | customtext:'login_codeInputErrorBody' | async }}
+    </p>
+    <!-- The image here is just the little arrow on the bubble, pointing towards the companion.-->
+    <svg width="18" height="19" viewBox="0 0 18 9" xmlns="http://www.w3.org/2000/svg">
+      <line x1="0" y1="0" x2="18" y2="0"
+            stroke="white" stroke-width="2" />
+      <line x1="0" y1="0" x2="0" y2="9"
+            stroke="#A92319" stroke-width="2" />
+      <line x1="0" y1="9" x2="18" y2="0"
+            stroke="#A92319" stroke-width="2" />
+    </svg>
+  </div>
+</div>

@@ -22,6 +22,22 @@ export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;pr
   return{physical,catalog};
  };
  return{
+  async reviewLabels(scope:Scope,fileId:string):Promise<{bookletLabel:string;unitLabels:Record<string,string>}>{
+   const{physical,catalog}=await current(scope),matches=catalog.items.filter(file=>file.fileType==='Booklet'&&originalParticipantGroupKeysEqual(file.metadata.identifier,fileId));
+   if(matches.length>1)throw new FirstSliceError(409,'original_booklet_ambiguous','The current physical Booklet is ambiguous.');
+   const file=matches[0],source=file?physical.find(row=>row.sourcePackageId===file.sourcePackageId):undefined;
+   if(!source)return{bookletLabel:'',unitLabels:{}};const xml=deps.project(source).sourceText;
+   if(typeof xml!=='string')return{bookletLabel:'',unitLabels:{}};
+   const document=new DOMParser({onError(){}}).parseFromString(xml,'application/xml'),root=document.documentElement;
+   const metadata=Array.from(root?.childNodes??[]).find(node=>node.nodeType===1&&(node as Element).tagName==='Metadata') as Element|undefined;
+   const bookletLabel=metadata?.getElementsByTagName('Label')[0]?.textContent??'',unitLabels:Record<string,string>={};
+   const units=root?.getElementsByTagName('Units')[0];
+   for(const unit of Array.from(units?.getElementsByTagName('Unit')??[])){
+    const raw=unit.getAttribute('alias'),alias=raw&&raw!=='0'?raw:unit.getAttribute('id')??'';
+    Object.defineProperty(unitLabels,alias,{value:unit.getAttribute('label')??'',enumerable:true,writable:true,configurable:true});
+   }
+   return{bookletLabel,unitLabels};
+  },
   async unit(scope:Scope,fileId:string):Promise<{definition:string;definitionType:string}>{
    const{physical,catalog}=await current(scope),matches=catalog.items.filter(file=>file.fileType==='Unit'&&originalParticipantGroupKeysEqual(file.metadata.identifier,fileId));
    if(matches.length!==1)throw new FirstSliceError(matches.length?409:404,'original_unit_file_unavailable','The current physical Unit is unavailable.');

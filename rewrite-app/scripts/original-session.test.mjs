@@ -1,3 +1,6 @@
+import './source-native-admin-session-evidence.mjs';
+import './native-admin-session-controls.mjs';
+import './native-admin-directory-controls.mjs';
 import assert from 'node:assert/strict';
 import {createHash, randomUUID} from 'node:crypto';
 import {mkdtemp, readFile, rm} from 'node:fs/promises';
@@ -17,7 +20,7 @@ import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js'
 
 const fixtureRoot = new URL('../test-fixtures/original-testcenter/source-workspace-results/', import.meta.url);
 const source = JSON.parse(await readFile(new URL('native-login-protocol/http-observations.json', fixtureRoot), 'utf8'));
-for (const folder of ['native-login-protocol', 'native-pow-protocol']) {
+for (const folder of ['native-login-protocol', 'native-pow-protocol', 'native-session-wire', 'native-protected-session-http']) {
   const manifest = JSON.parse(await readFile(new URL(folder + '/manifest.json', fixtureRoot), 'utf8'));
   assert.equal(manifest.testMode, false); assert.equal(manifest.sourceCommit, 'eedae41840cbe90e5547c0211da818bdf620f5aa');
   for (const [file, sha] of Object.entries(manifest.files)) {
@@ -27,6 +30,16 @@ for (const folder of ['native-login-protocol', 'native-pow-protocol']) {
 }
 const sourceLogin = source.find(row => row.path === '/session/login' && row.status === 200).value;
 const sourcePerson = source.find(row => row.path === '/session/person' && row.status === 200).value;
+const httpOracleRoot = new URL('native-login-http/', fixtureRoot);
+const httpOracleManifest = JSON.parse(await readFile(new URL('manifest.json', httpOracleRoot), 'utf8'));
+const httpOracle = JSON.parse(await readFile(new URL('observations.json', httpOracleRoot), 'utf8'));
+assert.equal(httpOracleManifest.sourceCommit, 'eedae41840cbe90e5547c0211da818bdf620f5aa');
+assert.equal(httpOracleManifest.sourceBackendHttpCaptured, true);assert.equal(httpOracleManifest.sqlSeedsOrDaoStubs, false);assert.equal(httpOracleManifest.testMode, false);
+assert.equal(httpOracleManifest.sourceFilesVerifiedBeforeAndAfter, 137);assert.equal(httpOracle.rows.length, 24);
+for (const [file, sha] of Object.entries(httpOracleManifest.files)) {
+  assert.match(file, /^[a-z0-9][a-z0-9.-]*$/);
+  assert.equal(createHash('sha256').update(await readFile(new URL(file, httpOracleRoot))).digest('hex'), sha);
+}
 const validator = await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE || '.data/original-xml-schemas'), process.env.FIRST_SLICE_XML_SCHEMA_DOWNLOAD !== 'false');
 const name = 'owned-native-binary-login', password = 'OWNED_PRIVATE_HTTP_PASSWORD_2026';
 const secret = 'OWNED_NATIVE_WORK_CURRENT_SECRET_2026_123456789', nextSecret = 'OWNED_NATIVE_WORK_ROTATED_SECRET_2026_987654321';
@@ -266,7 +279,7 @@ test(`real ${process.env.FIRST_SLICE_STORE === 'postgres' ? 'PostgreSQL' : 'SQLi
     const request = async (method, path, {body, token, status = 200} = {}) => {
       const response = await fetch(base + path, {method, headers: {...(body === undefined ? {} : {'content-type': 'application/json'}), ...(token ? {AuthToken: token} : {})},
         ...(body === undefined ? {} : {body: JSON.stringify(body)}), signal: AbortSignal.timeout(15_000)});
-      const text = await response.text(); const value = text ? JSON.parse(text) : null;
+      const text = await response.text(); const value = text ? (response.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : text) : null;
       assert.equal(response.status, status, `${method} ${path}: HTTP ${response.status}`);
       assert.equal(response.headers.get('cache-control'), 'private, no-store'); return {value, text, headers: response.headers};
     };
@@ -311,7 +324,7 @@ test(`real ${process.env.FIRST_SLICE_STORE === 'postgres' ? 'PostgreSQL' : 'SQLi
       assert.equal((await request('DELETE', '/session', {token: login.token, status: 205})).text, '');
       assert.equal((await request('GET', '/session', {token: login.token})).value.token, login.token);
       assert.equal((await request('DELETE', '/session', {token: person.token, status: 205})).text, '');
-      await request('GET', '/session', {token: person.token, status: 401});
+      await request('GET', '/session', {token: person.token, status: 403});
       const wrong = await request('GET', '/session/login', {status: 405}); assert.equal(wrong.headers.get('allow'), 'PUT');
     });
   } finally {
@@ -319,5 +332,192 @@ test(`real ${process.env.FIRST_SLICE_STORE === 'postgres' ? 'PostgreSQL' : 'SQLi
     await storage?.shutdown();
     if (created) { assert.equal(Number((await admin.query('SELECT count(*) AS count FROM pg_stat_activity WHERE application_name=$1', [schema])).rows[0].count), 0); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); }
     await admin?.end(); await rm(directory, {recursive: true, force: true});
+  }
+});
+
+
+test('native session server faults match the real Source HTTP oracle without exposing implementation details', async t => {
+ const directory=await mkdtemp(join(tmpdir(),'owned-native-source-error-')),schema='owned_native_error_'+randomUUID().replaceAll('-','');
+ const postgres=process.env.FIRST_SLICE_STORE==='postgres',url=postgres?new URL(process.env.FIRST_SLICE_POSTGRES_URL):null;
+ url?.searchParams.set('options','-c search_path='+schema);url?.searchParams.set('application_name',schema);
+ let server,storage,pool,created=false;
+ const environment={FIRST_SLICE_STORE:postgres?'postgres':'sqlite',FIRST_SLICE_SQLITE_FILE:join(directory,'owned.sqlite'),FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',REQUIRE_LOGIN_PASSWORD:'false',...(url?{FIRST_SLICE_POSTGRES_URL:url.toString()}:{})};
+ const previous=new Map(Object.keys(environment).map(k=>[k,process.env[k]]));
+ try{
+  if(url){pool=new Pool({connectionString:process.env.FIRST_SLICE_POSTGRES_URL});await pool.query(`CREATE SCHEMA "${schema}"`);created=true;}
+  try{Object.assign(process.env,environment);server=await createProductionApiServer();}finally{for(const[k,v]of previous){if(v===undefined)delete process.env[k];else process.env[k]=v;}}
+  storage=url?await createPostgresFirstSliceStorage(url.toString()):createSqliteFirstSliceStorage(environment.FIRST_SLICE_SQLITE_FILE);
+  const repository=storage.repository,services=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+  const tenant=await services.platform.createTenant({tenantKey:'owned-'+randomUUID(),displayName:'Owned HTTP errors'}),workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'owned',displayName:'Owned HTTP errors'});
+  const password='Owned Source error password';await services.workspaceAdminRead.importParticipantRoster({tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey,rosterText:xml('Testtakers','testcenter-testtaker-xml','<Metadata/><Group id="OWNED.ERROR" label=""><Login name="owned-http-empty" pw="'+password+'" mode="monitor-group"/></Group>')});
+  await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port;
+  for(const row of httpOracle.rows.filter(r=>r.state==='empty'))await t.test(row.passwordKind+' credential retains Source generic raw server-error response',async()=>{
+   const response=await fetch(base+'/session/login',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'owned-http-empty',password:row.passwordKind==='empty'?'':row.passwordKind==='wrong'?'Owned wrong password':password}),signal:AbortSignal.timeout(15000)});
+   const text=await response.text();assert.equal(response.status,row.status);assert.equal(text,row.value);assert.equal(response.headers.get('content-type'),row.contentType);assert.equal(response.headers.get('cache-control'),'private, no-store');
+   for(const privateText of [password,'original_group_label_invalid','imported Original group label'])assert.ok(!text.includes(privateText));
+   assert.deepEqual(await repository.listParticipantSessionsByWorkspace(workspace.tenantId,workspace.workspaceId),[]);assert.deepEqual(await repository.listOriginalLoginBindingsByWorkspace(workspace.tenantId,workspace.workspaceId),[]);
+  });
+ }finally{
+  if(server){server.closeAllConnections();await new Promise(done=>server.close(done));}await storage?.shutdown();if(created)await pool.query(`DROP SCHEMA "${schema}" CASCADE`);await pool?.end();await rm(directory,{recursive:true,force:true});
+ }
+});
+
+
+test('native Session errors match the captured production Source wire format and correlate to private diagnostics', async t => {
+  const oracle = JSON.parse(await readFile(new URL('native-session-wire/observations.json', fixtureRoot), 'utf8'));
+  assert.equal(oracle.verified, true); assert.equal(oracle.sourceFilesVerifiedBeforeAndAfter, 137);
+  assert.equal(oracle.rows.length + oracle.wireCases.length, 35);
+  const directory = await mkdtemp(join(tmpdir(), 'owned-native-wire-'));
+  const postgres = process.env.FIRST_SLICE_STORE === 'postgres', schema = 'owned_native_wire_' + randomUUID().replaceAll('-', '');
+  const url = postgres ? new URL(process.env.FIRST_SLICE_POSTGRES_URL) : null;
+  url?.searchParams.set('options', '-c search_path=' + schema); url?.searchParams.set('application_name', schema);
+  const environment = {FIRST_SLICE_STORE: postgres ? 'postgres' : 'sqlite', FIRST_SLICE_SQLITE_FILE: join(directory, 'wire.sqlite'),
+    FIRST_SLICE_BOOTSTRAP_DEMO: 'false', FIRST_SLICE_OPERATOR_AUTH_REQUIRED: 'true', FIRST_SLICE_XML_SCHEMA_PROFILE: 'original-19',
+    FIRST_SLICE_PROOF_OF_WORK_SCOPES: '', REQUIRE_LOGIN_PASSWORD: 'false', FIRST_SLICE_PARTICIPANT_TIME_ZONE: 'Europe/Berlin',
+    FIRST_SLICE_MAX_JSON_BODY_BYTES: '1024', ...(url ? {FIRST_SLICE_POSTGRES_URL: url.toString()} : {})};
+  const previous = new Map(Object.keys(environment).map(key => [key, process.env[key]]));
+  let server, storage, pool, created = false;
+  const diagnosticEvents = [], originalWrites = new Map([process.stdout, process.stderr].map(stream => [stream, stream.write]));
+  for (const [stream, write] of originalWrites) stream.write = function(chunk, ...args) {
+    for (const line of String(chunk).split('\n')) {
+      try { const event = JSON.parse(line); if (event.event === 'native_session_error') diagnosticEvents.push(event); } catch {}
+    }
+    return write.call(this, chunk, ...args);
+  };
+  try {
+    if (url) { pool = new Pool({connectionString: process.env.FIRST_SLICE_POSTGRES_URL}); await pool.query(`CREATE SCHEMA "${schema}"`); created = true; }
+    try { Object.assign(process.env, environment); server = await createProductionApiServer(); }
+    finally { for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
+    storage = url ? await createPostgresFirstSliceStorage(url.toString()) : createSqliteFirstSliceStorage(environment.FIRST_SLICE_SQLITE_FILE);
+    const repository = storage.repository, services = createFirstSliceServices({repository, originalXmlSchemaValidator: validator, xmlSchemaProfile: 'original-19'});
+    const tenant = await services.platform.createTenant({tenantKey: 'owned-' + randomUUID(), displayName: 'Owned native wire'});
+    const workspace = await services.platform.createWorkspace({tenantKey: tenant.tenantKey, workspaceKey: 'owned', displayName: 'Owned native wire'});
+    const scope = {tenantKey: tenant.tenantKey, workspaceKey: workspace.workspaceKey}, password = 'Owned native wire password';
+    const importRoster = expiredRate => services.workspaceAdminRead.importParticipantRoster({...scope, rosterText: xml('Testtakers', 'testcenter-testtaker-xml', '<Metadata/>' +
+      ['active', 'expired', 'scheduled', 'empty', 'space', 'rate'].map(state => '<Group id="OWNED.HTTP.' + state.toUpperCase() + '" label="' +
+        (state === 'empty' ? '' : state === 'space' ? '   ' : 'Owned ' + state) + '"' +
+        (state === 'expired' || state === 'rate' && expiredRate ? ' validTo="1/1/2000 12:00"' : state === 'scheduled' ? ' validFrom="1/1/2099 12:00"' : '') +
+        '><Login name="owned-http-' + state + '" pw="' + password + '" mode="monitor-group"/></Group>').join(''))});
+    await importRoster(false); await new Promise(done => server.listen(0, '127.0.0.1', done));
+    const base = 'http://127.0.0.1:' + server.address().port, ids = new Set(); let lastError;
+    const request = async (method, path, {body, rawBody, token, extraHeaders = {}} = {}) => {
+      const response = await fetch(base + path, {method, headers: {...(body === undefined && rawBody === undefined ? {} : {'Content-Type': 'application/json'}),
+        ...(token === undefined ? {} : {AuthToken: token}), ...extraHeaders},
+        ...(rawBody === undefined ? body === undefined ? {} : {body: JSON.stringify(body)} : {body: rawBody}), signal: AbortSignal.timeout(15000)});
+      return {status: response.status, value: await response.text(), headers: response.headers};
+    };
+    const checkError = (actual, expected) => {
+      assert.equal(actual.status, expected.status); assert.equal(actual.value, expected.value);
+      assert.equal(actual.headers.get('content-type'), expected.contentType); assert.equal(actual.headers.get('test-mode'), expected.testMode);
+      assert.equal(actual.headers.get('cache-control'), 'private, no-store');
+      const id = actual.headers.get('error-id'); assert.match(id, /^error-[a-f0-9]+\.\d+$/); assert.equal(ids.has(id), false); ids.add(id);
+      assert.ok(actual.headers.get('x-request-id')); lastError = actual;
+      for (const secret of [password, 'Owned wrong HTTP password', 'original_group_label_invalid', 'imported Original group label']) assert.equal(actual.value.includes(secret), false);
+    };
+    for (const [index, row] of oracle.rows.entries()) await t.test('Source login/window/rate ' + index + ': ' + row.state + '/' + row.passwordKind, async () => {
+      if (index === oracle.rows.length - 1) await importRoster(true);
+      const actual = await request('PUT', '/session/login', {body: {name: 'owned-http-' + row.state, password: row.passwordKind === 'correct' ? password : row.passwordKind === 'empty' ? '' : 'Owned wrong HTTP password'}});
+      if (row.status >= 400) checkError(actual, row);
+      else { assert.equal(actual.status, 200); assert.match(actual.headers.get('content-type'), /^application\/json/); assert.equal(actual.headers.get('error-id'), null);
+        const value = JSON.parse(actual.value); assert.deepEqual(value, {...row.value, token: value.token, groupToken: value.groupToken}); }
+    });
+    for (const row of oracle.wireCases) await t.test('Source Session wire ' + row.label, async () => {
+      const actual = await request(row.method, row.path, {body: row.request ?? undefined, rawBody: row.rawRequest ?? undefined,
+        ...(row.label === 'empty-token' ? {token: ''} : row.label === 'unknown-token' ? {token: 'owned-not-a-real-token'} : {})});
+      // Preserve the existing secret-redaction boundary: Source reflects an invalid bearer. The rewrite never echoes a bearer into a browser error.
+      checkError(actual, row.label === 'unknown-token' ? {...row, value: 'Invalid token.'} : row);
+      if (row.status === 405) assert.equal(actual.headers.get('allow'), 'PUT');
+    });
+    await t.test('malformed and typed credential input cannot mint a capability or bypass the body budget', async () => {
+      for (const body of [{name: 42, password}, {name: 'owned-http-active', password: {}}, {name: ['owned-http-active'], password}]) {
+        const response = await request('PUT', '/session/login', {body}); assert.equal(response.status, 400);
+        assert.equal(response.value.includes(password), false); assert.equal(response.headers.get('test-mode'), 'NO');
+      }
+      assert.equal((await request('PUT', '/session/login', {rawBody: JSON.stringify({name: 'x'.repeat(2048), password})})).status, 413);
+    });
+    await t.test('client-supplied diagnostic identifiers are ignored and the actual ID joins a private server event', async () => {
+      const sourceRow = oracle.wireCases.find(row => row.label === 'unknown-name');
+      const actual = await request('PUT', '/session/login', {body: sourceRow.request, extraHeaders: {'Error-ID': 'client-forged-error', 'X-Request-ID': 'client-forged-request', 'Test-Mode': 'YES'}});
+      checkError(actual, sourceRow); assert.notEqual(actual.headers.get('x-request-id'), 'client-forged-request');
+      assert.notEqual(actual.headers.get('error-id'), 'client-forged-error');
+      const diagnostics = await request('GET', '/diagnostics/runtime'); assert.equal(diagnostics.status, 200);
+      assert.equal(JSON.parse(diagnostics.value).recentEvents.some(event => event.event === 'native_session_error'), false);
+      const event = diagnosticEvents.find(event => event.errorId === actual.headers.get('error-id'));
+      assert.ok(event); assert.equal(event.requestId, actual.headers.get('x-request-id')); assert.equal(event.statusCode, 400);
+      assert.deepEqual(Object.keys(event).sort(), ['errorCode', 'errorId', 'event', 'level', 'method', 'path', 'requestId', 'statusCode', 'timestamp']);
+      for (const secret of [password, sourceRow.request.name, sourceRow.request.password]) assert.equal(JSON.stringify(event).includes(secret), false);
+    });
+    assert.ok(lastError);
+  } finally {
+    for (const [stream, write] of originalWrites) stream.write = write;
+    if (server) { server.closeAllConnections(); await new Promise(done => server.close(done)); } await storage?.shutdown();
+    if (created) await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool?.end(); await rm(directory, {recursive: true, force: true});
+  }
+});
+
+
+test('protected passwordless Source HTTP permits the empty-secret name step and preserves challenge requirements', async t => {
+  const oracle = JSON.parse(await readFile(new URL('native-protected-session-http/observations.json', fixtureRoot), 'utf8'));
+  assert.equal(oracle.verified, true); assert.deepEqual(oracle.configuration.bruteForceProtection, ['login', 'person']);
+  const rows = new Map(oracle.rows.map(row => [row.label, row])), directory = await mkdtemp(join(tmpdir(), 'owned-passwordless-http-'));
+  const postgres = process.env.FIRST_SLICE_STORE === 'postgres', schema = 'owned_passwordless_' + randomUUID().replaceAll('-', '');
+  const url = postgres ? new URL(process.env.FIRST_SLICE_POSTGRES_URL) : null; url?.searchParams.set('options', '-c search_path=' + schema); url?.searchParams.set('application_name', schema);
+  const environment = {FIRST_SLICE_STORE: postgres ? 'postgres' : 'sqlite', FIRST_SLICE_SQLITE_FILE: join(directory, 'owned.sqlite'),
+    FIRST_SLICE_BOOTSTRAP_DEMO: 'false', FIRST_SLICE_OPERATOR_AUTH_REQUIRED: 'true', FIRST_SLICE_XML_SCHEMA_PROFILE: 'original-19', REQUIRE_LOGIN_PASSWORD: 'false',
+    FIRST_SLICE_PROOF_OF_WORK_SCOPES: 'participant,second_code', FIRST_SLICE_PROOF_OF_WORK_SECRET: secret, FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET: '',
+    FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER: '12', FIRST_SLICE_PROOF_OF_WORK_TTL_MS: '60000', ...(url ? {FIRST_SLICE_POSTGRES_URL: url.toString()} : {})};
+  const previous = new Map(Object.keys(environment).map(key => [key, process.env[key]])); let server, storage, pool, created = false;
+  try {
+    if (url) { pool = new Pool({connectionString: process.env.FIRST_SLICE_POSTGRES_URL}); await pool.query(`CREATE SCHEMA "${schema}"`); created = true; }
+    try { Object.assign(process.env, environment); server = await createProductionApiServer(); }
+    finally { for (const [key, value] of previous) if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    storage = url ? await createPostgresFirstSliceStorage(url.toString()) : createSqliteFirstSliceStorage(environment.FIRST_SLICE_SQLITE_FILE);
+    const repository = storage.repository, services = createFirstSliceServices({repository, originalXmlSchemaValidator: validator, xmlSchemaProfile: 'original-19'});
+    const tenant = await services.platform.createTenant({tenantKey: 'owned-' + randomUUID(), displayName: 'Owned Source passwordless'});
+    const workspace = await services.platform.createWorkspace({tenantKey: tenant.tenantKey, workspaceKey: 'owned', displayName: 'Owned Source passwordless'});
+    const scope = {tenantKey: tenant.tenantKey, workspaceKey: workspace.workspaceKey}; await uploadDependencies(services, scope);
+    await services.contentIntake.uploadWorkspaceFile({...scope, fileName: 'booklet.xml', sourceDocument: booklet('Owned protected Booklet'), mediaType: 'application/xml'});
+    await services.workspaceAdminRead.importParticipantRoster({...scope, rosterText: xml('Testtakers', 'testcenter-testtaker-xml', '<Metadata/><Group id="OWNED.PROTECTED" label="Owned protected group">' +
+      '<Login name="owned-protected-code" pw="' + password + '" mode="run-hot-return"><Booklet codes="Shared">ORACLE.BOOK.A</Booklet></Login>' +
+      '<Login name="owned-passwordless-code" mode="run-hot-return"><Booklet codes="Shared">ORACLE.BOOK.A</Booklet></Login>' +
+      '<Login name="owned-passwordless-no-code" mode="run-hot-return"><Booklet>ORACLE.BOOK.A</Booklet></Login>' +
+      '<Login name="owned-passwordless-monitor" mode="monitor-group"/></Group>')});
+    await new Promise(done => server.listen(0, '127.0.0.1', done)); const base = 'http://127.0.0.1:' + server.address().port;
+    const request = async (path, body) => {const response = await fetch(base + path, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: AbortSignal.timeout(15000)});
+      const text = await response.text(); return {status: response.status, text, headers: response.headers, value: response.ok ? JSON.parse(text) : null};};
+    for (const [label, body] of [
+      ['passworded-empty', {name: 'owned-protected-code', password: ''}],
+      ['passworded-direct-correct', {name: 'owned-protected-code', password}],
+      ['passwordless-coded-direct-empty', {name: 'owned-passwordless-code', password: ''}],
+      ['passwordless-coded-omitted-password', {name: 'owned-passwordless-code'}],
+      ['passwordless-no-code-direct-empty', {name: 'owned-passwordless-no-code', password: ''}],
+      ['passwordless-monitor-direct-empty', {name: 'owned-passwordless-monitor', password: ''}],
+      ['proof-missing-algorithm', {}],
+      ['proof-missing-number', {algorithm: 'SHA-256', challenge: 'a'.repeat(64), salt: 'owned', signature: '0'.repeat(64)}]
+    ]) await t.test(label + ' matches actual protected Source', async () => {
+      const expected = rows.get(label), actual = await request(label.startsWith('proof-') ? '/session' : '/session/login', body);
+      assert.equal(actual.status, expected.status);
+      if (actual.status >= 400) {assert.equal(actual.text, expected.value); assert.equal(actual.headers.get('content-type'), expected.contentType); assert.equal(actual.headers.get('test-mode'), 'NO');}
+      else {assert.deepEqual(actual.value.flags, expected.value.flags); assert.equal(actual.value.loginName, expected.value.loginName);
+        assert.equal(actual.value.displayName, expected.value.displayName); assert.equal(actual.value.groupLabel, expected.value.groupLabel);
+        assert.deepEqual(Object.keys(actual.value).sort(), Object.keys(expected.value).sort()); assert.match(actual.value.token, /^[a-z0-9_-]{24}$/);
+        assert.equal(actual.value.pwSetByAdmin, null); assert.equal(actual.headers.get('error-id'), null);
+        if (actual.value.access.test) assert.deepEqual(actual.value.access.test, ['ORACLE.BOOK.A']);
+        if (actual.value.access.testGroupMonitor) assert.deepEqual(actual.value.access.testGroupMonitor, ['OWNED.PROTECTED']);}
+      assert.equal(actual.text.includes(password), false);
+    });
+    await t.test('global password-required configuration still rejects the empty-secret path', async () => {
+      server.closeAllConnections(); await new Promise(done => server.close(done)); server = undefined;
+      try {Object.assign(process.env, environment, {REQUIRE_LOGIN_PASSWORD: 'true'}); server = await createProductionApiServer();}
+      finally {for (const [key, value] of previous) if (value === undefined) delete process.env[key]; else process.env[key] = value;}
+      await new Promise(done => server.listen(0, '127.0.0.1', done));
+      const response = await fetch('http://127.0.0.1:' + server.address().port + '/session/login', {method: 'PUT',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: 'owned-passwordless-code', password: ''}), signal: AbortSignal.timeout(15000)});
+      assert.equal(response.status, 400); assert.equal(await response.text(), 'No Login for `owned-passwordless-code` with this password.');
+      assert.equal(response.headers.get('test-mode'), 'NO');
+    });
+  } finally {
+    if (server) {server.closeAllConnections(); await new Promise(done => server.close(done));} await storage?.shutdown();
+    if (created) await pool.query(`DROP SCHEMA "${schema}" CASCADE`); await pool?.end(); await rm(directory, {recursive: true, force: true});
   }
 });

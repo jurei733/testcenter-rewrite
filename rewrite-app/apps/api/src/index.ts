@@ -1,3 +1,8 @@
+import {handleOriginalAdminHttp,originalAdminRouteLabel} from './original-admin-http.js';
+import {handleOriginalWorkspaceHttp,originalWorkspaceRouteLabel} from './original-workspace-http.js';
+import {formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/application';
+import {handleOriginalReviewHttp,originalReviewRouteLabel} from './original-review-http.js';
+import {NativeBroadcaster} from './native-broadcaster.js';
 import {handleOriginalMonitorHttp,originalMonitorRouteLabel} from './original-monitor-http.js';
 import {handleOriginalTestHttp, originalTestCreationPath,originalTestRouteLabel,originalResourceLogPath} from './original-test-http.js';
 import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
@@ -2480,6 +2485,7 @@ const groupResultsPattern = createRoutePattern(
   productionApiRoutes.workspace.listGroupResults
 );
 const originalGroupResultsPattern = createRoutePattern(productionApiRoutes.workspace.listOriginalGroupResults);
+const originalTestSessionsPattern = createRoutePattern(productionApiRoutes.workspace.listOriginalTestSessions);
 const reviewListPattern = createRoutePattern(
   productionApiRoutes.workspace.listReviews
 );
@@ -2714,6 +2720,8 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", detailedResponsesPattern],
   ["GET", groupResultsPattern],
   ["GET", originalGroupResultsPattern],
+  ["GET", originalTestSessionsPattern],
+  ["DELETE", originalTestSessionsPattern],
   ["DELETE", originalGroupResultsPattern],
   ["DELETE", groupResultsPattern],
   ["GET", reviewListPattern],
@@ -3186,7 +3194,10 @@ const serveFrontendRequest = async (
       ? ""
       : pathname.replace(/^\/app\/?/, "");
 
-  if (relativePath === "" || !relativePath.includes(".")) {
+  // Native group/profile IDs are path data and can contain dots. Recognize
+  // exactly this client route before applying the static-asset extension rule.
+  const nativeMonitorRoute = /^group-monitor(?:\/[^/]+){0,2}\/?$/.test(relativePath);
+  if (relativePath === "" || nativeMonitorRoute || !relativePath.includes(".")) {
     const html = await readFile(frontendIndexPath, "utf8");
     sendHtml(response, 200, html);
     return true;
@@ -3330,7 +3341,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /system-check";
   }
 
+  const adminLabel=originalAdminRouteLabel(method,pathname);if(adminLabel)return adminLabel;
+  const workspaceLabel=originalWorkspaceRouteLabel(method,pathname);if(workspaceLabel)return workspaceLabel;
   const monitorLabel=originalMonitorRouteLabel(method,pathname);if(monitorLabel)return monitorLabel;
+  const reviewLabel=originalReviewRouteLabel(method,pathname);if(reviewLabel)return reviewLabel;
   const originalLabel=originalTestRouteLabel(method,pathname);if(originalLabel)return originalLabel;
   if (originalSessionRoutes.get(pathname)?.includes(method)) return `${method} ${pathname}`;
 
@@ -3695,6 +3709,8 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.listGroupResults
     ],
     ["GET", originalGroupResultsPattern, productionApiRoutes.workspace.listOriginalGroupResults],
+    ["GET", originalTestSessionsPattern, productionApiRoutes.workspace.listOriginalTestSessions],
+    ["DELETE", originalTestSessionsPattern, productionApiRoutes.workspace.deleteOriginalTestSessions],
     ["DELETE", originalGroupResultsPattern, productionApiRoutes.workspace.deleteOriginalGroupResults],
     [
       "DELETE",
@@ -4641,7 +4657,9 @@ const streamMonitorEvents = async (input: {
   pollHandle.unref();
 };
 
-const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>) =>
+type ProductionApiServerOptions = {originalSessionErrorId?: () => string};
+
+const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>, broadcaster?:NativeBroadcaster, options: ProductionApiServerOptions = {}) =>
   runtime.requestLifecycle.wrap(async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const services = runtime.services;
     const requestId = randomUUID();
@@ -4665,6 +4683,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         "max-age=31536000; includeSubDomains"
       );
     }
+    response.once('finish',()=>{if(response.statusCode<400&&!['GET','HEAD','OPTIONS'].includes(method))broadcaster?.wake();});
     metrics.activeRequests += 1;
     metrics.totalRequests += 1;
     incrementCounter(metrics.requestCountsByMethod, method);
@@ -4980,18 +4999,49 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
-      if (await handleOriginalMonitorHttp({request,pathname,services,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
+      if(await handleOriginalAdminHttp({request,pathname,services,reportError:receipt=>{
+        if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
+        logStructured(receipt.statusCode>=500?'error':'info','native_administration_error',{requestId,route:originalAdminRouteLabel(request.method??'',pathname),...receipt});
+      },readBody:()=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,true),
+        propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
+        header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
+      if(await handleOriginalWorkspaceHttp({request,pathname,searchParams:url.searchParams,services,readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,false,decode),
+        propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
+        header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
+      const subscribe=broadcaster?async(target:Parameters<NativeBroadcaster['issue']>[0],credential:string)=>{const ticket=await broadcaster.issue(target,credential);if(ticket&&!response.destroyed&&!response.headersSent)response.setHeader('SubscribeToken',ticket);}:undefined;
+      if (await handleOriginalMonitorHttp({request,pathname,services,subscribe,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
         raw:(status,text,contentType)=>{response.writeHead(status,{'content-type':contentType});response.end(text);}})) return;
-      if (await handleOriginalTestHttp({request, pathname, services,
+      if(await handleOriginalReviewHttp({request,pathname,services,
+        propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
+        reportError:receipt=>{
+          if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
+          logStructured(receipt.statusCode>=500?'error':'info','native_review_error',{requestId,...receipt,method:request.method,path:originalReviewRouteLabel('',pathname)?.trim()??'/test/:testId/review'});
+        },
+        readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),
+        header:(name,value)=>response.setHeader(name,value),
+        raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
+      if (await handleOriginalTestHttp({request, pathname, services,subscribe,
         reason: text => {response.statusMessage=text;},
         readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),
         send: (status, value) => sendJson(response, status, value),
         raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
-        binary:(bytes,contentType)=>{response.writeHead(200,{...securityHeaders,"content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}
+        // Only successfully capability-authorized native Resource bytes reach this
+        // callback. Opaque Verona players fetch and frame them without cookies.
+        binary:(bytes,contentType)=>{response.writeHead(200,{...participantResourceSecurityHeaders,"access-control-allow-origin":"*","content-type":contentType,"content-length":String(bytes.byteLength)});endResponse(response,Buffer.from(bytes));}
       })) return;
 
       if (await handleOriginalSessionHttp({request, pathname, services, proof: runtime.originalSessionProof,
+        timeZone: runtime.config.participantAccessTimeZone, createErrorId: options.originalSessionErrorId,
+        propagateError: error => error instanceof ClientRequestAbortedError || error instanceof RequestBodyTooLargeError,
+        reportError: receipt => {
+          if (receipt.errorCode === 'internal_error') metrics.errorCounts.internal += 1;
+          else metrics.errorCounts.firstSlice += 1;
+          // Correlation belongs in private process logs, never the public diagnostics DTO.
+          logStructured(receipt.statusCode >= 500 ? 'error' : 'info', 'native_session_error',
+            {requestId, method, path: pathname, ...receipt});
+        },
         readBody: () => readRequestJsonBody<unknown>(), header: (name, value) => response.setHeader(name, value),
+        raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
         send: (status, value) => {
           if (status === 205) { response.writeHead(205, securityHeaders); response.end(); }
           else sendJson(response, status, value);
@@ -7615,6 +7665,24 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const originalTestSessions = originalTestSessionsPattern.exec(pathname);
+      if(request.method==="GET"&&originalTestSessions?.groups){
+        const tenantKey=decodeRouteGroup(originalTestSessions.groups.tenantKey),workspaceKey=decodeRouteGroup(originalTestSessions.groups.workspaceKey);
+        if(!tenantKey||!workspaceKey){sendError(response,400,'invalid_workspace_scope','tenantKey and workspaceKey are required.');return;}
+        const groups=await services.originalTestAdministration.list({tenantKey,workspaceKey});
+        response.setHeader('cache-control','private, no-store');response.setHeader('content-type','application/json; charset=utf-8');
+        response.statusCode=200;response.end(formatOriginalTestAdministrationJson(groups));return;
+      }
+
+      if(request.method==="DELETE"&&originalTestSessions?.groups){
+        const tenantKey=decodeRouteGroup(originalTestSessions.groups.tenantKey),workspaceKey=decodeRouteGroup(originalTestSessions.groups.workspaceKey);
+        if(!tenantKey||!workspaceKey){sendError(response,400,'invalid_workspace_scope','tenantKey and workspaceKey are required.');return;}
+        const body=await readRequestJsonBody<unknown>();
+        const personSessions=body&&typeof body==='object'&&!Array.isArray(body)&&'personSessions' in body?body.personSessions:undefined;
+        await services.originalTestAdministration.delete({tenantKey,workspaceKey,personSessions});
+        response.setHeader('cache-control','private, no-store');response.statusCode=200;response.end();return;
+      }
+
       const originalGroups = originalGroupResultsPattern.exec(pathname);
       if (request.method === "GET" && originalGroups?.groups) {
         const tenantKey = decodeRouteGroup(originalGroups.groups.tenantKey), workspaceKey = decodeRouteGroup(originalGroups.groups.workspaceKey);
@@ -9891,10 +9959,14 @@ const applyHttpServerTimeouts = (
   server.keepAliveTimeout = runtime.config.httpTimeouts.keepAliveTimeoutMs;
 };
 
-export const createProductionApiServer = async () =>
+const createNativeBroadcaster=(runtime:Awaited<ReturnType<typeof createApiRuntime>>)=>['true','1'].includes((process.env.FIRST_SLICE_NATIVE_WEBSOCKET_ENABLED??'').toLowerCase())
+  ?new NativeBroadcaster(runtime.services,operation=>runtime.requestLifecycle.wrap(operation)(),stage=>recordRuntimeOperationalEvent(runtime,"error","native_broadcast_failed",{stage})):undefined;
+
+export const createProductionApiServer = async (options: ProductionApiServerOptions = {}) =>
   {
     const runtime = await createApiRuntime();
-    const server = createServer(createRequestHandler(runtime));
+    const broadcaster=createNativeBroadcaster(runtime);
+    const server = createServer(createRequestHandler(runtime,broadcaster,options));broadcaster?.attach(server);
     applyHttpServerTimeouts(server, runtime);
     let shutdownPromise: Promise<void> | undefined;
     const shutdownRuntime = () => shutdownPromise ??= runtime.shutdown();
@@ -9907,12 +9979,12 @@ export const createProductionApiServer = async () =>
       });
     });
     const close = server.close.bind(server);
-    server.close = callback => close(error => {
+    server.close = callback => {broadcaster?.close();return close(error => {
       void shutdownRuntime().then(() => callback?.(error), failure => {
         if (callback) callback(error ?? failure as Error);
         else server.emit("error", failure);
       });
-    });
+    });};
     return server;
   };
 
@@ -9920,11 +9992,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const runtime = await createApiRuntime();
   const port = runtime.config.port;
   const shutdownDrainDelayMs = runtime.config.shutdownDrainDelayMs;
-  const server = createServer(createRequestHandler(runtime));
+  const broadcaster=createNativeBroadcaster(runtime);
+  const server = createServer(createRequestHandler(runtime,broadcaster));broadcaster?.attach(server);
   applyHttpServerTimeouts(server, runtime);
   let shuttingDown = false;
 
   const closeServer = () => {
+    broadcaster?.close();
     server.closeIdleConnections?.();
     const forceCloseHandle = setTimeout(() => {
       server.closeAllConnections?.();

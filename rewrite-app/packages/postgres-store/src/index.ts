@@ -1,3 +1,7 @@
+import {readOriginalWorkspaceReportSnapshot} from './original-workspace-reports.js';
+import {deleteOriginalSelectedTests} from './original-test-deletion.js';
+import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
+import {listOriginalNativeReviews,mutateOriginalNativeReview,listOriginalNativeReviewsByPerson,synchronizeOriginalNativeReview} from './original-native-review.js';
 import {changeOriginalMonitorTestLock} from './original-monitor-lock.js';
 import {originalPersonCredentialMatches,projectOriginalPersonTestIdentity,prepareOriginalPersonTestCreation} from '@testcenter-rewrite-app/application';
 import {createOriginalMonitorRepository} from './original-monitor-session.js';
@@ -9,6 +13,8 @@ import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '
 import {appendOriginalTestLogs} from './original-test-log.js';
 import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
+import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
+import {mutateOriginalAdminSession} from './original-admin-session.js';
 import {allocateOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {assertOriginalTestCreationCandidate} from '@testcenter-rewrite-app/application';
 import {allocateOriginalTestNumber} from './original-test-number.js';
@@ -1745,6 +1751,18 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
         tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,original_login_key TEXT NOT NULL,original_name_suffix TEXT NOT NULL,
         FOREIGN KEY(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix)
           REFERENCES participant_sessions(participant_session_id,tenant_id,workspace_id,original_login_key,original_name_suffix) ON DELETE CASCADE);`}
+,{version:74,name:"original_native_reviews",sql:`CREATE TABLE original_native_review_counters(kind TEXT PRIMARY KEY CHECK(kind IN ('unit','test')),last_number TEXT NOT NULL);
+ INSERT INTO original_native_review_counters(kind,last_number) VALUES('unit','0'),('test','0');
+ CREATE TABLE original_native_reviews(kind TEXT NOT NULL CHECK(kind IN ('unit','test')),review_number TEXT NOT NULL,
+ review_id TEXT NOT NULL UNIQUE REFERENCES workspace_reviews(review_id) ON DELETE CASCADE,
+ test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+ participant_session_id TEXT NOT NULL REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE,
+ tenant_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_release_id TEXT NOT NULL,review_json TEXT NOT NULL,
+ PRIMARY KEY(kind,review_number));
+ CREATE INDEX original_native_reviews_scope ON original_native_reviews(test_run_id,participant_session_id);`}
+,{version:75,name:'original_native_admin_numbers',sql:`CREATE TABLE original_admin_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
+ INSERT INTO original_admin_number_counter(singleton,last_number) VALUES(1,'0');
+ CREATE TABLE original_admin_numbers(admin_number TEXT PRIMARY KEY,admin_user_id TEXT NOT NULL UNIQUE REFERENCES admin_users(admin_user_id) ON DELETE CASCADE);`}
 ];
 
 export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
@@ -2305,6 +2323,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
       return (result.rowCount ?? 0) > 0;
     },
+    async mutateOriginalAdminSession(selector,transform) {
+      return mutateOriginalAdminSession(pool, {user:mapAdminUser,session:mapAdminSession,role:mapAdminRoleAssignment,attempt:mapAdminLoginAttempt,workspace:mapWorkspace,tenant:mapTenant}, selector,transform);
+    },
     async listAdminUsers() {
       return many(
         `SELECT admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
@@ -2379,7 +2400,13 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       return result.rowCount === 1;
     },
     async saveAdminUser(adminUser) {
-      await pool.query(
+      const client=await pool.connect();
+      try {
+      await client.query('BEGIN');
+      const counter=(await client.query('SELECT last_number FROM original_admin_number_counter WHERE singleton=1 FOR UPDATE')).rows[0];
+      const names=(await client.query('SELECT admin_user_id,username FROM admin_users')).rows.map(r=>({adminUserId:String(r.admin_user_id),username:String(r.username)}));
+      assertOriginalAdminNameAvailable(adminUser,names.find(u=>u.adminUserId===adminUser.adminUserId)??null,names);
+      await client.query(
         `INSERT INTO admin_users (
           admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)
@@ -2410,6 +2437,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           adminUser.createdAt
         ]
       );
+      const previous=(await client.query('SELECT * FROM original_admin_numbers WHERE admin_user_id=$1',[adminUser.adminUserId])).rows[0];
+      const identity=prepareOriginalAdminNumber(adminUser,previous?{adminUserId:String(previous.admin_user_id),adminNumber:String(previous.admin_number)}:null,String(counter?.last_number));
+      if(!previous)await client.query('INSERT INTO original_admin_numbers(admin_number,admin_user_id) VALUES($1,$2)',[identity.number.adminNumber,adminUser.adminUserId]);
+      await client.query('UPDATE original_admin_number_counter SET last_number=$1 WHERE singleton=1',[identity.counter]);
+      await client.query('COMMIT');
+      }catch(error){
+        try{await client.query('ROLLBACK');}catch(rollback){throw new AggregateError([error,rollback],'Native administrator identity rollback failed.');}
+        throw error;
+      }finally{client.release();}
     },
     async deleteAdminUser(adminUserId) {
       const client = await pool.connect();
@@ -3620,6 +3656,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async getOrCreateOriginalWorkspaceNumber(input){return withWorkspaceMutationLock(input.tenantId,input.workspaceId,async client=>{
       const row=mapWorkspace((await client.query('SELECT * FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2',[input.tenantId,input.workspaceId])).rows[0]);return allocateOriginalWorkspaceNumber(client,input,row);
     });},
+    async getOriginalWorkspaceReportSnapshot(input){return readOriginalWorkspaceReportSnapshot(pool,input);},
+    async findOriginalWorkspaceAdministrationScope(workspaceNumber){const row=(await pool.query('SELECT n.tenant_id AS "tenantId",n.workspace_id AS "workspaceId",v.tenant_key AS "tenantKey",w.workspace_key AS "workspaceKey" FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_number=$1 AND w.status=\'active\' AND v.status=\'active\'',[workspaceNumber])).rows[0];return row?{tenantId:String(row.tenantId),workspaceId:String(row.workspaceId),tenantKey:String(row.tenantKey),workspaceKey:String(row.workspaceKey)}:null;},
     async matchesOriginalWorkspaceNumber(input){return (await pool.query('SELECT 1 FROM original_workspace_numbers n JOIN workspaces w ON w.workspace_id=n.workspace_id AND w.tenant_id=n.tenant_id JOIN tenants v ON v.tenant_id=n.tenant_id WHERE n.workspace_id=$1 AND n.tenant_id=$2 AND n.workspace_number=$3 AND w.status=$4 AND v.status=$5',[input.workspaceId,input.tenantId,input.workspaceNumber,'active','active'])).rowCount===1;},
     async findOriginalTestNumber(input){const row=(await pool.query(`SELECT m.* FROM original_test_numbers m JOIN test_runs t ON t.test_run_id=m.test_run_id AND t.participant_session_id=m.participant_session_id AND t.tenant_id=m.tenant_id AND t.workspace_id=m.workspace_id AND t.content_release_id=m.content_release_id
       JOIN participant_sessions p ON p.participant_session_id=m.participant_session_id AND p.tenant_id=m.tenant_id AND p.workspace_id=m.workspace_id AND p.content_release_id=m.content_release_id
@@ -3643,10 +3681,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapTestRun
       );
     },
+    async deleteOriginalSelectedTests(input){return deleteOriginalSelectedTests(pool,input);},
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(pool, input);},
     async listOriginalUnitsByWorkspace(tenantId,workspaceId){return (await pool.query('SELECT unit_json FROM original_native_units WHERE tenant_id=$1 AND workspace_id=$2',[tenantId,workspaceId])).rows.map(row=>JSON.parse(String(row.unit_json)));},
     async getOriginalUnit(input){return readOriginalNativeUnit(pool,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(pool,input,transform);},
+    async listOriginalReviews(scope){return listOriginalNativeReviews(pool,scope);},
+    async mutateOriginalReview(scope,operation){return mutateOriginalNativeReview(pool,scope,operation);},
+    async listOriginalReviewsByPerson(scope){return listOriginalNativeReviewsByPerson(pool,scope);},
+    async getOriginalTestAdministrationInventory(tenantId,workspaceId){return readOriginalTestAdministrationInventory(pool,tenantId,workspaceId);},
     async getOriginalGroupResultInventory(tenantId, workspaceId) {
       return readOriginalGroupResultInventory(pool, tenantId, workspaceId);
     },
@@ -3935,12 +3978,12 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
       return result.rowCount ?? 0;
     },
-    async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
+    async listParticipantTestLogsByWorkspace(tenantId, workspaceId, options) {
       return many(
         `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
          FROM participant_test_logs
          WHERE tenant_id = $1 AND workspace_id = $2
-         ORDER BY timestamp DESC, recorded_at DESC`,
+         ${options?.order==="collection"?"":"ORDER BY timestamp DESC, recorded_at DESC"}`,
         [tenantId, workspaceId],
         mapParticipantTestLog
       );
@@ -4094,6 +4137,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async saveWorkspaceReview(review) {
       await withResultArtifactParent(pool, review, async client => {
+        await synchronizeOriginalNativeReview(client,review);
         await client.query(
           `INSERT INTO workspace_reviews (
           review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, page, page_label, user_agent, reviewer_id, category, priority, comment_text, created_at, updated_at

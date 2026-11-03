@@ -3,7 +3,7 @@ import type {OriginalNativeUnit,TestRun} from '@testcenter-rewrite-app/domain';
 import {assertOriginalUnitInput,assertOriginalUnitRecord,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitParentMatches,resultParentUnavailable,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from '@testcenter-rewrite-app/application';
 import {withResultArtifactParent} from './result-artifact-parent.js';
 import type {Pool,PoolClient} from 'pg';
-async function read(client:PoolClient,input:OriginalUnitInput):Promise<OriginalNativeUnit|null>{
+export async function readOriginalNativeUnitInTransaction(client:PoolClient,input:OriginalUnitInput):Promise<OriginalNativeUnit|null>{
  const parent=await client.query(`SELECT 1 FROM test_runs t JOIN participant_sessions p ON p.participant_session_id=t.participant_session_id AND p.tenant_id=t.tenant_id AND p.workspace_id=t.workspace_id AND p.content_release_id=t.content_release_id
   WHERE t.test_run_id=$1 AND t.participant_session_id=$2 AND t.tenant_id=$3 AND t.workspace_id=$4 AND t.content_release_id=$5`,[input.testRunId,input.participantSessionId,input.tenantId,input.workspaceId,input.contentReleaseId]);
  if(!parent.rowCount)throw resultParentUnavailable();
@@ -19,14 +19,14 @@ async function read(client:PoolClient,input:OriginalUnitInput):Promise<OriginalN
  const unit=JSON.parse(String(row.unit_json)) as OriginalNativeUnit;assertOriginalUnitRecord(unit);if(!originalUnitParentMatches(input,unit)||unit.unitName!==name)throw resultParentUnavailable();return unit;
 }
 export async function readOriginalNativeUnit(pool:Pool,input:OriginalUnitInput):Promise<OriginalNativeUnit|null>{
- assertOriginalUnitInput(input);return withResultArtifactParent(pool,input,client=>read(client,input));
+ assertOriginalUnitInput(input);return withResultArtifactParent(pool,input,client=>readOriginalNativeUnitInTransaction(client,input));
 }
 export async function mutateOriginalNativeUnit(pool:Pool,input:OriginalUnitInput,transform:OriginalUnitTransform):Promise<OriginalNativeUnit|null>{
  assertOriginalUnitInput(input);return withResultArtifactParent(pool,input,async client=>{
   // Serialize first creation and german2_ci-equivalent aliases without decoding
   // or rewriting the complete canonical Run/other Unit payloads.
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['native-unit:'+input.testRunId]);
-  const previous=await read(client,input),effect=prepareOriginalUnitMutation(input,previous,transform);
+  const previous=await readOriginalNativeUnitInTransaction(client,input),effect=prepareOriginalUnitMutation(input,previous,transform);
   if(effect.unit){const unit=effect.unit;await client.query(`INSERT INTO original_native_units(test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,unit_name,unit_json) VALUES($1,$2,$3,$4,$5,$6,$7)
    ON CONFLICT(test_run_id,unit_name) DO UPDATE SET unit_json=excluded.unit_json`,[unit.testRunId,unit.participantSessionId,unit.tenantId,unit.workspaceId,unit.contentReleaseId,unit.unitName,JSON.stringify(unit)]);}
   for(const log of effect.logs)await client.query(`INSERT INTO participant_test_logs(participant_test_log_id,tenant_id,workspace_id,participant_session_id,test_run_id,unit_key,original_unit_id,log_key,log_content,timestamp,recorded_at,original_timestamp)

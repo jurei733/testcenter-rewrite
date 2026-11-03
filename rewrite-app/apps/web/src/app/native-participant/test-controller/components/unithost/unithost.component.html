@@ -1,0 +1,44 @@
+<div #iframeHost id="iframe-host"></div>
+
+@let unit = tcs.currentUnit;
+
+@if ((tcs.unitContentReady$ | async) && unit?.parent?.locked) {
+  <div class="lock-overlay" [class.alt-styling]="codeInputMode === 'keypad-symbols-alt'">
+    @if (unit?.parent?.locked?.by == 'code') {
+      <tc-code-input [inputType]="codeInputMode" [length]="codeInputLength" [problemText]="codeInputErrorText"
+                     [buttonLabel]="'Weiter'"
+                     (submitCode)="onSubmitCode($event)">
+        <div>
+          <h2>{{ 'Aufgabenblock ist noch gesperrt' | customtext:'booklet_codeToEnterTitle' | async}}</h2>
+          <p>{{ 'Bitte gib das Freigabewort ein, das angesagt wurde!' | customtext:'booklet_codeToEnterPrompt' | async }}</p>
+          @if (unit?.parent?.locked?.through?.restrictions?.codeToEnter?.message) {
+            <p>{{ unit?.parent?.locked?.through?.restrictions?.codeToEnter?.message }}</p>
+          }
+        </div>
+      </tc-code-input>
+    }
+
+    @if (unit?.parent?.locked?.by == 'time' || unit?.parent?.locked?.by == 'show' ||
+         unit?.parent?.locked?.by == 'afterLeave' || unit?.lockedAfterLeaving) {
+      <mat-card appearance="raised" data-cy="info-blocktime-is-up">-->
+        <mat-card-header>
+          <mat-card-title data-cy="unit-block-dialog-title" *ngIf="unit?.parent?.locked">
+            {{unit?.parent?.locked?.through?.label}}
+          </mat-card-title>
+          <mat-card-subtitle *ngIf="unit?.parent?.locked?.by === 'time'">
+            {{'Aufgabenzeit ist abgelaufen' | customtext:'booklet_lockedBlock' | async}}
+          </mat-card-subtitle>
+          <mat-card-subtitle *ngIf="unit?.parent?.locked?.by === 'show'">
+            {{'Aufgabenblock steht nicht zur Verfügung' | customtext:'booklet_blockConditionNotSatisfied' | async}}
+          </mat-card-subtitle>
+          <mat-card-subtitle *ngIf="unit?.parent?.locked?.by === 'afterLeave'">
+            {{'Aufgabenblock kann nur einmal betreten werden' | customtext:'booklet_blockLockedByAfterLeave' | async}}
+          </mat-card-subtitle>
+          <mat-card-subtitle *ngIf="unit?.lockedAfterLeaving">
+            {{'Aufgabe kann nur einmal betreten werden' | customtext:'booklet_lockedByAfterLeave' | async}}
+          </mat-card-subtitle>
+        </mat-card-header>
+      </mat-card>
+    }
+  </div>
+}

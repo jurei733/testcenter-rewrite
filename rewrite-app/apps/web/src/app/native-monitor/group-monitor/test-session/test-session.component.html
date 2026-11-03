@@ -1,0 +1,341 @@
+@if (displayOptions.manualChecking) {
+  <td class="selected">
+    @if (testSession.data.testId) {
+      <mat-checkbox
+        (change)="toggleCheckbox($event)"
+        (contextmenu)="invertSelection()"
+        [attr.data-cy]="'GM-tt-checkbox'"
+        [checked]="checked"
+        [disabled]="['pending'].includes(testSession.state)"
+        >
+      </mat-checkbox>
+    }
+  </td>
+}
+
+<td class="super-state" (contextmenu)="deselectForce($event)">
+  @if (superStateIcons[testSession.state]; as iconData) {
+    <div class="vertical-align-middle">
+      <mat-icon [svgIcon]="iconData.icon" class="unit-badge {{iconData?.class}}" matTooltip="{{iconData.tooltip}}"></mat-icon>
+    </div>
+  }
+</td>
+
+@if (displayOptions.groupColumn === 'show') {
+  <td class="group" (contextmenu)="deselectForce($event)">
+    <div class="vertical-align-middle">{{testSession.data.groupLabel}}</div>
+  </td>
+}
+
+<td class="user" (contextmenu)="deselectForce($event)">
+  <div class="vertical-align-middle">
+    <h1>{{testSession.data.personLabel}}</h1>
+  </div>
+</td>
+
+@if (displayOptions.bookletColumn === 'show') {
+  <td
+    class="booklet"
+    (contextmenu)="deselectForce($event)"
+    >
+    @if (isBooklet(testSession.booklet)) {
+      <div class="vertical-align-middle" [matTooltip]="testSession.booklet.metadata.label">
+        {{testSession.booklet.metadata.label}}
+      </div>
+    } @else {
+      <div class="vertical-align-middle">{{testSession.data.bookletName}}</div>
+    }
+  </td>
+}
+
+@if (displayOptions.blockColumn === 'show') {
+  <td class="block" (contextmenu)="deselectForce($event)">
+    @if (testSession.current; as current;) {
+      <div class="vertical-align-middle">
+        {{
+        current.parent.label ||
+        (current.parent.blockId ? (customtext(('Block'),('gm_col_blockLabel')))! + ' ' + current.parent.blockId : '') ||
+        current.parent.id
+        }}
+        @if (timeLeftView((testSession),(current.parent)); as timeLeft) {
+          <mat-icon
+            class="unit-badge"
+            svgIcon="schedule"
+            matBadge="{{formatRemainingTime(timeLeft)}}"
+            matTooltip="{{customtext(('Verbleibende Zeit'),('gm_timeleft_tooltip'),(timeLeft),((current.parent.restrictions.timeMax?.minutes || 0)))}}"
+          ></mat-icon>
+        }
+      </div>
+    }
+  </td>
+}
+
+<td class="test" (contextmenu)="deselectForce($event)">
+  @if (isBooklet(testSession.booklet)) {
+    @if (testSession.booklet.units; as units) {
+      <div
+        class="units-container"
+      [class]="{
+        locked: hasState(testSession.data.testState, 'status', 'locked'),
+        paused: hasState(testSession.data.testState, 'CONTROLLER', 'PAUSED'),
+        error: hasState(testSession.data.testState, 'CONTROLLER', 'ERROR'),
+        pending: !hasState(testSession.data.testState, 'CONTROLLER')
+      }"
+        (mouseleave)="mark()"
+        (click)="deselect($event)"
+        >
+        @switch (displayOptions.view) {
+          @case ('full') {
+            <div class="units full" >
+              <ng-container *ngTemplateOutlet="testletFull; context: {$implicit: units, recursionLevel: 0}"></ng-container>
+            </div>
+          }
+          @case ('medium') {
+            <div class="units medium" >
+              <ng-container *ngTemplateOutlet="bookletMedium; context: {$implicit: units}"></ng-container>
+            </div>
+          }
+          @case ('small') {
+            <div class="units small" >
+              <ng-container *ngTemplateOutlet="bookletSmall; context: {$implicit: units}"></ng-container>
+            </div>
+          }
+        }
+      </div>
+    }
+  } @else {
+    @if (!isBooklet(testSession.booklet)) {
+      @if (testSession.booklet.error == 'missing-id') {
+        <span>
+          Fehler beim Lesen der Testheft-Datei: Kein Testheft zugeordnet.
+        </span>
+      }
+      @if (testSession.booklet.error == 'missing-file') {
+        <span class="warning">
+          Fehler beim Lesen der Testheft-Datei: Datei nicht gefunden.
+        </span>
+      }
+      @if (testSession.booklet.error == 'xml') {
+        <span class="warning">
+          Fehler beim Lesen der Testheft-Datei: Invalides XML-Format.
+        </span>
+      }
+      @if (testSession.booklet.error == 'general') {
+        <span class="warning">
+          Fehler beim Lesen der Testheft-Datei.
+        </span>
+      }
+    }
+  }
+
+</td>
+
+<ng-template #testletFull let-units let-recursionLevel="recursionLevel"
+  [appTemplateContext]="testletContext">
+
+  <ng-container *ngTemplateOutlet="restrictions; context: { $implicit: units }"></ng-container>
+
+  @for (testletOrUnit of units.children; track trackUnits($index, testletOrUnit)) {
+    {{ '' // the testlets themselves }}
+    @if (!isTestlet(testletOrUnit)) {
+      <span
+        [class]="{
+          unit: true,
+          current: testSession.current?.unit?.alias === testletOrUnit.alias
+        }"
+        matTooltip="{{testletOrUnit.label}}"
+        matTooltipPosition="above"
+        >
+        {{testletOrUnit.labelShort || "&nbsp;"}}
+      </span>
+    }
+    @if (isTestlet(testletOrUnit)) {
+      @if (testletVisible((testSession),(testletOrUnit))) {
+        {{ '' // the borders around the testlets }}
+        <span
+          data-cy="gm-testlet-select"
+            [class]="{
+              testlet: true,
+              selected: isSelectionTheSameBlockAsParentSelection(testletOrUnit) && checked && testletOrUnit.blockId && recursionLevel === 0,
+              marked: isMarked(testletOrUnit) && testletOrUnit.blockId && recursionLevel === 0
+            }"
+          (mouseenter)="mark(testletOrUnit)"
+          (click)="select(testletOrUnit)"
+          matTooltip="{{testletOrUnit.label}}"
+          >
+          <ng-container *ngTemplateOutlet="testletFull; context: {$implicit: testletOrUnit, recursionLevl: 1}"></ng-container>
+        </span>
+      }
+    }
+  }
+</ng-template>
+
+<ng-template #bookletMedium let-testlet [appTemplateContext]="testletContext">
+  <ng-container *ngTemplateOutlet="testletTemplateMedium; context: {$implicit: testlet}">
+  </ng-container>
+</ng-template>
+
+<ng-template #testletTemplateMedium let-testlet [appTemplateContext]="testletContext">
+
+  @for (testletOrUnit of testlet.children; track trackUnits(i, testletOrUnit); let i = $index) {
+    @if (!isTestlet(testletOrUnit)) {
+      <span
+        [class]="(testSession.data.unitName === testletOrUnit.alias) ? 'unit current': 'unit'"
+        matTooltip="{{testletOrUnit.label}}"
+        matTooltipPosition="above"
+        >·
+      </span>
+    }
+    @if (isTestlet(testletOrUnit)) {
+      <span
+        class="testlet"
+        matTooltip="{{testletOrUnit.label}}"
+      [class]="{
+        timeup: testletOrUnit.restrictions.timeMax &&
+          testSession.timeLeft &&
+          testSession.timeLeft.hasOwnProperty(testletOrUnit.id) &&
+          testSession.timeLeft[testletOrUnit.id] <= 0
+      }"
+        >
+        <ng-container *ngTemplateOutlet="restrictions; context: { $implicit: testletOrUnit }"></ng-container>
+        {{ '' // this block shows the current block (.current css class) }}
+        @if (testSession.current && (testSession.current.ancestor.id === testletOrUnit.id)) {
+          <span
+          [class]="{
+            unit: true,
+            aggregated: true,
+            current: true,
+            selected: isSelectionTheSameBlockAsParentSelection(testletOrUnit) && checked && testletOrUnit.blockId,
+            marked: isMarked(testletOrUnit) && testletOrUnit.blockId
+          }"
+            matTooltip="{{testSession.current.unit?.label}}"
+            matTooltipPosition="above"
+            (mouseenter)="mark(testletOrUnit)"
+            (click)="select(testletOrUnit)"
+            >
+            {{position((testSession),(testletOrUnit))}}
+          </span>
+        } @else {
+          <span
+          [class]="{
+            unit: true,
+            aggregated: true,
+            selected: isSelectionTheSameBlockAsParentSelection(testletOrUnit) && checked,
+            marked: isMarked(testletOrUnit)
+          }"
+            (mouseenter)="mark(testletOrUnit)"
+            (click)="select(testletOrUnit)"
+          >{{position((testSession),(testletOrUnit))}}</span>
+        }
+      </span>
+    }
+  }
+</ng-template>
+
+
+<ng-template #bookletSmall let-testlet>
+  @if (testSession.current) {
+    <span
+      class="testlet"
+      matTooltip="{{testSession.current.parent.label}}"
+      >
+      @if (isBooklet(testSession.booklet)) {
+        <span
+          class="unit current aggregated"
+          matTooltip="{{testSession.current.unit?.label}}"
+          matTooltipPosition="above"
+          >
+          {{position((testSession),(testlet))}}
+        </span>
+      }
+    </span>
+  } @else {
+    <span class="testlet" >
+      <span class="unit aggregated">{{position((testSession),(testlet))}}</span>
+    </span>
+  }
+
+</ng-template>
+
+<ng-template #restrictions let-testlet [appTemplateContext]="testletContext">
+  @if (testlet.restrictions && testlet.restrictions.codeToEnter; as codeToEnter) {
+    <span
+      class="unit restriction"
+      [matTooltip]="(isCodeClear((testSession),(testlet))) ? (customtext(('Block wurde geöffnet'),('gm_codetoenter_unlock_tooltip')))! : ((customtext(('Freigabewort'),('booklet_codeToEnterTitle'))) + ': ' + codeToEnter.code.toUpperCase())"
+      matTooltipPosition="above"
+      >
+      <mat-icon [svgIcon]="(isCodeClear((testSession),(testlet))) ? 'lock_open' : 'lock'"></mat-icon>
+    </span>
+  }
+
+  @if (testlet.restrictions?.timeMax; as timeMax) {
+    <span
+      class="unit restriction"
+      >
+      @if ((testSession.timeLeft && testSession.timeLeft.hasOwnProperty(testlet.id))) {
+        @if (testSession.timeLeft[testlet.id] === 0) {
+          <mat-icon
+            svgIcon="timer_off"
+            matTooltip="{{customtext(('Zeit abgelaufen'),('gm_timeup_tooltip'))}}"
+          matTooltipPosition="above"></mat-icon>
+        }
+        @if (testSession.timeLeft[testlet.id] < 0) {
+          <mat-icon
+            svgIcon="timer_off"
+            matTooltip="{{customtext(('Verbleibende Zeit: %s/%s'),('gm_timeleft_tooltip'),(testSession.timeLeft[testlet.id]*-1),(timeMax.minutes))}}"
+          matTooltipPosition="above"></mat-icon>
+        }
+        @if (testSession.timeLeft[testlet.id] > 0) {
+          <mat-icon
+            svgIcon="timer"
+            matTooltip="{{customtext(('Verbleibende Zeit: %s/%s'),('gm_timeleft_tooltip'),(testSession.timeLeft[testlet.id]),(timeMax.minutes))}}"
+          matTooltipPosition="above"></mat-icon>
+        }
+      } @else {
+        <mat-icon svgIcon="timer"
+          matTooltip="{{customtext(('Zeitgesteuerter Block: %s Minute(n)'),('gm_timemax_tooltip'),(timeMax.minutes))}}"
+        matTooltipPosition="above"></mat-icon>
+      }
+    </span>
+  }
+</ng-template>
+
+@if (displayOptions.unitColumn === 'show') {
+  <td class="current-unit" (contextmenu)="deselectForce($event)">
+    @if (testSession.current; as current;) {
+      <div class="vertical-align-middle">
+        <h2 matTooltip="{{current.unit?.label}}">{{current.unit?.id}}</h2>
+        @if (hasState(testSession.data.unitState, 'PRESENTATION_PROGRESS', 'complete')) {
+          <mat-icon svgIcon="visibility"
+            class="unit-badge"
+          matTooltip="Vollständig betrachtet / angehört"></mat-icon>
+        }
+        @if (hasState(testSession.data.unitState, 'RESPONSE_PROGRESS', 'complete')) {
+          <mat-icon svgIcon="done_all"
+            class="unit-badge"
+          matTooltip="Fertig beantwortet"></mat-icon>
+        }
+        @if (hasState(testSession.data.unitState, 'CURRENT_PAGE_NR')) {
+          <mat-icon  svgIcon="description" class="unit-badge"
+            matBadge="{{this.stateString(testSession.data.unitState, ['CURRENT_PAGE_NR', 'PAGES_COUNT'], '/')}}"
+          matTooltip="{{this.stateString(testSession.data.unitState, ['CURRENT_PAGE_ID'])}}"></mat-icon>
+        }
+      </div>
+    }
+  </td>
+}
+
+@for (bookletState of entries((bookletStates)); track bookletState) {
+  @if (displayOptions.bookletStatesColumns.includes(bookletState.key)) {
+    <td
+      class="booklet-states"
+      (contextmenu)="deselectForce($event)"
+      >
+      <div class="vertical-align-middle">
+        @if (isBooklet(testSession.booklet)) {
+          {{bookletStateLabel(testSession, bookletState.key)}}
+        }
+      </div>
+    </td>
+  }
+}

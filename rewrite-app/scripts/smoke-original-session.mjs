@@ -19,9 +19,9 @@ const gate = createServerRequestFailureGate(), checks = [], expectedServerFailur
 const module = pathToFileURL(resolve('apps/api/dist/apps/api/src/index.js')).href;
 const server = spawn(process.execPath, ['--input-type=module', '-e', `
  import {createProductionApiServer} from ${JSON.stringify(module)};
- const server=await createProductionApiServer();
+ import {bindNativeSmokeServerOwner} from ${JSON.stringify(pathToFileURL(resolve('scripts/native-monitor-smoke-io.mjs')).href)};
+ const server=await createProductionApiServer();bindNativeSmokeServerOwner(server);
  server.listen(0,'127.0.0.1',()=>process.send({port:server.address().port}));
- process.once('SIGTERM',()=>server.close(()=>process.exit(0)));
 `], {cwd: root, env: {...process.env, FIRST_SLICE_STORE: 'sqlite', FIRST_SLICE_SQLITE_FILE: join(scratch, 'owned.sqlite'),
   FIRST_SLICE_BOOTSTRAP_DEMO: 'false', FIRST_SLICE_OPERATOR_AUTH_REQUIRED: 'true', REQUIRE_LOGIN_PASSWORD: 'false',
   FIRST_SLICE_XML_SCHEMA_PROFILE: 'original-19', FIRST_SLICE_PROOF_OF_WORK_SCOPES: 'participant,second_code',
@@ -65,7 +65,7 @@ try {
   setPhase('owned-roster-fixture');
   const password = 'Owned-native-browser-private-2026!';
   await operatorApi(workspace + '/participant-roster', {rosterText: '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="OWNED.NATIVE.BROWSER" label="Owned native browser">' +
-    ['native-browser', 'native-peer'].map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login>`).join('') + `<Login name="native-monitor" pw="${password}" mode="monitor-group"/></Group></Testtakers>`}, operator, 201);
+    ['native-browser', 'native-peer'].map(name => `<Login name="${name}" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login>`).join('') + `<Login name="native-monitor" pw="${password}" mode="monitor-group"/></Group><Group id="OWNED.PASSWORDLESS.BROWSER" label="Owned passwordless browser"><Login name="native-passwordless-code" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login><Login name="native-passwordless-no-code" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login><Login name="native-passwordless-monitor" mode="monitor-group"/></Group></Testtakers>`}, operator, 201);
   setPhase('browser-launch');
   browser = await chromium.launch({channel: process.env.UI_SMOKE_BROWSER_CHANNEL?.trim() || undefined, headless: process.env.CI === 'true' && process.env.UI_SMOKE_HEADFUL !== 'true'});
   page = await browser.newPage({viewport: {width: 1280, height: 720}, locale: 'de-DE'});
@@ -76,7 +76,7 @@ try {
     const result = await page.evaluate(async ({method, path, body, token}) => {
       const response = await fetch(path, {method, headers: {...(body === undefined ? {} : {'content-type': 'application/json'}), ...(token ? {AuthToken: token} : {})},
         ...(body === undefined ? {} : {body: JSON.stringify(body)})});
-      const text = await response.text(); return {status: response.status, cache: response.headers.get('cache-control'), value: text ? JSON.parse(text) : null, empty: text.length === 0, rawText: text, contentType: response.headers.get('content-type')};
+      const text = await response.text(); return {status: response.status, cache: response.headers.get('cache-control'), value: text ? (response.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : text) : null, empty: text.length === 0, rawText: text, contentType: response.headers.get('content-type')};
     }, {method, path, body, token});
     assert.equal(result.status, status, 'Unexpected native session HTTP status'); assert.equal(result.cache, 'private, no-store'); return result;
   };
@@ -92,6 +92,29 @@ try {
       throw Error('The actual native challenge was not solvable');
     }, challenge);
   };
+  const passwordlessCases = [];
+  for (const [actor, entry, coded] of [['native-passwordless-code', '/app/native-start?ui=original', true],
+    ['native-passwordless-no-code', '/app/native-start?ui=original', false], ['native-passwordless-monitor', '/app/group-monitor?ui=original', false]]) {
+    setPhase('passwordless-name-step-' + actor);
+    await page.evaluate(() => localStorage.clear()); await page.goto(base + entry, {waitUntil: 'domcontentloaded'});
+    const observed = [], observe = request => {const path = new URL(request.url()).pathname; if (path.startsWith('/session')) observed.push(request.method() + ' ' + path);};
+    page.on('request', observe);
+    try {
+      await page.locator('.login-section form input').first().fill(actor);
+      const [response] = await Promise.all([page.waitForResponse(response => new URL(response.url()).pathname === '/session/login' && response.request().method() === 'PUT'),
+        page.locator('[data-cy="login-user"]').click()]); assert.equal(response.status(), 200);
+      const access = await response.json(); assert.equal(access.loginName, actor);
+      if (coded) await page.locator('tc-code-input').waitFor();
+      else await page.getByRole('button', {name: 'Nutzerinformationen', exact: true}).waitFor();
+      assert.deepEqual(observed.filter(request => !request.startsWith('GET ')), ['PUT /session/login'], 'The actual Source empty-secret name step requires neither a challenge nor an extra credential write');
+      assert.equal(await page.locator('.password-headline').count(), 0);
+      passwordlessCases.push({actor, entry, coded, status: response.status(), requests: observed});
+      const logout = await fetch(base + '/session', {method: 'DELETE', headers: {AuthToken: access.token}, signal: AbortSignal.timeout(15000)}); assert.equal(logout.status, 205);
+      mark('passwordless-real-name-step-without-work-' + actor);
+    } finally {page.off('request', observe);}
+  }
+  await writeFile(join(artifacts, 'passwordless-name-steps.json'), JSON.stringify(passwordlessCases, null, 2));
+  await page.evaluate(() => localStorage.clear()); await page.goto(base + '/app/participant?ui=original', {waitUntil: 'domcontentloaded'});
   await request('PUT', '/session/login', {name: 'native-browser', password}, undefined, 400);
   await request('GET', '/session', undefined, undefined, 401);
   mark('configured-protection-refuses-direct-secrets');
@@ -169,7 +192,7 @@ try {
   const repeat = await solve((await request('POST', '/session/person/challenge', {code: 'SHARED'}, login.token)).value);
   await request('PUT', '/session', repeat, peer.token, 400);
   const former = person.token; person = (await request('PUT', '/session', repeat, login.token)).value;
-  assert.ok(person.displayName.endsWith('/SHARED')); await request('GET', '/session', undefined, former, 401);
+  assert.ok(person.displayName.endsWith('/SHARED')); await request('GET', '/session', undefined, former, 403);
   mark('cross-login-work-cannot-burn-owner-ticket-and-reentry-rotates-only-the-person');
   setPhase('document-reload');
   await page.reload({waitUntil: 'domcontentloaded'});
@@ -178,7 +201,7 @@ try {
   assert.equal((await request('DELETE', '/session', undefined, login.token, 205)).empty, true);
   assert.equal((await request('GET', '/session', undefined, login.token)).value.token, login.token);
   assert.equal((await request('DELETE', '/session', undefined, person.token, 205)).empty, true);
-  await request('GET', '/session', undefined, person.token, 401);
+  await request('GET', '/session', undefined, person.token, 403);
   mark('reload-preserves-first-person-spelling-and-empty-205-logout-keeps-login-capability');
   setPhase('actual-ui-entry-for-native-created-test');
   await page.goto(base + '/app/participant?ui=original&tenantKey=' + tenantKey + '&workspaceKey=' + workspaceKey, {waitUntil: 'domcontentloaded'});
@@ -235,7 +258,7 @@ try {
   await request('POST','/session/person/challenge',{code:'Shared'},monitor.token,403);
   const originalMonitorToken=monitor.token,monitorAgain=(await request('PUT','/session',await solve((await request('POST','/session/challenge',{loginType:'login',name:'native-monitor',password})).value))).value;
   assert.notEqual(monitorAgain.token,originalMonitorToken);assert.equal(monitorAgain.groupToken,monitor.groupToken);
-  await request('GET','/session',undefined,originalMonitorToken,401);
+  await request('GET','/session',undefined,originalMonitorToken,403);
   assert.equal((await request('PUT','/test',{bookletName:'OWNED.BROWSER'},monitorAgain.token,201)).rawText,monitorTest.rawText);
   await page.frameLocator('iframe').locator('main[data-started="true"]').waitFor();
   mark('browser-native-monitor-has-dual-claims-honest-own-test-mode-and-isolated-bearer');

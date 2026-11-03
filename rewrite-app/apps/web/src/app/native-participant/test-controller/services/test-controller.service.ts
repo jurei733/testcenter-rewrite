@@ -1,0 +1,1272 @@
+import {
+  bufferWhen, concatMap, filter, last, map, scan, share, shareReplay, take, takeUntil, takeWhile, tap, timeout, withLatestFrom
+} from 'rxjs/operators';
+import {
+  BehaviorSubject, combineLatest, firstValueFrom, forkJoin, from,
+  lastValueFrom, merge, Observable, of, Subject,
+  Subscription, timer
+} from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+import {NativeHttpClient} from '../../native-http-client';
+import {NATIVE_RUN_TEST_ID} from '../../native-tokens';
+import { PRIMARY_OUTLET, Router } from '@angular/router';
+import { NativeOwnedDialog as MatDialog } from '../../native-owned-overlays';
+import { CodingSchemeFactory } from '@iqb/responses';
+import { TimerData } from '../classes/test-controller.classes';
+import {
+  type Booklet,
+  type BufferFlushEvent,
+  type BufferFlushEventType,
+  bufferTypes,
+  isTestlet,
+  isUnit,
+  type KeyValuePairNumber,
+  type KeyValuePairString,
+  type LoadingProgress,
+  MaxTimerEvent,
+  type NavigationDirection, type NavigationDirectionValue,
+  type NavigationLeaveRestrictionValue,
+  type NavigationState,
+  type StateReportEntry,
+  type TestControllerState,
+  type Testlet,
+  type TestletLockType,
+  TestletLockTypes,
+  type TestStateKey,
+  type TestStateUpdate,
+  type Unit,
+  type UnitDataParts,
+  UnitNavigationTarget, type UnitStateKey,
+  type UnitStateUpdate,
+  type WindowFocusState
+} from '../interfaces/test-controller.interfaces';
+import { BackendService } from './backend.service';
+import {
+  BookletConfig,
+  CustomtextService,
+  MainDataService,
+  TestMode
+} from '../../shared/shared.module';
+import {
+  isVeronaProgress, type SharedParameter,
+  type VeronaNavigationDeniedReason,
+  VeronaProgressIncompleteValues
+} from '../interfaces/verona.interfaces';
+import { MissingBookletError } from '../classes/missing-booklet-error.class';
+import { MessageService } from '../../shared/services/message.service';
+import { AppError } from '../../app.interfaces';
+import { isIQBVariable } from '../interfaces/iqb.interfaces';
+import { TestStateUtil } from '../util/test-state.util';
+import { ConditionUtil } from '../util/condition.util';
+import { createTicker } from '../util/worker.util';
+
+type LeaveCheckResult =
+  // proceed; `notify` is an optional non-blocking FYI toast (test-mode preview of what would have
+  // been blocked/warned about in real test mode)
+  | { kind: 'allow'; notify?: string }
+  // block navigation; either silently, with an FYI toast, or after a blocking info dialog the
+  // user just acknowledges (no real choice involved)
+  | { kind: 'deny'; notify?: string; infoDialog?: { title: string; content: string } }
+  // block unless the user explicitly confirms leaving
+  | { kind: 'confirm'; title: string; content: string; onConfirmed: () => string | undefined };
+
+@Injectable({
+  providedIn: 'root'
+})
+export class TestControllerService {
+  private readonly nativeHttp=inject(NativeHttpClient);
+  private readonly nativeTestId=inject(NATIVE_RUN_TEST_ID);
+  private readonly nativeSubscriptions=new Subscription();
+  private readonly nativeRetired$=new Subject<void>();
+  private readonly nativeCloseTimers=new Set<ReturnType<typeof setTimeout>>();
+  private nativeRetired=false;
+  private get nativeCurrent(){return !this.nativeRetired&&this.nativeHttp.isCurrent;}
+  private readonly retireNative=()=>{
+    if(this.nativeRetired)return;
+    this.nativeRetired=true;
+    this.nativeSubscriptions.unsubscribe();
+    for(const name of Object.keys(this.subscriptions))this.destroySubscription(name);
+    this.timerIntervalSubscription?.unsubscribe();this.timerIntervalSubscription=null;
+    for(const timeout of this.nativeCloseTimers)clearTimeout(timeout);this.nativeCloseTimers.clear();
+    this.nativeRetired$.next();this.nativeRetired$.complete();
+    this.unitDataPartsBuffer$.complete();this.unitStateBuffer$.complete();this.testStateBuffer$.complete();
+    this.players={};this.sharedParameters=[];this.booklet=null;this.units={};this.testlets={};this.unitAliasMap={};this.testState={};
+  };
+  ngOnDestroy(){this.nativeHttp.accessSignal.removeEventListener('abort',this.retireNative);this.retireNative();}
+  private owned(start:()=>Subscription):Subscription{
+    if(!this.nativeCurrent)return Subscription.EMPTY;
+    const subscription=start();this.nativeSubscriptions.add(subscription);return subscription;
+  }
+  private reportBufferEvent(event:BufferFlushEvent){if(this.nativeCurrent)this.bufferFlushEventsOnClose$.next(event);}
+
+  testId = '';
+  readonly state$ = new BehaviorSubject<TestControllerState>('INIT');
+  workspaceId = '';
+  totalLoadingProgress = 0;
+  readonly unitContentReady$ = new BehaviorSubject<boolean>(false);
+  testMode = new TestMode();
+
+  // TODO hide those behind functions, this will be way easier with ts 5.5
+  booklet: Booklet | null = null;
+  units: { [sequenceId: number]: Unit } = {};
+  testlets: { [testletId: string] : Testlet } = {};
+  unitAliasMap: { [unitId: string] : number } = {};
+
+  private _currentUnitSequenceId = -Infinity;
+  readonly currentUnitSequenceId$ = new BehaviorSubject<number>(-Infinity);
+  configChanged$ = new Subject<void>(); // merely tracked that something changed, not interested in value
+  get currentUnitSequenceId(): number {
+    return this._currentUnitSequenceId;
+  }
+
+  set currentUnitSequenceId(value: number) {
+    this._currentUnitSequenceId = value;
+    this.currentUnitSequenceId$.next(value);
+  }
+
+  get currentUnit(): Unit | null {
+    return this.units[this.currentUnitSequenceId];
+  }
+
+  timers$ = new Subject<TimerData>();
+  timers: KeyValuePairNumber = {}; // TODO remove the redundancy with timers$
+  currentTimerId = '';
+  private timerIntervalSubscription: Subscription | null = null;
+  timerWarningPoints: number[] = [];
+
+  readonly windowFocusState$ = new Subject<WindowFocusState>(); // TODO why observable?
+
+  private _navigationDenial$ = new Subject<{ sourceUnitSequenceId: number, reason: VeronaNavigationDeniedReason[] }>();
+
+  get navigationDenial$(): Observable<{ sourceUnitSequenceId: number, reason: VeronaNavigationDeniedReason[] }> {
+    return this._navigationDenial$;
+  }
+
+  private players: { [filename: string]: string } = {};
+  private testState: { [key in TestStateKey]?: string } = {};
+
+  sharedParameters: SharedParameter[] = [];
+
+  navigation$: Subject<NavigationState> = new BehaviorSubject<NavigationState>({
+    targets: {
+      next: null,
+      previous: null,
+      first: null,
+      last: null,
+      end: null
+    },
+    directions: {
+      forward: 'yes',
+      backward: 'yes'
+    }
+  });
+
+  private readonly bufferClosed$ = new Subject<string>();
+  private readonly unitDataPartsBuffer$ = new Subject<UnitDataParts>();
+  private readonly unitStateBuffer$ = new Subject<UnitStateUpdate>();
+  private readonly testStateBuffer$ = new Subject<TestStateUpdate>();
+  private readonly bufferFlushEventsOnClose$ = new Subject<BufferFlushEvent>();
+  private readonly subscriptions: { [key: string]: Subscription } = {};
+
+  constructor(
+    private router: Router,
+    private bs: BackendService,
+    private ms: MessageService,
+    private mds: MainDataService,
+    private cts: CustomtextService,
+    private messageService: MessageService,
+    public confirmDialog: MatDialog
+  ) {
+    this.nativeHttp.accessSignal.addEventListener('abort',this.retireNative,{once:true});
+    if(!this.nativeHttp.isCurrent){this.retireNative();return;}
+    this.setupUnitDataPartsBuffer();
+    this.setupUnitStateBuffer();
+    this.setupTestStateBuffer();
+  }
+
+  setupUnitDataPartsBuffer(): void {
+    this.destroySubscription('unitDataPartsBuffer'); // important when called from unit-test with fakeAsync
+
+    const closingSignal = this.createClosingSignal('unit_responses_buffer_time');
+
+    this.subscriptions.unitDataPartsBuffer = this.owned(() => this.unitDataPartsBuffer$
+      .pipe(
+        bufferWhen(closingSignal.factory),
+        map(TestStateUtil.sortDataParts),
+        withLatestFrom(closingSignal.closingId$)
+      )
+      .subscribe(([buffer, closingId]) => {
+        let trackedVariablesChanged = false;
+        buffer
+          .forEach(changedDataPartsPerUnit => {
+            trackedVariablesChanged = this.updateVariables(
+              this.unitAliasMap[changedDataPartsPerUnit.unitAlias],
+              changedDataPartsPerUnit.unitStateDataType,
+              changedDataPartsPerUnit.dataParts
+            );
+          });
+
+        if (trackedVariablesChanged) {
+          this.evaluateConditions();
+        }
+
+        this.reportBufferEvent({ type: 'unitData', event: 'closed', id: closingId });
+
+        if (this.testMode.saveResponses) {
+          this.owned(() => forkJoin(
+            buffer.map(changedDataPartsPerUnit => this.bs.updateDataParts(
+              this.testId,
+              changedDataPartsPerUnit.unitAlias,
+              this.units[this.unitAliasMap[changedDataPartsPerUnit.unitAlias]].id,
+              changedDataPartsPerUnit.dataParts,
+              changedDataPartsPerUnit.unitStateDataType
+            ))
+          )
+            .subscribe({
+              complete: () => this.reportBufferEvent({ type: 'unitData', event: 'saved', id: closingId })
+            }));
+        } else {
+          this.reportBufferEvent({ type: 'unitData', event: 'saved', id: closingId });
+        }
+      }));
+  }
+
+  private createClosingSignal(
+    configSetting: keyof BookletConfig
+  ): { closingId$: Observable<string>, factory: () => Observable<string> } {
+    const closingId$ = new Subject<string>();
+
+    const factory = () => {
+      const closer$ = merge(
+        timer(Number(this.booklet?.config[configSetting] || 100000)).pipe(map(() => configSetting)),
+        this.bufferClosed$
+      ).pipe(take(1),share());
+      // the calling site 'bufferWhen' doesn't expose what caused the close. Forwarding the closing value
+      // into closingId$ lets withLatestFrom(closingId$) in each buffer pipe
+      // retrieve which closingId triggered the flush alongside the buffered data.
+      this.owned(() => closer$.subscribe(value=>closingId$.next(value)));
+      return closer$;
+    };
+    return { closingId$, factory };
+  }
+
+  setupUnitStateBuffer(): void {
+    this.destroySubscription('unitStateBuffer');
+    const closingSignal = this.createClosingSignal('unit_state_buffer_time');
+    this.subscriptions.unitStateBuffer = this.owned(() => this.unitStateBuffer$
+      .pipe(
+        bufferWhen(closingSignal.factory),
+        map(TestStateUtil.sort),
+        withLatestFrom(closingSignal.closingId$)
+      )
+      .subscribe(([buffer, closingId]) => {
+        this.reportBufferEvent({ type: 'unitState', event: 'closed', id: closingId });
+        if (!this.testMode.saveResponses) {
+          this.reportBufferEvent({ type: 'unitState', event: 'saved', id: closingId });
+        } else {
+          this.owned(() => from(buffer).pipe(
+            concatMap(patch => this.bs.patchUnitState(patch, this.units[this.unitAliasMap[patch.unitAlias]].id))
+          ).subscribe(
+            {
+              complete: () => this.reportBufferEvent({ type: 'unitState', event: 'saved', id: closingId })
+            }
+          ));
+        }
+      }));
+  }
+
+  setupTestStateBuffer(): void {
+    this.destroySubscription('testStateBuffer');
+    const closingSignal = this.createClosingSignal('test_state_buffer_time');
+    this.subscriptions.testStateBuffer = this.owned(() => this.testStateBuffer$
+      .pipe(
+        bufferWhen(closingSignal.factory),
+        map(TestStateUtil.sort),
+        withLatestFrom(closingSignal.closingId$)
+      )
+      .subscribe(([buffer, closingId]) => {
+        this.reportBufferEvent({ type: 'testState', event: 'closed', id: closingId });
+        if (!this.testMode.saveResponses) {
+          this.reportBufferEvent({ type: 'testState', event: 'saved', id: closingId });
+        } else {
+          this.owned(() => forkJoin(
+            buffer
+              .filter(patch => !!patch.testId)
+              .map(patch => this.bs.patchTestState(patch))
+          ).subscribe({
+            complete: () => { this.reportBufferEvent({ type: 'testState', event: 'saved', id: closingId }); }
+          }));
+        }
+      }));
+  }
+
+  addToTestStateBuffer(key: TestStateKey, content: string): void {
+    if (this.testState[key] === content) return;
+    this.testState[key] = content;
+    this.testStateBuffer$.next(<TestStateUpdate>{
+      testId: this.testId,
+      unitAlias: '',
+      state: [{ key, content, timeStamp: Date.now() }]
+    });
+  }
+
+  destroySubscription(name: string): void {
+    this.subscriptions[name]?.unsubscribe();
+    delete this.subscriptions[name];
+  }
+
+  // todo when calling closeAllBuffers, the resulting closingSignalId could result in an empty array, because the timer flush could have already happened in the meantime. Check if it is critical to know who exactly is reponsible for flushing the buffers
+  async closeAllBuffers(reasonType: string, trackEvent: BufferFlushEventType = 'closed'): Promise<NavigationState> {
+    if(!this.nativeCurrent)throw this.nativeHttp.ownError(new DOMException('Native run retired','AbortError'));
+    const closingSignalId = `${reasonType}:${Math.random()}`;
+
+    const closingBufferListener = this.bufferFlushEventsOnClose$
+      .pipe(
+        scan(
+          (agg, current) => {
+            if ((current.id === closingSignalId) && (current.event === trackEvent)) {
+              if(bufferTypes.includes(current.type)&&![...agg].some(prior=>prior.type===current.type))agg.add(current);
+            }
+            return agg;
+          },
+          new Set<BufferFlushEvent>()
+        ),
+        // After setting bufferClosed.next(), all three buffers will be closed, each emitting a 'closed' event and possibly a 'saved' event. Because closeAllBuffers() only tracks one kind of event, the happy path should produce N events of bufferTypes.length
+        takeWhile(flushedBuffers => flushedBuffers.size < bufferTypes.length, true),
+        filter(flushedBuffers=>flushedBuffers.size===bufferTypes.length),
+        withLatestFrom(this.navigation$),
+        map(([_, navigation]) => navigation),
+        takeUntil(this.nativeRetired$),
+        timeout({first:20000})
+      );
+
+    // setTimeout defers by one tick to ensure closingBufferListener is subscribed
+    // before the bufferClosed$ signal is emitted, avoiding a race condition.
+    const deferredClose=setTimeout(()=>{this.nativeCloseTimers.delete(deferredClose);if(this.nativeCurrent)this.bufferClosed$.next(closingSignalId);},0);
+    this.nativeCloseTimers.add(deferredClose);
+    return lastValueFrom(closingBufferListener).catch(error=>{throw this.nativeHttp.ownError(error);});
+  }
+
+  reset(): void {
+    this.players = {};
+    this.sharedParameters = [];
+
+    this.currentUnitSequenceId = -Infinity;
+    this.unitContentReady$.next(false);
+
+    this.booklet = null;
+    this.units = {};
+    this.testlets = {};
+    this.unitAliasMap = {};
+
+    this.timerWarningPoints = [];
+    this.workspaceId = '';
+
+    this.timers = {};
+    this.testState = {};
+
+    if (this.timerIntervalSubscription !== null) {
+      this.timerIntervalSubscription.unsubscribe();
+      this.timerIntervalSubscription = null;
+    }
+    this.currentTimerId = '';
+  }
+
+  AddToUnitStateDataPartsBuffer(unitSequenceId: number, dataParts: KeyValuePairString, unitStateDataType: string): void {
+    const unit = this.getUnit(unitSequenceId);
+
+    const changedParts: KeyValuePairString = {};
+    Object.keys(dataParts)
+      .forEach(dataPartId => {
+        if (
+          !unit.dataParts[dataPartId] ||
+          (unit.dataParts[dataPartId] !== dataParts[dataPartId])
+        ) {
+          unit.dataParts[dataPartId] = dataParts[dataPartId];
+          changedParts[dataPartId] = dataParts[dataPartId];
+        }
+      });
+    if (Object.keys(changedParts).length) {
+      this.unitDataPartsBuffer$.next({
+        testId: this.testId,
+        unitAlias: unit.alias,
+        dataParts: changedParts,
+        unitStateDataType
+      });
+    }
+    this.updateNavigationState(); // now, not after buffer is closed, because it affects forward/backward, not choice
+  }
+
+  AddToUnitStateBuffer(unitSequenceId: number, unitStateUpdate: StateReportEntry<UnitStateKey>[]): void {
+    const unit = this.getUnit(unitSequenceId);
+
+    const setUnitState = (stateKey: string, value: string): void => {
+      if (stateKey === 'RESPONSE_PROGRESS' && isVeronaProgress(value)) {
+        unit.state.RESPONSE_PROGRESS = value;
+      }
+
+      if (stateKey === 'PRESENTATION_PROGRESS' && isVeronaProgress(value)) {
+        unit.state.PRESENTATION_PROGRESS = value;
+      }
+
+      if (stateKey === 'CURRENT_PAGE_ID') {
+        unit.state.CURRENT_PAGE_ID = value;
+      }
+    };
+
+    const changedStates = unitStateUpdate
+      .filter(state => !!state.content)
+      .filter(changedState => {
+        const oldState = unit.state[changedState.key];
+        if (oldState) {
+          return oldState !== changedState.content;
+        }
+        return true;
+      });
+    changedStates
+      .forEach(changedState => setUnitState(changedState.key, changedState.content));
+    if (changedStates.length) {
+      this.unitStateBuffer$.next({
+        unitAlias: unit.alias,
+        testId: this.testId,
+        state: changedStates
+      });
+    }
+  }
+
+  addPlayer(fileName: string, player: string): void {
+    this.players[fileName] = player;
+  }
+
+  hasPlayer(fileName: string): boolean {
+    return fileName in this.players;
+  }
+
+  getPlayer(fileName: string): string {
+    return this.players[fileName];
+  }
+
+  clearCodeLock(testletId: string): void {
+    if (!this.testlets[testletId] || !this.testlets[testletId].restrictions.codeToEnter?.code) {
+      return;
+    }
+    this.updateSingleLock(this.testlets[testletId], 'code', false);
+    const unlockedTestlets = Object.values(this.testlets)
+      .filter(t => t.restrictions.codeToEnter?.code && !t.locks.code)
+      .map(t => t.id);
+    this.addToTestStateBuffer('TESTLETS_CLEARED_CODE', JSON.stringify(unlockedTestlets));
+  }
+
+  activateTestletLeaveLock(testletId: string): void {
+    this.updateSingleLock(this.testlets[testletId], 'afterLeave', true);
+    const lockedTestlets = Object.values(this.testlets)
+      .filter(t => (t.restrictions.lockAfterLeaving?.scope === 'testlet') && t.locks.afterLeave)
+      .map(t => t.id);
+    this.addToTestStateBuffer('TESTLETS_LOCKED_AFTER_LEAVE', JSON.stringify(lockedTestlets));
+  }
+
+  activateUnitLeaveLock(unitSequenceId: number): void {
+    this.units[unitSequenceId].lockedAfterLeaving = true;
+    const lockedUnits = Object.values(this.units)
+      .filter(u => (u.parent.restrictions.lockAfterLeaving?.scope === 'unit') && u.lockedAfterLeaving)
+      .map(u => u.sequenceId);
+    this.addToTestStateBuffer('UNITS_LOCKED_AFTER_LEAVE', JSON.stringify(lockedUnits));
+  }
+
+  getUnit(unitSequenceId: number): Unit {
+    if (!this.booklet) { // when loading process was aborted
+      throw new MissingBookletError();
+    }
+    const unit = this.units[unitSequenceId];
+
+    if (!unit) {
+      console.error(`Unit not found: ${unitSequenceId}`);
+      throw new AppError({
+        label: `Unit not found: ${unitSequenceId}`,
+        description: '',
+        type: 'script'
+      });
+    }
+    return unit;
+  }
+
+  private getUnitBlockIds(sequenceId: number): number[] {
+    const unit = this.getUnit(sequenceId);
+    if (!unit.parent) {
+      return [sequenceId];
+    }
+    const ids: number[] = [];
+    const addChildren = (testlet: Testlet): void => {
+      testlet.children.forEach(child => {
+        if (isUnit(child)) {
+          ids.push(child.sequenceId);
+        } else {
+          addChildren(child);
+        }
+      });
+    };
+    addChildren(unit.parent);
+    return ids;
+  }
+
+  unitBlockResourcesLoaded$(sequenceId: number): Observable<LoadingProgress[]> {
+    const resourcesToLoad = this.getUnitBlockIds(sequenceId)
+      .flatMap(id => Object.values(this.getUnit(id).loadingProgress));
+    return combineLatest(resourcesToLoad);
+  }
+
+  restoreTime(testlet: Testlet, timeGivenByGm: number): void {
+    if (!testlet.restrictions?.timeMax) return;
+    if (typeof this.timers[testlet.id] === 'undefined') return;
+    if (this.timers[testlet.id] > 0) return;
+    if (this.timers[testlet.id] <= 0) {
+      this.timers[testlet.id] = timeGivenByGm;
+    }
+    this.updateSingleLock(testlet, 'time', false);
+  }
+
+  startTimer(testlet: Testlet): void {
+    if (!testlet.restrictions?.timeMax) {
+      return;
+    }
+    const timeLeftMinutes = (this.timers[testlet.id] && (this.timers[testlet.id] > 0)) ?
+      Math.min(this.timers[testlet.id], testlet.restrictions.timeMax.minutes) :
+      testlet.restrictions.timeMax.minutes;
+    if (this.timerIntervalSubscription !== null) {
+      this.timerIntervalSubscription.unsubscribe();
+    }
+    this.timers$.next(new TimerData(timeLeftMinutes, testlet.id, MaxTimerEvent.STARTED));
+    this.currentTimerId = testlet.id;
+
+    const timeTicker$ = createTicker();
+    this.timerIntervalSubscription = this.owned(() => timeTicker$
+      .pipe(
+        takeUntil(
+          timer(timeLeftMinutes * 60 * 1000)
+        ),
+        map(val => (timeLeftMinutes * 60) - val - 1)
+      ).subscribe({
+        next: val => {
+          this.timers$.next(new TimerData(val / 60, testlet.id, MaxTimerEvent.STEP));
+        },
+        error: e => {
+          throw e;
+        },
+        complete: () => {
+          this.timers$.next(new TimerData(0, testlet.id, MaxTimerEvent.ENDED));
+          this.finishTimer();
+        }
+      }));
+  }
+
+  private finishTimer() {
+    if (this.timerIntervalSubscription !== null) {
+      this.timerIntervalSubscription.unsubscribe();
+    }
+    this.timerIntervalSubscription = null;
+    this.currentTimerId = '';
+  }
+
+  cancelTimer(): void {
+    if (this.currentTimerId) {
+      this.timers$.next(new TimerData(0, this.currentTimerId, MaxTimerEvent.CANCELLED));
+    }
+    this.finishTimer();
+  }
+
+  interruptTimer(): void {
+    if (this.currentTimerId) {
+      this.timers$.next(new TimerData(0, this.currentTimerId, MaxTimerEvent.INTERRUPTED));
+    }
+    this.finishTimer();
+  }
+
+  async terminateTest(logEntryKey: string, force: boolean, lockTest: boolean = false): Promise<boolean> {
+    if (this.state$.getValue() === 'TERMINATED') return true; // sometimes terminateTest get called two times
+
+    const navigationSuccessful = await lastValueFrom(this.canDeactivateUnit('/r/starter', force));
+    if (!(navigationSuccessful || force)) return true;
+
+    this.state$.next((this.state$.getValue() === 'PAUSED') ? 'TERMINATED_PAUSED' : 'TERMINATED');
+    // todo race condition: between state$.next() and the subsequent closingBufferListener, the automatic test_state_buffer_time could already flush the testState. This is handled by complete() instead of next() but could be improved overall.
+    await this.closeAllBuffers(`terminateTest:${logEntryKey}`, 'saved');
+
+    if (lockTest) {
+      await lastValueFrom(this.bs.lockTest(this.testId, Date.now(), logEntryKey));
+    }
+
+    return this.router.navigate(['/r/starter'], { state: { force: force } });
+  }
+
+  async executeGotoCommand(params: string[]): Promise<boolean> {
+    this.state$.next('RUNNING');
+    let gotoTarget = '';
+    if ((params.length > 1) && (params[0] === 'id')) {
+      gotoTarget = (this.unitAliasMap[params[1]]).toString(10);
+    } else if (params.length >= 1) {
+      gotoTarget = params[0];
+    }
+    if (gotoTarget && gotoTarget !== '0') {
+      const targetUnit = this.units[parseInt(gotoTarget, 10)];
+      if (targetUnit) {
+        if (targetUnit.parent.timerId !== this.currentUnit?.parent.timerId) {
+          this.cancelTimer();
+          this.restoreTime(targetUnit.parent, parseInt(params[2].trim().split(' ').pop()!, 10));
+        }
+        this.updateSingleLock(targetUnit.parent, 'afterLeave', false);
+        targetUnit.lockedAfterLeaving = false;
+        this.clearCodeLock(targetUnit.parent.id);
+      }
+      return this.setUnitNavigationRequest(gotoTarget, true);
+    }
+    return Promise.reject();
+  }
+
+  async setUnitNavigationRequest(navString: string, force = false): Promise<boolean> {
+    if (!this.booklet) {
+      throw new AppError({
+        label: 'Kein Booklet gefunden.',
+        description: ''
+      });
+    }
+    let navigation: NavigationState;
+    switch (navString) {
+    case UnitNavigationTarget.ERROR:
+      navigation = await this.closeAllBuffers(`setUnitNavigationRequest(${navString} NEXT`);
+      this.messageService.showErrorDialog(this.cts.getCustomText('booklet_errormessage'));
+      return false;
+    case UnitNavigationTarget.PAUSE:
+      navigation = await this.closeAllBuffers(`setUnitNavigationRequest(${navString} NEXT`);
+      return this.router.navigate([`/native-test/${this.testId}/status`], { skipLocationChange: true, state: { force } });
+    case UnitNavigationTarget.NEXT:
+      navigation = await this.closeAllBuffers(`setUnitNavigationRequest(${navString} NEXT`);
+      return this.router.navigate([`/native-test/${this.testId}/u/${navigation.targets.next}`], { state: { force } });
+    case UnitNavigationTarget.PREVIOUS:
+      navigation = await this.closeAllBuffers(`setUnitNavigationRequest(${navString} PREVIOUS`);
+      return this.router.navigate([`/native-test/${this.testId}/u/${navigation.targets.previous}`], { state: { force } });
+    case UnitNavigationTarget.FIRST:
+      navigation = await this.closeAllBuffers(`setUnitNavigationRequest(${navString} FIRST`);
+      return this.router.navigate([`/native-test/${this.testId}/u/${navigation.targets.first}`], { state: { force } });
+    case UnitNavigationTarget.LAST:
+      navigation = await this.closeAllBuffers(`setUnitNavigationRequest(${navString} LAST`);
+      return this.router.navigate([`/native-test/${this.testId}/u/${navigation.targets.last}`], { state: { force } });
+    case UnitNavigationTarget.END:
+      return this.terminateTest(
+        force ? 'BOOKLETLOCKEDforced' : 'BOOKLETLOCKEDbyTESTEE',
+        force,
+        this.booklet?.config.lock_test_on_termination === 'ON'
+      );
+    default:
+      const targetIsCurrent = this.currentUnitSequenceId.toString(10) === navString;
+      return this.router.navigate(
+        [`/native-test/${this.testId}/u/${navString}`],
+        {
+          state: { force },
+          queryParams: targetIsCurrent ? { reload: Date.now() >> 11 } : {}
+          //  unit shall be reloaded even if we are there already there
+        }
+      )
+        .then(navOk => {
+          if (!navOk && !targetIsCurrent) {
+            // happens when a goto goes to a unit which does exist, but is not accessible
+            if (this.shouldShowConfirmationUI()) {
+              this.ms.showSnackbar(`Navigation zu ${navString} nicht erlaubt.`);
+            }
+          }
+          return navOk;
+        });
+    }
+  }
+
+  errorOut(): void {
+    if(!this.nativeCurrent||this.state$.getValue()==='ERROR')return;
+    this.totalLoadingProgress = 0;
+    this.state$.next('ERROR');
+    if(this.booklet)void this.setUnitNavigationRequest(UnitNavigationTarget.ERROR);
+    else this.messageService.showErrorDialog(this.cts.getCustomText('booklet_errormessage'));
+  }
+
+  pause(): Promise<boolean> {
+    this.interruptTimer();
+    this.state$.next('PAUSED');
+    return this.setUnitNavigationRequest(UnitNavigationTarget.PAUSE, true);
+  }
+
+  resume(): Promise<boolean> {
+    const target = (this.currentUnitSequenceId > 0) ? String(this.currentUnitSequenceId) : UnitNavigationTarget.FIRST;
+    this.state$.next('RUNNING');
+    return this.setUnitNavigationRequest(target, true);
+  }
+
+  updateSingleLock(testlet: Testlet, key: TestletLockType, value: boolean): void {
+    testlet.locks[key] = value;
+    this.updateAllLocks();
+  }
+
+  updateAllLocks(): void {
+    const activatedLockTypes = TestletLockTypes;
+
+    const updateLocks = (testlet: Testlet, parents: Testlet[] = []): void => {
+      testlet.locked = [...parents, testlet]
+        .flatMap(item => activatedLockTypes.map(lockType => ({ through: item, by: lockType })))
+        .find(isLocked => isLocked.through.locks[isLocked.by]) || null;
+      testlet.children
+        .filter(isTestlet)
+        .forEach(child => updateLocks(child, [...parents, testlet]));
+    };
+
+    if (!this.booklet) {
+      return;
+    }
+
+    updateLocks(this.testlets[this.booklet.units.id]);
+    this.updateNavigationState();
+  }
+
+  updateNavigationState(): void {
+    if (!this.currentUnitSequenceId) return;
+    this.navigation$.next(this.getNavigationState(this.currentUnitSequenceId));
+  }
+
+  getNavigationState(fromUnitSequenceId: number): NavigationState {
+    let unit: Unit;
+    let first = null;
+    // eslint-disable-next-line @typescript-eslint/no-shadow
+    let last = null;
+    let previous = null;
+    let next = null;
+    for (let sequenceId = 1; sequenceId <= Object.keys(this.units).length; sequenceId++) {
+      unit = this.units[sequenceId];
+      if (!TestControllerService.unitIsInaccessible(unit)) {
+        last = unit.sequenceId;
+        if (sequenceId > fromUnitSequenceId && next === null) {
+          next = unit.sequenceId;
+        }
+        if (first === null) {
+          first = unit.sequenceId;
+        }
+        if (sequenceId < fromUnitSequenceId) {
+          previous = unit.sequenceId;
+        }
+      }
+    }
+    const end = (this.booklet?.config.allow_player_to_terminate_test === 'ON') ||
+    ((this.booklet?.config.allow_player_to_terminate_test === 'LAST_UNIT') && (fromUnitSequenceId === last)) ?
+      Infinity :
+      null;
+
+    let forward: NavigationDirectionValue = next !== null ? 'yes' : 'no';
+    let backward: NavigationDirectionValue = previous !== null ? 'yes' : 'no';
+    if (this.currentUnit && this.checkCompleteness(this.currentUnit, 'forward').length) {
+      forward = 'markedNo';
+    }
+    if (this.currentUnit && this.checkCompleteness(this.currentUnit, 'backward').length) {
+      backward = 'markedNo';
+    }
+
+    first = previous;
+
+    return {
+      directions: { forward, backward },
+      targets: {
+        next, previous, first, last, end
+      }
+    };
+  }
+
+  checkCompleteness(unit: Unit, direction: NavigationDirection): VeronaNavigationDeniedReason[] {
+    if (unit.parent.locked || unit.lockedAfterLeaving) {
+      return [];
+    }
+    const reasons: VeronaNavigationDeniedReason[] = [];
+    const checkOnValue = {
+      forward: <NavigationLeaveRestrictionValue[]>['ON', 'ALWAYS'],
+      backward: <NavigationLeaveRestrictionValue[]>['ALWAYS']
+    };
+    const presentationCompleteRequired =
+      unit.parent?.restrictions?.denyNavigationOnIncomplete?.presentation ||
+      this.booklet?.config.force_presentation_complete ||
+      'OFF';
+    if (
+      (checkOnValue[direction].includes(presentationCompleteRequired)) &&
+      (unit.state.PRESENTATION_PROGRESS !== 'complete')
+    ) {
+      reasons.push('presentationIncomplete');
+    }
+    const responseCompleteRequired =
+      unit.parent?.restrictions?.denyNavigationOnIncomplete?.response ||
+      this.booklet?.config.force_response_complete ||
+      'OFF';
+    if (
+      (checkOnValue[direction].includes(responseCompleteRequired)) &&
+      unit.state.RESPONSE_PROGRESS &&
+      (VeronaProgressIncompleteValues.includes(unit.state.RESPONSE_PROGRESS))
+    ) {
+      reasons.push('responsesIncomplete');
+    }
+    return reasons;
+  }
+
+  static unitIsInaccessible(unit: Unit): boolean {
+    if (unit.lockedAfterLeaving) return true;
+    if (!unit.parent.locked) return false;
+    if (
+      (unit.parent.locked.by === 'code') &&
+      (unit.localIndex === 0) &&
+      (!unit.parent.locks.show) &&
+      (!unit.parent.locks.time) &&
+      (!unit.parent.locks.afterLeave)
+    ) return false; // allow it to enter the first unit of a code-locked block to enter the code
+    return true;
+  }
+
+  updateVariables(
+    sequenceId: number,
+    unitStateDataType: string = this.units[sequenceId].responseType || 'unknown',
+    dataParts: KeyValuePairString = this.units[sequenceId].dataParts
+  ): boolean {
+    const isIqbStandard = unitStateDataType.match(/iqb-standard@(\d+)/);
+    const iqbStandardVersion = isIqbStandard ? Number(isIqbStandard[1]) : 0;
+    if (
+      iqbStandardVersion < (this.mds.appConfig?.iqbStandardResponseTypeMin || NaN) ||
+      iqbStandardVersion > (this.mds.appConfig?.iqbStandardResponseTypeMax || NaN)
+    ) {
+      return false;
+    }
+    const trackedVariables = Object.keys(this.units[sequenceId].variables);
+    if (!trackedVariables.length) {
+      return false;
+    }
+
+    const filterRegex = new RegExp(
+      trackedVariables
+        .map(varn => `"id":\\s*"${varn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`)
+        .join('|')
+    );
+
+    let somethingChanged = false;
+    Object.values(dataParts)
+      .forEach(dataPart => {
+        if (!dataPart.match(filterRegex)) {
+          // for the sake of performance we check the appearance of the tracked variable in the chunk before JSON.parse
+          // see commit message for details
+          return;
+        }
+        const data = JSON.parse(dataPart);
+        if (!Array.isArray(data)) {
+          return;
+        }
+        data
+          .forEach(variable => {
+            if (!isIQBVariable(variable)) {
+              return;
+            }
+            if (typeof this.units[sequenceId].variables[variable.id] === 'undefined') {
+              // variable is not tracked
+              return;
+            }
+
+            if (
+              this.units[sequenceId].variables[variable.id].status === variable.status &&
+              this.units[sequenceId].variables[variable.id].value === variable.value &&
+              this.units[sequenceId].variables[variable.id].code === variable.code &&
+              this.units[sequenceId].variables[variable.id].score === variable.score
+            ) {
+              // nothing has actually changed
+              return;
+            }
+
+            this.units[sequenceId].variables[variable.id] = variable;
+            somethingChanged = true;
+          });
+      });
+    if (somethingChanged && this.units[sequenceId].scheme.length) {
+      this.codeVariables(sequenceId);
+    }
+
+    return somethingChanged;
+  }
+
+  private codeVariables(sequenceId: number): void {
+    const baseVars = Object.values(this.units[sequenceId].variables)
+      .filter(vari => this.units[sequenceId].baseVariableIds.includes(vari.id));
+    CodingSchemeFactory.code(baseVars, this.units[sequenceId].scheme)
+      .forEach(variable => {
+        if (variable.id in this.units[sequenceId].variables) {
+          this.units[sequenceId].variables[variable.id] = variable;
+        }
+      });
+  }
+
+  evaluateConditions(): void {
+    this.updateStates();
+    this.onStateOptionChanged();
+  }
+
+  onStateOptionChanged(): void {
+    this.updateAllShowLocks();
+    this.saveConditionsTestState();
+  }
+
+  private updateStates(): void {
+    if (!this.booklet?.states) return;
+    const getVar =
+      (unitAlias: string, variableId: string) => this.units[this.unitAliasMap[unitAlias]].variables[variableId];
+    Object.values(this.booklet.states)
+      .forEach(state => {
+        const firstMatchingOption =
+          Object.values(state.options)
+            .find(option => {
+              option.firstUnsatisfiedCondition =
+                option.conditions
+                  .findIndex(condition => !ConditionUtil.isSatisfied(condition, getVar));
+              return option.firstUnsatisfiedCondition === -1;
+            });
+        state.current = firstMatchingOption?.id || state.options[Object.keys(state.options).length - 1].id;
+      });
+  }
+
+  private updateAllShowLocks(): void {
+    Object.values(this.testlets)
+      .forEach(testlet => {
+        if (!testlet.restrictions.show) return;
+        const current =
+          this.booklet?.states[testlet.restrictions.show.if].override ||
+          this.booklet?.states[testlet.restrictions.show.if].current;
+        testlet.locks.show = current !== testlet.restrictions.show.is;
+      });
+    this.updateAllLocks();
+  }
+
+  private saveConditionsTestState(): void {
+    const bookletStates = Object.values(this.booklet?.states || {})
+      .reduce(
+        (agg, state) => {
+          agg[state.id] = state.override || state.current;
+          return agg;
+        }, <{ [state: string]: string }>{});
+    if (!Object.keys(bookletStates).length) return;
+    this.addToTestStateBuffer('BOOKLET_STATES', JSON.stringify(bookletStates));
+  }
+
+  private checkAndSolveTimer(currentUnit: Unit, newUnit: Unit | null): Observable<LeaveCheckResult> {
+    if (!this.currentTimerId) { // leaving unit is not in a timed block
+      return of({ kind: 'allow' });
+    }
+
+    if (newUnit && newUnit.parent.timerId && // staying in the same timed block
+      (newUnit.parent.timerId === this.currentTimerId)
+    ) {
+      return of({ kind: 'allow' });
+    }
+
+    // when time restrictions aren't enforced (test/preview mode), interrupt the timer and let the
+    // caller show an informational toast instead of actually blocking/asking
+    const allowWithNotice = (text: string): LeaveCheckResult => {
+      this.interruptTimer();
+      return { kind: 'allow', notify: text };
+    };
+
+    if (this.testlets[this.currentTimerId].restrictions.timeMax?.leave === 'forbidden') {
+      if (!this.testMode.forceTimeRestrictions) {
+        return of(allowWithNotice('Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.'));
+      }
+      return of({ kind: 'deny', notify: 'Es darf erst weiter geblättert werden, wenn die Zeit abgelaufen ist.' });
+    }
+
+    if (this.testlets[this.currentTimerId].restrictions.timeMax?.leave === 'allowed') {
+      this.cancelTimer();
+      return of({ kind: 'allow' });
+    }
+
+    if (!this.testMode.forceTimeRestrictions) {
+      return of(allowWithNotice(
+        'Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.'
+      ));
+    }
+
+    return of({
+      kind: 'confirm',
+      title: this.cts.getCustomText('booklet_warningLeaveTimerBlockTitle'),
+      content: this.cts.getCustomText('booklet_warningLeaveTimerBlockTextPrompt'),
+      onConfirmed: () => { this.cancelTimer(); return undefined; } // does lock the block
+    });
+  }
+
+  private checkAndSolveCompleteness(currentUnit: Unit, newUnit: Unit | null): Observable<LeaveCheckResult> {
+    const direction = (!newUnit || currentUnit.sequenceId < newUnit.sequenceId) ? 'forward' : 'backward';
+    const reasons = this.checkCompleteness(currentUnit, direction);
+
+    // if no testlet has no DenyNavigationOnIncomplete defined
+    if (!reasons.length) {
+      return of({ kind: 'allow' });
+    }
+
+    if (!this.testMode.forceNaviRestrictions) {
+      const reasonTexts = {
+        presentationIncomplete: 'Es wurde nicht alles gesehen oder abgespielt.',
+        responsesIncomplete: 'Es wurde nicht alles bearbeitet.'
+      };
+      return of({
+        kind: 'allow',
+        notify: `Im Testmodus dürfte hier nicht ${(direction === 'forward') ? 'weiter' : ' zurück'} geblättert
+      werden: ${reasons.map(r => reasonTexts[r]).join(' ')}`
+      });
+    }
+
+    this._navigationDenial$.next({ sourceUnitSequenceId: currentUnit.sequenceId, reason: reasons });
+
+    return of({
+      kind: 'deny',
+      infoDialog: {
+        title: this.cts.getCustomText('booklet_msgNavigationDeniedTitle'),
+        content: reasons
+          .map(r => this.cts.getCustomText(`booklet_msgNavigationDeniedText_${r}`))
+          .join(' ')
+      }
+    });
+  }
+
+  private checkAndSolveLeaveLocks(currentUnit: Unit, newUnit: Unit | null): Observable<LeaveCheckResult> {
+    // no lockAfterLeaving defined for testlet
+    if (!currentUnit.parent.restrictions.lockAfterLeaving) {
+      return of({ kind: 'allow' });
+    }
+
+    const lockScope = currentUnit.parent.restrictions.lockAfterLeaving.scope;
+    const leaveLock = (): string | undefined => {
+      if (this.testMode.forceNaviRestrictions) {
+        if (lockScope === 'testlet') {
+          this.activateTestletLeaveLock(currentUnit.parent.id);
+        }
+        if (lockScope === 'unit') {
+          this.activateUnitLeaveLock(currentUnit.sequenceId);
+        }
+        return undefined;
+      }
+      return `${lockScope} würde im Testmodus nun gesperrt werden.`;
+    };
+
+    if ((lockScope === 'testlet') && (newUnit?.parent.id === currentUnit.parent.id)) {
+      return of({ kind: 'allow' });
+    }
+
+    if (currentUnit.parent.restrictions.lockAfterLeaving.confirm) {
+      return of({
+        kind: 'confirm',
+        title: this.cts.getCustomText(`booklet_warningLeaveTitle-${lockScope}`),
+        content: this.cts.getCustomText(`booklet_warningLeaveTextPrompt-${lockScope}`),
+        onConfirmed: () => leaveLock()
+      });
+    }
+
+    return of({ kind: 'allow', notify: leaveLock() });
+  }
+
+  // The only place that calls MessageService for the three checks above - shows whatever they
+  // decided (confirm dialog / info dialog / nothing) and resolves the final true/false.
+  //
+  // `alsoEndsTest` (see willAlsoEndTest) is true when this navigation would, by itself, also end
+  // the whole test - not just leave the current unit. TestControllerDeactivateGuard normally asks
+  // its own separate "end the test?" question for that; when a 'confirm' result ends up showing a
+  // dialog here anyway, we fold that into THIS dialog (one confirm covers both) instead of leaving
+  // it to a second, separate one right after
+  private resolveLeaveCheckResult(result: LeaveCheckResult, alsoEndsTest: boolean): Observable<boolean> {
+    switch (result.kind) {
+      case 'allow':
+        return of(true);
+      case 'deny':
+        return result.infoDialog ?
+          this.messageService.showInfoDialog(result.infoDialog).pipe(map(() => false)) :
+          of(false);
+      case 'confirm':
+        return this.messageService.showConfirmDialog({
+          title: alsoEndsTest ? 'Sicher, dass du den Test beenden möchtest?' : result.title,
+          content: result.content,
+          confirmText: 'Hier bleiben',
+          cancelText: 'Trotzdem weiter'
+        }).pipe(
+          concatMap(cdresult => {
+            if (cdresult !== false) {
+              return of(false); // user chose "Hier bleiben" - stay
+            }
+            const followUpNotify = result.onConfirmed();
+            if (followUpNotify) {
+              this.ms.showSnackbar(followUpNotify);
+            }
+            if (!alsoEndsTest) {
+              return of(true);
+            }
+            // terminateConfirmedLeave() transitions state$ away from RUNNING/PAUSED before this
+            // resolves, so confirmEndTestIfNeeded() (called next, by TestControllerDeactivateGuard)
+            // will see that and skip its own dialog/termination.
+            return from(this.terminateConfirmedLeave()).pipe(map(() => true));
+          })
+        );
+      default:
+        return of(true);
+    }
+  }
+
+  canDeactivateUnit(nextStateUrl: string, ignoreRouterState?: boolean): Observable<boolean> {
+    if (this.state$.getValue() === 'ERROR') {
+      return of(true);
+    }
+
+    if (!this.currentUnit) {
+      return of(true);
+    }
+
+    const currentUnit = this.currentUnit;
+
+    if (this.currentUnit.parent.locked) {
+      return of(true);
+    }
+
+    let newUnit: Unit | null = null;
+    const match = nextStateUrl.match(/t\/(\d+)\/u\/(\d+)$/);
+    if (match) {
+      const targetUnitSequenceId = Number(match[2]);
+      newUnit = this.units[targetUnitSequenceId] || null;
+    }
+
+    const forceNavigation = ignoreRouterState ?? this.router.getCurrentNavigation()?.extras?.state?.force ?? false;
+    if (forceNavigation) {
+      this.interruptTimer();
+      return of(true);
+    }
+
+    const alsoEndsTest = this.willAlsoEndTest(nextStateUrl);
+
+    return from([
+      this.checkAndSolveCompleteness.bind(this),
+      this.checkAndSolveTimer.bind(this),
+      this.checkAndSolveLeaveLocks.bind(this)
+    ])
+      .pipe(
+        concatMap(check => check(currentUnit, newUnit)),
+        // show each check's own FYI toast (`result.notify`) as it flows through, in order - not
+        // just the last one's, since an earlier check's "allow" can carry a notice even when a
+        // later check goes on to decide the final outcome
+        tap(result => { if (result.kind !== 'confirm' && result.notify) this.ms.showSnackbar(result.notify); }),
+        takeWhile(result => result.kind === 'allow', true),
+        last(),
+        concatMap(result => this.resolveLeaveCheckResult(result, alsoEndsTest))
+      );
+  }
+
+  // Whether navigating to `nextStateUrl` would also end the test - not just leave the current unit.
+  willAlsoEndTest(nextStateUrl: string): boolean {
+    if (!this.testMode.saveResponses) {
+      return false;
+    }
+    // Only navigation within this immutable native run keeps the test open.
+    const segments = this.router.parseUrl(nextStateUrl).root.children[PRIMARY_OUTLET]?.segments;
+    if (segments?.[0]?.path === 'native-test' && segments[1]?.path === this.nativeTestId) {
+      return false; // still inside the running test, not actually exiting it
+    }
+    const testStatus = this.state$.getValue();
+    const ignorePause = this.shouldShowConfirmationUI();
+    return (testStatus === 'RUNNING') || (testStatus === 'PAUSED' && !ignorePause);
+  }
+
+  // Both UnitDeactivateGuard and TestControllerDeactivateGuard call this - instead of
+  // canDeactivateUnit directly - whenever the navigation is leaving a unit page.
+  // So without sharing this exact check - and its result - both guards could independently run
+  // the checks above and pop their dialogs on top of one another. `shareReplay(1)` makes sure the
+  // underlying checks - and any dialog they show - only run once, no matter which guard
+  // subscribes first or how many do. Keyed by the current navigation's id (not the URL) so a
+  // *later*, unrelated navigation to the same URL always gets a fresh check instead of a stale
+  // cached result.
+  private pendingUnitDeactivationCheck: { navigationId: number; result$: Observable<boolean> } | null = null;
+
+  getUnitDeactivationCheck(nextStateUrl: string): Observable<boolean> {
+    const navigationId = this.router.getCurrentNavigation()?.id ?? -1;
+    if (!this.pendingUnitDeactivationCheck || this.pendingUnitDeactivationCheck.navigationId !== navigationId) {
+      this.pendingUnitDeactivationCheck = {
+        navigationId,
+        result$: this.canDeactivateUnit(nextStateUrl).pipe(shareReplay(1))
+      };
+    }
+    return this.pendingUnitDeactivationCheck.result$;
+  }
+
+  // Terminates the test as a consequence of the user confirming they want to leave/end it.
+  private async terminateConfirmedLeave(): Promise<void> {
+    await this.closeAllBuffers(`setUnitNavigationRequest(${UnitNavigationTarget.PAUSE} NEXT`);
+    await this.terminateTest(
+      'BOOKLETLOCKEDbyTESTEE', true, this.booklet?.config.lock_test_on_termination === 'ON'
+    );
+    this.cts.restoreDefault(false);
+  }
+
+  async confirmEndTestIfNeeded(): Promise<boolean> {
+    if (this.testMode.saveResponses) {
+      const testStatus: TestControllerState = this.state$.getValue();
+      // at this moment in time, hideConfirmationUI comes with ignorePause for Logo Navigation
+      const ignorePause = this.shouldShowConfirmationUI();
+      if ((testStatus === 'RUNNING') || (testStatus === 'PAUSED' && !ignorePause)) {
+        // this whole inner block mimics setUnitNavigationRequest(PAUSE), without manually triggering router.navigate()
+        // in order to correctly return a redirect, instead of hacking (router.navigate + return false)
+        if (!this.booklet) {
+          throw new AppError({
+            label: 'Kein Booklet gefunden.',
+            description: ''
+          });
+        }
+        const isLeaveConfirmed = await firstValueFrom(
+          this.messageService.showConfirmDialog({
+            title: 'Sicher, dass du den Test beenden möchtest?',
+            content: ''
+          })
+        );
+        if (isLeaveConfirmed) {
+          await this.terminateConfirmedLeave();
+        }
+        return isLeaveConfirmed;
+      }
+    }
+    return true;
+  }
+
+  shouldShowConfirmationUI(): boolean {
+    return !(this.booklet?.config.silent_mode === 'TRUE' &&
+           (this.testMode.forceTimeRestrictions || this.testMode.forceNaviRestrictions));
+  }
+
+  addSharedParameters(parameters: SharedParameter[]) {
+    if (!Array.isArray(parameters) || !parameters.length) return;
+
+    let hasChanged = false;
+
+    parameters.forEach(param => {
+      if (param.key && param.value) {
+        hasChanged = this.addSharedParameter(param.key, param.value) || hasChanged;
+      }
+    });
+
+    if (hasChanged) {
+      this.addToTestStateBuffer('SHARED_PARAMETERS', JSON.stringify(this.sharedParameters));
+      this.configChanged$.next();
+    }
+  }
+
+  private addSharedParameter(key: string, value: string): boolean {
+    let hasChanged = false;
+    const existingParam = this.sharedParameters.find(p => p.key === key);
+
+    if (existingParam) {
+      existingParam.value = value;
+      hasChanged = existingParam.value !== value;
+    } else {
+      const newParameter: SharedParameter = {
+        key: key,
+        value: value
+      };
+      this.sharedParameters.push(newParameter);
+      hasChanged = true;
+    }
+
+    return hasChanged;
+  }
+}

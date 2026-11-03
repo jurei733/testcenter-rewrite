@@ -20,7 +20,7 @@ export function normalizeWorkspacePlayerResourceId(reference: string): string | 
   return versioned?.[1] ? `${versioned[1]}-${Number.parseInt(versioned[2]!, 10)}.${Number.parseInt(versioned[3]!, 10)}` : null;
 }
 
-export function selectCurrentWorkspaceFiles(sourcePackages: SourcePackage[], activityEvents: WorkspaceActivityEvent[]): SourcePackage[] {
+export function selectCurrentWorkspaceFiles<T extends Pick<SourcePackage,'sourcePackageId'|'status'>>(sourcePackages: T[], activityEvents: Pick<WorkspaceActivityEvent,'eventType'|'subjectId'|'details'>[]): T[] {
   const byId = new Map(sourcePackages.map(source => [source.sourcePackageId, source]));
   const generated = new Set<string>(), replaced = new Set<string>();
   for (const event of activityEvents) {

@@ -1,3 +1,4 @@
+import {createOriginalReportTextComparator} from '../packages/application/dist/packages/application/src/original-report-collation.js';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
@@ -200,4 +201,15 @@ test('review display uses its stored instant and explicit system timezone across
   assert.equal(formatOriginalReviewTimestamp('1969-12-31T23:59:59Z','Europe/Berlin'),null);
   assert.throws(() => formatOriginalReviewTimestamp('not-a-time','Europe/Berlin'),/stored timestamp/);
   assert.throws(() => formatOriginalReviewTimestamp('2026-10-25T01:01:30Z','not-a-timezone'),RangeError);
+});
+
+
+test('portable Original collation matches actual libc SQL order, including ignored prefixes and long positions',async()=>{
+ const root=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-result-report-http/',import.meta.url);
+ const manifest=JSON.parse(await readFile(new URL('manifest.json',root))),bytes=await readFile(new URL('collation-comparisons.json',root));
+ assert.equal(createHash('sha256').update(bytes).digest('hex'),manifest.files['collation-comparisons.json']);
+ const source=JSON.parse(bytes),compare=createOriginalReportTextComparator();
+ assert.equal(source.version,'2.41');assert.equal(source.provider,'libc');assert.equal(source.productionVerification.scalars.count,1112063);assert.equal(source.productionVerification.scalars.allExact,true);assert.equal(source.productionVerification.compounds.count,977895);assert.equal(source.productionVerification.compounds.allExact,true);
+ assert.deepEqual([...source.input].reverse().sort(compare),source.output);
+ for(let left=0;left<source.output.length;left++)for(let right=left+1;right<source.output.length;right++)assert.ok(compare(source.output[left],source.output[right])<=0);
 });

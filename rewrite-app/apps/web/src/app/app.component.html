@@ -1,6 +1,7 @@
 <div
   class="page"
   [class.is-busy]="app.activeRequestLabel() !== null"
+  [class.is-native-monitor-page]="isNativeMonitorView"
   [class.is-participant-page]="isParticipantView || isOriginalAdminLogin"
 >
   <span hidden>{{ app.renderVersion() }}</span>
@@ -286,38 +287,7 @@
               class="nav-link"
               aria-label="Open operator account information"
             >Account · {{ app.operatorAccountUsername }}</summary>
-            <section class="operator-account-panel" aria-label="Operator account information">
-              <h2>User information</h2>
-              <dl>
-                <div>
-                  <dt>Username</dt>
-                  <dd id="operatorAccountUsername">{{ app.operatorAccountUsername }}</dd>
-                </div>
-                <div>
-                  <dt>Display name</dt>
-                  <dd id="operatorAccountDisplayName">{{ app.operatorAccountDisplayName }}</dd>
-                </div>
-                <div>
-                  <dt>Access</dt>
-                  <dd id="operatorAccountAccessLabel">{{ app.operatorAccessLabel }}</dd>
-                </div>
-                @for (access of app.operatorAccountAccessItems; track trackOperatorAccountAccess($index, access)) {
-                  <div class="operator-account-permission">
-                    <dt>Permission</dt>
-                    <dd class="operator-account-role">{{ access.role }}</dd>
-                    <dd class="operator-account-scope">{{ access.scope }}</dd>
-                  </div>
-                }
-                <div>
-                  <dt>Session expires</dt>
-                  <dd id="operatorAccountSessionExpiresAt">{{ app.operatorAccountSessionExpiresAt }}</dd>
-                </div>
-                <div>
-                  <dt>Version</dt>
-                  <dd id="operatorAccountVersion">{{ app.ops.buildRef }}</dd>
-                </div>
-              </dl>
-            </section>
+            @defer (when true) { <app-operator-account-panel /> }
           </details>
         }
         @if (app.hasAdminSession) {

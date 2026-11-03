@@ -1,5 +1,6 @@
 import { CdkTextareaAutosize } from "@angular/cdk/text-field";
 import { Component, DestroyRef, ElementRef, EventEmitter, Output, ViewChild, afterNextRender, inject, signal } from "@angular/core";
+import type { DoCheck, WritableSignal } from "@angular/core";
 import { FormsModule, NgForm } from "@angular/forms";
 import { MatButton, MatIconButton } from "@angular/material/button";
 import { MatCheckbox } from "@angular/material/checkbox";
@@ -11,6 +12,10 @@ import { MatToolbar } from "@angular/material/toolbar";
 import { MatTooltip } from "@angular/material/tooltip";
 import type { WorkspaceReview } from "@testcenter-rewrite-app/domain";
 import { ParticipantViewFacade } from "./participant-view.facade";
+
+type OriginalReviewPaneState = {
+  runId: string; unitKey: string; view: WritableSignal<"form" | "list">; dirty: boolean;
+};
 
 // Adapted from the current IQB Testcenter Review panel (MIT).
 // The existing authorized facade remains the only review persistence boundary.
@@ -24,14 +29,14 @@ import { ParticipantViewFacade } from "./participant-view.facade";
   templateUrl: "./original-review-panel.component.html",
   styleUrls: ["./original-review-panel.component.css", "./original-review-theme.scss"]
 })
-export class OriginalReviewPanelComponent {
-  private static readonly states = new WeakMap<ParticipantViewFacade, {
-    runId: string; unitKey: string; view: "form" | "list"; dirty: boolean;
-  }>();
+export class OriginalReviewPanelComponent implements DoCheck {
+  private static readonly states = new WeakMap<ParticipantViewFacade, OriginalReviewPaneState>();
   readonly view = inject(ParticipantViewFacade);
   private readonly destroyRef = inject(DestroyRef);
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
-  readonly activeView = signal<"form" | "list">("form");
+  private readonly state: OriginalReviewPaneState;
+  private retired = false;
+  readonly activeView: WritableSignal<"form" | "list">;
   readonly pending = signal(false);
   @ViewChild(NgForm) private form?: NgForm;
   @Output() readonly close = new EventEmitter<void>();
@@ -40,14 +45,16 @@ export class OriginalReviewPanelComponent {
     const unitKey = this.view.player.unitKey;
     const previous = OriginalReviewPanelComponent.states.get(this.view);
     const restored = previous?.runId === runId && previous.unitKey === unitKey ? previous : undefined;
-    if (restored) this.activeView.set(restored.view);
+    this.state = restored ? {...restored} : {runId, unitKey, view: signal<"form" | "list">("form"), dirty: false};
+    this.activeView = this.state.view;
+    OriginalReviewPanelComponent.states.set(this.view, this.state);
     this.destroyRef.onDestroy(() => {
-      if (this.view.runtime.testRunId === runId && this.view.player.unitKey === unitKey) {
-        OriginalReviewPanelComponent.states.set(this.view, {runId, unitKey, view: this.activeView(),
-          dirty: !!this.form?.dirty && this.view.reviewComment.length > 0});
-      } else OriginalReviewPanelComponent.states.delete(this.view);
+      // A replaced drawer must never erase a newer owner or its Unit state.
+      if (OriginalReviewPanelComponent.states.get(this.view) !== this.state) return;
+      this.state.dirty = !!this.form?.dirty && this.view.reviewComment.length > 0;
     });
     afterNextRender(() => {
+      if (!this.ownsCurrentScope()) return;
       // The shared facade preserves the draft when this lazy drawer is closed.
       // Recreating NgForm must preserve its ability to save those real changes.
       const review = this.editedReview;
@@ -60,6 +67,24 @@ export class OriginalReviewPanelComponent {
       if (restored?.dirty || changed) this.form?.form.markAsDirty();
       if (this.activeView() === "form")
         this.element.nativeElement.querySelector<HTMLInputElement>("#participantRouteReviewReviewer")?.focus();
+    });
+  }
+  private sameScope(): boolean {
+    return this.view.runtime.testRunId === this.state.runId && this.view.player.unitKey === this.state.unitKey;
+  }
+  private ownsCurrentScope(): boolean {
+    return !this.retired && !this.destroyRef.destroyed && this.sameScope() &&
+      OriginalReviewPanelComponent.states.get(this.view) === this.state;
+  }
+  ngDoCheck(): void {
+    if (this.retired || this.sameScope()) return;
+    this.retired = true;
+    // Source closes on a changed Unit sequence. Leave the parent change check
+    // before closing, and recheck ownership at that boundary. Draft reset
+    // belongs to the accepted controller update, not a retired drawer.
+    queueMicrotask(() => {
+      if (this.destroyRef.destroyed || OriginalReviewPanelComponent.states.get(this.view) !== this.state) return;
+      this.close.emit();
     });
   }
   readonly priorities = [
@@ -86,32 +111,30 @@ export class OriginalReviewPanelComponent {
     return this.view.participantReviews.find(review => review.reviewId === this.view.editingReviewId);
   }
   newReview(form: NgForm): void {
-    if (this.pending()) return;
+    if (this.pending() || !this.ownsCurrentScope()) return;
     this.view.cancelReviewEdit();
     form.resetForm({ target: "unit", priority: 0, reviewer: "", targetLabel: "", entry: "" });
     this.activeView.set("form");
   }
   edit(review: WorkspaceReview, form: NgForm): void {
-    if (this.pending()) return;
+    if (this.pending() || !this.ownsCurrentScope()) return;
     this.view.beginReviewEdit(review);
     form.form.markAsPristine();
     this.activeView.set("form");
   }
   save(form: NgForm): void {
-    if (this.pending() || !form.dirty || !this.view.canSubmitReview) return;
-    const runId = this.view.runtime.testRunId;
+    if (this.pending() || !this.ownsCurrentScope() || !form.dirty || !this.view.canSubmitReview) return;
     this.pending.set(true);
     this.view.saveReview(() => {
-      if (!this.destroyRef.destroyed && this.view.runtime.testRunId === runId) this.close.emit();
-    }, () => { if (!this.destroyRef.destroyed) this.pending.set(false); });
+      if (this.ownsCurrentScope()) this.close.emit();
+    }, () => { if (!this.destroyRef.destroyed) this.pending.set(false); }, () => this.ownsCurrentScope());
   }
   delete(): void {
     const review = this.editedReview;
-    if (this.pending() || !review) return;
-    const runId = this.view.runtime.testRunId;
+    if (this.pending() || !this.ownsCurrentScope() || !review) return;
     this.pending.set(true);
     void this.view.deleteReview(review, () => {
-      if (!this.destroyRef.destroyed && this.view.runtime.testRunId === runId) this.activeView.set("list");
-    }, () => { if (!this.destroyRef.destroyed) this.pending.set(false); });
+      if (this.ownsCurrentScope()) this.activeView.set("list");
+    }, () => { if (!this.destroyRef.destroyed) this.pending.set(false); }, () => this.ownsCurrentScope());
   }
 }

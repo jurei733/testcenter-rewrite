@@ -1,3 +1,5 @@
+import type {OriginalWorkspaceWriteAuthority} from './original-workspace-write.js';
+import type {OriginalNativeReview} from './original-review-record.js';
 import type {OriginalCommandDelivery} from './original-command-queue.js';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import type {OriginalPersonNumberRecord} from './original-person-number.js';
@@ -7,7 +9,7 @@ import type {OriginalSessionToken} from './original-session-token.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {compareOriginalParticipantGroupKeys} from './original-participant-group.js';
 
-export type OriginalGroupDeletionInput = {tenantId: string; workspaceId: string; groups: string[]};
+export type OriginalGroupDeletionInput = {tenantId: string; workspaceId: string; groups: string[]; authority?:OriginalWorkspaceWriteAuthority};
 export type OriginalGroupDeletionResult = {deletedGroupCount: number; deletedLoginCount: number; deletedPersonCount: number;
   deletedTestCount: number; deletedReviewCount: number; deletedLogCount: number; deletedAttachmentFileCount: number};
 export function prepareOriginalGroupSelection(groups: unknown): string[] {
@@ -16,7 +18,7 @@ export function prepareOriginalGroupSelection(groups: unknown): string[] {
 }
 export const prepareOriginalGroupDeletionInput = (input: OriginalGroupDeletionInput): OriginalGroupDeletionInput => {
   if (![input.tenantId, input.workspaceId].every(value => typeof value === 'string' && value.length > 0)) throw new TypeError('A native group deletion requires its workspace scope.');
-  return {tenantId: input.tenantId, workspaceId: input.workspaceId, groups: prepareOriginalGroupSelection(input.groups)};
+  return {tenantId: input.tenantId, workspaceId: input.workspaceId, groups: prepareOriginalGroupSelection(input.groups),...(input.authority?{authority:{...input.authority}}:{})};
 };
 export function selectOriginalGroupDeletionKeys(input: OriginalGroupDeletionInput, groups: Array<Pick<OriginalParticipantGroup, 'groupKey'>>): string[] {
   const selected = [...new Set(input.groups)].sort(compareOriginalParticipantGroupKeys);
@@ -55,6 +57,7 @@ export type OriginalGroupDeletionCollections = {
   originalTestNumbers?: Collection<OriginalTestNumberRecord>;
   originalPersonNumbers?: Collection<OriginalPersonNumberRecord>;
   originalNativeUnits?:Collection<OriginalNativeUnit>;
+  originalNativeReviews?:Collection<OriginalNativeReview>;
   originalNativeCommands?:Collection<OriginalCommandDelivery>;
   participantAccessCredentials: Collection<{participantSessionId: string}>; testRuns: Collection<TestRun>;
   workspaceReviews: Collection<WorkspaceReview>; participantTestLogs: Collection<ParticipantTestLog>;
@@ -81,6 +84,7 @@ export function deleteOriginalGroupsFromCollections(state: OriginalGroupDeletion
     typeof row.details.reviewId === 'string' && reviews.has(row.details.reviewId)));
   remove(state.participantRunCommands, descendant); remove(state.participantProgressDeliveries, descendant);
   if(state.originalNativeUnits)remove(state.originalNativeUnits,descendant);
+  if(state.originalNativeReviews)remove(state.originalNativeReviews,descendant);
   if(state.originalNativeCommands){
     remove(state.originalNativeCommands,descendant);
     const commands=state.originalNativeCommands;

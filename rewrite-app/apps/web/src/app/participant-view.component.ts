@@ -16,7 +16,7 @@ import { redactBugReportText } from "@testcenter-rewrite-app/contracts";
 
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
-import { ParticipantViewFacade } from "./participant-view.facade";
+import { ParticipantViewFacade, type ParticipantNavigationToast } from "./participant-view.facade";
 import type { ParticipantConfirmationDialog } from "./participant-view.facade";
 import { OriginalParticipantConfirmationLauncherComponent } from "./original-participant-confirmation-dialog.component";
 import { OriginalParticipantInformationLauncherComponent } from "./original-participant-information-dialog.component";
@@ -1131,18 +1131,20 @@ interface ParticipantVisibleCodeNotice {
         </div>
       </article>
       <ng-template #confirmationFallback let-confirmation>
-      <section
+      <dialog
+        #participantConfirmationModal
         id="participantConfirmationBackdrop"
         class="participant-confirmation-backdrop"
-        cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
-        (keydown.escape)="resolveOriginalConfirmation(confirmation, false); $event.stopPropagation()"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="participantConfirmationTitle"
+        aria-describedby="participantConfirmationMessage"
+        (keydown.escape)="resolveOriginalConfirmation(confirmation, false); $event.preventDefault(); $event.stopPropagation()"
+        (cancel)="$event.preventDefault(); resolveOriginalConfirmation(confirmation, false)"
       >
         <article
           class="participant-confirmation-dialog"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="participantConfirmationTitle"
-          aria-describedby="participantConfirmationMessage"
+          cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
         >
           <img
             id="participantConfirmationAsset"
@@ -1171,7 +1173,7 @@ interface ParticipantVisibleCodeNotice {
             }
           </div>
         </article>
-      </section>
+      </dialog>
       </ng-template>
       @if (interfaceMode.mode() === 'original' && view.controllerError; as error) {
         @for (request of [error]; track request) {
@@ -1218,6 +1220,13 @@ interface ParticipantVisibleCodeNotice {
   `
 })
 export class ParticipantViewComponent implements OnInit, OnDestroy {
+  @ViewChild('participantConfirmationModal')
+  set participantConfirmationModal(element: ElementRef<HTMLDialogElement> | undefined) {
+    const modal = element?.nativeElement;
+    if (!modal?.isConnected || modal.open) return;
+    if (typeof modal.showModal === 'function') modal.showModal();
+    else modal.open = true;
+  }
   readonly redactBugReportText = redactBugReportText;
   resolveOriginalConfirmation(request: ParticipantConfirmationDialog, confirmed: boolean): void {
     if (this.view.confirmationDialog() === request) this.view.resolveConfirmation(confirmed);
@@ -1228,13 +1237,19 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   private readonly changeDetector = inject(ChangeDetectorRef);
   readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly originalToasts = inject(OriginalToastService);
-  private consumedNavigationToast: { text: string; additionalTexts?: readonly string[] } | null = null;
+  private readonly consumedNavigationToasts = new WeakSet<ParticipantNavigationToast>();
   private readonly presentOriginalNavigationToast = effect(() => {
-    const notice = this.view.originalNavigationToast();
+    let notice = this.view.originalNavigationToast();
     const original = this.interfaceMode.mode() === "original";
-    if (!notice || notice === this.consumedNavigationToast) return;
-    this.consumedNavigationToast = notice;
-    if (original) for (const text of [notice.text, ...(notice.additionalTexts ?? [])]) this.originalToasts.show(text);
+    const pending: ParticipantNavigationToast[] = [];
+    while (notice && !this.consumedNavigationToasts.has(notice)) {
+      pending.push(notice);
+      notice = notice.previous ?? null;
+    }
+    for (const batch of pending.reverse()) {
+      this.consumedNavigationToasts.add(batch);
+      if (original) for (const text of [batch.text, ...(batch.additionalTexts ?? [])]) this.originalToasts.show(text);
+    }
   });
   readonly originalPanel = signal<"review" | "units" | null>(null);
 
