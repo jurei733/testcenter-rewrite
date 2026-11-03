@@ -1,0 +1,98 @@
+name: Independent native runtime qualification (not application acceptance)
+on:
+  push:
+    branches: [codex/native-runtime-november-qualification-20261103]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    name: Complete native qualification (${{ matrix.worker }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+    defaults:
+      run:
+        working-directory: rewrite-app
+        shell: bash
+    env:
+      CI: "true"
+      UI_SMOKE_HEADFUL: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 10
+      - name: Record actual native image
+        run: |
+          bash scripts/ci-browser-cohort.sh record
+          printf 'QUALIFICATION_ROOT=%s/independent-native-qualification\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Exercise owned exact Node normalization
+        run: |
+          mkdir -p "$QUALIFICATION_ROOT"
+          node --input-type=module <<'JS'
+          import {writeFile} from 'node:fs/promises';
+          import {exerciseOwnedRejectedNode} from './scripts/measure-rejected-native-cohort.mjs';
+          await writeFile(process.env.QUALIFICATION_ROOT+'/node-mode.json',JSON.stringify(await exerciseOwnedRejectedNode(process.cwd()))+'\n');
+          JS
+      - name: Complete native policy tests without skips
+        run: npm run test:ci-policy | tee "$QUALIFICATION_ROOT/policy.log"
+      - name: Complete native Debian controls
+        run: node --test scripts/ci-browser-system-linux.test.mjs | tee "$QUALIFICATION_ROOT/native-debian.log"
+      - name: Audit complete locked graph
+        run: npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json > "$QUALIFICATION_ROOT/audit.json"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "1"
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
+      - name: Download locked Chromium
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Measure actual native APT and unchanged Source rendering inputs
+        env:
+          CI_BROWSER_SYSTEM_FORMAT: "3"
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/independent-native-qualification/browser-system
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - name: Validate complete qualification and unchanged Source family
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFile,writeFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
+          import {loadCohortCertificates} from './scripts/ci-browser-cohort-certificates.mjs';
+          import {successfulTapSummary,validateRejectedSourceFamily} from './scripts/measure-rejected-native-cohort.mjs';
+          const root=process.env.QUALIFICATION_ROOT,read=path=>readFile(root+'/'+path,'utf8');
+          const policy=successfulTapSummary(await read('policy.log')),debian=successfulTapSummary(await read('native-debian.log'));
+          assert.equal(policy.pass,370);assert.equal(debian.pass,4);
+          const audit=JSON.parse(await read('audit.json'));assert.equal(audit.metadata.vulnerabilities.total,0);
+          const node=JSON.parse(await read('node-mode.json'));assert.equal(node.actualOwnedNodeModeCorrection,true);
+          const oracle=JSON.parse(await read('browser-system/manifest.json'));
+          validateRejectedSourceFamily(oracle.runtimeMaterial,await loadCohortCertificates(process.cwd()));
+          assert.equal(oracle.context.commit,process.env.GITHUB_SHA);assert.equal(oracle.context.runId,process.env.GITHUB_RUN_ID);
+          const applicationCommit='e3009ae496b09156dde5d369c4bdd233ff422d30';
+          execFileSync('git',['merge-base','--is-ancestor',applicationCommit,'HEAD']);
+          const changed=execFileSync('git',['diff','--name-only',applicationCommit,'HEAD'],{encoding:'utf8'}).trim();
+          assert.equal(applicationCommit,'e3009ae496b09156dde5d369c4bdd233ff422d30');
+          assert.equal(changed,'.github/workflows/native-runtime-qualification-20261103.yml');
+          execFileSync('git',['diff','--exit-code']);
+          const digest=createHash('sha256').update(JSON.stringify(oracle)+'\n').digest('hex');
+          await writeFile(root+'/qualification.json',JSON.stringify({applicationCommit,wrapperCommit:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,context:oracle.context,policy,debian,auditVulnerabilities:0,actualOwnedNodeModeCorrection:true,sourceFamilyEqual:true,nativeOracleManifestSha256:digest,scope:'Complete native runtime qualification only; no application acceptance or automatic certificate admission.'})+'\n');
+          JS
+      - name: Retain actual qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-cohort-qualification-${{ matrix.worker }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/independent-native-qualification/*.json
+            ${{ runner.temp }}/independent-native-qualification/*.log
+            ${{ runner.temp }}/independent-native-qualification/browser-system/
+            ${{ runner.temp }}/independent-native-qualification/browser-material-*/
+          if-no-files-found: error
+          retention-days: 30
