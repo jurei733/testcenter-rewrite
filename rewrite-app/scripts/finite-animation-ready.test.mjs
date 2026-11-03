@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {before,after,test} from 'node:test';
 import {chromium} from 'playwright';
 import {waitForFiniteDocumentAnimations} from './finite-animation-ready.mjs';
+import {waitForMaterialDialog} from './material-dialog-ready.mjs';
 let browser;
 before(async()=>{assert.equal(process.env.UI_SMOKE_HEADFUL,'true');browser=await chromium.launch({headless:false});});
 after(async()=>{await browser?.close();});
@@ -74,5 +75,80 @@ test('unexpected document animation inspection errors remain fatal',async()=>{
  await withPage(async page=>{
   await page.evaluate(()=>{document.getAnimations=()=>{throw Error('Owned animation inspection failure');};});
   await assert.rejects(waitForFiniteDocumentAnimations(page),/Owned animation inspection failure/);
+ });
+});
+
+const materialOpeningClassesAfterLatePaint=async()=>{
+ // Execute the installed Material scheduler and cleanup methods. Its real timer
+ // can complete while an animation frame is delayed; no product DOM is changed.
+ await import('@angular/compiler');
+ const {MatDialogContainer}=await import('@angular/material/dialog');
+ const prototype=MatDialogContainer.prototype,classes=new Set(),events=[];
+ let paint,opened;
+ const finished=new Promise(resolve=>opened=resolve),dialog=Object.create(prototype);
+ Object.assign(dialog,{_animationsEnabled:true,_enterAnimationDuration:1,_animationTimer:null,
+  _hostElement:{style:{setProperty(){}},classList:{add:(...names)=>names.forEach(name=>classes.add(name)),remove:(...names)=>names.forEach(name=>classes.delete(name))}},
+  _animationStateChanged:{emit:event=>events.push(event.state)},_requestAnimationFrame:callback=>{paint=callback;},
+  _finishDialogOpen:()=>{prototype._clearAnimationClasses.call(dialog);events.push('opened');opened();}});
+ prototype._startOpenAnimation.call(dialog);await finished;
+ assert.equal(classes.size,0);paint();
+ assert.deepEqual(events,['opening','opened']);
+ assert.deepEqual([...classes],['mdc-dialog--opening','mdc-dialog--open']);
+ return [...classes].join(' ');
+};
+const dialogFixture=async(page,classes)=>{
+ await page.setContent(`<!doctype html><style>mat-dialog-container{display:block;width:200px;height:100px;background:white}</style><button id="outside">Outside</button><mat-dialog-container class="${classes}"><button id="inside">Close</button></mat-dialog-container>`);
+ await page.evaluate(()=>{
+  globalThis.dialogClicks=[];
+  document.querySelector('#inside').addEventListener('click',event=>globalThis.dialogClicks.push({trusted:event.isTrusted}));
+ });
+};
+test('an actual late Material paint leaves opening set, but readiness observes natural animation completion, focus and trusted input',async()=>{
+ const classes=await materialOpeningClassesAfterLatePaint();
+ await withPage(async page=>{
+  page.setDefaultTimeout(1500);await dialogFixture(page,classes);
+  await page.locator('#inside').click();
+  await page.evaluate(()=>{
+   globalThis.dialogEffect=document.querySelector('mat-dialog-container').animate([{opacity:0.2},{opacity:1}],{duration:250,fill:'forwards'});
+  });
+  await waitForMaterialDialog(page);
+  assert.equal(await page.evaluate(()=>globalThis.dialogEffect.playState),'finished');
+  assert.equal(await page.evaluate(()=>globalThis.dialogEffect.effect.getTiming().duration),250);
+  assert.equal(await page.locator('mat-dialog-container').getAttribute('class'),classes,'Readiness does not edit Material classes.');
+  assert.equal(await page.locator('#inside').evaluate(element=>element===document.activeElement),true);
+  assert.deepEqual(await page.evaluate(()=>globalThis.dialogClicks),[{trusted:true}]);
+ });
+});
+test('a dialog without its open state or visible layout remains unready at the inherited deadline',async()=>{
+ await withPage(async page=>{
+  page.setDefaultTimeout(150);await dialogFixture(page,'mdc-dialog--opening');await page.locator('#inside').click();
+  await assert.rejects(waitForMaterialDialog(page),{name:'TimeoutError'});
+  await page.evaluate(()=>{const dialog=document.querySelector('mat-dialog-container');dialog.classList.add('mdc-dialog--open');dialog.style.visibility='hidden';});
+  await assert.rejects(waitForMaterialDialog(page),{name:'TimeoutError'});
+ });
+});
+test('readiness does not force focus into an otherwise open dialog',async()=>{
+ await withPage(async page=>{
+  page.setDefaultTimeout(150);await dialogFixture(page,'mdc-dialog--open');await page.locator('#outside').click();
+  await assert.rejects(waitForMaterialDialog(page),{name:'TimeoutError'});
+  assert.equal(await page.locator('#outside').evaluate(element=>element===document.activeElement),true);
+ });
+});
+test('a paused finite dialog effect still fails without being finished or canceled',async()=>{
+ await withPage(async page=>{
+  page.setDefaultTimeout(150);await dialogFixture(page,'mdc-dialog--open');await page.locator('#inside').click();
+  await page.evaluate(()=>{globalThis.dialogEffect=document.querySelector('mat-dialog-container').animate([{opacity:0.2},{opacity:1}],{duration:60000});globalThis.dialogEffect.pause();});
+  await assert.rejects(waitForMaterialDialog(page),{name:'TimeoutError'});
+  assert.equal(await page.evaluate(()=>globalThis.dialogEffect.playState),'paused');
+ });
+});
+test('replacement dialog effects are observed after a legitimate cancellation',async()=>{
+ await withPage(async page=>{
+  page.setDefaultTimeout(1500);await dialogFixture(page,'mdc-dialog--open');await page.locator('#inside').click();
+  await page.evaluate(()=>{globalThis.dialogEffect=document.querySelector('mat-dialog-container').animate([{opacity:0.2},{opacity:1}],{duration:60000});});
+  let completed=false;const ready=waitForMaterialDialog(page).then(()=>{completed=true;});
+  await frames(page);assert.equal(completed,false);
+  await page.evaluate(()=>{globalThis.dialogEffect.cancel();globalThis.dialogEffect=document.querySelector('mat-dialog-container').animate([{opacity:0.4},{opacity:1}],{duration:250,fill:'forwards'});});
+  await ready;assert.equal(await page.evaluate(()=>globalThis.dialogEffect.playState),'finished');
  });
 });
