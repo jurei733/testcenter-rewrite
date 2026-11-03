@@ -25,7 +25,7 @@ async function executableClass(file,name,selected) {
   return ts.transpileModule(text.replace("export class ","class "),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 }
 const facadeSource=await executableClass("participant-view.facade.ts","ParticipantViewFacade",[
-  "returnToStarterWithConfirmation","requestConfirmation","resolveConfirmation","clearNavigationAdvisory"]);
+  "returnToStarterWithConfirmation","requestConfirmation","resolveConfirmation","clearNavigationAdvisory","publishOriginalNavigationNotices"]);
 const policySource=ts.transpileModule(await readFile(new URL("../apps/web/src/app/participant-exit-policy.ts",import.meta.url),"utf8"),
   {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace(/^(?:import .*|export \{.*\} from .*);$/gm,"").replace("export function ","function ");
 const planParticipantStarterExit=new Function("bookletStarterExitDeniedReasons","parseVeronaUnitResponse",`${policySource}\nreturn planParticipantStarterExit;`)(bookletStarterExitDeniedReasons,parseVeronaUnitResponse);
@@ -52,6 +52,41 @@ function facadeFixture({saving=true,force=true,timer=null,lock=null,customTexts=
   const parent=new Parent();parent.view=facade;
   return{facade,parent,returns,preparations,replaceRun(){state={...state,testRun:{testRunId:"run-b"}};},replaceUnit(){state={...state,currentUnit:{unitKey:"new-unit"}};},replaceStatus(){state={...state,testRun:{...state.testRun,status:"paused"}};}};
 }
+// Angular may render after all awaited preparation microtasks have completed.
+// Execute the actual shipped consumer at that legal boundary, instead of making
+// every signal assignment synchronously visible in this class-level harness.
+const toastConsumerSource=await executableClass("participant-view.component.ts","ParticipantViewComponent",[
+  "consumedNavigationToast","consumedNavigationToasts","presentOriginalNavigationToast"]);
+function toastConsumer(facade) {
+  let render;const shown=[];
+  const Consumer=new Function("effect",`${toastConsumerSource}\nreturn ParticipantViewComponent;`)(callback=>{render=callback;return{};});
+  const component=new Consumer();component.view=facade;
+  component.interfaceMode={mode:()=>"original"};component.originalToasts={show:text=>shown.push(text)};
+  return{shown,render:()=>render()};
+}
+for(const timerStatus of ["running","paused"])for(const splitRender of [false,true])test(`${timerStatus} timer: starter notice events survive ${splitRender?"separate":"coalesced"} UI renders without duplication`,async()=>{
+  const f=facadeFixture({saving:false,force:false,forceNavigation:false,required:true,
+    progress:completenessCases.both,timer:{leave:"allowed",status:timerStatus},lock:{scope:"unit",confirm:false}});
+  const consumer=toastConsumer(f.facade),set=f.facade.originalNavigationToast.set;
+  f.facade.originalNavigationToast.set=value=>{set(value);if(splitRender)consumer.render();};
+  await f.facade.returnToStarterWithConfirmation();consumer.render();consumer.render();
+  assert.deepEqual(consumer.shown,[
+    "Im Testmodus dürfte hier nicht weiter geblättert\n      werden: Es wurde nicht alles gesehen oder abgespielt. Es wurde nicht alles bearbeitet.",
+    "unit würde im Testmodus nun gesperrt werden."
+  ]);
+  assert.deepEqual(f.returns,[[false,false]]);
+});
+test("a lock confirmation appends its notice after already consumed completeness and timer events",async()=>{
+  const f=facadeFixture({saving:false,force:false,forceNavigation:false,required:true,
+    progress:completenessCases.both,timer:{leave:"confirm",status:"running"},lock:{scope:"testlet",confirm:true}});
+  const consumer=toastConsumer(f.facade),pending=f.facade.returnToStarterWithConfirmation();
+  await Promise.resolve();await Promise.resolve();consumer.render();
+  assert.equal(consumer.shown.length,2);f.parent.resolveOriginalConfirmation(f.facade.confirmationDialog(),true);
+  await pending;consumer.render();consumer.render();
+  assert.equal(consumer.shown.length,3);assert.equal(consumer.shown[2],"testlet würde im Testmodus nun gesperrt werden.");
+  assert.deepEqual(f.returns,[[false,true]]);
+  f.facade.clearNavigationAdvisory();consumer.render();assert.equal(consumer.shown.length,3);
+});
 test("saved logo exit asks once, cancellation preserves the Run, and confirmation returns once",async()=>{
   const f=facadeFixture();const cancelled=f.facade.returnToStarterWithConfirmation();await Promise.resolve();
   const first=f.facade.confirmationDialog();assert.equal(first.title,"Return to test selection?");

@@ -279,6 +279,12 @@ type SettledVeronaResponse = Pick<
   "testRunId" | "unitKey" | "response"
 >;
 
+export type ParticipantNavigationToast = {
+  text: string;
+  additionalTexts?: readonly string[];
+  previous?: ParticipantNavigationToast | null;
+};
+
 export type ParticipantConfirmationDialog = {
   kind?: "information";
   title: string;
@@ -481,7 +487,7 @@ export class ParticipantViewFacade {
     null
   );
   // Each attempt has its own identity, including repeated blocked clicks.
-  readonly originalNavigationToast = signal<{ text: string; additionalTexts?: readonly string[] } | null>(null);
+  readonly originalNavigationToast = signal<ParticipantNavigationToast | null>(null);
   private confirmationResolver: ((confirmed: boolean) => void) | null = null;
   private navigationAdvisoryTimeout: number | null = null;
   private readonly fullscreenChangeListener = (): void => {
@@ -2232,6 +2238,15 @@ export class ParticipantViewFacade {
     this.navigationAdvisory.set(null);
   }
 
+  private publishOriginalNavigationNotices(texts: readonly string[]): void {
+    if (!texts.length) return;
+    // An awaited API response can finish before Angular's next render. Retain
+    // each event in this action, including batches already shown by the view.
+    this.originalNavigationToast.set({
+      text: texts[0], additionalTexts: texts.slice(1), previous: this.originalNavigationToast()
+    });
+  }
+
   private startTimerTicker(): void {
     if (this.timerTickerHandle != null || !globalThis.window) {
       return;
@@ -3325,9 +3340,7 @@ export class ParticipantViewFacade {
       response: this.runtime.currentUnitResponse, timer: this.player.testletTimer,
       lock: this.player.leaveLock, customText: this.customTextValue.bind(this) });
     this.clearNavigationAdvisory();
-    if (plan.originalNotices.length) this.originalNavigationToast.set({
-      text: plan.originalNotices[0], additionalTexts: plan.originalNotices.slice(1)
-    });
+    this.publishOriginalNavigationNotices(plan.originalNotices);
     if (plan.information) {
       await this.requestConfirmation(plan.information);
       return;
@@ -3341,17 +3354,12 @@ export class ParticipantViewFacade {
     if (this.viewLifecycleSequence !== viewLifecycleSequence ||
         this.readCurrentRunState()?.testRun.testRunId !== testRunId ||
         this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey || this.readCurrentRunState()?.testRun.status !== runStatus) return;
-    if (plan.afterTimerNotices.length) {
-      const notices = plan.prepareTimer ? plan.afterTimerNotices : [...plan.originalNotices, ...plan.afterTimerNotices];
-      this.originalNavigationToast.set({text: notices[0], additionalTexts: notices.slice(1)});
-    }
+    this.publishOriginalNavigationNotices(plan.afterTimerNotices);
     if (plan.confirmation && !(await this.requestConfirmation(plan.confirmation))) return;
     if (this.viewLifecycleSequence !== viewLifecycleSequence ||
         this.readCurrentRunState()?.testRun.testRunId !== testRunId ||
         this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey || this.readCurrentRunState()?.testRun.status !== runStatus) return;
-    if (plan.confirmedNotices.length) this.originalNavigationToast.set({
-      text: plan.confirmedNotices[0], additionalTexts: plan.confirmedNotices.slice(1)
-    });
+    this.publishOriginalNavigationNotices(plan.confirmedNotices);
     await this.returnToStarterInternal(plan.confirmTestletTimeLeave, plan.confirmTestletLeaveLock);
   }
 

@@ -16,7 +16,7 @@ import { redactBugReportText } from "@testcenter-rewrite-app/contracts";
 
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
-import { ParticipantViewFacade } from "./participant-view.facade";
+import { ParticipantViewFacade, type ParticipantNavigationToast } from "./participant-view.facade";
 import type { ParticipantConfirmationDialog } from "./participant-view.facade";
 import { OriginalParticipantConfirmationLauncherComponent } from "./original-participant-confirmation-dialog.component";
 import { OriginalParticipantInformationLauncherComponent } from "./original-participant-information-dialog.component";
@@ -1237,13 +1237,19 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   private readonly changeDetector = inject(ChangeDetectorRef);
   readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly originalToasts = inject(OriginalToastService);
-  private consumedNavigationToast: { text: string; additionalTexts?: readonly string[] } | null = null;
+  private readonly consumedNavigationToasts = new WeakSet<ParticipantNavigationToast>();
   private readonly presentOriginalNavigationToast = effect(() => {
-    const notice = this.view.originalNavigationToast();
+    let notice = this.view.originalNavigationToast();
     const original = this.interfaceMode.mode() === "original";
-    if (!notice || notice === this.consumedNavigationToast) return;
-    this.consumedNavigationToast = notice;
-    if (original) for (const text of [notice.text, ...(notice.additionalTexts ?? [])]) this.originalToasts.show(text);
+    const pending: ParticipantNavigationToast[] = [];
+    while (notice && !this.consumedNavigationToasts.has(notice)) {
+      pending.push(notice);
+      notice = notice.previous ?? null;
+    }
+    for (const batch of pending.reverse()) {
+      this.consumedNavigationToasts.add(batch);
+      if (original) for (const text of [batch.text, ...(batch.additionalTexts ?? [])]) this.originalToasts.show(text);
+    }
   });
   readonly originalPanel = signal<"review" | "units" | null>(null);
 

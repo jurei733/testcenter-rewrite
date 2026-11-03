@@ -1,7 +1,7 @@
 import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -14,7 +14,10 @@ import { createServerRequestFailureGate } from "./server-request-failure-gate.mj
 
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root,"dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(),"testcenter-starter-advisories-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR
+  ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR,"original-starter-advisories")
+  : await mkdtemp(join(tmpdir(),"testcenter-starter-advisories-"));
+await mkdir(artifacts,{recursive:true});
 console.log(`owned_artifacts=${artifacts}`);
 const failureGate = createServerRequestFailureGate();
 const module = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
@@ -30,7 +33,7 @@ const server = spawn(process.execPath,["--input-type=module","-e",`
   FIRST_SLICE_XML_SCHEMA_PROFILE:"legacy-compatibility",REQUIRE_LOGIN_PASSWORD:"false"},stdio:["ignore","pipe","pipe","ipc"]});
 failureGate.observeStream(server.stdout);failureGate.observeStream(server.stderr);
 const serverClosed=new Promise(done=>server.once("close",done));
-const errors=[],states={};let browser;
+const errors=[],states={};let browser,page;
 try {
   const port=await new Promise((done,reject)=>{
     const timer=setTimeout(()=>reject(Error("Owned API did not start")),20_000);
@@ -63,10 +66,11 @@ try {
     await api(workspace+"/participant-roster",{rosterText:`<Testtakers><Group id="owned" label="Exit Group">${modes.map(mode=>`<Login mode="${mode}" name="${mode}"><Booklet>owned-exit</Booklet></Login>`).join("")}</Group></Testtakers>`},operator);
     fixtures.push({workspaceKey,leave,scope,lockConfirm});
   }
-  browser=await chromium.launch({headless:process.env.CI==="true"&&process.env.UI_SMOKE_HEADFUL!=="true"});
+  const channel=process.env.UI_SMOKE_BROWSER_CHANNEL?.trim()||(process.env.CI==="true"?undefined:"chrome");
+  browser=await chromium.launch({...(channel?{channel}:{}),headless:process.env.CI==="true"&&process.env.UI_SMOKE_HEADFUL!=="true"});
   for(const mode of ["run-demo","run-review","run-trial"]) for(const {workspaceKey,leave,scope,lockConfirm} of fixtures) {
     const key=`${mode}-${leave}-${scope}-${lockConfirm}`,expected=reference.cases[key];assert.ok(expected,key);
-    const context=await browser.newContext({viewport:{width:1280,height:720},locale:"de-DE"}),page=await context.newPage();
+    const context=await browser.newContext({viewport:{width:1280,height:720},locale:"de-DE"});page=await context.newPage();
     page.on("pageerror",error=>errors.push({key,error:String(error)}));
     // Observe the owned Player's real messages without touching its controller.
     await page.addInitScript(()=>{window.ownedVeronaReports=[];window.addEventListener("message",event=>{if(event.data?.type==="vopStateChangedNotification")window.ownedVeronaReports.push(event.data);});});
@@ -132,6 +136,10 @@ try {
     await context.close();console.log(`original_starter_advisory=${key}:passed`);
   }
   assert.deepEqual(errors,[]);failureGate.assertHealthy();
+} catch(error) {
+  if(page&&!page.isClosed())await page.screenshot({path:join(artifacts,"failure.png"),fullPage:true}).catch(()=>{});
+  await writeFile(join(artifacts,"failure.json"),JSON.stringify({error:String(error),states,errors},null,2));
+  throw error;
 } finally {
   await writeFile(join(artifacts,"advisories.json"),JSON.stringify({states,errors},null,2));
   await browser?.close();server.kill("SIGTERM");
