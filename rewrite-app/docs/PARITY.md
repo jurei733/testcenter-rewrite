@@ -1,8 +1,28 @@
 # Testcenter parity checklist
 
+### CI browser-admission ownership (2026-11-03, PR16 merge review)
+
+Run 41634733039 rejected the non-browser SQLite shutdown owner during runtime
+preparation, before installing dependencies or executing its actual shutdown
+test. The composite action had applied browser inventory/certificate admission
+even with `playwright:false`. The retained rejection artifact 13232055048
+records that mismatch; its ZIP SHA256 is
+`dcd9a97e5e6d133be01ac31f7b0f6520dd0ab4332e74686203d4e24b133f8c79`.
+The preflight, route-selection and associated rejection-evidence predicates now
+require an explicit browser owner. Actual browser jobs keep their previous
+inventory, certificate, archive, native material and failure checks unchanged;
+no cohort is newly admitted and the historical qualified action fixture is
+unchanged. A regression using the actual workflow's non-browser matrix rows
+fails against the old action and passes with this correction, with positive
+controls requiring both browser admission routes. The complete local policy
+suite passes 365 checks (four Linux-only checks skip on macOS), and the actual
+File/SQLite shutdown smokes pass. The prior current-head CI had already passed
+5860 Unit and 3936 PostgreSQL checks, but its failed aggregate is not admitted
+as a passing merge qualification. The corrected commit needs a fresh full CI.
+
 ### Opaque native workspace roles (2026-11-03, R66; UI integration remains open)
 
-The R65 backend role-value gap is now implemented locally. A fresh
+The R65 backend role-value gap is now implemented and published for review. A fresh
 [233 actual production Source exchanges](../test-fixtures/original-testcenter/source-workspace-results/native-opaque-workspace-roles-http/observations.json)
 prove that membership is distinct from authority: Source stores `XX`, padded
 values and other strings, projects their exact values in both permission
@@ -52,7 +72,7 @@ additions. No product source changed between these executions.
 No schema, dependency, browser-policy, input, visual tolerance or authorization
 gate is weakened. Source's measured destructive partial effects on an invalid
 write remain recorded; Rewrite preserves the required atomic rollback gate.
-The published R65 PR16 remains Draft while its existing qualification runs;
+PR16 is ready for review under the user's explicit merge request; a merge still requires its current-head qualification and normal Entire gates.
 its actual Verona job 125888005853 has passed, but that is not a qualification
 of this unpublished R66 tree. The full 49 functional / eight visual Goal remains
 active. Native administration UI adoption, exact identity binding and remaining

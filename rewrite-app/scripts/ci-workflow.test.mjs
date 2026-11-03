@@ -961,13 +961,37 @@ test('native Test creation is mandatory in complete units, PostgreSQL and focuse
 });
 
 
+test('non-browser matrix owners skip browser admission while every actual browser still selects its required gate',()=>{
+ const gates=action.runs.steps.filter(step=>['node scripts/ci-browser-inventory-preflight.mjs','node scripts/ci-browser-cohort-route.mjs'].includes(step.run));
+ assert.equal(gates.length,2);
+ const enabled=(step,inputs)=>step.if.split(' && ').every(term=>{
+  const match=/^inputs\.([a-z0-9-]+) (==|!=) '([^']*)'$/.exec(term);assert.ok(match,term);
+  const actual=inputs[match[1]]??action.inputs[match[1]].default;
+  return match[2]==='=='?actual===match[3]:actual!==match[3];
+ });
+ const matrixOwners=Object.values(workflow.jobs).flatMap(job=>job.strategy?.matrix?.include??[]).filter(row=>row.playwright===false);
+ assert.ok(matrixOwners.some(row=>row.check==='shutdown'));
+ assert.ok(matrixOwners.some(row=>row.check==='shutdown-file'));
+ assert.ok(matrixOwners.some(row=>row.check==='integration-memory'));
+ for(const row of matrixOwners)for(const certified of ['false','true']){
+  const inputs={playwright:String(row.playwright),'browser-system-before-inventory-sha256':'unqualified-native-inventory','browser-system-certified-cohorts':certified};
+  assert.deepEqual(gates.filter(step=>enabled(step,inputs)).map(step=>step.run),[],row.check+' does not install or run a browser');
+ }
+ for(const certified of ['false','true']){
+  const inputs={playwright:'true','browser-system-before-inventory-sha256':'unqualified-native-inventory','browser-system-certified-cohorts':certified};
+  assert.deepEqual(gates.filter(step=>enabled(step,inputs)).map(step=>step.run),[
+   certified==='true'?'node scripts/ci-browser-cohort-route.mjs':'node scripts/ci-browser-inventory-preflight.mjs'
+  ],'a real browser must still prove its initial inventory or independently qualified certificate');
+ }
+ assert.deepEqual(gates.filter(step=>enabled(step,{})),[],'default setup does not request browser installation');
+});
 test('trusted initial inventory rejects before npm or browser downloads while retaining bounded package evidence',()=>{
  const setup=action.runs.steps.findIndex(step=>step.uses?.startsWith('actions/setup-node@'));
  const preflight=action.runs.steps.findIndex(step=>step.run==='node scripts/ci-browser-inventory-preflight.mjs');
  const install=action.runs.steps.findIndex(step=>step.run==='npm ci --no-audit --no-fund');
  assert.ok(setup<preflight&&preflight<install);
  const step=action.runs.steps[preflight];
- assert.equal(step.if,"inputs.browser-system-before-inventory-sha256 != '' && inputs.browser-system-certified-cohorts != 'true'");
+ assert.equal(step.if,"inputs.playwright == 'true' && inputs.browser-system-before-inventory-sha256 != '' && inputs.browser-system-certified-cohorts != 'true'");
  assert.equal(step.env.CI_BROWSER_SYSTEM_EXPECTED_BEFORE_SHA256,'${{ inputs.browser-system-before-inventory-sha256 }}');
  assert.equal(step.env.CI_BROWSER_COHORT_DIAGNOSTIC_DIR,'${{ runner.temp }}/browser-cohort');
  assert.equal(action.inputs['browser-system-before-inventory-sha256'].default,'','Earlier wrappers retain complete offline verification');
@@ -976,7 +1000,7 @@ test('trusted initial inventory rejects before npm or browser downloads while re
  const qualification=workflow.jobs['browser-system-qualification'].steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
  assert.equal(qualification.with['browser-system-before-inventory-sha256'],'${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}');
  const retained=action.runs.steps.find(step=>step.name==='Retain rejected initial package inventory');
- assert.equal(retained.if,"failure() && inputs.browser-system-before-inventory-sha256 != ''");
+ assert.equal(retained.if,"failure() && inputs.playwright == 'true' && inputs.browser-system-before-inventory-sha256 != ''");
  assert.equal(retained.with.path,'${{ runner.temp }}/browser-cohort/');assert.equal(retained.with['retention-days'],7);
  assert.ok(retained.with.name.includes('${{ inputs.browser-material-label }}'));
  assert.ok(action.runs.steps.some(step=>step.run?.includes('ci-browser-system.mjs restore')),'Early comparison cannot replace the complete offline gate');
@@ -1012,7 +1036,7 @@ test('every Node setup immediately qualifies the exact executable before npm or 
 test('certified routing is explicit before npm and preserves same-run authentication and native failure behavior',()=>{
  assert.equal(action.inputs['browser-system-certified-cohorts'].default,'false');
  const route=action.runs.steps.find(step=>step.id==='browser-route');
- assert.equal(route.if,"inputs.browser-system-certified-cohorts == 'true'");
+ assert.equal(route.if,"inputs.playwright == 'true' && inputs.browser-system-certified-cohorts == 'true'");
  assert.equal(route.run,'node scripts/ci-browser-cohort-route.mjs');
  assert.ok(action.runs.steps.indexOf(route)<action.runs.steps.findIndex(step=>step.run==='npm ci --no-audit --no-fund'));
  for(const [env,input]of [['CI_BROWSER_SYSTEM_FORMAT','browser-system-profile-format'],['CI_BROWSER_SYSTEM_ALLOW_CERTIFIED','browser-system-certified-cohorts'],
