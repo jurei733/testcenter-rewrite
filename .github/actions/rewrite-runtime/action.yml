@@ -68,7 +68,7 @@ runs:
       working-directory: rewrite-app
       run: node scripts/ci-node-runtime.mjs
     - name: Reject incompatible native inventories before installing dependencies
-      if: inputs.playwright == 'true' && inputs.browser-system-before-inventory-sha256 != '' && inputs.browser-system-certified-cohorts != 'true'
+      if: inputs.browser-system-before-inventory-sha256 != '' && inputs.browser-system-certified-cohorts != 'true'
       shell: bash
       working-directory: rewrite-app
       env:
@@ -77,7 +77,7 @@ runs:
       run: node scripts/ci-browser-inventory-preflight.mjs
     - name: Select an explicit independently qualified browser installation route
       id: browser-route
-      if: inputs.playwright == 'true' && inputs.browser-system-certified-cohorts == 'true'
+      if: inputs.browser-system-certified-cohorts == 'true'
       shell: bash
       working-directory: rewrite-app
       env:
@@ -167,7 +167,7 @@ runs:
         if-no-files-found: ignore
         retention-days: 7
     - name: Retain rejected initial package inventory
-      if: failure() && inputs.playwright == 'true' && inputs.browser-system-before-inventory-sha256 != ''
+      if: failure() && inputs.browser-system-before-inventory-sha256 != ''
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
         name: browser-cohort-${{ github.job }}-${{ inputs.browser-material-label }}-${{ github.sha }}-${{ github.run_attempt }}

@@ -68,23 +68,13 @@ test('the actual diagnostic CLI refuses an external output directory before it c
   assert.equal(child.status,1,child.stderr);assert.match(child.stderr,/Only the owned rejection directory/);await assert.rejects(access(outside),{code:'ENOENT'});
  }finally{await rm(directory,{recursive:true,force:true});}
 });
-test('the actual failure-only action preserves every qualified browser step and scopes admission to requested browsers',async()=>{
+test('the actual failure-only action preserves every previously qualified runtime step, field and gate',async()=>{
  const bytes=await readFile(new URL('./fixtures/qualified-runtime-action-7e40cc2e.yml',import.meta.url));
  assert.equal(cohortDigest(bytes),'d27b0048793092c12057062f2af9e26f2ae1fdddb6366122ee1cb1264559910d');
  const prior=parse(bytes.toString()),current=parse(await readFile(new URL('../../.github/actions/rewrite-runtime/action.yml',import.meta.url),'utf8'));
  const names=['Measure the actual rejected native cohort without granting admission','Retain actual rejected-cohort measurements without granting admission'];
  const added=current.runs.steps.filter(step=>names.includes(step.name));assert.equal(added.length,2);
  assert.ok(current.runs.steps.findIndex(step=>step.name==='Retain rejected initial package inventory')<current.runs.steps.findIndex(step=>step.name===names[0]),'The original inventory must be retained before any long-running measurement');
- // Keep the historical oracle immutable. Only the three browser-admission
- // predicates gain their explicit browser-owner condition; every other field
- // and gate still has to match the previously qualified action exactly.
- for(const [name,before,after]of [
-  ['Reject incompatible native inventories before installing dependencies',"inputs.browser-system-before-inventory-sha256 != '' && inputs.browser-system-certified-cohorts != 'true'","inputs.playwright == 'true' && inputs.browser-system-before-inventory-sha256 != '' && inputs.browser-system-certified-cohorts != 'true'"],
-  ['Select an explicit independently qualified browser installation route',"inputs.browser-system-certified-cohorts == 'true'","inputs.playwright == 'true' && inputs.browser-system-certified-cohorts == 'true'"],
-  ['Retain rejected initial package inventory',"failure() && inputs.browser-system-before-inventory-sha256 != ''","failure() && inputs.playwright == 'true' && inputs.browser-system-before-inventory-sha256 != ''"]
- ]){
-  const step=prior.runs.steps.find(step=>step.name===name);assert.equal(step.if,before);step.if=after;
- }
  const unchanged={...current,runs:{...current.runs,steps:current.runs.steps.filter(step=>!names.includes(step.name))}};assert.deepEqual(unchanged,prior);
  assert.equal(added[0].if,"failure() && !cancelled() && inputs.playwright == 'true' && inputs.browser-system-certified-cohorts == 'true' && steps.browser-route.outcome == 'failure'");
  assert.equal(added[1].if,"always() && inputs.playwright == 'true' && inputs.browser-system-certified-cohorts == 'true' && steps.browser-route.outcome == 'failure'");

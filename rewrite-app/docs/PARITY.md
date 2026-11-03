@@ -33,22 +33,28 @@ run 41634733039 remains failed and is not admitted as application acceptance.
 ### CI browser-admission ownership (2026-11-03, PR16 merge review)
 
 Run 41634733039 rejected the non-browser SQLite shutdown owner during runtime
-preparation, before installing dependencies or executing its actual shutdown
-test. The composite action had applied browser inventory/certificate admission
-even with `playwright:false`. The retained rejection artifact 13232055048
-records that mismatch; its ZIP SHA256 is
-`dcd9a97e5e6d133be01ac31f7b0f6520dd0ab4332e74686203d4e24b133f8c79`.
-The preflight, route-selection and associated rejection-evidence predicates now
-require an explicit browser owner. Actual browser jobs keep their previous
-inventory, certificate, archive, native material and failure checks unchanged;
-this guard correction admits no cohort, and the historical qualified action fixture is
-unchanged. A regression using the actual workflow's non-browser matrix rows
-fails against the old action and passes with this correction, with positive
-controls requiring both browser admission routes. The complete local policy
-suite passes 365 checks (four Linux-only checks skip on macOS), and the actual
-File/SQLite shutdown smokes pass. The prior current-head CI had already passed
-5860 Unit and 3936 PostgreSQL checks, but its failed aggregate is not admitted
-as a passing merge qualification. The corrected commit needs a fresh full CI.
+preparation, before its actual shutdown test. The mixed matrix passed browser
+inventory/certificate selectors even for `playwright:false` rows. The retained
+rejection artifact 13232055048 records that mismatch (ZIP SHA256
+`dcd9a97e5e6d133be01ac31f7b0f6520dd0ab4332e74686203d4e24b133f8c79`).
+The mixed matrix callers now supply the initial-inventory selector only for
+browser rows and explicitly set certified routing false for non-browser rows.
+Both early/late owners retain their exact shared execution context and every
+one of the 122 jobs remains mandatory.
+
+The composite runtime action is restored byte-for-byte to the qualified
+implementation. Its deliberate route-only bootstrap remains available to the
+independent offline qualifier, which chooses its route before performing its
+own fresh installation. Run 41639413628 exposed that the initial attempt to gate
+all routing on `playwright:true` omitted this owner; that attempt is superseded
+by the caller correction. No browser inventory, certificate, archive, material,
+Source oracle or failure predicate is relaxed. Regression controls consume the
+actual matrix/caller inputs, require all eight backend rows to avoid browser
+admission, require every browser row to retain routing and require the explicit
+offline owner to retain route-only bootstrap. The historical whole-workflow
+fingerprint stays fixed after normalizing only these two explicitly asserted
+caller inputs. The local complete policy suite and actual File/SQLite shutdown
+smokes pass; a fresh complete final-head CI remains mandatory.
 
 ### Opaque native workspace roles (2026-11-03, R66; UI integration remains open)
 
