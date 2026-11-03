@@ -5518,7 +5518,7 @@ const requireAdminRole = (
   roleAssignments: AdminRoleAssignment[],
   requiredRoles: AdminRole[]
 ): void => {
-  if (!roleAssignments.some(roleAssignment => requiredRoles.includes(roleAssignment.role))) {
+  if (!roleAssignments.some(roleAssignment => requiredRoles.some(role => role === roleAssignment.role))) {
     throw new FirstSliceError(
       403,
       "admin_role_required",
@@ -6474,7 +6474,7 @@ const isSameAdminRoleScope = (
   roleAssignment: AdminRoleAssignment,
   scope: ResolvedAdminRoleScope
 ): boolean =>
-  roleAssignment.role === scope.role &&
+  (roleAssignment.role === scope.role || scope.role === 'workspace_admin' && roleAssignment.role === 'native_workspace_opaque') &&
   roleAssignment.tenantId === scope.tenantId &&
   roleAssignment.workspaceId === scope.workspaceId &&
   roleAssignment.groupKey === scope.groupKey;
@@ -29335,6 +29335,7 @@ export const createFirstSliceServices = (
         );
         if (
           existingRoleAssignment &&
+          existingRoleAssignment.role === scope.role &&
           input.monitorProfiles === undefined &&
           input.monitorBookletVisibility === undefined &&
           input.accessMode === undefined
@@ -29343,8 +29344,10 @@ export const createFirstSliceServices = (
         }
 
         if (existingRoleAssignment) {
+          const {nativeWorkspaceRole:_retiredNativeRole,...previousRoleAssignment}=existingRoleAssignment;
           const updatedRoleAssignment: AdminRoleAssignment = {
-            ...existingRoleAssignment,
+            ...previousRoleAssignment,
+            role:scope.role,
             accessMode: scope.accessMode,
             monitorProfiles:
               input.monitorProfiles === undefined

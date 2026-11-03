@@ -33,7 +33,7 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
       // The selected grants stay locked until every effect/audit commits.
       const roles = user ? (await client.query('SELECT * FROM admin_role_assignments WHERE admin_user_id=$1 ORDER BY created_at FOR SHARE', [user.adminUserId])).rows.map(map.role).filter(present) : [];
       const workspaces = user ? (await client.query(`SELECT w.* FROM workspaces w WHERE EXISTS
-        (SELECT 1 FROM admin_role_assignments r WHERE r.admin_user_id=$1 AND r.role='workspace_admin' AND r.workspace_id=w.workspace_id AND r.tenant_id=w.tenant_id)`, [user.adminUserId])).rows.map(map.workspace).filter(present) : [];
+        (SELECT 1 FROM admin_role_assignments r WHERE r.admin_user_id=$1 AND r.role IN ('workspace_admin','native_workspace_opaque') AND r.workspace_id=w.workspace_id AND r.tenant_id=w.tenant_id)`, [user.adminUserId])).rows.map(map.workspace).filter(present) : [];
       const tenants = workspaces.length ? (await client.query('SELECT * FROM tenants WHERE tenant_id=ANY($1::text[])', [workspaces.map(w => w.tenantId)])).rows.map(map.tenant).filter(present) : [];
       const bucket = 'name' in selector ? originalAdminFailureBucket(user?.username ?? selector.name) : '';
       const number = user ? (await client.query('SELECT * FROM original_admin_numbers WHERE admin_user_id=$1', [user.adminUserId])).rows[0] : null;
@@ -61,7 +61,7 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
         }
         if(root&&selector.directory==='rights'){
           const ids=snapshot.directory!.workspaces!.map(w=>w.workspace.workspaceId);
-          snapshot.directory!.roles=ids.length?(await client.query("SELECT * FROM admin_role_assignments WHERE role='workspace_admin' AND group_key IS NULL AND workspace_id=ANY($1::text[])",[ids])).rows.map(map.role).filter(present):[];
+          snapshot.directory!.roles=ids.length?(await client.query("SELECT * FROM admin_role_assignments WHERE role IN ('workspace_admin','native_workspace_opaque') AND group_key IS NULL AND workspace_id=ANY($1::text[])",[ids])).rows.map(map.role).filter(present):[];
         }
         if(selector.targetAdminNumber!==undefined){
           const n=(await client.query('SELECT * FROM original_admin_numbers WHERE admin_number=$1',[selector.targetAdminNumber])).rows[0];
@@ -91,13 +91,13 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
       if (effect.counter !== undefined) await client.query('UPDATE original_admin_number_counter SET last_number=$1 WHERE singleton=1', [effect.counter]);
       for (const n of effect.workspaceNumbers ?? []) await client.query('INSERT INTO original_workspace_numbers(workspace_number,workspace_id,tenant_id) VALUES($1,$2,$3)', [n.workspaceNumber, n.workspaceId, n.tenantId]);
       if (effect.workspaceCounter !== undefined) await client.query('UPDATE original_workspace_number_counter SET last_number=$1 WHERE singleton=1', [effect.workspaceCounter]);
-      for(const roleId of effect.roleChanges?.removeIds??[])await client.query("DELETE FROM admin_role_assignments WHERE role_assignment_id=$1 AND role='workspace_admin' AND group_key IS NULL",[roleId]);
+      for(const roleId of effect.roleChanges?.removeIds??[])await client.query("DELETE FROM admin_role_assignments WHERE role_assignment_id=$1 AND role IN ('workspace_admin','native_workspace_opaque') AND group_key IS NULL",[roleId]);
       for(const r of effect.roleChanges?.assignments??[]){
         const changed=await client.query(`INSERT INTO admin_role_assignments(role_assignment_id,admin_user_id,role,access_mode,tenant_id,workspace_id,group_key,monitor_profiles_json,created_at)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9) ON CONFLICT(role_assignment_id) DO UPDATE SET access_mode=excluded.access_mode
-          WHERE admin_role_assignments.role='workspace_admin' AND admin_role_assignments.group_key IS NULL
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9) ON CONFLICT(role_assignment_id) DO UPDATE SET role=excluded.role,access_mode=excluded.access_mode,monitor_profiles_json=excluded.monitor_profiles_json
+          WHERE admin_role_assignments.role IN ('workspace_admin','native_workspace_opaque') AND admin_role_assignments.group_key IS NULL
             AND admin_role_assignments.admin_user_id=excluded.admin_user_id AND admin_role_assignments.tenant_id=excluded.tenant_id AND admin_role_assignments.workspace_id=excluded.workspace_id`,
-          [r.roleAssignmentId,r.adminUserId,r.role,r.accessMode,r.tenantId,r.workspaceId,r.groupKey,JSON.stringify({monitorProfiles:r.monitorProfiles,monitorBookletVisibility:r.monitorBookletVisibility}),r.createdAt]);
+          [r.roleAssignmentId,r.adminUserId,r.role,r.accessMode,r.tenantId,r.workspaceId,r.groupKey,JSON.stringify({monitorProfiles:r.monitorProfiles,monitorBookletVisibility:r.monitorBookletVisibility,...r.role==='native_workspace_opaque'?{nativeWorkspaceRole:r.nativeWorkspaceRole}:{}}),r.createdAt]);
         if(changed.rowCount!==1)throw Error('Native permission identity collision.');
       }
       for(const a of [...(effect.audit?[effect.audit]:[]),...(effect.audits??[])]) {

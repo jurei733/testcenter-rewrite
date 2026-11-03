@@ -15,7 +15,8 @@ export type OriginalAccessSet = {
 export type OriginalWorkChallenge = {algorithm: 'SHA-256'; challenge: string; maxNumber: number; salt: string; signature: string};
 export type OriginalWorkSolution = Omit<OriginalWorkChallenge, 'maxNumber'> & {number: number};
 
-export type OriginalWorkspaceAdminAccess = {id: string; type: 'workspaceAdmin'; label: string; flags: {mode: 'RO' | 'RW'}};
+// Source projects the stored role even if it grants no recognized authority.
+export type OriginalWorkspaceAdminAccess = {id: string; type: 'workspaceAdmin'; label: string; flags: {mode: string}};
 /** Server-side exact decimal ID. The native formatter emits id as a PHP int64
  * JSON number; workspace claim IDs remain decimal strings. */
 export type OriginalAdminAccessSet = {

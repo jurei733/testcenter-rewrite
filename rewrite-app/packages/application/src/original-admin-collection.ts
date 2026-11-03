@@ -3,6 +3,7 @@ import {originalDirectoryModification,type OriginalDirectoryFile,type OriginalDi
 import {originalAdminMetadataAllowed,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminNumber, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from './original-admin-session.js';
 import type {OriginalWorkspaceNumberRecord} from './original-workspace-number.js';
 import {validateOriginalAdminRoleChanges} from './original-admin-permissions.js';
+import {isOriginalWorkspaceMembership} from './original-workspace-role.js';
 
 type Rows<T> = Map<string, T> | Record<string, T>;
 const values = <T>(rows: Rows<T>): T[] => rows instanceof Map ? [...rows.values()] : Object.values(rows);
@@ -23,7 +24,7 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
   const id = 'name' in selector ? selectOriginalAdminIdentity(values(state.adminUsers), selector.name) : allSessions.find(row => row.token === selector.token)?.adminUserId ?? null;
   const user = values(state.adminUsers).find(row => row.adminUserId === id) ?? null;
   const roles = values(state.adminRoleAssignments).filter(row => row.adminUserId === id);
-  const workspaces = values(state.workspacesByScope).filter(w => roles.some(r => r.role === 'workspace_admin' && r.workspaceId === w.workspaceId && r.tenantId === w.tenantId));
+  const workspaces = values(state.workspacesByScope).filter(w => roles.some(r => isOriginalWorkspaceMembership(r) && r.workspaceId === w.workspaceId && r.tenantId === w.tenantId));
   const bucket = 'name' in selector ? originalAdminFailureBucket(user?.username ?? selector.name) : '';
   const snapshot:OriginalAdminSessionSnapshot = {user, sessions: allSessions.filter(row => row.adminUserId === id), roles, workspaces,
     tenants: values(state.tenants).filter(t => workspaces.some(w => w.tenantId === t.tenantId)),
@@ -41,7 +42,7 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
         if(number&&number.tenantId!==w.tenantId)throw Error('Native workspace directory identity scope changed.');
         return{workspace:w,workspaceNumber:number?.workspaceNumber??null,latestModificationAt:selector.directory==='rights'?null:originalDirectoryModification(values(state.sourcePackages??{}),values(state.workspaceActivityEvents??{}).filter(e=>e.eventType==='source_package_assembled'||e.eventType==='source_package_replaced'),w.tenantId,w.workspaceId)};
       });
-      if(selector.directory==='rights')snapshot.directory.roles=values(state.adminRoleAssignments).filter(r=>r.role==='workspace_admin'&&r.groupKey===null&&snapshot.directory!.workspaces!.some(w=>w.workspace.workspaceId===r.workspaceId&&w.workspace.tenantId===r.tenantId));
+      if(selector.directory==='rights')snapshot.directory.roles=values(state.adminRoleAssignments).filter(r=>isOriginalWorkspaceMembership(r)&&r.groupKey===null&&snapshot.directory!.workspaces!.some(w=>w.workspace.workspaceId===r.workspaceId&&w.workspace.tenantId===r.tenantId));
     }
     if(selector.targetAdminNumber!==undefined){
       const number=values(state.originalAdminNumbers??{}).find(n=>n.adminNumber===selector.targetAdminNumber);

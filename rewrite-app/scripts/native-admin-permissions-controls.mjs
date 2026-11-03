@@ -19,7 +19,7 @@ const password='Owned permissions password';
 const kindList=['memory','file','sqlite',...(process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:[])];
 const ordered=rows=>rows.toSorted((a,b)=>a.roleAssignmentId.localeCompare(b.roleAssignmentId));
 const rejection=status=>error=>error.statusCode===status;
-async function fixture(kind,t){
+export async function fixture(kind,t){
   const directory=await mkdtemp(join(tmpdir(),'owned-native-permissions-'));
   const file=join(directory,kind==='file'?'state.json':'state.sqlite');
   const schema='owned_permissions_'+randomUUID().replaceAll('-','');
@@ -47,7 +47,8 @@ async function fixture(kind,t){
   const allRoles=async()=>ordered((await Promise.all((await repository.listAdminUsers()).map(u=>repository.listAdminRoleAssignmentsByUserId(u.adminUserId)))).flat());
   return {kind,file,url,schema,pool,clock,now,root,tenant,one,two,a,b,password,
     get repository(){return repository;},get services(){return services;},allRoles,beforeShutdown:callback=>cleanups.unshift(callback),
-    async reopen(){if(kind!=='memory'){await storage.shutdown();storage=undefined;}await open();},
+    async releaseStorage(){await storage?.shutdown();storage=undefined;},
+    async reopen(){if(kind!=='memory'){await storage?.shutdown();storage=undefined;}await open();},
     users:()=>services.originalAdminPermissions.usersByWorkspace({token:root.token,reference:'1'}),
     workspaces:()=>services.originalAdminPermissions.workspacesByUser({token:root.token,reference:'2'}),
     setUsers:body=>services.originalAdminPermissions.replaceWorkspaceUsers({token:root.token,reference:'1',body}),
@@ -87,7 +88,7 @@ for(const kind of kindList)test(`${kind}: native permission matrices preserve So
     const before=await f.allRoles(),audits=await f.repository.listAdminAuditEvents();
     for(const body of [{},{u:null},{u:[]},{u:'bad'},{u:[{id:2,role:'RW'},{id:999999,role:'RO'}]},
       {u:[{id:2,role:'RO'},{id:2,role:'RW'}]},{u:[{id:2,role:null}]},{u:[{id:2.5,role:'RO'}]},
-      {u:[{id:2,role:'XX'}]},{u:[{id:2,role:' RW '}]}]){
+      {u:[{id:2,role:'12345678901'}]}]){
       await assert.rejects(f.setUsers(body));assert.deepEqual(await f.allRoles(),before);assert.deepEqual(await f.repository.listAdminAuditEvents(),audits);
     }
     await f.reopen();assert.deepEqual(await f.allRoles(),before);

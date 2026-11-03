@@ -5,6 +5,7 @@ import {OriginalPhpNumber, OriginalPhpObject} from './original-test-log-json.js'
 import {prepareOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {compareOriginalParticipantGroupKeys} from './original-participant-group.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {isOriginalWorkspaceMembership,originalWorkspaceRoleValue} from './original-workspace-role.js';
 import {originalAdminMetadataAllowed, prepareOriginalAdminNumber,
   type OriginalAdminSelector, type OriginalAdminSessionRepository, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from './original-admin-session.js';
 
@@ -37,27 +38,31 @@ function bodyNumber(value:unknown):string {
   if(id < -9223372036854775808n || id > 9223372036854775807n)throw internal();
   return id.toString();
 }
-function entries(body:unknown,key:'u'|'ws'):Array<{number:string;mode:'read_only'|'read_write'}> {
+function entries(body:unknown,key:'u'|'ws'):Array<{number:string;role:string}> {
   const value=field(body,key);
   if(value==null||Array.isArray(value)&&!value.length)throw new FirstSliceError(400,'original_permission_list_missing',
     key==='u'?'User-list (u) is missing':'Workspace-list (ws) is missing.');
   if(!Array.isArray(value))throw internal();
-  const result:Array<{number:string;mode:'read_only'|'read_write'}>=[],seen=new Set<string>();
+  const result:Array<{number:string;role:string}>=[],seen=new Set<string>();
   for(const row of value){
     const raw=field(row,'role');
     if(typeof raw!=='string')throw internal();
     if(raw==='')continue; // Source skips the ID entirely for an empty role.
-    const role=pdoText(raw);
-    if(role!=='RO'&&role!=='RW')throw new FirstSliceError(400,'original_permission_role_invalid','Role must be RO or RW.');
+    // PDO truncates at the first NUL. PostgreSQL varchar(10) counts Unicode
+    // characters and discards excess U+0020 spaces, but rejects other excess.
+    const characters=[...pdoText(raw)];
+    if(characters.slice(10).some(character=>character!==' '))throw internal();
+    const role=characters.slice(0,10).join('');
+    if(Buffer.from(role,'utf8').toString('utf8')!==role)throw internal();
     const number=bodyNumber(field(row,'id'));
     if(seen.has(number))throw internal();
-    seen.add(number);result.push({number,mode:role==='RO'?'read_only':'read_write'});
+    seen.add(number);result.push({number,role});
   }
   return result;
 }
 const pair=(r:Pick<AdminRoleAssignment,'adminUserId'|'tenantId'|'workspaceId'>)=>JSON.stringify([r.adminUserId,r.tenantId,r.workspaceId]);
 const inScope=(r:AdminRoleAssignment,scope:NonNullable<OriginalAdminSessionEffect['roleChanges']>['scope'])=>
-  r.role==='workspace_admin'&&r.groupKey===null&&(scope.kind==='user'?r.adminUserId===scope.adminUserId:r.tenantId===scope.tenantId&&r.workspaceId===scope.workspaceId);
+  isOriginalWorkspaceMembership(r)&&r.groupKey===null&&(scope.kind==='user'?r.adminUserId===scope.adminUserId:r.tenantId===scope.tenantId&&r.workspaceId===scope.workspaceId);
 
 /** Storage ports apply only the explicit native workspace grants shown in the
  * current directory. Root/Tenant/monitor roles and hidden scopes are untouched. */
@@ -71,6 +76,7 @@ export function validateOriginalAdminRoleChanges(snapshot:OriginalAdminSessionSn
   if(new Set(change.removeIds).size!==change.removeIds.length||change.removeIds.some(id=>!oldIds.has(id)))throw Error('Native permission removal scope changed.');
   const ids=new Set<string>(),pairs=new Set<string>();
   for(const r of change.assignments){
+    originalWorkspaceRoleValue(r);
     if(!inScope(r,change.scope)||!['read_only','read_write'].includes(r.accessMode)||
       !d.users.some(u=>u.adminUserId===r.adminUserId)||!d.workspaces.some(w=>w.workspace.workspaceId===r.workspaceId&&w.workspace.tenantId===r.tenantId))throw Error('Native permission assignment scope changed.');
     if(ids.has(r.roleAssignmentId)||pairs.has(pair(r)))throw Error('Native permission assignment collision.');
@@ -111,7 +117,7 @@ export function createOriginalAdminPermissionsPort(input:{repository:OriginalAdm
     return {users,workspaces,roles,effect:{adminNumbers,workspaceNumbers,counter,workspaceCounter}};
   }
   function rows(values:Array<{id:string;name:string;role:AdminRoleAssignment|undefined}>):string {
-    return '['+values.map(r=>'{"id":'+r.id+',"name":'+encodeOriginalReportJson(r.name)+',"selected":'+Boolean(r.role)+',"role":'+encodeOriginalReportJson(r.role?(r.role.accessMode==='read_only'?'RO':'RW'):'')+'}').join(',')+']';
+    return '['+values.map(r=>'{"id":'+r.id+',"name":'+encodeOriginalReportJson(r.name)+',"selected":'+Boolean(r.role)+',"role":'+encodeOriginalReportJson(r.role?originalWorkspaceRoleValue(r.role):'')+'}').join(',')+']';
   }
   const replace=(token:string,reference:string,body:unknown,kind:'user'|'workspace')=>run(token,true,s=>{
     const desired=entries(body,kind==='user'?'ws':'u'),d=directory(s),number=originalCommandInteger(reference).toString();
@@ -125,15 +131,20 @@ export function createOriginalAdminPermissionsPort(input:{repository:OriginalAdm
       if(!u||!w)throw internal();
       const key=pair({adminUserId:u.adminUserId,tenantId:w.tenantId,workspaceId:w.workspaceId});
       const previous=d.roles.get(key);
-      wanted.set(key,previous?{...previous,accessMode:row.mode}:{roleAssignmentId:input.id(),adminUserId:u.adminUserId,role:'workspace_admin',accessMode:row.mode,
-        tenantId:w.tenantId,workspaceId:w.workspaceId,groupKey:null,monitorProfiles:[],monitorBookletVisibility:'visible',createdAt:timestamp});
+      const {nativeWorkspaceRole:_oldNativeRole,...base}=previous??{roleAssignmentId:input.id(),adminUserId:u.adminUserId,
+        tenantId:w.tenantId,workspaceId:w.workspaceId,groupKey:null,monitorProfiles:[],monitorBookletVisibility:'visible' as const,createdAt:timestamp};
+      const recognized=row.role==='RO'||row.role==='RW';
+      wanted.set(key,{...base,role:recognized?'workspace_admin':'native_workspace_opaque',accessMode:row.role==='RW'?'read_write':'read_only',
+        ...recognized?{}:{nativeWorkspaceRole:row.role}});
     }
     const old=[...d.roles.values()].filter(r=>inScope(r,scope));
     const removed=old.filter(r=>!wanted.has(pair(r)));
-    const assignments=[...wanted.values()].filter(r=>d.roles.get(pair(r))?.accessMode!==r.accessMode);
+    const assignments=[...wanted.values()].filter(r=>{const before=d.roles.get(pair(r));return !before||before.role!==r.role||before.accessMode!==r.accessMode||before.nativeWorkspaceRole!==r.nativeWorkspaceRole;});
     const audits:AdminAuditEvent[]=[...removed.map(r=>({row:r,eventType:'admin_role_revoked' as const})),...assignments.map(r=>({row:r,eventType:'admin_role_assigned' as const}))].map(({row,eventType})=>({
       adminAuditEventId:input.id(),eventType,actorAdminUserId:s.user!.adminUserId,subjectAdminUserId:row.adminUserId,occurredAt:timestamp,
-      summary:'Native workspace permission '+(eventType==='admin_role_assigned'?'assigned':'revoked'),details:{native:true,roleAssignmentId:row.roleAssignmentId,tenantId:row.tenantId,workspaceId:row.workspaceId,accessMode:row.accessMode}}));
+      summary:'Native workspace permission '+(eventType==='admin_role_assigned'?(row.role==='native_workspace_opaque'?'membership stored without access':'assigned'):'revoked'),
+      details:{native:true,roleAssignmentId:row.roleAssignmentId,role:row.role,tenantId:row.tenantId,workspaceId:row.workspaceId,accessMode:row.accessMode,
+        ...row.role==='native_workspace_opaque'?{nativeWorkspaceRole:originalWorkspaceRoleValue(row)}:{}}}));
     const effect={...d.effect,directoryJson:'',roleChanges:{scope,removeIds:removed.map(r=>r.roleAssignmentId),assignments},audits};
     validateOriginalAdminRoleChanges(s,effect,{token,at:input.now(),directory:'rights',rightsWrite:true});return effect;
   });

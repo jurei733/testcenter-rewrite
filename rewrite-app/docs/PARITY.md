@@ -1,5 +1,63 @@
 # Testcenter parity checklist
 
+### Opaque native workspace roles (2026-11-03, R66; UI integration remains open)
+
+The R65 backend role-value gap is now implemented locally. A fresh
+[233 actual production Source exchanges](../test-fixtures/original-testcenter/source-workspace-results/native-opaque-workspace-roles-http/observations.json)
+prove that membership is distinct from authority: Source stores `XX`, padded
+values and other strings, projects their exact values in both permission
+matrices and Session claims, and rejects their actual read/write requests
+with 403. Clearing a role removes membership and returns 404 for that scope.
+RO may read and RW may read/write. Both matrix replacement directions are
+measured through actual HTTP, not DAO stubs or seeded SQL. The same 137 pinned
+Source files, 19 locked Composer packages, exact `d7045f22` image and effective
+production flags are reverified before/after; the owned baseline grants are
+restored and checked after capture. Test mode, static tokens/time shortcuts
+and insecure password handling remain disabled.
+
+The capture also proves first-NUL PDO binding and PostgreSQL `varchar(10)`
+behavior: ten Unicode characters fit, excess U+0020 spaces are discarded,
+other excess characters fail, and a NUL-only input creates a membership with
+an actually stored empty role. That last case has `selected:true, role:""`;
+it must not be confused with no membership. Rewrite now preserves these
+distinctions across all four stores, durable reopen and native Session reads.
+
+The internal `StoredAdminRole` includes a non-authorizing
+`native_workspace_opaque` kind with its normalized raw value in existing role
+metadata. Publicly assignable `AdminRole` retains its six existing values;
+the regular role API rejects the internal kind. Canonical administration,
+workspace, attachment, monitor and system-check policies continue to use
+explicit recognized-role checks. Native access produces the measured Source
+403 text, even for a stored empty role. Missing or forged opaque metadata fails
+closed instead of defaulting to RW. A normal canonical workspace assignment
+replaces the same opaque record and clears its raw metadata; later revocation
+cannot resurrect the old membership. Audits retain the raw value and explicitly
+describe opaque membership as having no access. Protected Root-role IDs and
+earlier removals survive a failed replacement atomically.
+
+The new Source contract checks and controls are mandatory imports of the native
+Session suite. The old current implementation passed 12 / failed 26 of the first
+Memory witness; after implementation all 38 initial checks pass. Current expanded
+evidence passes 353 checks without skips, including actual File, SQLite and
+PostgreSQL production HTTP, all four durable/service variants, canonical
+regrant/revocation, corrupt metadata, protected-ID collision and audit semantics.
+File HTTP setup transfers ownership between fixture and production server;
+its single-writer exclusion is preserved. The current complete Unit run passes
+5855 checks with no failures/skips. Typechecking and the production build pass;
+the initial bundle is 419.53kB under the unchanged 470kB cap. The full PostgreSQL
+suite passes 3929 checks with no failures or skips. Both broad suites ran before
+the final seven cross-workspace controls; the final 353-check run covers those
+additions. No product source changed between these executions.
+
+No schema, dependency, browser-policy, input, visual tolerance or authorization
+gate is weakened. Source's measured destructive partial effects on an invalid
+write remain recorded; Rewrite preserves the required atomic rollback gate.
+The published R65 PR16 remains Draft while its existing qualification runs;
+its actual Verona job 125888005853 has passed, but that is not a qualification
+of this unpublished R66 tree. The full 49 functional / eight visual Goal remains
+active. Native administration UI adoption, exact identity binding and remaining
+workspace/user CRUD still require implementation and functional/visual evidence.
+
 ### Native workspace permission matrices (2026-11-03, R65; incomplete)
 
 The native Root-only permission API now implements `GET` and `PATCH` for
