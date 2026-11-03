@@ -3891,3 +3891,12 @@ whole-project parity. The49-row ledger remains27done/22partial with all8 broad
 visual rows open; the actual native login still has measured layout, title,
 required-field, footer and administration-entry differences. PR13 stays Draft;
 no approval, merge or deployment is issued.
+
+
+### Independent image18 runtime qualification (2026-11-03)
+
+[Qualification41605299658](https://github.com/jurei733/testcenter-rewrite/actions/runs/41605299658) completes all16 jobs successfully on application25ac3321, wrapper5a231ddd. Only the wrapper workflow differs from the application tree. Job125813521040 records image20261018.96.1 consistently in both the runner header and actual native context. It passes368 policy cases without skips, four native Debian controls, the owned Node22.23.4 normalization exercise and a zero-vulnerability locked audit. Its authenticated17-package APT result retains591 runtime records and the unchanged Source family.
+
+Artifact13216461657 is retained with its GitHub ZIP digest. Independent decoding checks every pixel of eight visible PNGs and24 white repaint frames; every archived Debian package also matches its qualified size and SHA256. The exact20f9 registry adds this successful image18 oracle without relabeling historical26/84/faac records or changing Source pixels, fonts, browser flags, Node, lock or deadlines. The earlier successful steps inside failed visual jobs remain diagnostic evidence and are not promoted.
+
+The other selected worker has a25 runner header but a26 native manifest; that identity discrepancy is retained and does not qualify a new25 record. Fresh production restoration through the actual registry and the complete current-head application acceptance remain required before merge. The participant and Monitor Starter outlets are separately checked with real long-list button/wheel interactions and the complete64-check headed Chrome journey. Whole-project Original parity and deployment are not claimed.
