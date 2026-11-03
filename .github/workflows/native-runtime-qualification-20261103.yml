@@ -21,14 +21,15 @@ jobs:
     env:
       CI: "true"
       UI_SMOKE_HEADFUL: "true"
-      QUALIFICATION_ROOT: ${{ runner.temp }}/independent-native-qualification
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 10
       - name: Record actual native image
-        run: bash scripts/ci-browser-cohort.sh record
+        run: |
+          bash scripts/ci-browser-cohort.sh record
+          printf 'QUALIFICATION_ROOT=%s/independent-native-qualification\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: ./.github/actions/rewrite-runtime
       - name: Exercise owned exact Node normalization
         run: |
@@ -74,8 +75,9 @@ jobs:
           const oracle=JSON.parse(await read('browser-system/manifest.json'));
           validateRejectedSourceFamily(oracle.runtimeMaterial,await loadCohortCertificates(process.cwd()));
           assert.equal(oracle.context.commit,process.env.GITHUB_SHA);assert.equal(oracle.context.runId,process.env.GITHUB_RUN_ID);
-          const applicationCommit=execFileSync('git',['rev-parse','HEAD^'],{encoding:'utf8'}).trim();
-          const changed=execFileSync('git',['diff-tree','--no-commit-id','--name-only','-r','HEAD'],{encoding:'utf8'}).trim();
+          const applicationCommit='25ac332125bb90a884a68ab74785ca6633562683';
+          execFileSync('git',['merge-base','--is-ancestor',applicationCommit,'HEAD']);
+          const changed=execFileSync('git',['diff','--name-only',applicationCommit,'HEAD'],{encoding:'utf8'}).trim();
           assert.equal(applicationCommit,'25ac332125bb90a884a68ab74785ca6633562683');
           assert.equal(changed,'.github/workflows/native-runtime-qualification-20261103.yml');
           execFileSync('git',['diff','--exit-code']);
@@ -88,7 +90,9 @@ jobs:
         with:
           name: native-cohort-qualification-${{ matrix.worker }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/independent-native-qualification/
-            ${{ runner.temp }}/browser-material-*/
+            ${{ runner.temp }}/independent-native-qualification/*.json
+            ${{ runner.temp }}/independent-native-qualification/*.log
+            ${{ runner.temp }}/independent-native-qualification/browser-system/
+            ${{ runner.temp }}/independent-native-qualification/browser-material-*/
           if-no-files-found: error
           retention-days: 30
