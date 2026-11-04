@@ -100,3 +100,15 @@ test('Source immediate CSV selection clearing preserves a new selection across a
  f.c.check(f.c.rows[1],true);assert.deepEqual(f.c.selectedGroups.map(r=>r.groupName),['B']);
  gate.resolve(new Blob(['owned A']));assert.ok((await work).current());assert.deepEqual(f.c.selectedGroups.map(r=>r.groupName),['B']);
 });
+test('one Original Test sort applies to every group and survives deletion refresh and workspace changes',async()=>{
+ const f=fixture(call=>call.path.endsWith('/results')?[row()]:sessions,'tests');await f.c.connect();
+ const expected=Object.entries(sessions).map(([name,rows])=>({name,rows:[...rows].sort((a,b)=>b.loginName.localeCompare(a.loginName))}));
+ f.c.setTestSort('login','desc');assert.deepEqual(f.c.groups.map(g=>({name:g.name,rows:g.rows.map(({checked,...r})=>r)})),expected);
+ const group=f.c.groups[0];f.c.check(group.rows[0],true);const selected=group.rows[0];
+ f.c.setTestSort('booklet','asc');assert.equal(f.c.selectedTests[0],selected,'Sorting retains the exact selected row.');
+ f.c.setTestSort('login','desc');assert.equal(await f.c.captureDeletion().confirm(),true);
+ assert.deepEqual(f.c.groups.map(g=>({name:g.name,rows:g.rows.map(({checked,...r})=>r)})),expected,'Source reapplies the last sort after deletion refresh.');
+ f.setScope({workspaceKey:'new'});await f.c.connect();assert.deepEqual(f.c.groups.map(g=>g.rows.map(r=>r.loginName)),expected.map(g=>g.rows.map(r=>r.loginName)));
+ f.setScope({view:'results'});await f.c.connect();f.setScope({view:'tests'});await f.c.connect();
+ assert.deepEqual(f.c.groups.map(g=>g.rows.map(({checked,...r})=>r)),Object.values(sessions),'Leaving and reopening the Tests tab starts with native order.');
+});

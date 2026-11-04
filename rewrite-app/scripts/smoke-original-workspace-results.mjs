@@ -20,7 +20,7 @@ const file=join(scratch,'owned.sqlite'),storage=createSqliteFirstSliceStorage(fi
  originalXmlSchemaValidator:await prepareOriginalXmlSchemaValidator(schemaCache,false),xmlSchemaProfile:'original-19'});
 const password='Owned-native-results-password-9!',key='owned-results',scope={tenantKey:'owned-results',workspaceKey:key};
 let visual;
-let browser,server,page,base,rootToken,writerToken,readerToken,workspaceId;const markers=[],errors=[],wire=[];
+let browser,server,page,base,rootToken,writerToken,readerToken,workspaceId,ownedPersonToken;const markers=[],errors=[],wire=[];
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
 const mark=name=>{markers.push(name);console.log('native_workspace_results='+name+':passed');};
 const native=async(path,token=writerToken,method='GET',body,accept='application/json')=>{
@@ -54,12 +54,12 @@ try{
  const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType});
  await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-results-player',version:'1.0.0',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned Player'}]})+'</script></html>','text/html');
  await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.RESULT.UNIT</Id><Label>Owned result Unit</Label></Metadata><Definition player="owned-results-player@1.0.0">Owned</Definition>'));
- for(const id of ['A','B'])await upload(id+'.xml',xml('Booklet','<Metadata><Id>OWNED.RESULT.'+id+'</Id><Label>Testheft '+id+' Ω</Label></Metadata><Units><Unit id="OWNED.RESULT.UNIT" label="Owned result Unit"/></Units>'));
- await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/>'+['A','B'].map(id=>`<Group id="OWNED.RESULT.${id}" label="Ergebnisgruppe ${id}"><Login name="owned-result-${id.toLowerCase()}" mode="run-trial"><Booklet>OWNED.RESULT.A</Booklet><Booklet>OWNED.RESULT.B</Booklet></Login></Group>`).join(''))});
+ for(const id of ['A','B','C'])await upload(id+'.xml',xml('Booklet','<Metadata><Id>OWNED.RESULT.'+id+'</Id><Label>Testheft '+id+' Ω</Label></Metadata><Units><Unit id="OWNED.RESULT.UNIT" label="Owned result Unit"/></Units>'));
+ await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/>'+['A','B'].map(id=>`<Group id="OWNED.RESULT.${id}" label="Ergebnisgruppe ${id}"><Login name="owned-result-${id.toLowerCase()}" mode="run-trial"><Booklet>OWNED.RESULT.A</Booklet><Booklet>OWNED.RESULT.B</Booklet><Booklet>OWNED.RESULT.C</Booklet></Login></Group>`).join(''))});
  const reviewFixture=JSON.parse(await readFile(new URL('../test-fixtures/original-testcenter/source-workspace-results/native-result-report-http/observations.json',import.meta.url),'utf8'));
  let clock=1793782800000;
  for(const group of ['A','B']){
-  const actor=await services.originalSession.login({name:'owned-result-'+group.toLowerCase(),password:''});
+  const actor=await services.originalSession.login({name:'owned-result-'+group.toLowerCase(),password:''});if(group==='A')ownedPersonToken=actor.token;
   for(const id of group==='A'?['A','B']:['A']){
    const testNumber=await services.originalTest.create({token:actor.token,bookletName:'OWNED.RESULT.'+id});
    await services.originalTest.read({token:actor.token,testNumber});
@@ -138,16 +138,28 @@ try{
   assert.equal(await page.locator('[data-cy="download-responses"]').isEnabled(),true);
   await tab('Tests löschen');await page.locator('#originalWorkspaceTests mat-row input').first().check();assert.equal(await page.locator('#originalWorkspaceTests .sidebar button').isDisabled(),true);mark('readonly-controls');
  }finally{await ro.close();}
+ // Add a third real Test only after the fixed visual cohort is captured.
+ // Deleting the highest sorted booklet then leaves B,A, distinguishable from
+ // the native A,B creation order and proving post-delete sort reapplication.
+ const extra=await native('/test',ownedPersonToken,'PUT',{bookletName:'OWNED.RESULT.C'});assert.equal(extra.status,201);
+ const extraId=extra.bytes.toString();assert.match(extraId,/^[1-9][0-9]*$/);
+ assert.equal((await native('/test/'+extraId,ownedPersonToken)).status,200);
+ assert.equal((await native('/test/'+extraId+'/state',ownedPersonToken,'PATCH',[{key:'CONTROLLER',content:'RUNNING',timeStamp:++clock}])).status,200);
  const write=await browser.newContext({viewport:{width:1280,height:844}});
  try{
   await open(write,'owned-results-writer','tests');const before=JSON.parse((await native('/workspace/'+workspaceId+'/responses/detailed')).bytes);
   const retained=await native('/workspace/'+workspaceId+'/report/response?dataIds=OWNED.RESULT.B',writerToken,'GET',undefined,'text/csv');
+  const bookletHeader=page.locator('#originalWorkspaceTests mat-header-cell').filter({hasText:'Booklet'}).first();
+  await bookletHeader.click();await bookletHeader.click();
+  await page.locator('#originalWorkspaceTests mat-row').first().getByText('Testheft C Ω',{exact:false}).waitFor();
   await page.locator('#originalWorkspaceTests mat-row input').first().check();await page.locator('#originalWorkspaceTests .sidebar button').click();await waitForMaterialDialog(page);
   await page.locator('[data-cy="dialog-confirm"]').click();await page.locator('#originalWorkspaceTests[aria-busy="false"]').waitFor();
-  await page.waitForFunction(()=>document.querySelectorAll('#originalWorkspaceTests mat-row').length===2);
+  await page.waitForFunction(()=>document.querySelectorAll('#originalWorkspaceTests mat-row').length===3);
+  await page.locator('#originalWorkspaceTests mat-row').first().getByText('Testheft B Ω',{exact:false}).waitFor();
+  mark('last-sort-reapplied-after-actual-test-deletion');
   const after=JSON.parse((await native('/workspace/'+workspaceId+'/responses/detailed')).bytes);assert.equal(Object.values(after).flat().length,Object.values(before).flat().length-1);
   assert.deepEqual((await native('/workspace/'+workspaceId+'/report/response?dataIds=OWNED.RESULT.B',writerToken,'GET',undefined,'text/csv')).bytes,retained.bytes);
-  await page.reload({waitUntil:'domcontentloaded'});await page.locator('#originalWorkspaceTests[aria-busy="false"]').waitFor();assert.equal(await page.locator('#originalWorkspaceTests mat-row').count(),2);
+  await page.reload({waitUntil:'domcontentloaded'});await page.locator('#originalWorkspaceTests[aria-busy="false"]').waitFor();assert.equal(await page.locator('#originalWorkspaceTests mat-row').count(),3);
   mark('actual-selected-test-delete-retains-other-group-and-survives-reload');
   await tab('Ergebnisse/Antworten');await selectGroup('Ergebnisgruppe B');await page.locator('[data-cy="delete-files"]').click();await waitForMaterialDialog(page);
   await page.locator('[data-cy="dialog-confirm"]').click();await page.waitForFunction(()=>document.querySelectorAll('#originalWorkspaceResults mat-row').length===1);

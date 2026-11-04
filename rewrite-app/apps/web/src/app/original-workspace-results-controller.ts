@@ -18,6 +18,7 @@ export class OriginalWorkspaceResultsController {
  groups:Array<{name:string;rows:OriginalTestRow[]}>=[];
  busy=false;loaded=false;problem='';notice='';role:''|'RO'|'RW'='';
  private nativeId='';private epoch=0;private owner:Owner|null=null;private destroyed=false;private selection=0;
+ private testSort={active:'name',direction:'asc'};
  constructor(private readonly transport:OriginalWorkspaceResultsTransport,private readonly current:()=>OriginalResultsScope,
   private readonly changed:()=>void){}
  private owns(o:Owner):boolean {
@@ -31,7 +32,9 @@ export class OriginalWorkspaceResultsController {
  }
  private clear():void{this.rows=[];this.groups=[];this.selection++;this.loaded=false;}
  async connect():Promise<void>{
-  this.owner?.abort.abort();const s=this.current(),o={...s,epoch:++this.epoch,abort:new AbortController()};this.owner=o;
+  this.owner?.abort.abort();const s=this.current();
+  if(this.owner?.view!==s.view)this.testSort={active:'name',direction:'asc'};
+  const o={...s,epoch:++this.epoch,abort:new AbortController()};this.owner=o;
   this.clear();this.nativeId='';this.role='';this.problem='';this.notice='';
   this.busy=!!s.token&&!!s.tenantKey&&!!s.workspaceKey;this.changed();if(!this.busy)return;
   try{
@@ -63,7 +66,16 @@ export class OriginalWorkspaceResultsController {
     })};
    }).filter(group=>group.rows.length);
   }
-  this.selection++;this.loaded=true;
+  this.orderTests();this.selection++;this.loaded=true;
+ }
+ setTestSort(active:string,direction:string):void{
+  if(!this.owner||!this.owns(this.owner)||this.owner.view!=='tests'||this.busy)return;
+  this.testSort={active,direction};this.orderTests();this.changed();
+ }
+ private orderTests():void{
+  const key=this.testSort.active==='login'?'loginName':this.testSort.active==='code'?'code':this.testSort.active==='booklet'?'bookletName':null;
+  if(!key)return;const direction=this.testSort.direction==='asc'?1:-1;
+  for(const group of this.groups)group.rows.sort((a,b)=>a[key].localeCompare(b[key])*direction);
  }
  get canWrite():boolean{return !!this.owner&&this.owns(this.owner)&&this.loaded&&this.role==='RW';}
  get selectedGroups():OriginalResultRow[]{return this.rows.filter(row=>row.checked);}

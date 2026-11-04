@@ -53,10 +53,7 @@ export class OriginalWorkspaceResultsComponent implements OnChanges,OnDestroy {
  ngOnChanges():void{this.deletion?.close(false);void this.controller.connect();}
  ngOnDestroy():void{this.destroyed=true;this.deletion?.close(false);this.controller.destroy();}
  setTableSorting(sort:Sort):void{
-  const key=sort.active==='login'?'loginName':sort.active==='code'?'code':sort.active==='booklet'?'bookletName':null;
-  if(!key)return;const direction=sort.direction==='asc'?1:-1;
-  for(const group of this.controller.groups){group.rows.sort((a,b)=>a[key].localeCompare(b[key])*direction);
-   const source=this.groupDataSources.get(group.name);if(source)source.data=[...group.rows];}
+  this.controller.setTestSort(sort.active,sort.direction);
  }
  downloadResponsesCSV():void{void this.download('response');}
  downloadLogsCSV():void{void this.download('log');}
