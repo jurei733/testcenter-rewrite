@@ -4,11 +4,13 @@ import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 
 // Source has single-account actions. Rewrite batch deletion remains covered
 // independently in the owning gate; Original exercises its actual visible UI.
-export async function runOriginalAdminDeletionSmoke({page,users,api,password,wrongPassword,screen,deletions}){
+export async function runOriginalAdminDeletionSmoke({page,users,nativeUserIds,api,password,wrongPassword,screen,deletions}){
+ assert.equal(nativeUserIds.length,users.length);
+ assert.ok(nativeUserIds.every(id=>/^[1-9][0-9]*$/.test(id)));
  const root=page.locator('#originalSystemAdministration[aria-busy="false"]');await root.waitFor();
  const trigger=page.locator('[data-cy="delete-user"]'),secret=page.locator('#globalConfirmationPasswordInput');
  const submit=page.locator('#globalConfirmationConfirmButton'),backdrop=page.locator('#globalConfirmationBackdrop');
- await page.locator('[data-admin-id="'+users[0].adminUser.adminUserId+'"]').click();
+ await page.locator('[data-admin-id="'+nativeUserIds[0]+'"]').click();
  const open=async()=>{await trigger.click();await waitForMaterialDialog(page);await page.waitForFunction(()=>document.activeElement?.id==='globalConfirmationPasswordInput');};
  await open();assert.equal(await secret.getAttribute('type'),'password');assert.equal(await submit.isDisabled(),true);
  assert.equal(await page.locator('.original-password-confirmation-dialog .mat-mdc-dialog-surface').evaluate(element=>getComputedStyle(element).backgroundColor),'rgb(255, 255, 255)');
@@ -27,7 +29,7 @@ export async function runOriginalAdminDeletionSmoke({page,users,api,password,wro
  assert.equal(deletions.length,1);assert.equal(deletions[0].status(),403);
  assert.ok((await api('/api/v1/admin/users?limit=100')).items.some(item=>item.adminUser.adminUserId===users[0].adminUser.adminUserId));
  await secret.fill(password);await page.locator('#globalConfirmationPasswordError').waitFor({state:'detached'});
- let release,started;const pending=new Promise(done=>release=done),held=new Promise(done=>started=done);const pattern='**/api/v1/admin/users/*';
+ let release,started;const pending=new Promise(done=>release=done),held=new Promise(done=>started=done);const pattern=url=>url.pathname==='/users';
  if(screen==='desktop')await page.route(pattern,async route=>{
   if(route.request().method()==='DELETE'){const response=await route.fetch();started();await pending;await route.fulfill({response});}else await route.continue();
  });
@@ -46,14 +48,17 @@ export async function runOriginalAdminDeletionSmoke({page,users,api,password,wro
  if(screen==='mobile'){
   // Source updates the acknowledged cache without a refresh. A later failed
   // reload must not reopen or replay that completed destructive operation.
-  let faults=0;const pattern='**/api/v1/admin/users**';
+  let faults=0;const pattern=url=>url.pathname==='/users';
   await page.route(pattern,async route=>{if(route.request().method()==='GET'){faults++;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_directory_read_failure',message:'Owned refresh fault'})});}else await route.continue();});
   await page.reload({waitUntil:'domcontentloaded'});await page.locator('#originalAdministrationError').waitFor();
   assert.ok(faults>0);assert.equal(await backdrop.count(),0);assert.equal(deletions.length,2);
   await page.unroute(pattern);await page.reload({waitUntil:'domcontentloaded'});await root.waitFor();
  }
- await page.locator('[data-admin-id="'+users[1].adminUser.adminUserId+'"]').click();await open();await secret.fill(password);await submit.click();await backdrop.waitFor({state:'detached'});await root.waitFor();
+ await page.locator('[data-admin-id="'+nativeUserIds[1]+'"]').click();await open();await secret.fill(password);await submit.click();await backdrop.waitFor({state:'detached'});await root.waitFor();
  assert.equal(deletions.length,3);assert.equal(deletions.at(-1).status(),200);
+ assert.deepEqual(deletions.map(response=>({path:new URL(response.url()).pathname,ids:response.request().postDataJSON().u})),[
+  {path:'/users',ids:[nativeUserIds[0]]},{path:'/users',ids:[nativeUserIds[0]]},{path:'/users',ids:[nativeUserIds[1]]}
+ ]);
  const remaining=(await api('/api/v1/admin/users?limit=100')).items;
  assert.ok(users.every(user=>!remaining.some(item=>item.adminUser.adminUserId===user.adminUser.adminUserId)));
  await page.locator('#originalAdministrationHeader .logo a').click();await page.locator('#deleteWorkspaceButton').waitFor();

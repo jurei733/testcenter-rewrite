@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readdir, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
@@ -26,7 +27,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true" },
   stdio: ["ignore", "ignore", "inherit", "ipc"]
 });
-let browser, token, baseUrl;
+let browser, token, baseUrl, nativeIndex;
 const password = "demo-admin-password", wrongPassword = "owned-wrong-confirmation-password";
 const api = async (path, body, method = body === undefined ? "GET" : "POST") => {
   const response = await fetch(`${baseUrl}${path}`, { method,
@@ -50,8 +51,21 @@ try {
   baseUrl = `http://127.0.0.1:${port}`;
   assert.equal((await fetch(`${baseUrl}/readyz`)).status, 200);
   token = (await api("/api/v1/admin/auth/sign-in", { username: "demo-admin", password })).sessionToken;
+  nativeIndex = new DatabaseSync(join(root, "store.sqlite"), {readOnly:true});
+  const nativeAdminId = async id => {
+    const response = await fetch(baseUrl + '/users', {headers:{AuthToken:token}});
+    assert.equal(response.status,200);
+    await response.arrayBuffer();
+    // Read this disposable database's actual native index; labels and UUID
+    // casts cannot establish a native account identity.
+    const statement = nativeIndex.prepare('SELECT admin_number FROM original_admin_numbers WHERE admin_user_id=?');
+    statement.setReadBigInts(true);
+    const row = statement.get(id);assert.ok(row,'Owned account must have a persisted native ID.');
+    return String(row.admin_number);
+  };
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
-  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
+    ...process.env.UI_SMOKE_BROWSER_CHANNEL?{channel:process.env.UI_SMOKE_BROWSER_CHANNEL}:{} });
   for (const ui of ["rewrite", "original"]) {
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844]]) {
       const fixture = `${ui}-${screen}`;
@@ -79,7 +93,9 @@ try {
       const secretInput = page.locator("#globalConfirmationPasswordInput");
       const submit = page.locator("#globalConfirmationConfirmButton");
       if (ui === "original") {
-        await runOriginalAdminDeletionSmoke({page,users,api,password,wrongPassword,screen,deletions});
+        const nativeUserIds=[];
+        for(const user of users)nativeUserIds.push(await nativeAdminId(user.adminUser.adminUserId));
+        await runOriginalAdminDeletionSmoke({page,users,nativeUserIds,api,password,wrongPassword,screen,deletions});
       } else {
       await page.locator("#adminSignOutButton").waitFor();
       await page.locator("#adminUsersButton").click();
@@ -244,7 +260,7 @@ try {
   await fallbackPage.goto(`${baseUrl}/app/ops?ui=original`, { waitUntil: "networkidle" });
   await fallbackPage.locator("#adminUsername").fill("demo-admin"); await fallbackPage.locator("#adminPassword").fill(password);
   await fallbackPage.locator("#adminSignInButton").click(); await fallbackPage.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
-  await fallbackPage.locator('[data-admin-id="' + fallbackUser.adminUser.adminUserId + '"]').click();
+  await fallbackPage.locator('[data-admin-id="' + await nativeAdminId(fallbackUser.adminUser.adminUserId) + '"]').click();
   await fallbackPage.locator('[data-cy="delete-user"]').click();
   await fallbackPage.waitForFunction(() => document.activeElement?.id === "globalConfirmationPasswordInput");
   try { await fallbackPage.locator("#globalConfirmationConfirmButton").filter({ hasText: "Administrator:in löschen" }).waitFor(); }
@@ -261,6 +277,7 @@ try {
   assert.equal(await fallbackPage.locator('[data-cy="delete-user"]').isEnabled(), true);
   await fallbackContext.close(); console.log("deletion_confirmation=original-renderer-chunk-fallback:passed");
 } finally {
+  nativeIndex?.close();
   await browser?.close(); server.kill("SIGTERM");
   await Promise.race([new Promise(done => server.once("exit", done)), delay(5_000)]);
   if (server.exitCode === null) server.kill("SIGKILL");
