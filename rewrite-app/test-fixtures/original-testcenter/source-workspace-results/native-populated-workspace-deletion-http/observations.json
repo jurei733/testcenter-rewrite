@@ -1,0 +1,3180 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeBefore": {
+    "sourceRuntime": {
+      "verified": true,
+      "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+      "sourceFiles": 137,
+      "composerPackages": 19,
+      "actualHttpExchanges": 112,
+      "observationSha256": "32808d788575b0a5f8fae8a28db809b34755419185b8bba803001e6e2e02e17f",
+      "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+      "php": "8.3.36",
+      "configuration": {
+        "version": "19.0.0",
+        "xmlSchemaValidation": true,
+        "allowTestMode": false,
+        "staticTime": "now",
+        "staticTokens": false,
+        "insecurePasswords": false,
+        "protection": [
+          "login",
+          "person"
+        ]
+      },
+      "readOnlyVerification": true
+    },
+    "broadcaster": {
+      "sourceHashes": {
+        "broadcaster/AGENTS.md": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "broadcaster/CLAUDE.md": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "broadcaster/Dockerfile": "e107ea612c0b8ebbf3699bda73fcbba154c551edfd8fe1e1c800b89ef32777b4",
+        "broadcaster/README": "05bdacdd872352d11ad321cbe73b88e2c068f134378dbf3d267a50bb76f95916",
+        "broadcaster/nest-cli.json": "671121f38a7615744b555cd9276f83c683e527dfb96ee052dfc5c54015449b16",
+        "broadcaster/package-lock.json": "d557eab2a977e740a6c83ae235219da23a600a1b939ab2eaaaef96bff4783633",
+        "broadcaster/package.json": "c19426065f322e650ebd2fd56d849e99f4025151db84ffe17107a573b868cbd8",
+        "broadcaster/src/app.module.ts": "71d3fb585f43e30821a6bb37f509e12965600677f235d4a024b7dc02db9ed8ec",
+        "broadcaster/src/command/command.controller.spec.ts": "e0420332f1410170e22e1a2e764bea573c50712f5e592cba5149ca1648d5ba15",
+        "broadcaster/src/command/command.controller.ts": "67bf6df29ad1738bb10f5aa645debc27dc40c48650aeeca963cd526886addc05",
+        "broadcaster/src/command/command.interface.ts": "db024c730d6cdf716511feeb7fbca2a8fa0e4292227438510f5b6ef2ce3526e0",
+        "broadcaster/src/common/error-handler.ts": "4894c77aa4c43be9ab7e75b5f81e3d38b85feb5ebd94f1fea1e782a5610f1cb5",
+        "broadcaster/src/common/interfaces.ts": "ac5334652079580fd1365b5181314e9b5f6915e0961bb79462be3fb633bd2633",
+        "broadcaster/src/common/websocket.gateway.spec.ts": "f55c0b0fefbc26d1111338b203573dcdca0c9fefa6dda51e569a217b951c5f55",
+        "broadcaster/src/common/websocket.gateway.ts": "dbc95b97e042f741fec16fd6673e75c82f7cf6f509de79a51144b31aba797cb1",
+        "broadcaster/src/logger.ts": "f9b787435520b8e1b3b4e5482ea244f3fd8d44a6fabb56916544248072bc3deb",
+        "broadcaster/src/main.ts": "c531afa5d73afebb7b313270821c59b04c55c3f5ed385885ad7a7b7c6448cd96",
+        "broadcaster/src/monitor/monitor.controller.spec.ts": "a8074eab5ea80b37e08c3174a271e5da1eea8051aba446aeea381eaacc25877b",
+        "broadcaster/src/monitor/monitor.controller.ts": "107aa337b3d7738f3f1ac4b83c9b1dfc40e2efd6c3e94bc1eb89537b245e4801",
+        "broadcaster/src/monitor/monitor.interface.ts": "e770971dff7cd97d161637aee346e2888b26571fe8d1ff0c8aee5eab05d663cb",
+        "broadcaster/src/system/system.controller.ts": "c750636269eda1adc01101dd9924a9c5d1f752f20b7de8ba837ce81c07a9692c",
+        "broadcaster/src/test-session/test-session.controller.spec.ts": "4c163d133e3ce4a9f7015554a5361d7b78baf3e4f3c3626dfa60a157be82cec4",
+        "broadcaster/src/test-session/test-session.controller.ts": "fc7a9a6b05cea01fb94e34b6083dda20633ccdd43be7449ef6a6df4783547216",
+        "broadcaster/src/test-session/test-session.service.spec.ts": "c3f25d3e79125dc839987dc5801b611179ec6fc4b3072a3f1981b6d6b907aad0",
+        "broadcaster/src/test-session/test-session.service.ts": "d8b1b24f78a577db43ef909c12c18f6c9fe0465c565e232edbab3cee6308b305",
+        "broadcaster/src/testee/testee.controller.spec.ts": "244ed3720549cc710b89d84d7e3a01daeee6b88c695d85002a7f60c55f4fc2d1",
+        "broadcaster/src/testee/testee.controller.ts": "915b1ac4cb98a336879c34885103a6cff06941709f4e4d8324e8e1706b69cf4d",
+        "broadcaster/src/testee/testee.interface.ts": "5fa3f92ff045d7c594562c93481515c28bc3135f349f9941110f7fd63c179dbb",
+        "broadcaster/src/testee/testee.service.spec.ts": "2b15b802d7a676c447bbe2ba104afa0da47dcf9e5b6b84c2d67a4447696cf434",
+        "broadcaster/src/testee/testee.service.ts": "574a16ff5f2f5c5681a58ca25426ee32ab4545be3e83f9f38cca2ac025cb1e69",
+        "broadcaster/tsconfig.compodoc.json": "5d307379531d2bfef5d649d0fd7aaa146c218ed7d870ca75470e5f953930ba53",
+        "broadcaster/tsconfig.json": "2894155e46321fbb20565f7f07dd3f07acd05f88cfd2d7e960791b09b0c9a886",
+        "broadcaster/tsconfig.spec.json": "b5f99a1e17821e5bb34ed5059abee886ecec3bfa3b850f6d4314a89b3d697ee7",
+        "common/README": "d2b476d0dc8e085fbff239f70daf44804eccf77626d2972964c699ed4fbdb3d7",
+        "common/src/classes/booklet-config-data.class.ts": "4c8f1e9411f042e4384467c78682dd401e7835dd8186dd3e177987aa28c3f404",
+        "common/src/classes/test-mode-data.class.ts": "abd7104e28380e740b9dc2a85fe4468a08276af61e247cf0da29d9d8295c9f67",
+        "common/src/interfaces/test-session-change.interface.ts": "b61878c1a74f44e8a06391833228e6842113a0da861efa05459e54a1a9785a3d",
+        "common/tsconfig.json": "e010ec721ccde565852f801fd5d402684f7ff4b38191a7fb6041cae2a07be3a9"
+      },
+      "sourceFiles": 38,
+      "image": "sha256:b0ab6f3cb99aa7803adbc14d9027ec1785fc6e433b97e134e0f8fe61683b6b53",
+      "node": "v24.14.1",
+      "bundleSha256": "daa495c5d0a510a6eb29e75cb7149834365028829b9b5a8b4b636550a74ac05b",
+      "broadcasting": {
+        "url": "http://broadcaster:3000",
+        "status": "on"
+      },
+      "originalUnmodified": true
+    }
+  },
+  "runtimeAfter": {
+    "sourceRuntime": {
+      "verified": true,
+      "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+      "sourceFiles": 137,
+      "composerPackages": 19,
+      "actualHttpExchanges": 112,
+      "observationSha256": "32808d788575b0a5f8fae8a28db809b34755419185b8bba803001e6e2e02e17f",
+      "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+      "php": "8.3.36",
+      "configuration": {
+        "version": "19.0.0",
+        "xmlSchemaValidation": true,
+        "allowTestMode": false,
+        "staticTime": "now",
+        "staticTokens": false,
+        "insecurePasswords": false,
+        "protection": [
+          "login",
+          "person"
+        ]
+      },
+      "readOnlyVerification": true
+    },
+    "broadcaster": {
+      "sourceHashes": {
+        "broadcaster/AGENTS.md": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "broadcaster/CLAUDE.md": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "broadcaster/Dockerfile": "e107ea612c0b8ebbf3699bda73fcbba154c551edfd8fe1e1c800b89ef32777b4",
+        "broadcaster/README": "05bdacdd872352d11ad321cbe73b88e2c068f134378dbf3d267a50bb76f95916",
+        "broadcaster/nest-cli.json": "671121f38a7615744b555cd9276f83c683e527dfb96ee052dfc5c54015449b16",
+        "broadcaster/package-lock.json": "d557eab2a977e740a6c83ae235219da23a600a1b939ab2eaaaef96bff4783633",
+        "broadcaster/package.json": "c19426065f322e650ebd2fd56d849e99f4025151db84ffe17107a573b868cbd8",
+        "broadcaster/src/app.module.ts": "71d3fb585f43e30821a6bb37f509e12965600677f235d4a024b7dc02db9ed8ec",
+        "broadcaster/src/command/command.controller.spec.ts": "e0420332f1410170e22e1a2e764bea573c50712f5e592cba5149ca1648d5ba15",
+        "broadcaster/src/command/command.controller.ts": "67bf6df29ad1738bb10f5aa645debc27dc40c48650aeeca963cd526886addc05",
+        "broadcaster/src/command/command.interface.ts": "db024c730d6cdf716511feeb7fbca2a8fa0e4292227438510f5b6ef2ce3526e0",
+        "broadcaster/src/common/error-handler.ts": "4894c77aa4c43be9ab7e75b5f81e3d38b85feb5ebd94f1fea1e782a5610f1cb5",
+        "broadcaster/src/common/interfaces.ts": "ac5334652079580fd1365b5181314e9b5f6915e0961bb79462be3fb633bd2633",
+        "broadcaster/src/common/websocket.gateway.spec.ts": "f55c0b0fefbc26d1111338b203573dcdca0c9fefa6dda51e569a217b951c5f55",
+        "broadcaster/src/common/websocket.gateway.ts": "dbc95b97e042f741fec16fd6673e75c82f7cf6f509de79a51144b31aba797cb1",
+        "broadcaster/src/logger.ts": "f9b787435520b8e1b3b4e5482ea244f3fd8d44a6fabb56916544248072bc3deb",
+        "broadcaster/src/main.ts": "c531afa5d73afebb7b313270821c59b04c55c3f5ed385885ad7a7b7c6448cd96",
+        "broadcaster/src/monitor/monitor.controller.spec.ts": "a8074eab5ea80b37e08c3174a271e5da1eea8051aba446aeea381eaacc25877b",
+        "broadcaster/src/monitor/monitor.controller.ts": "107aa337b3d7738f3f1ac4b83c9b1dfc40e2efd6c3e94bc1eb89537b245e4801",
+        "broadcaster/src/monitor/monitor.interface.ts": "e770971dff7cd97d161637aee346e2888b26571fe8d1ff0c8aee5eab05d663cb",
+        "broadcaster/src/system/system.controller.ts": "c750636269eda1adc01101dd9924a9c5d1f752f20b7de8ba837ce81c07a9692c",
+        "broadcaster/src/test-session/test-session.controller.spec.ts": "4c163d133e3ce4a9f7015554a5361d7b78baf3e4f3c3626dfa60a157be82cec4",
+        "broadcaster/src/test-session/test-session.controller.ts": "fc7a9a6b05cea01fb94e34b6083dda20633ccdd43be7449ef6a6df4783547216",
+        "broadcaster/src/test-session/test-session.service.spec.ts": "c3f25d3e79125dc839987dc5801b611179ec6fc4b3072a3f1981b6d6b907aad0",
+        "broadcaster/src/test-session/test-session.service.ts": "d8b1b24f78a577db43ef909c12c18f6c9fe0465c565e232edbab3cee6308b305",
+        "broadcaster/src/testee/testee.controller.spec.ts": "244ed3720549cc710b89d84d7e3a01daeee6b88c695d85002a7f60c55f4fc2d1",
+        "broadcaster/src/testee/testee.controller.ts": "915b1ac4cb98a336879c34885103a6cff06941709f4e4d8324e8e1706b69cf4d",
+        "broadcaster/src/testee/testee.interface.ts": "5fa3f92ff045d7c594562c93481515c28bc3135f349f9941110f7fd63c179dbb",
+        "broadcaster/src/testee/testee.service.spec.ts": "2b15b802d7a676c447bbe2ba104afa0da47dcf9e5b6b84c2d67a4447696cf434",
+        "broadcaster/src/testee/testee.service.ts": "574a16ff5f2f5c5681a58ca25426ee32ab4545be3e83f9f38cca2ac025cb1e69",
+        "broadcaster/tsconfig.compodoc.json": "5d307379531d2bfef5d649d0fd7aaa146c218ed7d870ca75470e5f953930ba53",
+        "broadcaster/tsconfig.json": "2894155e46321fbb20565f7f07dd3f07acd05f88cfd2d7e960791b09b0c9a886",
+        "broadcaster/tsconfig.spec.json": "b5f99a1e17821e5bb34ed5059abee886ecec3bfa3b850f6d4314a89b3d697ee7",
+        "common/README": "d2b476d0dc8e085fbff239f70daf44804eccf77626d2972964c699ed4fbdb3d7",
+        "common/src/classes/booklet-config-data.class.ts": "4c8f1e9411f042e4384467c78682dd401e7835dd8186dd3e177987aa28c3f404",
+        "common/src/classes/test-mode-data.class.ts": "abd7104e28380e740b9dc2a85fe4468a08276af61e247cf0da29d9d8295c9f67",
+        "common/src/interfaces/test-session-change.interface.ts": "b61878c1a74f44e8a06391833228e6842113a0da861efa05459e54a1a9785a3d",
+        "common/tsconfig.json": "e010ec721ccde565852f801fd5d402684f7ff4b38191a7fb6041cae2a07be3a9"
+      },
+      "sourceFiles": 38,
+      "image": "sha256:b0ab6f3cb99aa7803adbc14d9027ec1785fc6e433b97e134e0f8fe61683b6b53",
+      "node": "v24.14.1",
+      "bundleSha256": "daa495c5d0a510a6eb29e75cb7149834365028829b9b5a8b4b636550a74ac05b",
+      "broadcasting": {
+        "url": "http://broadcaster:3000",
+        "status": "on"
+      },
+      "originalUnmodified": true
+    }
+  },
+  "ownedHTTPWorkspacesOnly": true,
+  "baselineRestored": true,
+  "sqlSeedsOrDaoStubs": false,
+  "readOnlySqlInspection": true,
+  "baselineFiles": {
+    "1": {
+      "exists": false,
+      "files": {}
+    },
+    "2": {
+      "exists": false,
+      "files": {}
+    }
+  },
+  "snapshots": {
+    "targetBefore": {
+      "sql": {
+        "workspaces": 1,
+        "workspace_users": 1,
+        "files": 4,
+        "file_relations": 3,
+        "unit_defs_attachments": 0,
+        "logins": 2,
+        "login_session_groups": 1,
+        "login_sessions": 2,
+        "person_sessions": 2,
+        "tests": 1,
+        "units": 1,
+        "unit_data": 1,
+        "unit_logs": 2,
+        "unit_reviews": 1,
+        "test_commands": 1,
+        "test_logs": 2,
+        "test_reviews": 1
+      },
+      "files": {
+        "exists": true,
+        "files": {
+          "Booklet/owned-delete-booklet.xml": "af0ac4969de6739b6bc346abeb41a20cb76d6f9f481605d77beb16c22ab037e9",
+          "Resource/owned-ws-delete-player-1.0.html": "9122f17c6a5fd56dba43a5ad884cb426fb89f3f85824a2500d8631d7516bcc11",
+          "Testtakers/owned-delete-testtakers.xml": "4f7ed51c2d3450026612e076de55335ea2b172794ddc0596078d375e60f87615",
+          "Unit/owned-delete-unit.xml": "e9c8a5ba4691bae1ca3f63fc247de66c812ab69db5d2b4abfb3a0b946e1c2268"
+        }
+      },
+      "http": {
+        "/files": "{\"Booklet\":[{\"name\":\"owned-delete-booklet.xml\",\"size\":325,\"modificationTime\":1793794334,\"type\":\"Booklet\",\"id\":\"OWNED.WS.DELETE.TARGET\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned target Booklet \\u03a9\",\"description\":\"\"}}],\"Testtakers\":[{\"name\":\"owned-delete-testtakers.xml\",\"size\":439,\"modificationTime\":1793794334,\"type\":\"Testtakers\",\"id\":\"OWNED-DELETE-TESTTAKERS.XML\",\"report\":[],\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"\",\"testtakers\":2}}],\"Unit\":[{\"name\":\"owned-delete-unit.xml\",\"size\":309,\"modificationTime\":1793794334,\"type\":\"Unit\",\"id\":\"OWNED.WS.DELETE.UNIT\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned deletion Unit\",\"description\":\"\"}}],\"Resource\":[{\"name\":\"owned-ws-delete-player-1.0.html\",\"size\":300,\"modificationTime\":1793794334,\"type\":\"Resource\",\"id\":\"OWNED-WS-DELETE-PLAYER-1.0\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"owned-ws-delete-player-1.0.0\",\"description\":\"\"}}]}",
+        "/results": "[{\"groupName\":\"OWNED.W70.TARGET.1793794333705\",\"groupLabel\":\"Owned target group \\u03a9\",\"bookletsStarted\":1,\"numUnitsMin\":1,\"numUnitsMax\":1,\"numUnitsTotal\":1,\"numUnitsAvg\":1,\"lastChange\":1793794334}]",
+        "/responses/detailed": "{\"OWNED.W70.TARGET.1793794333705\":[{\"loginName\":\"owned-w70-1793794333705-target\",\"groupName\":\"OWNED.W70.TARGET.1793794333705\",\"groupLabel\":\"Owned target group \\u03a9\",\"code\":\"\",\"nameSuffix\":\"\",\"bookletName\":\"OWNED.WS.DELETE.TARGET\",\"bookletLabel\":\"Owned target Booklet \\u03a9\"}]}",
+        "/report/response": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"laststate\":\"{\\\"PRESENTATION_PROGRESS\\\": \\\"some\\\"}\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"responses\":[{\"id\":\"owned\",\"content\":\"{\\\"answer\\\":\\\"Owned target answer \\u03a9\\\"}\",\"ts\":1793796000003,\"responseType\":\"owned\"}]}]",
+        "/report/log": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"timestamp\":1793796000002,\"logentry\":\"PRESENTATION_PROGRESS = some\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"timestamp\":1793796000004,\"logentry\":\"OWNED_UNIT = \\\"Owned target unit log\\\"\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000001,\"logentry\":\"OWNED.STORED : \\\"Owned target state \\\\u03a9\\\"\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000005,\"logentry\":\"OWNED_TEST : \\\"Owned target test log\\\"\"}]",
+        "/report/review": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:14\",\"entry\":\"Owned target unit review \\u03a9\\n  line two\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"userAgent\":\"Owned Source deletion probe\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:14\",\"entry\":\"Owned target test review \\u03a9\\n  line two\",\"page\":null,\"pagelabel\":null,\"originalUnitId\":\"\",\"userAgent\":\"Owned Source deletion probe\"}]"
+      }
+    },
+    "controlBefore": {
+      "sql": {
+        "workspaces": 1,
+        "workspace_users": 1,
+        "files": 4,
+        "file_relations": 3,
+        "unit_defs_attachments": 0,
+        "logins": 2,
+        "login_session_groups": 1,
+        "login_sessions": 2,
+        "person_sessions": 2,
+        "tests": 1,
+        "units": 1,
+        "unit_data": 1,
+        "unit_logs": 2,
+        "unit_reviews": 1,
+        "test_commands": 1,
+        "test_logs": 2,
+        "test_reviews": 1
+      },
+      "files": {
+        "exists": true,
+        "files": {
+          "Booklet/owned-delete-booklet.xml": "864ec215234bd4e1704c14d17c831e535e9c4877d4c32290b83a6a0bf3fbdf1e",
+          "Resource/owned-ws-delete-player-1.0.html": "9122f17c6a5fd56dba43a5ad884cb426fb89f3f85824a2500d8631d7516bcc11",
+          "Testtakers/owned-delete-testtakers.xml": "83b50999dd4c3d021be1f1c42c04ccddd4b83e3228ba4d9b29fd03ddee164f6c",
+          "Unit/owned-delete-unit.xml": "351d816c36010df55384744488998eb1e0c2f343e31ec824f91f20cf9616c24b"
+        }
+      },
+      "http": {
+        "/files": "{\"Booklet\":[{\"name\":\"owned-delete-booklet.xml\",\"size\":327,\"modificationTime\":1793794335,\"type\":\"Booklet\",\"id\":\"OWNED.WS.DELETE.CONTROL\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned control Booklet \\u03a9\",\"description\":\"\"}}],\"Testtakers\":[{\"name\":\"owned-delete-testtakers.xml\",\"size\":444,\"modificationTime\":1793794335,\"type\":\"Testtakers\",\"id\":\"OWNED-DELETE-TESTTAKERS.XML\",\"report\":[],\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"\",\"testtakers\":2}}],\"Unit\":[{\"name\":\"owned-delete-unit.xml\",\"size\":310,\"modificationTime\":1793794335,\"type\":\"Unit\",\"id\":\"OWNED.WS.DELETE.UNIT\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned deletion Unit\",\"description\":\"\"}}],\"Resource\":[{\"name\":\"owned-ws-delete-player-1.0.html\",\"size\":300,\"modificationTime\":1793794335,\"type\":\"Resource\",\"id\":\"OWNED-WS-DELETE-PLAYER-1.0\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"owned-ws-delete-player-1.0.0\",\"description\":\"\"}}]}",
+        "/results": "[{\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"bookletsStarted\":1,\"numUnitsMin\":1,\"numUnitsMax\":1,\"numUnitsTotal\":1,\"numUnitsAvg\":1,\"lastChange\":1793794335}]",
+        "/responses/detailed": "{\"OWNED.W70.CONTROL.1793794333705\":[{\"loginName\":\"owned-w70-1793794333705-control\",\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"code\":\"\",\"nameSuffix\":\"\",\"bookletName\":\"OWNED.WS.DELETE.CONTROL\",\"bookletLabel\":\"Owned control Booklet \\u03a9\"}]}",
+        "/report/response": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"laststate\":\"{\\\"PRESENTATION_PROGRESS\\\": \\\"some\\\"}\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"responses\":[{\"id\":\"owned\",\"content\":\"{\\\"answer\\\":\\\"Owned control answer \\u03a9\\\"}\",\"ts\":1793796000009,\"responseType\":\"owned\"}]}]",
+        "/report/log": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000008,\"logentry\":\"PRESENTATION_PROGRESS = some\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000010,\"logentry\":\"OWNED_UNIT = \\\"Owned control unit log\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000007,\"logentry\":\"OWNED.STORED : \\\"Owned control state \\\\u03a9\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000011,\"logentry\":\"OWNED_TEST : \\\"Owned control test log\\\"\"}]",
+        "/report/review": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control unit review \\u03a9\\n  line two\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"userAgent\":\"Owned Source deletion probe\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control test review \\u03a9\\n  line two\",\"page\":null,\"pagelabel\":null,\"originalUnitId\":\"\",\"userAgent\":\"Owned Source deletion probe\"}]"
+      }
+    },
+    "cacheBefore": {
+      "/clients": [
+        "[owned-subscribeToken-6]",
+        "[owned-subscribeToken-5]",
+        "[owned-subscribeToken-11]",
+        "[owned-subscribeToken-10]"
+      ],
+      "/testees": [
+        {
+          "testId": 5,
+          "disconnectNotificationUri": "http://127.0.0.1:32775/test/5/connection-lost",
+          "token": "[owned-subscribeToken-6]"
+        },
+        {
+          "testId": 6,
+          "disconnectNotificationUri": "http://127.0.0.1:32775/test/6/connection-lost",
+          "token": "[owned-subscribeToken-11]"
+        }
+      ],
+      "/monitors": [
+        {
+          "groups": [
+            "OWNED.W70.TARGET.1793794333705"
+          ],
+          "token": "[owned-subscribeToken-5]"
+        },
+        {
+          "groups": [
+            "OWNED.W70.CONTROL.1793794333705"
+          ],
+          "token": "[owned-subscribeToken-10]"
+        }
+      ],
+      "/test-sessions": [
+        {
+          "personId": 9,
+          "timestamp": 1793794334,
+          "testId": 5,
+          "groupName": "OWNED.W70.TARGET.1793794333705",
+          "groupLabel": "Owned target group Ω",
+          "personLabel": "owned-w70-1793794333705-target",
+          "mode": "run-trial",
+          "testState": {
+            "OWNED.STORED": "Owned target state Ω",
+            "status": "running"
+          },
+          "bookletName": "OWNED.WS.DELETE.TARGET",
+          "unitState": {}
+        },
+        {
+          "personId": 11,
+          "timestamp": 1793794335,
+          "testId": 6,
+          "groupName": "OWNED.W70.CONTROL.1793794333705",
+          "groupLabel": "Owned control group Ω",
+          "personLabel": "owned-w70-1793794333705-control",
+          "mode": "run-trial",
+          "testState": {
+            "OWNED.STORED": "Owned control state Ω",
+            "status": "running"
+          },
+          "bookletName": "OWNED.WS.DELETE.CONTROL",
+          "unitState": {}
+        }
+      ]
+    },
+    "peersAfter": [
+      {
+        "label": "target-commands",
+        "closed": true,
+        "closeCode": 1005,
+        "closeReason": "",
+        "messages": [
+          {
+            "event": "commands",
+            "data": [
+              {
+                "id": 5,
+                "keyword": "pause",
+                "arguments": [],
+                "timestamp": 1793796000
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "label": "target-monitor",
+        "closed": true,
+        "closeCode": 1005,
+        "closeReason": "",
+        "messages": []
+      },
+      {
+        "label": "control-commands",
+        "closed": true,
+        "closeCode": 1005,
+        "closeReason": "",
+        "messages": [
+          {
+            "event": "commands",
+            "data": [
+              {
+                "id": 6,
+                "keyword": "pause",
+                "arguments": [],
+                "timestamp": 1793796000
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "label": "control-monitor",
+        "closed": true,
+        "closeCode": 1005,
+        "closeReason": "",
+        "messages": []
+      }
+    ],
+    "cacheAfter": {
+      "/clients": [],
+      "/testees": [],
+      "/monitors": [],
+      "/test-sessions": []
+    },
+    "targetAfter": {
+      "sql": {
+        "workspaces": 0,
+        "workspace_users": 0,
+        "files": 0,
+        "file_relations": 0,
+        "unit_defs_attachments": 0,
+        "logins": 0,
+        "login_session_groups": 1,
+        "login_sessions": 0,
+        "person_sessions": 0,
+        "tests": 0,
+        "units": 0,
+        "unit_data": 0,
+        "unit_logs": 0,
+        "unit_reviews": 0,
+        "test_commands": 0,
+        "test_logs": 0,
+        "test_reviews": 0
+      },
+      "files": {
+        "exists": false,
+        "files": {}
+      }
+    },
+    "controlAfter": {
+      "sql": {
+        "workspaces": 1,
+        "workspace_users": 1,
+        "files": 4,
+        "file_relations": 3,
+        "unit_defs_attachments": 0,
+        "logins": 2,
+        "login_session_groups": 1,
+        "login_sessions": 2,
+        "person_sessions": 2,
+        "tests": 1,
+        "units": 1,
+        "unit_data": 1,
+        "unit_logs": 2,
+        "unit_reviews": 1,
+        "test_commands": 1,
+        "test_logs": 2,
+        "test_reviews": 1
+      },
+      "files": {
+        "exists": true,
+        "files": {
+          "Booklet/owned-delete-booklet.xml": "864ec215234bd4e1704c14d17c831e535e9c4877d4c32290b83a6a0bf3fbdf1e",
+          "Resource/owned-ws-delete-player-1.0.html": "9122f17c6a5fd56dba43a5ad884cb426fb89f3f85824a2500d8631d7516bcc11",
+          "Testtakers/owned-delete-testtakers.xml": "83b50999dd4c3d021be1f1c42c04ccddd4b83e3228ba4d9b29fd03ddee164f6c",
+          "Unit/owned-delete-unit.xml": "351d816c36010df55384744488998eb1e0c2f343e31ec824f91f20cf9616c24b"
+        }
+      },
+      "http": {
+        "/files": "{\"Booklet\":[{\"name\":\"owned-delete-booklet.xml\",\"size\":327,\"modificationTime\":1793794335,\"type\":\"Booklet\",\"id\":\"OWNED.WS.DELETE.CONTROL\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned control Booklet \\u03a9\",\"description\":\"\"}}],\"Testtakers\":[{\"name\":\"owned-delete-testtakers.xml\",\"size\":444,\"modificationTime\":1793794335,\"type\":\"Testtakers\",\"id\":\"OWNED-DELETE-TESTTAKERS.XML\",\"report\":[],\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"\",\"testtakers\":2}}],\"Unit\":[{\"name\":\"owned-delete-unit.xml\",\"size\":310,\"modificationTime\":1793794335,\"type\":\"Unit\",\"id\":\"OWNED.WS.DELETE.UNIT\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned deletion Unit\",\"description\":\"\"}}],\"Resource\":[{\"name\":\"owned-ws-delete-player-1.0.html\",\"size\":300,\"modificationTime\":1793794335,\"type\":\"Resource\",\"id\":\"OWNED-WS-DELETE-PLAYER-1.0\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"owned-ws-delete-player-1.0.0\",\"description\":\"\"}}]}",
+        "/results": "[{\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"bookletsStarted\":1,\"numUnitsMin\":1,\"numUnitsMax\":1,\"numUnitsTotal\":1,\"numUnitsAvg\":1,\"lastChange\":1793794335}]",
+        "/responses/detailed": "{\"OWNED.W70.CONTROL.1793794333705\":[{\"loginName\":\"owned-w70-1793794333705-control\",\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"code\":\"\",\"nameSuffix\":\"\",\"bookletName\":\"OWNED.WS.DELETE.CONTROL\",\"bookletLabel\":\"Owned control Booklet \\u03a9\"}]}",
+        "/report/response": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"laststate\":\"{\\\"PRESENTATION_PROGRESS\\\": \\\"some\\\"}\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"responses\":[{\"id\":\"owned\",\"content\":\"{\\\"answer\\\":\\\"Owned control answer \\u03a9\\\"}\",\"ts\":1793796000009,\"responseType\":\"owned\"}]}]",
+        "/report/log": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000008,\"logentry\":\"PRESENTATION_PROGRESS = some\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000010,\"logentry\":\"OWNED_UNIT = \\\"Owned control unit log\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000007,\"logentry\":\"OWNED.STORED : \\\"Owned control state \\\\u03a9\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000011,\"logentry\":\"OWNED_TEST : \\\"Owned control test log\\\"\"}]",
+        "/report/review": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control unit review \\u03a9\\n  line two\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"userAgent\":\"Owned Source deletion probe\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control test review \\u03a9\\n  line two\",\"page\":null,\"pagelabel\":null,\"originalUnitId\":\"\",\"userAgent\":\"Owned Source deletion probe\"}]"
+      }
+    },
+    "freshSubscriptionAccepted": true,
+    "owned": {
+      "target": {
+        "id": "64",
+        "testId": "5",
+        "group": "OWNED.W70.TARGET.1793794333705"
+      },
+      "control": {
+        "id": "65",
+        "testId": "6",
+        "group": "OWNED.W70.CONTROL.1793794333705"
+      }
+    }
+  },
+  "createdOwnedIDs": [
+    "64",
+    "65"
+  ],
+  "actualHttpExchanges": 97,
+  "rows": [
+    {
+      "label": "root-login",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "requestBody": {
+        "name": "super",
+        "password": "[owned-root-password]"
+      },
+      "rawText": "{\"token\":\"[owned-token-1]\",\"displayName\":\"super\",\"loginName\":\"super\",\"groupLabel\":null,\"id\":1,\"pwSetByAdmin\":false,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[],\"superAdmin\":[]}}",
+      "value": {
+        "token": "[owned-token-1]",
+        "displayName": "super",
+        "loginName": "super",
+        "groupLabel": null,
+        "id": 1,
+        "pwSetByAdmin": false,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "accd6a658c12768225b5eeb869dd3239526129561ff8fb0d360121e644718c39"
+    },
+    {
+      "label": "baseline-users",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "c794271d6db4a100f521b736df4280ad9d667001417b71cf3d158f4f965d6d34"
+    },
+    {
+      "label": "baseline-workspaces",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"latest_modification_ts\":null},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"latest_modification_ts\":null}]",
+      "value": [
+        {
+          "id": 1,
+          "name": "Owned permissions One Ω",
+          "latest_modification_ts": null
+        },
+        {
+          "id": 2,
+          "name": "Owned permissions Two β",
+          "latest_modification_ts": null
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "5150a89ca8a6fe0560d42df48d488f47f1e7aab8949c29ebef62a445df84b05c"
+    },
+    {
+      "label": "baseline-root-workspaces",
+      "method": "GET",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"selected\":false,\"role\":\"\"},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"selected\":false,\"role\":\"\"}]",
+      "value": [
+        {
+          "id": 1,
+          "name": "Owned permissions One Ω",
+          "selected": false,
+          "role": ""
+        },
+        {
+          "id": 2,
+          "name": "Owned permissions Two β",
+          "selected": false,
+          "role": ""
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "6c46392897c8903ab9f5076e5900e73253479d0a9a8889c36f123ddb2ab15645"
+    },
+    {
+      "label": "target-create",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "name": "Owned W70 1793794333705 target"
+      },
+      "rawText": "64",
+      "value": 64,
+      "subscribeToken": null,
+      "redactedBodySha256": "a68b412c4282555f15546cf6e1fc42893b7e07f271557ceb021821098dd66c1b"
+    },
+    {
+      "label": "target-grant",
+      "method": "PATCH",
+      "path": "/workspace/64/users",
+      "status": 200,
+      "contentType": "text/plain;charset=UTF-8",
+      "requestBody": {
+        "u": [
+          {
+            "id": 1,
+            "role": "RW"
+          }
+        ]
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-upload-owned-ws-delete-player-1.0.html",
+      "method": "POST",
+      "path": "/workspace/64/file",
+      "status": 201,
+      "contentType": "application/json",
+      "requestBody": "[actual multipart upload]",
+      "rawText": "{\"owned-ws-delete-player-1.0.html\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\",\"Resource is never used\"]}}",
+      "value": {
+        "owned-ws-delete-player-1.0.html": {
+          "warning": [
+            "Could not read metadata: $schema missing",
+            "Metadata missing. Version guessed from Filename.",
+            "Resource is never used"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "579453e20b750ae264d07a2eabac7e759ba1057fe4a7bcd71c17b8fb1baa2e03"
+    },
+    {
+      "label": "target-upload-owned-delete-unit.xml",
+      "method": "POST",
+      "path": "/workspace/64/file",
+      "status": 201,
+      "contentType": "application/json",
+      "requestBody": "[actual multipart upload]",
+      "rawText": "{\"owned-delete-unit.xml\":{\"warning\":[\"Unit is never used\"]}}",
+      "value": {
+        "owned-delete-unit.xml": {
+          "warning": [
+            "Unit is never used"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "9d4627a251629800773fbb6a3fba3d2dd4d0e640b540daeeae1ab6e8ebf84d67"
+    },
+    {
+      "label": "target-upload-owned-delete-booklet.xml",
+      "method": "POST",
+      "path": "/workspace/64/file",
+      "status": 201,
+      "contentType": "application/json",
+      "requestBody": "[actual multipart upload]",
+      "rawText": "{\"owned-delete-booklet.xml\":{\"warning\":[\"Booklet is never used\"]}}",
+      "value": {
+        "owned-delete-booklet.xml": {
+          "warning": [
+            "Booklet is never used"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "b5b3b19f5d0c40acce53c84d1d3a7cdf3b0000b605e797848b20127896a1013e"
+    },
+    {
+      "label": "target-upload-owned-delete-testtakers.xml",
+      "method": "POST",
+      "path": "/workspace/64/file",
+      "status": 201,
+      "contentType": "application/json",
+      "requestBody": "[actual multipart upload]",
+      "rawText": "{\"owned-delete-testtakers.xml\":[]}",
+      "value": {
+        "owned-delete-testtakers.xml": []
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "30d66c5245b7f60af524d655e8367995dc0ff405bd83ed36be295efc47a15c19"
+    },
+    {
+      "label": "target-participant-login",
+      "method": "PUT",
+      "path": "/session/login",
+      "status": 200,
+      "contentType": "application/json",
+      "requestBody": {
+        "name": "owned-w70-1793794333705-target",
+        "password": ""
+      },
+      "rawText": "{\"token\":\"[owned-token-2]\",\"displayName\":\"Owned target group \\u03a9\\/owned-w70-1793794333705-target\",\"loginName\":\"owned-w70-1793794333705-target\",\"groupLabel\":\"Owned target group \\u03a9\",\"id\":null,\"pwSetByAdmin\":null,\"customTexts\":{},\"flags\":[],\"claims\":{\"test\":[{\"id\":\"OWNED.WS.DELETE.TARGET\",\"type\":\"test\",\"label\":\"Owned target Booklet \\u03a9\",\"flags\":{\"locked\":false,\"running\":false}}]},\"groupToken\":\"[owned-groupToken-3]\",\"viewSettings\":[],\"access\":{\"test\":[\"OWNED.WS.DELETE.TARGET\"]}}",
+      "value": {
+        "token": "[owned-token-2]",
+        "displayName": "Owned target group Ω/owned-w70-1793794333705-target",
+        "loginName": "owned-w70-1793794333705-target",
+        "groupLabel": "Owned target group Ω",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "test": [
+            {
+              "id": "OWNED.WS.DELETE.TARGET",
+              "type": "test",
+              "label": "Owned target Booklet Ω",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            }
+          ]
+        },
+        "groupToken": "[owned-groupToken-3]",
+        "viewSettings": [],
+        "access": {
+          "test": [
+            "OWNED.WS.DELETE.TARGET"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "65c786cdd64d51b6dca407b4eb5bf60a56c7ed4f5d8d732c466e2b81b306d872"
+    },
+    {
+      "label": "target-test-create",
+      "method": "PUT",
+      "path": "/test",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "bookletName": "OWNED.WS.DELETE.TARGET"
+      },
+      "rawText": "5",
+      "value": 5,
+      "subscribeToken": null,
+      "redactedBodySha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d"
+    },
+    {
+      "label": "target-test-open",
+      "method": "GET",
+      "path": "/test/5",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"mode\":\"run-trial\",\"laststate\":[],\"xml\":\"<Booklet xmlns:xsi=\\\"http:\\/\\/www.w3.org\\/2001\\/XMLSchema-instance\\\" xsi:noNamespaceSchemaLocation=\\\"https:\\/\\/w3id.org\\/iqb\\/spec\\/testcenter-booklet-xml\\/18.0\\\"><Metadata><Id>OWNED.WS.DELETE.TARGET<\\/Id><Label>Owned target Booklet \\u03a9<\\/Label><\\/Metadata><Units><Unit id=\\\"OWNED.WS.DELETE.UNIT\\\" label=\\\"Owned deletion Unit\\\"\\/><\\/Units><\\/Booklet>\",\"resources\":{\"OWNED.WS.DELETE.UNIT\":{\"usesPlayer\":[\"Resource\\/owned-ws-delete-player-1.0.html\"]}},\"firstStart\":true,\"workspaceId\":64,\"presetBookletStates\":[]}",
+      "value": {
+        "mode": "run-trial",
+        "laststate": [],
+        "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>OWNED.WS.DELETE.TARGET</Id><Label>Owned target Booklet Ω</Label></Metadata><Units><Unit id=\"OWNED.WS.DELETE.UNIT\" label=\"Owned deletion Unit\"/></Units></Booklet>",
+        "resources": {
+          "OWNED.WS.DELETE.UNIT": {
+            "usesPlayer": [
+              "Resource/owned-ws-delete-player-1.0.html"
+            ]
+          }
+        },
+        "firstStart": true,
+        "workspaceId": 64,
+        "presetBookletStates": []
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "1ea613d7dbb05333f166ebb4ba6db52064ac6db9c817dff8f18ba6fd88eeaf80"
+    },
+    {
+      "label": "target-test-state",
+      "method": "PATCH",
+      "path": "/test/5/state",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": [
+        {
+          "key": "OWNED.STORED",
+          "content": "Owned target state Ω",
+          "timeStamp": 1793796000001
+        }
+      ],
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-unit-state",
+      "method": "PATCH",
+      "path": "/test/5/unit/OWNED.WS.DELETE.UNIT/state",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "originalUnitId": "OWNED.ORIGINAL.target",
+        "newState": [
+          {
+            "key": "PRESENTATION_PROGRESS",
+            "content": "some",
+            "timeStamp": 1793796000002
+          }
+        ]
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-response",
+      "method": "PUT",
+      "path": "/test/5/unit/OWNED.WS.DELETE.UNIT/response",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "timeStamp": 1793796000003,
+        "dataParts": {
+          "owned": "{\"answer\":\"Owned target answer Ω\"}"
+        },
+        "responseType": "owned"
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-unit-log",
+      "method": "PUT",
+      "path": "/test/5/unit/OWNED.WS.DELETE.UNIT/log",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "logEntries": [
+          {
+            "key": "OWNED_UNIT",
+            "content": "Owned target unit log",
+            "timeStamp": 1793796000004
+          }
+        ]
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-test-log",
+      "method": "PUT",
+      "path": "/test/5/log",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": [
+        {
+          "key": "OWNED_TEST",
+          "content": "Owned target test log",
+          "timeStamp": 1793796000005
+        }
+      ],
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-unit-review",
+      "method": "PUT",
+      "path": "/test/5/unit/OWNED.WS.DELETE.UNIT/review",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "priority": 2,
+        "categories": "tech design",
+        "entry": "Owned target unit review Ω\n  line two",
+        "reviewer": "Reviewer Ä",
+        "userAgent": "Owned Source deletion probe",
+        "originalUnitId": "OWNED.ORIGINAL.target",
+        "page": 3,
+        "pagelabel": "Teilaufgabe β"
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-unit-reviews",
+      "method": "GET",
+      "path": "/test/5/unit/OWNED.WS.DELETE.UNIT/reviews",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":5,\"unit_name\":\"OWNED.WS.DELETE.UNIT\",\"test_id\":5,\"person_id\":9,\"reviewtime\":\"2026-11-04 12:12:14+00\",\"priority\":2,\"categories\":\"tech design\",\"entry\":\"Owned target unit review \\u03a9\\n  line two\",\"reviewer\":\"Reviewer \\u00c4\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"userAgent\":\"Owned Source deletion probe\",\"originalUnitId\":\"OWNED.ORIGINAL.target\"}]",
+      "value": [
+        {
+          "id": 5,
+          "unit_name": "OWNED.WS.DELETE.UNIT",
+          "test_id": 5,
+          "person_id": 9,
+          "reviewtime": "2026-11-04 12:12:14+00",
+          "priority": 2,
+          "categories": "tech design",
+          "entry": "Owned target unit review Ω\n  line two",
+          "reviewer": "Reviewer Ä",
+          "page": 3,
+          "pagelabel": "Teilaufgabe β",
+          "userAgent": "Owned Source deletion probe",
+          "originalUnitId": "OWNED.ORIGINAL.target"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "d09df0d170e3fd87b2235dfc93cc52d98c7be48cb5f616d1d966a32062c2f2cf"
+    },
+    {
+      "label": "target-test-review",
+      "method": "PUT",
+      "path": "/test/5/review",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "priority": 2,
+        "categories": "tech design",
+        "entry": "Owned target test review Ω\n  line two",
+        "reviewer": "Reviewer Ä",
+        "userAgent": "Owned Source deletion probe",
+        "originalUnitId": "OWNED.ORIGINAL.target",
+        "page": 3,
+        "pagelabel": "Teilaufgabe β"
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-test-reviews",
+      "method": "GET",
+      "path": "/test/5/reviews",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":5,\"booklet_id\":5,\"person_id\":9,\"reviewtime\":\"2026-11-04 12:12:14+00\",\"priority\":2,\"categories\":\"tech design\",\"entry\":\"Owned target test review \\u03a9\\n  line two\",\"reviewer\":\"Reviewer \\u00c4\",\"userAgent\":\"Owned Source deletion probe\"}]",
+      "value": [
+        {
+          "id": 5,
+          "booklet_id": 5,
+          "person_id": 9,
+          "reviewtime": "2026-11-04 12:12:14+00",
+          "priority": 2,
+          "categories": "tech design",
+          "entry": "Owned target test review Ω\n  line two",
+          "reviewer": "Reviewer Ä",
+          "userAgent": "Owned Source deletion probe"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "d3109602bddc9772ca257882feb593252316b8de6cfcdfcf2a6f15575aed07ec"
+    },
+    {
+      "label": "target-monitor-login",
+      "method": "PUT",
+      "path": "/session/login",
+      "status": 200,
+      "contentType": "application/json",
+      "requestBody": {
+        "name": "owned-w70-1793794333705-target-m",
+        "password": ""
+      },
+      "rawText": "{\"token\":\"[owned-token-4]\",\"displayName\":\"Owned target group \\u03a9\\/owned-w70-1793794333705-target-m\",\"loginName\":\"owned-w70-1793794333705-target-m\",\"groupLabel\":\"Owned target group \\u03a9\",\"id\":null,\"pwSetByAdmin\":null,\"customTexts\":{},\"flags\":[],\"claims\":{\"test\":[{\"id\":\"OWNED.WS.DELETE.TARGET\",\"type\":\"test\",\"label\":\"Owned target Booklet \\u03a9\",\"flags\":{\"locked\":false,\"running\":false}}],\"testGroupMonitor\":[{\"id\":\"OWNED.W70.TARGET.1793794333705\",\"type\":\"testGroupMonitor\",\"label\":\"Owned target group \\u03a9\",\"flags\":[]}]},\"groupToken\":\"[owned-groupToken-3]\",\"viewSettings\":[],\"access\":{\"test\":[\"OWNED.WS.DELETE.TARGET\"],\"testGroupMonitor\":[\"OWNED.W70.TARGET.1793794333705\"]}}",
+      "value": {
+        "token": "[owned-token-4]",
+        "displayName": "Owned target group Ω/owned-w70-1793794333705-target-m",
+        "loginName": "owned-w70-1793794333705-target-m",
+        "groupLabel": "Owned target group Ω",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "test": [
+            {
+              "id": "OWNED.WS.DELETE.TARGET",
+              "type": "test",
+              "label": "Owned target Booklet Ω",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            }
+          ],
+          "testGroupMonitor": [
+            {
+              "id": "OWNED.W70.TARGET.1793794333705",
+              "type": "testGroupMonitor",
+              "label": "Owned target group Ω",
+              "flags": []
+            }
+          ]
+        },
+        "groupToken": "[owned-groupToken-3]",
+        "viewSettings": [],
+        "access": {
+          "test": [
+            "OWNED.WS.DELETE.TARGET"
+          ],
+          "testGroupMonitor": [
+            "OWNED.W70.TARGET.1793794333705"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "0987e705e722e6c44b767dbc544414b60ecf09f6c7a26497bf45428f3d6c36b3"
+    },
+    {
+      "label": "target-monitor-sessions",
+      "method": "GET",
+      "path": "/monitor/group/OWNED.W70.TARGET.1793794333705/test-sessions",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"personId\":9,\"timestamp\":1793794334,\"testId\":5,\"groupName\":\"OWNED.W70.TARGET.1793794333705\",\"groupLabel\":\"Owned target group \\u03a9\",\"personLabel\":\"owned-w70-1793794333705-target\",\"mode\":\"run-trial\",\"testState\":{\"OWNED.STORED\":\"Owned target state \\u03a9\",\"status\":\"running\"},\"bookletName\":\"OWNED.WS.DELETE.TARGET\",\"unitState\":{}}]",
+      "value": [
+        {
+          "personId": 9,
+          "timestamp": 1793794334,
+          "testId": 5,
+          "groupName": "OWNED.W70.TARGET.1793794333705",
+          "groupLabel": "Owned target group Ω",
+          "personLabel": "owned-w70-1793794333705-target",
+          "mode": "run-trial",
+          "testState": {
+            "OWNED.STORED": "Owned target state Ω",
+            "status": "running"
+          },
+          "bookletName": "OWNED.WS.DELETE.TARGET",
+          "unitState": {}
+        }
+      ],
+      "subscribeToken": "[owned-subscribeToken-5]",
+      "redactedBodySha256": "23557ae8d64bf931717fd8fd7fd2849bceb72b115ca65e371ca3e4264e007962"
+    },
+    {
+      "label": "target-commands",
+      "method": "GET",
+      "path": "/test/5/commands",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[]",
+      "value": [],
+      "subscribeToken": "[owned-subscribeToken-6]",
+      "redactedBodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "label": "target-pending-command",
+      "method": "PUT",
+      "path": "/monitor/command",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "keyword": "pause",
+        "arguments": [],
+        "timestamp": 1793796000,
+        "testIds": [
+          5
+        ]
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-create",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "name": "Owned W70 1793794333705 control"
+      },
+      "rawText": "65",
+      "value": 65,
+      "subscribeToken": null,
+      "redactedBodySha256": "108c995b953c8a35561103e2014cf828eb654a99e310f87fab94c2f4b7d2a04f"
+    },
+    {
+      "label": "control-grant",
+      "method": "PATCH",
+      "path": "/workspace/65/users",
+      "status": 200,
+      "contentType": "text/plain;charset=UTF-8",
+      "requestBody": {
+        "u": [
+          {
+            "id": 1,
+            "role": "RW"
+          }
+        ]
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-upload-owned-ws-delete-player-1.0.html",
+      "method": "POST",
+      "path": "/workspace/65/file",
+      "status": 201,
+      "contentType": "application/json",
+      "requestBody": "[actual multipart upload]",
+      "rawText": "{\"owned-ws-delete-player-1.0.html\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\",\"Resource is never used\"]}}",
+      "value": {
+        "owned-ws-delete-player-1.0.html": {
+          "warning": [
+            "Could not read metadata: $schema missing",
+            "Metadata missing. Version guessed from Filename.",
+            "Resource is never used"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "579453e20b750ae264d07a2eabac7e759ba1057fe4a7bcd71c17b8fb1baa2e03"
+    },
+    {
+      "label": "control-upload-owned-delete-unit.xml",
+      "method": "POST",
+      "path": "/workspace/65/file",
+      "status": 201,
+      "contentType": "application/json",
+      "requestBody": "[actual multipart upload]",
+      "rawText": "{\"owned-delete-unit.xml\":{\"warning\":[\"Unit is never used\"]}}",
+      "value": {
+        "owned-delete-unit.xml": {
+          "warning": [
+            "Unit is never used"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "9d4627a251629800773fbb6a3fba3d2dd4d0e640b540daeeae1ab6e8ebf84d67"
+    },
+    {
+      "label": "control-upload-owned-delete-booklet.xml",
+      "method": "POST",
+      "path": "/workspace/65/file",
+      "status": 201,
+      "contentType": "application/json",
+      "requestBody": "[actual multipart upload]",
+      "rawText": "{\"owned-delete-booklet.xml\":{\"warning\":[\"Booklet is never used\"]}}",
+      "value": {
+        "owned-delete-booklet.xml": {
+          "warning": [
+            "Booklet is never used"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "b5b3b19f5d0c40acce53c84d1d3a7cdf3b0000b605e797848b20127896a1013e"
+    },
+    {
+      "label": "control-upload-owned-delete-testtakers.xml",
+      "method": "POST",
+      "path": "/workspace/65/file",
+      "status": 201,
+      "contentType": "application/json",
+      "requestBody": "[actual multipart upload]",
+      "rawText": "{\"owned-delete-testtakers.xml\":[]}",
+      "value": {
+        "owned-delete-testtakers.xml": []
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "30d66c5245b7f60af524d655e8367995dc0ff405bd83ed36be295efc47a15c19"
+    },
+    {
+      "label": "control-participant-login",
+      "method": "PUT",
+      "path": "/session/login",
+      "status": 200,
+      "contentType": "application/json",
+      "requestBody": {
+        "name": "owned-w70-1793794333705-control",
+        "password": ""
+      },
+      "rawText": "{\"token\":\"[owned-token-7]\",\"displayName\":\"Owned control group \\u03a9\\/owned-w70-1793794333705-control\",\"loginName\":\"owned-w70-1793794333705-control\",\"groupLabel\":\"Owned control group \\u03a9\",\"id\":null,\"pwSetByAdmin\":null,\"customTexts\":{},\"flags\":[],\"claims\":{\"test\":[{\"id\":\"OWNED.WS.DELETE.CONTROL\",\"type\":\"test\",\"label\":\"Owned control Booklet \\u03a9\",\"flags\":{\"locked\":false,\"running\":false}}]},\"groupToken\":\"[owned-groupToken-8]\",\"viewSettings\":[],\"access\":{\"test\":[\"OWNED.WS.DELETE.CONTROL\"]}}",
+      "value": {
+        "token": "[owned-token-7]",
+        "displayName": "Owned control group Ω/owned-w70-1793794333705-control",
+        "loginName": "owned-w70-1793794333705-control",
+        "groupLabel": "Owned control group Ω",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "test": [
+            {
+              "id": "OWNED.WS.DELETE.CONTROL",
+              "type": "test",
+              "label": "Owned control Booklet Ω",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            }
+          ]
+        },
+        "groupToken": "[owned-groupToken-8]",
+        "viewSettings": [],
+        "access": {
+          "test": [
+            "OWNED.WS.DELETE.CONTROL"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "780e3e37c5ffea88e315334ad65168103446270197d5600d8d5f6080fe1a475d"
+    },
+    {
+      "label": "control-test-create",
+      "method": "PUT",
+      "path": "/test",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "bookletName": "OWNED.WS.DELETE.CONTROL"
+      },
+      "rawText": "6",
+      "value": 6,
+      "subscribeToken": null,
+      "redactedBodySha256": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683"
+    },
+    {
+      "label": "control-test-open",
+      "method": "GET",
+      "path": "/test/6",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"mode\":\"run-trial\",\"laststate\":[],\"xml\":\"<Booklet xmlns:xsi=\\\"http:\\/\\/www.w3.org\\/2001\\/XMLSchema-instance\\\" xsi:noNamespaceSchemaLocation=\\\"https:\\/\\/w3id.org\\/iqb\\/spec\\/testcenter-booklet-xml\\/18.0\\\"><Metadata><Id>OWNED.WS.DELETE.CONTROL<\\/Id><Label>Owned control Booklet \\u03a9<\\/Label><\\/Metadata><Units><Unit id=\\\"OWNED.WS.DELETE.UNIT\\\" label=\\\"Owned deletion Unit\\\"\\/><\\/Units><\\/Booklet>\",\"resources\":{\"OWNED.WS.DELETE.UNIT\":{\"usesPlayer\":[\"Resource\\/owned-ws-delete-player-1.0.html\"]}},\"firstStart\":true,\"workspaceId\":65,\"presetBookletStates\":[]}",
+      "value": {
+        "mode": "run-trial",
+        "laststate": [],
+        "xml": "<Booklet xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0\"><Metadata><Id>OWNED.WS.DELETE.CONTROL</Id><Label>Owned control Booklet Ω</Label></Metadata><Units><Unit id=\"OWNED.WS.DELETE.UNIT\" label=\"Owned deletion Unit\"/></Units></Booklet>",
+        "resources": {
+          "OWNED.WS.DELETE.UNIT": {
+            "usesPlayer": [
+              "Resource/owned-ws-delete-player-1.0.html"
+            ]
+          }
+        },
+        "firstStart": true,
+        "workspaceId": 65,
+        "presetBookletStates": []
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "40d41058938f02b93d9e260e9f662b20706f1955a5571d87ea1e6e7f3081f282"
+    },
+    {
+      "label": "control-test-state",
+      "method": "PATCH",
+      "path": "/test/6/state",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": [
+        {
+          "key": "OWNED.STORED",
+          "content": "Owned control state Ω",
+          "timeStamp": 1793796000007
+        }
+      ],
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-unit-state",
+      "method": "PATCH",
+      "path": "/test/6/unit/OWNED.WS.DELETE.UNIT/state",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "originalUnitId": "OWNED.ORIGINAL.control",
+        "newState": [
+          {
+            "key": "PRESENTATION_PROGRESS",
+            "content": "some",
+            "timeStamp": 1793796000008
+          }
+        ]
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-response",
+      "method": "PUT",
+      "path": "/test/6/unit/OWNED.WS.DELETE.UNIT/response",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "timeStamp": 1793796000009,
+        "dataParts": {
+          "owned": "{\"answer\":\"Owned control answer Ω\"}"
+        },
+        "responseType": "owned"
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-unit-log",
+      "method": "PUT",
+      "path": "/test/6/unit/OWNED.WS.DELETE.UNIT/log",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "logEntries": [
+          {
+            "key": "OWNED_UNIT",
+            "content": "Owned control unit log",
+            "timeStamp": 1793796000010
+          }
+        ]
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-test-log",
+      "method": "PUT",
+      "path": "/test/6/log",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": [
+        {
+          "key": "OWNED_TEST",
+          "content": "Owned control test log",
+          "timeStamp": 1793796000011
+        }
+      ],
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-unit-review",
+      "method": "PUT",
+      "path": "/test/6/unit/OWNED.WS.DELETE.UNIT/review",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "priority": 2,
+        "categories": "tech design",
+        "entry": "Owned control unit review Ω\n  line two",
+        "reviewer": "Reviewer Ä",
+        "userAgent": "Owned Source deletion probe",
+        "originalUnitId": "OWNED.ORIGINAL.control",
+        "page": 3,
+        "pagelabel": "Teilaufgabe β"
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-unit-reviews",
+      "method": "GET",
+      "path": "/test/6/unit/OWNED.WS.DELETE.UNIT/reviews",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":6,\"unit_name\":\"OWNED.WS.DELETE.UNIT\",\"test_id\":6,\"person_id\":11,\"reviewtime\":\"2026-11-04 12:12:15+00\",\"priority\":2,\"categories\":\"tech design\",\"entry\":\"Owned control unit review \\u03a9\\n  line two\",\"reviewer\":\"Reviewer \\u00c4\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"userAgent\":\"Owned Source deletion probe\",\"originalUnitId\":\"OWNED.ORIGINAL.control\"}]",
+      "value": [
+        {
+          "id": 6,
+          "unit_name": "OWNED.WS.DELETE.UNIT",
+          "test_id": 6,
+          "person_id": 11,
+          "reviewtime": "2026-11-04 12:12:15+00",
+          "priority": 2,
+          "categories": "tech design",
+          "entry": "Owned control unit review Ω\n  line two",
+          "reviewer": "Reviewer Ä",
+          "page": 3,
+          "pagelabel": "Teilaufgabe β",
+          "userAgent": "Owned Source deletion probe",
+          "originalUnitId": "OWNED.ORIGINAL.control"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "4841f3f3b6db9ea3696d73a3428acda05a0f03e000b6439a94b6ad09bc7661c4"
+    },
+    {
+      "label": "control-test-review",
+      "method": "PUT",
+      "path": "/test/6/review",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "priority": 2,
+        "categories": "tech design",
+        "entry": "Owned control test review Ω\n  line two",
+        "reviewer": "Reviewer Ä",
+        "userAgent": "Owned Source deletion probe",
+        "originalUnitId": "OWNED.ORIGINAL.control",
+        "page": 3,
+        "pagelabel": "Teilaufgabe β"
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "control-test-reviews",
+      "method": "GET",
+      "path": "/test/6/reviews",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":6,\"booklet_id\":6,\"person_id\":11,\"reviewtime\":\"2026-11-04 12:12:15+00\",\"priority\":2,\"categories\":\"tech design\",\"entry\":\"Owned control test review \\u03a9\\n  line two\",\"reviewer\":\"Reviewer \\u00c4\",\"userAgent\":\"Owned Source deletion probe\"}]",
+      "value": [
+        {
+          "id": 6,
+          "booklet_id": 6,
+          "person_id": 11,
+          "reviewtime": "2026-11-04 12:12:15+00",
+          "priority": 2,
+          "categories": "tech design",
+          "entry": "Owned control test review Ω\n  line two",
+          "reviewer": "Reviewer Ä",
+          "userAgent": "Owned Source deletion probe"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "a490dfdd470686a44ae9522a895400dc9f2ffc7424e372e42cacbd95e8bac42e"
+    },
+    {
+      "label": "control-monitor-login",
+      "method": "PUT",
+      "path": "/session/login",
+      "status": 200,
+      "contentType": "application/json",
+      "requestBody": {
+        "name": "owned-w70-1793794333705-control-m",
+        "password": ""
+      },
+      "rawText": "{\"token\":\"[owned-token-9]\",\"displayName\":\"Owned control group \\u03a9\\/owned-w70-1793794333705-control-m\",\"loginName\":\"owned-w70-1793794333705-control-m\",\"groupLabel\":\"Owned control group \\u03a9\",\"id\":null,\"pwSetByAdmin\":null,\"customTexts\":{},\"flags\":[],\"claims\":{\"test\":[{\"id\":\"OWNED.WS.DELETE.CONTROL\",\"type\":\"test\",\"label\":\"Owned control Booklet \\u03a9\",\"flags\":{\"locked\":false,\"running\":false}}],\"testGroupMonitor\":[{\"id\":\"OWNED.W70.CONTROL.1793794333705\",\"type\":\"testGroupMonitor\",\"label\":\"Owned control group \\u03a9\",\"flags\":[]}]},\"groupToken\":\"[owned-groupToken-8]\",\"viewSettings\":[],\"access\":{\"test\":[\"OWNED.WS.DELETE.CONTROL\"],\"testGroupMonitor\":[\"OWNED.W70.CONTROL.1793794333705\"]}}",
+      "value": {
+        "token": "[owned-token-9]",
+        "displayName": "Owned control group Ω/owned-w70-1793794333705-control-m",
+        "loginName": "owned-w70-1793794333705-control-m",
+        "groupLabel": "Owned control group Ω",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "test": [
+            {
+              "id": "OWNED.WS.DELETE.CONTROL",
+              "type": "test",
+              "label": "Owned control Booklet Ω",
+              "flags": {
+                "locked": false,
+                "running": false
+              }
+            }
+          ],
+          "testGroupMonitor": [
+            {
+              "id": "OWNED.W70.CONTROL.1793794333705",
+              "type": "testGroupMonitor",
+              "label": "Owned control group Ω",
+              "flags": []
+            }
+          ]
+        },
+        "groupToken": "[owned-groupToken-8]",
+        "viewSettings": [],
+        "access": {
+          "test": [
+            "OWNED.WS.DELETE.CONTROL"
+          ],
+          "testGroupMonitor": [
+            "OWNED.W70.CONTROL.1793794333705"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "7bb91991e9e453397fccc2daf017b24615d047dbd370726156ced800fb8dbe7b"
+    },
+    {
+      "label": "control-monitor-sessions",
+      "method": "GET",
+      "path": "/monitor/group/OWNED.W70.CONTROL.1793794333705/test-sessions",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"personId\":11,\"timestamp\":1793794335,\"testId\":6,\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"personLabel\":\"owned-w70-1793794333705-control\",\"mode\":\"run-trial\",\"testState\":{\"OWNED.STORED\":\"Owned control state \\u03a9\",\"status\":\"running\"},\"bookletName\":\"OWNED.WS.DELETE.CONTROL\",\"unitState\":{}}]",
+      "value": [
+        {
+          "personId": 11,
+          "timestamp": 1793794335,
+          "testId": 6,
+          "groupName": "OWNED.W70.CONTROL.1793794333705",
+          "groupLabel": "Owned control group Ω",
+          "personLabel": "owned-w70-1793794333705-control",
+          "mode": "run-trial",
+          "testState": {
+            "OWNED.STORED": "Owned control state Ω",
+            "status": "running"
+          },
+          "bookletName": "OWNED.WS.DELETE.CONTROL",
+          "unitState": {}
+        }
+      ],
+      "subscribeToken": "[owned-subscribeToken-10]",
+      "redactedBodySha256": "e8c4e995671bd9a1d4a6076ac1507c2e653dbff5cdac595272259fa3522b1421"
+    },
+    {
+      "label": "control-commands",
+      "method": "GET",
+      "path": "/test/6/commands",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[]",
+      "value": [],
+      "subscribeToken": "[owned-subscribeToken-11]",
+      "redactedBodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "label": "control-pending-command",
+      "method": "PUT",
+      "path": "/monitor/command",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "keyword": "pause",
+        "arguments": [],
+        "timestamp": 1793796000,
+        "testIds": [
+          6
+        ]
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "target-before/files",
+      "method": "GET",
+      "path": "/workspace/64/files",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"Booklet\":[{\"name\":\"owned-delete-booklet.xml\",\"size\":325,\"modificationTime\":1793794334,\"type\":\"Booklet\",\"id\":\"OWNED.WS.DELETE.TARGET\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned target Booklet \\u03a9\",\"description\":\"\"}}],\"Testtakers\":[{\"name\":\"owned-delete-testtakers.xml\",\"size\":439,\"modificationTime\":1793794334,\"type\":\"Testtakers\",\"id\":\"OWNED-DELETE-TESTTAKERS.XML\",\"report\":[],\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"\",\"testtakers\":2}}],\"Unit\":[{\"name\":\"owned-delete-unit.xml\",\"size\":309,\"modificationTime\":1793794334,\"type\":\"Unit\",\"id\":\"OWNED.WS.DELETE.UNIT\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned deletion Unit\",\"description\":\"\"}}],\"Resource\":[{\"name\":\"owned-ws-delete-player-1.0.html\",\"size\":300,\"modificationTime\":1793794334,\"type\":\"Resource\",\"id\":\"OWNED-WS-DELETE-PLAYER-1.0\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"owned-ws-delete-player-1.0.0\",\"description\":\"\"}}]}",
+      "value": {
+        "Booklet": [
+          {
+            "name": "owned-delete-booklet.xml",
+            "size": 325,
+            "modificationTime": 1793794334,
+            "type": "Booklet",
+            "id": "OWNED.WS.DELETE.TARGET",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned target Booklet Ω",
+              "description": ""
+            }
+          }
+        ],
+        "Testtakers": [
+          {
+            "name": "owned-delete-testtakers.xml",
+            "size": 439,
+            "modificationTime": 1793794334,
+            "type": "Testtakers",
+            "id": "OWNED-DELETE-TESTTAKERS.XML",
+            "report": [],
+            "dependencies": [],
+            "info": {
+              "label": "",
+              "description": "",
+              "testtakers": 2
+            }
+          }
+        ],
+        "Unit": [
+          {
+            "name": "owned-delete-unit.xml",
+            "size": 309,
+            "modificationTime": 1793794334,
+            "type": "Unit",
+            "id": "OWNED.WS.DELETE.UNIT",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned deletion Unit",
+              "description": ""
+            }
+          }
+        ],
+        "Resource": [
+          {
+            "name": "owned-ws-delete-player-1.0.html",
+            "size": 300,
+            "modificationTime": 1793794334,
+            "type": "Resource",
+            "id": "OWNED-WS-DELETE-PLAYER-1.0",
+            "report": {
+              "warning": [
+                "Could not read metadata: $schema missing",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "owned-ws-delete-player-1.0.0",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "4410e4f6b1efc1111d1df273f7336cdc5b4a4e5aaa2377212b2a9462951fed47"
+    },
+    {
+      "label": "target-before/results",
+      "method": "GET",
+      "path": "/workspace/64/results",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupName\":\"OWNED.W70.TARGET.1793794333705\",\"groupLabel\":\"Owned target group \\u03a9\",\"bookletsStarted\":1,\"numUnitsMin\":1,\"numUnitsMax\":1,\"numUnitsTotal\":1,\"numUnitsAvg\":1,\"lastChange\":1793794334}]",
+      "value": [
+        {
+          "groupName": "OWNED.W70.TARGET.1793794333705",
+          "groupLabel": "Owned target group Ω",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793794334
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "6f4a0b9da0681d526cf3cfebddb212e38b366e44f91e1dac16a274d8a03f5b7b"
+    },
+    {
+      "label": "target-before/responses/detailed",
+      "method": "GET",
+      "path": "/workspace/64/responses/detailed",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"OWNED.W70.TARGET.1793794333705\":[{\"loginName\":\"owned-w70-1793794333705-target\",\"groupName\":\"OWNED.W70.TARGET.1793794333705\",\"groupLabel\":\"Owned target group \\u03a9\",\"code\":\"\",\"nameSuffix\":\"\",\"bookletName\":\"OWNED.WS.DELETE.TARGET\",\"bookletLabel\":\"Owned target Booklet \\u03a9\"}]}",
+      "value": {
+        "OWNED.W70.TARGET.1793794333705": [
+          {
+            "loginName": "owned-w70-1793794333705-target",
+            "groupName": "OWNED.W70.TARGET.1793794333705",
+            "groupLabel": "Owned target group Ω",
+            "code": "",
+            "nameSuffix": "",
+            "bookletName": "OWNED.WS.DELETE.TARGET",
+            "bookletLabel": "Owned target Booklet Ω"
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "977dcb497d45a22a1092f1b0fbc6b8d88e8a817ca1a5d793d15703d08a024a24"
+    },
+    {
+      "label": "target-before/report/response",
+      "method": "GET",
+      "path": "/workspace/64/report/response",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"laststate\":\"{\\\"PRESENTATION_PROGRESS\\\": \\\"some\\\"}\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"responses\":[{\"id\":\"owned\",\"content\":\"{\\\"answer\\\":\\\"Owned target answer \\u03a9\\\"}\",\"ts\":1793796000003,\"responseType\":\"owned\"}]}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "laststate": "{\"PRESENTATION_PROGRESS\": \"some\"}",
+          "originalUnitId": "OWNED.ORIGINAL.target",
+          "responses": [
+            {
+              "id": "owned",
+              "content": "{\"answer\":\"Owned target answer Ω\"}",
+              "ts": 1793796000003,
+              "responseType": "owned"
+            }
+          ]
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "c6d41b3c8cd20c489164c5c8811f80cb25f57f8abe9824bea058a0428400aee1"
+    },
+    {
+      "label": "target-before/report/log",
+      "method": "GET",
+      "path": "/workspace/64/report/log",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"timestamp\":1793796000002,\"logentry\":\"PRESENTATION_PROGRESS = some\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"timestamp\":1793796000004,\"logentry\":\"OWNED_UNIT = \\\"Owned target unit log\\\"\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000001,\"logentry\":\"OWNED.STORED : \\\"Owned target state \\\\u03a9\\\"\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000005,\"logentry\":\"OWNED_TEST : \\\"Owned target test log\\\"\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.target",
+          "timestamp": 1793796000002,
+          "logentry": "PRESENTATION_PROGRESS = some"
+        },
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.target",
+          "timestamp": 1793796000004,
+          "logentry": "OWNED_UNIT = \"Owned target unit log\""
+        },
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000001,
+          "logentry": "OWNED.STORED : \"Owned target state \\u03a9\""
+        },
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000005,
+          "logentry": "OWNED_TEST : \"Owned target test log\""
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "459941761067f8fb5952156ed797a2e054adca81f63c7be8bfe3ecafef5e90e3"
+    },
+    {
+      "label": "target-before/report/review",
+      "method": "GET",
+      "path": "/workspace/64/report/review",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:14\",\"entry\":\"Owned target unit review \\u03a9\\n  line two\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"userAgent\":\"Owned Source deletion probe\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:14\",\"entry\":\"Owned target test review \\u03a9\\n  line two\",\"page\":null,\"pagelabel\":null,\"originalUnitId\":\"\",\"userAgent\":\"Owned Source deletion probe\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:14",
+          "entry": "Owned target unit review Ω\n  line two",
+          "page": 3,
+          "pagelabel": "Teilaufgabe β",
+          "originalUnitId": "OWNED.ORIGINAL.target",
+          "userAgent": "Owned Source deletion probe"
+        },
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:14",
+          "entry": "Owned target test review Ω\n  line two",
+          "page": null,
+          "pagelabel": null,
+          "originalUnitId": "",
+          "userAgent": "Owned Source deletion probe"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "03345e2e9ebfa44515be355eb0849f16165c39e9ea44a3f6acc7fb192900b502"
+    },
+    {
+      "label": "control-before/files",
+      "method": "GET",
+      "path": "/workspace/65/files",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"Booklet\":[{\"name\":\"owned-delete-booklet.xml\",\"size\":327,\"modificationTime\":1793794335,\"type\":\"Booklet\",\"id\":\"OWNED.WS.DELETE.CONTROL\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned control Booklet \\u03a9\",\"description\":\"\"}}],\"Testtakers\":[{\"name\":\"owned-delete-testtakers.xml\",\"size\":444,\"modificationTime\":1793794335,\"type\":\"Testtakers\",\"id\":\"OWNED-DELETE-TESTTAKERS.XML\",\"report\":[],\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"\",\"testtakers\":2}}],\"Unit\":[{\"name\":\"owned-delete-unit.xml\",\"size\":310,\"modificationTime\":1793794335,\"type\":\"Unit\",\"id\":\"OWNED.WS.DELETE.UNIT\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned deletion Unit\",\"description\":\"\"}}],\"Resource\":[{\"name\":\"owned-ws-delete-player-1.0.html\",\"size\":300,\"modificationTime\":1793794335,\"type\":\"Resource\",\"id\":\"OWNED-WS-DELETE-PLAYER-1.0\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"owned-ws-delete-player-1.0.0\",\"description\":\"\"}}]}",
+      "value": {
+        "Booklet": [
+          {
+            "name": "owned-delete-booklet.xml",
+            "size": 327,
+            "modificationTime": 1793794335,
+            "type": "Booklet",
+            "id": "OWNED.WS.DELETE.CONTROL",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned control Booklet Ω",
+              "description": ""
+            }
+          }
+        ],
+        "Testtakers": [
+          {
+            "name": "owned-delete-testtakers.xml",
+            "size": 444,
+            "modificationTime": 1793794335,
+            "type": "Testtakers",
+            "id": "OWNED-DELETE-TESTTAKERS.XML",
+            "report": [],
+            "dependencies": [],
+            "info": {
+              "label": "",
+              "description": "",
+              "testtakers": 2
+            }
+          }
+        ],
+        "Unit": [
+          {
+            "name": "owned-delete-unit.xml",
+            "size": 310,
+            "modificationTime": 1793794335,
+            "type": "Unit",
+            "id": "OWNED.WS.DELETE.UNIT",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned deletion Unit",
+              "description": ""
+            }
+          }
+        ],
+        "Resource": [
+          {
+            "name": "owned-ws-delete-player-1.0.html",
+            "size": 300,
+            "modificationTime": 1793794335,
+            "type": "Resource",
+            "id": "OWNED-WS-DELETE-PLAYER-1.0",
+            "report": {
+              "warning": [
+                "Could not read metadata: $schema missing",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "owned-ws-delete-player-1.0.0",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "e8ab7dc84e8736357045b3e48296bb45afafbd45600aae22839a523d28e1f281"
+    },
+    {
+      "label": "control-before/results",
+      "method": "GET",
+      "path": "/workspace/65/results",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"bookletsStarted\":1,\"numUnitsMin\":1,\"numUnitsMax\":1,\"numUnitsTotal\":1,\"numUnitsAvg\":1,\"lastChange\":1793794335}]",
+      "value": [
+        {
+          "groupName": "OWNED.W70.CONTROL.1793794333705",
+          "groupLabel": "Owned control group Ω",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793794335
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "49aecf6538c1ddc887d35cbac476be454bd25af6d5c42a3c1e0992eb014cce48"
+    },
+    {
+      "label": "control-before/responses/detailed",
+      "method": "GET",
+      "path": "/workspace/65/responses/detailed",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"OWNED.W70.CONTROL.1793794333705\":[{\"loginName\":\"owned-w70-1793794333705-control\",\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"code\":\"\",\"nameSuffix\":\"\",\"bookletName\":\"OWNED.WS.DELETE.CONTROL\",\"bookletLabel\":\"Owned control Booklet \\u03a9\"}]}",
+      "value": {
+        "OWNED.W70.CONTROL.1793794333705": [
+          {
+            "loginName": "owned-w70-1793794333705-control",
+            "groupName": "OWNED.W70.CONTROL.1793794333705",
+            "groupLabel": "Owned control group Ω",
+            "code": "",
+            "nameSuffix": "",
+            "bookletName": "OWNED.WS.DELETE.CONTROL",
+            "bookletLabel": "Owned control Booklet Ω"
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "69a3a688980f52e76100808f4ccfddd8d413a9d4cb47d5b003fd23a9b3721ce2"
+    },
+    {
+      "label": "control-before/report/response",
+      "method": "GET",
+      "path": "/workspace/65/report/response",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"laststate\":\"{\\\"PRESENTATION_PROGRESS\\\": \\\"some\\\"}\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"responses\":[{\"id\":\"owned\",\"content\":\"{\\\"answer\\\":\\\"Owned control answer \\u03a9\\\"}\",\"ts\":1793796000009,\"responseType\":\"owned\"}]}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "laststate": "{\"PRESENTATION_PROGRESS\": \"some\"}",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "responses": [
+            {
+              "id": "owned",
+              "content": "{\"answer\":\"Owned control answer Ω\"}",
+              "ts": 1793796000009,
+              "responseType": "owned"
+            }
+          ]
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "23816954eaeeacfc16809a8f6da958ec5aa2498530812aa97d493bfd4bc285b3"
+    },
+    {
+      "label": "control-before/report/log",
+      "method": "GET",
+      "path": "/workspace/65/report/log",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000008,\"logentry\":\"PRESENTATION_PROGRESS = some\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000010,\"logentry\":\"OWNED_UNIT = \\\"Owned control unit log\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000007,\"logentry\":\"OWNED.STORED : \\\"Owned control state \\\\u03a9\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000011,\"logentry\":\"OWNED_TEST : \\\"Owned control test log\\\"\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "timestamp": 1793796000008,
+          "logentry": "PRESENTATION_PROGRESS = some"
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "timestamp": 1793796000010,
+          "logentry": "OWNED_UNIT = \"Owned control unit log\""
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000007,
+          "logentry": "OWNED.STORED : \"Owned control state \\u03a9\""
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000011,
+          "logentry": "OWNED_TEST : \"Owned control test log\""
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "1e0999ff9c780ab3bef63b525bd9f9aecd603a790ab4b9ec2469e9c07da6a6f2"
+    },
+    {
+      "label": "control-before/report/review",
+      "method": "GET",
+      "path": "/workspace/65/report/review",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control unit review \\u03a9\\n  line two\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"userAgent\":\"Owned Source deletion probe\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control test review \\u03a9\\n  line two\",\"page\":null,\"pagelabel\":null,\"originalUnitId\":\"\",\"userAgent\":\"Owned Source deletion probe\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:15",
+          "entry": "Owned control unit review Ω\n  line two",
+          "page": 3,
+          "pagelabel": "Teilaufgabe β",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "userAgent": "Owned Source deletion probe"
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:15",
+          "entry": "Owned control test review Ω\n  line two",
+          "page": null,
+          "pagelabel": null,
+          "originalUnitId": "",
+          "userAgent": "Owned Source deletion probe"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "c3487bcc29e2fe2a84161ddd2d59ad01a032d5e9c3bc3b9cc6ff6542086fb322"
+    },
+    {
+      "label": "cache-before/clients",
+      "method": "GET",
+      "path": "/clients",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rawText": "[\"[owned-subscribeToken-6]\",\"[owned-subscribeToken-5]\",\"[owned-subscribeToken-11]\",\"[owned-subscribeToken-10]\"]",
+      "value": [
+        "[owned-subscribeToken-6]",
+        "[owned-subscribeToken-5]",
+        "[owned-subscribeToken-11]",
+        "[owned-subscribeToken-10]"
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "5ffc792bca3c647c395e4eaf99b2f093d1eb3e95ebcafde90d03e15ff7cad211"
+    },
+    {
+      "label": "cache-before/testees",
+      "method": "GET",
+      "path": "/testees",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rawText": "[{\"testId\":5,\"disconnectNotificationUri\":\"http://127.0.0.1:32775/test/5/connection-lost\",\"token\":\"[owned-subscribeToken-6]\"},{\"testId\":6,\"disconnectNotificationUri\":\"http://127.0.0.1:32775/test/6/connection-lost\",\"token\":\"[owned-subscribeToken-11]\"}]",
+      "value": [
+        {
+          "testId": 5,
+          "disconnectNotificationUri": "http://127.0.0.1:32775/test/5/connection-lost",
+          "token": "[owned-subscribeToken-6]"
+        },
+        {
+          "testId": 6,
+          "disconnectNotificationUri": "http://127.0.0.1:32775/test/6/connection-lost",
+          "token": "[owned-subscribeToken-11]"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "946f174271538f67fc08596ae521e66801bc6d84f65ee3c9fa4e15804fb70dd1"
+    },
+    {
+      "label": "cache-before/monitors",
+      "method": "GET",
+      "path": "/monitors",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rawText": "[{\"groups\":[\"OWNED.W70.TARGET.1793794333705\"],\"token\":\"[owned-subscribeToken-5]\"},{\"groups\":[\"OWNED.W70.CONTROL.1793794333705\"],\"token\":\"[owned-subscribeToken-10]\"}]",
+      "value": [
+        {
+          "groups": [
+            "OWNED.W70.TARGET.1793794333705"
+          ],
+          "token": "[owned-subscribeToken-5]"
+        },
+        {
+          "groups": [
+            "OWNED.W70.CONTROL.1793794333705"
+          ],
+          "token": "[owned-subscribeToken-10]"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "8638207c7969cfff80fd024ba55dd05f8cae8baf2321ea7b802e0c907116a0dc"
+    },
+    {
+      "label": "cache-before/test-sessions",
+      "method": "GET",
+      "path": "/test-sessions",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rawText": "[{\"personId\":9,\"timestamp\":1793794334,\"testId\":5,\"groupName\":\"OWNED.W70.TARGET.1793794333705\",\"groupLabel\":\"Owned target group Ω\",\"personLabel\":\"owned-w70-1793794333705-target\",\"mode\":\"run-trial\",\"testState\":{\"OWNED.STORED\":\"Owned target state Ω\",\"status\":\"running\"},\"bookletName\":\"OWNED.WS.DELETE.TARGET\",\"unitState\":{}},{\"personId\":11,\"timestamp\":1793794335,\"testId\":6,\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group Ω\",\"personLabel\":\"owned-w70-1793794333705-control\",\"mode\":\"run-trial\",\"testState\":{\"OWNED.STORED\":\"Owned control state Ω\",\"status\":\"running\"},\"bookletName\":\"OWNED.WS.DELETE.CONTROL\",\"unitState\":{}}]",
+      "value": [
+        {
+          "personId": 9,
+          "timestamp": 1793794334,
+          "testId": 5,
+          "groupName": "OWNED.W70.TARGET.1793794333705",
+          "groupLabel": "Owned target group Ω",
+          "personLabel": "owned-w70-1793794333705-target",
+          "mode": "run-trial",
+          "testState": {
+            "OWNED.STORED": "Owned target state Ω",
+            "status": "running"
+          },
+          "bookletName": "OWNED.WS.DELETE.TARGET",
+          "unitState": {}
+        },
+        {
+          "personId": 11,
+          "timestamp": 1793794335,
+          "testId": 6,
+          "groupName": "OWNED.W70.CONTROL.1793794333705",
+          "groupLabel": "Owned control group Ω",
+          "personLabel": "owned-w70-1793794333705-control",
+          "mode": "run-trial",
+          "testState": {
+            "OWNED.STORED": "Owned control state Ω",
+            "status": "running"
+          },
+          "bookletName": "OWNED.WS.DELETE.CONTROL",
+          "unitState": {}
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "434e3bc961e13ff0af8188a68c2ef87dfa2082e2f416289e509050095a977a60"
+    },
+    {
+      "label": "wrong-password-delete",
+      "method": "DELETE",
+      "path": "/workspaces",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "requestBody": {
+        "ws": [
+          "64"
+        ],
+        "p": "owned-incorrect-password"
+      },
+      "rawText": "Invalid password for user 1",
+      "value": "Invalid password for user 1",
+      "subscribeToken": null,
+      "redactedBodySha256": "a2315ae98d4193ad32d7a87cbf599175922dd853254b186f6b4d05537ec69267"
+    },
+    {
+      "label": "target-after-denial/files",
+      "method": "GET",
+      "path": "/workspace/64/files",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"Booklet\":[{\"name\":\"owned-delete-booklet.xml\",\"size\":325,\"modificationTime\":1793794334,\"type\":\"Booklet\",\"id\":\"OWNED.WS.DELETE.TARGET\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned target Booklet \\u03a9\",\"description\":\"\"}}],\"Testtakers\":[{\"name\":\"owned-delete-testtakers.xml\",\"size\":439,\"modificationTime\":1793794334,\"type\":\"Testtakers\",\"id\":\"OWNED-DELETE-TESTTAKERS.XML\",\"report\":[],\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"\",\"testtakers\":2}}],\"Unit\":[{\"name\":\"owned-delete-unit.xml\",\"size\":309,\"modificationTime\":1793794334,\"type\":\"Unit\",\"id\":\"OWNED.WS.DELETE.UNIT\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned deletion Unit\",\"description\":\"\"}}],\"Resource\":[{\"name\":\"owned-ws-delete-player-1.0.html\",\"size\":300,\"modificationTime\":1793794334,\"type\":\"Resource\",\"id\":\"OWNED-WS-DELETE-PLAYER-1.0\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"owned-ws-delete-player-1.0.0\",\"description\":\"\"}}]}",
+      "value": {
+        "Booklet": [
+          {
+            "name": "owned-delete-booklet.xml",
+            "size": 325,
+            "modificationTime": 1793794334,
+            "type": "Booklet",
+            "id": "OWNED.WS.DELETE.TARGET",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned target Booklet Ω",
+              "description": ""
+            }
+          }
+        ],
+        "Testtakers": [
+          {
+            "name": "owned-delete-testtakers.xml",
+            "size": 439,
+            "modificationTime": 1793794334,
+            "type": "Testtakers",
+            "id": "OWNED-DELETE-TESTTAKERS.XML",
+            "report": [],
+            "dependencies": [],
+            "info": {
+              "label": "",
+              "description": "",
+              "testtakers": 2
+            }
+          }
+        ],
+        "Unit": [
+          {
+            "name": "owned-delete-unit.xml",
+            "size": 309,
+            "modificationTime": 1793794334,
+            "type": "Unit",
+            "id": "OWNED.WS.DELETE.UNIT",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned deletion Unit",
+              "description": ""
+            }
+          }
+        ],
+        "Resource": [
+          {
+            "name": "owned-ws-delete-player-1.0.html",
+            "size": 300,
+            "modificationTime": 1793794334,
+            "type": "Resource",
+            "id": "OWNED-WS-DELETE-PLAYER-1.0",
+            "report": {
+              "warning": [
+                "Could not read metadata: $schema missing",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "owned-ws-delete-player-1.0.0",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "4410e4f6b1efc1111d1df273f7336cdc5b4a4e5aaa2377212b2a9462951fed47"
+    },
+    {
+      "label": "target-after-denial/results",
+      "method": "GET",
+      "path": "/workspace/64/results",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupName\":\"OWNED.W70.TARGET.1793794333705\",\"groupLabel\":\"Owned target group \\u03a9\",\"bookletsStarted\":1,\"numUnitsMin\":1,\"numUnitsMax\":1,\"numUnitsTotal\":1,\"numUnitsAvg\":1,\"lastChange\":1793794334}]",
+      "value": [
+        {
+          "groupName": "OWNED.W70.TARGET.1793794333705",
+          "groupLabel": "Owned target group Ω",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793794334
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "6f4a0b9da0681d526cf3cfebddb212e38b366e44f91e1dac16a274d8a03f5b7b"
+    },
+    {
+      "label": "target-after-denial/responses/detailed",
+      "method": "GET",
+      "path": "/workspace/64/responses/detailed",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"OWNED.W70.TARGET.1793794333705\":[{\"loginName\":\"owned-w70-1793794333705-target\",\"groupName\":\"OWNED.W70.TARGET.1793794333705\",\"groupLabel\":\"Owned target group \\u03a9\",\"code\":\"\",\"nameSuffix\":\"\",\"bookletName\":\"OWNED.WS.DELETE.TARGET\",\"bookletLabel\":\"Owned target Booklet \\u03a9\"}]}",
+      "value": {
+        "OWNED.W70.TARGET.1793794333705": [
+          {
+            "loginName": "owned-w70-1793794333705-target",
+            "groupName": "OWNED.W70.TARGET.1793794333705",
+            "groupLabel": "Owned target group Ω",
+            "code": "",
+            "nameSuffix": "",
+            "bookletName": "OWNED.WS.DELETE.TARGET",
+            "bookletLabel": "Owned target Booklet Ω"
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "977dcb497d45a22a1092f1b0fbc6b8d88e8a817ca1a5d793d15703d08a024a24"
+    },
+    {
+      "label": "target-after-denial/report/response",
+      "method": "GET",
+      "path": "/workspace/64/report/response",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"laststate\":\"{\\\"PRESENTATION_PROGRESS\\\": \\\"some\\\"}\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"responses\":[{\"id\":\"owned\",\"content\":\"{\\\"answer\\\":\\\"Owned target answer \\u03a9\\\"}\",\"ts\":1793796000003,\"responseType\":\"owned\"}]}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "laststate": "{\"PRESENTATION_PROGRESS\": \"some\"}",
+          "originalUnitId": "OWNED.ORIGINAL.target",
+          "responses": [
+            {
+              "id": "owned",
+              "content": "{\"answer\":\"Owned target answer Ω\"}",
+              "ts": 1793796000003,
+              "responseType": "owned"
+            }
+          ]
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "c6d41b3c8cd20c489164c5c8811f80cb25f57f8abe9824bea058a0428400aee1"
+    },
+    {
+      "label": "target-after-denial/report/log",
+      "method": "GET",
+      "path": "/workspace/64/report/log",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"timestamp\":1793796000002,\"logentry\":\"PRESENTATION_PROGRESS = some\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"timestamp\":1793796000004,\"logentry\":\"OWNED_UNIT = \\\"Owned target unit log\\\"\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000001,\"logentry\":\"OWNED.STORED : \\\"Owned target state \\\\u03a9\\\"\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000005,\"logentry\":\"OWNED_TEST : \\\"Owned target test log\\\"\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.target",
+          "timestamp": 1793796000002,
+          "logentry": "PRESENTATION_PROGRESS = some"
+        },
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.target",
+          "timestamp": 1793796000004,
+          "logentry": "OWNED_UNIT = \"Owned target unit log\""
+        },
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000001,
+          "logentry": "OWNED.STORED : \"Owned target state \\u03a9\""
+        },
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000005,
+          "logentry": "OWNED_TEST : \"Owned target test log\""
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "459941761067f8fb5952156ed797a2e054adca81f63c7be8bfe3ecafef5e90e3"
+    },
+    {
+      "label": "target-after-denial/report/review",
+      "method": "GET",
+      "path": "/workspace/64/report/review",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:14\",\"entry\":\"Owned target unit review \\u03a9\\n  line two\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"originalUnitId\":\"OWNED.ORIGINAL.target\",\"userAgent\":\"Owned Source deletion probe\"},{\"groupname\":\"OWNED.W70.TARGET.1793794333705\",\"loginname\":\"owned-w70-1793794333705-target\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.TARGET\",\"unitname\":\"\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:14\",\"entry\":\"Owned target test review \\u03a9\\n  line two\",\"page\":null,\"pagelabel\":null,\"originalUnitId\":\"\",\"userAgent\":\"Owned Source deletion probe\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:14",
+          "entry": "Owned target unit review Ω\n  line two",
+          "page": 3,
+          "pagelabel": "Teilaufgabe β",
+          "originalUnitId": "OWNED.ORIGINAL.target",
+          "userAgent": "Owned Source deletion probe"
+        },
+        {
+          "groupname": "OWNED.W70.TARGET.1793794333705",
+          "loginname": "owned-w70-1793794333705-target",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.TARGET",
+          "unitname": "",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:14",
+          "entry": "Owned target test review Ω\n  line two",
+          "page": null,
+          "pagelabel": null,
+          "originalUnitId": "",
+          "userAgent": "Owned Source deletion probe"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "03345e2e9ebfa44515be355eb0849f16165c39e9ea44a3f6acc7fb192900b502"
+    },
+    {
+      "label": "control-after-denial/files",
+      "method": "GET",
+      "path": "/workspace/65/files",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"Booklet\":[{\"name\":\"owned-delete-booklet.xml\",\"size\":327,\"modificationTime\":1793794335,\"type\":\"Booklet\",\"id\":\"OWNED.WS.DELETE.CONTROL\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned control Booklet \\u03a9\",\"description\":\"\"}}],\"Testtakers\":[{\"name\":\"owned-delete-testtakers.xml\",\"size\":444,\"modificationTime\":1793794335,\"type\":\"Testtakers\",\"id\":\"OWNED-DELETE-TESTTAKERS.XML\",\"report\":[],\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"\",\"testtakers\":2}}],\"Unit\":[{\"name\":\"owned-delete-unit.xml\",\"size\":310,\"modificationTime\":1793794335,\"type\":\"Unit\",\"id\":\"OWNED.WS.DELETE.UNIT\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned deletion Unit\",\"description\":\"\"}}],\"Resource\":[{\"name\":\"owned-ws-delete-player-1.0.html\",\"size\":300,\"modificationTime\":1793794335,\"type\":\"Resource\",\"id\":\"OWNED-WS-DELETE-PLAYER-1.0\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"owned-ws-delete-player-1.0.0\",\"description\":\"\"}}]}",
+      "value": {
+        "Booklet": [
+          {
+            "name": "owned-delete-booklet.xml",
+            "size": 327,
+            "modificationTime": 1793794335,
+            "type": "Booklet",
+            "id": "OWNED.WS.DELETE.CONTROL",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned control Booklet Ω",
+              "description": ""
+            }
+          }
+        ],
+        "Testtakers": [
+          {
+            "name": "owned-delete-testtakers.xml",
+            "size": 444,
+            "modificationTime": 1793794335,
+            "type": "Testtakers",
+            "id": "OWNED-DELETE-TESTTAKERS.XML",
+            "report": [],
+            "dependencies": [],
+            "info": {
+              "label": "",
+              "description": "",
+              "testtakers": 2
+            }
+          }
+        ],
+        "Unit": [
+          {
+            "name": "owned-delete-unit.xml",
+            "size": 310,
+            "modificationTime": 1793794335,
+            "type": "Unit",
+            "id": "OWNED.WS.DELETE.UNIT",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned deletion Unit",
+              "description": ""
+            }
+          }
+        ],
+        "Resource": [
+          {
+            "name": "owned-ws-delete-player-1.0.html",
+            "size": 300,
+            "modificationTime": 1793794335,
+            "type": "Resource",
+            "id": "OWNED-WS-DELETE-PLAYER-1.0",
+            "report": {
+              "warning": [
+                "Could not read metadata: $schema missing",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "owned-ws-delete-player-1.0.0",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "e8ab7dc84e8736357045b3e48296bb45afafbd45600aae22839a523d28e1f281"
+    },
+    {
+      "label": "control-after-denial/results",
+      "method": "GET",
+      "path": "/workspace/65/results",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"bookletsStarted\":1,\"numUnitsMin\":1,\"numUnitsMax\":1,\"numUnitsTotal\":1,\"numUnitsAvg\":1,\"lastChange\":1793794335}]",
+      "value": [
+        {
+          "groupName": "OWNED.W70.CONTROL.1793794333705",
+          "groupLabel": "Owned control group Ω",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793794335
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "49aecf6538c1ddc887d35cbac476be454bd25af6d5c42a3c1e0992eb014cce48"
+    },
+    {
+      "label": "control-after-denial/responses/detailed",
+      "method": "GET",
+      "path": "/workspace/65/responses/detailed",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"OWNED.W70.CONTROL.1793794333705\":[{\"loginName\":\"owned-w70-1793794333705-control\",\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"code\":\"\",\"nameSuffix\":\"\",\"bookletName\":\"OWNED.WS.DELETE.CONTROL\",\"bookletLabel\":\"Owned control Booklet \\u03a9\"}]}",
+      "value": {
+        "OWNED.W70.CONTROL.1793794333705": [
+          {
+            "loginName": "owned-w70-1793794333705-control",
+            "groupName": "OWNED.W70.CONTROL.1793794333705",
+            "groupLabel": "Owned control group Ω",
+            "code": "",
+            "nameSuffix": "",
+            "bookletName": "OWNED.WS.DELETE.CONTROL",
+            "bookletLabel": "Owned control Booklet Ω"
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "69a3a688980f52e76100808f4ccfddd8d413a9d4cb47d5b003fd23a9b3721ce2"
+    },
+    {
+      "label": "control-after-denial/report/response",
+      "method": "GET",
+      "path": "/workspace/65/report/response",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"laststate\":\"{\\\"PRESENTATION_PROGRESS\\\": \\\"some\\\"}\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"responses\":[{\"id\":\"owned\",\"content\":\"{\\\"answer\\\":\\\"Owned control answer \\u03a9\\\"}\",\"ts\":1793796000009,\"responseType\":\"owned\"}]}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "laststate": "{\"PRESENTATION_PROGRESS\": \"some\"}",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "responses": [
+            {
+              "id": "owned",
+              "content": "{\"answer\":\"Owned control answer Ω\"}",
+              "ts": 1793796000009,
+              "responseType": "owned"
+            }
+          ]
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "23816954eaeeacfc16809a8f6da958ec5aa2498530812aa97d493bfd4bc285b3"
+    },
+    {
+      "label": "control-after-denial/report/log",
+      "method": "GET",
+      "path": "/workspace/65/report/log",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000008,\"logentry\":\"PRESENTATION_PROGRESS = some\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000010,\"logentry\":\"OWNED_UNIT = \\\"Owned control unit log\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000007,\"logentry\":\"OWNED.STORED : \\\"Owned control state \\\\u03a9\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000011,\"logentry\":\"OWNED_TEST : \\\"Owned control test log\\\"\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "timestamp": 1793796000008,
+          "logentry": "PRESENTATION_PROGRESS = some"
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "timestamp": 1793796000010,
+          "logentry": "OWNED_UNIT = \"Owned control unit log\""
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000007,
+          "logentry": "OWNED.STORED : \"Owned control state \\u03a9\""
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000011,
+          "logentry": "OWNED_TEST : \"Owned control test log\""
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "1e0999ff9c780ab3bef63b525bd9f9aecd603a790ab4b9ec2469e9c07da6a6f2"
+    },
+    {
+      "label": "control-after-denial/report/review",
+      "method": "GET",
+      "path": "/workspace/65/report/review",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control unit review \\u03a9\\n  line two\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"userAgent\":\"Owned Source deletion probe\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control test review \\u03a9\\n  line two\",\"page\":null,\"pagelabel\":null,\"originalUnitId\":\"\",\"userAgent\":\"Owned Source deletion probe\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:15",
+          "entry": "Owned control unit review Ω\n  line two",
+          "page": 3,
+          "pagelabel": "Teilaufgabe β",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "userAgent": "Owned Source deletion probe"
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:15",
+          "entry": "Owned control test review Ω\n  line two",
+          "page": null,
+          "pagelabel": null,
+          "originalUnitId": "",
+          "userAgent": "Owned Source deletion probe"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "c3487bcc29e2fe2a84161ddd2d59ad01a032d5e9c3bc3b9cc6ff6542086fb322"
+    },
+    {
+      "label": "delete-populated-target",
+      "method": "DELETE",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "ws": [
+          "64"
+        ],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "cache-after/clients",
+      "method": "GET",
+      "path": "/clients",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rawText": "[]",
+      "value": [],
+      "subscribeToken": null,
+      "redactedBodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "label": "cache-after/testees",
+      "method": "GET",
+      "path": "/testees",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rawText": "[]",
+      "value": [],
+      "subscribeToken": null,
+      "redactedBodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "label": "cache-after/monitors",
+      "method": "GET",
+      "path": "/monitors",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rawText": "[]",
+      "value": [],
+      "subscribeToken": null,
+      "redactedBodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "label": "cache-after/test-sessions",
+      "method": "GET",
+      "path": "/test-sessions",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "rawText": "[]",
+      "value": [],
+      "subscribeToken": null,
+      "redactedBodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "label": "control-after-delete/files",
+      "method": "GET",
+      "path": "/workspace/65/files",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"Booklet\":[{\"name\":\"owned-delete-booklet.xml\",\"size\":327,\"modificationTime\":1793794335,\"type\":\"Booklet\",\"id\":\"OWNED.WS.DELETE.CONTROL\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned control Booklet \\u03a9\",\"description\":\"\"}}],\"Testtakers\":[{\"name\":\"owned-delete-testtakers.xml\",\"size\":444,\"modificationTime\":1793794335,\"type\":\"Testtakers\",\"id\":\"OWNED-DELETE-TESTTAKERS.XML\",\"report\":[],\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"\",\"testtakers\":2}}],\"Unit\":[{\"name\":\"owned-delete-unit.xml\",\"size\":310,\"modificationTime\":1793794335,\"type\":\"Unit\",\"id\":\"OWNED.WS.DELETE.UNIT\",\"report\":{\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"Owned deletion Unit\",\"description\":\"\"}}],\"Resource\":[{\"name\":\"owned-ws-delete-player-1.0.html\",\"size\":300,\"modificationTime\":1793794335,\"type\":\"Resource\",\"id\":\"OWNED-WS-DELETE-PLAYER-1.0\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"owned-ws-delete-player-1.0.0\",\"description\":\"\"}}]}",
+      "value": {
+        "Booklet": [
+          {
+            "name": "owned-delete-booklet.xml",
+            "size": 327,
+            "modificationTime": 1793794335,
+            "type": "Booklet",
+            "id": "OWNED.WS.DELETE.CONTROL",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned control Booklet Ω",
+              "description": ""
+            }
+          }
+        ],
+        "Testtakers": [
+          {
+            "name": "owned-delete-testtakers.xml",
+            "size": 444,
+            "modificationTime": 1793794335,
+            "type": "Testtakers",
+            "id": "OWNED-DELETE-TESTTAKERS.XML",
+            "report": [],
+            "dependencies": [],
+            "info": {
+              "label": "",
+              "description": "",
+              "testtakers": 2
+            }
+          }
+        ],
+        "Unit": [
+          {
+            "name": "owned-delete-unit.xml",
+            "size": 310,
+            "modificationTime": 1793794335,
+            "type": "Unit",
+            "id": "OWNED.WS.DELETE.UNIT",
+            "report": {
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned deletion Unit",
+              "description": ""
+            }
+          }
+        ],
+        "Resource": [
+          {
+            "name": "owned-ws-delete-player-1.0.html",
+            "size": 300,
+            "modificationTime": 1793794335,
+            "type": "Resource",
+            "id": "OWNED-WS-DELETE-PLAYER-1.0",
+            "report": {
+              "warning": [
+                "Could not read metadata: $schema missing",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "owned-ws-delete-player-1.0.0",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "e8ab7dc84e8736357045b3e48296bb45afafbd45600aae22839a523d28e1f281"
+    },
+    {
+      "label": "control-after-delete/results",
+      "method": "GET",
+      "path": "/workspace/65/results",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"bookletsStarted\":1,\"numUnitsMin\":1,\"numUnitsMax\":1,\"numUnitsTotal\":1,\"numUnitsAvg\":1,\"lastChange\":1793794335}]",
+      "value": [
+        {
+          "groupName": "OWNED.W70.CONTROL.1793794333705",
+          "groupLabel": "Owned control group Ω",
+          "bookletsStarted": 1,
+          "numUnitsMin": 1,
+          "numUnitsMax": 1,
+          "numUnitsTotal": 1,
+          "numUnitsAvg": 1,
+          "lastChange": 1793794335
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "49aecf6538c1ddc887d35cbac476be454bd25af6d5c42a3c1e0992eb014cce48"
+    },
+    {
+      "label": "control-after-delete/responses/detailed",
+      "method": "GET",
+      "path": "/workspace/65/responses/detailed",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"OWNED.W70.CONTROL.1793794333705\":[{\"loginName\":\"owned-w70-1793794333705-control\",\"groupName\":\"OWNED.W70.CONTROL.1793794333705\",\"groupLabel\":\"Owned control group \\u03a9\",\"code\":\"\",\"nameSuffix\":\"\",\"bookletName\":\"OWNED.WS.DELETE.CONTROL\",\"bookletLabel\":\"Owned control Booklet \\u03a9\"}]}",
+      "value": {
+        "OWNED.W70.CONTROL.1793794333705": [
+          {
+            "loginName": "owned-w70-1793794333705-control",
+            "groupName": "OWNED.W70.CONTROL.1793794333705",
+            "groupLabel": "Owned control group Ω",
+            "code": "",
+            "nameSuffix": "",
+            "bookletName": "OWNED.WS.DELETE.CONTROL",
+            "bookletLabel": "Owned control Booklet Ω"
+          }
+        ]
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "69a3a688980f52e76100808f4ccfddd8d413a9d4cb47d5b003fd23a9b3721ce2"
+    },
+    {
+      "label": "control-after-delete/report/response",
+      "method": "GET",
+      "path": "/workspace/65/report/response",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"laststate\":\"{\\\"PRESENTATION_PROGRESS\\\": \\\"some\\\"}\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"responses\":[{\"id\":\"owned\",\"content\":\"{\\\"answer\\\":\\\"Owned control answer \\u03a9\\\"}\",\"ts\":1793796000009,\"responseType\":\"owned\"}]}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "laststate": "{\"PRESENTATION_PROGRESS\": \"some\"}",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "responses": [
+            {
+              "id": "owned",
+              "content": "{\"answer\":\"Owned control answer Ω\"}",
+              "ts": 1793796000009,
+              "responseType": "owned"
+            }
+          ]
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "23816954eaeeacfc16809a8f6da958ec5aa2498530812aa97d493bfd4bc285b3"
+    },
+    {
+      "label": "control-after-delete/report/log",
+      "method": "GET",
+      "path": "/workspace/65/report/log",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000008,\"logentry\":\"PRESENTATION_PROGRESS = some\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"timestamp\":1793796000010,\"logentry\":\"OWNED_UNIT = \\\"Owned control unit log\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000007,\"logentry\":\"OWNED.STORED : \\\"Owned control state \\\\u03a9\\\"\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"originalUnitId\":\"\",\"timestamp\":1793796000011,\"logentry\":\"OWNED_TEST : \\\"Owned control test log\\\"\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "timestamp": 1793796000008,
+          "logentry": "PRESENTATION_PROGRESS = some"
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "timestamp": 1793796000010,
+          "logentry": "OWNED_UNIT = \"Owned control unit log\""
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000007,
+          "logentry": "OWNED.STORED : \"Owned control state \\u03a9\""
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "originalUnitId": "",
+          "timestamp": 1793796000011,
+          "logentry": "OWNED_TEST : \"Owned control test log\""
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "1e0999ff9c780ab3bef63b525bd9f9aecd603a790ab4b9ec2469e9c07da6a6f2"
+    },
+    {
+      "label": "control-after-delete/report/review",
+      "method": "GET",
+      "path": "/workspace/65/report/review",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"OWNED.WS.DELETE.UNIT\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control unit review \\u03a9\\n  line two\",\"page\":3,\"pagelabel\":\"Teilaufgabe \\u03b2\",\"originalUnitId\":\"OWNED.ORIGINAL.control\",\"userAgent\":\"Owned Source deletion probe\"},{\"groupname\":\"OWNED.W70.CONTROL.1793794333705\",\"loginname\":\"owned-w70-1793794333705-control\",\"code\":\"\",\"bookletname\":\"OWNED.WS.DELETE.CONTROL\",\"unitname\":\"\",\"priority\":2,\"category: design\":\"X\",\"category: tech\":\"X\",\"reviewtime\":\"2026-11-04 13:12:15\",\"entry\":\"Owned control test review \\u03a9\\n  line two\",\"page\":null,\"pagelabel\":null,\"originalUnitId\":\"\",\"userAgent\":\"Owned Source deletion probe\"}]",
+      "value": [
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "OWNED.WS.DELETE.UNIT",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:15",
+          "entry": "Owned control unit review Ω\n  line two",
+          "page": 3,
+          "pagelabel": "Teilaufgabe β",
+          "originalUnitId": "OWNED.ORIGINAL.control",
+          "userAgent": "Owned Source deletion probe"
+        },
+        {
+          "groupname": "OWNED.W70.CONTROL.1793794333705",
+          "loginname": "owned-w70-1793794333705-control",
+          "code": "",
+          "bookletname": "OWNED.WS.DELETE.CONTROL",
+          "unitname": "",
+          "priority": 2,
+          "category: design": "X",
+          "category: tech": "X",
+          "reviewtime": "2026-11-04 13:12:15",
+          "entry": "Owned control test review Ω\n  line two",
+          "page": null,
+          "pagelabel": null,
+          "originalUnitId": "",
+          "userAgent": "Owned Source deletion probe"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "c3487bcc29e2fe2a84161ddd2d59ad01a032d5e9c3bc3b9cc6ff6542086fb322"
+    },
+    {
+      "label": "deleted-participant-session",
+      "method": "GET",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "rawText": "Invalid token: `[owned-token-2]`",
+      "value": "Invalid token: `[owned-token-2]`",
+      "subscribeToken": null,
+      "redactedBodySha256": "2cd561aaf7820efda1eb2cf57d17a03ef5dc8c555faf12af0f1e6a477715e612"
+    },
+    {
+      "label": "deleted-test",
+      "method": "GET",
+      "path": "/test/5",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "rawText": "Invalid token: `[owned-token-2]`",
+      "value": "Invalid token: `[owned-token-2]`",
+      "subscribeToken": null,
+      "redactedBodySha256": "2cd561aaf7820efda1eb2cf57d17a03ef5dc8c555faf12af0f1e6a477715e612"
+    },
+    {
+      "label": "retained-participant-session",
+      "method": "GET",
+      "path": "/session",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"token\":\"[owned-token-7]\",\"displayName\":\"Owned control group \\u03a9\\/owned-w70-1793794333705-control\",\"loginName\":\"owned-w70-1793794333705-control\",\"groupLabel\":\"Owned control group \\u03a9\",\"id\":null,\"pwSetByAdmin\":null,\"customTexts\":{},\"flags\":[],\"claims\":{\"test\":[{\"id\":\"OWNED.WS.DELETE.CONTROL\",\"type\":\"test\",\"label\":\"Owned control Booklet \\u03a9\",\"flags\":{\"locked\":false,\"running\":true}}]},\"groupToken\":\"[owned-groupToken-8]\",\"viewSettings\":[],\"access\":{\"test\":[\"OWNED.WS.DELETE.CONTROL\"]}}",
+      "value": {
+        "token": "[owned-token-7]",
+        "displayName": "Owned control group Ω/owned-w70-1793794333705-control",
+        "loginName": "owned-w70-1793794333705-control",
+        "groupLabel": "Owned control group Ω",
+        "id": null,
+        "pwSetByAdmin": null,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "test": [
+            {
+              "id": "OWNED.WS.DELETE.CONTROL",
+              "type": "test",
+              "label": "Owned control Booklet Ω",
+              "flags": {
+                "locked": false,
+                "running": true
+              }
+            }
+          ]
+        },
+        "groupToken": "[owned-groupToken-8]",
+        "viewSettings": [],
+        "access": {
+          "test": [
+            "OWNED.WS.DELETE.CONTROL"
+          ]
+        }
+      },
+      "subscribeToken": null,
+      "redactedBodySha256": "2a6fb21f75ec27c527d229429ae6e7d101ce6a7b611f6d043dcba90a41705d19"
+    },
+    {
+      "label": "retained-fresh-commands",
+      "method": "GET",
+      "path": "/test/6/commands",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":6,\"keyword\":\"pause\",\"arguments\":[],\"timestamp\":1793796000}]",
+      "value": [
+        {
+          "id": 6,
+          "keyword": "pause",
+          "arguments": [],
+          "timestamp": 1793796000
+        }
+      ],
+      "subscribeToken": "[owned-subscribeToken-12]",
+      "redactedBodySha256": "84c2e54d75450c087033cba786c67a25f21df9a9b679e87292b1fe69fad68690"
+    },
+    {
+      "label": "cleanup-workspaces",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"latest_modification_ts\":null},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"latest_modification_ts\":null},{\"id\":65,\"name\":\"Owned W70 1793794333705 control\",\"latest_modification_ts\":\"2026-11-04 13:12:15\"}]",
+      "value": [
+        {
+          "id": 1,
+          "name": "Owned permissions One Ω",
+          "latest_modification_ts": null
+        },
+        {
+          "id": 2,
+          "name": "Owned permissions Two β",
+          "latest_modification_ts": null
+        },
+        {
+          "id": 65,
+          "name": "Owned W70 1793794333705 control",
+          "latest_modification_ts": "2026-11-04 13:12:15"
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "214322deddbf20d8e3d644186c816f4b8ef3b909f935033572a5ae88eecd035c"
+    },
+    {
+      "label": "cleanup-owned-workspaces",
+      "method": "DELETE",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "requestBody": {
+        "ws": [
+          "65"
+        ],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "subscribeToken": null,
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "final-users",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "c794271d6db4a100f521b736df4280ad9d667001417b71cf3d158f4f965d6d34"
+    },
+    {
+      "label": "final-workspaces",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"latest_modification_ts\":null},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"latest_modification_ts\":null}]",
+      "value": [
+        {
+          "id": 1,
+          "name": "Owned permissions One Ω",
+          "latest_modification_ts": null
+        },
+        {
+          "id": 2,
+          "name": "Owned permissions Two β",
+          "latest_modification_ts": null
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "5150a89ca8a6fe0560d42df48d488f47f1e7aab8949c29ebef62a445df84b05c"
+    },
+    {
+      "label": "final-root-workspaces",
+      "method": "GET",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"selected\":false,\"role\":\"\"},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"selected\":false,\"role\":\"\"}]",
+      "value": [
+        {
+          "id": 1,
+          "name": "Owned permissions One Ω",
+          "selected": false,
+          "role": ""
+        },
+        {
+          "id": 2,
+          "name": "Owned permissions Two β",
+          "selected": false,
+          "role": ""
+        }
+      ],
+      "subscribeToken": null,
+      "redactedBodySha256": "6c46392897c8903ab9f5076e5900e73253479d0a9a8889c36f123ddb2ab15645"
+    }
+  ],
+  "fullOriginalParityProven": false
+}

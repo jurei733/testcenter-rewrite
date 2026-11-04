@@ -1,0 +1,20 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "observationSha256": "42e5b279e328a1c4206ef006478cacc9319be593d95f25d3483c58dbcba4b49a",
+  "manifestSha256": "00c81b063201ee3e2209842ee9efba715edd3f8bf3c4094e7167869f4d101f27",
+  "verifierSha256": "ecbef29a6831bfc3c04a97bd33fba1929a2380703a77aca5c24fe882cddf89e3",
+  "sourceFiles": 137,
+  "composerPackages": 19,
+  "actualHttpExchanges": 210,
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "ownedUsers": 25,
+  "ownedWorkspaces": 25,
+  "baselineRestored": true,
+  "readOnlyVerification": true,
+  "sqlSeedsOrDaoStubs": false,
+  "sourcePartialDeletionConfirmed": true,
+  "rewriteBatchMustRemainAtomic": true,
+  "unsafeBaselineProbeExcluded": true,
+  "fullOriginalParityProven": false
+}

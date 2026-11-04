@@ -1,0 +1,23 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "observationSha256": "a44d3e8600bf0cfb02aa2925e3b017adf19afb6e5a30cd5509dda328b2cad570",
+  "manifestSha256": "ea02ed0371a10587eb800af8f8dda4fed073ff8ffee0faf51f7079bf2185b64b",
+  "verifierSha256": "36660f7804585317ff735a803a3bd40ef699dca726aa626334c6a60c9e36e883",
+  "sourceFiles": 137,
+  "broadcasterSourceFiles": 38,
+  "composerPackages": 19,
+  "actualHttpExchanges": 97,
+  "ownedWorkspaces": 2,
+  "baselineUsersWorkspacesGrantsAndFilesUnchanged": true,
+  "controlReportsAndFilesByteIdentical": true,
+  "realCommandsDelivered": true,
+  "allFourPeersSilentlyClosed": true,
+  "allBroadcasterCachesEmptied": true,
+  "freshSubscriptionAccepted": true,
+  "sourceOrphanGroupRows": 1,
+  "rewriteMustRemoveOwnedGroupRows": true,
+  "sqlSeedsOrDaoStubs": false,
+  "readOnlyVerification": true,
+  "fullOriginalParityProven": false
+}

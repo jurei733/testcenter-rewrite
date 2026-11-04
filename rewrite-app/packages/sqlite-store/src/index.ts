@@ -1,3 +1,4 @@
+import {deleteWorkspaceAggregateRows} from './workspace-aggregate-deletion.js';
 import {readOriginalWorkspaceReportSnapshot} from './original-workspace-reports.js';
 import {deleteOriginalSelectedTests} from './original-test-deletion.js';
 import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
@@ -2853,48 +2854,7 @@ export const createSqliteFirstSliceStorage = (
           database.exec("ROLLBACK");
           return null;
         }
-        const deleteScoped = (tableName: string): number =>
-          Number(
-            database
-              .prepare(
-                `DELETE FROM ${tableName} WHERE tenant_id = ? AND workspace_id = ?`
-              )
-              .run(input.tenantId, input.workspaceId).changes
-          );
-        const counts = {
-          deletedWorkspaceCount: 0,
-          deletedAdminRoleAssignmentCount: Number(
-            database
-              .prepare(`DELETE FROM admin_role_assignments WHERE workspace_id = ?`)
-              .run(input.workspaceId).changes
-          ),
-          deletedAttachmentFileCount: deleteScoped("attachment_files"),
-          deletedActivityEventCount: deleteScoped("workspace_activity_events"),
-          deletedReviewCount: deleteScoped("workspace_reviews"),
-          deletedSourcePackageCount: deleteScoped("source_packages"),
-          deletedImportJobCount: deleteScoped("import_jobs"),
-          deletedContentReleaseCount: deleteScoped("content_releases"),
-          deletedParticipantSessionCount: deleteScoped("participant_sessions"),
-          deletedRosterEntryCount: deleteScoped("participant_roster_entries"),
-          deletedLoginAttemptCount: deleteScoped("participant_login_attempts"),
-          deletedTestRunCount: deleteScoped("test_runs"),
-          deletedTestLogCount: deleteScoped("participant_test_logs")
-        };
-        deleteScoped("operational_login_migration_candidates");
-        deleteScoped("original_login_bindings");
-        deleteScoped("original_participant_groups");
-        counts.deletedWorkspaceCount = Number(
-          database
-            .prepare(
-              `DELETE FROM workspaces
-               WHERE tenant_id = ? AND workspace_id = ? AND workspace_key = ?`
-            )
-            .run(input.tenantId, input.workspaceId, input.workspaceKey).changes
-        );
-        if (counts.deletedWorkspaceCount !== 1) {
-          database.exec("ROLLBACK");
-          return null;
-        }
+        const counts=deleteWorkspaceAggregateRows(database,input);
         database
           .prepare(
             `INSERT INTO admin_audit_events (

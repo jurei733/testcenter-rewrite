@@ -1,0 +1,21 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "observationSha256": "9b0c8afee83ef26fb8293079f3bf2362c86cc157267fbcdc2449651be7cdd0e3",
+  "manifestSha256": "86d0d4b0b4f6d95512f5bc0bfa8502eeff5fb97781bf6e1fb67b6352aaeb40d3",
+  "verifierSha256": "ab7c8433981de9d41810fcf897db3586c956fe71d3cb2a79f68fd66be45e57e7",
+  "sourceFiles": 137,
+  "composerPackages": 19,
+  "actualHttpExchanges": 112,
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "ownedCreatedAccounts": 5,
+  "baselineRestored": true,
+  "readOnlyVerification": true,
+  "sqlSeedsOrDaoStubs": false,
+  "sourceUnsafeBehaviorCaptured": {
+    "partialDeletion": true,
+    "selfDemotion": true,
+    "selfDeletion": true
+  },
+  "rewriteSecurityGatesMustRemain": true
+}

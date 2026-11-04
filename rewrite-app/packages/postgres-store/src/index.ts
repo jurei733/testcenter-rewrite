@@ -1,3 +1,4 @@
+import {deleteWorkspaceAggregateRows} from './workspace-aggregate-deletion.js';
 import {readOriginalWorkspaceReportSnapshot} from './original-workspace-reports.js';
 import {deleteOriginalSelectedTests} from './original-test-deletion.js';
 import {readOriginalTestAdministrationInventory} from './original-test-administration.js';
@@ -2701,48 +2702,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           await client.query("ROLLBACK");
           return null;
         }
-        const deleteScoped = async (tableName: string): Promise<number> => {
-          const result = await client.query(
-            `DELETE FROM ${tableName} WHERE tenant_id = $1 AND workspace_id = $2`,
-            [input.tenantId, input.workspaceId]
-          );
-          return result.rowCount ?? 0;
-        };
-        const roleAssignments = await client.query(
-          "DELETE FROM admin_role_assignments WHERE workspace_id = $1",
-          [input.workspaceId]
-        );
-        const deletedAttachmentFileCount = await deleteScoped("attachment_files");
-        const deletedActivityEventCount = await deleteScoped(
-          "workspace_activity_events"
-        );
-        const deletedReviewCount = await deleteScoped("workspace_reviews");
-        const deletedSourcePackageCount = await deleteScoped("source_packages");
-        const deletedImportJobCount = await deleteScoped("import_jobs");
-        const deletedContentReleaseCount = await deleteScoped("content_releases");
-        const deletedParticipantSessionCount = await deleteScoped(
-          "participant_sessions"
-        );
-        const deletedRosterEntryCount = await deleteScoped(
-          "participant_roster_entries"
-        );
-        await deleteScoped("operational_login_migration_candidates");
-        await deleteScoped("original_login_bindings");
-        await deleteScoped("original_participant_groups");
-        const deletedLoginAttemptCount = await deleteScoped(
-          "participant_login_attempts"
-        );
-        const deletedTestRunCount = await deleteScoped("test_runs");
-        const deletedTestLogCount = await deleteScoped("participant_test_logs");
-        const deletedWorkspace = await client.query(
-          `DELETE FROM workspaces
-           WHERE tenant_id = $1 AND workspace_id = $2 AND workspace_key = $3`,
-          [input.tenantId, input.workspaceId, input.workspaceKey]
-        );
-        if ((deletedWorkspace.rowCount ?? 0) !== 1) {
-          await client.query("ROLLBACK");
-          return null;
-        }
+        const counts=await deleteWorkspaceAggregateRows(client,input);
         await client.query(
           `INSERT INTO admin_audit_events (
             admin_audit_event_id, event_type, actor_admin_user_id,
@@ -2759,21 +2719,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           ]
         );
         await client.query("COMMIT");
-        return {
-          deletedWorkspaceCount: 1,
-          deletedAdminRoleAssignmentCount: roleAssignments.rowCount ?? 0,
-          deletedAttachmentFileCount,
-          deletedActivityEventCount,
-          deletedReviewCount,
-          deletedSourcePackageCount,
-          deletedImportJobCount,
-          deletedContentReleaseCount,
-          deletedParticipantSessionCount,
-          deletedRosterEntryCount,
-          deletedLoginAttemptCount,
-          deletedTestRunCount,
-          deletedTestLogCount
-        };
+        return counts;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

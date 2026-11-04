@@ -1,7 +1,8 @@
+import {deleteWorkspaceAggregateRows} from './workspace-aggregate-deletion.js';
 import type {Pool} from 'pg';
 import {setTimeout} from 'node:timers/promises';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
-import {validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
+import {validateOriginalWorkspaceDeletionEffect,validateOriginalAdminDeletionEffect,validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
 
 type Row = Record<string, unknown>;
 type Mappers = {user: (row: Row | undefined) => AdminUser | null; session: (row: Row | undefined) => AdminSession | null;
@@ -18,16 +19,18 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
     try {
       const rightsWrite='token' in selector&&selector.directory==='rights'&&selector.rightsWrite;
       const workspaceWrite='token' in selector&&selector.directory==='workspaces'&&selector.workspaceWrite;
+      const adminWrite='token' in selector&&selector.directory==='users'&&selector.adminWrite;
       // Complete grant-set replacement must include committed insertions, not
       // an RR phantom from before a counter wait. Serialize role writers after
       // that wait, then read current rows under READ COMMITTED. Actor/session
       // and catalog parent locks remain held through grants plus audit commit.
-      await client.query(rightsWrite||workspaceWrite?'BEGIN ISOLATION LEVEL READ COMMITTED':'BEGIN ISOLATION LEVEL REPEATABLE READ');
+      await client.query(rightsWrite||workspaceWrite||adminWrite?'BEGIN ISOLATION LEVEL READ COMMITTED':'BEGIN ISOLATION LEVEL REPEATABLE READ');
       const counter = (await client.query('SELECT last_number FROM original_admin_number_counter WHERE singleton=1 FOR UPDATE')).rows[0];
       // Serialize canonical tenant/catalog writes before reading native name
       // conflicts and parents. READ COMMITTED observes any writer that just
       // released these locks; Root grants remain fixed through audit commit.
-      if(workspaceWrite)await client.query('LOCK TABLE tenants,workspaces,admin_role_assignments IN SHARE ROW EXCLUSIVE MODE');
+      if(adminWrite)await client.query('LOCK TABLE admin_users,admin_role_assignments IN SHARE ROW EXCLUSIVE MODE');
+      else if(workspaceWrite)await client.query('LOCK TABLE tenants,workspaces,admin_role_assignments IN SHARE ROW EXCLUSIVE MODE');
       else if(rightsWrite)await client.query('LOCK TABLE admin_role_assignments IN SHARE ROW EXCLUSIVE MODE');
       const id = 'name' in selector ? selectOriginalAdminIdentity((await client.query('SELECT admin_user_id,username FROM admin_users')).rows.map(row =>
         ({adminUserId: String(row.admin_user_id), username: String(row.username)})), selector.name)
@@ -56,8 +59,12 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
           if(selector.directory==='users'||selector.directory==='rights')snapshot.directory.users=(await client.query(`SELECT u.admin_user_id,u.username,n.admin_number,
             EXISTS(SELECT 1 FROM admin_role_assignments r WHERE r.admin_user_id=u.admin_user_id AND r.role='platform_admin') AS super_admin
             FROM admin_users u LEFT JOIN original_admin_numbers n ON n.admin_user_id=u.admin_user_id`)).rows.map(r=>({adminUserId:String(r.admin_user_id),username:String(r.username),adminNumber:r.admin_number==null?null:String(r.admin_number),isSuperadmin:Boolean(r.super_admin)}));
+          if(adminWrite&&snapshot.directory.users){
+            const roots=(await client.query("SELECT role_assignment_id,admin_user_id FROM admin_role_assignments WHERE role='platform_admin'")).rows;
+            for(const user of snapshot.directory.users)user.rootRoleAssignmentIds=roots.filter(r=>r.admin_user_id===user.adminUserId).map(r=>String(r.role_assignment_id));
+          }
           if(selector.directory==='workspaces'||selector.directory==='rights'){
-            const ws=(await client.query(`SELECT w.* FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active'${rightsWrite||workspaceWrite?' FOR SHARE OF w,t':''}`)).rows.map(map.workspace).filter(present);
+            const ws=(await client.query(`SELECT w.* FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active'${workspaceWrite==='delete'?' FOR UPDATE OF w FOR SHARE OF t':rightsWrite||workspaceWrite?' FOR SHARE OF w,t':''}`)).rows.map(map.workspace).filter(present);
             const metadataOnly=selector.directory==='rights'||workspaceWrite;
             const files=(metadataOnly?[]:(await client.query('SELECT source_package_id,tenant_id,workspace_id,status,uploaded_at FROM source_packages')).rows).map(r=>({sourcePackageId:String(r.source_package_id),tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),status:r.status as import('@testcenter-rewrite-app/domain').SourcePackageStatus,uploadedAt:String(r.uploaded_at)}));
             const events=(metadataOnly?[]:(await client.query("SELECT tenant_id,workspace_id,event_type,subject_id,details_json FROM workspace_activity_events WHERE event_type IN ('source_package_assembled','source_package_replaced')")).rows).map(r=>({tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),eventType:r.event_type as import('@testcenter-rewrite-app/domain').WorkspaceActivityEvent['eventType'],subjectId:String(r.subject_id),details:typeof r.details_json==='string'?JSON.parse(r.details_json) as Record<string,unknown>:r.details_json as Record<string,unknown>}));
@@ -80,9 +87,36 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
           if(n&&target)snapshot.target={user:target,number:{adminUserId:target.adminUserId,adminNumber:String(n.admin_number)},sessions:(await client.query('SELECT * FROM admin_sessions WHERE admin_user_id=$1 FOR UPDATE',[target.adminUserId])).rows.map(map.session).filter(present)};
         }
       }
+      if(workspaceWrite==='delete'&&snapshot.directory?.workspaces){
+        // Recheck the clock and actor only after every workspace/person/run
+        // writer wait. The locks survive the entire batch and all audits.
+        const ids=snapshot.directory.workspaces.map(row=>row.workspace.workspaceId);
+        if(ids.length){
+          await client.query('SELECT p.participant_session_id FROM participant_sessions p JOIN workspaces w ON w.workspace_id=p.workspace_id AND w.tenant_id=p.tenant_id WHERE w.workspace_id=ANY($1::text[]) ORDER BY p.participant_session_id FOR UPDATE OF p',[ids]);
+          await client.query('SELECT r.test_run_id FROM test_runs r JOIN workspaces w ON w.workspace_id=r.workspace_id AND w.tenant_id=r.tenant_id WHERE w.workspace_id=ANY($1::text[]) ORDER BY r.test_run_id FOR UPDATE OF r',[ids]);
+        }
+      }
       const effect = transform(structuredClone(snapshot));
       validateOriginalAdminRoleChanges(snapshot,effect,selector);
       validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
+      validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
+      validateOriginalAdminDeletionEffect(snapshot,effect,selector);
+      validateOriginalWorkspaceDeletionEffect(snapshot,effect,selector);
+      for(const target of effect.deletedWorkspaces??[])await deleteWorkspaceAggregateRows(client,target.workspace);
+      for(const user of effect.deletedUsers??[]){
+        await client.query('DELETE FROM admin_role_assignments WHERE admin_user_id=$1',[user.adminUserId]);
+        await client.query('DELETE FROM admin_sessions WHERE admin_user_id=$1',[user.adminUserId]);
+        const identity=await client.query('DELETE FROM original_admin_numbers WHERE admin_user_id=$1 AND admin_number=$2',[user.adminUserId,user.adminNumber]);
+        if(identity.rowCount!==1)throw Error('Native user deletion identity changed.');
+        const deleted=await client.query('DELETE FROM admin_users WHERE admin_user_id=$1',[user.adminUserId]);
+        if(deleted.rowCount!==1)throw Error('Native user deletion target changed.');
+      }
+      if(effect.rootRoleChange){
+        const c=effect.rootRoleChange;
+        for(const id of c.removeIds){const changed=await client.query("DELETE FROM admin_role_assignments WHERE role_assignment_id=$1 AND admin_user_id=$2 AND role='platform_admin'",[id,c.adminUserId]);if(changed.rowCount!==1)throw Error('Native Root removal identity changed.');}
+        if(c.assignment){const r=c.assignment;await client.query('INSERT INTO admin_role_assignments(role_assignment_id,admin_user_id,role,access_mode,tenant_id,workspace_id,group_key,monitor_profiles_json,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)',
+          [r.roleAssignmentId,r.adminUserId,r.role,r.accessMode,null,null,null,JSON.stringify({monitorProfiles:[],monitorBookletVisibility:'visible'}),r.createdAt]);}
+      }
       if(effect.workspaceChange){
         const c=effect.workspaceChange,w=c.workspace,t=c.tenant;
         if(c.kind==='create'){

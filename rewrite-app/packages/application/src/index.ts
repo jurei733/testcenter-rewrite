@@ -87,6 +87,10 @@ import {createOriginalAdminPermissionsPort} from './original-admin-permissions.j
 export {validateOriginalAdminRoleChanges} from './original-admin-permissions.js';
 export {originalDirectoryModification} from './original-admin-directory.js';
 export {validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey} from './original-workspace-directory.js';
+export {validateOriginalAdminLifecycleEffect} from './original-admin-lifecycle.js';
+export {validateOriginalAdminDeletionEffect} from './original-admin-deletion.js';
+export {validateOriginalWorkspaceDeletionEffect} from './original-workspace-deletion.js';
+export {deleteWorkspaceCollections,workspaceDeletionScopeExists} from './workspace-deletion-collections.js';
 export type {OriginalDirectoryFile,OriginalDirectoryFileEvent,OriginalAdminDirectoryPort} from './original-admin-directory.js';
 import {createOriginalAdminSessionPort} from './original-admin-session.js';
 export {assertOriginalAdminNameAvailable,originalAdminMetadataAllowed,selectOriginalAdminIdentity,originalAdminFailureBucket,prepareOriginalAdminNumber,originalAdminNumber,formatOriginalAdminAccessSet} from './original-admin-session.js';
@@ -32727,7 +32731,7 @@ export const createFirstSliceServices = (
     originalWorkspaceReport:createOriginalWorkspaceReportPort({repository,workspace:(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey),timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
     originalTestAdministration: createOriginalTestAdministrationPort(repository,(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey)),
     originalAdminSession: createOriginalAdminSessionPort({repository,now,id:idGenerator,verifyPassword:verifyAdminPassword,accessFailure:resolveAdminAccessFailureReason,accessUntil:resolveAdminAccessValidUntil,sessionTtlMs:adminSessionTtlMs,maxFailures:adminLoginMaxFailures,failureWindowMs:adminLoginFailureWindowMs,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),
-    originalAdminDirectory:createOriginalAdminDirectoryPort({repository,now,id:idGenerator,timeZone:participantAccessTimeZone,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),
+    originalAdminDirectory:createOriginalAdminDirectoryPort({repository,now,id:idGenerator,timeZone:participantAccessTimeZone,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword,verifyPassword:verifyAdminPassword}),
     originalAdminPermissions:createOriginalAdminPermissionsPort({repository,now,id:idGenerator}),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,

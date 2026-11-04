@@ -1,0 +1,15 @@
+import type {DatabaseSync} from 'node:sqlite';
+import type {WorkspaceAggregateDeletionCounts} from '@testcenter-rewrite-app/domain';
+/** Called only while the caller owns the workspace and the transaction. No
+ * private result/package/release payload is selected or decoded here. */
+export function deleteWorkspaceAggregateRows(database:DatabaseSync,scope:{tenantId:string;workspaceId:string;workspaceKey:string}):WorkspaceAggregateDeletionCounts {
+ const args=[scope.tenantId,scope.workspaceId];
+ database.prepare('DELETE FROM participant_access_credentials WHERE participant_session_id IN (SELECT participant_session_id FROM participant_sessions WHERE tenant_id=? AND workspace_id=?)').run(...args);
+ database.prepare('DELETE FROM participant_connection_presence WHERE test_run_id IN (SELECT test_run_id FROM test_runs WHERE tenant_id=? AND workspace_id=?)').run(...args);
+ const counts:WorkspaceAggregateDeletionCounts={deletedWorkspaceCount:0,deletedAdminRoleAssignmentCount:0,deletedAttachmentFileCount:0,deletedActivityEventCount:0,deletedReviewCount:0,deletedSourcePackageCount:0,deletedImportJobCount:0,deletedContentReleaseCount:0,deletedParticipantSessionCount:0,deletedRosterEntryCount:0,deletedLoginAttemptCount:0,deletedTestRunCount:0,deletedTestLogCount:0};
+ const fields={"admin_role_assignments": "deletedAdminRoleAssignmentCount", "attachment_files": "deletedAttachmentFileCount", "workspace_activity_events": "deletedActivityEventCount", "workspace_reviews": "deletedReviewCount", "source_packages": "deletedSourcePackageCount", "import_jobs": "deletedImportJobCount", "content_releases": "deletedContentReleaseCount", "participant_sessions": "deletedParticipantSessionCount", "participant_roster_entries": "deletedRosterEntryCount", "participant_login_attempts": "deletedLoginAttemptCount", "test_runs": "deletedTestRunCount", "participant_test_logs": "deletedTestLogCount"} as const;
+ for(const table of ["original_native_commands", "participant_run_commands", "participant_progress_deliveries", "original_native_units", "original_native_reviews", "original_test_numbers", "original_person_numbers", "original_session_tokens", "original_login_bindings", "original_participant_groups", "original_workspace_numbers", "admin_role_assignments", "attachment_files", "workspace_activity_events", "workspace_reviews", "source_packages", "import_jobs", "content_releases", "participant_sessions", "participant_roster_entries", "operational_login_migration_candidates", "participant_login_attempts", "test_runs", "participant_test_logs"]){const count=Number(database.prepare('DELETE FROM '+table+' WHERE tenant_id=? AND workspace_id=?').run(...args).changes);if(table in fields)counts[fields[table as keyof typeof fields]]=count;}
+ counts.deletedWorkspaceCount=Number(database.prepare('DELETE FROM workspaces WHERE tenant_id=? AND workspace_id=? AND workspace_key=?').run(...args,scope.workspaceKey).changes);
+ if(counts.deletedWorkspaceCount!==1)throw Error('Workspace deletion identity changed.');
+ return counts;
+}

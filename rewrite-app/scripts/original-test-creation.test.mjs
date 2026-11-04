@@ -911,7 +911,8 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         const adminToken=(await services.adminAuth.signIn({username:'owned-native-admin',password})).adminSession.token;
         await call('PUT',undefined,'{',401);await call('PUT',httpPerson.login.token,'{',403);
         await call('PUT',httpPerson.person.groupToken,'{',403);await call('PUT',adminToken,'{',403);
-        await call('PUT','invalid-owned-token','{',401);await call('PUT',httpPerson.person.token,'{',400);
+        const invalid=await call('PUT','invalid-owned-token','{',403);assert.equal(invalid.text,'Invalid token.');assert.equal(invalid.headers.get('content-type'),'text/html;charset=UTF-8');assert.equal(invalid.headers.get('test-mode'),'NO');assert.match(invalid.headers.get('error-id'),/^error-/);
+        await call('PUT',httpPerson.person.token,'{',400);
         for(const body of ['null','[]','{}','{"bookletName":1}'])await call('PUT',httpPerson.person.token,body,400);
         assert.deepEqual(await owned(httpPerson.person),before);
         const key=native.bookletName,expected=await request(httpPerson,key);
