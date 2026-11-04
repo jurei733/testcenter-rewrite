@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {execFileSync} from 'node:child_process';
-import {createHash} from 'node:crypto';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {extname,join,relative,resolve} from 'node:path';
-import {originalBrowserSource,verifyOriginalBuild} from './original-browser-reference.mjs';
+import {originalBrowserSource,verifyOriginalBuild,originalWorkspaceResultsReference} from './original-browser-reference.mjs';
 import {captureStableViewport} from './stable-viewport-capture.mjs';
 import {compareScreenshots} from './exact-rgba-comparison.mjs';
 import {waitForFiniteDocumentAnimations} from './finite-animation-ready.mjs';
@@ -14,10 +12,7 @@ import {waitForFiniteDocumentAnimations} from './finite-animation-ready.mjs';
  * qualified separately by the accompanying real SQLite browser journey. */
 export async function createOriginalResultsVisualReference({browser,root,sourceRoot,artifacts}){
  root=resolve(root);await verifyOriginalBuild(root);await mkdir(artifacts,{recursive:true});
- const paths=['workspace.component.ts','workspace.component.html','workspace.component.css','workspace.interfaces.ts',
-  'results/results.component.ts','results/results.component.html','results/results.component.css',
-  'tests/tests.component.ts','tests/tests.component.html','tests/tests.component.css'].map(p=>'frontend/src/app/workspace-admin/'+p);
- const provenance=paths.map(path=>({path,sha256:createHash('sha256').update(execFileSync('git',['show',originalBrowserSource.commit+':'+path],{cwd:sourceRoot})).digest('hex')}));
+ const provenance=originalWorkspaceResultsReference.sources;
  const server=createServer(async(req,res)=>{
   try{const path=resolve(root,'.'+new URL(req.url,'http://owned.invalid').pathname.replace(/^\/$/,'/index.html'));
    if(relative(root,path).startsWith('..'))return res.writeHead(404).end();

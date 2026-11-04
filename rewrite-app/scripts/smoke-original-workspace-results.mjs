@@ -96,38 +96,41 @@ try{
   const r=await native('/workspace/'+workspaceId+'/report/'+type+'?dataIds=OWNED.RESULT.A&useNewVersion='+enhanced,writerToken,'GET',undefined,'text/csv');assert.equal(r.status,200);assert.ok(r.bytes.length>0);expected[label]=r.bytes;
  }
  browser=await chromium.launch({channel:process.env.UI_SMOKE_BROWSER_CHANNEL||(process.env.CI==='true'?undefined:'chrome'),headless:process.env.CI==='true'&&process.env.UI_SMOKE_HEADFUL!=='true'});
- for(const theme of ['Primar','Sekundar','Erwachsene'])for(const width of [1280,390]){
+ for(const theme of ['Primar','Sekundar','Erwachsene'])for(const width of [1280,390])for(const role of process.env.ORIGINAL_BROWSER_REFERENCE_ROOT?['RW','RO']:['RW']){
   const settings=await fetch(base+'/api/v1/admin/original-interface/application-settings',{method:'PATCH',headers:{authorization:'Bearer '+rootToken,'Content-Type':'application/json'},body:JSON.stringify({themeName:theme})});assert.equal(settings.status,200);
   if(process.env.ORIGINAL_BROWSER_REFERENCE_ROOT&&!visual){const {createOriginalResultsVisualReference}=await import('./original-workspace-results-visual.mjs');visual=await createOriginalResultsVisualReference({browser,root:process.env.ORIGINAL_BROWSER_REFERENCE_ROOT,sourceRoot:process.env.ORIGINAL_SOURCE_ROOT,artifacts:join(artifacts,'visual')});}
   const context=await browser.newContext({viewport:{width,height:844},locale:'de-DE',timezoneId:'Europe/Berlin'});
   try{
-   await open(context);const visualInput={page,theme,width,workspaceId,groups:JSON.parse((await native('/workspace/'+workspaceId+'/results')).bytes),tests:JSON.parse((await native('/workspace/'+workspaceId+'/responses/detailed')).bytes)};
+   await open(context,role==='RW'?'owned-results-writer':'owned-results-reader');const visualInput={page,theme,width,role,workspaceId,groups:JSON.parse((await native('/workspace/'+workspaceId+'/results')).bytes),tests:JSON.parse((await native('/workspace/'+workspaceId+'/responses/detailed')).bytes)};
    if(visual)await visual.compare({...visualInput,view:'results',selected:false});
    assert.equal(await page.locator('#originalWorkspaceResults mat-row').count(),2);
-   await page.locator('#originalWorkspaceFileHeader h1').getByText('Verwaltung "Eigene Ergebnisse Ω" (RW)',{exact:true}).waitFor();
+   await page.locator('#originalWorkspaceFileHeader h1').getByText('Verwaltung "Eigene Ergebnisse Ω" ('+role+')',{exact:true}).waitFor();
    assert.equal(await page.locator('[data-cy="download-responses"]').isDisabled(),true);
    for(const label of ['responses','logs','comments','comments-newFormat']){
     await selectGroup('Ergebnisgruppe A');const downloaded=page.waitForEvent('download');await page.locator('[data-cy="download-'+label+'"]').click();const download=await downloaded;
     assert.equal(download.suggestedFilename(),'iqb-testcenter-'+(label==='responses'?'responses':label==='logs'?'logs':'reviews')+'.csv');
-    const destination=join(artifacts,theme+'-'+width+'-'+label+'.csv');await download.saveAs(destination);assert.deepEqual(await readFile(destination),expected[label]);
+    const destination=join(artifacts,theme+'-'+width+'-'+role+'-'+label+'.csv');await download.saveAs(destination);assert.deepEqual(await readFile(destination),expected[label]);
     assert.equal(await page.locator('#originalWorkspaceResults mat-row input:checked').count(),0);
    }
    await selectGroup('Ergebnisgruppe A');await page.waitForFunction(()=>document.querySelector('#originalWorkspaceResults mat-header-cell input')?.indeterminate===true);
-   await page.locator('[data-cy="delete-files"]').click();await waitForMaterialDialog(page);await page.locator('[data-cy="dialog-cancel"]').click();
+   if(role==='RW'){await page.locator('[data-cy="delete-files"]').click();await waitForMaterialDialog(page);await page.locator('[data-cy="dialog-cancel"]').click();}
+   else assert.equal(await page.locator('[data-cy="delete-files"]').isDisabled(),true);
    assert.equal(await page.locator('#originalWorkspaceResults mat-row input:checked').count(),1);
    if(visual)await visual.compare({...visualInput,view:'results',selected:true});
-   await waitForFiniteDocumentAnimations(page);await page.screenshot({path:join(artifacts,theme+'-'+width+'-results-selected.png'),fullPage:true});
+   await waitForFiniteDocumentAnimations(page);await page.screenshot({path:join(artifacts,theme+'-'+width+'-'+role+'-results-selected.png'),fullPage:true});
    await tab('Tests löschen');assert.equal(await page.locator('#originalWorkspaceTests mat-row').count(),3);
    if(visual)await visual.compare({...visualInput,view:'tests',selected:false});
    await page.locator('#originalWorkspaceTests mat-row input').first().check();await page.getByText('1 Test-Session(s) zum Löschen ausgewählt',{exact:true}).waitFor();
-   await page.locator('#originalWorkspaceTests .sidebar button').click();await waitForMaterialDialog(page);
-   await page.locator('[data-cy="dialog-content"]').getByText('Sie haben eine Test-Session ausgewählt. Soll diese gelöscht werden?',{exact:true}).waitFor();
-   await page.locator('[data-cy="dialog-cancel"]').click();await page.locator('mat-dialog-container').waitFor({state:'detached'});
+   if(role==='RW'){
+    await page.locator('#originalWorkspaceTests .sidebar button').click();await waitForMaterialDialog(page);
+    await page.locator('[data-cy="dialog-content"]').getByText('Sie haben eine Test-Session ausgewählt. Soll diese gelöscht werden?',{exact:true}).waitFor();
+    await page.locator('[data-cy="dialog-cancel"]').click();await page.locator('mat-dialog-container').waitFor({state:'detached'});
+   }else assert.equal(await page.locator('#originalWorkspaceTests .sidebar button').isDisabled(),true);
    if(visual)await visual.compare({...visualInput,view:'tests',selected:true});
-   await page.screenshot({path:join(artifacts,theme+'-'+width+'-tests-selected.png'),fullPage:true});
+   await page.screenshot({path:join(artifacts,theme+'-'+width+'-'+role+'-tests-selected.png'),fullPage:true});
    await page.reload({waitUntil:'domcontentloaded'});await page.locator('#originalWorkspaceTests[aria-busy="false"]').waitFor();
-   assert.equal(await page.locator('#originalWorkspaceTests mat-row input:checked').count(),0);mark('four-downloads-two-tabs-cancel-reload-'+theme+'-'+width);
-  }catch(e){await page?.screenshot({path:join(artifacts,theme+'-'+width+'-failure.png'),fullPage:true});throw e;}finally{await context.close();}
+   assert.equal(await page.locator('#originalWorkspaceTests mat-row input:checked').count(),0);mark('four-downloads-two-tabs-cancel-reload-'+theme+'-'+width+'-'+role);
+  }catch(e){await page?.screenshot({path:join(artifacts,theme+'-'+width+'-'+role+'-failure.png'),fullPage:true});throw e;}finally{await context.close();}
  }
  const ro=await browser.newContext({viewport:{width:1280,height:844}});
  try{

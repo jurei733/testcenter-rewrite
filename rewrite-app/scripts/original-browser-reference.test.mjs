@@ -100,12 +100,13 @@ for (const change of ["corrupt", "extra", "missing", "symlink", "directory-link"
 test("capture tasks cover each renderer family without duplicates or substituted Source", async () => {
   assert.deepEqual(Object.keys(originalReferenceTasks), ["entry", "dialogs", "starter", "administration", "directory"]);
   const tasks = Object.values(originalReferenceTasks).flat();
-  assert.equal(tasks.length, 24); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
-  assert.deepEqual(tasks.map(task => task.name).filter(name => !['directory','entry-viewports','starter-viewports','starter-empty-viewports','starter-asset-viewports'].includes(name)).sort(), [
+  assert.equal(tasks.length, 25); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
+  assert.deepEqual(tasks.map(task => task.name).filter(name => !['workspace-results','directory','entry-viewports','starter-viewports','starter-empty-viewports','starter-asset-viewports'].includes(name)).sort(), [
     'system-check-welcome', 'login', 'insecure-participant', 'insecure-admin', 'header-login', 'header-admin', 'header-starter',
     'exit', 'completeness', 'legacy-completeness', 'runtime', 'runtime-contract', 'version-missing', 'version-unsupported',
     'starter', 'paused', 'paused-locked', 'advisories', 'settings'
   ].sort(), 'The new directory family cannot replace any of the prior 19 Source tasks');
+  assert.deepEqual(originalReferenceTasks.administration.filter(t=>t.name==='workspace-results'),[{name:'workspace-results',script:'reference-original-workspace-results.mjs',environment:{},output:'workspace-results.json'}]);
   assert.deepEqual(originalReferenceTasks.directory, [{name: 'directory', script: 'reference-original-administration-directory.mjs', environment: {}, output: 'directory.json'}]);
   assert.deepEqual(originalReferenceTasks.entry.filter(task=>task.name==='entry-viewports'),
     [{name:'entry-viewports',script:'reference-original-participant-entry-viewports.mjs',environment:{},output:'entry-viewports.json'}]);

@@ -48,6 +48,16 @@ export async function verifyOriginalSettingsPatchSource(root, reference=original
   assert.equal(reference.table,reference.files[3].excerpt);
 }
 const originalAdministrationReference = JSON.parse(await readFile(new URL("./fixtures/original-administration-permissions.json", import.meta.url), "utf8"));
+export const originalWorkspaceResultsReference = JSON.parse(await readFile(new URL('./fixtures/original-workspace-results-source.json', import.meta.url), 'utf8'));
+export async function verifyOriginalWorkspaceResultsSource(root) {
+  const reference=originalWorkspaceResultsReference;
+  assert.equal(reference.version,1);assert.equal(reference.commit,originalBrowserSource.commit);
+  assert.equal(reference.sources.length,10);assert.equal(new Set(reference.sources.map(s=>s.path)).size,10);
+  for(const item of reference.sources){
+    assert.match(item.path,/^frontend\/src\/app\/workspace-admin\/(?:workspace\.(?:component\.(?:ts|html|css)|interfaces\.ts)|(?:results|tests)\/(?:results|tests)\.component\.(?:ts|html|css))$/);
+    assert.equal(sha256(await readFile(join(root,item.path))),item.sha256,'Workspace Results reference must retain the actual pinned Source.');
+  }
+}
 export const originalDirectoryReference = JSON.parse(await readFile(new URL('./fixtures/original-directory-source.json', import.meta.url), 'utf8'));
 export async function verifyOriginalDirectorySource(root, reference = originalDirectoryReference) {
   assert.equal(reference.version, 1); assert.equal(reference.repository, originalBrowserSource.repository);
@@ -93,6 +103,7 @@ export async function verifyOriginalSource(root) {
   assert.equal(Number(process.versions.node.split(".")[0]), 22);
   await verifyOriginalAdministrationSource(root);
   await verifyOriginalDirectorySource(root);
+  await verifyOriginalWorkspaceResultsSource(root);
   await verifyOriginalSettingsSource(root);
   await verifyOriginalAssetDeletionSource(root);
   await verifyOriginalSettingsPatchSource(root);
@@ -162,7 +173,8 @@ export const originalReferenceTasks = {
     task("advisories", "reference-original-starter-advisories.mjs")
   ],
   administration: [
-    task("settings", "reference-original-administration-settings.mjs", {}, "settings.json")
+    task("settings", "reference-original-administration-settings.mjs", {}, "settings.json"),
+    task("workspace-results", "reference-original-workspace-results.mjs", {}, "workspace-results.json")
   ],
   directory: [
     task('directory', 'reference-original-administration-directory.mjs', {}, 'directory.json')

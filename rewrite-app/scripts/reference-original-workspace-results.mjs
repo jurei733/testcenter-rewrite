@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {copyFile} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
+assert.equal(process.env.UI_SMOKE_HEADFUL,'true');
+assert.ok(!process.env.UI_SMOKE_BROWSER_CHANNEL,'The paired Source gate must use the lockfile Chromium.');
+assert.equal(process.env.ORIGINAL_REFERENCE_CAPTURE_ONLY,'true');
+assert.ok(process.env.ORIGINAL_PLAYER_REFERENCE_ROOT);
+process.env.ORIGINAL_BROWSER_REFERENCE_ROOT=process.env.ORIGINAL_PLAYER_REFERENCE_ROOT;
+await import('./smoke-original-workspace-results.mjs');
+await copyFile(join(resolve(process.env.UI_SMOKE_ARTIFACT_DIR),'original-workspace-results','results.json'),join(resolve(process.env.UI_SMOKE_ARTIFACT_DIR),'workspace-results.json'));

@@ -44,6 +44,8 @@
 .tests-view .sidebar {
   flex: 10 0 200px;
   padding-left: 1em;
+  /* Source's flex basis excludes this padding. */
+  box-sizing: content-box;
 }
 
 .tests-view .sidebar .buttons {
