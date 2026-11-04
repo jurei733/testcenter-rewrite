@@ -9,6 +9,7 @@ import { chromium } from "playwright";
 import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { runOriginalApplicationSettingsSmoke } from "./original-application-settings-smoke.mjs";
 import { waitForMaterialDialog } from "./material-dialog-ready.mjs";
+import {checkNativeNameInputBoundary,checkNativePasswordInputBoundary,selectAfterNativeMatrixFailure} from './original-administration-boundary-smoke.mjs';
 
 // Real protected API, native Original controls and an owned SQLite database.
 // Setup credentials never pre-authenticate the browser or enter UI fixtures.
@@ -71,7 +72,7 @@ try{
   assert.equal(await page.locator("#originalAdministrationHeader h1").textContent(),"Systemverwaltung");
   assert.equal(await page.locator(".hero:visible,.view-nav:visible,.app-layout:visible").count(),0);
   assert.equal(await page.locator("#adminSessionToken").count(),0);
-  await page.locator(`[data-admin-id="${adminNativeId}"]`).click();
+  await selectAfterNativeMatrixFailure(page,`[data-admin-id="${adminNativeId}"]`,'/user/'+adminNativeId+'/workspaces');
   const ro=page.locator(`[data-cy="workspace-${alphaNativeId}-role-ro"] input`);
   const rw=page.locator(`[data-cy="workspace-${alphaNativeId}-role-rw"] input`);
   const originalCheckbox=await ro.elementHandle();
@@ -83,7 +84,7 @@ try{
   assert.equal(directory.items.find(item=>item.adminUser.adminUserId===adminId).roleAssignments.find(role=>role.workspaceId===alpha.workspaceId).accessMode,"read_only");
   console.log("original_administration=users-real-read-only-grant:passed");
   await page.locator('[data-cy="superadmin-tabs:workspaces"]').click();
-  await page.locator(`[data-workspace-id="${betaNativeId}"]`).click();
+  await selectAfterNativeMatrixFailure(page,`[data-workspace-id="${betaNativeId}"]`,'/workspace/'+betaNativeId+'/users');
   const row=page.locator(".directory-permissions mat-row").filter({hasText:"owned-admin-b"});
   await row.getByRole("checkbox",{name:"Lesen und Schreiben",exact:true}).check();
   await page.locator('[data-cy="save"]').click();await surface.waitFor();
@@ -97,7 +98,8 @@ try{
   assert.equal(await page.locator('#originalAdministrationName').inputValue(),'');
   await page.locator('#originalAdministrationName').fill('ab');
   await page.locator('#originalAdministrationEditorSave:disabled').waitFor();
-  await page.locator("#originalAdministrationName").fill("ZZZ Beta geändert");await page.locator("#originalAdministrationEditorSave").click();
+  await page.locator("#originalAdministrationName").fill("ZZZ Beta geändert");
+  await checkNativeNameInputBoundary(page,'rename-workspace');await page.locator("#originalAdministrationEditorSave").click();
   await page.locator("mat-dialog-container").waitFor({state:"detached"});
   assert.equal((await api("/api/v1/tenants/owned-other-tenant/workspaces")).items.find(item=>item.workspaceId===beta.workspaceId).displayName,"ZZZ Beta geändert");
   assert.equal(await page.locator('.directory-list [data-workspace-id]').last().getAttribute('data-workspace-id'),betaNativeId,
@@ -141,7 +143,8 @@ try{
   await page.locator('[data-cy="add-workspace"]').click();await waitForMaterialDialog(page);
   await page.locator('#originalAdministrationName').fill('ab');
   await page.locator('#originalAdministrationEditorSave:disabled').waitFor();
-  await page.locator("#originalAdministrationName").fill("AAA Neuer Original-Bereich");await page.locator("#originalAdministrationEditorSave").click();
+  await page.locator("#originalAdministrationName").fill("AAA Neuer Original-Bereich");
+  await checkNativeNameInputBoundary(page,'create-workspace');await page.locator("#originalAdministrationEditorSave").click();
   await page.locator("mat-dialog-container").waitFor({state:"detached"});
   const tenants=await api("/api/v1/platform/tenants");assert.ok(tenants.items.some(item=>item.tenantKey==="original-interface"));
   const originalWorkspaces=(await api("/api/v1/tenants/original-interface/workspaces")).items;
@@ -153,6 +156,7 @@ try{
   await page.locator('[data-cy="add-user"]').click();await waitForMaterialDialog(page);
   await page.locator("#originalAdministrationName").fill("aaa-new-original-admin");
   await page.locator("#originalAdministrationPassword").fill("New-original-password-9!");
+  await checkNativeNameInputBoundary(page,'create-user');await checkNativePasswordInputBoundary(page,'create-user');
   await page.locator("#originalAdministrationEditorSave").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
   const created=(await api("/api/v1/admin/users")).items.find(item=>item.adminUser.username==="aaa-new-original-admin");assert.ok(created);
   const createdNativeId=adminNumber(created.adminUser.adminUserId);
@@ -193,7 +197,8 @@ try{
   await runOriginalApplicationSettingsSmoke(page,api,{artifacts});
   const resetInOriginal=async password=>{
     await page.locator(`[data-admin-id="${adminNativeId}"]`).click();await page.locator('[data-cy="change-password"]').click();await waitForMaterialDialog(page);
-    await page.locator("#originalAdministrationPassword").fill(password);await page.locator("#originalAdministrationPasswordConfirmation").fill(password);await page.locator("#originalAdministrationEditorSave").click();
+    await page.locator("#originalAdministrationPassword").fill(password);await page.locator("#originalAdministrationPasswordConfirmation").fill(password);
+    await checkNativePasswordInputBoundary(page,'reset-other');await page.locator("#originalAdministrationEditorSave").click();
     await page.locator("mat-dialog-container").waitFor({state:"detached"});
   };
   await resetInOriginal("Reset-original-password-9!");
@@ -231,12 +236,17 @@ try{
   await failedGuest.close();await page.bringToFront();
   console.log("original_administration=missing-password-renderer-keeps-server-gate-and-safe-signout:passed");
   await page.locator(`[data-admin-id="${rootNativeId}"]`).click();
+  // Selection and its asynchronous matrix must be rendered before inspecting
+  // self-action guards; locator.isDisabled() itself does not wait for a render.
+  await page.waitForFunction(id=>document.querySelector('[data-admin-id="'+id+'"]')?.style.backgroundColor==='lightblue',rootNativeId);
+  await surface.waitFor();
   assert.equal(await page.locator('[data-cy="delete-user"]').isDisabled(),true);
   assert.equal(await page.locator('[data-cy="change-superadmin"]').isDisabled(),true);
   await page.locator('[data-cy="change-password"]').click();await waitForMaterialDialog(page);
   await page.locator("#originalAdministrationCurrentPassword").fill("wrong-current-password");
   await page.locator("#originalAdministrationPassword").fill("Own-root-updated-password-9!");
   await page.locator("#originalAdministrationPasswordConfirmation").fill("Own-root-updated-password-9!");
+  await checkNativePasswordInputBoundary(page,'reset-self');
   await page.locator("#originalAdministrationEditorSave").click();await page.getByText("Falsches Kennwort.",{exact:true}).waitFor();
   const previousBrowserToken=browserToken;
   await page.locator("#originalAdministrationCurrentPassword").fill("demo-admin-password");

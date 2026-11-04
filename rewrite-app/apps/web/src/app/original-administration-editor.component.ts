@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogActions, MatDialogContent, MatDialogRef, MatD
 import { MatFormField, MatLabel, MatError } from "@angular/material/form-field";
 import { MatInput } from "@angular/material/input";
 import { AppShellFacade } from "./app-shell.facade";
+import {exceedsOriginalAdministrationNameLimit,exceedsOriginalAdministrationPasswordBytes} from "./original-administration-input";
 
 export type OriginalAdministrationEditorData = {
   kind: "create-user" | "create-workspace" | "rename-workspace" | "reset-password";
@@ -29,11 +30,13 @@ export type OriginalAdministrationEditorData = {
             <input matInput id="originalAdministrationName" data-cy="new-user-name" formControlName="name"
               placeholder="Name" autocomplete="off" [readonly]="busy" />
             @if (form.controls.name.hasError('minlength')) { <mat-error>Mindestlänge für den Namen ist 3 Zeichen.</mat-error> }
+            @else if (form.controls.name.hasError('nativeNameLength')) { <mat-error>Maximallänge für den Namen ist 50 Zeichen.</mat-error> }
           </mat-form-field>
         } @else if (data.kind === 'create-workspace' || data.kind === 'rename-workspace') {
           <p><mat-form-field>
             <input matInput id="originalAdministrationName" data-cy="new-user-name" formControlName="name"
               placeholder="Name" autocomplete="off" [readonly]="busy" />
+            @if (form.controls.name.hasError('nativeNameLength')) { <mat-error>Maximallänge für den Namen ist 50 Zeichen.</mat-error> }
           </mat-form-field></p>
         }
         @if (data.isSelfService) {
@@ -47,7 +50,8 @@ export type OriginalAdministrationEditorData = {
             <mat-label>Kennwort</mat-label>
             <input matInput id="originalAdministrationPassword" data-cy="new-user-password" type="password"
               formControlName="password" placeholder="Kennwort" autocomplete="new-password" [readonly]="busy" />
-            @if (form.controls.password.hasError('passwordPolicy')) { <mat-error>{{ passwordError }}</mat-error> }
+            @if (form.controls.password.hasError('nativePasswordBytes')) { <mat-error>Das Kennwort darf höchstens 60 UTF-8-Bytes enthalten.</mat-error> }
+            @else if (form.controls.password.hasError('passwordPolicy')) { <mat-error>{{ passwordError }}</mat-error> }
           </mat-form-field>
         }
         @if (data.kind === 'reset-password') {
@@ -82,11 +86,13 @@ export class OriginalAdministrationEditorComponent {
   readonly hasPassword = this.data.kind==="create-user" || this.data.kind==="reset-password";
   readonly form = new FormGroup({
     name:new FormControl(this.data.kind==="rename-workspace"?"":this.data.name ?? "",{nonNullable:true,
-      validators:this.data.kind==="reset-password"?[]:[Validators.required,Validators.minLength(3)]}),
+      validators:this.data.kind==="reset-password"?[]:[Validators.required,Validators.minLength(3),
+        control=>exceedsOriginalAdministrationNameLimit(control.value,this.data.kind)?{nativeNameLength:true}:null]}),
     oldPassword:new FormControl("",{nonNullable:true,validators:this.data.isSelfService?[Validators.required]:[]}),
     passwordConfirmation:new FormControl("",{nonNullable:true,validators:this.data.kind==="reset-password"?[Validators.required]:[]}),
     password:new FormControl("",{nonNullable:true,validators:this.hasPassword
-      ?[Validators.required,control=>this.app.getAdminPasswordViolation(control.value)===null?null:{passwordPolicy:true}]:[]})
+      ?[Validators.required,control=>this.app.getAdminPasswordViolation(control.value)===null?null:{passwordPolicy:true},
+        control=>exceedsOriginalAdministrationPasswordBytes(control.value)?{nativePasswordBytes:true}:null]:[]})
   },{validators:control=>this.data.kind!=="reset-password"||control.get('password')?.value===control.get('passwordConfirmation')?.value?null:{samePassword:true}});
   busy = false;
   problem = "";

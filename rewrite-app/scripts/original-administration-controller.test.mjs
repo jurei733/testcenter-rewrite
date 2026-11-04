@@ -1,4 +1,5 @@
 import './original-administration-wire.test.mjs';
+import './original-administration-input.test.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
@@ -39,6 +40,13 @@ test('last grant can be cleared with a nonempty complete matrix instead of inval
  const f=fixture();f.setUserMatrix(workspaces.map((w,i)=>permission(w.id,i===0?'RO':'')));await f.connect();await f.c.selectAdmin(users[1].id);
  f.c.togglePermissionRow(f.c.permissionRows('users')[0],'RO');assert.equal(await f.c.savePermissions(),true);
  assert.deepEqual(f.calls.at(-1).body,{ws:workspaces.map(w=>({id:w.id,role:''}))});
+});
+for(const section of ['users','workspaces'])test(section+': selecting the same row retries a failed matrix GET',async()=>{
+ let reads=0;const path=section==='users'?'/user/'+users[1].id+'/workspaces':'/workspace/'+workspaces[0].id+'/users';
+ const f=fixture(call=>{if(call.method==='GET'&&call.path===path&&++reads===1)throw Error('Owned transient matrix failure.');});
+ await f.connect();const select=()=>section==='users'?f.c.selectAdmin(users[1].id):f.c.selectWorkspace(workspaces[0].id);
+ assert.equal(await select(),false);assert.deepEqual(f.c.permissionRows(section),[]);
+ assert.equal(await select(),true);assert.equal(reads,2);assert.ok(f.c.permissionRows(section).length>0);assert.equal(f.c.problem,'');
 });
 for(const section of ['users','workspaces'])test(section+': retained visual rows cannot stage or write after clear, old row cannot edit new subject',async()=>{
  const f=fixture();await f.connect();await(section==='users'?f.c.selectAdmin(users[1].id):f.c.selectWorkspace(workspaces[0].id));

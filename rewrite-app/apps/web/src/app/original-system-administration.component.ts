@@ -26,6 +26,7 @@ import type { AdministrationSection } from "./administration-nav.component";
 import { OriginalOverlayStylesComponent } from "./original-overlay-styles.component";
 import { OriginalAdministrationIconComponent } from "./original-administration-icon.component";
 import { OriginalAdministrationController } from "./original-administration-controller";
+import {originalAdministrationModificationDate} from "./original-administration-input";
 import type {OriginalAdmin} from "./original-administration-controller";
 import type { OriginalWorkspace } from "./original-administration-controller";
 import { OriginalAdministrationSurfaceStylesComponent } from "./original-administration-surface-styles.component";
@@ -74,8 +75,7 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
     day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"
   });
   formatModification(value: string | null): string {
-    if(!value)return "";
-    const date=new Date(value);if(!Number.isFinite(date.getTime()))return "";
+    const date=originalAdministrationModificationDate(value);if(!date)return "";
     const parts=Object.fromEntries(this.modificationDate.formatToParts(date).map(part=>[part.type,part.value]));
     return `${parts["day"]}.${parts["month"]}.${parts["year"]} ${parts["hour"]}:${parts["minute"]}`;
   }

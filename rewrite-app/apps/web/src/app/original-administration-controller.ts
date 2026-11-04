@@ -114,7 +114,8 @@ export class OriginalAdministrationController {
   async selectWorkspace(id:string):Promise<boolean>{return this.select('workspaces',id);}
   private async select(section:'users'|'workspaces',id:string):Promise<boolean>{
     if(this.busy||!(section==='users'?this.admins:this.workspaces).some(row=>row.id===id))return false;
-    if((section==='users'?this.selectedAdminId:this.selectedWorkspaceId)===id)return true;
+    if((section==='users'?this.selectedAdminId:this.selectedWorkspaceId)===id&&this.matrixOwner?.section===section&&
+      this.matrixOwner.id===id&&this.subjectCurrent(this.matrixOwner))return true;
     this.clearSelection(false);if(section==='users')this.selectedAdminId=id;else this.selectedWorkspaceId=id;
     this.permissionViewEpoch++;
     const subject:MatrixOwner={section,id,view:this.selection};
