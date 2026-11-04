@@ -28,6 +28,7 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
    return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},scroll:[scrollX,scrollY],
     heading:[...document.querySelectorAll('mat-toolbar h1')].map(box),tabs:[...document.querySelectorAll('a[mat-tab-link]')].map(box),
     pagination:[...document.querySelectorAll('.mat-mdc-tab-header-pagination-chevron')].map(node=>({...box(node),boxSizing:getComputedStyle(node).boxSizing,border:getComputedStyle(node).border,transform:getComputedStyle(node).transform})),
+    notices:[...document.querySelectorAll('.alert .vertical-align-middle')].map(node=>({...box(node),children:[...node.children].map(child=>({...box(child),flexShrink:getComputedStyle(child).flexShrink}))})),
     panels:[...document.querySelectorAll('mat-expansion-panel')].map(box),rows:[...document.querySelectorAll('mat-header-row,mat-row')].map(box),
     buttons:[...document.querySelectorAll('mat-tab-nav-panel button')].map(node=>({...box(node),disabled:node.disabled})),
     checks:[...document.querySelectorAll('input[type=checkbox]')].map(node=>({checked:node.checked,indeterminate:node.indeterminate,disabled:node.disabled})),
