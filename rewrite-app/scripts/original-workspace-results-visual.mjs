@@ -29,7 +29,8 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
     heading:[...document.querySelectorAll('mat-toolbar h1')].map(box),tabs:[...document.querySelectorAll('a[mat-tab-link]')].map(box),
     panels:[...document.querySelectorAll('mat-expansion-panel')].map(box),rows:[...document.querySelectorAll('mat-header-row,mat-row')].map(box),
     buttons:[...document.querySelectorAll('mat-tab-nav-panel button')].map(node=>({...box(node),disabled:node.disabled})),
-    checks:[...document.querySelectorAll('input[type=checkbox]')].map(node=>({checked:node.checked,indeterminate:node.indeterminate,disabled:node.disabled}))};
+    checks:[...document.querySelectorAll('input[type=checkbox]')].map(node=>({checked:node.checked,indeterminate:node.indeterminate,disabled:node.disabled})),
+    containers:(()=>{const rows=[];let node=[...document.querySelectorAll('mat-expansion-panel')].at(-1);for(let i=0;node&&i<9;i++,node=node.parentElement){const s=getComputedStyle(node);rows.push({tag:node.tagName,...box(node),display:s.display,overflowX:s.overflowX,overflowY:s.overflowY,clientHeight:node.clientHeight,scrollHeight:node.scrollHeight});}return rows;})()};
   });
   const result=await captureStableViewport(page,measure,path);await writeFile(path+'.json',JSON.stringify({geometry:result.geometry,paintDiagnostics:result.paintDiagnostics},null,2));return result;
  }
