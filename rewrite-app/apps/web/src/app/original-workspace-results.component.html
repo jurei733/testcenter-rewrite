@@ -1,0 +1,218 @@
+@if (controller.problem) {
+  <p role="alert">{{controller.problem}}</p>
+  <button mat-raised-button [disabled]="controller.busy" (click)="controller.connect()">Erneut laden</button>
+}
+@if (view === 'results') {
+<div class="results-view">
+<div id="originalWorkspaceResults" class="columnhost flex-column" [attr.aria-busy]="controller.busy">
+  <div class="flex-row">
+    <button
+      mat-raised-button
+      (click)="downloadResponsesCSV()"
+      [disabled]="controller.busy || !controller.selectedCount"
+      matTooltip="Download markierte Gruppen als CSV für Excel"
+      matTooltipPosition="below"
+      data-cy="download-responses"
+    >
+      <mat-icon originalWorkspaceFileIcon name="download" />Antworten
+    </button>
+    <button
+      mat-raised-button (click)="downloadLogsCSV()"
+      [disabled]="controller.busy || !controller.selectedCount"
+      matTooltip="Download markierte Gruppen als CSV für Excel"
+      matTooltipPosition="below"
+      data-cy="download-logs"
+    >
+      <mat-icon originalWorkspaceFileIcon name="download" />Logs
+    </button>
+    <button
+      mat-raised-button
+      (click)="downloadNewReviewsCSV()"
+      [disabled]="controller.busy || !controller.selectedCount"
+      matTooltip="(NEU) Download markierte Gruppen als CSV für Excel"
+      matTooltipPosition="below"
+      data-cy="download-comments-newFormat"
+    >
+      <mat-icon originalWorkspaceFileIcon name="download" />Kommentare (neues Format)
+    </button>
+    <button
+      mat-raised-button
+      (click)="downloadReviewsCSV()"
+      [disabled]="controller.busy || !controller.selectedCount"
+      matTooltip="Download markierte Gruppen als CSV für Excel"
+      matTooltipPosition="below"
+      data-cy="download-comments"
+    >
+      <mat-icon originalWorkspaceFileIcon name="download" />Kommentare
+    </button>
+    <button
+      mat-raised-button
+      (click)="deleteData()"
+      [disabled]="controller.busy || !controller.selectedCount || (!controller.canWrite)"
+      matTooltip="Löschen Ergebnisdaten aus der Datenbank für markierte Gruppen"
+      matTooltipPosition="below"
+      data-cy="delete-files"
+    >
+      <mat-icon originalWorkspaceFileIcon name="delete" />Löschen
+    </button>
+  </div>
+
+  <mat-progress-bar mode="indeterminate" *ngIf="!resultDataSource"></mat-progress-bar>
+
+  <mat-table [dataSource]="resultDataSource" matSort>
+    <ng-container matColumnDef="selectCheckbox">
+      <mat-header-cell *matHeaderCellDef [style.max-width.px]="70">
+        <mat-checkbox [disabled]="controller.busy" aria-label="Alle Ergebnisgruppen auswählen" (change)="$event ? controller.checkAll(!controller.all()) : null"
+                      [checked]="controller.selectedCount > 0 && controller.all()"
+                      [indeterminate]="controller.selectedCount > 0 && !controller.all()">
+        </mat-checkbox>
+      </mat-header-cell>
+      <mat-cell *matCellDef="let row; let i = index" [style.max-width.px]="70">
+        <mat-checkbox [disabled]="controller.busy" [aria-label]="'Ergebnisgruppe ' + row.groupLabel" (click)="$event.stopPropagation()"
+                      (change)="controller.check(row, $event.checked)"
+                      [checked]="row.checked"
+                      [attr.data-cy]="'results-checkbox' + i">
+        </mat-checkbox>
+      </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="groupName">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Login-Gruppe</mat-header-cell>
+      <mat-cell *matCellDef="let element">
+        <span [matTooltip]="element.groupName">{{element.groupLabel}}</span>
+      </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="bookletsStarted">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header"
+                       [style.justify-content]="'center'">Testhefte gestartet</mat-header-cell>
+      <mat-cell *matCellDef="let element" [style.justify-content]="'center'"> {{element.bookletsStarted}} </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="numUnitsMin">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header"
+                       [style.justify-content]="'center'">Aufgaben min</mat-header-cell>
+      <mat-cell *matCellDef="let element" [style.justify-content]="'center'">{{element.numUnitsMin}} </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="numUnitsMax">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header"
+                       [style.justify-content]="'center'">Aufgaben max</mat-header-cell>
+      <mat-cell *matCellDef="let element" [style.justify-content]="'center'">{{element.numUnitsMax}} </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="numUnitsAvg">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header"
+                       [style.justify-content]="'center'">Aufgaben Mittelwert</mat-header-cell>
+      <mat-cell *matCellDef="let element" [style.justify-content]="'center'">{{element.numUnitsAvg | number:'1.1-1'}} </mat-cell>
+    </ng-container>
+
+    <ng-container matColumnDef="lastChange">
+      <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header"
+                       [style.justify-content]="'center'">Letzte Testzeit</mat-header-cell>
+      <mat-cell *matCellDef="let element" [style.justify-content]="'center'">
+        <span *ngIf="$any(element.lastChange) !== '0'">{{element.lastChange * 1000 | date:'dd.MM.yyyy HH:mm'}}</span>
+      </mat-cell>
+    </ng-container>
+
+    <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+    <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
+  </mat-table>
+</div>
+
+</div>
+} @else {
+<div class="tests-view">
+<div id="originalWorkspaceTests" class="columnhost" [attr.aria-busy]="controller.busy">
+  <div class="testslist">
+    <mat-progress-bar mode="indeterminate" *ngIf="!controller.loaded"></mat-progress-bar>
+    <mat-accordion class="example-headers-align" multi="true">
+      <ng-container *ngFor="let groupName of groupNames">
+        <mat-expansion-panel [expanded]="true" *ngIf="controller.loaded && rowsFor(groupName).length">
+          <mat-expansion-panel-header>
+            <mat-panel-title class="table-header" [matTooltip]="groupName" >
+              {{ rowsFor(groupName)[0].groupLabel }}
+            </mat-panel-title>
+            <mat-panel-description>
+              <span>{{ rowsFor(groupName).length }} Test-Session{{ rowsFor(groupName).length === 1 ? '' : 's' }}</span>
+            </mat-panel-description>
+          </mat-expansion-panel-header>
+
+          <mat-table [dataSource]="getDataSourceForGroup(groupName)" matSort (matSortChange)="setTableSorting($event)">
+            <ng-container matColumnDef="checked">
+              <mat-header-cell *matHeaderCellDef class="checkboxcell">
+                <mat-checkbox
+                  [disabled]="controller.busy"
+                  [aria-label]="'Alle Test-Sessions in ' + groupName" [checked]="controller.all(groupName)"
+                  [indeterminate]="controller.some(groupName) && !controller.all(groupName)"
+                  (change)="controller.checkAll($event.checked, groupName)">
+                </mat-checkbox>
+              </mat-header-cell>
+              <mat-cell *matCellDef="let session" class="checkboxcell">
+                <mat-checkbox
+                  [disabled]="controller.busy"
+                  [aria-label]="'Test-Session ' + session.loginName + ' ' + session.bookletName" [checked]="session.checked"
+                  (change)="controller.check(session, $event.checked)">
+                </mat-checkbox>
+              </mat-cell>
+            </ng-container>
+
+            <ng-container matColumnDef="login">
+              <mat-header-cell *matHeaderCellDef mat-sort-header class="namecell">Login</mat-header-cell>
+              <mat-cell *matCellDef="let session" class="namecell">
+                <div class="session-info">
+                  <span class="login-name">{{ session.loginName }}</span>
+                </div>
+              </mat-cell>
+            </ng-container>
+
+            <ng-container matColumnDef="code">
+              <mat-header-cell *matHeaderCellDef mat-sort-header class="codecell">Code (generiert)</mat-header-cell>
+              <mat-cell *matCellDef="let session" class="codecell">
+                {{ session.nameSuffix !== session.code ? '(' + session.nameSuffix + ')' : (session.code ?? '') }}
+              </mat-cell>
+            </ng-container>
+
+            <ng-container matColumnDef="booklet">
+              <mat-header-cell *matHeaderCellDef mat-sort-header class="bookletcell">Booklet</mat-header-cell>
+              <mat-cell *matCellDef="let session" class="bookletcell">
+                {{ session.bookletLabel }}<br>
+                (id: {{ session.bookletName }})
+              </mat-cell>
+            </ng-container>
+
+            <mat-header-row *matHeaderRowDef="['checked', 'login', 'code', 'booklet']"></mat-header-row>
+            <mat-row *matRowDef="let row; columns: ['checked', 'login', 'code', 'booklet'];"></mat-row>
+          </mat-table>
+
+        </mat-expansion-panel>
+      </ng-container>
+    </mat-accordion>
+
+    <div class="no-data-message" *ngIf="controller.loaded && groupNames.length === 0">
+      <app-original-workspace-file-notice level="info" text="Keine Test-Sessions gefunden."></app-original-workspace-file-notice>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="buttons">
+      <button
+        mat-raised-button
+        (click)="deleteSelectedSessions()"
+        matTooltip="Markierte Test-Sessions löschen"
+        matTooltipPosition="above"
+        [disabled]="controller.busy || (!controller.canWrite) || !controller.loaded || !controller.selectedCount">
+        <mat-icon originalWorkspaceFileIcon name="delete" />
+        Löschen
+      </button>
+    </div>
+
+    <app-original-workspace-file-notice
+      *ngIf="controller.selectedCount > 0"
+      level="warning"
+      [text]="controller.selectedCount + ' Test-Session(s) zum Löschen ausgewählt'">
+    </app-original-workspace-file-notice>
+  </div>
+</div>
+</div>
+}

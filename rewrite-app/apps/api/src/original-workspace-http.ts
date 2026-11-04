@@ -3,7 +3,9 @@ import type {IncomingMessage} from 'node:http';
 import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,type FirstSliceServices} from '@testcenter-rewrite-app/application';
 
 const route=/^\/workspace\/([^/]+)\/(results|responses(?:\/detailed)?|report\/([^/]+))$/;
+const contextRoute=/^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/original-administration$/;
 export function originalWorkspaceRouteLabel(method:string,pathname:string):string|null {
+  if(contextRoute.test(pathname))return method+' /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/original-administration';
   const match=route.exec(pathname);return match?method+' /workspace/:workspaceId/'+(match[3]?'report/:reportType':match[2]):null;
 }
 /** Native routes always require a current admin capability, independently of
@@ -12,7 +14,26 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
   readBody:(decode:(payload:Uint8Array)=>unknown)=>Promise<unknown>;
   propagateError:(error:unknown)=>boolean;
   header:(name:string,value:string)=>void;raw:(status:number,text:string,contentType:string)=>void}):Promise<boolean> {
-  const match=route.exec(input.pathname);if(!match)return false;
+  const context=contextRoute.exec(input.pathname);
+  const match=route.exec(input.pathname);if(!match&&!context)return false;
+  if(context){
+    input.header('cache-control','private, no-store');
+    try{
+      if(input.request.method!=='GET'){input.header('allow','GET');throw new FirstSliceError(405,'original_method_not_allowed','Method not allowed. Must be one of: GET');}
+      const token=input.request.headers.authtoken;
+      if(typeof token!=='string'||!token)throw new FirstSliceError(401,'original_token_missing','Auth Header not sufficient.');
+      let tenantKey:string,workspaceKey:string;
+      try{tenantKey=decodeURIComponent(context[1]!);workspaceKey=decodeURIComponent(context[2]!);}catch{throw new FirstSliceError(400,'original_workspace_invalid','Invalid workspace scope.');}
+      const value=await input.services.originalWorkspaceAdministration.context({token,tenantKey,workspaceKey});
+      input.raw(200,JSON.stringify(value),'application/json; charset=UTF-8');
+    }catch(error){
+      if(input.propagateError(error))throw error;
+      if(!(error instanceof FirstSliceError))throw error;
+      input.raw(error.statusCode,JSON.stringify({error:error.errorCode,message:error.statusCode>=500?'Internal error.':error.message}),'application/json; charset=UTF-8');
+    }
+    return true;
+  }
+  if(!match)return false;
   input.header('cache-control','private, no-store');const methods=match[2]==='results'||match[3]?['GET']:match[2]==='responses'?['DELETE']:['GET','DELETE'];
   try {
     if(!methods.includes(input.request.method??'')){input.header('allow',methods.join(', '));throw new FirstSliceError(405,'original_method_not_allowed','Method not allowed. Must be one of: '+methods.join(', '));}

@@ -33,9 +33,22 @@
         queryParamsHandling="merge" [active]="tab === 'files'"><h2>Dateien</h2></a>
       <a mat-tab-link routerLink="/content" data-cy="Systemcheck Berichte" [queryParams]="{tab:'syscheck'}"
         queryParamsHandling="merge" [active]="tab === 'syscheck'"><h2>Systemcheck Berichte</h2></a>
+      <a mat-tab-link routerLink="/content" data-cy="Ergebnisse/Antworten" [queryParams]="{tab:'results'}"
+        queryParamsHandling="merge" [active]="tab === 'results'"><h2>Ergebnisse/Antworten</h2></a>
+      <a mat-tab-link routerLink="/content" data-cy="Tests löschen" [queryParams]="{tab:'tests'}"
+        queryParamsHandling="merge" [active]="tab === 'tests'"><h2>Tests löschen</h2></a>
     </nav>
     <mat-tab-nav-panel #tabPanel>
-    @if (tab === 'syscheck') {
+    @if (tab === 'results' || tab === 'tests') {
+      @defer (when true) {
+        <app-original-workspace-results [sessionToken]="sessionToken" [tenantKey]="tenantKey" [workspaceKey]="workspaceKey"
+          [view]="tab" (roleChange)="resultsRole=$event" />
+      } @placeholder { <p role="status">Ergebnisse werden geladen…</p> }
+      @error {
+        <p role="alert">Die Ergebnisverwaltung konnte nicht geladen werden.</p>
+        <button mat-raised-button (click)="reloadReports()">Erneut laden</button>
+      }
+    } @else if (tab === 'syscheck') {
       @defer (when true) {
         <app-original-system-check-reports [sessionToken]="sessionToken" [tenantKey]="tenantKey" [workspaceKey]="workspaceKey" />
       } @placeholder { <p role="status">Berichte werden geladen…</p> }

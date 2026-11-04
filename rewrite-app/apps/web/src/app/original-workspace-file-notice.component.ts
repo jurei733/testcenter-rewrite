@@ -6,7 +6,7 @@ import {OriginalWorkspaceFileIconComponent} from './original-workspace-file-icon
     <mat-icon originalWorkspaceFileIcon [name]="level" [class]="'alert-'+level" />
     <span>{{text}}</span></div></div>`,
   styles:[`.alert { margin-bottom:2px; } .vertical-align-middle { display:inline-flex; vertical-align:middle; align-items:center; }
-    mat-icon { margin-right:0.2em; overflow:visible!important; } .alert-error { color:#821324; } .alert-warning { color:goldenrod; }
+    mat-icon { margin-right:0.2em; overflow:visible!important; flex-shrink:1; } .alert-error { color:#821324; } .alert-warning { color:goldenrod; }
     .alert-info { color:blue; } .alert-success { color:green; } .alert,.vertical-align-middle,span { box-sizing:content-box; }`]
 })
 export class OriginalWorkspaceFileNoticeComponent {

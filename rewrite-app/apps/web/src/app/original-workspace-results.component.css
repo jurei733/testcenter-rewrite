@@ -1,0 +1,9 @@
+.results-view .mat-mdc-raised-button {
+  min-width: 100px;
+  margin: 2px;
+}
+:host { min-width:0; }
+.results-view .flex-column { display:flex; flex-direction:column; }
+.results-view .flex-row { display:flex; flex-direction:row; }
+button.mat-mdc-button-base:disabled { opacity:1; }
+button:hover { transform:none; }

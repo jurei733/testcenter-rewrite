@@ -65,6 +65,10 @@
     "./original-group-results": {
       "types": "./dist/packages/contracts/src/original-group-results.d.ts",
       "default": "./dist/packages/contracts/src/original-group-results.js"
+    },
+    "./original-test-administration": {
+      "types": "./dist/packages/contracts/src/original-test-administration.d.ts",
+      "default": "./dist/packages/contracts/src/original-test-administration.js"
     }
   },
   "dependencies": {

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "repository": "iqb-berlin/testcenter",
+  "commit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sources": [
+    {
+      "path": "frontend/src/app/workspace-admin/workspace.component.ts",
+      "sha256": "d347a0489150234e565753471f3be44000f9b7dcda25616560935e4b7206db2d"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/workspace.component.html",
+      "sha256": "bf3bab27aff272eb230c57cfa678042d494543c801a0b2e77a132492f8469201"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/workspace.component.css",
+      "sha256": "ea790f89b770e2d2a454b2827b3cd46ef0bcd1d727d98e96b0ed03826a67e994"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/workspace.interfaces.ts",
+      "sha256": "cd6f5afc16b98d6c0dbb8cca0ee7f1d55d0c39d28dceeafce59403eb9ff15e8e"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/results/results.component.ts",
+      "sha256": "d98097bb14a0b54e8b4286db8417b5887114a7599efe603cabfbf7bdb47e65bc"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/results/results.component.html",
+      "sha256": "55228943e33683aa89cd81060d38df38722c1c5ec201717b287b8cbdcf02a539"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/results/results.component.css",
+      "sha256": "2841c135b291d89d7c46d5d56a5506bb5c8077d03cb069bd3ee3e37e2ce0c87f"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/tests/tests.component.ts",
+      "sha256": "b919509f749e7841e9052d09378e7cd860eeb23bd2eb76e931cc34705c4b6268"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/tests/tests.component.html",
+      "sha256": "50a1680d0011836c761da59ac2ffa5094d7cf4c866e08a3ae7987382afaf69e4"
+    },
+    {
+      "path": "frontend/src/app/workspace-admin/tests/tests.component.css",
+      "sha256": "adef7b5d26639b0a7c7a611a62ac01fbd23794bda690af183253e74afc1071ab"
+    }
+  ]
+}
