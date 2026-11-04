@@ -215,6 +215,8 @@ const mapAdminRoleAssignment = (
             ? null
             : String(row.group_key),
         monitorProfiles: monitorRoleSettings.monitorProfiles,
+        ...(row.role === "native_workspace_opaque" && typeof monitorRoleSettings.nativeWorkspaceRole === "string"
+          ? {nativeWorkspaceRole: monitorRoleSettings.nativeWorkspaceRole} : {}),
         monitorBookletVisibility: monitorRoleSettings.monitorBookletVisibility,
         createdAt: String(row.created_at)
       };
@@ -222,7 +224,7 @@ const mapAdminRoleAssignment = (
 
 const parseMonitorRoleSettings = (
   value: unknown
-): Pick<AdminRoleAssignment, "monitorProfiles" | "monitorBookletVisibility"> => {
+): Pick<AdminRoleAssignment, "monitorProfiles" | "monitorBookletVisibility" | "nativeWorkspaceRole"> => {
   if (Array.isArray(value)) {
     return {
       monitorProfiles: value as AdminRoleAssignment["monitorProfiles"],
@@ -233,6 +235,7 @@ const parseMonitorRoleSettings = (
     if (value && typeof value === "object") {
       const settings = value as Record<string, unknown>;
       return {
+        ...(typeof settings.nativeWorkspaceRole === "string" ? {nativeWorkspaceRole: settings.nativeWorkspaceRole} : {}),
         monitorProfiles: Array.isArray(settings.monitorProfiles)
           ? (settings.monitorProfiles as AdminRoleAssignment["monitorProfiles"])
           : [],
@@ -2506,6 +2509,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           roleAssignment.workspaceId,
           roleAssignment.groupKey,
           JSON.stringify({
+            ...(roleAssignment.role === "native_workspace_opaque" ? {nativeWorkspaceRole:roleAssignment.nativeWorkspaceRole} : {}),
             monitorProfiles: roleAssignment.monitorProfiles,
             monitorBookletVisibility:
               roleAssignment.monitorBookletVisibility ?? "visible"

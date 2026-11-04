@@ -77,6 +77,37 @@ test('even re-signed alternative Source pixels or font catalogs cannot join the 
     assert.throws(()=>validateCohortRegistry(d,bindings),/identical Source pixels, fonts and browser inputs/);
   }
 });
+test('the November native cohort selects only its independently measured image and inventory while prior oracles stay immutable',async()=>{
+ const currentBindings=await readCohortBindings(root,{nodeVersion:'v22.23.4'});
+ const data=JSON.parse(await readFile(join(root,'scripts/fixtures/ci-browser-native-cohorts-'+currentBindings.lockSha256+'.json'),'utf8'));
+ const records=validateCohortFamily(registry,data,currentBindings),record=records.find(r=>r.id==='20261101.360.1');assert.ok(record);
+ assert.deepEqual(records.filter(r=>['20261026.354.1','20261018.96.1'].includes(r.id)).map(r=>cohortDigest(JSON.stringify(r))),[
+  '763eda9c513230d89b6e3eadac4b9021c4f5146d70d5cfe4b8d65b9af8d70a48','fc6495e25a4da1d2a4942eca15a6a105bd151d24432350ede6f31aed43e40e6a'
+ ]);
+ assert.equal(record.provenance.runId,41634733039);assert.equal(record.provenance.jobId,125916607651);
+ assert.equal(record.provenance.nativeQualification.policyTests,368);assert.equal(record.provenance.nativeQualification.policySkipped,0);
+ assert.equal(record.provenance.independentPNGVerification.visiblePixelHashes,8);assert.equal(record.provenance.independentPNGVerification.actualWhiteFrames,24);
+ const context=record.nativeOracle.context,before=record.nativeOracle.beforeInventory;
+ assert.equal(chooseCohortCertificate(records,context,before,currentBindings,{requireRuntimeGraph:true}),record);
+ assert.throws(()=>chooseCohortCertificate(records,{...context,imageVersion:'20261101.unmeasured'},before,currentBindings),/No unique/);
+ assert.throws(()=>chooseCohortCertificate(records,context,before+'\n',currentBindings),/initial inventory differs/);
+});
+test('the separately measured November 114 variant retains exact native provenance and cannot retarget any prior certificate',async()=>{
+ const currentBindings=await readCohortBindings(root,{nodeVersion:'v22.23.4'});
+ const data=JSON.parse(await readFile(join(root,'scripts/fixtures/ci-browser-native-cohorts-'+currentBindings.lockSha256+'.json'),'utf8'));
+ const records=validateCohortFamily(registry,data,currentBindings),record=records.find(r=>r.id==='20261101.114.1');assert.ok(record);
+ assert.deepEqual(records.map(r=>r.id),['20261026.354.1','20261018.96.1','20261101.360.1','20261101.114.1']);
+ assert.deepEqual(records.slice(0,3).map(r=>cohortDigest(JSON.stringify(r))),[
+  '763eda9c513230d89b6e3eadac4b9021c4f5146d70d5cfe4b8d65b9af8d70a48','fc6495e25a4da1d2a4942eca15a6a105bd151d24432350ede6f31aed43e40e6a','6c9c567c636ff5d31a7b71a9791c8de712b6ac69078aacb83c147234af644a81'
+ ]);
+ assert.equal(record.provenance.runId,41640942834);assert.equal(record.provenance.jobId,125938960716);assert.equal(record.provenance.artifactId,13235191255);
+ assert.equal(record.provenance.nativeQualification.policyTests,370);assert.equal(record.provenance.nativeQualification.policySkipped,0);
+ const context=record.nativeOracle.context,before=record.nativeOracle.beforeInventory;
+ assert.equal(cohortDigest(before),'d35c06b98bb4d11730bd2f1ad1f2a512952d45e364d971c443afc23afa95d66d');
+ assert.equal(chooseCohortCertificate(records,context,before,currentBindings,{requireRuntimeGraph:true}),record);
+ assert.throws(()=>chooseCohortCertificate(records,{...context,imageVersion:'20261101.114.unmeasured'},before,currentBindings),/No unique/);
+ assert.throws(()=>chooseCohortCertificate(records,context,before+'\n',currentBindings),/initial inventory differs/);
+});
 test('registry ambiguity, unexpected fields and malformed binding hashes reject',()=>{
   for(const change of [d=>d.records.push(structuredClone(d.records[0])),d=>d.version=2,d=>d.extra=true,
     d=>d.records=[],d=>d.records[0].bindings.extra=true,d=>d.records[0].bindings.collectorSha256+='\n']){

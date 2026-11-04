@@ -1,5 +1,212 @@
 # Testcenter parity checklist
 
+### Exact second November runner variant (2026-11-03)
+
+Current-head run 41640942834 correctly rejected actual `20261101.114.1` before
+the Player-version and login-rate-limit tests. Two separate rejection-measurement
+phases on jobs 125938960716 and 125938960659 then each passed the complete 370
+native policy checks, four Debian controls, zero-vulnerability locked audit and
+actual Node-mode normalization. Both actual job headers match their unchanged
+native manifests; both initial inventories have SHA256
+`d35c06b98bb4d11730bd2f1ad1f2a512952d45e364d971c443afc23afa95d66d`.
+Raw artifacts 13235191255 and 13235420396 were independently verified by their
+GitHub ZIP digests/CRC, all nine actual Debian archive digests, eight decoded
+visible PNG hashes and 24 actual white frames per worker. The unchanged Source
+pixel/font/browser family matches all prior cohorts exactly.
+
+Only that exact image, inventory and native runtime graph is now manually added
+as a fourth current-lock certificate. All three previous certificate records
+stay byte equivalent. No validator, unknown-image rejection, browser policy,
+Source oracle, timeout, input assertion or installation gate changes. Original
+measurement receipts remain `measurementOnly:true, productionAdmission:false`;
+the successful native phases do not turn their failed application jobs/run into
+passing acceptance. The new exact-selection regression fails against the old
+three-record registry. The final combined head still needs a fresh complete CI
+and all normal merge gates; the full parity Goal remains active.
+
+### Exact November runner certificate and participant entry readiness (2026-11-03)
+
+Two independent workers in run 41634733039 measured the actual hosted image
+`20261101.360.1`, with initial inventory SHA256
+`2b84303175eb3b570e0e84acaa1ba8f9328f765e04abde8d29daf8b37c334b2d`.
+Their initial browser routes correctly failed because this image was unknown.
+The separate measurement phases each passed all 368 native policy checks,
+four Debian archive controls, zero-vulnerability locked audit and actual owned
+Node-mode normalization. Both measured the same native material and unchanged
+Source pixel/font/browser family. Before this explicit manual certificate
+addition, both raw ZIPs, manifests, all nine Debian archive hashes, and the actual
+eight visible PNGs plus 24 white frames per worker were independently checked.
+Artifacts 13230948407 (job 125916607651) and 13231880727 (job 125916607915)
+retain the original failed-job provenance; `nativeQualification.conclusion`
+describes their successful complete native measurement phases, not overall job
+or application acceptance. The existing two current-lock records remain byte
+equivalent. Only the exact new image, inventory and verified runtime graph are
+admitted; unknown labels or altered inventory remain rejected. No historical
+Source pixels, fonts, browser policy or certificate validation is changed.
+
+The same run's participant-console owner timed out at a `networkidle` navigation
+while exercising a second active participant page. The entry now waits for the
+document, existing native API and actual Player controls; live runtime traffic
+does not have to become idle. All subsequent command, durable-state, response,
+clock, sibling and acknowledgement assertions and all deadlines remain intact.
+The complete actual local Chrome loading journey passes all 43 checks. Current
+local policy passes 366 checks, with four Linux-only checks skipped on macOS.
+A fresh complete CI of the final combined commit is still mandatory for merge;
+run 41634733039 remains failed and is not admitted as application acceptance.
+
+### CI browser-admission ownership (2026-11-03, PR16 merge review)
+
+Run 41634733039 rejected the non-browser SQLite shutdown owner during runtime
+preparation, before its actual shutdown test. The mixed matrix passed browser
+inventory/certificate selectors even for `playwright:false` rows. The retained
+rejection artifact 13232055048 records that mismatch (ZIP SHA256
+`dcd9a97e5e6d133be01ac31f7b0f6520dd0ab4332e74686203d4e24b133f8c79`).
+The mixed matrix callers now supply the initial-inventory selector only for
+browser rows and explicitly set certified routing false for non-browser rows.
+Both early/late owners retain their exact shared execution context and every
+one of the 122 jobs remains mandatory.
+
+The composite runtime action is restored byte-for-byte to the qualified
+implementation. Its deliberate route-only bootstrap remains available to the
+independent offline qualifier, which chooses its route before performing its
+own fresh installation. Run 41639413628 exposed that the initial attempt to gate
+all routing on `playwright:true` omitted this owner; that attempt is superseded
+by the caller correction. No browser inventory, certificate, archive, material,
+Source oracle or failure predicate is relaxed. Regression controls consume the
+actual matrix/caller inputs, require all eight backend rows to avoid browser
+admission, require every browser row to retain routing and require the explicit
+offline owner to retain route-only bootstrap. The historical whole-workflow
+fingerprint stays fixed after normalizing only these two explicitly asserted
+caller inputs. The local complete policy suite and actual File/SQLite shutdown
+smokes pass; a fresh complete final-head CI remains mandatory.
+
+### Opaque native workspace roles (2026-11-03, R66; UI integration remains open)
+
+The R65 backend role-value gap is now implemented and published for review. A fresh
+[233 actual production Source exchanges](../test-fixtures/original-testcenter/source-workspace-results/native-opaque-workspace-roles-http/observations.json)
+prove that membership is distinct from authority: Source stores `XX`, padded
+values and other strings, projects their exact values in both permission
+matrices and Session claims, and rejects their actual read/write requests
+with 403. Clearing a role removes membership and returns 404 for that scope.
+RO may read and RW may read/write. Both matrix replacement directions are
+measured through actual HTTP, not DAO stubs or seeded SQL. The same 137 pinned
+Source files, 19 locked Composer packages, exact `d7045f22` image and effective
+production flags are reverified before/after; the owned baseline grants are
+restored and checked after capture. Test mode, static tokens/time shortcuts
+and insecure password handling remain disabled.
+
+The capture also proves first-NUL PDO binding and PostgreSQL `varchar(10)`
+behavior: ten Unicode characters fit, excess U+0020 spaces are discarded,
+other excess characters fail, and a NUL-only input creates a membership with
+an actually stored empty role. That last case has `selected:true, role:""`;
+it must not be confused with no membership. Rewrite now preserves these
+distinctions across all four stores, durable reopen and native Session reads.
+
+The internal `StoredAdminRole` includes a non-authorizing
+`native_workspace_opaque` kind with its normalized raw value in existing role
+metadata. Publicly assignable `AdminRole` retains its six existing values;
+the regular role API rejects the internal kind. Canonical administration,
+workspace, attachment, monitor and system-check policies continue to use
+explicit recognized-role checks. Native access produces the measured Source
+403 text, even for a stored empty role. Missing or forged opaque metadata fails
+closed instead of defaulting to RW. A normal canonical workspace assignment
+replaces the same opaque record and clears its raw metadata; later revocation
+cannot resurrect the old membership. Audits retain the raw value and explicitly
+describe opaque membership as having no access. Protected Root-role IDs and
+earlier removals survive a failed replacement atomically.
+
+The new Source contract checks and controls are mandatory imports of the native
+Session suite. The old current implementation passed 12 / failed 26 of the first
+Memory witness; after implementation all 38 initial checks pass. Current expanded
+evidence passes 353 checks without skips, including actual File, SQLite and
+PostgreSQL production HTTP, all four durable/service variants, canonical
+regrant/revocation, corrupt metadata, protected-ID collision and audit semantics.
+File HTTP setup transfers ownership between fixture and production server;
+its single-writer exclusion is preserved. The current complete Unit run passes
+5855 checks with no failures/skips. Typechecking and the production build pass;
+the initial bundle is 419.53kB under the unchanged 470kB cap. The full PostgreSQL
+suite passes 3929 checks with no failures or skips. Both broad suites ran before
+the final seven cross-workspace controls; the final 353-check run covers those
+additions. No product source changed between these executions.
+
+No schema, dependency, browser-policy, input, visual tolerance or authorization
+gate is weakened. Source's measured destructive partial effects on an invalid
+write remain recorded; Rewrite preserves the required atomic rollback gate.
+PR16 is ready for review under the user's explicit merge request; a merge still requires its current-head qualification and normal Entire gates.
+its older Verona job 125888005853 has passed, but that does not qualify the
+final combined tree. The full 49 functional / eight visual Goal remains
+active. Native administration UI adoption, exact identity binding and remaining
+workspace/user CRUD still require implementation and functional/visual evidence.
+
+### Native workspace permission matrices (2026-11-03, R65; incomplete)
+
+The native Root-only permission API now implements `GET` and `PATCH` for
+`/workspace/{id}/users` and `/user/{id}/workspaces`. The actual production API
+at the preceding main-equivalent tree returned404 on all four operations.
+The new implementation returns the pinned Source's name-sorted matrices,
+exact signed64-bit numeric identifiers, `selected` flags and `RO`/`RW` roles.
+A PATCH replaces the complete explicit grant set of its selected owner;
+the request's `selected` field does not determine permissions. Clearing one
+workspace preserves grants in another. Root, tenant, group-monitor and hidden
+workspace assignments are preserved rather than becoming native membership.
+
+The frozen [112 actual Source HTTP exchanges](../test-fixtures/original-testcenter/source-workspace-results/native-workspace-permissions-http/observations.json)
+were captured with Original `eedae418`, PHP8.3.36/PostgreSQL18.4 and the exact
+`d7045f22` backend image. The independent read-only `verify.mjs` rechecks the
+actual image, all137 Source files in both checkout and container, all19 locked
+production Composer packages and the effective runtime configuration. Source
+test mode, static tokens, static time and insecure passwords remain disabled;
+XML validation and login/person protection remain enabled. The original112
+exchanges are retained unchanged; revalidation does not replay their mutations.
+
+Grant changes and audit events commit atomically in Memory, File, SQLite and
+PostgreSQL. Authorization is checked again after body completion and at the
+durable writer using the current clock, session, account and Root assignment.
+PostgreSQL permission replacements use READ COMMITTED after the native counter
+wait and hold a SHARE ROW EXCLUSIVE role-table lock through their commit. This
+includes newly committed canonical grants in a complete replacement and fences
+canonical Root revocation. The other native Admin actions retain their existing
+REPEATABLE READ transactions and current-grant locks. The rights projection
+does not decode Source-package contents or another administrator's custom text.
+
+The mandatory native Session suites import the new regression controls. Current
+focused evidence passes155 checks without skips across all four stores, real
+SQLite/PostgreSQL HTTP,112 body/writer invalidation cases and five independent
+PostgreSQL lock interleavings. Checks include numeric identifiers above2^53,
+unknown/alias targets, full replacement, live-session revocation, protected-role
+ID collisions, audit-failure rollback and durable reopen. Typechecking and the
+production build pass; the entry bundle remains419.45kB under the unchanged470kB
+gate. The broader Unit and PostgreSQL results are recorded separately from
+these focused checks and must be bound to their actual tested state.
+
+The broader local suites passed5627 Unit checks and3734 PostgreSQL checks,
+without failures or skips. They started before the last protected-ID and
+high-workspace-number test additions. The final actual native Session suite
+passes290 checks, all-store permission controls pass155, and two additional
+production HTTP runs prove both user and workspace IDs9007199254740993 without
+rounding either adjacent ID9007199254740992. These final targeted controls
+exercise the current test additions; no earlier whole-suite receipt is relabeled.
+
+This does not close the platform/admin requirement or any of the eight broad
+visual surfaces. The existing administration UI still uses canonical per-row
+permission requests; native endpoint adoption, workspace CRUD and remaining
+user-management operations are open. Source also accepts opaque role strings
+such as `XX`; this increment rejects roles outside RO/RW, which is an explicit
+remaining observable API parity gap. Source's measured partial deletion on a
+failed foreign key or duplicate is recorded, while Rewrite preserves its
+mandatory atomic rollback gate. The full49-functional/eight-visual scope remains.
+
+The separate post-merge main run41617941812 failed its `publish-red` native-click
+witness (zero events);120 jobs passed and acceptance failed dependently. The
+smoke's readiness selector referenced outer content instead of the actual inert
+frame host. It now waits on that host and also requires the click witness to
+belong to the same Player document. The unchanged trusted-once assertion remains.
+Actual local Chrome156.0.8078.80 passes both blue/red native clicks and the full
+requested Verona smoke. A permanently inert counterexample correctly times out
+in Chrome; therefore the selector defect alone is not asserted as the proven
+cause of the historical CI failure. No unchanged CI rerun or browser-input bypass
+is admitted, and a current qualified CI result is still required.
+
 ### Native null versus explicit empty Unit state (2026-11-01)
 
 The unchanged production Source68 HTTP witness distinguishes Review-only NULL

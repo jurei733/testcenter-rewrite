@@ -5,6 +5,7 @@ import type {OriginalTestSelection} from './original-test-deletion.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {originalCommandInteger,originalCommandFloatString} from './original-command-codec.js';
 import {OriginalPhpNumber,OriginalPhpObject} from './original-test-log-json.js';
+import {originalOpaqueWorkspaceRole} from './original-workspace-role.js';
 
 export type OriginalWorkspaceAdministrationScope={tenantId:string;workspaceId:string;tenantKey:string;workspaceKey:string};
 export type OriginalWorkspaceAdministrationPort={resolve(input:{token:string;workspacePathSegment:string;write:boolean}):Promise<OriginalWorkspaceAdministrationScope>;delete(input:{token:string;workspacePathSegment:string;kind:'groups'|'tests';body:unknown}):Promise<void>};
@@ -43,6 +44,8 @@ export function createOriginalWorkspaceAdministrationPort(input:{repository:Firs
     if(number===null)throw new FirstSliceError(404,'original_workspace_invalid','No valid workspace: `'+reference+'`');
     const scope=await input.repository.findOriginalWorkspaceAdministrationScope(number);
     const role=scope?originalExplicitWorkspaceAccess(actor.roleAssignments,actor.adminUser.adminUserId,scope):null;
+    const opaque=scope&&!role?originalOpaqueWorkspaceRole(actor.roleAssignments,actor.adminUser.adminUserId,scope):null;
+    if(opaque!==null)throw new FirstSliceError(403,'original_workspace_opaque_role','Access Denied: Role `'+(request.write?'RW':'RO')+'` on workspace `ws_'+reference+'`, needed. Only `'+opaque+'` provided.');
     if(!scope||!role)throw new FirstSliceError(404,'original_workspace_not_found','Workspace `'+reference+'` not found.');
     if(request.write&&role!=='RW')throw new FirstSliceError(403,'original_workspace_read_only','Access Denied: Role `RW` on workspace `ws_'+reference+'`, needed. Only `RO` provided.');
     return scope;

@@ -1,6 +1,8 @@
 import './source-native-admin-session-evidence.mjs';
 import './native-admin-session-controls.mjs';
 import './native-admin-directory-controls.mjs';
+import './native-admin-permissions-controls.mjs';
+import './native-opaque-workspace-role-controls.mjs';
 import assert from 'node:assert/strict';
 import {createHash, randomUUID} from 'node:crypto';
 import {mkdtemp, readFile, rm} from 'node:fs/promises';

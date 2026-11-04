@@ -182,6 +182,8 @@ export class RewriteAppOperatorAccessService {
         return assignment.accessMode === "read_only"
           ? "Workspace administrator (read-only)"
           : "Workspace administrator";
+      case "native_workspace_opaque":
+        return "Unrecognized workspace role (no access)";
       case "study_monitor":
         return "Study monitor";
       case "group_monitor":

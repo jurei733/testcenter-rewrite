@@ -16422,10 +16422,18 @@ try {
   const publishOwnedSharedParameters = async definition => {
     // Start can render inside the frame before Angular removes the parent's
     // loading/inert surface. Input must wait for that actual interaction gate.
-    await page.locator("app-verona-player-host .verona-player-content:not([inert])").waitFor();
+    await page.locator("app-verona-player-host #participantVeronaFrameHost:not([inert])").waitFor();
     await page.bringToFront();
     await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
     const button=sharedParameterFrame.locator("#sharedParameterPublish");
+    const beforeInput=await button.evaluate(element=>({
+      definition:element.ownerDocument.querySelector("#sharedParameterDefinition")?.textContent,
+      frameTimeOrigin:element.ownerDocument.defaultView.performance.timeOrigin
+    }));
+    const hostInputState=await page.locator("#participantVeronaFrameHost").evaluate(element=>({
+      inert:element.inert,frameCount:element.querySelectorAll("iframe").length,
+      status:document.querySelector("#participantVeronaPlayerStatus")?.textContent
+    }));
     await button.click();
     const snapshot=await button.evaluate(element=>({
       clicks:element.ownerDocument.defaultView.ownedSharedParameterClicks,
@@ -16435,7 +16443,8 @@ try {
     }));
     const witness=snapshot.clicks;
     assert.equal(witness.filter(event=>event.definition===definition).length,1,
-      "Publish must receive exactly one actual native click in the current Player. Native input snapshot: "+JSON.stringify(snapshot));
+      "Publish must receive exactly one actual native click in the current Player. Native input snapshot: "+JSON.stringify({beforeInput,hostInputState,afterInput:snapshot}));
+    assert.equal(snapshot.frameTimeOrigin,beforeInput.frameTimeOrigin,"The native click witness must belong to the same actual Player document.");
     assert.deepEqual(witness.at(-1),{trusted:true,definition});
     console.log(`shared_parameter_native_input=${definition}:trusted-once`);
   };

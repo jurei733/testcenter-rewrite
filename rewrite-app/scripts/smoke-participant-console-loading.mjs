@@ -570,7 +570,10 @@ try {
     const externalBaseline=await loadingRepository.getTestRunById(runId),applicationStart=applications.length;
     const externalStatus=externalKeyword==='pause'?'paused':'running',followingKeyword=externalKeyword==='pause'?'resume':'pause';
     try {
-      await externalPage.goto(remotePage.url(),{waitUntil:'networkidle'});
+      // An active participant keeps receiving runtime/monitor traffic. The
+      // loaded document, native API and actual Player below define readiness;
+      // an unrelated quiet network interval does not establish that state.
+      await externalPage.goto(remotePage.url(),{waitUntil:'domcontentloaded'});
       await externalPage.waitForFunction(()=>typeof window.tc?.resume==='function');
       await externalPage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
       await remotePage.route('**/application',captureApplication);

@@ -796,8 +796,8 @@ jobs:
           browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
-          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
-          browser-system-certified-cohorts: "true"
+          browser-system-before-inventory-sha256: ${{ matrix.playwright && needs.browser-system-dependencies.outputs.before-inventory-sha256 || '' }}
+          browser-system-certified-cohorts: ${{ matrix.playwright && 'true' || 'false' }}
           browser-material-label: ${{ strategy.job-index }}
       - name: Run ${{ matrix.check }}
         env:
@@ -938,8 +938,8 @@ jobs:
           browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
           browser-system-profile-format: ${{ needs.browser-system-dependencies.outputs.profile-format }}
           browser-system-material-sha256: ${{ needs.browser-system-dependencies.outputs.material-sha256 }}
-          browser-system-before-inventory-sha256: ${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}
-          browser-system-certified-cohorts: "true"
+          browser-system-before-inventory-sha256: ${{ matrix.playwright && needs.browser-system-dependencies.outputs.before-inventory-sha256 || '' }}
+          browser-system-certified-cohorts: ${{ matrix.playwright && 'true' || 'false' }}
           browser-material-label: ${{ strategy.job-index }}
       - name: Run ${{ matrix.check }}
         env:

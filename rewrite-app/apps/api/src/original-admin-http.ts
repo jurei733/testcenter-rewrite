@@ -1,24 +1,43 @@
 import type {IncomingMessage} from 'node:http';
 import {randomUUID} from 'node:crypto';
-import {FirstSliceError,originalCommandInteger,type FirstSliceServices} from '@testcenter-rewrite-app/application';
+import {FirstSliceError,originalCommandInteger,decodeOriginalTestLogJson,type FirstSliceServices} from '@testcenter-rewrite-app/application';
 
 const passwordRoute=/^\/user\/([^/]+)\/password$/;
+const workspaceUsersRoute=/^\/workspace\/([^/]+)\/users$/;
+const userWorkspacesRoute=/^\/user\/([^/]+)\/workspaces$/;
 const methods=new Map<string,string[]>([['/users',['GET']],['/workspaces',['GET']],['/user',['PUT']]]);
 const object=(value:unknown):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value));
 const escape=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]!));
 export function originalAdminRouteLabel(method:string,pathname:string):string|null {
+  if(workspaceUsersRoute.test(pathname))return method+' /workspace/:workspaceId/users';
+  if(userWorkspacesRoute.test(pathname))return method+' /user/:userId/workspaces';
   return passwordRoute.test(pathname)?method+' /user/:userId/password':methods.has(pathname)?method+' '+pathname:null;
 }
 export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;
-  readBody:()=>Promise<unknown>;header:(name:string,value:string)=>void;raw:(status:number,value:string,contentType:string)=>void;
+  readBody:(decode?:(payload:Uint8Array)=>unknown)=>Promise<unknown>;header:(name:string,value:string)=>void;raw:(status:number,value:string,contentType:string)=>void;
   propagateError:(error:unknown)=>boolean;reportError:(receipt:{errorId:string;statusCode:number;errorCode:string})=>void}):Promise<boolean> {
-  const password=passwordRoute.exec(input.pathname),allowed=password?['PATCH']:methods.get(input.pathname);
+  const workspaceUsers=workspaceUsersRoute.exec(input.pathname),userWorkspaces=userWorkspacesRoute.exec(input.pathname);
+  const permission=workspaceUsers??userWorkspaces;
+  const password=passwordRoute.exec(input.pathname),allowed=permission?['GET','PATCH']:password?['PATCH']:methods.get(input.pathname);
   if(!allowed)return false;
   input.header('cache-control','private, no-store');
   try {
     if(!allowed.includes(input.request.method??'')){input.header('allow',allowed.join(', '));throw new FirstSliceError(405,'original_method_not_allowed','Method not allowed. Must be one of: '+allowed.join(', '));}
     const token=input.request.headers.authtoken;
     if(typeof token!=='string'||!token)throw new FirstSliceError(401,'original_token_missing','Auth Header not sufficient: '+(token===''?'empty':'missing'));
+    if(permission){
+      let reference:string;try{reference=decodeURIComponent(permission[1]!);}catch{throw new FirstSliceError(400,'original_request_invalid','Invalid permission reference.');}
+      if(input.request.method==='GET'){
+        const result=workspaceUsers?await input.services.originalAdminPermissions.usersByWorkspace({token,reference})
+          :await input.services.originalAdminPermissions.workspacesByUser({token,reference});
+        input.raw(200,result,'application/json');return true;
+      }
+      await input.services.originalAdminSession.authorize({token,superAdmin:true});
+      let body:unknown;try{body=await input.readBody(decodeOriginalTestLogJson);}catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_json_invalid','Internal error.');throw error;}
+      if(workspaceUsers)await input.services.originalAdminPermissions.replaceWorkspaceUsers({token,reference,body});
+      else await input.services.originalAdminPermissions.replaceUserWorkspaces({token,reference,body});
+      input.raw(200,'',workspaceUsers?'text/plain;charset=UTF-8':'text/html; charset=UTF-8');return true;
+    }
     if(input.request.method==='GET'){
       const result=input.pathname==='/users'?await input.services.originalAdminDirectory.listUsers({token}):await input.services.originalAdminDirectory.listWorkspaces({token});
       input.raw(200,result,'application/json');return true;

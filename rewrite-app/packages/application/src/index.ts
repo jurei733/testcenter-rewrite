@@ -83,6 +83,8 @@ export type {OriginalSessionTest} from './original-session.js';
 import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
 import {createOriginalSessionPort} from './original-session.js';
 import {createOriginalAdminDirectoryPort} from './original-admin-directory.js';
+import {createOriginalAdminPermissionsPort} from './original-admin-permissions.js';
+export {validateOriginalAdminRoleChanges} from './original-admin-permissions.js';
 export {originalDirectoryModification} from './original-admin-directory.js';
 export type {OriginalDirectoryFile,OriginalDirectoryFileEvent,OriginalAdminDirectoryPort} from './original-admin-directory.js';
 import {createOriginalAdminSessionPort} from './original-admin-session.js';
@@ -1347,6 +1349,7 @@ export type FirstSlicePorts = {
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalAdminSession: import('./original-admin-session.js').OriginalAdminSessionPort;
   originalAdminDirectory: import('./original-admin-directory.js').OriginalAdminDirectoryPort;
+  originalAdminPermissions: import('./original-admin-permissions.js').OriginalAdminPermissionsPort;
   originalGroupResults: import('./original-group-results.js').OriginalGroupResultsPort;
   originalWorkspaceAdministration: import('./original-workspace-administration.js').OriginalWorkspaceAdministrationPort;
   originalWorkspaceReport:ReturnType<typeof createOriginalWorkspaceReportPort>;
@@ -5515,7 +5518,7 @@ const requireAdminRole = (
   roleAssignments: AdminRoleAssignment[],
   requiredRoles: AdminRole[]
 ): void => {
-  if (!roleAssignments.some(roleAssignment => requiredRoles.includes(roleAssignment.role))) {
+  if (!roleAssignments.some(roleAssignment => requiredRoles.some(role => role === roleAssignment.role))) {
     throw new FirstSliceError(
       403,
       "admin_role_required",
@@ -6471,7 +6474,7 @@ const isSameAdminRoleScope = (
   roleAssignment: AdminRoleAssignment,
   scope: ResolvedAdminRoleScope
 ): boolean =>
-  roleAssignment.role === scope.role &&
+  (roleAssignment.role === scope.role || scope.role === 'workspace_admin' && roleAssignment.role === 'native_workspace_opaque') &&
   roleAssignment.tenantId === scope.tenantId &&
   roleAssignment.workspaceId === scope.workspaceId &&
   roleAssignment.groupKey === scope.groupKey;
@@ -29332,6 +29335,7 @@ export const createFirstSliceServices = (
         );
         if (
           existingRoleAssignment &&
+          existingRoleAssignment.role === scope.role &&
           input.monitorProfiles === undefined &&
           input.monitorBookletVisibility === undefined &&
           input.accessMode === undefined
@@ -29340,8 +29344,10 @@ export const createFirstSliceServices = (
         }
 
         if (existingRoleAssignment) {
+          const {nativeWorkspaceRole:_retiredNativeRole,...previousRoleAssignment}=existingRoleAssignment;
           const updatedRoleAssignment: AdminRoleAssignment = {
-            ...existingRoleAssignment,
+            ...previousRoleAssignment,
+            role:scope.role,
             accessMode: scope.accessMode,
             monitorProfiles:
               input.monitorProfiles === undefined
@@ -32721,6 +32727,7 @@ export const createFirstSliceServices = (
     originalTestAdministration: createOriginalTestAdministrationPort(repository,(tenantKey,workspaceKey)=>requireWorkspace(repository,tenantKey,workspaceKey)),
     originalAdminSession: createOriginalAdminSessionPort({repository,now,id:idGenerator,verifyPassword:verifyAdminPassword,accessFailure:resolveAdminAccessFailureReason,accessUntil:resolveAdminAccessValidUntil,sessionTtlMs:adminSessionTtlMs,maxFailures:adminLoginMaxFailures,failureWindowMs:adminLoginFailureWindowMs,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),
     originalAdminDirectory:createOriginalAdminDirectoryPort({repository,now,id:idGenerator,timeZone:participantAccessTimeZone,validatePassword:p=>requireAdminPassword(p,configuredAdminPasswordPolicy),hashPassword:hashAdminPassword}),
+    originalAdminPermissions:createOriginalAdminPermissionsPort({repository,now,id:idGenerator}),
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,
       async monitorAssignments(entry){

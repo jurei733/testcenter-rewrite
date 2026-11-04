@@ -10,6 +10,9 @@ export type AdminRole =
   | "study_monitor"
   | "group_monitor"
   | "system_check";
+/** Internal Source membership; excluded from publicly assignable AdminRole.
+ * This kind grants no canonical or native workspace authority. */
+export type StoredAdminRole = AdminRole | "native_workspace_opaque";
 export type AdminRoleAccessMode = "read_write" | "read_only";
 export type AdminAuditEventType =
   | "admin_user_bootstrapped"
@@ -594,8 +597,10 @@ export type OperationalLoginMigrationCandidate = {
 export type AdminRoleAssignment = {
   roleAssignmentId: string;
   adminUserId: string;
-  role: AdminRole;
+  role: StoredAdminRole;
   accessMode: AdminRoleAccessMode;
+  /** Raw, already PDO/varchar-normalized Source role; only for the opaque kind. */
+  nativeWorkspaceRole?: string;
   tenantId: string | null;
   workspaceId: string | null;
   groupKey: string | null;

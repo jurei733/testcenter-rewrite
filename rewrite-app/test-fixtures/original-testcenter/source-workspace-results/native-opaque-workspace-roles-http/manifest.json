@@ -1,0 +1,9 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "actualHttpExchanges": 233,
+  "files": {
+    "capture.mjs": "1c971f1ab0022bfa96e083fe34a38ad3d51429046e4170d5df7b542b2ce9ff5f",
+    "observations.json": "d90d63d31b5ffa206bda7d9bade4b73e6b339158994676eea628e9523725fd18"
+  }
+}

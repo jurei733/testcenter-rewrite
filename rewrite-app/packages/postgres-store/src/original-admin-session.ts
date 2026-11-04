@@ -1,7 +1,7 @@
 import type {Pool} from 'pg';
 import {setTimeout} from 'node:timers/promises';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
-import {originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
+import {validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
 
 type Row = Record<string, unknown>;
 type Mappers = {user: (row: Row | undefined) => AdminUser | null; session: (row: Row | undefined) => AdminSession | null;
@@ -16,8 +16,14 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
   for (let attempt = 0; ; attempt++) {
     const client = await pool.connect();
     try {
-      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+      const rightsWrite='token' in selector&&selector.directory==='rights'&&selector.rightsWrite;
+      // Complete grant-set replacement must include committed insertions, not
+      // an RR phantom from before a counter wait. Serialize role writers after
+      // that wait, then read current rows under READ COMMITTED. Actor/session
+      // and catalog parent locks remain held through grants plus audit commit.
+      await client.query(rightsWrite?'BEGIN ISOLATION LEVEL READ COMMITTED':'BEGIN ISOLATION LEVEL REPEATABLE READ');
       const counter = (await client.query('SELECT last_number FROM original_admin_number_counter WHERE singleton=1 FOR UPDATE')).rows[0];
+      if(rightsWrite)await client.query('LOCK TABLE admin_role_assignments IN SHARE ROW EXCLUSIVE MODE');
       const id = 'name' in selector ? selectOriginalAdminIdentity((await client.query('SELECT admin_user_id,username FROM admin_users')).rows.map(row =>
         ({adminUserId: String(row.admin_user_id), username: String(row.username)})), selector.name)
         : (await client.query('SELECT admin_user_id FROM admin_sessions WHERE session_token=$1', [selector.token])).rows[0]?.admin_user_id;
@@ -27,7 +33,7 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
       // The selected grants stay locked until every effect/audit commits.
       const roles = user ? (await client.query('SELECT * FROM admin_role_assignments WHERE admin_user_id=$1 ORDER BY created_at FOR SHARE', [user.adminUserId])).rows.map(map.role).filter(present) : [];
       const workspaces = user ? (await client.query(`SELECT w.* FROM workspaces w WHERE EXISTS
-        (SELECT 1 FROM admin_role_assignments r WHERE r.admin_user_id=$1 AND r.role='workspace_admin' AND r.workspace_id=w.workspace_id AND r.tenant_id=w.tenant_id)`, [user.adminUserId])).rows.map(map.workspace).filter(present) : [];
+        (SELECT 1 FROM admin_role_assignments r WHERE r.admin_user_id=$1 AND r.role IN ('workspace_admin','native_workspace_opaque') AND r.workspace_id=w.workspace_id AND r.tenant_id=w.tenant_id)`, [user.adminUserId])).rows.map(map.workspace).filter(present) : [];
       const tenants = workspaces.length ? (await client.query('SELECT * FROM tenants WHERE tenant_id=ANY($1::text[])', [workspaces.map(w => w.tenantId)])).rows.map(map.tenant).filter(present) : [];
       const bucket = 'name' in selector ? originalAdminFailureBucket(user?.username ?? selector.name) : '';
       const number = user ? (await client.query('SELECT * FROM original_admin_numbers WHERE admin_user_id=$1', [user.adminUserId])).rows[0] : null;
@@ -42,16 +48,20 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
         const root=roles.some(r=>r.role==='platform_admin');
         if(root&&selector.directory){
           snapshot.directory={};
-          if(selector.directory==='users')snapshot.directory.users=(await client.query(`SELECT u.admin_user_id,u.username,n.admin_number,
+          if(selector.directory==='users'||selector.directory==='rights')snapshot.directory.users=(await client.query(`SELECT u.admin_user_id,u.username,n.admin_number,
             EXISTS(SELECT 1 FROM admin_role_assignments r WHERE r.admin_user_id=u.admin_user_id AND r.role='platform_admin') AS super_admin
             FROM admin_users u LEFT JOIN original_admin_numbers n ON n.admin_user_id=u.admin_user_id`)).rows.map(r=>({adminUserId:String(r.admin_user_id),username:String(r.username),adminNumber:r.admin_number==null?null:String(r.admin_number),isSuperadmin:Boolean(r.super_admin)}));
-          else {
-            const ws=(await client.query(`SELECT w.* FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active'`)).rows.map(map.workspace).filter(present);
-            const files=(await client.query('SELECT source_package_id,tenant_id,workspace_id,status,uploaded_at FROM source_packages')).rows.map(r=>({sourcePackageId:String(r.source_package_id),tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),status:r.status as import('@testcenter-rewrite-app/domain').SourcePackageStatus,uploadedAt:String(r.uploaded_at)}));
-            const events=(await client.query("SELECT tenant_id,workspace_id,event_type,subject_id,details_json FROM workspace_activity_events WHERE event_type IN ('source_package_assembled','source_package_replaced')")).rows.map(r=>({tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),eventType:r.event_type as import('@testcenter-rewrite-app/domain').WorkspaceActivityEvent['eventType'],subjectId:String(r.subject_id),details:typeof r.details_json==='string'?JSON.parse(r.details_json) as Record<string,unknown>:r.details_json as Record<string,unknown>}));
+          if(selector.directory==='workspaces'||selector.directory==='rights'){
+            const ws=(await client.query(`SELECT w.* FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active'${selector.directory==='rights'&&selector.rightsWrite?' FOR SHARE OF w,t':''}`)).rows.map(map.workspace).filter(present);
+            const files=(selector.directory==='rights'?[]:(await client.query('SELECT source_package_id,tenant_id,workspace_id,status,uploaded_at FROM source_packages')).rows).map(r=>({sourcePackageId:String(r.source_package_id),tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),status:r.status as import('@testcenter-rewrite-app/domain').SourcePackageStatus,uploadedAt:String(r.uploaded_at)}));
+            const events=(selector.directory==='rights'?[]:(await client.query("SELECT tenant_id,workspace_id,event_type,subject_id,details_json FROM workspace_activity_events WHERE event_type IN ('source_package_assembled','source_package_replaced')")).rows).map(r=>({tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),eventType:r.event_type as import('@testcenter-rewrite-app/domain').WorkspaceActivityEvent['eventType'],subjectId:String(r.subject_id),details:typeof r.details_json==='string'?JSON.parse(r.details_json) as Record<string,unknown>:r.details_json as Record<string,unknown>}));
             const mappings=(await client.query('SELECT * FROM original_workspace_numbers')).rows;
-            snapshot.directory.workspaces=ws.map(w=>{const n=mappings.find(n=>n.workspace_id===w.workspaceId);if(n&&n.tenant_id!==w.tenantId)throw Error('Native workspace directory identity scope changed.');return{workspace:w,workspaceNumber:n?String(n.workspace_number):null,latestModificationAt:originalDirectoryModification(files,events,w.tenantId,w.workspaceId)};});
+            snapshot.directory.workspaces=ws.map(w=>{const n=mappings.find(n=>n.workspace_id===w.workspaceId);if(n&&n.tenant_id!==w.tenantId)throw Error('Native workspace directory identity scope changed.');return{workspace:w,workspaceNumber:n?String(n.workspace_number):null,latestModificationAt:selector.directory==='rights'?null:originalDirectoryModification(files,events,w.tenantId,w.workspaceId)};});
           }
+        }
+        if(root&&selector.directory==='rights'){
+          const ids=snapshot.directory!.workspaces!.map(w=>w.workspace.workspaceId);
+          snapshot.directory!.roles=ids.length?(await client.query("SELECT * FROM admin_role_assignments WHERE role IN ('workspace_admin','native_workspace_opaque') AND group_key IS NULL AND workspace_id=ANY($1::text[])",[ids])).rows.map(map.role).filter(present):[];
         }
         if(selector.targetAdminNumber!==undefined){
           const n=(await client.query('SELECT * FROM original_admin_numbers WHERE admin_number=$1',[selector.targetAdminNumber])).rows[0];
@@ -60,6 +70,7 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
         }
       }
       const effect = transform(snapshot);
+      validateOriginalAdminRoleChanges(snapshot,effect,selector);
       if (effect.user) await client.query('UPDATE admin_users SET first_signed_in_at=$1,password_hash=$2,password_change_required=$3 WHERE admin_user_id=$4', [effect.user.firstSignedInAt,effect.user.passwordHash,effect.user.passwordChangeRequired,effect.user.adminUserId]);
       if(effect.targetUser){if(effect.targetUser.adminUserId!==snapshot.target?.user.adminUserId)throw Error('Native target administrator scope changed.');await client.query('UPDATE admin_users SET password_hash=$1,password_change_required=$2 WHERE admin_user_id=$3',[effect.targetUser.passwordHash,effect.targetUser.passwordChangeRequired,effect.targetUser.adminUserId]);}
       if(effect.createdUser){const u=effect.createdUser;await client.query('INSERT INTO admin_users(admin_user_id,username,display_name,password_hash,password_change_required,status,custom_texts_json,valid_from,valid_to,valid_for_minutes,first_signed_in_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12)',[u.adminUserId,u.username,u.displayName,u.passwordHash,u.passwordChangeRequired,u.status,JSON.stringify(u.customTexts),u.validFrom,u.validTo,u.validForMinutes,u.firstSignedInAt,u.createdAt]);}
@@ -80,8 +91,16 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
       if (effect.counter !== undefined) await client.query('UPDATE original_admin_number_counter SET last_number=$1 WHERE singleton=1', [effect.counter]);
       for (const n of effect.workspaceNumbers ?? []) await client.query('INSERT INTO original_workspace_numbers(workspace_number,workspace_id,tenant_id) VALUES($1,$2,$3)', [n.workspaceNumber, n.workspaceId, n.tenantId]);
       if (effect.workspaceCounter !== undefined) await client.query('UPDATE original_workspace_number_counter SET last_number=$1 WHERE singleton=1', [effect.workspaceCounter]);
-      if (effect.audit) {
-        const a = effect.audit;
+      for(const roleId of effect.roleChanges?.removeIds??[])await client.query("DELETE FROM admin_role_assignments WHERE role_assignment_id=$1 AND role IN ('workspace_admin','native_workspace_opaque') AND group_key IS NULL",[roleId]);
+      for(const r of effect.roleChanges?.assignments??[]){
+        const changed=await client.query(`INSERT INTO admin_role_assignments(role_assignment_id,admin_user_id,role,access_mode,tenant_id,workspace_id,group_key,monitor_profiles_json,created_at)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9) ON CONFLICT(role_assignment_id) DO UPDATE SET role=excluded.role,access_mode=excluded.access_mode,monitor_profiles_json=excluded.monitor_profiles_json
+          WHERE admin_role_assignments.role IN ('workspace_admin','native_workspace_opaque') AND admin_role_assignments.group_key IS NULL
+            AND admin_role_assignments.admin_user_id=excluded.admin_user_id AND admin_role_assignments.tenant_id=excluded.tenant_id AND admin_role_assignments.workspace_id=excluded.workspace_id`,
+          [r.roleAssignmentId,r.adminUserId,r.role,r.accessMode,r.tenantId,r.workspaceId,r.groupKey,JSON.stringify({monitorProfiles:r.monitorProfiles,monitorBookletVisibility:r.monitorBookletVisibility,...r.role==='native_workspace_opaque'?{nativeWorkspaceRole:r.nativeWorkspaceRole}:{}}),r.createdAt]);
+        if(changed.rowCount!==1)throw Error('Native permission identity collision.');
+      }
+      for(const a of [...(effect.audit?[effect.audit]:[]),...(effect.audits??[])]) {
         await client.query('INSERT INTO admin_audit_events(admin_audit_event_id,event_type,actor_admin_user_id,subject_admin_user_id,occurred_at,summary,details_json) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)',
           [a.adminAuditEventId, a.eventType, a.actorAdminUserId, a.subjectAdminUserId, a.occurredAt, a.summary, JSON.stringify(a.details)]);
       }

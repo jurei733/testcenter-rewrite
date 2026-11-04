@@ -594,8 +594,15 @@ test('global early eligibility uses the complete accepted 60-row observation wit
  unchanged.jobs.quick.strategy.matrix.include=unchanged.jobs.quick.strategy.matrix.include.filter(row=>row.check!=='native-monitor');
  for(const id of['verify-long-ui','verify-memory-sqlite','quick-extended'])unchanged.jobs[id].strategy.matrix.include=[];
  unchanged.jobs.acceptance.needs=unchanged.jobs.acceptance.needs.filter(id=>!['quick-extended-long','native-monitor-visual','native-login-visual'].includes(id));
+ for(const id of ['verify-long-ui','verify-memory-sqlite']){
+  const runtime=unchanged.jobs[id].steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
+  assert.equal(runtime.with['browser-system-before-inventory-sha256'],"${{ matrix.playwright && needs.browser-system-dependencies.outputs.before-inventory-sha256 || '' }}");
+  assert.equal(runtime.with['browser-system-certified-cohorts'],"${{ matrix.playwright && 'true' || 'false' }}");
+  runtime.with['browser-system-before-inventory-sha256']='${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}';
+  runtime.with['browser-system-certified-cohorts']='true';
+ }
  assert.equal(createHash('sha256').update(JSON.stringify(unchanged)).digest('hex'),data.baselineContextSha256,
-  'Only the three recorded matrix partitions, their early owner and acceptance edge, plus the explicitly checked native Quick and full-viewport Monitor/login gates may change.');
+  'Only the three recorded matrix partitions, their early owner and acceptance edge, explicitly checked native Quick/full-viewport gates and exact mixed-owner browser inputs may change.');
  const clone=structuredClone(qualificationEarly),later=workflow.jobs['quick-extended'];
  clone.needs=later.needs;clone.strategy.matrix.include=later.strategy.matrix.include;
  assert.deepEqual(clone,later,'The promoted qualification retains its complete prior shell, artifact ownership, browser mode and execution context.');
@@ -941,8 +948,9 @@ test('all v3 consumers use exact immutable producer format and digest and cannot
   if(step.uses!=='./.github/actions/rewrite-runtime'||!step.with?.playwright||step.with.playwright==='false')continue;
   assert.equal(step.with['browser-system-profile-format'],'${{ needs.browser-system-dependencies.outputs.profile-format }}',name);
   assert.equal(step.with['browser-system-material-sha256'],'${{ needs.browser-system-dependencies.outputs.material-sha256 }}',name);
-  assert.equal(step.with['browser-system-before-inventory-sha256'],'${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}',name);
-  assert.equal(step.with['browser-system-certified-cohorts'],'true',name);
+  const mixed=step.with.playwright.includes('matrix.playwright');
+  assert.equal(step.with['browser-system-before-inventory-sha256'],mixed?"${{ matrix.playwright && needs.browser-system-dependencies.outputs.before-inventory-sha256 || '' }}":'${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}',name);
+  assert.equal(step.with['browser-system-certified-cohorts'],mixed?"${{ matrix.playwright && 'true' || 'false' }}":'true',name);
   assert.equal(step.with['browser-material-label'],'${{ strategy.job-index }}',name);
  }
  const qualification=workflow.jobs['browser-system-qualification'];
@@ -961,6 +969,33 @@ test('native Test creation is mandatory in complete units, PostgreSQL and focuse
 });
 
 
+test('mixed matrix callers omit browser admission for non-browser rows and retain the deliberate route-only qualification owner',()=>{
+ const gates=action.runs.steps.filter(step=>['node scripts/ci-browser-inventory-preflight.mjs','node scripts/ci-browser-cohort-route.mjs'].includes(step.run));assert.equal(gates.length,2);
+ const enabled=(step,inputs)=>step.if.split(' && ').every(term=>{
+  const match=/^inputs\.([a-z0-9-]+) (==|!=) '([^']*)'$/.exec(term);assert.ok(match,term);
+  const actual=inputs[match[1]]??action.inputs[match[1]].default;return match[2]==='=='?actual===match[3]:actual!==match[3];
+ });
+ const resolve=(value,row)=>{
+  if(value==="${{ matrix.playwright && 'true' || 'false' }}")return String(row.playwright);
+  if(value==="${{ matrix.playwright && needs.browser-system-dependencies.outputs.before-inventory-sha256 || '' }}")return row.playwright?'unqualified-native-inventory':'';
+  if(value==='${{ needs.browser-system-dependencies.outputs.before-inventory-sha256 }}')return 'unqualified-native-inventory';
+  return value;
+ };
+ let checked=0;
+ for(const[id,job]of Object.entries(workflow.jobs))for(const runtime of job.steps??[]){
+  if(runtime.uses!=='./.github/actions/rewrite-runtime'||!runtime.with?.playwright?.includes('matrix.playwright'))continue;
+  for(const row of job.strategy.matrix.include){
+   const inputs=Object.fromEntries(Object.entries(runtime.with).map(([key,value])=>[key,resolve(value,row)]));
+   assert.deepEqual(gates.filter(step=>enabled(step,inputs)).map(step=>step.run),row.playwright?['node scripts/ci-browser-cohort-route.mjs']:[],id+'/'+row.check);
+   if(!row.playwright){assert.equal(inputs['browser-system-before-inventory-sha256'],'');assert.equal(inputs['browser-system-certified-cohorts'],'false');checked++;}
+  }
+ }
+ assert.equal(checked,8,'integration, compatibility, startup and both shutdown stores remain browser-free');
+ const qualification=workflow.jobs['browser-system-qualification'].steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
+ assert.equal(qualification.with.playwright,undefined,'Independent installation remains outside bootstrap');
+ const inputs=Object.fromEntries(Object.entries(qualification.with).map(([key,value])=>[key,resolve(value,{playwright:false})]));
+ assert.deepEqual(gates.filter(step=>enabled(step,inputs)).map(step=>step.run),['node scripts/ci-browser-cohort-route.mjs'],'Independent offline installation still requires its explicit route');
+});
 test('trusted initial inventory rejects before npm or browser downloads while retaining bounded package evidence',()=>{
  const setup=action.runs.steps.findIndex(step=>step.uses?.startsWith('actions/setup-node@'));
  const preflight=action.runs.steps.findIndex(step=>step.run==='node scripts/ci-browser-inventory-preflight.mjs');

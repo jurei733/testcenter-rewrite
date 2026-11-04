@@ -5,16 +5,17 @@ import {originalParticipantGroupKeysEqual} from './original-participant-group.js
 import {createOriginalSessionToken} from './original-session-token.js';
 import {prepareOriginalWorkspaceNumber, type OriginalWorkspaceNumberRecord} from './original-workspace-number.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {isOriginalWorkspaceMembership,originalWorkspaceRoleValue} from './original-workspace-role.js';
 
 export type OriginalAdminNumber = {adminUserId: string; adminNumber: string};
-export type OriginalAdminSelector = {name: string} | {token: string; at?: string; directory?: 'users' | 'workspaces'; targetAdminNumber?: string};
+export type OriginalAdminSelector = {name: string} | {token: string; at?: string; directory?: 'users' | 'workspaces' | 'rights'; rightsWrite?: boolean; targetAdminNumber?: string};
 export type OriginalAdminDirectoryUser = {adminUserId:string;username:string;adminNumber:string|null;isSuperadmin:boolean};
 export type OriginalAdminDirectoryWorkspace = {workspace:Workspace;workspaceNumber:string|null;latestModificationAt:string|null};
 export type OriginalAdminSessionSnapshot = {
   user: AdminUser | null; sessions: AdminSession[]; roles: AdminRoleAssignment[];
   workspaces: Workspace[]; tenants: Tenant[]; attempt: AdminLoginAttempt | null;
   number: OriginalAdminNumber | null; counter: string;
-  directory?: {users?:OriginalAdminDirectoryUser[];workspaces?:OriginalAdminDirectoryWorkspace[]};
+  directory?: {users?:OriginalAdminDirectoryUser[];workspaces?:OriginalAdminDirectoryWorkspace[];roles?:AdminRoleAssignment[]};
   target?: {user:AdminUser;sessions:AdminSession[];number:OriginalAdminNumber};
   workspaceNumbers: OriginalWorkspaceNumberRecord[]; workspaceCounter: string;
 };
@@ -25,6 +26,8 @@ export type OriginalAdminSessionEffect = {
   targetUser?:AdminUser; targetSessions?:AdminSession[]; attempt?: AdminLoginAttempt; audit?: AdminAuditEvent;
   number?: OriginalAdminNumber; counter?: string;
   workspaceNumbers?: OriginalWorkspaceNumberRecord[]; workspaceCounter?: string;
+  roleChanges?: {scope:{kind:'user';adminUserId:string}|{kind:'workspace';tenantId:string;workspaceId:string};removeIds:string[];assignments:AdminRoleAssignment[]};
+  audits?:AdminAuditEvent[];
 };
 export type OriginalAdminSessionRepository = {
   /** The callback is synchronous and receives only this actor's metadata.
@@ -119,7 +122,7 @@ export function createOriginalAdminSessionPort(input: {
     let workspaceCounter = s.workspaceCounter;
     const seen = new Set<string>();
     for (const role of s.roles) {
-      if (role.adminUserId !== user.adminUserId || role.role !== 'workspace_admin' || !role.tenantId || !role.workspaceId || seen.has(role.workspaceId)) continue;
+      if (role.adminUserId !== user.adminUserId || !isOriginalWorkspaceMembership(role) || !role.tenantId || !role.workspaceId || seen.has(role.workspaceId)) continue;
       const workspace = s.workspaces.find(w => w.workspaceId === role.workspaceId && w.tenantId === role.tenantId && w.status === 'active');
       if (!workspace || !s.tenants.some(t => t.tenantId === workspace.tenantId && t.status === 'active')) continue;
       seen.add(workspace.workspaceId);
@@ -128,7 +131,7 @@ export function createOriginalAdminSessionPort(input: {
       if (prepared.changed) numbers.push(prepared.record);
       const rw = s.roles.some(r => r.adminUserId === user.adminUserId && r.role === 'workspace_admin' && r.workspaceId === workspace.workspaceId &&
         r.tenantId === workspace.tenantId && (r.accessMode === undefined || r.accessMode === 'read_write'));
-      workspaces.push({id: prepared.record.workspaceNumber, type: 'workspaceAdmin', label: workspace.displayName, flags: {mode: rw ? 'RW' : 'RO'}});
+      workspaces.push({id: prepared.record.workspaceNumber, type: 'workspaceAdmin', label: workspace.displayName, flags: {mode: role.role==='native_workspace_opaque'?originalWorkspaceRoleValue(role):rw?'RW':'RO'}});
     }
     const claims: OriginalAdminAccessSet['claims'] = {workspaceAdmin: workspaces};
     const access: OriginalAdminAccessSet['access'] = {workspaceAdmin: workspaces.map(w => w.id)};
