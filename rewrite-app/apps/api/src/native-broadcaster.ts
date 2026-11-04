@@ -20,6 +20,7 @@ export class NativeBroadcaster {
  private readonly interval:ReturnType<typeof setInterval>;
  private server:Server|undefined;
  private closed=false;
+ private generation=0;
  private lastHeartbeat=Date.now();
  private upgrading=0;
  constructor(private readonly services:FirstSliceServices,private readonly track:Track,private readonly report:(stage:'read'|'cleanup')=>void=()=>{}){
@@ -28,8 +29,9 @@ export class NativeBroadcaster {
  attach(server:Server){this.server=server;server.on('upgrade',this.upgrade);}
  async issue(target:Target,credential:string):Promise<string|undefined>{
   if(this.closed)return;
+  const generation=this.generation;
   await this.services.originalSession.read({token:credential});
-  if(this.closed)return;
+  if(this.closed||generation!==this.generation)return;
   this.expire();
   const owner=JSON.stringify([credential,target]);
   const pending=[...this.tickets].filter(([,ticket])=>JSON.stringify([ticket.credential,ticket.target])===owner);
@@ -41,6 +43,14 @@ export class NativeBroadcaster {
  }
  /** A successful HTTP commit wakes readers immediately; the sweep also observes other processes. */
  wake(){for(const peer of this.peers){peer.dirty=true;void this.publish(peer);}}
+ /** Original's internal system/clean closes every peer, including retained
+  * workspaces, without reporting a connection loss or stopping the server. */
+ clean(){
+  if(this.closed)return;
+  this.generation++;this.tickets.clear();
+  for(const socket of this.sockets)socket.destroy();this.sockets.clear();
+  for(const peer of [...this.peers]){this.retire(peer,false);peer.ws.close();}
+ }
  close(){
   if(this.closed)return;this.closed=true;clearInterval(this.interval);this.tickets.clear();
   this.server?.removeListener('upgrade',this.upgrade);
@@ -115,11 +125,12 @@ export class NativeBroadcaster {
   }catch(error){if(!peer.retired&&!this.closed){const forbidden=error instanceof FirstSliceError&&[401,403,409].includes(error.statusCode);if(!forbidden)this.report('read');peer.ws.close(forbidden?1008:1013,forbidden?'Access unavailable':'Use polling');}}
   finally{clearTimeout(peer.deadline);peer.deadline=undefined;peer.reading=false;if(peer.dirty&&!peer.retired&&!this.closed)queueMicrotask(()=>void this.publish(peer));}
  }
- private retire(peer:Peer){
+ private retire(peer:Peer,notify=true){
   if(peer.retired)return;peer.retired=true;clearTimeout(peer.deadline);peer.deadline=undefined;this.peers.delete(peer);
   const target=peer.ticket.target;
-  if(target.channel==='commands'){
-   const stillDisconnected=()=>![...this.peers].some(other=>!other.retired&&other.ticket.target.channel==='commands'&&other.ticket.target.testNumber===target.testNumber);
+  if(notify&&target.channel==='commands'){
+   const generation=this.generation;
+   const stillDisconnected=()=>generation===this.generation&&![...this.peers].some(other=>!other.retired&&other.ticket.target.channel==='commands'&&other.ticket.target.testNumber===target.testNumber);
    if(stillDisconnected())void this.track(async()=>{
     try{await this.services.originalCommand.connectionLost({token:peer.ticket.credential,testNumber:target.testNumber,stillDisconnected});this.wake();}catch(error){if(!(error instanceof FirstSliceError)||![401,403,409].includes(error.statusCode))this.report('cleanup');}
    });
