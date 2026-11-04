@@ -27,6 +27,7 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
    const box=node=>{const r=node.getBoundingClientRect(),s=getComputedStyle(node);return {x:r.x,y:r.y,width:r.width,height:r.height,font:s.font,padding:s.padding,opacity:s.opacity,color:s.color,background:s.backgroundColor,text:node.textContent.trim()};};
    return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},scroll:[scrollX,scrollY],
     heading:[...document.querySelectorAll('mat-toolbar h1')].map(box),tabs:[...document.querySelectorAll('a[mat-tab-link]')].map(box),
+    pagination:[...document.querySelectorAll('.mat-mdc-tab-header-pagination-chevron')].map(node=>({...box(node),boxSizing:getComputedStyle(node).boxSizing,border:getComputedStyle(node).border,transform:getComputedStyle(node).transform})),
     panels:[...document.querySelectorAll('mat-expansion-panel')].map(box),rows:[...document.querySelectorAll('mat-header-row,mat-row')].map(box),
     buttons:[...document.querySelectorAll('mat-tab-nav-panel button')].map(node=>({...box(node),disabled:node.disabled})),
     checks:[...document.querySelectorAll('input[type=checkbox]')].map(node=>({checked:node.checked,indeterminate:node.indeterminate,disabled:node.disabled})),

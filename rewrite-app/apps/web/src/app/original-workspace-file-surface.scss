@@ -1,6 +1,10 @@
 :root[data-interface-mode='original']:has(#originalWorkspaceFileFrame),
 :root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame) { height:100%; overflow:hidden; }
 :root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame) { background:white; color-scheme:light; }
+:root[data-interface-mode='original'] #originalWorkspaceFileFrame .mat-mdc-tab-header-pagination-chevron {
+ // Source's border-drawn Material chevrons use the default content box.
+ box-sizing:content-box;
+}
 :root[data-interface-mode='original'] .page:has(#originalWorkspaceFileFrame) {
  display:flex; flex-direction:column; height:100dvh; min-height:0; max-width:none; padding:0; overflow:visible;
 }
