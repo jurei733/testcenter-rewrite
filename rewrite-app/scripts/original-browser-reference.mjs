@@ -51,7 +51,7 @@ const originalAdministrationReference = JSON.parse(await readFile(new URL("./fix
 export const originalWorkspaceResultsReference = JSON.parse(await readFile(new URL('./fixtures/original-workspace-results-source.json', import.meta.url), 'utf8'));
 export async function verifyOriginalWorkspaceResultsSource(root) {
   const reference=originalWorkspaceResultsReference;
-  assert.equal(reference.version,1);assert.equal(reference.commit,originalBrowserSource.commit);
+  assert.equal(reference.version,1);assert.equal(reference.repository,originalBrowserSource.repository);assert.equal(reference.commit,originalBrowserSource.commit);
   assert.equal(reference.sources.length,10);assert.equal(new Set(reference.sources.map(s=>s.path)).size,10);
   for(const item of reference.sources){
     assert.match(item.path,/^frontend\/src\/app\/workspace-admin\/(?:workspace\.(?:component\.(?:ts|html|css)|interfaces\.ts)|(?:results|tests)\/(?:results|tests)\.component\.(?:ts|html|css))$/);
