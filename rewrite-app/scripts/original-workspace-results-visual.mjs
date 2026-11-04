@@ -34,8 +34,18 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
   });
   const result=await captureStableViewport(page,measure,path);await writeFile(path+'.json',JSON.stringify({geometry:result.geometry,paintDiagnostics:result.paintDiagnostics},null,2));return result;
  }
+ async function activateTab(page,view){
+  await page.evaluate(()=>document.fonts.ready);
+  // The candidate journey enters from Files by keyboard. Reproduce that focus
+  // history on both sides: initial-route selection alone retains a different
+  // legitimate Material scroll position in a narrow viewport.
+  await page.locator('[data-cy="Dateien"]').focus();
+  const target=page.locator('[data-cy="'+(view==='results'?'Ergebnisse/Antworten':'Tests löschen')+'"]');
+  await target.focus();await target.press('Enter');await waitForFiniteDocumentAnimations(page);
+ }
  return {async compare({page,theme,width,role='RW',view,selected,workspaceId,groups,tests}){
   const key=theme+'-'+width+'-'+role+'-'+view+'-'+(selected?'selected':'empty-selection');
+  await activateTab(page,view);
   const candidate=await capture(page,join(artifacts,'rewrite-'+key+'.png'));
   const context=await browser.newContext({viewport:{width,height:844},deviceScaleFactor:1,locale:'de-DE',timezoneId:'Europe/Berlin',colorScheme:'light'});
   const unknown=[],errors=[];let first;
@@ -60,13 +70,14 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
     const original=await context.newPage();original.on('pageerror',error=>errors.push(String(error)));
     await original.goto(base+'/#/admin/'+workspaceId+'/'+view,{waitUntil:'networkidle'});
     await original.waitForFunction(n=>document.querySelectorAll('mat-row').length===n,view==='results'?groups.length:Object.values(tests).flat().length);
+    await activateTab(original,view);
     if(selected)await original.locator('mat-row input[type=checkbox]').first().check();
     await original.waitForFunction(selected=>[...document.querySelectorAll('mat-row input[type=checkbox]')].some(n=>n.checked)===selected,selected);
     const result=await capture(original,join(artifacts,kind+'-'+key+'.png'));
     if(kind==='source')first=result;
     else{
      const self=await compareScreenshots(original,first.bytes,result.bytes),comparison=await compareScreenshots(original,first.bytes,candidate.bytes);
-     const receipt={key,sourceSelfControl:self,comparison,sourceGeometry:first.geometry,rewriteGeometry:candidate.geometry};results.push(receipt);
+     const receipt={key,inputSequence:'Fonts ready; focus Files; focus target tab; Enter; select row when requested; blur via heading',sourceSelfControl:self,comparison,sourceGeometry:first.geometry,rewriteGeometry:candidate.geometry};results.push(receipt);
      await writeFile(join(artifacts,key+'.json'),JSON.stringify(receipt,null,2));
      assert.equal(self.differingPixels,0,'Original self-control: '+key);assert.equal(comparison.differingPixels,0,'Actual Original-to-Rewrite whole viewport: '+key);
     }
