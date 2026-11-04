@@ -5,6 +5,7 @@ import {FirstSliceError,originalCommandInteger,decodeOriginalTestLogJson,type Fi
 const passwordRoute=/^\/user\/([^/]+)\/password$/;
 const workspaceUsersRoute=/^\/workspace\/([^/]+)\/users$/;
 const userWorkspacesRoute=/^\/user\/([^/]+)\/workspaces$/;
+const superAdminRoute=/^\/user\/([^/]+)\/super-admin\/([^/]+)$/;
 const workspaceRoute=/^\/workspace\/([^/]+)$/;
 const methods=new Map<string,string[]>([['/users',['GET']],['/workspaces',['GET']],['/user',['PUT']],['/workspace',['PUT']]]);
 const object=(value:unknown):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value));
@@ -12,6 +13,7 @@ const escape=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 export function originalAdminRouteLabel(method:string,pathname:string):string|null {
   if(workspaceUsersRoute.test(pathname))return method+' /workspace/:workspaceId/users';
   if(userWorkspacesRoute.test(pathname))return method+' /user/:userId/workspaces';
+  if(superAdminRoute.test(pathname))return method+' /user/:userId/super-admin/:status';
   if(workspaceRoute.test(pathname)&&method!=='GET')return method+' /workspace/:workspaceId';
   return passwordRoute.test(pathname)?method+' /user/:userId/password':methods.has(pathname)?method+' '+pathname:null;
 }
@@ -24,7 +26,8 @@ export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pat
   // GET is owned by the existing native workspace-access handler, whose
   // explicit membership gate is different from Root's rename capability.
   if(workspace&&input.request.method==='GET')return false;
-  const password=passwordRoute.exec(input.pathname),allowed=permission?['GET','PATCH']:workspace?['GET','PATCH']:password?['PATCH']:methods.get(input.pathname);
+  const superAdmin=superAdminRoute.exec(input.pathname);
+  const password=passwordRoute.exec(input.pathname),allowed=permission?['GET','PATCH']:workspace?['GET','PATCH']:superAdmin||password?['PATCH']:methods.get(input.pathname);
   if(!allowed)return false;
   input.header('cache-control','private, no-store');
   try {
@@ -43,6 +46,12 @@ export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pat
       if(workspaceUsers)await input.services.originalAdminPermissions.replaceWorkspaceUsers({token,reference,body});
       else await input.services.originalAdminPermissions.replaceUserWorkspaces({token,reference,body});
       input.raw(200,'',workspaceUsers?'text/plain;charset=UTF-8':'text/html; charset=UTF-8');return true;
+    }
+    if(superAdmin){
+      await input.services.originalAdminSession.authorize({token,superAdmin:true});
+      let reference:string,status:string;try{reference=decodeURIComponent(superAdmin[1]!);status=decodeURIComponent(superAdmin[2]!);}catch{throw new FirstSliceError(400,'original_request_invalid','Invalid administrator reference.');}
+      let body:unknown;try{body=await input.readBody(decodeOriginalTestLogJson);}catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_json_invalid','Internal error.');throw error;}
+      await input.services.originalAdminDirectory.setSuperadmin({token,reference,status,body});input.raw(200,'','text/html; charset=UTF-8');return true;
     }
     if(workspace||input.pathname==='/workspace'){
       await input.services.originalAdminSession.authorize({token,superAdmin:true});

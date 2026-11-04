@@ -1,6 +1,6 @@
 import type {DatabaseSync} from 'node:sqlite';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
-import {validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
+import {validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
 import {rollbackAfterFailure} from './transaction-rollback.js';
 
 type Row = Record<string, unknown>;
@@ -39,6 +39,10 @@ export function mutateOriginalAdminSession(database: DatabaseSync, map: Mappers,
         if(selector.directory==='users'||selector.directory==='rights')snapshot.directory.users=database.prepare(`SELECT u.admin_user_id,u.username,n.admin_number,
           EXISTS(SELECT 1 FROM admin_role_assignments r WHERE r.admin_user_id=u.admin_user_id AND r.role='platform_admin') AS super_admin
           FROM admin_users u LEFT JOIN original_admin_numbers n ON n.admin_user_id=u.admin_user_id`).all().map(r=>({adminUserId:String(r.admin_user_id),username:String(r.username),adminNumber:r.admin_number==null?null:String(r.admin_number),isSuperadmin:Boolean(r.super_admin)}));
+        if(selector.adminWrite&&snapshot.directory.users){
+          const roots=database.prepare("SELECT role_assignment_id,admin_user_id FROM admin_role_assignments WHERE role='platform_admin'").all();
+          for(const user of snapshot.directory.users)user.rootRoleAssignmentIds=roots.filter(r=>r.admin_user_id===user.adminUserId).map(r=>String(r.role_assignment_id));
+        }
         if(selector.directory==='workspaces'||selector.directory==='rights'){
           const ws=database.prepare(`SELECT w.* FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active'`).all().map(map.workspace).filter(present);
           const metadataOnly=selector.directory==='rights'||selector.workspaceWrite;
@@ -65,6 +69,13 @@ export function mutateOriginalAdminSession(database: DatabaseSync, map: Mappers,
     const effect = transform(structuredClone(snapshot));
     validateOriginalAdminRoleChanges(snapshot,effect,selector);
     validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
+    validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
+    if(effect.rootRoleChange){
+      const c=effect.rootRoleChange;
+      for(const id of c.removeIds){const changed=database.prepare("DELETE FROM admin_role_assignments WHERE role_assignment_id=? AND admin_user_id=? AND role='platform_admin'").run(id,c.adminUserId);if(Number(changed.changes)!==1)throw Error('Native Root removal identity changed.');}
+      if(c.assignment){const r=c.assignment;database.prepare('INSERT INTO admin_role_assignments(role_assignment_id,admin_user_id,role,access_mode,tenant_id,workspace_id,group_key,monitor_profiles_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
+        .run(r.roleAssignmentId,r.adminUserId,r.role,r.accessMode,null,null,null,JSON.stringify({monitorProfiles:[],monitorBookletVisibility:'visible'}),r.createdAt);}
+    }
     if(effect.workspaceChange){
       const c=effect.workspaceChange,w=c.workspace,t=c.tenant;
       if(c.kind==='create'){

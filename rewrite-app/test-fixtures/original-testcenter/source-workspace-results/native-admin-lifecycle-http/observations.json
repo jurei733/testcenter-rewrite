@@ -1,0 +1,3293 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceHashes": {
+    "backend/index.php": "a4152e0457971f2047200478114e313a7a80ec58b37540baeaa8e18a0ab247d5",
+    "backend/initialize.php": "5c4c28147e1665f1ad430f1829423654fd9a0e5afbe7caf211f870d64f0656ef",
+    "backend/routes.php": "8ecafc8e25edaf2cd0453c180a23be8a8d0568f048000eb033d7772af1b3a213",
+    "backend/src/controller/AssetAssignmentController.class.php": "e307afb12e1df37a6580f14ca4fdcf02980ae022f0c35e5cb8138f95400126db",
+    "backend/src/controller/AssetController.class.php": "076a80c5d748228b81cdde4ad4241d47f951fb68fd6c963edba65b89edb7db74",
+    "backend/src/controller/AttachmentController.class.php": "9cd7d14166925fc342f31a0269e601ba7dba719717a4eee85d332f54022003fd",
+    "backend/src/controller/BookletController.class.php": "17c269fe37d01c1fc0aff7e5b0c76edb9026c9603ccedb9956d14446aca52661",
+    "backend/src/controller/Controller.class.php": "5737a5309104cdd8c38f581b8126cffe60a7c455dbd275ee950fa6d28669930b",
+    "backend/src/controller/MonitorController.class.php": "6cbde3f3eb4c7eec6f38aa1e6c2012488f46614e69fa688e81ad0411af92fc44",
+    "backend/src/controller/ReviewController.class.php": "29aeebea8fa3edecbfc471d4ca9e14ceadb64e9b9852cfa76fe39d20e96bad3a",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/controller/SpeedtestController.class.php": "2cc8b0b62510e1c9f39cc3b86dec2fe6134aedc0e948af04e2f01568bceb90c3",
+    "backend/src/controller/SystemController.class.php": "ef72f6dc675ba3962243bcddd11a41acca0085b70969700996e6bfeba62327a9",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/controller/UserController.class.php": "4db2b090b786c61801e589a3c984f98d06cdd46198d29e9120bddb386ca359db",
+    "backend/src/controller/WorkspaceController.class.php": "f9cb336fc05ad115d1ebfca923d48eb397ed94cd065ccbdd83c359849233a6b4",
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/AssetDAO.class.php": "68523d5f3133ae70c6c528ff34ddd37f963b83f35325f15716d7821fe78b2481",
+    "backend/src/dao/DAO.class.php": "76eea068ed1a0a4f98bfbcc78f063432b5af6ed122de8fa5b098076f500c8fe0",
+    "backend/src/dao/InitDAO.class.php": "dccb2452cc7768e767ce59d525339d1c7af11e0be3a8627f00e5f77e68cfb67d",
+    "backend/src/dao/ReviewDAO.class.php": "4dd27f0f2790ef50f8a02ad76ab6300ede0ecb79690eea357e2bc734eafdb3bb",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/dao/SuperAdminDAO.class.php": "9df7e3672e8fbb84a568e77ff5660737bd0f664a6de43918f78bbe727b1f8f18",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/dao/WorkspaceDAO.class.php": "74e8df283418921640d4e4ddb780ce95483f319bca974b7464a17f5d1bb341f4",
+    "backend/src/data-collection/AccessObject.class.php": "c4f0ce85985a62ce07a20de5bb2e88b7304103de2dfbb9f77897cde2522efa05",
+    "backend/src/data-collection/AccessObjectType.enum.php": "755f588bcf2777b64242d1cf9d865552f1ea4b644f54549eb0b1e51edfa57470",
+    "backend/src/data-collection/AccessSet.class.php": "e76d5c03c642a8d178c583766ffc66b27355c3606bb34add287e55ccb6cdca6c",
+    "backend/src/data-collection/Admin.class.php": "7a4591b4f0cfea0a77077ca0a712642145f1bf56de545610b610672e70dbd5b8",
+    "backend/src/data-collection/Attachment.class.php": "b5cd413287ce9ed7f494660fa053d8e115f80a3996a67764ca63cb2aad877bd4",
+    "backend/src/data-collection/AuthToken.class.php": "490b1bb7c8e2ec222b4575093eacedfb03065cad60f82ed7961110de4c736757",
+    "backend/src/data-collection/Command.class.php": "ad229250685b1219c8e30a85abab4f62c75c19da5d89f36fa35adef953cbf742",
+    "backend/src/data-collection/DataCollection.class.php": "7405639c008e69237aa61469d537d65a9c33390d3b8171fe9ab421ac2f81a593",
+    "backend/src/data-collection/DataCollectionTypeSafe.class.php": "6ccc2c21ceac3a43f52fd4a7463b9207c2115c3bcd3152eb8c9a667b1a1a0ec8",
+    "backend/src/data-collection/ExpirationState.class.php": "3b2358989cc58677e9fc28eb459dec5726d940c426ac382c413b839a16c2d96a",
+    "backend/src/data-collection/ExpirationStateType.enum.php": "6721b483572334023ec9b766cb1f0b6c290151da4f676746bc5e030768964afb",
+    "backend/src/data-collection/FailedLogin.enum.php": "0ef2529cb59a72ed130184c38d36262fa1158dfc9e868f5563fef57032ad153e",
+    "backend/src/data-collection/FileData.class.php": "b74f6346353ea262a0c94fb51d36759442a59da6bba4d55a9d9105b62a5742c0",
+    "backend/src/data-collection/FileDeletionReport.php": "d59827f9ad3b1a50f986573f79ecea3194f2c5bb23461aa4fb6b4ded9e4699d2",
+    "backend/src/data-collection/FileRelation.class.php": "2f4212cb1c4fcfb50ebcc014175a96767a3dc540487031e444295696d77a54e1",
+    "backend/src/data-collection/FileRelationshipType.class.php": "6a19b6def6f8c56916a6da4ad0761ff5693ad2ae93d175d82f69bfb89efec623",
+    "backend/src/data-collection/FileType.enum.php": "3363f79ab4c02c9f1ad6c21c3a22df7e107218fc4b116ee99dfb5eac9f6dffd2",
+    "backend/src/data-collection/Group.class.php": "a7f72e4e18ab1853512f902ecf52a44bda30305efe6a6b7bdae02ae38669d067",
+    "backend/src/data-collection/GroupResultStats.class.php": "79afaea436ee3a283e95e1ba37b244eb6e0224523888962de7cd7fd7769e1e33",
+    "backend/src/data-collection/InstallationArguments.class.php": "32518b1003a56e4117eb45a132eccff4c38ee6276d23b3ac49cbc5d5bac9bc3e",
+    "backend/src/data-collection/Login.class.php": "e33fdd4458b8d429b93341bb1294931415cfe3004f3ca3610af9ccbc8affda3c",
+    "backend/src/data-collection/LoginArray.class.php": "98b67dfe641d39e1ffe34ed9845541d3f3ec059ede0b86bd418d6e97545ae0be",
+    "backend/src/data-collection/LoginSession.class.php": "b4dccca03d7cc8241ceef4061550cd315d5cf1b68670c39a47ba66fd21c847c5",
+    "backend/src/data-collection/ModeCapability.enum.php": "4f89ea43dc814aa134f0bd31ba0ceecfe3fd6216b84108311a0b309b9198a8b3",
+    "backend/src/data-collection/Person.class.php": "d6d6dd0ece78a171e330c9258a7313ce77a25b95e36b958116a4f1a7bb83882f",
+    "backend/src/data-collection/PersonSession.class.php": "e1b577384df193b147dec4ed39c6430f16a93f7d91ff1f99e09fa1e835fd4926",
+    "backend/src/data-collection/ReportFormat.php": "3fb41e925c59daf7800a132187fb324f31a20562fbadd5932e464d90ea180f94",
+    "backend/src/data-collection/ReportType.php": "e6ca8b7b6a202f1348f2fb6f663de126ff4e03d8b7ef2aa99daec01f6488e69e",
+    "backend/src/data-collection/RequestedAttachment.class.php": "2f5fbc026e866c61ef811c2a22148dd355487973a9fb82db572c1854aa52bd20",
+    "backend/src/data-collection/SessionChangeMessage.class.php": "f73461197c01ee1f074c2b059b28d395b726f8fbc5c9fd0584a7d3cd2f3111f1",
+    "backend/src/data-collection/SessionChangeMessageArray.class.php": "9cbb9ee45e64272c3e236e3d29f5a45d0d32b3ccb7489beed1fced160091617c",
+    "backend/src/data-collection/SysCheckMode.php": "6ed3dc350af687ec1de0f12b455c18ee10e9a2810f9d6231bf3366b0e1f647b4",
+    "backend/src/data-collection/SysCheckReport.class.php": "a7321fe98b9535cca435d3df12276ecd210ed343de56e2a9742b74efba0b95ba",
+    "backend/src/data-collection/SystemCheck.php": "11f966345af3357d2763eaa7de7833b94a5e424b109c5ab5983a2c82052723c8",
+    "backend/src/data-collection/SystemCheckAccessObject.class.php": "7d5e973c7d7a8591437acc0041f82f101071d4fcc602683a9aa0be22c992f4af",
+    "backend/src/data-collection/TestData.class.php": "e7dbcd111dbd1b5287edc7122948965ce2db74ed5df865f2aa0eef983113faec",
+    "backend/src/data-collection/TestLog.class.php": "a7d19bd78ee744ebe26d41b3034d48b2ef80d637d7a5c560a22e875cde82574a",
+    "backend/src/data-collection/TestName.class.php": "9cc3de2c85f03ab3464cda4b2b1fa5539f4675cc86c418df068fefd6ced6922e",
+    "backend/src/data-collection/TestSession.class.php": "a7beb6d00a1a05ce03c8bdca62ae6e4a888bedac041326a6a15bdcffad1dc5eb",
+    "backend/src/data-collection/UnitLog.php": "351139441c71cd3dd29597383f656abe7e77875873b5ce27104f9725b60449db",
+    "backend/src/data-collection/WorkspaceData.class.php": "44d8e40be003b5c6a129368170dac233bb0db17eb812007aa79665f43b4db3f3",
+    "backend/src/data-collection/WorkspaceRole.enum.php": "54ba8baef3b71f91f6bc17ba01c699a5498eb73439d29d3bbb7862925c969cb8",
+    "backend/src/exception/DbConnectionException.class.php": "caea94e9e78998b723b954164ac9ee35090a9b7661d98b654b5884d3d674507f",
+    "backend/src/exception/HttpError.class.php": "9afa5b6ecdb2b116b96926d228eea0789339737a3a81ce8293e94ebbb0a5e0c7",
+    "backend/src/files/File.class.php": "f1628add4bad358e9e5f3cc2cf8110bde426dfdb595504ec6991e70ca9a976e5",
+    "backend/src/files/ResourceFile.class.php": "519d5cd82482f936af87ccfa394ea139a3085d089e80ea38f8f894a803693d8e",
+    "backend/src/files/SysCheckReportFile.class.php": "1dc05fadecedd8ee23e75cab3249fbd7b72f4a3a44d532044a0bff00e822e5d3",
+    "backend/src/files/XMLFile.class.php": "517dc5ca052e52bcc569c9c4f974240094647eaaf3758125c0a0eb702ff70c61",
+    "backend/src/files/XMLFileBooklet.class.php": "95cefab11030f5aa237941311874f46b4def068bcdd009638dfaec01b151bfa1",
+    "backend/src/files/XMLFileSysCheck.class.php": "d7857437a97847d01c6054bda9fd3bbe1580c2cb6a8b561aac3a738fc747626e",
+    "backend/src/files/XMLFileTesttakers.class.php": "20bd5e27314507982ba81f9f947b488ab86655290d8bf714c6ab7a9f8ba221f7",
+    "backend/src/files/XMLFileUnit.class.php": "56e42c9860d562f94d317e3c32c5a66b1cf62a9b2b378a7926df1cf5ab7ed017",
+    "backend/src/helper/AssetStorage.class.php": "353420c059912ee6d40137ef63c4f0cfa221c97f6450888ad1fc58589dbc864d",
+    "backend/src/helper/AttachmentFiles.class.php": "76d467373fbcb24a282034fcabab4aaadeb4cf4fe3a0caf6df89302425e9f0d5",
+    "backend/src/helper/AttachmentTemplate.class.php": "df91b9d6ac59440d366dca837681394b504a6ca911e57fb71b2deb293c01d4b2",
+    "backend/src/helper/BroadcastService.class.php": "874facc8417cb24276e3e9997ea76aad5dfba473f7c46da3f3f0cc7b4a300a55",
+    "backend/src/helper/CLI.class.php": "5be4fffdb473d5b104c9a630b5f7b6dacdf35abe837839a7f1675b136cd6f635",
+    "backend/src/helper/CSV.class.php": "77d3e0cfca1a99e37efccb49480b68d1737ea63ead252f25d18662ebe997bb84",
+    "backend/src/helper/CacheService.class.php": "0b793acfe34a6bdb20729e2c76dc95c186103553406aba3f9ec29aaa06a0cdbd",
+    "backend/src/helper/DB.class.php": "ce53c415910ee5c51141fde64fb109e44479d78337f1b89e6ff952c6c23028c5",
+    "backend/src/helper/DBSchema.class.php": "d4da64210ef5358a893a065893d719e2ff00d4ede2446e6a73e054206999b45e",
+    "backend/src/helper/ExternalFile.class.php": "3aaf2d056b318d06357fe1e9122a5a1638f3f5e87b36ef80724620911c711eae",
+    "backend/src/helper/FileExt.class.php": "6babc2ccdb0f4a05b379876cb7100629e61e456ecea05fa8f57c325a1ce27156",
+    "backend/src/helper/FileID.class.php": "8c490045d4e1af66639e2af191502a87f6062fada54d1ef57c523a7fe806214e",
+    "backend/src/helper/FileResponse.class.php": "1896bc0a2822d324a7a424fc744ab8d296aac1220fa2ee013e5183db9524bdb2",
+    "backend/src/helper/FileService.class.php": "6ff5eb664f975befc6b498b85a727ed11792d6cf2ac1e397482ce00f89312b28",
+    "backend/src/helper/FileSize.class.php": "020f42d9559680afa675b82a7893086a6a43cd0ea7f8cabe3bb8897af525b70d",
+    "backend/src/helper/FileTime.class.php": "ac428d00e95b5ab08253e492347afcde143b3ef715991fd15f8ad2c849c142f5",
+    "backend/src/helper/Folder.class.php": "d3e1d59460ab519bfa299992a5e12458d17a0ccbed8e7a8ccdcbbd4a1114b9f7",
+    "backend/src/helper/JSON.class.php": "bb2a79d8853f35a82c80b71ab769f857ae03d268ae1a5919dab72f14000bfeda",
+    "backend/src/helper/Mode.class.php": "bacc300340201d9698bb7a8fe96588403a8ac490dbb9c73677954a1a4d2a2b85",
+    "backend/src/helper/Password.class.php": "6f807473c2014ad8ece505448cea1375a9cce6fc8c688a1b9892676c8a016643",
+    "backend/src/helper/Random.class.php": "d36a65e5c516e5238229b16ab08c26e788f800a350283379e79a7ab387dfca7d",
+    "backend/src/helper/RequestHelper.class.php": "c5aab20fff896d13afb2c969346d91c3749e40936849e6d4d51ba74e0d2ab57f",
+    "backend/src/helper/ReviewCSVFormatter.php": "5db29ee7680ffa8ddf01febe71a95c0d5fc580091a4f5111ba819cc37123df2e",
+    "backend/src/helper/Server.class.php": "f173d96749355ed7aaf307f2fcb4d76ad948533964e31250eedb84de0d0e0835",
+    "backend/src/helper/State.class.php": "62475f6edc2adda96097658c33e67e2c5a7ad534ed5addb9d9a57b638e329c91",
+    "backend/src/helper/SystemConfig.class.php": "2f97c265453d34d1d7be465afd2b58ac2422f60fbdcf7e970352b60bc23e957d",
+    "backend/src/helper/TestEnvironment.class.php": "8f6262e0fcbd78d0693a3de98189b8368f6fa24f45b504958060e59b6970b70b",
+    "backend/src/helper/TimeStamp.class.php": "eba4eb49ca3dbe8aa99733a55b40b9259823edb05e0f67267e946c8bcac87a7d",
+    "backend/src/helper/Token.class.php": "d57516492d6f68fecfb070d3a9fd81edb245bd7c365c389c419504bcbaa87cf9",
+    "backend/src/helper/Version.class.php": "d5757233ce2a70919b005d1292201219d9bee5527639c0fc91c8d67de502878b",
+    "backend/src/helper/XMLSchema.class.php": "dd20acac130fa86736d8cb68238ea65b3d23f438be3126ade14226017d26a20b",
+    "backend/src/helper/ZIP.class.php": "a072bd47e570174bc501d0634ad6ab29ccf6accc45e0f0b1e5a654a083557069",
+    "backend/src/middleware/ErrorHandler.class.php": "94f8fd5a5a501ff03fb440f5201230b92e22224f59a0cabf7d4fc0dbc045965f",
+    "backend/src/middleware/HandleCorsPreflight.class.php": "074e0c47627ea9f67ecf5cc0e218b942d26e173f25ac91c2e69bfae68535c7fb",
+    "backend/src/middleware/HandleOptionalToken.class.php": "e30ee7e4365cb145b14bf45c34413564f6fe7257a5b05da152a19e2aef2d9537",
+    "backend/src/middleware/IsGroupMonitor.class.php": "49a0b75d3efaac0a3ad10d0dec9577b2ef54d319727ccaaaf573c5a065f1031a",
+    "backend/src/middleware/IsSuperAdmin.class.php": "68f1e80cdbed7970f9f4cc0303cba0f453a4175d8619808c1d10978bffa07739",
+    "backend/src/middleware/IsSuperAdminOrSelf.php": "143d9d19942c2ed34506db97eaec9090591155e666ca8095a0a6fbcf04ef6fd5",
+    "backend/src/middleware/IsTestOwner.class.php": "f2b8f79c3588801f0ddd057027682e2a554c791cae05cdf5242519a9b3b26316",
+    "backend/src/middleware/IsWorkspaceBlocked.class.php": "be88cd772f3459d3c5fdce17d08f051ae3868442f0a35321926752769d5789f4",
+    "backend/src/middleware/IsWorkspacePermitted.class.php": "c9db6d848266796d6bf29ed4468425a89db08c34278d947c110ecd9d2119c569",
+    "backend/src/middleware/MayModifyAttachments.class.php": "4e1f434570aa0ef71be83ffe7157ab6879e17a6be6ac5f840553600f48aeab5c",
+    "backend/src/middleware/MayReview.class.php": "7612d5376f23b89c6c4db859fe6644fd88e74e779907d684ad516fd8ea3823f2",
+    "backend/src/middleware/RequireToken.class.php": "f2d19714051837e46c07adec45bc1c52205cc9a282b37441a248bf9916f3c35a",
+    "backend/src/workspace/LogReportOutput.php": "cfcb2fd3418195fdac8bc6b7dcfeafeb53da36745c7fa1f37194e9fbf9da8b86",
+    "backend/src/workspace/Report.php": "f81129e75bfb3550205d3668fb2de1821967f20994c604cc0d41b380a13e543f",
+    "backend/src/workspace/ReportOutputFactory.php": "a94287404a75d0c933cd726c0b5a714503d7bd91dbaf56c416d1d20b63380f1a",
+    "backend/src/workspace/ResponseReportOutput.php": "0c88a1742d3e321cccb4c62c6fc34ca1627faa9b9e2763227310dc2dd1187466",
+    "backend/src/workspace/ReviewReportOutput.php": "d1f39523e236b0f2265da3a1892775f1bd5977fdc50da4c2091afab48282ba59",
+    "backend/src/workspace/SysCheckReportOutput.php": "a95e341b85194ddf65256cd33889925b680e249d246c669b23ade1b7862eb3da",
+    "backend/src/workspace/SysChecksFolder.class.php": "d5aa8f49861b6d36184de3c377d969312d65655a10daf15be570054141c0085e",
+    "backend/src/workspace/UploadedFilesHandler.class.php": "a7e4a8f062059ea7b49f5eb1dde4028edfc5120b3e399ef9b7686bf04dbe89e4",
+    "backend/src/workspace/Workspace.class.php": "5866681acead26a9dc570e0fd50a32a963e6e8f1b4098b98f3803d3d5a378ac0",
+    "backend/src/workspace/WorkspaceCache.class.php": "d4145a784fbb1397adb609380a9c1b10beaef371850ac7f537f2624d9fc5c4ac",
+    "backend/src/workspace/WorkspaceInitializer.class.php": "62343bd5e53ec4aefe8725438fb44f0bd2a658e9f5f9320c0d3af1655796c340",
+    "definitions/testtaker/custom-texts.json": "201f23fa1140265e84b47da978881269e4583c01a8e52dee22a731dc5af96edc",
+    "definitions/testtaker/mode-options.json": "4ad95c15ee7bbe78e475a03a4b37c6a86e102f7b26d83429536e6c37d854d339",
+    "definitions/testtaker/test-mode.json": "abbd8746a1f304b5ea6f01177a297b27fbd7c04742b687cfd13bffea1658619e",
+    "definitions/testtaker/testtaker.json": "eeb5ce41bedd00f4e91d1adfe3e90e187f3a798c290a6944cdb7593907188f34",
+    "scripts/database/full.sql": "9ac4b941ba40d75a563cbe4fb9d55075f27e46894902eb50100eb7263594ed08"
+  },
+  "sourceRuntimeBefore": {
+    "verified": true,
+    "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+    "sourceFiles": 137,
+    "composerPackages": 19,
+    "actualHttpExchanges": 112,
+    "observationSha256": "32808d788575b0a5f8fae8a28db809b34755419185b8bba803001e6e2e02e17f",
+    "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+    "php": "8.3.36",
+    "configuration": {
+      "version": "19.0.0",
+      "xmlSchemaValidation": true,
+      "allowTestMode": false,
+      "staticTime": "now",
+      "staticTokens": false,
+      "insecurePasswords": false,
+      "protection": [
+        "login",
+        "person"
+      ]
+    },
+    "readOnlyVerification": true
+  },
+  "sourceRuntimeAfter": {
+    "verified": true,
+    "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+    "sourceFiles": 137,
+    "composerPackages": 19,
+    "actualHttpExchanges": 112,
+    "observationSha256": "32808d788575b0a5f8fae8a28db809b34755419185b8bba803001e6e2e02e17f",
+    "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+    "php": "8.3.36",
+    "configuration": {
+      "version": "19.0.0",
+      "xmlSchemaValidation": true,
+      "allowTestMode": false,
+      "staticTime": "now",
+      "staticTokens": false,
+      "insecurePasswords": false,
+      "protection": [
+        "login",
+        "person"
+      ]
+    },
+    "readOnlyVerification": true
+  },
+  "ownedSyntheticAccountsOnly": true,
+  "baselineRestored": true,
+  "sqlSeedsOrDaoStubs": false,
+  "createdOwnedIDs": [
+    "4",
+    "5",
+    "6",
+    "7",
+    "8"
+  ],
+  "actualHttpExchanges": 112,
+  "rows": [
+    {
+      "label": "root-login",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "name": "super",
+        "password": "[owned-root-password]"
+      },
+      "rawText": "{\"token\":\"[owned-token-2]\",\"displayName\":\"super\",\"loginName\":\"super\",\"groupLabel\":null,\"id\":1,\"pwSetByAdmin\":false,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[],\"superAdmin\":[]}}",
+      "value": {
+        "token": "[owned-token-2]",
+        "displayName": "super",
+        "loginName": "super",
+        "groupLabel": null,
+        "id": 1,
+        "pwSetByAdmin": false,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        }
+      },
+      "bodySha256": "727cf80755462fe6dc317ec24b80192011655438553dd64d1aacff3605f86a63",
+      "redactedBodySha256": "6c44b6753e475a032c4f39b12dda083cfe24c29083e05a4b2f0736e65c41658b"
+    },
+    {
+      "label": "baseline-users",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "c794271d6db4a100f521b736df4280ad9d667001417b71cf3d158f4f965d6d34",
+      "redactedBodySha256": "c794271d6db4a100f521b736df4280ad9d667001417b71cf3d158f4f965d6d34"
+    },
+    {
+      "label": "baseline-workspaces",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"latest_modification_ts\":null},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"latest_modification_ts\":null}]",
+      "value": [
+        {
+          "id": 1,
+          "name": "Owned permissions One Ω",
+          "latest_modification_ts": null
+        },
+        {
+          "id": 2,
+          "name": "Owned permissions Two β",
+          "latest_modification_ts": null
+        }
+      ],
+      "bodySha256": "5150a89ca8a6fe0560d42df48d488f47f1e7aab8949c29ebef62a445df84b05c",
+      "redactedBodySha256": "5150a89ca8a6fe0560d42df48d488f47f1e7aab8949c29ebef62a445df84b05c"
+    },
+    {
+      "label": "create-target",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "n": "Owned R68 1793786315921 target",
+        "p": "[owned-lifecycle-password]"
+      },
+      "rawText": "4",
+      "value": 4,
+      "bodySha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "redactedBodySha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+    },
+    {
+      "label": "create-reader",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "n": "Owned R68 1793786315921 reader",
+        "p": "[owned-lifecycle-password]"
+      },
+      "rawText": "5",
+      "value": 5,
+      "bodySha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+      "redactedBodySha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d"
+    },
+    {
+      "label": "reader-login",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "name": "Owned R68 1793786315921 reader",
+        "password": "[owned-lifecycle-password]"
+      },
+      "rawText": "{\"token\":\"[owned-token-3]\",\"displayName\":\"Owned R68 1793786315921 reader\",\"loginName\":\"Owned R68 1793786315921 reader\",\"groupLabel\":null,\"id\":5,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[]}}",
+      "value": {
+        "token": "[owned-token-3]",
+        "displayName": "Owned R68 1793786315921 reader",
+        "loginName": "Owned R68 1793786315921 reader",
+        "groupLabel": null,
+        "id": 5,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": []
+        }
+      },
+      "bodySha256": "5e88b804978c101fe9f167f94cc306ab2f36a5837f9ebce8de10f152679324e1",
+      "redactedBodySha256": "106ac1253a630453ab689c96ce4c182d8f5807bb538d05a241a0be09479a2d29"
+    },
+    {
+      "label": "missing-status",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 401,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cd800507.78710775",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Auth Header not sufficient: missing",
+      "value": "Auth Header not sufficient: missing",
+      "bodySha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+      "redactedBodySha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd"
+    },
+    {
+      "label": "missing-delete",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 401,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cd82d2d2.10818236",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Auth Header not sufficient: missing",
+      "value": "Auth Header not sufficient: missing",
+      "bodySha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd",
+      "redactedBodySha256": "475c40fa65b7944ea2badcd208857d45f1bbc86f1bba459542430d7a0abee0fd"
+    },
+    {
+      "label": "invalid-status",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cd8893b4.68939027",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Invalid token: `owned-nonexistent-token`",
+      "value": "Invalid token: `owned-nonexistent-token`",
+      "bodySha256": "4abbc1b40c1fa38ed0bd64c1bb867218a561baebe66f463c19d59d1589c9b241",
+      "redactedBodySha256": "4abbc1b40c1fa38ed0bd64c1bb867218a561baebe66f463c19d59d1589c9b241"
+    },
+    {
+      "label": "invalid-delete",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cd8fedf0.12532682",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Invalid token: `owned-nonexistent-token`",
+      "value": "Invalid token: `owned-nonexistent-token`",
+      "bodySha256": "4abbc1b40c1fa38ed0bd64c1bb867218a561baebe66f463c19d59d1589c9b241",
+      "redactedBodySha256": "4abbc1b40c1fa38ed0bd64c1bb867218a561baebe66f463c19d59d1589c9b241"
+    },
+    {
+      "label": "non-root-status",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cd951883.39378916",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Only SuperAdmins can do that!",
+      "value": "Only SuperAdmins can do that!",
+      "bodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90",
+      "redactedBodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90"
+    },
+    {
+      "label": "non-root-delete",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cd9dc8c2.13976549",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Only SuperAdmins can do that!",
+      "value": "Only SuperAdmins can do that!",
+      "bodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90",
+      "redactedBodySha256": "0eab1e454d39ff5a8ad107c98a739bcc5dae60c5b3bb203ed7d80d8ad781be90"
+    },
+    {
+      "label": "status-\"on\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"on\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "status-\"true\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/true",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"true\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"1\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/1",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"1\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"TRUE\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/TRUE",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"TRUE\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"True\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/True",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"True\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"ON\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/ON",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"ON\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"On\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/On",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"On\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"off\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/off",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"off\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"false\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/false",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"false\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"0\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/0",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"0\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"FALSE\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/FALSE",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"FALSE\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"False\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/False",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"False\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"OFF\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/OFF",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"OFF\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"Off\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/Off",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-\"Off\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"undefined\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/undefined",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf00ea36.69063413",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "New Status `undefined` is undefined!",
+      "value": "New Status `undefined` is undefined!",
+      "bodySha256": "cb1a849fa7433cc6dd227283229227bf5f401cd8779ef7a26f82b463be565648",
+      "redactedBodySha256": "cb1a849fa7433cc6dd227283229227bf5f401cd8779ef7a26f82b463be565648"
+    },
+    {
+      "label": "after-status-\"undefined\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"2\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/2",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf0c4528.90007862",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "New Status `2` is undefined!",
+      "value": "New Status `2` is undefined!",
+      "bodySha256": "c95d69963d92a6da4fa76e515edf1f5c46fe3f1a48552c964ef056650c8198c5",
+      "redactedBodySha256": "c95d69963d92a6da4fa76e515edf1f5c46fe3f1a48552c964ef056650c8198c5"
+    },
+    {
+      "label": "after-status-\"2\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"yes\"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/yes",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf178691.90298589",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "New Status `yes` is undefined!",
+      "value": "New Status `yes` is undefined!",
+      "bodySha256": "214dfe77e54156e3306f8fb599b636ff3d86c31d24f6b07b5d9e19a8773193cb",
+      "redactedBodySha256": "214dfe77e54156e3306f8fb599b636ff3d86c31d24f6b07b5d9e19a8773193cb"
+    },
+    {
+      "label": "after-status-\"yes\"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-\"on \"",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on%20",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf2232c6.15976840",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "New Status `on ` is undefined!",
+      "value": "New Status `on ` is undefined!",
+      "bodySha256": "cc41d8dce706f9bc60e8de6c42bea60f7e239420285fc94f7905917c7dfa49f4",
+      "redactedBodySha256": "cc41d8dce706f9bc60e8de6c42bea60f7e239420285fc94f7905917c7dfa49f4"
+    },
+    {
+      "label": "after-status-\"on \"",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-password-missing",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf2c1652.23739434",
+      "testMode": "NO",
+      "requestBody": {},
+      "rawText": "Provide Password for security reasons!",
+      "value": "Provide Password for security reasons!",
+      "bodySha256": "8e2da1a03c8344d0e7819d7e174c810148c56b04909617f2e562ddb2280c7cdf",
+      "redactedBodySha256": "8e2da1a03c8344d0e7819d7e174c810148c56b04909617f2e562ddb2280c7cdf"
+    },
+    {
+      "label": "after-status-password-missing",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-password-null",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf35c961.97011922",
+      "testMode": "NO",
+      "requestBody": {
+        "p": null
+      },
+      "rawText": "Provide Password for security reasons!",
+      "value": "Provide Password for security reasons!",
+      "bodySha256": "8e2da1a03c8344d0e7819d7e174c810148c56b04909617f2e562ddb2280c7cdf",
+      "redactedBodySha256": "8e2da1a03c8344d0e7819d7e174c810148c56b04909617f2e562ddb2280c7cdf"
+    },
+    {
+      "label": "after-status-password-null",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-password-false",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf3f73f6.57885306",
+      "testMode": "NO",
+      "requestBody": {
+        "p": false
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "after-status-password-false",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-password-array",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf48c449.01594025",
+      "testMode": "NO",
+      "requestBody": {
+        "p": []
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "after-status-password-array",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-password-object",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf524734.78698397",
+      "testMode": "NO",
+      "requestBody": {
+        "p": {
+          "owned": 1
+        }
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "after-status-password-object",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-password-wrong",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf690997.66420674",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "owned-wrong-password"
+      },
+      "rawText": "Invalid password for user 1",
+      "value": "Invalid password for user 1",
+      "bodySha256": "a2315ae98d4193ad32d7a87cbf599175922dd853254b186f6b4d05537ec69267",
+      "redactedBodySha256": "a2315ae98d4193ad32d7a87cbf599175922dd853254b186f6b4d05537ec69267"
+    },
+    {
+      "label": "after-status-password-wrong",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252",
+      "redactedBodySha256": "925a93cdb3a5132dd3433b8e2e12a49f7025cb191d4d2c8bdae5ca877dbe4252"
+    },
+    {
+      "label": "status-password-valid",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]",
+        "ignored": "owned"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-password-valid",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "invalid-status-before-password",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/undefined",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf88f3c2.01876137",
+      "testMode": "NO",
+      "requestBody": {},
+      "rawText": "New Status `undefined` is undefined!",
+      "value": "New Status `undefined` is undefined!",
+      "bodySha256": "cb1a849fa7433cc6dd227283229227bf5f401cd8779ef7a26f82b463be565648",
+      "redactedBodySha256": "cb1a849fa7433cc6dd227283229227bf5f401cd8779ef7a26f82b463be565648"
+    },
+    {
+      "label": "status-invalid-json",
+      "method": "PATCH",
+      "path": "/user/4/super-admin/on",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01cf8d5149.78885832",
+      "testMode": "NO",
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawRequestBody": "{\"p\":",
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "status-reference-prefix",
+      "method": "PATCH",
+      "path": "/user/4owned/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-reference-prefix",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "status-reference-fraction",
+      "method": "PATCH",
+      "path": "/user/4.9/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-reference-fraction",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "status-reference-exponent",
+      "method": "PATCH",
+      "path": "/user/4e0/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-reference-exponent",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "status-reference-negative",
+      "method": "PATCH",
+      "path": "/user/-4/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-reference-negative",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "status-reference-unknown",
+      "method": "PATCH",
+      "path": "/user/9223372036854775807/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-reference-unknown",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "status-reference-overflow",
+      "method": "PATCH",
+      "path": "/user/9223372036854775808/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-reference-overflow",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "status-reference-word",
+      "method": "PATCH",
+      "path": "/user/owned/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-status-reference-word",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "delete-missing-password",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d04549c9.74360719",
+      "testMode": "NO",
+      "requestBody": {},
+      "rawText": "Provide Password for security reasons!",
+      "value": "Provide Password for security reasons!",
+      "bodySha256": "8e2da1a03c8344d0e7819d7e174c810148c56b04909617f2e562ddb2280c7cdf",
+      "redactedBodySha256": "8e2da1a03c8344d0e7819d7e174c810148c56b04909617f2e562ddb2280c7cdf"
+    },
+    {
+      "label": "delete-null-password",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 400,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d049ab67.01800719",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [],
+        "p": null
+      },
+      "rawText": "Provide Password for security reasons!",
+      "value": "Provide Password for security reasons!",
+      "bodySha256": "8e2da1a03c8344d0e7819d7e174c810148c56b04909617f2e562ddb2280c7cdf",
+      "redactedBodySha256": "8e2da1a03c8344d0e7819d7e174c810148c56b04909617f2e562ddb2280c7cdf"
+    },
+    {
+      "label": "delete-wrong-password",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d05c0808.42308409",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [],
+        "p": "owned-wrong-password"
+      },
+      "rawText": "Invalid password for user 1",
+      "value": "Invalid password for user 1",
+      "bodySha256": "a2315ae98d4193ad32d7a87cbf599175922dd853254b186f6b4d05537ec69267",
+      "redactedBodySha256": "a2315ae98d4193ad32d7a87cbf599175922dd853254b186f6b4d05537ec69267"
+    },
+    {
+      "label": "delete-false-password",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d060b1c0.74491669",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [],
+        "p": false
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "delete-array-password",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d064f367.58773173",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [],
+        "p": []
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "delete-object-password",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d06966e0.80722122",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [],
+        "p": {
+          "owned": 1
+        }
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "delete-empty",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "u": [],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "delete-missing-list",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "delete-null-list",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "u": null,
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "delete-string-list",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d0b37a53.94958211",
+      "testMode": "NO",
+      "requestBody": {
+        "u": "owned",
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "delete-object-list",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d0c650e9.68729303",
+      "testMode": "NO",
+      "requestBody": {
+        "u": {
+          "owned": true
+        },
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "delete-zero",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "u": [
+          0
+        ],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "delete-unknown",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "u": [
+          "9223372036854775807"
+        ],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "delete-negative",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "u": [
+          "-4"
+        ],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "delete-invalid-json",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d10eccb3.28224850",
+      "testMode": "NO",
+      "rawRequestBody": "{\"u\":",
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "create-duplicate-victim",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "n": "Owned R68 1793786315921 duplicate-victim",
+        "p": "[owned-lifecycle-password]"
+      },
+      "rawText": "6",
+      "value": 6,
+      "bodySha256": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683",
+      "redactedBodySha256": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683"
+    },
+    {
+      "label": "delete-duplicate-owned",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "u": [
+          "6",
+          "6"
+        ],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-delete-duplicate",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "create-partial-victim",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "n": "Owned R68 1793786315921 partial-victim",
+        "p": "[owned-lifecycle-password]"
+      },
+      "rawText": "7",
+      "value": 7,
+      "bodySha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451",
+      "redactedBodySha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+    },
+    {
+      "label": "delete-partial-before-invalid",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d15ebe70.45600313",
+      "testMode": "NO",
+      "requestBody": {
+        "u": [
+          "7",
+          "owned-invalid-bigint"
+        ],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "Internal error.",
+      "value": "Internal error.",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "redactedBodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986"
+    },
+    {
+      "label": "after-delete-partial",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "create-self-owned",
+      "method": "PUT",
+      "path": "/user",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "n": "Owned R68 1793786315921 self-owned",
+        "p": "[owned-lifecycle-password]"
+      },
+      "rawText": "8",
+      "value": 8,
+      "bodySha256": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+      "redactedBodySha256": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3"
+    },
+    {
+      "label": "self-grant-by-baseline-root",
+      "method": "PATCH",
+      "path": "/user/8/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "self-login",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "name": "Owned R68 1793786315921 self-owned",
+        "password": "[owned-lifecycle-password]"
+      },
+      "rawText": "{\"token\":\"[owned-token-4]\",\"displayName\":\"Owned R68 1793786315921 self-owned\",\"loginName\":\"Owned R68 1793786315921 self-owned\",\"groupLabel\":null,\"id\":8,\"pwSetByAdmin\":true,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[],\"superAdmin\":[]}}",
+      "value": {
+        "token": "[owned-token-4]",
+        "displayName": "Owned R68 1793786315921 self-owned",
+        "loginName": "Owned R68 1793786315921 self-owned",
+        "groupLabel": null,
+        "id": 8,
+        "pwSetByAdmin": true,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [],
+          "superAdmin": []
+        }
+      },
+      "bodySha256": "09f6370240d3c6e677f6a8b55351ac6916c3ff9f9ef8ef68cda21f4e0b4117b2",
+      "redactedBodySha256": "295b383122b74b4d03eb266cb9f5cbbf97afb60c30939576b1eeffb5426e4c25"
+    },
+    {
+      "label": "owned-self-demotion",
+      "method": "PATCH",
+      "path": "/user/8/super-admin/off",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-lifecycle-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "after-owned-self-demotion",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 self-owned\",\"id\":8,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 self-owned",
+          "id": 8,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "8df491d7dd02de2681f66fe39194c36b5dafbcf19e75367a9c38d3fbf870d6ad",
+      "redactedBodySha256": "8df491d7dd02de2681f66fe39194c36b5dafbcf19e75367a9c38d3fbf870d6ad"
+    },
+    {
+      "label": "self-regrant-by-baseline-root",
+      "method": "PATCH",
+      "path": "/user/8/super-admin/on",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "owned-self-delete",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "u": [
+          "8"
+        ],
+        "p": "[owned-lifecycle-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "owned-self-session-after-delete",
+      "method": "GET",
+      "path": "/session",
+      "status": 403,
+      "contentType": "text/html;charset=UTF-8",
+      "allow": null,
+      "errorId": "error-6aeb01d26aa238.72090118",
+      "testMode": "NO",
+      "rawText": "Invalid token: `[owned-token-4]`",
+      "value": "Invalid token: `[owned-token-4]`",
+      "bodySha256": "233d5aa9da989478b32dc39ffca43b0fc9e068c9f275ebc35c9c23923aed444a",
+      "redactedBodySha256": "f95745bd3c3c2de2085c0c92d2da17637351159643ff359156f41dbb8a00e39d"
+    },
+    {
+      "label": "after-owned-self-delete",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "cleanup-current",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 reader\",\"id\":5,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned R68 1793786315921 target\",\"id\":4,\"email\":null,\"isSuperadmin\":true},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 reader",
+          "id": 5,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned R68 1793786315921 target",
+          "id": 4,
+          "email": null,
+          "isSuperadmin": true
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e",
+      "redactedBodySha256": "6c8f0b1ccabaf367b342fad6c3a5d93b843081648c4130352a7bdfbf15060d3e"
+    },
+    {
+      "label": "cleanup-owned-users",
+      "method": "DELETE",
+      "path": "/users",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "requestBody": {
+        "u": [
+          "4",
+          "5"
+        ],
+        "p": "[owned-root-password]"
+      },
+      "rawText": "",
+      "value": "",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redactedBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "final-users",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]",
+      "value": [
+        {
+          "name": "Owned permissions A",
+          "id": 2,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "Owned permissions B",
+          "id": 3,
+          "email": null,
+          "isSuperadmin": false
+        },
+        {
+          "name": "super",
+          "id": 1,
+          "email": null,
+          "isSuperadmin": true
+        }
+      ],
+      "bodySha256": "c794271d6db4a100f521b736df4280ad9d667001417b71cf3d158f4f965d6d34",
+      "redactedBodySha256": "c794271d6db4a100f521b736df4280ad9d667001417b71cf3d158f4f965d6d34"
+    },
+    {
+      "label": "final-workspaces",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "allow": null,
+      "errorId": null,
+      "testMode": null,
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"latest_modification_ts\":null},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"latest_modification_ts\":null}]",
+      "value": [
+        {
+          "id": 1,
+          "name": "Owned permissions One Ω",
+          "latest_modification_ts": null
+        },
+        {
+          "id": 2,
+          "name": "Owned permissions Two β",
+          "latest_modification_ts": null
+        }
+      ],
+      "bodySha256": "5150a89ca8a6fe0560d42df48d488f47f1e7aab8949c29ebef62a445df84b05c",
+      "redactedBodySha256": "5150a89ca8a6fe0560d42df48d488f47f1e7aab8949c29ebef62a445df84b05c"
+    }
+  ],
+  "fullOriginalParityProven": false
+}

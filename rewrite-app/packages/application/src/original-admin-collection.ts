@@ -5,6 +5,7 @@ import type {OriginalWorkspaceNumberRecord} from './original-workspace-number.js
 import {validateOriginalAdminRoleChanges} from './original-admin-permissions.js';
 import {isOriginalWorkspaceMembership} from './original-workspace-role.js';
 import {originalAdministrationWorkspaceTenantKey,validateOriginalWorkspaceDirectoryEffect} from './original-workspace-directory.js';
+import {validateOriginalAdminLifecycleEffect} from './original-admin-lifecycle.js';
 
 type Rows<T> = Map<string, T> | Record<string, T>;
 const values = <T>(rows: Rows<T>): T[] => rows instanceof Map ? [...rows.values()] : Object.values(rows);
@@ -39,7 +40,8 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
     const root=roles.some(r=>r.role==='platform_admin');
     if(selector.directory&&root){
       snapshot.directory={};
-      if(selector.directory==='users'||selector.directory==='rights')snapshot.directory.users=values(state.adminUsers).map(u=>({adminUserId:u.adminUserId,username:u.username,adminNumber:values(state.originalAdminNumbers??{}).find(n=>n.adminUserId===u.adminUserId)?.adminNumber??null,isSuperadmin:values(state.adminRoleAssignments).some(r=>r.adminUserId===u.adminUserId&&r.role==='platform_admin')}));
+      if(selector.directory==='users'||selector.directory==='rights')snapshot.directory.users=values(state.adminUsers).map(u=>({adminUserId:u.adminUserId,username:u.username,adminNumber:values(state.originalAdminNumbers??{}).find(n=>n.adminUserId===u.adminUserId)?.adminNumber??null,isSuperadmin:values(state.adminRoleAssignments).some(r=>r.adminUserId===u.adminUserId&&r.role==='platform_admin'),
+        ...selector.adminWrite?{rootRoleAssignmentIds:values(state.adminRoleAssignments).filter(r=>r.adminUserId===u.adminUserId&&r.role==='platform_admin').map(r=>r.roleAssignmentId)}:{}}));
       if(selector.directory==='workspaces'||selector.directory==='rights')snapshot.directory.workspaces=values(state.workspacesByScope).filter(w=>w.status==='active'&&values(state.tenants).some(t=>t.tenantId===w.tenantId&&t.status==='active')).map(w=>{
         const number=values(state.originalWorkspaceNumbers??{}).find(n=>n.workspaceId===w.workspaceId);
         if(number&&number.tenantId!==w.tenantId)throw Error('Native workspace directory identity scope changed.');
@@ -60,10 +62,12 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
   const effect=transform(structuredClone(snapshot));
   validateOriginalAdminRoleChanges(snapshot,effect,selector);
   validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
+  validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
   // Validate every foreign-token collision before editing even an in-memory row.
   const audits=[...effect.audit?[effect.audit]:[],...effect.audits??[]];
   if(new Set(audits.map(a=>a.adminAuditEventId)).size!==audits.length||audits.some(a=>values(state.adminAuditEvents).some(old=>old.adminAuditEventId===a.adminAuditEventId)))throw Error('Native administrator audit identity collision.');
   for(const role of effect.roleChanges?.assignments??[]){const previous=values(state.adminRoleAssignments).find(r=>r.roleAssignmentId===role.roleAssignmentId);if(previous&&!snapshot.directory?.roles?.some(r=>r.roleAssignmentId===previous.roleAssignmentId))throw Error('Native permission identity collision.');}
+  if(effect.rootRoleChange?.assignment&&values(state.adminRoleAssignments).some(r=>r.roleAssignmentId===effect.rootRoleChange!.assignment!.roleAssignmentId))throw Error('Native Root assignment identity collision.');
   if(effect.user&&effect.user.adminUserId!==id)throw Error('Native administrator mutation scope changed.');
   if(effect.createdUser&&values(state.adminUsers).some(u=>u.adminUserId===effect.createdUser!.adminUserId||u.username===effect.createdUser!.username))throw Error('Native administrator creation identity collision.');
   if(effect.targetUser&&effect.targetUser.adminUserId!==snapshot.target?.user.adminUserId)throw Error('Native target administrator scope changed.');
@@ -86,6 +90,8 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
   for(const audit of audits)set(state.adminAuditEvents,audit.adminAuditEventId,audit);
   for(const id of effect.roleChanges?.removeIds??[])remove(state.adminRoleAssignments,id);
   for(const role of effect.roleChanges?.assignments??[])set(state.adminRoleAssignments,role.roleAssignmentId,role);
+  for(const id of effect.rootRoleChange?.removeIds??[])remove(state.adminRoleAssignments,id);
+  if(effect.rootRoleChange?.assignment)set(state.adminRoleAssignments,effect.rootRoleChange.assignment.roleAssignmentId,effect.rootRoleChange.assignment);
   for (const row of [...effect.sessions??[],...effect.targetSessions??[]]) set(sessions, row[sessionKey], row);
   if(change){
     const w=change.workspace,t=change.tenant;
