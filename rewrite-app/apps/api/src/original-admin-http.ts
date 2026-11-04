@@ -7,7 +7,7 @@ const workspaceUsersRoute=/^\/workspace\/([^/]+)\/users$/;
 const userWorkspacesRoute=/^\/user\/([^/]+)\/workspaces$/;
 const superAdminRoute=/^\/user\/([^/]+)\/super-admin\/([^/]+)$/;
 const workspaceRoute=/^\/workspace\/([^/]+)$/;
-const methods=new Map<string,string[]>([['/users',['GET']],['/workspaces',['GET']],['/user',['PUT']],['/workspace',['PUT']]]);
+const methods=new Map<string,string[]>([['/users',['GET','DELETE']],['/workspaces',['GET']],['/user',['PUT']],['/workspace',['PUT']]]);
 const object=(value:unknown):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value));
 const escape=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]!));
 export function originalAdminRouteLabel(method:string,pathname:string):string|null {
@@ -46,6 +46,11 @@ export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pat
       if(workspaceUsers)await input.services.originalAdminPermissions.replaceWorkspaceUsers({token,reference,body});
       else await input.services.originalAdminPermissions.replaceUserWorkspaces({token,reference,body});
       input.raw(200,'',workspaceUsers?'text/plain;charset=UTF-8':'text/html; charset=UTF-8');return true;
+    }
+    if(input.pathname==='/users'&&input.request.method==='DELETE'){
+      await input.services.originalAdminSession.authorize({token,superAdmin:true});
+      let body:unknown;try{body=await input.readBody(decodeOriginalTestLogJson);}catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_json_invalid','Internal error.');throw error;}
+      await input.services.originalAdminDirectory.deleteUsers({token,body});input.raw(200,'','text/html; charset=UTF-8');return true;
     }
     if(superAdmin){
       await input.services.originalAdminSession.authorize({token,superAdmin:true});

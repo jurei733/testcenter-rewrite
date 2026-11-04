@@ -4,6 +4,7 @@ import './native-admin-directory-controls.mjs';
 import './native-admin-permissions-controls.mjs';
 import './native-workspace-directory-controls.mjs';
 import './native-admin-lifecycle-controls.mjs';
+import './native-admin-deletion-controls.mjs';
 import './native-opaque-workspace-role-controls.mjs';
 import assert from 'node:assert/strict';
 import {createHash, randomUUID} from 'node:crypto';

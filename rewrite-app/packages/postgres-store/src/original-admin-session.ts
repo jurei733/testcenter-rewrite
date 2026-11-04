@@ -1,7 +1,7 @@
 import type {Pool} from 'pg';
 import {setTimeout} from 'node:timers/promises';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
-import {validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
+import {validateOriginalAdminDeletionEffect,validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
 
 type Row = Record<string, unknown>;
 type Mappers = {user: (row: Row | undefined) => AdminUser | null; session: (row: Row | undefined) => AdminSession | null;
@@ -90,6 +90,15 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
       validateOriginalAdminRoleChanges(snapshot,effect,selector);
       validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
       validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
+      validateOriginalAdminDeletionEffect(snapshot,effect,selector);
+      for(const user of effect.deletedUsers??[]){
+        await client.query('DELETE FROM admin_role_assignments WHERE admin_user_id=$1',[user.adminUserId]);
+        await client.query('DELETE FROM admin_sessions WHERE admin_user_id=$1',[user.adminUserId]);
+        const identity=await client.query('DELETE FROM original_admin_numbers WHERE admin_user_id=$1 AND admin_number=$2',[user.adminUserId,user.adminNumber]);
+        if(identity.rowCount!==1)throw Error('Native user deletion identity changed.');
+        const deleted=await client.query('DELETE FROM admin_users WHERE admin_user_id=$1',[user.adminUserId]);
+        if(deleted.rowCount!==1)throw Error('Native user deletion target changed.');
+      }
       if(effect.rootRoleChange){
         const c=effect.rootRoleChange;
         for(const id of c.removeIds){const changed=await client.query("DELETE FROM admin_role_assignments WHERE role_assignment_id=$1 AND admin_user_id=$2 AND role='platform_admin'",[id,c.adminUserId]);if(changed.rowCount!==1)throw Error('Native Root removal identity changed.');}

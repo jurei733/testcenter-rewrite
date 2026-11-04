@@ -6,6 +6,7 @@ import {validateOriginalAdminRoleChanges} from './original-admin-permissions.js'
 import {isOriginalWorkspaceMembership} from './original-workspace-role.js';
 import {originalAdministrationWorkspaceTenantKey,validateOriginalWorkspaceDirectoryEffect} from './original-workspace-directory.js';
 import {validateOriginalAdminLifecycleEffect} from './original-admin-lifecycle.js';
+import {validateOriginalAdminDeletionEffect} from './original-admin-deletion.js';
 
 type Rows<T> = Map<string, T> | Record<string, T>;
 const values = <T>(rows: Rows<T>): T[] => rows instanceof Map ? [...rows.values()] : Object.values(rows);
@@ -13,6 +14,7 @@ const set = <T>(rows: Rows<T>, key: string, value: T) => {if (rows instanceof Ma
 const get = <T>(rows: Rows<T>, key: string):T|undefined => rows instanceof Map?rows.get(key):Object.hasOwn(rows,key)?rows[key]:undefined;
 const remove = <T>(rows: Rows<T>, key: string) => {if(rows instanceof Map)rows.delete(key);else delete rows[key];};
 export type OriginalAdminCollections = {
+  adminUsersByUsername?:Rows<AdminUser>;
   adminUsers: Rows<AdminUser>; adminLoginAttempts: Rows<AdminLoginAttempt>; adminRoleAssignments: Rows<AdminRoleAssignment>;
   adminAuditEvents: Rows<AdminAuditEvent>; tenants: Rows<Tenant>; workspacesByScope: Rows<Workspace>;
   workspacesByKey?:Rows<Workspace>;
@@ -63,6 +65,7 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
   validateOriginalAdminRoleChanges(snapshot,effect,selector);
   validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
   validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
+  validateOriginalAdminDeletionEffect(snapshot,effect,selector);
   // Validate every foreign-token collision before editing even an in-memory row.
   const audits=[...effect.audit?[effect.audit]:[],...effect.audits??[]];
   if(new Set(audits.map(a=>a.adminAuditEventId)).size!==audits.length||audits.some(a=>values(state.adminAuditEvents).some(old=>old.adminAuditEventId===a.adminAuditEventId)))throw Error('Native administrator audit identity collision.');
@@ -106,5 +109,12 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
   if (effect.counter !== undefined) state.originalAdminNumberCounter = effect.counter;
   if (effect.workspaceNumbers?.length) {state.originalWorkspaceNumbers ??= {}; for (const row of effect.workspaceNumbers) set(state.originalWorkspaceNumbers, row.workspaceId, row);}
   if (effect.workspaceCounter !== undefined) state.originalWorkspaceNumberCounter = effect.workspaceCounter;
+  for(const user of effect.deletedUsers??[]){
+    remove(state.adminUsers,user.adminUserId);
+    if(state.adminUsersByUsername&&get(state.adminUsersByUsername,user.username)?.adminUserId===user.adminUserId)remove(state.adminUsersByUsername,user.username);
+    if(state.originalAdminNumbers)remove(state.originalAdminNumbers,user.adminUserId);
+    for(const role of values(state.adminRoleAssignments))if(role.adminUserId===user.adminUserId)remove(state.adminRoleAssignments,role.roleAssignmentId);
+    for(const session of values(sessions))if(session.adminUserId===user.adminUserId)remove(sessions,session[sessionKey]);
+  }
   return effect;
 }

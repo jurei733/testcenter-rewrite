@@ -1,6 +1,6 @@
 import type {DatabaseSync} from 'node:sqlite';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
-import {validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
+import {validateOriginalAdminDeletionEffect,validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
 import {rollbackAfterFailure} from './transaction-rollback.js';
 
 type Row = Record<string, unknown>;
@@ -70,6 +70,13 @@ export function mutateOriginalAdminSession(database: DatabaseSync, map: Mappers,
     validateOriginalAdminRoleChanges(snapshot,effect,selector);
     validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
     validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
+    validateOriginalAdminDeletionEffect(snapshot,effect,selector);
+    for(const user of effect.deletedUsers??[]){
+      database.prepare('DELETE FROM admin_role_assignments WHERE admin_user_id=?').run(user.adminUserId);
+      database.prepare('DELETE FROM admin_sessions WHERE admin_user_id=?').run(user.adminUserId);
+      if(Number(database.prepare('DELETE FROM original_admin_numbers WHERE admin_user_id=? AND admin_number=?').run(user.adminUserId,user.adminNumber).changes)!==1)throw Error('Native user deletion identity changed.');
+      if(Number(database.prepare('DELETE FROM admin_users WHERE admin_user_id=?').run(user.adminUserId).changes)!==1)throw Error('Native user deletion target changed.');
+    }
     if(effect.rootRoleChange){
       const c=effect.rootRoleChange;
       for(const id of c.removeIds){const changed=database.prepare("DELETE FROM admin_role_assignments WHERE role_assignment_id=? AND admin_user_id=? AND role='platform_admin'").run(id,c.adminUserId);if(Number(changed.changes)!==1)throw Error('Native Root removal identity changed.');}
