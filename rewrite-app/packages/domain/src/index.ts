@@ -28,6 +28,8 @@ export type AdminAuditEventType =
   | "admin_role_assigned"
   | "admin_role_revoked"
   | "workspace_deleted"
+  | "workspace_created"
+  | "workspace_renamed"
   | "application_asset_uploaded"
   | "application_asset_deleted"
   | "application_settings_updated";
@@ -250,6 +252,8 @@ export const adminAuditEventTypes = [
   "admin_role_assigned",
   "admin_role_revoked",
   "workspace_deleted",
+  "workspace_created",
+  "workspace_renamed",
   "application_asset_uploaded",
   "application_asset_deleted",
   "application_settings_updated"
