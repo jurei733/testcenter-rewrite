@@ -88,15 +88,16 @@ export class OriginalWorkspaceResultsController {
  async download(type:'response'|'log'|'review',enhanced=false):Promise<{blob:Blob;current:()=>boolean}|null>{
   const o=this.owner,groups=this.selectedGroups.map(row=>row.groupName);
   if(!o||!this.owns(o)||this.busy||o.view!=='results'||!groups.length)return null;
-  this.busy=true;this.problem='';this.changed();
+  // Source clears the submitted group selection immediately. A later reply
+  // must not clear a new selection made while this CSV is downloading.
+  this.rows.forEach(row=>row.checked=false);this.selection++;this.problem='';this.changed();
   try{
    const params=new URLSearchParams({dataIds:groups.join(','),useNewVersion:String(enhanced)});
    const blob=await this.request(o,'GET','/workspace/'+this.nativeId+'/report/'+type+'?'+params,undefined,true);
    if(!(blob instanceof Blob))throw Error('Ungültige Berichtsdatei.');
-   this.rows.forEach(row=>row.checked=false);this.selection++;
    return {blob,current:()=>this.owns(o)};
   }catch(e){if(this.owns(o))this.problem=problem(e);return null;}
-  finally{if(this.owns(o)){this.busy=false;this.changed();}}
+  finally{if(this.owns(o))this.changed();}
  }
  captureDeletion():{count:number;groups:string[];current:()=>boolean;confirm:()=>Promise<boolean>}|null{
   const o=this.owner;if(!o||!this.canWrite||this.busy||!this.selectedCount)return null;

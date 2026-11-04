@@ -57,7 +57,7 @@
     </button>
   </div>
 
-  <mat-progress-bar mode="indeterminate" *ngIf="controller.busy"></mat-progress-bar>
+  <mat-progress-bar mode="indeterminate" *ngIf="!resultDataSource"></mat-progress-bar>
 
   <mat-table [dataSource]="resultDataSource" matSort>
     <ng-container matColumnDef="selectCheckbox">
@@ -111,7 +111,7 @@
       <mat-header-cell *matHeaderCellDef mat-sort-header class="table-header"
                        [style.justify-content]="'center'">Letzte Testzeit</mat-header-cell>
       <mat-cell *matCellDef="let element" [style.justify-content]="'center'">
-        <span *ngIf="element.lastChange !== 0">{{element.lastChange * 1000 | date:'dd.MM.yyyy HH:mm'}}</span>
+        <span *ngIf="$any(element.lastChange) !== '0'">{{element.lastChange * 1000 | date:'dd.MM.yyyy HH:mm'}}</span>
       </mat-cell>
     </ng-container>
 

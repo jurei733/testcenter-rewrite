@@ -94,3 +94,9 @@ test('native transport uses owned AuthToken, no-store, omitted credentials, CSV 
  assert.equal(captured.init.credentials,'omit');assert.equal(captured.init.cache,'no-store');assert.equal(captured.init.redirect,'error');
  await assert.rejects(transport('DELETE','/workspace/1/results',{},'owned',abort.signal));abort.abort();await assert.rejects(transport('GET','/workspace/1/results',undefined,'owned',abort.signal));
 });
+test('Source immediate CSV selection clearing preserves a new selection across an older reply',async()=>{
+ const gate=held(),f=fixture(call=>call.csv?gate.promise:[row(),row('B')]);await f.c.connect();f.c.check(f.c.rows[0],true);
+ const work=f.c.download('response');assert.equal(f.c.selectedCount,0);assert.equal(f.c.busy,false);
+ f.c.check(f.c.rows[1],true);assert.deepEqual(f.c.selectedGroups.map(r=>r.groupName),['B']);
+ gate.resolve(new Blob(['owned A']));assert.ok((await work).current());assert.deepEqual(f.c.selectedGroups.map(r=>r.groupName),['B']);
+});
