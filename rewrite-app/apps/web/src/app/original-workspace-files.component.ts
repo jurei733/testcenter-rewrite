@@ -6,6 +6,7 @@ import {MatToolbar} from '@angular/material/toolbar';
 import {Router,RouterLink,ActivatedRoute} from '@angular/router';
 import {MatTabNav,MatTabLink,MatTabNavPanel} from '@angular/material/tabs';
 import {OriginalSystemCheckReportsComponent} from './original-system-check-reports.component';
+import {OriginalWorkspaceResultsComponent} from './original-workspace-results.component';
 import {AppShellFacade} from './app-shell.facade';
 import {OriginalOverlayStylesComponent} from './original-overlay-styles.component';
 import {OriginalParticipantLogoutDialogComponent} from './original-participant-logout-dialog.component';
@@ -32,7 +33,7 @@ import {ApplicationSettingsService} from './application-settings.service';
 import {RewriteAppUiStateService} from './rewrite-app-ui-state.service';
 
 @Component({selector:'app-original-workspace-files',standalone:true,
- imports:[RouterLink,MatTabNav,MatTabLink,MatTabNavPanel,OriginalSystemCheckReportsComponent,MatToolbar,MatMenu,MatMenuTrigger,MatDivider,MatIconButton,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
+ imports:[RouterLink,MatTabNav,MatTabLink,MatTabNavPanel,OriginalSystemCheckReportsComponent,OriginalWorkspaceResultsComponent,MatToolbar,MatMenu,MatMenuTrigger,MatDivider,MatIconButton,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
    MatCheckbox,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatExpansionPanelDescription,
    MatProgressBar,MatProgressSpinner,MatSort,MatSortHeader,MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,MatCellDef,MatCell,
    MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow,MatTooltip,OriginalWorkspaceFileIconComponent,OriginalWorkspaceFileNoticeComponent],
@@ -51,7 +52,8 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  readonly app=inject(AppShellFacade);
  private readonly router=inject(Router);
  private readonly route=inject(ActivatedRoute);
- tab:'files'|'syscheck'='files';
+ tab:'files'|'syscheck'|'results'|'tests'='files';
+ resultsRole:''|'RO'|'RW'='';
  private logout:MatDialogRef<OriginalParticipantLogoutDialogComponent>|null=null;
  private readonly snacks=inject(MatSnackBar);
  private destroyed=false;
@@ -61,8 +63,8 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments}),
    ()=>{if(!this.destroyed)this.changed.markForCheck();});
  private readonly routeChanges=this.route.queryParamMap.subscribe(params=>{
-   const next=params.get('tab')==='syscheck'?'syscheck':'files';
-   if(this.tab!==next){this.tab=next;this.deletion?.close(false);void this.controller.connect();}
+   const value=params.get('tab'),next=value==='syscheck'||value==='results'||value==='tests'?value:'files';
+   if(this.tab!==next){this.tab=next;this.resultsRole='';this.deletion?.close(false);void this.controller.connect();}
  });
  readonly fileTypes:WorkspaceFileType[]=['Testtakers','Booklet','SysCheck','Unit','Resource','Package'];
  readonly labels:Record<WorkspaceFileType,string>={Testtakers:'Teilnehmerlisten',Booklet:'Testhefte',SysCheck:'Systemcheck-Definitionen',Unit:'Units',Resource:'Ressourcen',Package:'Pakete'};
@@ -82,7 +84,8 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  ngOnDestroy():void {this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.logout?.close(false);this.controller.destroy();}
  get title():string {
    const workspace=this.controller.overview?.workspace;
-   return workspace ? `Verwaltung "${workspace.displayName}" (${this.controller.canWrite?'RW':'RO'})` : 'Verwaltung';
+   const role=(this.tab==='results'||this.tab==='tests')&&this.resultsRole?this.resultsRole:this.controller.canWrite?'RW':'RO';
+   return workspace ? `Verwaltung "${workspace.displayName}" (${role})` : 'Verwaltung';
  }
  confirmLogout(trigger:MatMenuTrigger):void {
    if(this.destroyed || this.logout)return;const token=this.state.ops.adminSessionToken;trigger.closeMenu();

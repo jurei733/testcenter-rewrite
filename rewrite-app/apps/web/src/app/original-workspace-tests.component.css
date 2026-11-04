@@ -1,0 +1,100 @@
+.tests-view .columnhost {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: left;
+}
+
+.tests-view .testslist {
+  flex: 10 0 400px;
+  margin-top: 0.7em;
+}
+
+.tests-view mat-expansion-panel {
+  overflow: visible;
+}
+
+.tests-view mat-cell:first-of-type, .tests-view mat-header-cell:first-of-type, .tests-view mat-footer-cell:first-of-type {
+  padding-left: 0
+}
+
+.tests-view .checkboxcell {
+  overflow: visible;
+  flex: 0 0 30px;
+}
+
+.tests-view .namecell {
+  flex: 3 3 150px;
+}
+
+.tests-view .namecell.mat-mdc-header-cell {
+  padding-left: 16px;
+}
+
+.tests-view .codecell {
+  flex: 2 2 100px;
+}
+
+.tests-view .bookletcell {
+  flex: 3 3 150px;
+}
+
+.tests-view .sidebar {
+  flex: 10 0 200px;
+  padding-left: 1em;
+}
+
+.tests-view .sidebar .buttons {
+  margin-top: 0.7em;
+  margin-bottom: 0.7em;
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+}
+
+.tests-view .mat-mdc-raised-button {
+  min-width: 100px;
+  margin: 2px;
+}
+
+.tests-view .no-data-message {
+  margin-top: 2em;
+  text-align: center;
+}
+
+.tests-view .group-checkbox {
+  margin-right: 12px;
+}
+
+.tests-view .session-info .login-name {
+  font-weight: 500;
+  display: block;
+}
+
+.tests-view .session-details {
+  margin-top: 4px;
+  display: flex;
+  gap: 6px;
+}
+
+.tests-view .mode-badge, .tests-view .status-badge {
+  font-size: 0.75em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+}
+
+.tests-view .status-badge.running {
+  background-color: #e8f5e8;
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+.tests-view .status-badge.locked {
+  background-color: #fff3e0;
+  border-color: #ff9800;
+  color: #ef6c00;
+}

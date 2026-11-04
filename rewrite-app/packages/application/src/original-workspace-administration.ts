@@ -8,7 +8,7 @@ import {OriginalPhpNumber,OriginalPhpObject} from './original-test-log-json.js';
 import {originalOpaqueWorkspaceRole} from './original-workspace-role.js';
 
 export type OriginalWorkspaceAdministrationScope={tenantId:string;workspaceId:string;tenantKey:string;workspaceKey:string};
-export type OriginalWorkspaceAdministrationPort={resolve(input:{token:string;workspacePathSegment:string;write:boolean}):Promise<OriginalWorkspaceAdministrationScope>;delete(input:{token:string;workspacePathSegment:string;kind:'groups'|'tests';body:unknown}):Promise<void>};
+export type OriginalWorkspaceAdministrationPort={context(input:{token:string;tenantKey:string;workspaceKey:string}):Promise<{workspaceId:string;role:'RO'|'RW'}>;resolve(input:{token:string;workspacePathSegment:string;write:boolean}):Promise<OriginalWorkspaceAdministrationScope>;delete(input:{token:string;workspacePathSegment:string;kind:'groups'|'tests';body:unknown}):Promise<void>};
 type Collection<T>=Map<string,T>|Record<string,T>;
 const values=<T>(rows:Collection<T>):T[]=>rows instanceof Map?[...rows.values()]:Object.values(rows);
 const internal=()=>new FirstSliceError(500,'original_workspace_request_invalid','Internal error.');
@@ -33,7 +33,26 @@ export function originalExplicitWorkspaceAccess(roles:Array<Pick<AdminRoleAssign
   return selected.some(r=>r.accessMode==='read_only')?'RO':null;
 }
 export function createOriginalWorkspaceAdministrationPort(input:{repository:FirstSliceRepository;now:()=>string;admin:(token:string)=>ReturnType<AdminAuthPort['getCurrentSession']>}):OriginalWorkspaceAdministrationPort {
-  const port:OriginalWorkspaceAdministrationPort={async resolve(request){
+  const port:OriginalWorkspaceAdministrationPort={async context(request){
+    // Bridge the shell's canonical scope to its persisted native identity. Never
+    // infer this association from labels, list order, or a JavaScript Number.
+    const actor=await input.admin(request.token);
+    const tenant=await input.repository.getTenantByKey(request.tenantKey);
+    const workspace=await input.repository.getWorkspaceByScope(request.tenantKey,request.workspaceKey);
+    const scope=tenant?.status==='active'&&workspace?.status==='active'&&workspace.tenantId===tenant.tenantId
+      ?{tenantId:tenant.tenantId,workspaceId:workspace.workspaceId,tenantKey:request.tenantKey,workspaceKey:request.workspaceKey}:null;
+    const role=scope?originalExplicitWorkspaceAccess(actor.roleAssignments,actor.adminUser.adminUserId,scope):null;
+    if(!scope||!role)throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
+    const workspaceId=await input.repository.getOrCreateOriginalWorkspaceNumber(scope);
+    // Allocation may wait for a durable writer. Recheck current authority and
+    // active parents after that wait; this reply is a locator, never a grant.
+    const current=await port.resolve({token:request.token,workspacePathSegment:workspaceId,write:false});
+    if(current.tenantId!==scope.tenantId||current.workspaceId!==scope.workspaceId)throw internal();
+    const refreshed=await input.admin(request.token);
+    const currentRole=originalExplicitWorkspaceAccess(refreshed.roleAssignments,refreshed.adminUser.adminUserId,current);
+    if(!currentRole)throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
+    return {workspaceId,role:currentRole};
+  },async resolve(request){
     let actor:Awaited<ReturnType<AdminAuthPort['getCurrentSession']>>;
     try{actor=await input.admin(request.token);}catch(error){
       if(error instanceof FirstSliceError&&error.statusCode===401)throw new FirstSliceError(403,'original_admin_token_invalid','Invalid admin token.');

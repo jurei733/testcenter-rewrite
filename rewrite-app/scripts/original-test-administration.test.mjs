@@ -164,13 +164,18 @@ for(const kind of kinds)test(kind+': native Test read has a durable private cons
    for(const token of ['owned-invalid-token',person.token])await assert.rejects(resolve(token),e=>e.statusCode===403&&!e.message.includes(token));
    await assert.rejects(resolve(nativeTokens['needs-change']),e=>e.errorCode==='admin_password_change_required');
    assert.deepEqual(await resolve(nativeTokens.reader),{...scope,...ids});assert.deepEqual(await resolve(nativeTokens.writer,true),{...scope,...ids});
+   const context=token=>services.originalWorkspaceAdministration.context({...scope,token});
+   assert.deepEqual(await context(nativeTokens.reader),{workspaceId:nativeWorkspaceNumber,role:'RO'});
+   assert.deepEqual(await context(nativeTokens.writer),{workspaceId:nativeWorkspaceNumber,role:'RW'});
+   for(const name of ['root','foreign','tenant-only'])await assert.rejects(context(nativeTokens[name]),e=>e.statusCode===404);
+   await assert.rejects(context(nativeTokens['needs-change']),e=>e.errorCode==='admin_password_change_required');
    await assert.rejects(resolve(nativeTokens.reader,true),e=>e.statusCode===403&&e.errorCode==='original_workspace_read_only');
    for(const raw of [nativeWorkspaceNumber.padStart(2,'0'),' +'+nativeWorkspaceNumber,nativeWorkspaceNumber+'abc',nativeWorkspaceNumber+'.9',nativeWorkspaceNumber+'e0'])assert.deepEqual(await resolve(nativeTokens.reader,false,raw),{...scope,...ids});
    for(const raw of ['0','-1','text','2147483648','9223372036854775808'])await assert.rejects(resolve(nativeTokens.reader,false,raw),e=>e.statusCode===404,raw);
    const expired=await repository.getAdminSessionByToken(nativeTokens.expired);await repository.saveAdminSession({...expired,expiresAt:new Date(Date.now()-1000).toISOString()});
    await services.adminAuth.signOut({sessionToken:nativeTokens['signed-out']});
    const disabled=await repository.getAdminUserById(nativeRoles.disabled.adminUserId);await repository.saveAdminUser({...disabled,status:'disabled'});
-   for(const name of ['expired','signed-out','disabled'])await assert.rejects(resolve(nativeTokens[name]),e=>e.statusCode===403,name);
+   for(const name of ['expired','signed-out','disabled']){await assert.rejects(resolve(nativeTokens[name]),e=>e.statusCode===403,name);await assert.rejects(context(nativeTokens[name]),e=>e.statusCode===401||e.statusCode===403,name+' context');}
    await repository.saveTenant({...tenant,status:'suspended'});await assert.rejects(resolve(nativeTokens.reader),e=>e.statusCode===404);await repository.saveTenant(tenant);
    await repository.deleteAdminRoleAssignment(nativeRoles.revoked.roleAssignmentId);await assert.rejects(resolve(nativeTokens.revoked),e=>e.statusCode===404);
    await close();await open();assert.deepEqual(await resolve(nativeTokens.reader),{...scope,...ids});
