@@ -73,30 +73,30 @@
           @if (section === 'users') {
             <mat-table [dataSource]="users" [trackBy]="trackUser" matSort (matSortChange)="sortUsers($event)">
               <ng-container matColumnDef="name"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Name</mat-header-cell>
-                <mat-cell *matCellDef="let row">{{ row.adminUser.username }} {{ directory.isSuperadmin(row) ? '*' : '' }}</mat-cell>
+                <mat-cell *matCellDef="let row">{{ row.name }} {{ directory.isSuperadmin(row) ? '*' : '' }}</mat-cell>
               </ng-container>
               <mat-header-row *matHeaderRowDef="['name']" />
-              <mat-row *matRowDef="let row; columns:['name']" tabindex="0" [attr.data-admin-id]="row.adminUser.adminUserId"
-                (click)="directory.selectAdmin(row.adminUser.adminUserId)" (keydown.enter)="directory.selectAdmin(row.adminUser.adminUserId)"
-                [style.background]="directory.selectedAdminId === row.adminUser.adminUserId ? 'lightblue' : ''" />
+              <mat-row *matRowDef="let row; columns:['name']" tabindex="0" [attr.data-admin-id]="row.id"
+                (click)="directory.selectAdmin(row.id)" (keydown.enter)="directory.selectAdmin(row.id)"
+                [style.background]="directory.selectedAdminId === row.id ? 'lightblue' : ''" />
             </mat-table>
           } @else {
             <mat-table [dataSource]="workspaces" [trackBy]="trackWorkspace" matSort (matSortChange)="sortWorkspaces($event)">
               <ng-container matColumnDef="name"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Name</mat-header-cell>
-                <mat-cell *matCellDef="let row">{{ row.displayName }}</mat-cell></ng-container>
+                <mat-cell *matCellDef="let row">{{ row.name }}</mat-cell></ng-container>
               <ng-container matColumnDef="modification_timestamp"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Letztes Änderungsdatum</mat-header-cell>
-                <mat-cell *matCellDef="let row">{{ formatModification(row.latestFileModificationAt) }}</mat-cell></ng-container>
+                <mat-cell *matCellDef="let row">{{ formatModification(row.latest_modification_ts) }}</mat-cell></ng-container>
               <mat-header-row *matHeaderRowDef="['name','modification_timestamp']" />
-              <mat-row *matRowDef="let row; columns:['name','modification_timestamp']" tabindex="0" [attr.data-workspace-id]="row.workspaceId"
-                (click)="directory.selectWorkspace(row.workspaceId)" (keydown.enter)="directory.selectWorkspace(row.workspaceId)"
-                [style.background]="directory.selectedWorkspaceId === row.workspaceId ? 'lightblue' : ''" />
+              <mat-row *matRowDef="let row; columns:['name','modification_timestamp']" tabindex="0" [attr.data-workspace-id]="row.id"
+                (click)="directory.selectWorkspace(row.id)" (keydown.enter)="directory.selectWorkspace(row.id)"
+                [style.background]="directory.selectedWorkspaceId === row.id ? 'lightblue' : ''" />
             </mat-table>
           }
         </div>
         <div class="directory-permissions">
           @if (section === 'users' ? directory.selectedAdmin : directory.selectedWorkspace) {
             <div class="toolbar permission-heading">
-              <div>Zugriffsrechte für {{ section === 'users' ? directory.selectedAdmin?.adminUser?.username : '"' + directory.selectedWorkspace?.displayName + '"' }}:</div>
+              <div>Zugriffsrechte für {{ section === 'users' ? directory.selectedAdmin?.name : '"' + directory.selectedWorkspace?.name + '"' }}:</div>
               <button mat-fab data-cy="save" aria-label="Speichern" matTooltip="Speichern" matTooltipPosition="above"
                 [disabled]="directory.busy || !directory.changes.size" (click)="directory.savePermissions()"><mat-icon originalAdministrationIcon name="save" /></button>
             </div>

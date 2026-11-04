@@ -1,259 +1,116 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import test from "node:test";
-import ts from "typescript";
-import { productionApiRoutes, resolveRoutePath } from "@testcenter-rewrite-app/contracts";
-
-const url = new URL("../apps/web/src/app/original-administration-controller.ts",import.meta.url);
-const source = ts.createSourceFile("controller.ts",readFileSync(url,"utf8"),ts.ScriptTarget.Latest,true);
-const code = source.statements.filter(node=>!ts.isImportDeclaration(node)).map(node=>node.getText(source)).join("\n");
-const exports = {};
-new Function("exports","productionApiRoutes","resolveRoutePath","crypto",ts.transpileModule(code,{
-  compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}
-}).outputText)(exports,productionApiRoutes,resolveRoutePath,globalThis.crypto);
-const { OriginalAdministrationController: Controller, originalAdministrationTenantKey } = exports;
-const defer = () => {let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
-const admin = (id="other", assignments=[]) => ({adminUser:{adminUserId:id,username:id},roleAssignments:assignments});
-const workspace = (id="ws-a",tenant="a") => ({workspaceId:id,workspaceKey:id,tenantId:tenant,tenantKey:tenant,displayName:id,latestFileModificationAt:null});
-const role = (accessMode="read_only",id="ws-a") => ({roleAssignmentId:"role-"+id,role:"workspace_admin",workspaceId:id,accessMode});
-const fixture = handler => {
-  const session={token:"owned-token",adminUserId:"self"},calls=[],changed=[];
-  const controller=new Controller(async(method,path,body,token)=>{
-    const call={method,path,body,token};calls.push(call);return handler(call);
-  },()=>session,()=>changed.push(true),()=>"owned-workspace-key");
-  controller.token=session.token;
-  controller.admins=[admin("self"),admin()];controller.workspaces=[workspace(),workspace("ws-b","b")];
-  return {controller,session,calls,changed};
-};
-
-// CI independently verifies both captured methods against the unchanged pinned
-// Original checkout before producing its browser build. Ordinary unit jobs need
-// no unrelated checkout or network access to execute that real Source method.
-const sourceReference=JSON.parse(readFileSync(new URL("./fixtures/original-administration-permissions.json",import.meta.url),"utf8"));
-for (const owner of ['admin','workspace']) test(`selecting the same ${owner} again retains the Source permission draft without a reload`,()=>{
- const f=fixture(()=>{throw Error('Selection must not dispatch a write');});
- f.controller.admins=[admin('self'),admin('other',[role()])];
- const select=id=>owner==='admin'?f.controller.selectAdmin(id):f.controller.selectWorkspace(id);
- const id=owner==='admin'?'other':'ws-a';select(id);
- f.controller.togglePermission('other','ws-a','RW');
- const draft=[...f.controller.changes],changes=f.changed.length,epoch=f.controller.permissionViewEpoch;select(id);
- assert.deepEqual([...f.controller.changes],draft);assert.equal(f.controller.access('other','ws-a'),'RW');
- assert.equal(f.changed.length,changes);assert.deepEqual(f.calls,[]);
- assert.equal(f.controller.permissionViewEpoch,epoch,'Repeated selection keeps the existing focused row.');
- select(owner==='admin'?'self':'ws-b');assert.equal(f.controller.changes.size,0);
- assert.equal(f.controller.access('other','ws-a'),'RO');
-});
-for (const section of ['users','workspaces']) test(`${section}: cleared selection retains visual draft rows without staging or saving them`,async()=>{
- const f=fixture(()=>{throw Error('A retained visual row has no mutation owner');});
- f.controller.admins=[admin('self'),admin('other',[role()])];
- const select=()=>section==='users'?f.controller.selectAdmin('other'):f.controller.selectWorkspace('ws-a');
- select();f.controller.togglePermission('other','ws-a','RW');
- const expected=f.controller.permissionRows(section),epoch=f.controller.permissionViewEpoch;f.controller.clearSelection();
- assert.equal(f.controller.permissionViewEpoch,epoch,'Clearing selection retains the actual permission view.');
- assert.deepEqual(f.controller.permissionRows(section),expected);assert.equal(f.controller.changes.size,0);
- const row=f.controller.permissionRows(section).find(row=>row.adminUserId==='other'&&row.workspaceId==='ws-a');
- assert.equal(row.access,'RW');f.controller.togglePermissionRow(row,'RO');assert.equal(row.access,'');
- assert.equal(f.controller.changes.size,0);assert.equal(await f.controller.savePermissions(),false);assert.deepEqual(f.calls,[]);
- select();assert.equal(f.controller.permissionRows(section).find(row=>row.adminUserId==='other'&&row.workspaceId==='ws-a').access,'RO');
- assert.equal(f.controller.permissionViewEpoch,epoch+1,'Selecting the owner again creates fresh Source permission rows.');
- if(section==='users')f.controller.selectAdmin('self');else f.controller.selectWorkspace('ws-b');
- f.controller.togglePermissionRow(row,'RW');assert.equal(f.controller.changes.size,0,'An old row cannot stage rights for the newly selected owner.');
- f.controller.clearSelection(false);assert.deepEqual(f.controller.permissionRows(section),[]);
-});
-test('a replacement session and destruction clear every retained permission label and draft',async()=>{
- const f=fixture(call=>call.path===productionApiRoutes.admin.listUsers?{items:[admin('replacement')]}:
-   call.path===productionApiRoutes.platform.listTenants?{items:[]}:{items:[]});
- f.controller.selectAdmin('other');f.controller.togglePermission('other','ws-a','RW');f.controller.clearSelection();
- assert.ok(f.controller.permissionRows('users').length);f.session.token='replacement';await f.controller.connect('replacement');
- assert.deepEqual(f.controller.permissionRows('users'),[]);assert.deepEqual(f.controller.permissionRows('workspaces'),[]);
- f.controller.admins=[admin('other')];f.controller.workspaces=[workspace()];f.controller.selectAdmin('other');
- f.controller.clearSelection();assert.ok(f.controller.permissionRows('users').length);f.controller.destroy();
- assert.deepEqual(f.controller.permissionRows('users'),[]);
-});
-for (const captured of sourceReference.sources) {
- const reference={};new Function("exports",ts.transpileModule(`export class Source {${captured.handler}}`,{
-   compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}
- }).outputText)(reference);
- for (const saved of ["","RO","RW"]) for (const checkbox of ["RO","RW"]) {
-  test(`${captured.path}: permission ${saved||"none"} + ${checkbox} matches the pinned Original's actual checkbox handler`,()=>{
-    const f=fixture(()=>{}),row={role:saved},oracle=new reference.Source();
-    f.controller.admins=[admin("other",saved?[role(saved==="RO"?"read_only":"read_write")]:[])];
-    oracle.selectPermissions(row,checkbox);f.controller.togglePermission("other","ws-a",checkbox);
-    assert.equal(f.controller.access("other","ws-a"),row.role);
-    oracle.selectPermissions(row,checkbox);f.controller.togglePermission("other","ws-a",checkbox);
-    assert.equal(f.controller.access("other","ws-a"),row.role);
-    assert.equal(f.controller.changes.size,row.role===saved?0:1);
-  });
- }
+import './original-administration-wire.test.mjs';
+import './original-administration-input.test.mjs';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import {administrationModule} from './original-administration-test-loader.mjs';
+const {OriginalAdministrationController:Controller}=administrationModule('original-administration-controller');
+const defer=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
+const users=[{id:'1',name:'root',email:null,isSuperadmin:true},{id:'9007199254740993',name:'duplicate',email:null,isSuperadmin:false},{id:'3',name:'duplicate',email:null,isSuperadmin:false}];
+const workspaces=[{id:'9007199254740995',name:'same',latest_modification_ts:null},{id:'2',name:'same',latest_modification_ts:'2026-11-04 12:13:14'},{id:'4',name:'opaque',latest_modification_ts:null}];
+const permission=(id,role='',selected=!!role)=>({id,name:'same',role,selected});
+function fixture(handler=()=>{}){
+ const session={token:'owned-token'},calls=[],changed=[];let userMatrix=workspaces.map(w=>permission(w.id)),workspaceMatrix=users.map(u=>permission(u.id));
+ const c=new Controller(async(method,path,body,token,signal)=>{
+  const call={method,path,body,token,signal};calls.push(call);const result=await handler(call);
+  if(result!==undefined)return result;
+  const value=path==='/session'?{id:'1',token,claims:{superAdmin:[],workspaceAdmin:[]}}:path==='/users'?users.map(u=>({...u})):path==='/workspaces'?workspaces.map(w=>({...w})):
+   method==='GET'&&path.endsWith('/workspaces')?userMatrix.map(r=>({...r})):method==='GET'&&path.endsWith('/users')?workspaceMatrix.map(r=>({...r})):undefined;
+  return {value};
+ },()=>session,()=>changed.push(true),(previous,next)=>{if(session.token!==previous)return false;session.token=next;return true;});
+ return {c,session,calls,changed,setUserMatrix:r=>userMatrix=r,setWorkspaceMatrix:r=>workspaceMatrix=r,connect:()=>c.connect(session.token)};
 }
-
-test("loading the flat directory keeps every workspace's real tenant and ignores late retired-session reads",async()=>{
-  const first=defer();const f=fixture(call=>{
-    if(call.path===productionApiRoutes.admin.listUsers)return call.token==="owned-token"?first.promise:{items:[admin("replacement")]};
-    if(call.path===productionApiRoutes.platform.listTenants)return {items:[{tenantKey:"b",tenantId:"b"},{tenantKey:"a",tenantId:"a"}]};
-    return {items:[workspace(call.path.includes('/b/')?"b":"a")]};
-  });
-  const old=f.controller.connect("owned-token");
-  f.session.token="new-token";await f.controller.connect("new-token");
-  first.resolve({items:[admin("old-private-directory")]});assert.equal(await old,false);
-  assert.deepEqual(f.controller.admins.map(a=>a.adminUser.username),["replacement"]);
-  assert.deepEqual(f.controller.workspaces.map(w=>w.tenantKey),["a","b"]);
-  assert.equal(f.controller.busy,false);assert.equal(f.controller.problem,"");
-  assert.ok(f.calls.filter(c=>c.path.includes('/workspaces')).every(c=>c.token==="new-token"));
+test('connect uses only native numeric directories and native current self, independent of duplicate names',async()=>{
+ const f=fixture();assert.equal(await f.connect(),true);assert.equal(f.c.selfId,'1');assert.deepEqual(f.c.admins,users);assert.deepEqual(f.c.workspaces,workspaces);
+ assert.deepEqual(f.calls.map(x=>x.path),['/session','/users','/workspaces']);assert.equal(f.c.admins[1].name,f.c.admins[2].name);
 });
-
-test("a failed permission batch retains only unacknowledged rows and retries only those rows",async()=>{
-  let fail=true;const f=fixture(call=>{
-    if(call.body.workspaceKey==="ws-b"&&fail)throw {error:"owned_failure"};
-    const old=f.controller.admins.find(a=>a.adminUser.adminUserId==="other");
-    return admin("other",[...old.roleAssignments,role(call.body.accessMode,call.body.workspaceKey)]);
-  });
-  f.controller.togglePermission("other","ws-a","RO");f.controller.togglePermission("other","ws-b","RW");
-  assert.equal(await f.controller.savePermissions(),false);
-  assert.equal(f.controller.changes.size,1);assert.equal(f.controller.access("other","ws-a"),"RO");
-  assert.equal(f.controller.access("other","ws-b"),"RW");
-  fail=false;assert.equal(await f.controller.savePermissions(),true);
-  assert.deepEqual(f.calls.map(c=>[c.body.tenantKey,c.body.workspaceKey,c.body.accessMode]),
-    [["a","ws-a","read_only"],["b","ws-b","read_write"],["b","ws-b","read_write"]]);
-  assert.equal(f.controller.changes.size,0);
+for(const direction of ['users','workspaces'])test(direction+': one complete save preserves opaque/raw grants and retry is atomic',async()=>{
+ let fail=true;const f=fixture(call=>{if(call.method==='PATCH'&&fail)throw {error:'owned_write_failure'};});
+ const basis=direction==='users'?[permission(workspaces[0].id,'RO'),permission('2','OTHER'),permission('4','',true)]:[permission('1','RO'),permission(users[1].id,'OTHER'),permission('3','',true)];
+ direction==='users'?f.setUserMatrix(basis):f.setWorkspaceMatrix(basis);await f.connect();
+ const select=()=>direction==='users'?f.c.selectAdmin(users[1].id):f.c.selectWorkspace(workspaces[0].id);await select();
+ const row=f.c.permissionRows(direction)[0];f.c.togglePermissionRow(row,'RW');const before=[...f.c.changes];
+ assert.equal(await f.c.savePermissions(),false);assert.deepEqual([...f.c.changes],before);fail=false;assert.equal(await f.c.savePermissions(),true);
+ const writes=f.calls.filter(c=>c.method==='PATCH');assert.equal(writes.length,2);assert.deepEqual(writes[0].body,writes[1].body);
+ assert.deepEqual(Object.values(writes[1].body)[0],basis.map((r,i)=>({id:r.id,role:i===0?'RW':r.selected&&r.role===''?'\0':r.role})));
+ assert.equal(f.c.changes.size,0);const reads=f.calls.length;await select();assert.equal(f.calls.length,reads,'Same selection preserves current matrix/focus.');
 });
-
-test("session replacement during a permission acknowledgement prevents the next write and any stale update",async()=>{
-  const pending=defer();const f=fixture(()=>pending.promise);
-  f.controller.togglePermission("other","ws-a","RW");f.controller.togglePermission("other","ws-b","RW");
-  const save=f.controller.savePermissions();f.controller.destroy();f.session.token="replacement";
-  pending.resolve(admin("old-private-user",[role("read_write")]));assert.equal(await save,false);
-  assert.equal(f.calls.length,1);assert.deepEqual(f.controller.admins,[]);assert.deepEqual(f.controller.workspaces,[]);
-  assert.equal(f.controller.problem,"");assert.equal(f.controller.notice,"");
+test('last grant can be cleared with a nonempty complete matrix instead of invalid empty selection body',async()=>{
+ const f=fixture();f.setUserMatrix(workspaces.map((w,i)=>permission(w.id,i===0?'RO':'')));await f.connect();await f.c.selectAdmin(users[1].id);
+ f.c.togglePermissionRow(f.c.permissionRows('users')[0],'RO');assert.equal(await f.c.savePermissions(),true);
+ assert.deepEqual(f.calls.at(-1).body,{ws:workspaces.map(w=>({id:w.id,role:''}))});
 });
-
-test("permission removal deletes the exact assignment while leaving unrelated roles intact",async()=>{
-  const f=fixture(()=>admin("other",[{role:"study_monitor",roleAssignmentId:"monitor"}]));
-  f.controller.admins=[admin("other",[role(),{role:"study_monitor",roleAssignmentId:"monitor"}])];
-  f.controller.togglePermission("other","ws-a","RO");assert.equal(await f.controller.savePermissions(),true);
-  assert.equal(f.calls[0].method,"DELETE");assert.ok(f.calls[0].path.endsWith('/role-assignments/role-ws-a'));
-  assert.deepEqual(f.controller.admins[0].roleAssignments,[{role:"study_monitor",roleAssignmentId:"monitor"}]);
+for(const section of ['users','workspaces'])test(section+': selecting the same row retries a failed matrix GET',async()=>{
+ let reads=0;const path=section==='users'?'/user/'+users[1].id+'/workspaces':'/workspace/'+workspaces[0].id+'/users';
+ const f=fixture(call=>{if(call.method==='GET'&&call.path===path&&++reads===1)throw Error('Owned transient matrix failure.');});
+ await f.connect();const select=()=>section==='users'?f.c.selectAdmin(users[1].id):f.c.selectWorkspace(workspaces[0].id);
+ assert.equal(await select(),false);assert.deepEqual(f.c.permissionRows(section),[]);
+ assert.equal(await select(),true);assert.equal(reads,2);assert.ok(f.c.permissionRows(section).length>0);assert.equal(f.c.problem,'');
 });
-
-test("workspace creation uses its dedicated container, never the last selected tenant",async()=>{
-  const f=fixture(call=>call.path===productionApiRoutes.platform.createTenant
-    ?{tenant:{tenantId:"owned-original",tenantKey:originalAdministrationTenantKey,status:"active"}}
-    :{workspace:{...workspace("new","owned-original"),displayName:call.body.displayName}});
-  f.controller.tenants=[{tenantKey:"unrelated-active-study",status:"active"}];
-  assert.equal(await f.controller.createWorkspace("  Neuer Bereich  "),true);
-  assert.equal(f.calls[0].body.tenantKey,originalAdministrationTenantKey);
-  assert.equal(f.calls[1].path,`/api/v1/tenants/${originalAdministrationTenantKey}/workspaces`);
-  assert.deepEqual(f.calls[1].body,{workspaceKey:"owned-workspace-key",displayName:"Neuer Bereich"});
-  assert.equal(f.controller.workspaces.find(item=>item.workspaceId==="new").tenantKey,originalAdministrationTenantKey);
+for(const section of ['users','workspaces'])test(section+': retained visual rows cannot stage or write after clear, old row cannot edit new subject',async()=>{
+ const f=fixture();await f.connect();await(section==='users'?f.c.selectAdmin(users[1].id):f.c.selectWorkspace(workspaces[0].id));
+ const row=f.c.permissionRows(section)[1];f.c.togglePermissionRow(row,'RW');const expected=f.c.permissionRows(section),epoch=f.c.permissionViewEpoch;
+ f.c.clearSelection();assert.deepEqual(f.c.permissionRows(section),expected);assert.equal(f.c.permissionViewEpoch,epoch);
+ const retained=f.c.permissionRows(section)[1];f.c.togglePermissionRow(retained,'RO');assert.equal(retained.access,'');assert.equal(f.c.changes.size,0);assert.equal(await f.c.savePermissions(),false);
+ await(section==='users'?f.c.selectAdmin('3'):f.c.selectWorkspace('2'));f.c.togglePermissionRow(retained,'RW');assert.equal(f.c.changes.size,0);
+ f.c.clearSelection(false);assert.deepEqual(f.c.permissionRows(section),[]);
 });
-
-test("a concurrently created Original container is read back only on a genuine conflict",async()=>{
-  const f=fixture(call=>{
-    if(call.method==="POST"&&call.path===productionApiRoutes.platform.createTenant)throw {statusCode:409,error:"tenant_key_conflict"};
-    if(call.method==="GET")return {items:[{tenantKey:originalAdministrationTenantKey,status:"active"}]};
-    return {workspace:workspace("new")};
-  });
-  assert.equal(await f.controller.createWorkspace("Owned"),true);assert.equal(f.calls.length,3);
+test('retired matrix read cannot populate cleared selection or a replacement session',async()=>{
+ const d=defer();let hold=true;const f=fixture(call=>hold&&call.path.endsWith('/workspaces')&&call.path!=='/workspaces'?d.promise:undefined);await f.connect();
+ const old=f.c.selectAdmin(users[1].id);f.c.clearSelection(false);hold=false;f.session.token='replacement';await f.connect();d.resolve({value:[permission('2','RW')]});
+ assert.equal(await old,false);assert.deepEqual(f.c.permissionRows('users'),[]);assert.equal(f.c.busy,false);assert.equal(f.c.problem,'');
 });
-
-test("wrong confirmation passwords retain the directory and secrets are never stored in controller state",async()=>{
-  const f=fixture(()=>{throw {error:"admin_password_confirmation_invalid"};});
-  assert.equal(await f.controller.deleteWorkspace("ws-a","owned-secret"),false);
-  assert.equal(f.controller.workspaces.length,2);assert.equal(f.controller.problem,"Falsches Kennwort.");
-  assert.equal(JSON.stringify(f.controller).includes("owned-secret"),false);
-  assert.equal(f.calls[0].body.confirmation,"ws-a");assert.equal(f.calls[0].token,"owned-token");
+for(const retire of ['replace','destroy'])test('retired permission acknowledgement '+retire+' cannot clear/populate the current actor',async()=>{
+ const d=defer();const f=fixture(call=>call.method==='PATCH'?d.promise:undefined);await f.connect();await f.c.selectAdmin(users[1].id);f.c.togglePermissionRow(f.c.permissionRows('users')[0],'RO');
+ const saved=f.c.savePermissions();if(retire==='replace'){f.session.token='next';await f.connect();}else f.c.destroy();d.resolve({value:undefined});
+ assert.equal(await saved,false);assert.deepEqual(f.c.permissionRows('users'),[]);assert.equal(f.c.changes.size,0);assert.equal(f.c.busy,false);
 });
-
-test("existing self-management guards remain in effect and retired sessions cannot dispatch a mutation",async()=>{
-  const f=fixture(()=>{throw Error("must not dispatch");});
-  assert.equal(await f.controller.deleteUser("self","secret"),false);
-  assert.equal(await f.controller.changeSuperadmin("self","secret"),false);
-  f.session.token="replacement";assert.equal(await f.controller.createUser("new","secret"),false);
-  assert.deepEqual(f.calls,[]);
+test('all native CRUD actions use exact IDs and complete Source payloads, reload only after acknowledgement',async()=>{
+ const f=fixture();await f.connect();
+ for(const action of [()=>f.c.createUser(' raw user ','pw'),()=>f.c.createWorkspace(' raw workspace '),()=>f.c.renameWorkspace(workspaces[0].id,'new name'),()=>f.c.resetPassword(users[1].id,'new pw'),()=>f.c.changeSuperadmin(users[1].id,'root pw'),()=>f.c.deleteUser('3','root pw'),()=>f.c.deleteWorkspace('2','root pw')])assert.equal(await action(),true);
+ assert.deepEqual(f.calls.filter(c=>c.method!=='GET').map(({method,path,body})=>({method,path,body})),[
+  {method:'PUT',path:'/user',body:{n:' raw user ',p:'pw'}},{method:'PUT',path:'/workspace',body:{name:' raw workspace '}},{method:'PATCH',path:'/workspace/9007199254740995',body:{name:'new name'}},
+  {method:'PATCH',path:'/user/9007199254740993/password',body:{p:'new pw'}},{method:'PATCH',path:'/user/9007199254740993/super-admin/on',body:{p:'root pw'}},
+  {method:'DELETE',path:'/users',body:{u:['3'],p:'root pw'}},{method:'DELETE',path:'/workspaces',body:{ws:['2'],p:'root pw'}}
+ ]);
+ const n=f.calls.length;assert.equal(await f.c.deleteUser('1','pw'),false);assert.equal(await f.c.changeSuperadmin('1','pw'),false);assert.equal(await f.c.deleteWorkspace('foreign-uuid','pw'),false);assert.equal(f.calls.length,n);
 });
-test("the existing API's own-password reset remains available without persisting the new secret",async()=>{
-  const f=fixture(()=>admin("self"));
-  assert.equal(await f.controller.resetPassword("self","own-new-secret"),true);
-  assert.equal(f.calls[0].path,"/api/v1/admin/users/self/password");
-  assert.equal(f.calls[0].body.password,"own-new-secret");
-  assert.equal(JSON.stringify(f.controller).includes("own-new-secret"),false);
+test('a committed creation with failed directory reload is acknowledged and never repeated automatically',async()=>{
+ let fail=false;const f=fixture(call=>{if(fail&&call.path==='/users'&&call.method==='GET')throw Error('read failed');});await f.connect();fail=true;
+ assert.equal(await f.c.createUser('new user','pw'),true);assert.equal(f.c.problemCode,'original_directory_refresh_failed');assert.equal(f.calls.filter(c=>c.method==='PUT').length,1);
 });
-
-test("global Source name order survives cross-tenant loading, creation and rename without changing scope identity",async()=>{
- const a={...workspace("alpha-id","tenant-a"),tenantKey:"a",displayName:"alpha"};
- const b={...workspace("beta-id","tenant-b"),tenantKey:"b",displayName:"beta"};
- const z={...workspace("zeta-id","tenant-b"),tenantKey:"b",displayName:"zeta"};
- const f=fixture(call=>{
-  if(call.path===productionApiRoutes.admin.listUsers)return{items:[admin("reader",[role("read_only","alpha-id")]),admin("self")]};
-  if(call.path===productionApiRoutes.platform.listTenants)return{items:[{tenantKey:"b",status:"active"},{tenantKey:"a",status:"active"},{tenantKey:originalAdministrationTenantKey,status:"active"}]};
-  if(call.method==="GET")return{items:call.path.includes('/b/')?[b,z]:call.path.includes('/a/')?[a]:[]};
-  if(call.method==="POST"&&call.path.endsWith("/role-assignments"))return admin("reader",[role("read_write","alpha-id")]);
-  if(call.method==="POST")return{workspace:{...workspace("created-id",originalAdministrationTenantKey),displayName:call.body.displayName}};
-  if(call.method==="PATCH")return{workspace:{...z,displayName:call.body.displayName}};
- });
- await f.controller.connect("owned-token");
- assert.deepEqual(f.controller.workspaces.map(row=>row.displayName),["alpha","beta","zeta"]);
- assert.deepEqual(f.controller.workspaces.map(row=>row.tenantKey),["a","b","b"]);
- f.controller.selectAdmin("reader");f.controller.togglePermission("reader","alpha-id","RW");
- assert.equal(await f.controller.savePermissions(),true);
- const access=f.calls.find(call=>call.method==="POST"&&call.path.endsWith("/role-assignments"));
- assert.equal(access.path,"/api/v1/admin/users/reader/role-assignments");
- assert.deepEqual([access.body.tenantKey,access.body.workspaceKey],["a","alpha-id"]);
- f.controller.selectWorkspace("zeta-id");
- await f.controller.renameWorkspace("zeta-id","aardvark");
- assert.deepEqual(f.controller.workspaces.map(row=>row.displayName),["aardvark","alpha","beta"]);
- const renamed=f.calls.find(call=>call.method==="PATCH");assert.equal(renamed.path,"/api/v1/tenants/b/workspaces/zeta-id");
- assert.equal(f.controller.access("reader","alpha-id"),"RW");assert.equal(f.controller.changes.size,0);
- assert.equal(await f.controller.createWorkspace("aa-first"),true);
- assert.deepEqual(f.controller.workspaces.map(row=>row.displayName),["aa-first","aardvark","alpha","beta"]);
- assert.equal(f.controller.workspaces[0].tenantKey,originalAdministrationTenantKey);
+test('self password rotation adopts only the still-current actor, retains native identity and uses the new token next',async()=>{
+ const f=fixture(call=>call.path==='/user/1/password'?{value:undefined,authToken:'renewed'}:undefined);await f.connect();
+ assert.equal(await f.c.resetPassword('1','new pw','old pw'),true);assert.equal(f.session.token,'renewed');assert.equal(f.c.selfId,'1');assert.equal(f.c.busy,false);
+ assert.deepEqual(f.calls.at(-1).body,{p:'new pw',oldPassword:'old pw'});await f.c.selectAdmin('3');assert.equal(f.calls.at(-1).token,'renewed');
 });
-test("a newly acknowledged administrator is inserted in Source name order while role receipts keep the same owner",async()=>{
- const f=fixture(call=>call.method==="POST"&&call.path===productionApiRoutes.admin.createUser?admin(call.body.username):admin("other",[role("read_write")]));
- assert.equal(await f.controller.createUser("aardvark","Owned-password-9!"),true);
- assert.deepEqual(f.controller.admins.map(row=>row.adminUser.username),["aardvark","other","self"]);
- f.controller.selectAdmin("other");f.controller.togglePermission("other","ws-a","RW");
- assert.equal(await f.controller.savePermissions(),true);assert.equal(f.controller.selectedAdminId,"other");
- assert.equal(f.controller.access("other","ws-a"),"RW");assert.deepEqual(f.controller.admins.map(row=>row.adminUser.username),["aardvark","other","self"]);
+test('late self-password response cannot overwrite a replacement bearer',async()=>{
+ const d=defer();const f=fixture(call=>call.path==='/user/1/password'?d.promise:undefined);await f.connect();
+ const pending=f.c.resetPassword('1','new','old');f.session.token='replacement';await f.connect();d.resolve({value:undefined,authToken:'old-actor-renewed'});
+ assert.equal(await pending,false);assert.equal(f.session.token,'replacement');assert.equal(f.c.busy,false);
 });
-
-for (const mutation of ['rename-workspace','change-superadmin']) for (const outcome of ['acknowledged','rejected','retired']) {
- test(`${mutation}: Source clears selection and drafts only after its own successful acknowledgement (${outcome})`,async()=>{
-  const held=defer(),savedRoles=[role()];
-  const f=fixture(call=>{
-   if(call.method!=='GET')return held.promise;
-   if(call.path===productionApiRoutes.admin.listUsers)return {items:[admin('self'),admin('other',savedRoles)]};
-   if(call.path===productionApiRoutes.platform.listTenants)return {items:[{tenantKey:'a'},{tenantKey:'b'}]};
-   return {items:[workspace(call.path.includes('/a/')?'ws-a':'ws-b')]};
-  });
-  f.controller.admins=[admin('self'),admin('other',savedRoles)];
-  if(mutation==='rename-workspace')f.controller.selectWorkspace('ws-a');else f.controller.selectAdmin('other');
-  f.controller.togglePermission('other','ws-a','RW');
-  const selected=[f.controller.selectedAdminId,f.controller.selectedWorkspaceId];
-  const action=mutation==='rename-workspace'?f.controller.renameWorkspace('ws-a','Zeta renamed'):
-    f.controller.changeSuperadmin('other','owned-confirmation');
-  assert.deepEqual([f.controller.selectedAdminId,f.controller.selectedWorkspaceId],selected);
-  assert.equal(f.controller.changes.size,1);assert.equal(f.controller.busy,true);
-  if(outcome==='retired'){
-   f.session.token='replacement';await f.controller.connect('replacement');f.controller.selectWorkspace('ws-b');
-  }
-  if(outcome==='rejected')held.reject({error:'owned_rejected'});
-  else held.resolve(mutation==='rename-workspace'?{workspace:{...workspace(),displayName:'Zeta renamed'}}:
-    admin('other',[...savedRoles,{role:'platform_admin',roleAssignmentId:'platform'}]));
-  assert.equal(await action,outcome==='acknowledged');
-  assert.equal(f.calls.filter(call=>call.method!=='GET').length,1,'Discarding a draft must never submit it');
-  if(outcome==='acknowledged'){
-   assert.equal(f.controller.selectedAdminId,'');assert.equal(f.controller.selectedWorkspaceId,'');
-   assert.equal(f.controller.changes.size,0);assert.equal(f.controller.access('other','ws-a'),'RO');
-   if(mutation==='rename-workspace')assert.equal(f.controller.workspaces.find(row=>row.workspaceId==='ws-a').displayName,'Zeta renamed');
-   else assert.equal(f.controller.isSuperadmin(f.controller.admins.find(row=>row.adminUser.adminUserId==='other')),true);
-  }else if(outcome==='rejected'){
-   assert.deepEqual([f.controller.selectedAdminId,f.controller.selectedWorkspaceId],selected);
-   assert.equal(f.controller.changes.size,1);assert.equal(f.controller.access('other','ws-a'),'RW');
-  }else{
-   assert.equal(f.controller.selectedWorkspaceId,'ws-b');assert.equal(f.controller.selectedAdminId,'');
-   assert.equal(f.controller.workspaces.find(row=>row.workspaceId==='ws-a').displayName,'ws-a');
-   assert.equal(f.controller.isSuperadmin(f.controller.admins.find(row=>row.adminUser.adminUserId==='other')),false);
-  }
+const reference=JSON.parse(readFileSync(new URL('./fixtures/original-administration-permissions.json',import.meta.url),'utf8'));
+test('a queued event from an old matrix cannot edit a reselected identical native owner',async()=>{
+ const f=fixture();await f.connect();await f.c.selectAdmin(users[1].id);const row=f.c.permissionRows('users')[0];
+ f.c.clearSelection();await f.c.selectAdmin(users[1].id);f.c.togglePermissionRow(row,'RW');assert.equal(f.c.changes.size,0);
+});
+for(const mutation of ['rename-workspace','change-superadmin'])for(const outcome of ['acknowledged','rejected','retired'])test(mutation+' '+outcome+' preserves Source visual rows and exact ownership',async()=>{
+ const d=defer();const f=fixture(call=>call.method==='PATCH'?d.promise:undefined);await f.connect();await f.c.selectAdmin(users[1].id);
+ f.c.togglePermissionRow(f.c.permissionRows('users')[0],'RW');const before=f.c.permissionRows('users');
+ const action=mutation==='rename-workspace'?f.c.renameWorkspace(workspaces[0].id,'new label'):f.c.changeSuperadmin(users[1].id,'owned confirmation');
+ if(outcome==='retired'){f.session.token='next';await f.connect();}
+ if(outcome==='rejected')d.reject({error:'admin_password_confirmation_invalid'});else d.resolve({value:undefined});
+ assert.equal(await action,outcome==='acknowledged');
+ if(outcome==='acknowledged'){assert.equal(f.c.selectedAdminId,'');assert.deepEqual(f.c.permissionRows('users'),before);assert.equal(f.c.changes.size,0);}
+ else if(outcome==='rejected'){assert.equal(f.c.selectedAdminId,users[1].id);assert.deepEqual(f.c.permissionRows('users'),before);assert.equal(f.c.changes.size,1);assert.equal(f.c.problem,'Falsches Kennwort.');}
+ else {assert.deepEqual(f.c.permissionRows('users'),[]);assert.equal(f.c.changes.size,0);}
+ assert.ok(!JSON.stringify(f.c).includes('owned confirmation'));
+});
+for(const captured of reference.sources){
+ const exports={};new Function('exports',ts.transpileModule('export class Source {'+captured.handler+'}',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(exports);
+ for(const saved of ['','RO','RW','OTHER'])for(const control of ['RO','RW'])test(captured.path+': native checkbox '+saved+' '+control+' uses actual Source handler',async()=>{
+  const f=fixture(),row={role:saved},oracle=new exports.Source();f.setUserMatrix(workspaces.map(w=>permission(w.id,saved)));await f.connect();await f.c.selectAdmin(users[1].id);
+  oracle.selectPermissions(row,control);f.c.togglePermission(users[1].id,workspaces[0].id,control);assert.equal(f.c.access(users[1].id,workspaces[0].id),row.role);
  });
 }

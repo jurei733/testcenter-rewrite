@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {writeFile} from 'node:fs/promises';
 import {repaintNativeViewport} from './native-viewport-repaint.mjs';
+import {waitForFiniteDocumentAnimations} from './finite-animation-ready.mjs';
 
 /** Fresh native paint for every steady frame; no expected image is available here. */
 export async function captureStableViewport(page,measure,path){
@@ -26,6 +27,10 @@ export async function sampleStableViewport(page, measure, path, expectedGeometry
     await prepareFrame?.(attempt);
     assert.deepEqual(await measure(),geometry,'Preparing each frame must preserve the actual viewport and navigation layout.');
     await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+    // Restoring root visibility can start a fresh Material elevation effect.
+    // Wait after the repaint frames, without pausing or canceling the effect.
+    // The scene's earlier animation barrier cannot observe this new effect.
+    await waitForFiniteDocumentAnimations(page);
     const bytes = await page.screenshot({fullPage: false});
     sampledFrames.push(bytes);
     first ??= bytes;

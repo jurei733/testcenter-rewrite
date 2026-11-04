@@ -1,0 +1,309 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceReadOnly": true,
+  "actualHttpExchanges": 24,
+  "ownedUsers": [
+    "57",
+    "58"
+  ],
+  "ownedWorkspaces": [
+    "68",
+    "69"
+  ],
+  "baselineUsersWorkspacesAndGrantsRestored": true,
+  "rows": [
+    {
+      "label": "root-login",
+      "method": "PUT",
+      "path": "/session/admin",
+      "body": {
+        "name": "super",
+        "password": "[owned-secret]"
+      },
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "{\"token\":\"[owned-secret]\",\"displayName\":\"super\",\"loginName\":\"super\",\"groupLabel\":null,\"id\":1,\"pwSetByAdmin\":false,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[],\"superAdmin\":[]}}"
+    },
+    {
+      "label": "users-before",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]"
+    },
+    {
+      "label": "workspaces-before",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"latest_modification_ts\":null},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"latest_modification_ts\":null}]"
+    },
+    {
+      "label": "baseline-grants-1",
+      "method": "GET",
+      "path": "/workspace/1/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":2,\"name\":\"Owned permissions A\",\"selected\":true,\"role\":\"RO\"},{\"id\":3,\"name\":\"Owned permissions B\",\"selected\":true,\"role\":\"RW\"},{\"id\":1,\"name\":\"super\",\"selected\":false,\"role\":\"\"}]"
+    },
+    {
+      "label": "baseline-grants-2",
+      "method": "GET",
+      "path": "/workspace/2/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":2,\"name\":\"Owned permissions A\",\"selected\":true,\"role\":\"RW\"},{\"id\":3,\"name\":\"Owned permissions B\",\"selected\":false,\"role\":\"\"},{\"id\":1,\"name\":\"super\",\"selected\":false,\"role\":\"\"}]"
+    },
+    {
+      "label": "create-user-A",
+      "method": "PUT",
+      "path": "/user",
+      "body": {
+        "n": "Owned R71 mw26tjan A",
+        "p": "[owned-password]"
+      },
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": "57"
+    },
+    {
+      "label": "create-user-B",
+      "method": "PUT",
+      "path": "/user",
+      "body": {
+        "n": "Owned R71 mw26tjan B",
+        "p": "[owned-password]"
+      },
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": "58"
+    },
+    {
+      "label": "create-workspace-A",
+      "method": "PUT",
+      "path": "/workspace",
+      "body": {
+        "name": "Owned R71 mw26tjan A"
+      },
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": "68"
+    },
+    {
+      "label": "create-workspace-B",
+      "method": "PUT",
+      "path": "/workspace",
+      "body": {
+        "name": "Owned R71 mw26tjan B"
+      },
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": "69"
+    },
+    {
+      "label": "workspace-empty-selected-seed",
+      "method": "PATCH",
+      "path": "/workspace/68/users",
+      "body": {
+        "u": [
+          {
+            "id": "57",
+            "role": "\u0000"
+          },
+          {
+            "id": "58",
+            "role": "RO"
+          }
+        ]
+      },
+      "status": 200,
+      "contentType": "text/plain;charset=UTF-8",
+      "rawText": ""
+    },
+    {
+      "label": "workspace-matrix-seeded",
+      "method": "GET",
+      "path": "/workspace/68/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":2,\"name\":\"Owned permissions A\",\"selected\":false,\"role\":\"\"},{\"id\":3,\"name\":\"Owned permissions B\",\"selected\":false,\"role\":\"\"},{\"id\":57,\"name\":\"Owned R71 mw26tjan A\",\"selected\":true,\"role\":\"\"},{\"id\":58,\"name\":\"Owned R71 mw26tjan B\",\"selected\":true,\"role\":\"RO\"},{\"id\":1,\"name\":\"super\",\"selected\":false,\"role\":\"\"}]"
+    },
+    {
+      "label": "workspace-opaque-roundtrip",
+      "method": "PATCH",
+      "path": "/workspace/68/users",
+      "body": {
+        "u": [
+          {
+            "id": "2",
+            "role": ""
+          },
+          {
+            "id": "3",
+            "role": ""
+          },
+          {
+            "id": "57",
+            "role": "\u0000"
+          },
+          {
+            "id": "58",
+            "role": "RW"
+          },
+          {
+            "id": "1",
+            "role": ""
+          }
+        ]
+      },
+      "status": 200,
+      "contentType": "text/plain;charset=UTF-8",
+      "rawText": ""
+    },
+    {
+      "label": "workspace-matrix-after",
+      "method": "GET",
+      "path": "/workspace/68/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":2,\"name\":\"Owned permissions A\",\"selected\":false,\"role\":\"\"},{\"id\":3,\"name\":\"Owned permissions B\",\"selected\":false,\"role\":\"\"},{\"id\":57,\"name\":\"Owned R71 mw26tjan A\",\"selected\":true,\"role\":\"\"},{\"id\":58,\"name\":\"Owned R71 mw26tjan B\",\"selected\":true,\"role\":\"RW\"},{\"id\":1,\"name\":\"super\",\"selected\":false,\"role\":\"\"}]"
+    },
+    {
+      "label": "user-empty-selected-seed",
+      "method": "PATCH",
+      "path": "/user/57/workspaces",
+      "body": {
+        "ws": [
+          {
+            "id": "68",
+            "role": "\u0000"
+          },
+          {
+            "id": "69",
+            "role": "RO"
+          }
+        ]
+      },
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": ""
+    },
+    {
+      "label": "user-matrix-seeded",
+      "method": "GET",
+      "path": "/user/57/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"selected\":false,\"role\":\"\"},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"selected\":false,\"role\":\"\"},{\"id\":68,\"name\":\"Owned R71 mw26tjan A\",\"selected\":true,\"role\":\"\"},{\"id\":69,\"name\":\"Owned R71 mw26tjan B\",\"selected\":true,\"role\":\"RO\"}]"
+    },
+    {
+      "label": "user-opaque-roundtrip",
+      "method": "PATCH",
+      "path": "/user/57/workspaces",
+      "body": {
+        "ws": [
+          {
+            "id": "1",
+            "role": ""
+          },
+          {
+            "id": "2",
+            "role": ""
+          },
+          {
+            "id": "68",
+            "role": "\u0000"
+          },
+          {
+            "id": "69",
+            "role": "RW"
+          }
+        ]
+      },
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": ""
+    },
+    {
+      "label": "user-matrix-after",
+      "method": "GET",
+      "path": "/user/57/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"selected\":false,\"role\":\"\"},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"selected\":false,\"role\":\"\"},{\"id\":68,\"name\":\"Owned R71 mw26tjan A\",\"selected\":true,\"role\":\"\"},{\"id\":69,\"name\":\"Owned R71 mw26tjan B\",\"selected\":true,\"role\":\"RW\"}]"
+    },
+    {
+      "label": "cleanup-owned-users",
+      "method": "DELETE",
+      "path": "/users",
+      "body": {
+        "u": [
+          "57",
+          "58"
+        ],
+        "p": "[owned-secret]"
+      },
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": ""
+    },
+    {
+      "label": "cleanup-owned-workspaces",
+      "method": "DELETE",
+      "path": "/workspaces",
+      "body": {
+        "ws": [
+          "68",
+          "69"
+        ],
+        "p": "[owned-secret]"
+      },
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": ""
+    },
+    {
+      "label": "users-after",
+      "method": "GET",
+      "path": "/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"name\":\"Owned permissions A\",\"id\":2,\"email\":null,\"isSuperadmin\":false},{\"name\":\"Owned permissions B\",\"id\":3,\"email\":null,\"isSuperadmin\":false},{\"name\":\"super\",\"id\":1,\"email\":null,\"isSuperadmin\":true}]"
+    },
+    {
+      "label": "workspaces-after",
+      "method": "GET",
+      "path": "/workspaces",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":1,\"name\":\"Owned permissions One \\u03a9\",\"latest_modification_ts\":null},{\"id\":2,\"name\":\"Owned permissions Two \\u03b2\",\"latest_modification_ts\":null}]"
+    },
+    {
+      "label": "baseline-grants-after-1",
+      "method": "GET",
+      "path": "/workspace/1/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":2,\"name\":\"Owned permissions A\",\"selected\":true,\"role\":\"RO\"},{\"id\":3,\"name\":\"Owned permissions B\",\"selected\":true,\"role\":\"RW\"},{\"id\":1,\"name\":\"super\",\"selected\":false,\"role\":\"\"}]"
+    },
+    {
+      "label": "baseline-grants-after-2",
+      "method": "GET",
+      "path": "/workspace/2/users",
+      "status": 200,
+      "contentType": "application/json",
+      "rawText": "[{\"id\":2,\"name\":\"Owned permissions A\",\"selected\":true,\"role\":\"RW\"},{\"id\":3,\"name\":\"Owned permissions B\",\"selected\":false,\"role\":\"\"},{\"id\":1,\"name\":\"super\",\"selected\":false,\"role\":\"\"}]"
+    },
+    {
+      "label": "root-logout",
+      "method": "DELETE",
+      "path": "/session",
+      "status": 205,
+      "contentType": "text/html; charset=UTF-8",
+      "rawText": ""
+    }
+  ]
+}

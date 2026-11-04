@@ -1,0 +1,9 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "files": {
+    "capture.mjs": "0b52f08e79b56e2fca90436e51342e7abaf94398925c8cb5afb7e515d94eb9c2",
+    "observations.json": "cc185919cccf97413f33e0f83f8fd2a01a5492f11b882d1122f65ad84441d886",
+    "runtime-verification.json": "3129e572215b0fc741ce79851960bdc5a654a81a3d6abc0cf1453ed4becd2e5c",
+    "verify.mjs": "946f37c03ac86236413e5bdcd4acf58767d0dccb50ea29fb7216db471e54015a"
+  }
+}

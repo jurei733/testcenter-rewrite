@@ -6,7 +6,8 @@ import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {chromium} from 'playwright';
 import {createHash} from 'node:crypto';
-import {captureStableViewport} from './stable-viewport-capture.mjs';
+import {captureStableViewport,sampleStableViewport} from './stable-viewport-capture.mjs';
+import {sampleStableViewport as legacySampleBeforeFiniteEffects} from './fixtures/stable-viewport-before-finite-effects.mjs';
 import {repaintNativeViewport as legacyRepaintNativeViewport} from './fixtures/native-viewport-repaint-before-scrollbar-witness.mjs';
 import {compareScreenshots} from './exact-rgba-comparison.mjs';
 import {captureViewportRepaintDiagnostic,captureSurfaceBackgroundDiagnostic} from './viewport-repaint-diagnostic.mjs';
@@ -49,6 +50,7 @@ const paint = (page, color) => page.evaluate(color => {
 const observe = (page, afterImage) => ({
   evaluate: (...args) => page.evaluate(...args),
   evaluateHandle: (...args) => page.evaluateHandle(...args),
+  waitForFunction: (...args) => page.waitForFunction(...args),
   screenshot: async options => {
     const visible=await page.evaluate(()=>getComputedStyle(document.documentElement).opacity!=="0");
     const bytes = await page.screenshot(options);
@@ -171,7 +173,7 @@ test('failed diagnostic captures restore the original surface attribute before p
    window.ownedBlurCount=0;input.addEventListener('blur',()=>window.ownedBlurCount++);
   });
   const before=await page.content();
-  const failing={evaluate:(...args)=>page.evaluate(...args),evaluateHandle:(...args)=>page.evaluateHandle(...args),screenshot:async()=>{throw Error('Owned diagnostic capture failure');}};
+  const failing={evaluate:(...args)=>page.evaluate(...args),evaluateHandle:(...args)=>page.evaluateHandle(...args),waitForFunction:(...args)=>page.waitForFunction(...args),screenshot:async()=>{throw Error('Owned diagnostic capture failure');}};
   await assert.rejects(captureSurfaceBackgroundDiagnostic(failing,measure,'body','transparent',join(artifacts,'failed-background')),/Owned diagnostic capture failure/);
   assert.equal(await page.content(),before);
   await assert.rejects(captureViewportRepaintDiagnostic(failing,measure,join(artifacts,'failed-repaint')),/Owned diagnostic capture failure/);
@@ -188,7 +190,7 @@ test('a layout change during the cleared frame cannot become the restored baseli
  await withViewport(async(page,measure)=>{
   const style=await page.evaluate(()=>document.documentElement.getAttribute('style'));
   let changed=false;
-  const changing={evaluate:(...args)=>page.evaluate(...args),evaluateHandle:(...args)=>page.evaluateHandle(...args),screenshot:async options=>{
+  const changing={evaluate:(...args)=>page.evaluate(...args),evaluateHandle:(...args)=>page.evaluateHandle(...args),waitForFunction:(...args)=>page.waitForFunction(...args),screenshot:async options=>{
     const bytes=await page.screenshot(options);
     if(!changed&&await page.evaluate(()=>getComputedStyle(document.documentElement).opacity==='0')){
       changed=true;await page.evaluate(()=>document.querySelector('canvas').style.width='90px');
@@ -221,3 +223,58 @@ test('native Linux root scrollbars are cleared without hiding or resizing the re
     assert.equal(await page.evaluate(()=>document.documentElement.getAttribute('style')),'--owned-root-sentinel:1');
   });
  });
+
+test('equal native pixels cannot acknowledge an unfinished finite effect',async()=>{
+ await withViewport(async(page,measure)=>{
+  await page.evaluate(()=>{
+   window.ownedFinite=document.querySelector('canvas').animate([{opacity:1},{opacity:1}],{duration:60000,fill:'forwards'});
+   window.ownedFinite.pause();
+  });
+  const previous=await legacySampleBeforeFiniteEffects(page,measure,join(artifacts,'legacy-paused-finite.png'));
+  assert.equal(new Set(previous.paintDiagnostics.pngFrameSha256).size,1);
+  assert.equal(await page.evaluate(()=>window.ownedFinite.playState),'paused','The previous sampler accepted identical pixels while a finite effect was unfinished.');
+  let completed=false;
+  const pending=sampleStableViewport(page,measure,join(artifacts,'current-paused-finite.png')).then(value=>{completed=true;return value;});
+  await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+  assert.equal(completed,false);
+  await page.evaluate(()=>window.ownedFinite.finish());
+  const current=await pending;assert.equal(new Set(current.paintDiagnostics.pngFrameSha256.slice(-3)).size,1);
+  assert.equal(await page.evaluate(()=>window.ownedFinite.playState),'finished');
+ });
+});
+
+test('actual root restoration starts a finite effect that must finish before the first accepted visible frame',async()=>{
+ await withViewport(async(page,measure)=>{
+  await page.evaluate(()=>{
+   window.ownedWasHidden=false;
+   window.ownedObserver=new MutationObserver(()=>{
+    const hidden=getComputedStyle(document.documentElement).opacity==='0';
+    if(hidden)window.ownedWasHidden=true;
+    else if(window.ownedWasHidden&&!window.ownedFinite){
+     window.ownedFinite=document.querySelector('canvas').animate([{opacity:1},{opacity:1}],{duration:60000,fill:'forwards'});
+    }
+   });
+   window.ownedObserver.observe(document.documentElement,{attributes:true,attributeFilter:['style']});
+  });
+  const html=await page.content();let completed=false;
+  const pending=captureStableViewport(page,measure,join(artifacts,'after-restoration-finite.png')).then(value=>{completed=true;return value;});
+  await page.waitForFunction(()=>window.ownedFinite?.playState==='running');
+  await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+  assert.equal(completed,false,'The pre-scene barrier ran before this actual restoration effect existed.');
+  assert.equal(await page.evaluate(()=>document.documentElement.getAttribute('style')),null);
+  await page.evaluate(()=>window.ownedFinite.finish());
+  const capture=await pending;
+  assert.equal(new Set(capture.paintDiagnostics.pngFrameSha256.slice(-3)).size,1);
+  assert.ok(capture.paintDiagnostics.nativeRepaints.every(frame=>frame.hiddenFrame.nonWhitePixels===0));
+  assert.equal(await page.content(),html);await page.evaluate(()=>window.ownedObserver.disconnect());
+ });
+});
+
+test('animation inspection failure after native restoration remains fatal and cannot publish a baseline',async()=>{
+ await withViewport(async(page,measure)=>{
+  const html=await page.content(),path=join(artifacts,'animation-inspection-failed.png');
+  await page.evaluate(()=>{document.getAnimations=()=>{throw Error('Owned post-repaint animation failure');};});
+  await assert.rejects(captureStableViewport(page,measure,path),/Owned post-repaint animation failure/);
+  assert.equal(await page.content(),html);await assert.rejects(readFile(path),{code:'ENOENT'});
+ });
+});

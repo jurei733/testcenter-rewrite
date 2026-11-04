@@ -18,13 +18,16 @@ import { ApplicationSettingsService } from "./application-settings.service";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
-import { OpsViewFacade } from "./ops-view.facade";
+import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
+import {createOriginalAdministrationTransport,OriginalAdministrationHttpError} from "./original-administration-http";
+import {productionApiRoutes} from "@testcenter-rewrite-app/contracts";
 import { OriginalApplicationSettingsComponent } from "./original-application-settings.component";
 import type { AdministrationSection } from "./administration-nav.component";
 import { OriginalOverlayStylesComponent } from "./original-overlay-styles.component";
 import { OriginalAdministrationIconComponent } from "./original-administration-icon.component";
 import { OriginalAdministrationController } from "./original-administration-controller";
-import type { AdminUserDirectoryItem } from "@testcenter-rewrite-app/contracts";
+import {originalAdministrationModificationDate} from "./original-administration-input";
+import type {OriginalAdmin} from "./original-administration-controller";
 import type { OriginalWorkspace } from "./original-administration-controller";
 import { OriginalAdministrationSurfaceStylesComponent } from "./original-administration-surface-styles.component";
 import { OriginalAdministrationEditorComponent, type OriginalAdministrationEditorData } from "./original-administration-editor.component";
@@ -34,7 +37,7 @@ import { OriginalToastContainerComponent } from "./original-toast-container.comp
 import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers";
 
 // IQB Testcenter 19 Superadmin tables and header (MIT), using the Rewrite's
-// existing authorization, role-assignment and workspace aggregate APIs.
+// native authorization, directories, complete matrices and aggregate APIs.
 @Component({
   selector:"app-original-system-administration",standalone:true,
   imports:[OriginalApplicationSettingsComponent,RouterLink,RouterLinkActive,MatButton,MatFabButton,MatIconButton,MatCheckbox,MatDivider,
@@ -50,7 +53,8 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
   @Output() sectionSelected = new EventEmitter<AdministrationSection>();
   readonly app = inject(AppShellFacade);
   readonly settings = inject(ApplicationSettingsService);
-  private readonly view = inject(OpsViewFacade);
+  private readonly persistence = inject(RewriteAppShellPersistenceService);
+  private readonly nativeRequest=createOriginalAdministrationTransport();
   private readonly request = inject(RewriteAppShellRequestService);
   private readonly state = inject(RewriteAppUiStateService);
   private readonly changed = inject(ChangeDetectorRef);
@@ -71,8 +75,7 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
     day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"
   });
   formatModification(value: string | null): string {
-    if(!value)return "";
-    const date=new Date(value);if(!Number.isFinite(date.getTime()))return "";
+    const date=originalAdministrationModificationDate(value);if(!date)return "";
     const parts=Object.fromEntries(this.modificationDate.formatToParts(date).map(part=>[part.type,part.value]));
     return `${parts["day"]}.${parts["month"]}.${parts["year"]} ${parts["hour"]}:${parts["minute"]}`;
   }
@@ -80,9 +83,26 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
     {id:"users",label:"Admins"},{id:"workspaces",label:"Arbeitsbereiche"},{id:"settings",label:"Einstellungen"}
   ];
   readonly directory = new OriginalAdministrationController(
-    (method,path,body,token)=>this.request.request("Systemverwaltung",method,path,body,{quiet:true,headers:{authorization:`Bearer ${token}`}}),
-    ()=>({token:this.state.ops.adminSessionToken.trim(),adminUserId:this.view.currentAdminUserId}),
-    ()=>{if(!this.destroyed){this.showNotice();this.changed.markForCheck();}}
+    async(method,path,body,token,signal)=>{
+      try{return await this.nativeRequest(method,path,body,token,signal);}
+      catch(error){
+        if(!this.destroyed&&this.state.ops.adminSessionToken.trim()===token&&error instanceof OriginalAdministrationHttpError&&error.error==="original_admin_session_invalid"){
+          this.state.setAdminSessionToken("");this.state.ops.adminSessionView="";
+          try{this.persistence.persistShellState();}catch{/* A storage failure cannot retain an active revoked capability. */}
+          this.changed.markForCheck();
+        }
+        throw error;
+      }
+    },
+    ()=>({token:this.state.ops.adminSessionToken.trim()}),
+    ()=>{if(!this.destroyed){this.showNotice();this.changed.markForCheck();}},
+    (previous,next)=>{
+      if(this.destroyed||this.connectedToken!==previous||this.sessionToken.trim()!==previous||this.state.ops.adminSessionToken.trim()!==previous)return false;
+      this.state.setAdminSessionToken(next);this.connectedToken=next;this.sessionToken=next;
+      try{this.persistence.persistShellState();}catch{/* The renewed in-memory session remains valid. */}
+      void this.refreshSessionMetadata(next);
+      return true;
+    }
   );
   private showNotice(): void {
     const notice=this.directory.notice;
@@ -108,7 +128,13 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
     }
   }
   private connectedToken = "";
-  get selfId(): string { return this.view.currentAdminUserId; }
+  get selfId(): string { return this.directory.selfId; }
+  private async refreshSessionMetadata(token:string):Promise<void>{
+    try{
+      const payload=await this.request.requestJson("Aktuelle Anmeldung",productionApiRoutes.admin.currentSession,true,{authorization:`Bearer ${token}`});
+      if(!this.destroyed&&this.state.ops.adminSessionToken.trim()===token){this.state.ops.adminSessionView=JSON.stringify(payload,null,2);try{this.persistence.persistShellState();}catch{}this.changed.markForCheck();}
+    }catch{/* The request service retires an actually invalid current canonical session. */}
+  }
   get version(): string {
     const commit=readStringValue(parseJsonDocument(this.app.ops.runtimeHealthView),["manifest","build","commitSha"]);
     return commit?`Rewrite (${commit.slice(0,12)})`:"Rewrite";
@@ -121,19 +147,19 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
   }
   get users() {
     const values=[...this.directory.admins];
-    if(this.userSort.direction)values.sort((a,b)=>this.direction(this.userSort)*a.adminUser.username.localeCompare(b.adminUser.username));
+    if(this.userSort.direction)values.sort((a,b)=>this.direction(this.userSort)*a.name.localeCompare(b.name));
     return values;
   }
   get workspaces() {
     const values=[...this.directory.workspaces];
     if(this.workspaceSort.direction)values.sort((a,b)=>this.direction(this.workspaceSort)*(this.workspaceSort.active==="modification_timestamp"
-      ?(a.latestFileModificationAt??"").localeCompare(b.latestFileModificationAt??"")
-      :a.displayName.localeCompare(b.displayName)));
+      ?(a.latest_modification_ts??"").localeCompare(b.latest_modification_ts??"")
+      :a.name.localeCompare(b.name)));
     return values;
   }
   private direction(sort: Sort): number { return sort.direction==="desc"?-1:1; }
-  readonly trackUser = (_index:number,row:AdminUserDirectoryItem): string => row.adminUser.adminUserId;
-  readonly trackWorkspace = (_index:number,row:OriginalWorkspace): string => row.workspaceId;
+  readonly trackUser = (_index:number,row:OriginalAdmin): string => row.id;
+  readonly trackWorkspace = (_index:number,row:OriginalWorkspace): string => row.id;
   // Source recreates permission rows on owner selection, while checkbox edits
   // keep the same row. Reusing a previously clicked overflow cell on re-selection
   // also reuses its internal scroll position on narrow screens.
@@ -158,12 +184,12 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
     const token=this.connectedToken;
     this.editor=this.dialogs.open(OriginalAdministrationEditorComponent,{
       width:"600px",panelClass:"original-administration-editor-dialog",
-      data:{kind,name,submit:async value=>{
+      data:{kind,name,isSelfService:kind==="reset-password"&&userId===this.directory.selfId,submit:async value=>{
         if(this.destroyed || this.connectedToken!==token || this.sessionToken.trim()!==token)return "Die Anmeldung hat sich geändert. Bitte schließen Sie den Dialog.";
         const result=kind==="create-user"?await this.directory.createUser(value.name,value.password)
           :kind==="create-workspace"?await this.directory.createWorkspace(value.name)
           :kind==="rename-workspace"?await this.directory.renameWorkspace(workspaceId,value.name)
-          :await this.directory.resetPassword(userId,value.password);
+          :await this.directory.resetPassword(userId,value.password,userId===this.directory.selfId?value.oldPassword:undefined);
         return result?null:this.consumeDialogProblem();
       }} satisfies OriginalAdministrationEditorData
     });
@@ -171,8 +197,8 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
   }
   addUser(): void { this.openEditor("create-user"); }
   addWorkspace(): void { this.openEditor("create-workspace"); }
-  renameWorkspace(): void { if(this.directory.selectedWorkspace)this.openEditor("rename-workspace",this.directory.selectedWorkspace.displayName); }
-  resetPassword(): void { if(this.directory.selectedAdmin)this.openEditor("reset-password",this.directory.selectedAdmin.adminUser.username); }
+  renameWorkspace(): void { if(this.directory.selectedWorkspace)this.openEditor("rename-workspace",this.directory.selectedWorkspace.name); }
+  resetPassword(): void { if(this.directory.selectedAdmin)this.openEditor("reset-password",this.directory.selectedAdmin.name); }
 
   async confirmAction(kind:"delete-user"|"delete-workspace"|"superadmin"): Promise<void> {
     const user=this.directory.selectedAdmin,workspace=this.directory.selectedWorkspace,token=this.connectedToken;
@@ -180,16 +206,16 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
     const title=kind==="delete-workspace"?"Löschen von Arbeitsbereichen"
       :kind==="delete-user"?"Löschen von Administrator:innen":"Superadmin-Status ändern";
     const confirmLabel=kind==="delete-workspace"?"Arbeitsbereich(e) löschen":kind==="delete-user"?"Administrator:in löschen":"Bestätigen";
-    const message=kind==="delete-workspace"?`Arbeitsbereich "${workspace!.displayName}" löschen?`
-      :kind==="delete-user"?`Soll Administrator:in "${user!.adminUser.username}" gelöscht werden?`
-      :`Soll der Superadmin-Status von "${user!.adminUser.username}" geändert werden?`;
+    const message=kind==="delete-workspace"?`Arbeitsbereich "${workspace!.name}" löschen?`
+      :kind==="delete-user"?`Soll Administrator:in "${user!.name}" gelöscht werden?`
+      :`Soll der Superadmin-Status von "${user!.name}" geändert werden?`;
     const pending=this.confirmation.confirm({title,message,confirmLabel,cancelLabel:"Abbrechen",
       originalPasswordDialog:{title:kind==="superadmin"?`Superadmin-Status ${this.directory.isSuperadmin(user!)?'entziehen':'setzen'}`:title,
         message:kind==="superadmin"?"":message,confirmLabel},passwordSubmit:async password=>{
         if(this.destroyed || this.connectedToken!==token || this.sessionToken.trim()!==token)return "The administrator session changed. Cancel and review the operation again.";
-        const result=kind==="delete-workspace"?await this.directory.deleteWorkspace(workspace!.workspaceId,password)
-          :kind==="delete-user"?await this.directory.deleteUser(user!.adminUser.adminUserId,password)
-          :await this.directory.changeSuperadmin(user!.adminUser.adminUserId,password);
+        const result=kind==="delete-workspace"?await this.directory.deleteWorkspace(workspace!.id,password)
+          :kind==="delete-user"?await this.directory.deleteUser(user!.id,password)
+          :await this.directory.changeSuperadmin(user!.id,password);
         if(result)return null;
         const wrongPassword=this.directory.problemCode==="admin_password_confirmation_invalid";
         const problem=this.consumeDialogProblem();
