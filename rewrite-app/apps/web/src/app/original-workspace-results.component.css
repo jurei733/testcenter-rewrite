@@ -1,7 +1,3 @@
-.results-view .mat-icon {
-  margin-right: 5px;
-}
-
 .results-view .mat-mdc-raised-button {
   min-width: 100px;
   margin: 2px;
@@ -9,4 +5,5 @@
 :host { display:block; min-width:0; }
 .results-view .flex-column { display:flex; flex-direction:column; }
 .results-view .flex-row { display:flex; flex-direction:row; }
-.table-header { font-weight:700; }
+button.mat-mdc-button-base:disabled { opacity:1; }
+button:hover { transform:none; }

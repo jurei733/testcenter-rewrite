@@ -29,7 +29,7 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
   await page.bringToFront();await page.evaluate(()=>document.fonts.ready);
   await page.locator('[data-cy="header"] h1').click();await page.mouse.move(0,0);await waitForFiniteDocumentAnimations(page);
   const measure=()=>page.evaluate(()=>{
-   const box=node=>{const r=node.getBoundingClientRect(),s=getComputedStyle(node);return {x:r.x,y:r.y,width:r.width,height:r.height,font:s.font,padding:s.padding,text:node.textContent.trim()};};
+   const box=node=>{const r=node.getBoundingClientRect(),s=getComputedStyle(node);return {x:r.x,y:r.y,width:r.width,height:r.height,font:s.font,padding:s.padding,opacity:s.opacity,color:s.color,background:s.backgroundColor,text:node.textContent.trim()};};
    return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},scroll:[scrollX,scrollY],
     heading:[...document.querySelectorAll('mat-toolbar h1')].map(box),tabs:[...document.querySelectorAll('a[mat-tab-link]')].map(box),
     panels:[...document.querySelectorAll('mat-expansion-panel')].map(box),rows:[...document.querySelectorAll('mat-header-row,mat-row')].map(box),
