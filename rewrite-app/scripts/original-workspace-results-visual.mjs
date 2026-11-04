@@ -11,7 +11,7 @@ import {waitForFiniteDocumentAnimations} from './finite-animation-ready.mjs';
  * DTOs are captured from the real candidate API; authorization and writes are
  * qualified separately by the accompanying real SQLite browser journey. */
 export async function createOriginalResultsVisualReference({browser,root,sourceRoot,artifacts}){
- root=resolve(root);await verifyOriginalBuild(root);await mkdir(artifacts,{recursive:true});
+ root=resolve(root);const manifest=await verifyOriginalBuild(root);await mkdir(artifacts,{recursive:true});
  const provenance=originalWorkspaceResultsReference.sources;
  const server=createServer(async(req,res)=>{
   try{const path=resolve(root,'.'+new URL(req.url,'http://owned.invalid').pathname.replace(/^\/$/,'/index.html'));
@@ -46,11 +46,22 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
  }
  return {async compare({page,theme,width,role='RW',view,selected,workspaceId,groups,tests}){
   const key=theme+'-'+width+'-'+role+'-'+view+'-'+(selected?'selected':'empty-selection');
-  await activateTab(page,view);
-  const candidate=await capture(page,join(artifacts,'rewrite-'+key+'.png'));
-  const context=await browser.newContext({viewport:{width,height:844},deviceScaleFactor:1,locale:'de-DE',timezoneId:'Europe/Berlin',colorScheme:'light'});
+  // Both renderers get a fresh document for this scene. Earlier real CSV and
+  // dialog actions can legitimately leave their overflowing panel scrolled;
+  // that functional journey is qualified separately by the caller.
+  const candidatePage=await page.context().newPage();let context;
   const unknown=[],errors=[];let first;
   try{
+   candidatePage.on('pageerror',error=>errors.push(String(error)));
+   await candidatePage.goto(page.url(),{waitUntil:'domcontentloaded'});
+   const id=view==='results'?'originalWorkspaceResults':'originalWorkspaceTests';
+   await candidatePage.locator('#'+id+'[aria-busy="false"]').waitFor();
+   await candidatePage.waitForFunction(({id,n})=>document.querySelectorAll('#'+id+' mat-row').length===n,
+    {id,n:view==='results'?groups.length:Object.values(tests).flat().length});
+   await activateTab(candidatePage,view);
+   if(selected)await candidatePage.locator('#'+id+' mat-row input[type=checkbox]').first().check();
+   const candidate=await capture(candidatePage,join(artifacts,'rewrite-'+key+'.png'));
+   context=await browser.newContext({viewport:{width,height:844},deviceScaleFactor:1,locale:'de-DE',timezoneId:'Europe/Berlin',colorScheme:'light'});
    await context.addInitScript(({origin,theme,role,workspaceId})=>{if(location.origin!==origin)return;
     localStorage.setItem('iqb-tc-a',JSON.stringify({token:'owned-results-reference',displayName:'Owned Admin',loginName:'owned-admin',groupLabel:null,id:7,
      flags:[],customTexts:{},claims:{workspaceAdmin:[{id:workspaceId,type:'workspaceAdmin',label:'Eigene Ergebnisse Ω',flags:{mode:role}}]},viewSettings:{theme}}));
@@ -78,16 +89,18 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
     if(kind==='source')first=result;
     else{
      const self=await compareScreenshots(original,first.bytes,result.bytes),comparison=await compareScreenshots(original,first.bytes,candidate.bytes);
-     const receipt={key,inputSequence:'Fonts ready; focus Files; focus target tab; Enter; select row when requested; blur via heading',sourceSelfControl:self,comparison,sourceGeometry:first.geometry,rewriteGeometry:candidate.geometry};results.push(receipt);
+     const receipt={key,candidate:manifest.appCommit,sourceCommit:manifest.source.commit,inputSequence:'Fresh document in authenticated context; fonts ready; focus Files; focus target tab; Enter; select row when requested; blur via heading',sourceSelfControl:self,comparison,sourceGeometry:first.geometry,rewriteGeometry:candidate.geometry};results.push(receipt);
      await writeFile(join(artifacts,key+'.json'),JSON.stringify(receipt,null,2));
      assert.equal(self.differingPixels,0,'Original self-control: '+key);assert.equal(comparison.differingPixels,0,'Actual Original-to-Rewrite whole viewport: '+key);
     }
     await original.close();
    }
    assert.deepEqual(unknown,[]);assert.deepEqual(errors,[]);console.log('native_results_visual='+key+':exact');
-  }finally{await context.close();await page.bringToFront();}
+  }catch(error){
+   if(!candidatePage.isClosed())await candidatePage.screenshot({path:join(artifacts,'failure-rewrite-'+key+'.png'),fullPage:true});throw error;
+  }finally{await context?.close();await candidatePage.close();await page.bringToFront();}
  },async close(){
-  await new Promise(done=>server.close(done));await writeFile(join(artifacts,'visuals.json'),JSON.stringify({source:originalBrowserSource,provenance,results,
+  await new Promise(done=>server.close(done));await verifyOriginalBuild(root);await writeFile(join(artifacts,'visuals.json'),JSON.stringify({manifest,source:originalBrowserSource,provenance,results,
    fullOriginalParityProven:false,scope:'Actual Results and Tests frontend viewports; real candidate data; Source API fixture does not prove Source backend authorization.'},null,2));
  }};
 }

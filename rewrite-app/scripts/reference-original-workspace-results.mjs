@@ -10,7 +10,8 @@ await import('./smoke-original-workspace-results.mjs');
 const output=resolve(process.env.UI_SMOKE_ARTIFACT_DIR),root=join(output,'original-workspace-results');
 const functional=JSON.parse(await readFile(join(root,'results.json'),'utf8'));
 const visual=JSON.parse(await readFile(join(root,'visual','visuals.json'),'utf8'));
+assert.equal(visual.manifest.appCommit,process.env.GITHUB_SHA);
 assert.equal(visual.results.length,48);
 assert.ok(visual.results.every(row=>row.sourceSelfControl.differingPixels===0&&row.comparison.differingPixels===0));
-await writeFile(join(output,'workspace-results.json'),JSON.stringify({...functional,visualProof:{source:visual.source,provenance:visual.provenance,
+await writeFile(join(output,'workspace-results.json'),JSON.stringify({...functional,visualProof:{manifest:visual.manifest,source:visual.source,provenance:visual.provenance,
  comparisons:visual.results.length,sourceSelfControls:visual.results.length,differingPixels:0,scope:visual.scope}},null,2));
