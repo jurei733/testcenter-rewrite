@@ -59,6 +59,12 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   if(state){await input.services.originalTest.patchState({token,testNumber:state[1]!,patch:body});input.raw(200,'','text/html; charset=UTF-8');return true;}
   if(body===null||typeof body!=='object'||Array.isArray(body)||typeof(body as Record<string,unknown>).bookletName!=='string')throw new FirstSliceError(400,'original_request_invalid','Required body-parameter is missing: `bookletName`');
   input.raw(201,await input.services.originalTest.create({token,bookletName:(body as {bookletName:string}).bookletName}),'text/html; charset=UTF-8');
- }catch(error){if(log||lock||nativeCommand){if(error instanceof FirstSliceError)sendNativeTestWriteError(input,error.statusCode,error.message);else throw error;}else{if(!(error instanceof FirstSliceError))throw error;input.raw(error.statusCode,encodeOriginalReportJson(error.message),'application/json');}}
+ }catch(error){
+  // Source RequireToken distinguishes a missing header (401) from a retired
+  // or unknown supplied bearer (403). Keep the bearer redacted, as on Session.
+  if(error instanceof FirstSliceError&&error.errorCode==='original_session_invalid')sendNativeTestWriteError(input,403,'Invalid token.');
+  else if(log||lock||nativeCommand){if(error instanceof FirstSliceError)sendNativeTestWriteError(input,error.statusCode,error.message);else throw error;}
+  else{if(!(error instanceof FirstSliceError))throw error;input.raw(error.statusCode,encodeOriginalReportJson(error.message),'application/json');}
+ }
  return true;
 }

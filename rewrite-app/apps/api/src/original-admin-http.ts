@@ -7,7 +7,7 @@ const workspaceUsersRoute=/^\/workspace\/([^/]+)\/users$/;
 const userWorkspacesRoute=/^\/user\/([^/]+)\/workspaces$/;
 const superAdminRoute=/^\/user\/([^/]+)\/super-admin\/([^/]+)$/;
 const workspaceRoute=/^\/workspace\/([^/]+)$/;
-const methods=new Map<string,string[]>([['/users',['GET','DELETE']],['/workspaces',['GET']],['/user',['PUT']],['/workspace',['PUT']]]);
+const methods=new Map<string,string[]>([['/users',['GET','DELETE']],['/workspaces',['GET','DELETE']],['/user',['PUT']],['/workspace',['PUT']]]);
 const object=(value:unknown):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value));
 const escape=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]!));
 export function originalAdminRouteLabel(method:string,pathname:string):string|null {
@@ -19,7 +19,7 @@ export function originalAdminRouteLabel(method:string,pathname:string):string|nu
 }
 export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;
   readBody:(decode?:(payload:Uint8Array)=>unknown)=>Promise<unknown>;header:(name:string,value:string)=>void;raw:(status:number,value:string,contentType:string)=>void;
-  propagateError:(error:unknown)=>boolean;reportError:(receipt:{errorId:string;statusCode:number;errorCode:string})=>void}):Promise<boolean> {
+  propagateError:(error:unknown)=>boolean;reportError:(receipt:{errorId:string;statusCode:number;errorCode:string})=>void;clean?:()=>void}):Promise<boolean> {
   const workspaceUsers=workspaceUsersRoute.exec(input.pathname),userWorkspaces=userWorkspacesRoute.exec(input.pathname);
   const permission=workspaceUsers??userWorkspaces;
   const workspace=workspaceRoute.exec(input.pathname);
@@ -51,6 +51,12 @@ export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pat
       await input.services.originalAdminSession.authorize({token,superAdmin:true});
       let body:unknown;try{body=await input.readBody(decodeOriginalTestLogJson);}catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_json_invalid','Internal error.');throw error;}
       await input.services.originalAdminDirectory.deleteUsers({token,body});input.raw(200,'','text/html; charset=UTF-8');return true;
+    }
+    if(input.pathname==='/workspaces'&&input.request.method==='DELETE'){
+      await input.services.originalAdminSession.authorize({token,superAdmin:true});
+      let body:unknown;try{body=await input.readBody(decodeOriginalTestLogJson);}catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_json_invalid','Internal error.');throw error;}
+      await input.services.originalAdminDirectory.deleteWorkspaces({token,body});
+      input.clean?.();input.raw(200,'','text/html; charset=UTF-8');return true;
     }
     if(superAdmin){
       await input.services.originalAdminSession.authorize({token,superAdmin:true});

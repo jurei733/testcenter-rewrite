@@ -1,7 +1,8 @@
+import {deleteWorkspaceAggregateRows} from './workspace-aggregate-deletion.js';
 import type {Pool} from 'pg';
 import {setTimeout} from 'node:timers/promises';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
-import {validateOriginalAdminDeletionEffect,validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
+import {validateOriginalWorkspaceDeletionEffect,validateOriginalAdminDeletionEffect,validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
 
 type Row = Record<string, unknown>;
 type Mappers = {user: (row: Row | undefined) => AdminUser | null; session: (row: Row | undefined) => AdminSession | null;
@@ -63,7 +64,7 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
             for(const user of snapshot.directory.users)user.rootRoleAssignmentIds=roots.filter(r=>r.admin_user_id===user.adminUserId).map(r=>String(r.role_assignment_id));
           }
           if(selector.directory==='workspaces'||selector.directory==='rights'){
-            const ws=(await client.query(`SELECT w.* FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active'${rightsWrite||workspaceWrite?' FOR SHARE OF w,t':''}`)).rows.map(map.workspace).filter(present);
+            const ws=(await client.query(`SELECT w.* FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active'${workspaceWrite==='delete'?' FOR UPDATE OF w FOR SHARE OF t':rightsWrite||workspaceWrite?' FOR SHARE OF w,t':''}`)).rows.map(map.workspace).filter(present);
             const metadataOnly=selector.directory==='rights'||workspaceWrite;
             const files=(metadataOnly?[]:(await client.query('SELECT source_package_id,tenant_id,workspace_id,status,uploaded_at FROM source_packages')).rows).map(r=>({sourcePackageId:String(r.source_package_id),tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),status:r.status as import('@testcenter-rewrite-app/domain').SourcePackageStatus,uploadedAt:String(r.uploaded_at)}));
             const events=(metadataOnly?[]:(await client.query("SELECT tenant_id,workspace_id,event_type,subject_id,details_json FROM workspace_activity_events WHERE event_type IN ('source_package_assembled','source_package_replaced')")).rows).map(r=>({tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),eventType:r.event_type as import('@testcenter-rewrite-app/domain').WorkspaceActivityEvent['eventType'],subjectId:String(r.subject_id),details:typeof r.details_json==='string'?JSON.parse(r.details_json) as Record<string,unknown>:r.details_json as Record<string,unknown>}));
@@ -86,11 +87,22 @@ export async function mutateOriginalAdminSession(pool: Pool, map: Mappers, selec
           if(n&&target)snapshot.target={user:target,number:{adminUserId:target.adminUserId,adminNumber:String(n.admin_number)},sessions:(await client.query('SELECT * FROM admin_sessions WHERE admin_user_id=$1 FOR UPDATE',[target.adminUserId])).rows.map(map.session).filter(present)};
         }
       }
+      if(workspaceWrite==='delete'&&snapshot.directory?.workspaces){
+        // Recheck the clock and actor only after every workspace/person/run
+        // writer wait. The locks survive the entire batch and all audits.
+        const ids=snapshot.directory.workspaces.map(row=>row.workspace.workspaceId);
+        if(ids.length){
+          await client.query('SELECT p.participant_session_id FROM participant_sessions p JOIN workspaces w ON w.workspace_id=p.workspace_id AND w.tenant_id=p.tenant_id WHERE w.workspace_id=ANY($1::text[]) ORDER BY p.participant_session_id FOR UPDATE OF p',[ids]);
+          await client.query('SELECT r.test_run_id FROM test_runs r JOIN workspaces w ON w.workspace_id=r.workspace_id AND w.tenant_id=r.tenant_id WHERE w.workspace_id=ANY($1::text[]) ORDER BY r.test_run_id FOR UPDATE OF r',[ids]);
+        }
+      }
       const effect = transform(structuredClone(snapshot));
       validateOriginalAdminRoleChanges(snapshot,effect,selector);
       validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
       validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
       validateOriginalAdminDeletionEffect(snapshot,effect,selector);
+      validateOriginalWorkspaceDeletionEffect(snapshot,effect,selector);
+      for(const target of effect.deletedWorkspaces??[])await deleteWorkspaceAggregateRows(client,target.workspace);
       for(const user of effect.deletedUsers??[]){
         await client.query('DELETE FROM admin_role_assignments WHERE admin_user_id=$1',[user.adminUserId]);
         await client.query('DELETE FROM admin_sessions WHERE admin_user_id=$1',[user.adminUserId]);

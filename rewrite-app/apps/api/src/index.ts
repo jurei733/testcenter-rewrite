@@ -4999,7 +4999,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
-      if(await handleOriginalAdminHttp({request,pathname,services,reportError:receipt=>{
+      if(await handleOriginalAdminHttp({request,pathname,services,clean:()=>broadcaster?.clean(),reportError:receipt=>{
         if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
         logStructured(receipt.statusCode>=500?'error':'info','native_administration_error',{requestId,route:originalAdminRouteLabel(request.method??'',pathname),...receipt});
       },readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,true,decode),

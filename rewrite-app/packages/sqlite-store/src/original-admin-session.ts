@@ -1,6 +1,7 @@
+import {deleteWorkspaceAggregateRows} from './workspace-aggregate-deletion.js';
 import type {DatabaseSync} from 'node:sqlite';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
-import {validateOriginalAdminDeletionEffect,validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
+import {validateOriginalWorkspaceDeletionEffect,validateOriginalAdminDeletionEffect,validateOriginalAdminLifecycleEffect,validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
 import {rollbackAfterFailure} from './transaction-rollback.js';
 
 type Row = Record<string, unknown>;
@@ -71,6 +72,8 @@ export function mutateOriginalAdminSession(database: DatabaseSync, map: Mappers,
     validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
     validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
     validateOriginalAdminDeletionEffect(snapshot,effect,selector);
+    validateOriginalWorkspaceDeletionEffect(snapshot,effect,selector);
+    for(const target of effect.deletedWorkspaces??[])deleteWorkspaceAggregateRows(database,target.workspace);
     for(const user of effect.deletedUsers??[]){
       database.prepare('DELETE FROM admin_role_assignments WHERE admin_user_id=?').run(user.adminUserId);
       database.prepare('DELETE FROM admin_sessions WHERE admin_user_id=?').run(user.adminUserId);

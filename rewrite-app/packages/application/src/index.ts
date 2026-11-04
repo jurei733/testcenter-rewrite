@@ -89,6 +89,8 @@ export {originalDirectoryModification} from './original-admin-directory.js';
 export {validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey} from './original-workspace-directory.js';
 export {validateOriginalAdminLifecycleEffect} from './original-admin-lifecycle.js';
 export {validateOriginalAdminDeletionEffect} from './original-admin-deletion.js';
+export {validateOriginalWorkspaceDeletionEffect} from './original-workspace-deletion.js';
+export {deleteWorkspaceCollections,workspaceDeletionScopeExists} from './workspace-deletion-collections.js';
 export type {OriginalDirectoryFile,OriginalDirectoryFileEvent,OriginalAdminDirectoryPort} from './original-admin-directory.js';
 import {createOriginalAdminSessionPort} from './original-admin-session.js';
 export {assertOriginalAdminNameAvailable,originalAdminMetadataAllowed,selectOriginalAdminIdentity,originalAdminFailureBucket,prepareOriginalAdminNumber,originalAdminNumber,formatOriginalAdminAccessSet} from './original-admin-session.js';

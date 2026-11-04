@@ -7,6 +7,7 @@ import {isOriginalWorkspaceMembership} from './original-workspace-role.js';
 import {originalAdministrationWorkspaceTenantKey,validateOriginalWorkspaceDirectoryEffect} from './original-workspace-directory.js';
 import {validateOriginalAdminLifecycleEffect} from './original-admin-lifecycle.js';
 import {validateOriginalAdminDeletionEffect} from './original-admin-deletion.js';
+import {validateOriginalWorkspaceDeletionEffect,type OriginalWorkspaceDeletionTarget} from './original-workspace-deletion.js';
 
 type Rows<T> = Map<string, T> | Record<string, T>;
 const values = <T>(rows: Rows<T>): T[] => rows instanceof Map ? [...rows.values()] : Object.values(rows);
@@ -25,7 +26,8 @@ export type OriginalAdminCollections = {
 /** Called only inside Memory's synchronous boundary or File's durable writer.
  * No Run, response, release or other actor's credential payload is projected. */
 export function mutateOriginalAdminCollections(state: OriginalAdminCollections, sessions: Rows<AdminSession>, sessionKey: 'token' | 'adminSessionId',
-  selector: OriginalAdminSelector, transform: (snapshot: OriginalAdminSessionSnapshot) => OriginalAdminSessionEffect): OriginalAdminSessionEffect {
+  selector: OriginalAdminSelector, transform: (snapshot: OriginalAdminSessionSnapshot) => OriginalAdminSessionEffect,
+  prepareWorkspaceDeletion?:(targets:OriginalWorkspaceDeletionTarget[])=>()=>void): OriginalAdminSessionEffect {
   const allSessions = values(sessions);
   const id = 'name' in selector ? selectOriginalAdminIdentity(values(state.adminUsers), selector.name) : allSessions.find(row => row.token === selector.token)?.adminUserId ?? null;
   const user = values(state.adminUsers).find(row => row.adminUserId === id) ?? null;
@@ -66,6 +68,9 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
   validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
   validateOriginalAdminLifecycleEffect(snapshot,effect,selector);
   validateOriginalAdminDeletionEffect(snapshot,effect,selector);
+  validateOriginalWorkspaceDeletionEffect(snapshot,effect,selector);
+  if(effect.deletedWorkspaces&&!prepareWorkspaceDeletion)throw Error('Native workspace deletion writer is unavailable.');
+  const deleteWorkspaces=effect.deletedWorkspaces?prepareWorkspaceDeletion!(effect.deletedWorkspaces):undefined;
   // Validate every foreign-token collision before editing even an in-memory row.
   const audits=[...effect.audit?[effect.audit]:[],...effect.audits??[]];
   if(new Set(audits.map(a=>a.adminAuditEventId)).size!==audits.length||audits.some(a=>values(state.adminAuditEvents).some(old=>old.adminAuditEventId===a.adminAuditEventId)))throw Error('Native administrator audit identity collision.');
@@ -116,5 +121,6 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
     for(const role of values(state.adminRoleAssignments))if(role.adminUserId===user.adminUserId)remove(state.adminRoleAssignments,role.roleAssignmentId);
     for(const session of values(sessions))if(session.adminUserId===user.adminUserId)remove(sessions,session[sessionKey]);
   }
+  deleteWorkspaces?.();
   return effect;
 }

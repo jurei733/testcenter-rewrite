@@ -1,3 +1,4 @@
+import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
 import {guardOriginalWorkspaceWriteCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceAdministrationCollection} from '@testcenter-rewrite-app/application';
@@ -1041,7 +1042,11 @@ const createFileRepository = (
       });
     },
     async mutateOriginalAdminSession(selector,transform) {
-      return mutate(state=>mutateOriginalAdminCollections(state,state.adminSessions,'adminSessionId',selector,transform));
+      return mutate(state=>mutateOriginalAdminCollections(state,state.adminSessions,'adminSessionId',selector,transform,targets=>{
+        const scopes=targets.map(({tenant:t,workspace:w})=>({tenantKey:t.tenantKey,workspaceKey:w.workspaceKey,tenantId:t.tenantId,workspaceId:w.workspaceId}));
+        if(scopes.some(scope=>!workspaceDeletionScopeExists(state,scope)))throw Error('Native workspace deletion index changed.');
+        return()=>{for(const scope of scopes)deleteWorkspaceCollections(state,scope,{source:dirtySourcePackageIds,release:dirtyContentReleaseIds});};
+      }));
     },
     async listAdminUsers() {
       const state = await getState();
@@ -1224,104 +1229,9 @@ const createFileRepository = (
       });
     },
     async deleteWorkspaceAggregate(input) {
-      return mutate(state => {
-        const scopeKey = workspaceScopeKey(input.tenantKey, input.workspaceKey);
-        const workspace = state.workspacesByScope[scopeKey];
-        if (!workspace || workspace.workspaceId !== input.workspaceId) {
-          return null;
-        }
-        const deleteMatching = <Value>(
-          values: Record<string, Value>,
-          matches: (value: Value) => boolean
-        ): number => {
-          let deletedCount = 0;
-          for (const [key, value] of Object.entries(values)) {
-            if (matches(value)) {
-              delete values[key];
-              deletedCount += 1;
-            }
-          }
-          return deletedCount;
-        };
-        const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
-          value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
-        deleteMatching(state.participantRunCommands, workspaceMatches);
-        deleteMatching(state.originalNativeCommands, workspaceMatches);
-      deleteMatching(state.participantProgressDeliveries, workspaceMatches);
-        deleteMatching(state.originalLoginBindings, workspaceMatches);
-        deleteMatching(state.originalSessionTokens, workspaceMatches);
-        deleteMatching(state.originalParticipantGroups, workspaceMatches);
-        deleteMatching(state.originalNativeUnits,workspaceMatches);
-        deleteMatching(state.originalNativeReviews,workspaceMatches);
-        deleteMatching(state.originalPersonNumbers,workspaceMatches);
-        if(state.originalTestNumbers)deleteMatching(state.originalTestNumbers,row=>{if(!workspaceMatches(row))return false;delete state.originalTestRunsByNumber[row.testNumber];return true;});
-        if(state.originalWorkspaceNumbers)deleteMatching(state.originalWorkspaceNumbers,workspaceMatches);
-        for (const run of Object.values(state.testRuns)) {
-          if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
-        }
-        for (const session of Object.values(state.participantSessions)) {
-          if (workspaceMatches(session)) delete state.participantAccessCredentials[session.participantSessionId];
-        }
-        for (const sourcePackage of Object.values(state.sourcePackages)) {
-          if (workspaceMatches(sourcePackage)) {
-            dirtySourcePackageIds.add(sourcePackage.sourcePackageId);
-          }
-        }
-        for (const contentRelease of Object.values(state.contentReleases)) {
-          if (workspaceMatches(contentRelease)) {
-            dirtyContentReleaseIds.add(contentRelease.contentReleaseId);
-          }
-        }
-        const counts = {
-          deletedWorkspaceCount: 1,
-          deletedAdminRoleAssignmentCount: deleteMatching(
-            state.adminRoleAssignments,
-            value => value.workspaceId === input.workspaceId
-          ),
-          deletedAttachmentFileCount: deleteMatching(state.attachmentFiles, workspaceMatches),
-          deletedActivityEventCount: deleteMatching(
-            state.workspaceActivityEvents,
-            workspaceMatches
-          ),
-          deletedReviewCount: deleteMatching(state.workspaceReviews, workspaceMatches),
-          deletedSourcePackageCount: deleteMatching(state.sourcePackages, workspaceMatches),
-          deletedImportJobCount: deleteMatching(state.importJobs, workspaceMatches),
-          deletedContentReleaseCount: deleteMatching(state.contentReleases, workspaceMatches),
-          deletedParticipantSessionCount: deleteMatching(
-            state.participantSessions,
-            workspaceMatches
-          ),
-          deletedRosterEntryCount: deleteMatching(
-            state.participantRosterEntries,
-            workspaceMatches
-          ),
-          deletedLoginAttemptCount: deleteMatching(
-            state.participantLoginAttempts,
-            workspaceMatches
-          ),
-          deletedTestRunCount: deleteMatching(state.testRuns, workspaceMatches),
-          deletedTestLogCount: deleteMatching(state.participantTestLogs, workspaceMatches)
-        };
-        for (const key of Object.keys(state.participantRosterPasswordHashes)) {
-          if (key.startsWith(`${input.tenantId}::${input.workspaceId}::`)) {
-            delete state.participantRosterPasswordHashes[key];
-          }
-        }
-        delete state.operationalLoginMigrationCandidates[
-          `${input.tenantId}::${input.workspaceId}`
-        ];
-        delete state.originalOperationalLogins[`${input.tenantId}::${input.workspaceId}`];
-        delete state.workspacesByScope[scopeKey];
-        const remainingWorkspaceWithSameKey = Object.values(
-          state.workspacesByScope
-        ).find(candidate => candidate.workspaceKey === workspace.workspaceKey);
-        if (remainingWorkspaceWithSameKey) {
-          state.workspacesByKey[remainingWorkspaceWithSameKey.workspaceKey] =
-            remainingWorkspaceWithSameKey;
-        } else {
-          delete state.workspacesByKey[workspace.workspaceKey];
-        }
-        state.adminAuditEvents[input.auditEvent.adminAuditEventId] = input.auditEvent;
+      return mutate(state=>{
+        const counts=deleteWorkspaceCollections(state,input,{source:dirtySourcePackageIds,release:dirtyContentReleaseIds});
+        if(counts)state.adminAuditEvents[input.auditEvent.adminAuditEventId]=input.auditEvent;
         return counts;
       });
     },

@@ -8,7 +8,7 @@ import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 import {isOriginalWorkspaceMembership,originalWorkspaceRoleValue} from './original-workspace-role.js';
 
 export type OriginalAdminNumber = {adminUserId: string; adminNumber: string};
-export type OriginalAdminSelector = {name: string} | {token: string; at?: string; directory?: 'users' | 'workspaces' | 'rights'; rightsWrite?: boolean; workspaceWrite?:'create'|'rename'; adminWrite?:'superadmin'|'delete-users'; targetAdminNumber?: string};
+export type OriginalAdminSelector = {name: string} | {token: string; at?: string; directory?: 'users' | 'workspaces' | 'rights'; rightsWrite?: boolean; workspaceWrite?:'create'|'rename'|'delete'; adminWrite?:'superadmin'|'delete-users'; targetAdminNumber?: string};
 export type OriginalAdminDirectoryUser = {adminUserId:string;username:string;adminNumber:string|null;isSuperadmin:boolean;rootRoleAssignmentIds?:string[]};
 export type OriginalAdminDirectoryWorkspace = {workspace:Workspace;workspaceNumber:string|null;latestModificationAt:string|null};
 export type OriginalAdminSessionSnapshot = {
@@ -29,6 +29,7 @@ export type OriginalAdminSessionEffect = {
   workspaceChange?: {kind:'create'|'rename';tenant:Tenant;workspace:Workspace;createTenant?:boolean};
   rootRoleChange?: {adminUserId:string;enabled:boolean;removeIds:string[];assignment?:AdminRoleAssignment};
   deletedUsers?:Array<{adminUserId:string;adminNumber:string;username:string}>;
+  deletedWorkspaces?:import('./original-workspace-deletion.js').OriginalWorkspaceDeletionTarget[];
   roleChanges?: {scope:{kind:'user';adminUserId:string}|{kind:'workspace';tenantId:string;workspaceId:string};removeIds:string[];assignments:AdminRoleAssignment[]};
   audits?:AdminAuditEvent[];
 };
