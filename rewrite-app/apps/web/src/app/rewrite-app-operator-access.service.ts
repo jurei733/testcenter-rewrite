@@ -102,7 +102,9 @@ export class RewriteAppOperatorAccessService {
     if (!this.uiState.ops.adminSessionToken.trim()) {
       return false;
     }
-    return this.session?.adminUser?.passwordChangeRequired === true;
+    // Native Source retains pwSetByAdmin for Root even after its own password
+    // change. Root is already exempt in the server's current-actor policy.
+    return this.session?.adminUser?.passwordChangeRequired === true && !this.isPlatformAdmin;
   }
 
   get canReadWorkspaceDirectory(): boolean {

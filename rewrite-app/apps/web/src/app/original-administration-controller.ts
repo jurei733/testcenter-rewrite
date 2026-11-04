@@ -1,286 +1,211 @@
-import {
-  productionApiRoutes, resolveRoutePath,
-  type AdminUserDirectoryItem, type CreateTenantResponse, type CreateWorkspaceResponse,
-  type ListAdminUsersResponse, type ListTenantsResponse, type ListWorkspacesResponse,
-  type UpdateWorkspaceResponse
-} from "@testcenter-rewrite-app/contracts";
-import type { Tenant, WorkspaceDirectoryItem } from "@testcenter-rewrite-app/domain";
+import type {OriginalAdminAccessSet} from '@testcenter-rewrite-app/contracts/original-session';
+import type {NativeAdministrationTransport} from './original-administration-http';
+import {originalAdministrationId,originalAdministrationPermissionBody,type OriginalAdmin,type OriginalWorkspace,type OriginalPermission} from './original-administration-wire';
+export type {OriginalAdmin,OriginalWorkspace} from './original-administration-wire';
+// Application settings retain their existing canonical transport.
+export type OriginalAdministrationTransport=<T>(method:string,path:string,body:unknown,sessionToken:string)=>Promise<T>;
+export type OriginalWorkspaceAccess=''|'RO'|'RW';
+export type OriginalPermissionChange={adminUserId:string;workspaceId:string;access:OriginalWorkspaceAccess;selected:boolean;role:string};
+export type OriginalPermissionRow=OriginalPermissionChange&{label:string;view:number};
+type Owner={epoch:number;token:string};
+type MatrixOwner={section:'users'|'workspaces';id:string;view:number};
+const permissionKey=(a:string,w:string)=>JSON.stringify([a,w]);
+const effective=(role:string):OriginalWorkspaceAccess=>role==='RO'||role==='RW'?role:'';
 
-export type OriginalWorkspace = WorkspaceDirectoryItem & { tenantKey: string };
-export type OriginalWorkspaceAccess = "" | "RO" | "RW";
-export type OriginalPermissionChange = { adminUserId: string; workspaceId: string; access: OriginalWorkspaceAccess };
-export type OriginalPermissionRow = OriginalPermissionChange & { label: string };
-export type OriginalAdministrationTransport = <T>(method: string, path: string, body: unknown,
-  sessionToken: string) => Promise<T>;
-type Owner = { epoch: number; token: string };
-
-// The Original has a flat workspace directory. Newly created workspaces use a
-// dedicated internal container; never guess a tenant from the last open test.
-export const originalAdministrationTenantKey = "original-interface";
-const newWorkspaceKey = (): string => "workspace-" + [...crypto.getRandomValues(new Uint8Array(16))]
-  .map(value => value.toString(16).padStart(2, "0")).join("");
-const permissionKey = (adminUserId: string, workspaceId: string): string => JSON.stringify([adminUserId, workspaceId]);
-// Source's flat directory queries order by name, across every workspace scope.
-const orderWorkspaces = (rows:OriginalWorkspace[]):OriginalWorkspace[] => rows.sort((a,b)=>a.displayName.localeCompare(b.displayName));
-const orderAdmins = (rows:AdminUserDirectoryItem[]):AdminUserDirectoryItem[] => rows.sort((a,b)=>a.adminUser.username.localeCompare(b.adminUser.username));
-
-
-/** Presentation adapter over the existing authenticated production API.
- * Every continuation owns its session, including the next write in a batch.
- * No password or bearer token enters persisted UI state or a directory row.
- */
+/** Native identities only. Every continuation owns its session and selected
+ * matrix; one complete PATCH owns each permission save. */
 export class OriginalAdministrationController {
-  admins: AdminUserDirectoryItem[] = [];
-  workspaces: OriginalWorkspace[] = [];
-  tenants: Tenant[] = [];
-  selectedAdminId = "";
-  selectedWorkspaceId = "";
-  permissionViewEpoch = 0;
-  busy = false;
-  problem = "";
-  problemCode = "";
-  notice = "";
-  readonly changes = new Map<string, OriginalPermissionChange>();
-  private epoch = 0;
-  private token = "";
-  private destroyed = false;
-  private retainedPermissions: { section: "users" | "workspaces"; rows: OriginalPermissionRow[] } | null = null;
-
-  constructor(private readonly transport: OriginalAdministrationTransport,
-    private readonly currentSession: () => { token: string; adminUserId: string },
-    private readonly changed: () => void, private readonly makeWorkspaceKey = newWorkspaceKey) {}
-
-  private owns(owner: Owner): boolean {
-    return !this.destroyed && owner.epoch === this.epoch && owner.token === this.token &&
-      owner.token === this.currentSession().token && owner.token !== "";
+  admins:OriginalAdmin[]=[];
+  workspaces:OriginalWorkspace[]=[];
+  selfId='';
+  selectedAdminId='';
+  selectedWorkspaceId='';
+  permissionViewEpoch=0;
+  busy=false;
+  problem='';
+  problemCode='';
+  notice='';
+  readonly changes=new Map<string,OriginalPermissionChange>();
+  private epoch=0;
+  private token='';
+  private destroyed=false;
+  private scope=new AbortController();
+  private selection=0;
+  private matrix:OriginalPermission[]=[];
+  private matrixOwner:MatrixOwner|null=null;
+  private retainedPermissions:{section:'users'|'workspaces';rows:OriginalPermissionRow[]}|null=null;
+  constructor(private readonly transport:NativeAdministrationTransport,
+    private readonly currentSession:()=>{token:string},private readonly changed:()=>void,
+    private readonly replaceToken:(previous:string,next:string)=>boolean=()=>false){}
+  private owns(o:Owner):boolean {
+    return !this.destroyed&&o.epoch===this.epoch&&o.token!==''&&o.token===this.token&&o.token===this.currentSession().token;
   }
-
-  private async request<T>(owner: Owner, method: string, path: string, body?: unknown): Promise<T> {
-    if (!this.owns(owner)) throw Error("Original administrator session changed.");
-    const result = await this.transport<T>(method, path, body, owner.token);
-    if (!this.owns(owner)) throw Error("Original administrator session changed.");
-    return result;
-  }
-
-  private async run(action: (owner: Owner) => Promise<void>, success: string): Promise<boolean> {
-    const owner = { epoch:this.epoch, token:this.token };
-    if (this.busy || !this.owns(owner)) return false;
-    this.busy = true; this.problem = ""; this.problemCode = ""; this.notice = ""; this.changed();
-    try {
-      await action(owner);
-      if (!this.owns(owner)) return false;
-      this.notice = success;
-      return true;
-    } catch (error) {
-      if (this.owns(owner)) {
-        this.problemCode = typeof error === "object" && error !== null && "error" in error
-          ? String(error.error) : "unexpected_error";
-        this.problem = this.problemCode === "admin_password_confirmation_invalid" ? "Falsches Kennwort."
-          : "Die Aktion konnte nicht abgeschlossen werden. Bitte prüfen Sie die Eingaben und versuchen Sie es erneut.";
-      }
-      return false;
-    } finally {
-      if (this.owns(owner)) { this.busy = false; this.changed(); }
+  private async request<T>(o:Owner,method:string,path:string,body?:unknown):Promise<T>{
+    if(!this.owns(o))throw Error('Original administrator session changed.');
+    const reply=await this.transport(method,path,body,o.token,this.scope.signal);
+    if(!this.owns(o))throw Error('Original administrator session changed.');
+    if(reply.authToken){
+      if(path!=='/user/'+this.selfId+'/password'||method!=='PATCH'||!this.replaceToken(o.token,reply.authToken))throw Error('Administrator token ownership changed.');
+      this.scope.abort();this.scope=new AbortController();this.token=reply.authToken;o.token=reply.authToken;
     }
+    return reply.value as T;
   }
-
-  async connect(token: string): Promise<boolean> {
-    this.epoch++; this.token = token; this.busy = false;
-    this.admins = []; this.workspaces = []; this.tenants = [];
-    this.clearSelection(false); this.problem = ""; this.problemCode = ""; this.notice = ""; this.changed();
-    return this.run(async owner => {
-      const [users, tenants] = await Promise.all([
-        this.request<ListAdminUsersResponse>(owner,"GET",productionApiRoutes.admin.listUsers),
-        this.request<ListTenantsResponse>(owner,"GET",productionApiRoutes.platform.listTenants)
+  private async run(action:(o:Owner)=>Promise<void>,success:string):Promise<boolean>{
+    const o={epoch:this.epoch,token:this.token};
+    if(this.busy||!this.owns(o))return false;
+    this.busy=true;this.problem='';this.problemCode='';this.notice='';this.changed();
+    try{await action(o);if(!this.owns(o))return false;this.notice=success;return true;}
+    catch(error){
+      if(this.owns(o)){
+        this.problemCode=error&&typeof error==='object'&&'error' in error?String(error.error):'unexpected_error';
+        this.problem=this.problemCode==='admin_password_confirmation_invalid'?'Falsches Kennwort.':
+          'Die Aktion konnte nicht abgeschlossen werden. Bitte prüfen Sie die Eingaben und versuchen Sie es erneut.';
+      }return false;
+    }finally{if(this.owns(o)){this.busy=false;this.changed();}}
+  }
+  async connect(token:string):Promise<boolean>{
+    this.scope.abort();this.scope=new AbortController();this.epoch++;this.token=token;this.busy=false;
+    this.admins=[];this.workspaces=[];this.selfId='';this.clearSelection(false);
+    this.problem='';this.problemCode='';this.notice='';this.changed();
+    return this.run(async o=>{
+      const [access,users,workspaces]=await Promise.all([
+        this.request<OriginalAdminAccessSet>(o,'GET','/session'),
+        this.request<OriginalAdmin[]>(o,'GET','/users'),
+        this.request<OriginalWorkspace[]>(o,'GET','/workspaces')
       ]);
-      const workspaces: OriginalWorkspace[] = [];
-      for (const tenant of tenants.items) {
-        const result = await this.request<ListWorkspacesResponse>(owner,"GET",
-          resolveRoutePath(productionApiRoutes.workspace.listWorkspaces,{tenantKey:tenant.tenantKey}));
-        workspaces.push(...result.items.map(workspace=>({...workspace,tenantKey:tenant.tenantKey})));
-      }
-      this.admins = orderAdmins([...users.items]); this.tenants = tenants.items; this.workspaces = orderWorkspaces(workspaces);
-    }, "");
+      if(access.token!==o.token||!Array.isArray(access.claims.superAdmin))throw Error('Invalid native Root session.');
+      this.selfId=originalAdministrationId(access.id);this.admins=users;this.workspaces=workspaces;
+    },'');
   }
-
-  destroy(): void {
-    this.destroyed = true; this.epoch++; this.token = "";
-    this.admins = []; this.workspaces = []; this.tenants = []; this.busy = false; this.clearSelection(false);
+  destroy():void {
+    this.destroyed=true;this.scope.abort();this.epoch++;this.token='';this.selfId='';
+    this.admins=[];this.workspaces=[];this.busy=false;this.clearSelection(false);
   }
-
-  clearSelection(retainRows = true): void {
-    const section = this.selectedAdminId ? "users" : this.selectedWorkspaceId ? "workspaces" : null;
-    if (!retainRows) this.retainedPermissions = null;
-    else if (section) this.retainedPermissions = {section, rows:this.permissionRows(section)};
-    this.selectedAdminId = ""; this.selectedWorkspaceId = ""; this.changes.clear();
+  clearSelection(retainRows=true):void {
+    const section=this.selectedAdminId?'users':this.selectedWorkspaceId?'workspaces':null;
+    if(!retainRows)this.retainedPermissions=null;
+    else if(section)this.retainedPermissions={section,rows:this.permissionRows(section)};
+    this.selection++;this.selectedAdminId='';this.selectedWorkspaceId='';this.changes.clear();this.matrix=[];this.matrixOwner=null;
   }
-  permissionRows(section: "users" | "workspaces"): OriginalPermissionRow[] {
-    if (section === "users" && this.selectedAdminId) return this.workspaces.map(workspace=>({
-      label:workspace.displayName,workspaceId:workspace.workspaceId,adminUserId:this.selectedAdminId,
-      access:this.access(this.selectedAdminId,workspace.workspaceId)}));
-    if (section === "workspaces" && this.selectedWorkspaceId) return this.admins.map(user=>({
-      label:user.adminUser.username,adminUserId:user.adminUser.adminUserId,workspaceId:this.selectedWorkspaceId,
-      access:this.access(user.adminUser.adminUserId,this.selectedWorkspaceId)}));
-    return this.retainedPermissions?.section === section ? [...this.retainedPermissions.rows] : [];
+  private subjectCurrent(subject:MatrixOwner):boolean {
+    return subject.view===this.selection&&(subject.section==='users'?this.selectedAdminId:this.selectedWorkspaceId)===subject.id;
   }
-  togglePermissionRow(row: OriginalPermissionRow, control: "RO" | "RW"): void {
-    if (this.busy) return;
-    if (this.selectedAdminId || this.selectedWorkspaceId) {
-      if ((this.selectedAdminId && row.adminUserId !== this.selectedAdminId) ||
-        (this.selectedWorkspaceId && row.workspaceId !== this.selectedWorkspaceId)) return;
-      this.togglePermission(row.adminUserId,row.workspaceId,control);
+  private pair(row:OriginalPermission,subject:MatrixOwner):[string,string] {
+    return subject.section==='users'?[subject.id,row.id]:[row.id,subject.id];
+  }
+  permissionRows(section:'users'|'workspaces'):OriginalPermissionRow[]{
+    const subject=this.matrixOwner;
+    if(subject&&subject.section===section&&this.subjectCurrent(subject))return this.matrix.map(row=>{
+      const [adminUserId,workspaceId]=this.pair(row,subject),draft=this.changes.get(permissionKey(adminUserId,workspaceId));
+      return {adminUserId,workspaceId,label:row.name,view:subject.view,selected:draft?.selected??row.selected,role:draft?.role??row.role,access:draft?.access??effective(row.role)};
+    });
+    return !this.selectedAdminId&&!this.selectedWorkspaceId&&this.retainedPermissions?.section===section?[...this.retainedPermissions.rows]:[];
+  }
+  togglePermissionRow(row:OriginalPermissionRow,control:'RO'|'RW'):void {
+    if(this.busy)return;
+    if(this.selectedAdminId||this.selectedWorkspaceId){
+      if(this.matrixOwner?.view===row.view)this.togglePermission(row.adminUserId,row.workspaceId,control);
     }
-    else if (this.retainedPermissions?.rows.includes(row)) {
-      // Source keeps these visual rows after clearing selection. They no longer
-      // own a save target; editing them must never stage or dispatch a write.
-      row.access = control === "RW" ? row.access === "RW" ? "RO" : "RW" : row.access ? "" : "RO";
-      this.changed();
+    else if(this.retainedPermissions?.rows.includes(row)){
+      row.access=control==='RW'?(row.access==='RW'?'RO':'RW'):(row.access?'':'RO');this.changed();
     }
   }
-  selectAdmin(id: string): void {
-    if (this.busy || !this.admins.some(item=>item.adminUser.adminUserId===id)) return;
-    if (this.selectedAdminId === id) return;
-    this.clearSelection(); this.selectedAdminId = id; this.permissionViewEpoch++; this.changed();
+  async selectAdmin(id:string):Promise<boolean>{return this.select('users',id);}
+  async selectWorkspace(id:string):Promise<boolean>{return this.select('workspaces',id);}
+  private async select(section:'users'|'workspaces',id:string):Promise<boolean>{
+    if(this.busy||!(section==='users'?this.admins:this.workspaces).some(row=>row.id===id))return false;
+    if((section==='users'?this.selectedAdminId:this.selectedWorkspaceId)===id)return true;
+    this.clearSelection(false);if(section==='users')this.selectedAdminId=id;else this.selectedWorkspaceId=id;
+    this.permissionViewEpoch++;
+    const subject:MatrixOwner={section,id,view:this.selection};
+    return this.run(async o=>{
+      const rows=await this.request<OriginalPermission[]>(o,'GET',this.matrixPath(subject));
+      if(this.subjectCurrent(subject)){this.matrix=rows;this.matrixOwner=subject;}
+    },'');
   }
-  selectWorkspace(id: string): void {
-    if (this.busy || !this.workspaces.some(item=>item.workspaceId===id)) return;
-    if (this.selectedWorkspaceId === id) return;
-    this.clearSelection(); this.selectedWorkspaceId = id; this.permissionViewEpoch++; this.changed();
+  get selectedAdmin():OriginalAdmin|undefined{return this.admins.find(row=>row.id===this.selectedAdminId);}
+  get selectedWorkspace():OriginalWorkspace|undefined{return this.workspaces.find(row=>row.id===this.selectedWorkspaceId);}
+  isSuperadmin(admin:OriginalAdmin):boolean{return admin.isSuperadmin;}
+  access(adminUserId:string,workspaceId:string):OriginalWorkspaceAccess {
+    const subject=this.matrixOwner;if(!subject||!this.subjectCurrent(subject))return '';
+    const row=this.matrix.find(row=>{const [a,w]=this.pair(row,subject);return a===adminUserId&&w===workspaceId;});
+    return row?this.changes.get(permissionKey(adminUserId,workspaceId))?.access??effective(row.role):'';
   }
-
-  get selectedAdmin(): AdminUserDirectoryItem | undefined {
-    return this.admins.find(item=>item.adminUser.adminUserId===this.selectedAdminId);
-  }
-  get selectedWorkspace(): OriginalWorkspace | undefined {
-    return this.workspaces.find(item=>item.workspaceId===this.selectedWorkspaceId);
-  }
-  isSuperadmin(admin: AdminUserDirectoryItem): boolean { return admin.roleAssignments.some(role=>role.role==="platform_admin"); }
-  private assignment(adminUserId: string, workspaceId: string) {
-    return this.admins.find(item=>item.adminUser.adminUserId===adminUserId)?.roleAssignments
-      .find(role=>role.role==="workspace_admin" && role.workspaceId===workspaceId);
-  }
-  access(adminUserId: string, workspaceId: string): OriginalWorkspaceAccess {
-    const draft = this.changes.get(permissionKey(adminUserId,workspaceId));
-    if (draft) return draft.access;
-    const assignment = this.assignment(adminUserId,workspaceId);
-    return assignment ? assignment.accessMode==="read_only" ? "RO" : "RW" : "";
-  }
-  togglePermission(adminUserId: string, workspaceId: string, control: "RO" | "RW"): void {
-    if (this.busy ||
-      !this.admins.some(item=>item.adminUser.adminUserId===adminUserId) ||
-      !this.workspaces.some(item=>item.workspaceId===workspaceId)) return;
-    const previous = this.access(adminUserId,workspaceId);
-    const access = control==="RW" ? previous==="RW" ? "RO" : "RW" : previous ? "" : "RO";
-    const assignment = this.assignment(adminUserId,workspaceId);
-    const saved = assignment ? assignment.accessMode==="read_only" ? "RO" : "RW" : "";
-    const key = permissionKey(adminUserId,workspaceId);
-    if (access===saved) this.changes.delete(key);
-    else this.changes.set(key,{adminUserId,workspaceId,access});
+  togglePermission(adminUserId:string,workspaceId:string,control:'RO'|'RW'):void {
+    const subject=this.matrixOwner;if(this.busy||!subject||!this.subjectCurrent(subject))return;
+    const row=this.matrix.find(row=>{const [a,w]=this.pair(row,subject);return a===adminUserId&&w===workspaceId;});if(!row)return;
+    const key=permissionKey(adminUserId,workspaceId),draft=this.changes.get(key),previous=draft?.role??row.role;
+    const access:OriginalWorkspaceAccess=control==='RW'?(previous==='RW'?'RO':'RW'):(previous==='RO'||previous==='RW'?'':'RO');
+    const selected=access!=='';
+    if(access===row.role&&selected===row.selected)this.changes.delete(key);
+    else this.changes.set(key,{adminUserId,workspaceId,access,role:access,selected});
     this.changed();
   }
-  private applyAdmin(item: AdminUserDirectoryItem): void {
-    const index = this.admins.findIndex(existing=>existing.adminUser.adminUserId===item.adminUser.adminUserId);
-    this.admins = orderAdmins(index<0 ? [...this.admins,item] : this.admins.map((old,i)=>i===index?item:old));
+  private matrixPath(s:MatrixOwner):string{return s.section==='users'?'/user/'+s.id+'/workspaces':'/workspace/'+s.id+'/users';}
+  async savePermissions():Promise<boolean>{
+    const subject=this.matrixOwner;
+    if(!subject||!this.subjectCurrent(subject)||!this.changes.size||!this.matrix.length)return false;
+    const rows=this.matrix.map(row=>{
+      const [a,w]=this.pair(row,subject),draft=this.changes.get(permissionKey(a,w));
+      return draft?{...row,role:draft.role,selected:draft.selected}:{...row};
+    });
+    const body={[subject.section==='users'?'ws':'u']:originalAdministrationPermissionBody(rows)};
+    return this.run(async o=>{
+      if(!this.subjectCurrent(subject))throw Error('Permission subject changed.');
+      await this.request(o,'PATCH',this.matrixPath(subject),body);
+      if(this.subjectCurrent(subject)){this.matrix=rows;this.changes.clear();}
+    },'Zugriffsrechte geändert');
   }
-  async savePermissions(): Promise<boolean> {
-    const edits = [...this.changes.values()].map(edit=>({...edit}));
-    if (!edits.length) return false;
-    return this.run(async owner => {
-      for (const edit of edits) {
-        const workspace = this.workspaces.find(item=>item.workspaceId===edit.workspaceId);
-        if (!workspace) throw Error("The selected workspace no longer exists.");
-        const assignment = this.assignment(edit.adminUserId,edit.workspaceId);
-        if (edit.access) {
-          this.applyAdmin(await this.request<AdminUserDirectoryItem>(owner,"POST",
-            resolveRoutePath(productionApiRoutes.admin.assignRole,{adminUserId:edit.adminUserId}),
-            {role:"workspace_admin",tenantKey:workspace.tenantKey,workspaceKey:workspace.workspaceKey,
-              accessMode:edit.access==="RO"?"read_only":"read_write"}));
-        } else if (assignment) {
-          this.applyAdmin(await this.request<AdminUserDirectoryItem>(owner,"DELETE",
-            resolveRoutePath(productionApiRoutes.admin.revokeRole,{adminUserId:edit.adminUserId,roleAssignmentId:assignment.roleAssignmentId}),{}));
-        }
-        // An acknowledged row is never replayed after a later row fails.
-        this.changes.delete(permissionKey(edit.adminUserId,edit.workspaceId)); this.changed();
-      }
-    }, "Zugriffsrechte geändert");
+  /** A committed write must not be repeated if the following directory read
+   * fails. Keep the acknowledgement and show an owned refresh error instead. */
+  private async refresh(o:Owner,kind:'users'|'workspaces'):Promise<void>{
+    try{
+      if(kind==='users')this.admins=await this.request<OriginalAdmin[]>(o,'GET','/users');
+      else this.workspaces=await this.request<OriginalWorkspace[]>(o,'GET','/workspaces');
+    }catch(error){
+      if(!this.owns(o))throw error;
+      this.problem='Die Änderung wurde gespeichert. Die Liste konnte nicht neu geladen werden. Bitte laden Sie die Seite erneut.';
+      this.problemCode='original_directory_refresh_failed';
+    }
   }
-
-  async createUser(username: string, password: string): Promise<boolean> {
-    return this.run(async owner => {
-      this.applyAdmin(await this.request<AdminUserDirectoryItem>(owner,"POST",productionApiRoutes.admin.createUser,
-        {username:username.trim(),displayName:username.trim(),password,roleAssignments:[]}));
-      this.clearSelection();
-    }, "Administrator:in hinzugefügt");
+  async createUser(name:string,password:string):Promise<boolean>{
+    return this.run(async o=>{await this.request(o,'PUT','/user',{n:name,p:password});this.clearSelection();await this.refresh(o,'users');},'Administrator:in hinzugefügt');
   }
-  async resetPassword(adminUserId: string, password: string): Promise<boolean> {
-    return this.run(async owner => {
-      this.applyAdmin(await this.request<AdminUserDirectoryItem>(owner,"POST",
-        resolveRoutePath(productionApiRoutes.admin.resetPassword,{adminUserId}),{password}));
-    }, "Kennwort geändert");
+  async resetPassword(id:string,password:string,oldPassword?:string):Promise<boolean>{
+    if(!this.admins.some(row=>row.id===id)||!this.selfId)return false;
+    return this.run(async o=>{
+      const previous=o.token;
+      await this.request(o,'PATCH','/user/'+id+'/password',{p:password,...oldPassword===undefined?{}:{oldPassword}});
+      if(id===this.selfId&&previous===o.token)throw Error('Missing renewed administrator token.');
+    },'Kennwort geändert');
   }
-  async changeSuperadmin(adminUserId: string, confirmationPassword: string): Promise<boolean> {
-    if (adminUserId===this.currentSession().adminUserId) return false;
-    const assignment = this.admins.find(item=>item.adminUser.adminUserId===adminUserId)?.roleAssignments.find(role=>role.role==="platform_admin");
-    return this.run(async owner => {
-      this.applyAdmin(await this.request<AdminUserDirectoryItem>(owner,assignment?"DELETE":"POST",
-        assignment ? resolveRoutePath(productionApiRoutes.admin.revokeRole,{adminUserId,roleAssignmentId:assignment.roleAssignmentId})
-          : resolveRoutePath(productionApiRoutes.admin.assignRole,{adminUserId}),
-        {confirmationPassword,...(!assignment?{role:"platform_admin"}:{})}));
-      this.clearSelection();
-    }, "Superadmin-Status geändert");
+  async changeSuperadmin(id:string,password:string):Promise<boolean>{
+    const user=this.admins.find(row=>row.id===id);if(!user||!this.selfId||id===this.selfId)return false;
+    const enabled=!user.isSuperadmin;
+    return this.run(async o=>{
+      await this.request(o,'PATCH','/user/'+id+'/super-admin/'+(enabled?'on':'off'),{p:password});
+      this.clearSelection();this.admins=this.admins.map(row=>row.id===id?{...row,isSuperadmin:enabled}:row);await this.refresh(o,'users');
+    },'Superadmin-Status geändert');
   }
-  async deleteUser(adminUserId: string, confirmationPassword: string): Promise<boolean> {
-    if (adminUserId===this.currentSession().adminUserId) return false;
-    return this.run(async owner => {
-      await this.request(owner,"DELETE",resolveRoutePath(productionApiRoutes.admin.deleteUser,{adminUserId}),{confirmationPassword});
-      this.clearSelection(); this.admins = this.admins.filter(item=>item.adminUser.adminUserId!==adminUserId);
-    }, "Administrator:in gelöscht");
+  async deleteUser(id:string,password:string):Promise<boolean>{
+    if(!this.selfId||id===this.selfId||!this.admins.some(row=>row.id===id))return false;
+    return this.run(async o=>{
+      await this.request(o,'DELETE','/users',{u:[id],p:password});this.clearSelection();
+      this.admins=this.admins.filter(row=>row.id!==id);await this.refresh(o,'users');
+    },'Administrator:in gelöscht');
   }
-
-  async createWorkspace(displayName: string): Promise<boolean> {
-    return this.run(async owner => {
-      let tenant = this.tenants.find(item=>item.tenantKey===originalAdministrationTenantKey);
-      if (!tenant) {
-        try {
-          tenant = (await this.request<CreateTenantResponse>(owner,"POST",productionApiRoutes.platform.createTenant,
-            {tenantKey:originalAdministrationTenantKey,displayName:"Testcenter"})).tenant;
-        } catch (error) {
-          // Concurrent first-workspace creation may have created this container.
-          if (!(typeof error==="object" && error!==null && "statusCode" in error && error.statusCode===409)) throw error;
-          tenant = (await this.request<ListTenantsResponse>(owner,"GET",productionApiRoutes.platform.listTenants))
-            .items.find(item=>item.tenantKey===originalAdministrationTenantKey);
-          if (!tenant) throw error;
-        }
-        this.tenants = [...this.tenants,tenant];
-      }
-      if (tenant.status!=="active") throw Error("Original workspace container is unavailable.");
-      const result = await this.request<CreateWorkspaceResponse>(owner,"POST",
-        resolveRoutePath(productionApiRoutes.workspace.createWorkspace,{tenantKey:tenant.tenantKey}),
-        {workspaceKey:this.makeWorkspaceKey(),displayName:displayName.trim()});
-      this.workspaces = orderWorkspaces([...this.workspaces,{...result.workspace,tenantKey:tenant.tenantKey,latestFileModificationAt:null}]);
-      this.clearSelection();
-    }, "Arbeitsbereich hinzugefügt");
+  async createWorkspace(name:string):Promise<boolean>{
+    return this.run(async o=>{await this.request(o,'PUT','/workspace',{name});this.clearSelection();await this.refresh(o,'workspaces');},'Arbeitsbereich hinzugefügt');
   }
-  async renameWorkspace(workspaceId: string, displayName: string): Promise<boolean> {
-    const workspace = this.workspaces.find(item=>item.workspaceId===workspaceId);
-    if (!workspace) return false;
-    return this.run(async owner => {
-      const result = await this.request<UpdateWorkspaceResponse>(owner,"PATCH",
-        resolveRoutePath(productionApiRoutes.workspace.updateWorkspace,{tenantKey:workspace.tenantKey,workspaceKey:workspace.workspaceKey}),
-        {displayName:displayName.trim()});
-      this.workspaces = orderWorkspaces(this.workspaces.map(item=>item.workspaceId===workspaceId?{...item,...result.workspace}:item));
-      this.clearSelection();
-    }, "Arbeitsbereich geändert");
+  async renameWorkspace(id:string,name:string):Promise<boolean>{
+    if(!this.workspaces.some(row=>row.id===id))return false;
+    return this.run(async o=>{await this.request(o,'PATCH','/workspace/'+id,{name});this.clearSelection();await this.refresh(o,'workspaces');},'Arbeitsbereich geändert');
   }
-  async deleteWorkspace(workspaceId: string, confirmationPassword: string): Promise<boolean> {
-    const workspace = this.workspaces.find(item=>item.workspaceId===workspaceId);
-    if (!workspace) return false;
-    return this.run(async owner => {
-      await this.request(owner,"DELETE",resolveRoutePath(productionApiRoutes.workspace.deleteWorkspace,
-        {tenantKey:workspace.tenantKey,workspaceKey:workspace.workspaceKey}),{confirmation:workspace.workspaceKey,confirmationPassword});
-      this.clearSelection();
-      this.workspaces = this.workspaces.filter(item=>item.workspaceId!==workspaceId);
-      this.admins = this.admins.map(item=>({...item,roleAssignments:item.roleAssignments.filter(role=>role.workspaceId!==workspaceId)}));
-    }, "Arbeitsbereich gelöscht");
+  async deleteWorkspace(id:string,password:string):Promise<boolean>{
+    if(!this.workspaces.some(row=>row.id===id))return false;
+    return this.run(async o=>{
+      await this.request(o,'DELETE','/workspaces',{ws:[id],p:password});this.clearSelection();
+      this.workspaces=this.workspaces.filter(row=>row.id!==id);await this.refresh(o,'workspaces');
+    },'Arbeitsbereich gelöscht');
   }
 }
