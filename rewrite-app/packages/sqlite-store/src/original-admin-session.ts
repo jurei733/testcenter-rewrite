@@ -1,6 +1,6 @@
 import type {DatabaseSync} from 'node:sqlite';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
-import {validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
+import {validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey,validateOriginalAdminRoleChanges,originalAdminMetadataAllowed,originalDirectoryModification,selectOriginalAdminIdentity, originalAdminFailureBucket, type OriginalAdminSelector, type OriginalAdminSessionSnapshot, type OriginalAdminSessionEffect} from '@testcenter-rewrite-app/application';
 import {rollbackAfterFailure} from './transaction-rollback.js';
 
 type Row = Record<string, unknown>;
@@ -41,9 +41,15 @@ export function mutateOriginalAdminSession(database: DatabaseSync, map: Mappers,
           FROM admin_users u LEFT JOIN original_admin_numbers n ON n.admin_user_id=u.admin_user_id`).all().map(r=>({adminUserId:String(r.admin_user_id),username:String(r.username),adminNumber:r.admin_number==null?null:String(r.admin_number),isSuperadmin:Boolean(r.super_admin)}));
         if(selector.directory==='workspaces'||selector.directory==='rights'){
           const ws=database.prepare(`SELECT w.* FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active'`).all().map(map.workspace).filter(present);
-          const files=(selector.directory==='rights'?[]:database.prepare('SELECT source_package_id,tenant_id,workspace_id,status,uploaded_at FROM source_packages').all()).map(r=>({sourcePackageId:String(r.source_package_id),tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),status:r.status as import('@testcenter-rewrite-app/domain').SourcePackageStatus,uploadedAt:String(r.uploaded_at)}));
-          const events=(selector.directory==='rights'?[]:database.prepare("SELECT tenant_id,workspace_id,event_type,subject_id,details_json FROM workspace_activity_events WHERE event_type IN ('source_package_assembled','source_package_replaced')").all()).map(r=>({tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),eventType:r.event_type as import('@testcenter-rewrite-app/domain').WorkspaceActivityEvent['eventType'],subjectId:String(r.subject_id),details:JSON.parse(String(r.details_json)) as Record<string,unknown>}));
-          snapshot.directory.workspaces=ws.map(w=>{const n=database.prepare('SELECT * FROM original_workspace_numbers WHERE workspace_id=?').get(w.workspaceId);if(n&&n.tenant_id!==w.tenantId)throw Error('Native workspace directory identity scope changed.');return{workspace:w,workspaceNumber:n?String(n.workspace_number):null,latestModificationAt:selector.directory==='rights'?null:originalDirectoryModification(files,events,w.tenantId,w.workspaceId)};});
+          const metadataOnly=selector.directory==='rights'||selector.workspaceWrite;
+          const files=(metadataOnly?[]:database.prepare('SELECT source_package_id,tenant_id,workspace_id,status,uploaded_at FROM source_packages').all()).map(r=>({sourcePackageId:String(r.source_package_id),tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),status:r.status as import('@testcenter-rewrite-app/domain').SourcePackageStatus,uploadedAt:String(r.uploaded_at)}));
+          const events=(metadataOnly?[]:database.prepare("SELECT tenant_id,workspace_id,event_type,subject_id,details_json FROM workspace_activity_events WHERE event_type IN ('source_package_assembled','source_package_replaced')").all()).map(r=>({tenantId:String(r.tenant_id),workspaceId:String(r.workspace_id),eventType:r.event_type as import('@testcenter-rewrite-app/domain').WorkspaceActivityEvent['eventType'],subjectId:String(r.subject_id),details:JSON.parse(String(r.details_json)) as Record<string,unknown>}));
+          snapshot.directory.workspaces=ws.map(w=>{const n=database.prepare('SELECT * FROM original_workspace_numbers WHERE workspace_id=?').get(w.workspaceId);if(n&&n.tenant_id!==w.tenantId)throw Error('Native workspace directory identity scope changed.');return{workspace:w,workspaceNumber:n?String(n.workspace_number):null,latestModificationAt:metadataOnly?null:originalDirectoryModification(files,events,w.tenantId,w.workspaceId)};});
+          if(selector.workspaceWrite){
+            const ids=[...new Set(ws.map(w=>w.tenantId))];
+            snapshot.directory.tenants=ids.length?database.prepare('SELECT * FROM tenants WHERE tenant_id IN ('+ids.map(()=>'?').join(',')+')').all(...ids).map(map.tenant).filter(present):[];
+            if(selector.workspaceWrite==='create')snapshot.directory.creationTenant=map.tenant(database.prepare('SELECT * FROM tenants WHERE tenant_key=?').get(originalAdministrationWorkspaceTenantKey));
+          }
         }
       }
       if(root&&selector.directory==='rights'){
@@ -56,8 +62,20 @@ export function mutateOriginalAdminSession(database: DatabaseSync, map: Mappers,
         if(n&&target)snapshot.target={user:target,number:{adminUserId:target.adminUserId,adminNumber:String(n.admin_number)},sessions:database.prepare('SELECT * FROM admin_sessions WHERE admin_user_id=?').all(target.adminUserId).map(map.session).filter(present)};
       }
     }
-    const effect = transform(snapshot);
+    const effect = transform(structuredClone(snapshot));
     validateOriginalAdminRoleChanges(snapshot,effect,selector);
+    validateOriginalWorkspaceDirectoryEffect(snapshot,effect,selector);
+    if(effect.workspaceChange){
+      const c=effect.workspaceChange,w=c.workspace,t=c.tenant;
+      if(c.kind==='create'){
+        if(database.prepare('SELECT 1 FROM workspaces WHERE workspace_id=? OR workspace_key=?').get(w.workspaceId,w.workspaceKey))throw Error('Native workspace creation identity collision.');
+        if(c.createTenant)database.prepare('INSERT INTO tenants(tenant_id,tenant_key,display_name,status,created_at) VALUES(?,?,?,?,?)').run(t.tenantId,t.tenantKey,t.displayName,t.status,t.createdAt);
+        database.prepare('INSERT INTO workspaces(workspace_id,tenant_id,tenant_key,workspace_key,display_name,status,created_at) VALUES(?,?,?,?,?,?,?)').run(w.workspaceId,w.tenantId,t.tenantKey,w.workspaceKey,w.displayName,w.status,w.createdAt);
+      }else{
+        const changed=database.prepare("UPDATE workspaces SET display_name=? WHERE workspace_id=? AND tenant_id=? AND status='active'").run(w.displayName,w.workspaceId,w.tenantId);
+        if(Number(changed.changes)!==1)throw Error('Native workspace rename scope changed.');
+      }
+    }
     if (effect.user) database.prepare('UPDATE admin_users SET first_signed_in_at=?,password_hash=?,password_change_required=? WHERE admin_user_id=?').run(effect.user.firstSignedInAt,effect.user.passwordHash,effect.user.passwordChangeRequired?1:0,effect.user.adminUserId);
     if(effect.targetUser){if(effect.targetUser.adminUserId!==snapshot.target?.user.adminUserId)throw Error('Native target administrator scope changed.');database.prepare('UPDATE admin_users SET password_hash=?,password_change_required=? WHERE admin_user_id=?').run(effect.targetUser.passwordHash,effect.targetUser.passwordChangeRequired?1:0,effect.targetUser.adminUserId);}
     if(effect.createdUser){const u=effect.createdUser;database.prepare('INSERT INTO admin_users(admin_user_id,username,display_name,password_hash,password_change_required,status,custom_texts_json,valid_from,valid_to,valid_for_minutes,first_signed_in_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(u.adminUserId,u.username,u.displayName,u.passwordHash,u.passwordChangeRequired?1:0,u.status,JSON.stringify(u.customTexts),u.validFrom,u.validTo,u.validForMinutes,u.firstSignedInAt,u.createdAt);}

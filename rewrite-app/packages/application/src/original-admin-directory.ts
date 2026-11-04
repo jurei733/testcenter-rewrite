@@ -5,6 +5,7 @@ import {selectCurrentWorkspaceFiles} from './workspace-file-catalog.js';
 import {prepareOriginalWorkspaceNumber} from './original-workspace-number.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 import {prepareOriginalAdminNumber,originalAdminNumber,originalAdminMetadataAllowed,type OriginalAdminSessionSnapshot,type OriginalAdminSessionRepository} from './original-admin-session.js';
+import {createOriginalWorkspaceDirectoryPort,type OriginalWorkspaceDirectoryPort} from './original-workspace-directory.js';
 
 export type OriginalDirectoryFile = Pick<SourcePackage,'sourcePackageId'|'status'|'uploadedAt'|'tenantId'|'workspaceId'>;
 export type OriginalDirectoryFileEvent = Pick<WorkspaceActivityEvent,'eventType'|'subjectId'|'details'|'tenantId'|'workspaceId'>;
@@ -27,7 +28,7 @@ function displayDate(value:string|null,timeZone:string):string|null {
   const p=(type:string)=>parts.find(p=>p.type===type)!.value;
   return `${p('year')}-${p('month')}-${p('day')} ${p('hour')}:${p('minute')}:${p('second')}`;
 }
-export type OriginalAdminDirectoryPort={
+export type OriginalAdminDirectoryPort=OriginalWorkspaceDirectoryPort&{
   listUsers(input:{token:string}):Promise<string>;
   listWorkspaces(input:{token:string}):Promise<string>;
   createUser(input:{token:string;name:string;password:string}):Promise<string>;
@@ -45,6 +46,7 @@ export function createOriginalAdminDirectoryPort(input:{repository:OriginalAdmin
     return effect.directoryJson;
   };
   return {
+    ...createOriginalWorkspaceDirectoryPort(input),
     listUsers:({token})=>run(token,'users',s=>{
       if(!s.directory?.users)throw new FirstSliceError(409,'original_admin_directory_unavailable','The native administrator directory is unavailable.');
       let counter=s.counter;const numbers:import('./original-admin-session.js').OriginalAdminNumber[]=[];

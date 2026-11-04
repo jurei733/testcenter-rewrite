@@ -5,12 +5,14 @@ import {FirstSliceError,originalCommandInteger,decodeOriginalTestLogJson,type Fi
 const passwordRoute=/^\/user\/([^/]+)\/password$/;
 const workspaceUsersRoute=/^\/workspace\/([^/]+)\/users$/;
 const userWorkspacesRoute=/^\/user\/([^/]+)\/workspaces$/;
-const methods=new Map<string,string[]>([['/users',['GET']],['/workspaces',['GET']],['/user',['PUT']]]);
+const workspaceRoute=/^\/workspace\/([^/]+)$/;
+const methods=new Map<string,string[]>([['/users',['GET']],['/workspaces',['GET']],['/user',['PUT']],['/workspace',['PUT']]]);
 const object=(value:unknown):value is Record<string,unknown>=>Boolean(value&&typeof value==='object'&&!Array.isArray(value));
 const escape=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]!));
 export function originalAdminRouteLabel(method:string,pathname:string):string|null {
   if(workspaceUsersRoute.test(pathname))return method+' /workspace/:workspaceId/users';
   if(userWorkspacesRoute.test(pathname))return method+' /user/:userId/workspaces';
+  if(workspaceRoute.test(pathname)&&method!=='GET')return method+' /workspace/:workspaceId';
   return passwordRoute.test(pathname)?method+' /user/:userId/password':methods.has(pathname)?method+' '+pathname:null;
 }
 export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;
@@ -18,7 +20,11 @@ export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pat
   propagateError:(error:unknown)=>boolean;reportError:(receipt:{errorId:string;statusCode:number;errorCode:string})=>void}):Promise<boolean> {
   const workspaceUsers=workspaceUsersRoute.exec(input.pathname),userWorkspaces=userWorkspacesRoute.exec(input.pathname);
   const permission=workspaceUsers??userWorkspaces;
-  const password=passwordRoute.exec(input.pathname),allowed=permission?['GET','PATCH']:password?['PATCH']:methods.get(input.pathname);
+  const workspace=workspaceRoute.exec(input.pathname);
+  // GET is owned by the existing native workspace-access handler, whose
+  // explicit membership gate is different from Root's rename capability.
+  if(workspace&&input.request.method==='GET')return false;
+  const password=passwordRoute.exec(input.pathname),allowed=permission?['GET','PATCH']:workspace?['GET','PATCH']:password?['PATCH']:methods.get(input.pathname);
   if(!allowed)return false;
   input.header('cache-control','private, no-store');
   try {
@@ -37,6 +43,14 @@ export async function handleOriginalAdminHttp(input:{request:IncomingMessage;pat
       if(workspaceUsers)await input.services.originalAdminPermissions.replaceWorkspaceUsers({token,reference,body});
       else await input.services.originalAdminPermissions.replaceUserWorkspaces({token,reference,body});
       input.raw(200,'',workspaceUsers?'text/plain;charset=UTF-8':'text/html; charset=UTF-8');return true;
+    }
+    if(workspace||input.pathname==='/workspace'){
+      await input.services.originalAdminSession.authorize({token,superAdmin:true});
+      let reference='';if(workspace)try{reference=decodeURIComponent(workspace[1]!);}catch{throw new FirstSliceError(400,'original_request_invalid','Invalid workspace reference.');}
+      let body:unknown;try{body=await input.readBody(decodeOriginalTestLogJson);}catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_json_invalid','Internal error.');throw error;}
+      if(workspace){await input.services.originalAdminDirectory.renameWorkspace({token,reference,body});input.raw(200,'','text/html; charset=UTF-8');}
+      else input.raw(201,await input.services.originalAdminDirectory.createWorkspace({token,body}),'text/html; charset=UTF-8');
+      return true;
     }
     if(input.request.method==='GET'){
       const result=input.pathname==='/users'?await input.services.originalAdminDirectory.listUsers({token}):await input.services.originalAdminDirectory.listWorkspaces({token});

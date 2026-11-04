@@ -86,6 +86,7 @@ import {createOriginalAdminDirectoryPort} from './original-admin-directory.js';
 import {createOriginalAdminPermissionsPort} from './original-admin-permissions.js';
 export {validateOriginalAdminRoleChanges} from './original-admin-permissions.js';
 export {originalDirectoryModification} from './original-admin-directory.js';
+export {validateOriginalWorkspaceDirectoryEffect,originalAdministrationWorkspaceTenantKey} from './original-workspace-directory.js';
 export type {OriginalDirectoryFile,OriginalDirectoryFileEvent,OriginalAdminDirectoryPort} from './original-admin-directory.js';
 import {createOriginalAdminSessionPort} from './original-admin-session.js';
 export {assertOriginalAdminNameAvailable,originalAdminMetadataAllowed,selectOriginalAdminIdentity,originalAdminFailureBucket,prepareOriginalAdminNumber,originalAdminNumber,formatOriginalAdminAccessSet} from './original-admin-session.js';
