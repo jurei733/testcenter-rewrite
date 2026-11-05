@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {writeFile} from 'node:fs/promises';
+import {waitForFiniteDocumentAnimations} from './finite-animation-ready.mjs';
 
 /** Actual native Trial/Review entry, original components and production API.
  * No intercepted responses, component state assignment or forced clicks. */
@@ -11,8 +12,9 @@ export async function runNativeParticipantReviewSmoke({browser,base,password,out
   page.setDefaultTimeout(20000);page.on('pageerror',error=>errors.push(String(error)));
   const prefix='native-review-'+mode+'-'+width;
   const panel=page.locator('tc-review-panel'),comment=panel.locator('[data-cy=comment-diag-comment]');
-  const closed=()=>page.waitForFunction(()=>!document.querySelector('mat-sidenav.mat-drawer-opened'));
-  const open=async()=>{await page.locator('[data-cy=send-comments]').click();await page.locator('mat-sidenav.mat-drawer-opened').waitFor();await panel.waitFor();};
+  const settled=async()=>{await page.waitForFunction(()=>!document.querySelector('mat-sidenav.mat-drawer-animating'));await waitForFiniteDocumentAnimations(page);};
+  const closed=async()=>{await page.waitForFunction(()=>!document.querySelector('mat-sidenav.mat-drawer-opened'));await settled();};
+  const open=async()=>{await page.locator('[data-cy=send-comments]').click();await page.locator('mat-sidenav.mat-drawer-opened').waitFor();await panel.waitFor();await settled();};
   const shownList=()=>panel.getByRole('heading',{name:'Kommentarübersicht',exact:true}).waitFor();
   const showList=async()=>{if(!await panel.getByRole('heading',{name:'Kommentarübersicht',exact:true}).isVisible())await panel.locator('[data-cy=comment-toolbar-show-list]').click();await shownList();};
   const listReply=async(path,token)=>{

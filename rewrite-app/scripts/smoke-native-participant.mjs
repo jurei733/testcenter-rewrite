@@ -24,6 +24,7 @@ for(const [name,files]of [['application',['index','original-group-deletion','ori
 qualificationFiles.push('apps/api/src/original-review-http.ts','apps/api/dist/apps/api/src/original-review-http.js');
 for(const name of ['original-unit','original-unit-record','original-unit-collections','original-unit-delivery'])qualificationFiles.push(`packages/application/src/${name}.ts`,`packages/application/dist/packages/application/src/${name}.js`);
 qualificationFiles.push('apps/api/src/original-test-http.ts','apps/api/dist/apps/api/src/original-test-http.js');
+qualificationFiles.push('scripts/finite-animation-ready.mjs');
 
 const hashQualification=async()=>Object.fromEntries(await Promise.all(qualificationFiles.map(async path=>[path,createHash('sha256').update(await readFile(join(app,path))).digest('hex')])));
 const qualificationHashes=await hashQualification();
