@@ -1,10 +1,12 @@
 import {exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
-import type {ParticipantSession, ParticipantTestLog, TestRun} from '@testcenter-rewrite-app/domain';
+import type {ParticipantSession, ParticipantTestLog, ParticipantProgressDelivery, TestRun} from '@testcenter-rewrite-app/domain';
+import {prepareOriginalNativeDelivery,type OriginalNativeDelivery} from './original-native-delivery.js';
 import {parseOriginalNativeTestNumber} from './original-test-access.js';
 import {selectOwnedOriginalTestNumber, type OriginalTestNumberRecord} from './original-test-number.js';
 import {resultParentUnavailable} from './result-artifact-parent.js';
 
 const scopeKeys = ['testRunId', 'participantSessionId', 'tenantId', 'workspaceId', 'contentReleaseId'] as const;
+export type OriginalTestLogInput=OriginalTestNumberRecord&{delivery?:OriginalNativeDelivery};
 
 export function assertOriginalTestLogInput(input: OriginalTestNumberRecord): void {
   if (scopeKeys.some(key => typeof input[key] !== 'string' || !input[key]) ||
@@ -46,24 +48,30 @@ type State = {
   testRuns: Collection<TestRun>;
   participantSessions: Collection<ParticipantSession>;
   participantTestLogs: Collection<ParticipantTestLog>;
+  participantProgressDeliveries?:Collection<ParticipantProgressDelivery>;
 };
 const get = <Row>(collection: Collection<Row> | undefined, key: string): Row | undefined =>
   collection instanceof Map ? collection.get(key) : collection && Object.hasOwn(collection, key) ? collection[key] : undefined;
 
 /** Recheck the native mapping and current parent before examining append data.
  * The Run, its saved state, revision, presence and clocks are never rewritten. */
-export function appendOriginalTestLogCollection(state: State, input: OriginalTestNumberRecord, logs: ParticipantTestLog[]): void {
+export function appendOriginalTestLogCollection(state: State, input: OriginalTestLogInput, logs: ParticipantTestLog[]): void {
   assertOriginalTestLogInput(input);
   const mapping = selectOwnedOriginalTestNumber(input, get(state.originalTestNumbers, input.testRunId),
     get(state.testRuns, input.testRunId) ?? null, get(state.participantSessions, input.participantSessionId) ?? null);
   if (!mapping || scopeKeys.some(key => mapping[key] !== input[key]) ||
       get(state.originalTestRunsByNumber, input.testNumber) !== input.testRunId) throw resultParentUnavailable();
+  const receiptKey=input.delivery?JSON.stringify([input.testRunId,input.delivery.deliveryId]):undefined;
+  if(input.delivery&&!state.participantProgressDeliveries)throw Error('Native delivery storage is unavailable.');
+  const receipt=input.delivery?prepareOriginalNativeDelivery(input,input.delivery,get(state.participantProgressDeliveries!,receiptKey!),'test'):undefined;
+  if(receipt===null)return;
   const prepared = prepareOriginalTestLogs(input, logs);
   if (prepared.some(log => get(state.participantTestLogs, log.participantTestLogId))) throw new Error('Native Test log identity collision.');
   for (const log of prepared) {
     if (state.participantTestLogs instanceof Map) state.participantTestLogs.set(log.participantTestLogId, log);
     else Object.defineProperty(state.participantTestLogs, log.participantTestLogId, {value: log, writable: true, enumerable: true, configurable: true});
   }
+  if(receipt){if(state.participantProgressDeliveries instanceof Map)state.participantProgressDeliveries.set(receiptKey!,receipt);else Object.defineProperty(state.participantProgressDeliveries!,receiptKey!,{value:receipt,writable:true,enumerable:true,configurable:true});}
 }
 
 /** TestDAO receives already PHP-JSON-encoded content. Its string "0" is falsy,

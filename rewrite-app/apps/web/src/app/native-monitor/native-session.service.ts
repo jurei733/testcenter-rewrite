@@ -126,13 +126,14 @@ export class NativeMonitorSessionService {
   const text=await this.readText('GET','/reviews/export',undefined,access.token,false,owner,scope,true,undefined,'text/csv',true);
   owner.throwIfAborted();scope.throwIfAborted();return text;
  }
- async text(method:string,path:string,body?:unknown,token=this.access()?.token??'',rawBody=false,signal?:AbortSignal,subscribeToken?:(value:string|null)=>void):Promise<string>{
+ async text(method:string,path:string,body?:unknown,token=this.access()?.token??'',rawBody=false,signal?:AbortSignal,subscribeToken?:(value:string|null)=>void,deliveryId?:string):Promise<string>{
+  if(deliveryId!==undefined&&(method!=='PUT'||!/^\/test\/[1-9]\d*\/log$/.test(path)||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(deliveryId)))throw new Error('Invalid native Test log delivery.');
   const scope=token&&token===this.access()?.token?this.accessSignal:undefined;
-  return this.readText(method,path,body,token,rawBody,signal,scope,true,subscribeToken);
+  return this.readText(method,path,body,token,rawBody,signal,scope,true,subscribeToken,'application/json',false,deliveryId);
  }
- private async readText(method:string,path:string,body:unknown,token:string,rawBody:boolean,signal?:AbortSignal,scope?:AbortSignal,invalidate=true,subscribeToken?:(value:string|null)=>void,accept='application/json',preserveBom=false):Promise<string>{
+ private async readText(method:string,path:string,body:unknown,token:string,rawBody:boolean,signal?:AbortSignal,scope?:AbortSignal,invalidate=true,subscribeToken?:(value:string|null)=>void,accept='application/json',preserveBom=false,deliveryId?:string):Promise<string>{
   const signals=[AbortSignal.timeout(20000),...(signal?[signal]:[]),...(scope?[scope]:[])];
-  const response=await fetch(path,{method,headers:{Accept:accept,...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},...(body===undefined?{}:{body:rawBody?String(body):JSON.stringify(body)}),signal:AbortSignal.any(signals),cache:'no-store',credentials:'omit',redirect:'error'});
+  const response=await fetch(path,{method,headers:{Accept:accept,...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'Content-Type':'application/json'}),...(deliveryId?{'X-Native-Delivery-Id':deliveryId}:{})},...(body===undefined?{}:{body:rawBody?String(body):JSON.stringify(body)}),signal:AbortSignal.any(signals),cache:'no-store',credentials:'omit',redirect:'error'});
   // Response.text() removes the Source CSV's UTF-8 BOM. Preserve it when
   // recreating that file; ordinary JSON/error text keeps its existing decoder.
   const text=preserveBom?new TextDecoder('utf-8',{ignoreBOM:true}).decode(await response.arrayBuffer()):await response.text();scope?.throwIfAborted();if(!response.ok){

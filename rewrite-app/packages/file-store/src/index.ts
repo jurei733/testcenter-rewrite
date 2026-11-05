@@ -1764,7 +1764,7 @@ const createFileRepository = (
     },
     async lockOriginalTest(input, timestamp) {await mutate(state => lockOriginalTestCollection(state, input, timestamp));},
     async appendOriginalTestLogs(input, logs) {
-      if (logs.length === 0) {appendOriginalTestLogCollection(await getState(), input, logs); return;}
+      if (logs.length === 0&&!input.delivery) {appendOriginalTestLogCollection(await getState(), input, logs); return;}
       await mutate(state => appendOriginalTestLogCollection(state, input, logs));
     },
     async getOrCreateOriginalTestNumber(input) {

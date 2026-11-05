@@ -14,17 +14,20 @@ const proxy=createServer((incoming,outgoing)=>{
  const testRead=incoming.method==='GET'&&/^\/test\/[^/]+$/.test(path);
  const sessionRead=incoming.method==='GET'&&path==='/session';
  const commandAck=incoming.method==='PATCH'&&/^\/test\/[^/]+\/command\/[^/]+\/executed$/.test(path);
+ const testStateWrite=incoming.method==='PATCH'&&/^\/test\/[^/]+\/state$/.test(path),testLogWrite=incoming.method==='PUT'&&/^\/test\/[^/]+\/log$/.test(path);
  const resourceRead=incoming.method==='GET'&&/^\/file\//.test(path);
  const record={phase,time:Date.now(),method:incoming.method,path:resourceRead?path.replace(/^(\/file\/)[^/]+/,'$1[resource-capability]'):path,hasNativeToken:!!incoming.headers.authtoken};
  if(resourceRead)outgoing.once('finish',()=>process.send?.({nativeResource:{...record,origin:incoming.headers.origin,status:outgoing.statusCode}}));
  if(responseWrite||testRead)outgoing.once('finish',()=>process.send?.({nativeResponse:{...record,status:outgoing.statusCode}}));
  if(sessionRead)outgoing.once('finish',()=>process.send?.({nativeSession:{...record,status:outgoing.statusCode}}));
  if(commandAck)outgoing.once('finish',()=>process.send?.({nativeCommand:{...record,status:outgoing.statusCode}}));
- const forward=body=>{
+ if(testStateWrite||testLogWrite)outgoing.once('finish',()=>process.send?.({nativeTestWrite:{...record,deliveryId:incoming.headers['x-native-delivery-id'],status:outgoing.statusCode}}));
+ const forward=(body,loseAcknowledgement=false)=>{
   if(outgoing.destroyed||incoming.aborted)return;
   const port=backend.address().port,headers={...incoming.headers,host:'127.0.0.1:'+port,connection:'close'};
   if(body!==undefined){delete headers['transfer-encoding'];headers['content-length']=body.length;}
   const forwarded=request({hostname:'127.0.0.1',port,path:incoming.url,method:incoming.method,headers},response=>{
+   if(loseAcknowledgement&&response.statusCode>=200&&response.statusCode<300){record.backendStatus=response.statusCode;response.once('end',()=>fail());response.resume();return;}
    outgoing.writeHead(response.statusCode,response.headers);response.pipe(outgoing);
   });
   forwarded.on('error',()=>{if(!outgoing.headersSent)outgoing.writeHead(502);outgoing.end('Owned API proxy failed');});
@@ -32,11 +35,15 @@ const proxy=createServer((incoming,outgoing)=>{
   if(body===undefined)incoming.pipe(forwarded);else forwarded.end(body);
  };
  const fail=()=>outgoing.writeHead(503,{'Content-Type':'text/plain','error-id':'OWNED-RESPONSE-FAILURE','test-mode':'integration'}).end('Owned temporary response failure');
- if(responseWrite||commandAck){
+ if(responseWrite||commandAck||testStateWrite||testLogWrite){
   const chunks=[];let bytes=0;
   incoming.on('data',chunk=>{bytes+=chunk.length;if(bytes>1024*1024){outgoing.writeHead(413).end();incoming.destroy();}else chunks.push(chunk);});
   incoming.once('end',()=>{
    const body=Buffer.concat(chunks);record.body=body.toString('utf8');
+   if(testStateWrite&&target==='test-state-lost-ack'||testLogWrite&&(target==='test-log-lost-ack'||target==='terminal-log-lost-ack')){
+    const entries=JSON.parse(record.body);record.probe=Array.isArray(entries)&&entries.some(entry=>testStateWrite?entry.key==='SHARED_PARAMETERS':entry.key==='command executed'&&entry.content===(target==='terminal-log-lost-ack'?'terminate lock':'pause'));
+    if(record.probe&&remaining>0){remaining--;forward(body,true);return;}
+   }
    if(commandAck&&target==='command-ack'){
     if(remaining>0){remaining--;fail();return;}
     const value={outgoing,forward:()=>forward(body)};held.set(record.phase,value);

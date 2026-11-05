@@ -1,0 +1,97 @@
+{
+  "producerCommit": "19ab7f2a00021c5e1a4312b6cce1be601c0d5713",
+  "producerFile": "packages/application/src/original-unit-delivery.ts",
+  "producerFileSha256": "67a63077a91d6d5314bc04bcfb227b7771ae4d1eaa359fd9f2f9d36f06f196a9",
+  "cases": [
+    {
+      "input": {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "kind": "state",
+        "scope": {
+          "testRunId": "owned-r73-run",
+          "participantSessionId": "owned-r73-person",
+          "tenantId": "owned-r73-tenant",
+          "workspaceId": "owned-r73-workspace",
+          "contentReleaseId": "owned-r73-release"
+        },
+        "unitName": "OWNED.R73.ALIAS",
+        "body": {
+          "originalUnitId": "OWNED.ORIGINAL",
+          "newState": [
+            {
+              "key": "RESPONSE_PROGRESS",
+              "content": "some",
+              "timeStamp": 100
+            }
+          ]
+        },
+        "at": "2026-11-05T00:00:00.000Z"
+      },
+      "expected": {
+        "deliveryId": "native-unit-state:11111111-1111-4111-8111-111111111111",
+        "payloadSha256": "e33a8097ce00b851ad9fa085e5ebfa830182d17b74497e1cefbd34d4d42bd194",
+        "acceptedAt": "2026-11-05T00:00:00.000Z"
+      }
+    },
+    {
+      "input": {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "kind": "response",
+        "scope": {
+          "testRunId": "owned-r73-run",
+          "participantSessionId": "owned-r73-person",
+          "tenantId": "owned-r73-tenant",
+          "workspaceId": "owned-r73-workspace",
+          "contentReleaseId": "owned-r73-release"
+        },
+        "unitName": "OWNED.R73.ALIAS",
+        "body": {
+          "timeStamp": 101,
+          "dataParts": {
+            "opaque": "{\"exact\":\"Ω\\n\\u0000\"}"
+          },
+          "originalUnitId": "OWNED.ORIGINAL",
+          "responseType": "owned/type"
+        },
+        "at": "2026-11-05T00:00:00.000Z"
+      },
+      "expected": {
+        "deliveryId": "native-unit-response:11111111-1111-4111-8111-111111111111",
+        "payloadSha256": "00b3dd40ba7918a4a5cbe700a0ebc0d07f4b39dfdaa99b9cfd48c55d4931d43a",
+        "acceptedAt": "2026-11-05T00:00:00.000Z"
+      }
+    },
+    {
+      "input": {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "kind": "log",
+        "scope": {
+          "testRunId": "owned-r73-run",
+          "participantSessionId": "owned-r73-person",
+          "tenantId": "owned-r73-tenant",
+          "workspaceId": "owned-r73-workspace",
+          "contentReleaseId": "owned-r73-release"
+        },
+        "unitName": "OWNED.R73.ALIAS",
+        "body": {
+          "originalUnitId": "OWNED.ORIGINAL",
+          "logEntries": [
+            {
+              "key": "OWNED.LOG",
+              "content": {
+                "exact": "Ω\n"
+              },
+              "timeStamp": 102
+            }
+          ]
+        },
+        "at": "2026-11-05T00:00:00.000Z"
+      },
+      "expected": {
+        "deliveryId": "native-unit-log:11111111-1111-4111-8111-111111111111",
+        "payloadSha256": "0d69d4702ecdd873c626f77a999a68a114420dd6a2d6592ded49ebb1480050c6",
+        "acceptedAt": "2026-11-05T00:00:00.000Z"
+      }
+    }
+  ]
+}

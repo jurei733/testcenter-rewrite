@@ -10,6 +10,7 @@ import {hashOriginalSessionToken} from './original-session-token.js';
 import type {OriginalBookletFiles} from './original-test-files.js';
 import {parseOriginalNativeTestNumber,readOriginalPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
 import {defaultParticipantExecutionMode,type ParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
+import {originalTestDelivery,prepareOriginalNativeDelivery} from './original-native-delivery.js';
 
 /** PHP TestName preserves first key position while duplicate values replace it. */
 function orderedName(input:string):{name:string;fileId:string;states:Map<string,string>}{
@@ -34,11 +35,11 @@ export function formatOriginalTestReadJson(value:OriginalTestRead):string{
 export type OriginalTestPort = {
   requirePerson(input: {token: string}): Promise<void>;
   requireOwner(input:{token:string;testNumber:string}):Promise<void>;
-  putLog(input:{token:string;testNumber:string;body:unknown}):Promise<void>;
+  putLog(input:{token:string;testNumber:string;body:unknown;deliveryId?:unknown}):Promise<void>;
   patchLock(input:{token:string;testNumber:string;body:unknown}):Promise<void>;
   create(input: {token: string; bookletName: string}): Promise<string>;
   read(input:{token:string;testNumber:string}):Promise<OriginalTestRead>;
-  patchState(input:{token:string;testNumber:string;patch:unknown}):Promise<void>;
+  patchState(input:{token:string;testNumber:string;patch:unknown;deliveryId?:unknown}):Promise<void>;
   resource(input:{groupToken:string;workspaceNumber:string;path:string}):Promise<{bytes:Uint8Array;contentType:string}>;
 };
 const unavailable = () => new FirstSliceError(409, 'original_test_history_unknown', 'The Original Test identity is unavailable.');
@@ -113,11 +114,14 @@ export function createOriginalTestPort(input: {
       if(!result)throw forbidden(raw);
       return{...files,workspaceId,mode:person.originalOperationalMode??entry?.executionMode??defaultParticipantExecutionMode,laststate:savedState(result.testRun),firstStart:result.applied,presetBookletStates:orderedName(identity.bookletName).states};
     },
-    async patchState({token,testNumber:raw,patch}){
-      const{run}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch);
-      const result=await input.repository.mutateParticipantRun(run,context=>{const values=applyOriginalTestStatePatch(savedState(context.testRun),entries),timestamp=input.now();
+    async patchState({token,testNumber:raw,patch,deliveryId}){
+      const{run,testNumber}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch),delivery=originalTestDelivery({id:deliveryId,kind:'state',scope:{...run,testNumber},entries,now:input.now});
+      const result=await input.repository.mutateParticipantRun({...run,...(delivery?{deliveryId:delivery.deliveryId}:{})},context=>{
+        const receipt=delivery?prepareOriginalNativeDelivery(run,delivery,context.progressDelivery??undefined,'test'):undefined;
+        if(receipt===null)return null;
+        const values=applyOriginalTestStatePatch(savedState(context.testRun),entries),timestamp=input.now();
         const testLogs=entries.map(entry=>({participantTestLogId:originalTestStateLogIdPrefix+input.id(),tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,testRunId:run.testRunId,unitKey:null,originalUnitId:null,logKey:entry.key,logContent:encodeOriginalReportJson(entry.content),timestamp:entry.timeStamp,recordedAt:timestamp,...(entry.timeStamp===0?{originalTimestamp:0 as const}:{})}));
-        return{testRun:{...context.testRun,updatedAt:timestamp},originalTestState:values,originalResultModifiedAt:timestamp,testLogs,activityEvents:[]};});
+        return{testRun:{...context.testRun,updatedAt:timestamp},originalTestState:values,originalResultModifiedAt:timestamp,testLogs,activityEvents:[],...(receipt?{progressDelivery:receipt}:{})};});
       if(!result)throw forbidden(raw);
     },
     async requireOwner({token,testNumber}){await resolveOriginalOwnedTestScope(input,token,testNumber);},
@@ -132,12 +136,12 @@ export function createOriginalTestPort(input: {
         unitKey:null,originalUnitId:null,logKey:entry.key,logContent:entry.content,timestamp:entry.timeStamp,
         ...(entry.originalClientTimestamp===undefined?{}:{originalClientTimestamp:entry.originalClientTimestamp}),recordedAt}]);
     },
-    async putLog({token,testNumber,body}){
+    async putLog({token,testNumber,body,deliveryId}){
       const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber);
-      const entries=parseOriginalTestLogEntries(body);
-      if(!entries.length){await input.repository.appendOriginalTestLogs(scope,[]);return;}
+      const entries=parseOriginalTestLogEntries(body),delivery=originalTestDelivery({id:deliveryId,kind:'log',scope,entries,now:input.now}),target={...scope,...(delivery?{delivery}:{})};
+      if(!entries.length){await input.repository.appendOriginalTestLogs(target,[]);return;}
       const recordedAt=input.now();
-      await input.repository.appendOriginalTestLogs(scope,entries.map(entry=>({participantTestLogId:originalTestLogIdPrefix+input.id(),
+      await input.repository.appendOriginalTestLogs(target,entries.map(entry=>({participantTestLogId:originalTestLogIdPrefix+input.id(),
         tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId,testRunId:scope.testRunId,
         unitKey:null,originalUnitId:null,logKey:entry.key,logContent:entry.content,timestamp:entry.timeStamp,...(entry.originalClientTimestamp===undefined?{}:{originalClientTimestamp:entry.originalClientTimestamp}),recordedAt})));
     },

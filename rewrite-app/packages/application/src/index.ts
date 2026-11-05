@@ -44,6 +44,9 @@ export {originalUnitHistoryUnavailable,assertOriginalUnitParent,assertOriginalUn
 export type {OriginalUnitScope,OriginalUnitInput,OriginalUnitEffect,OriginalUnitTransform} from './original-unit-record.js';
 export {originalUnitDelivery,prepareOriginalUnitDelivery} from './original-unit-delivery.js';
 export type {OriginalUnitDelivery} from './original-unit-delivery.js';
+export {originalTestDelivery,prepareOriginalNativeDelivery} from './original-native-delivery.js';
+export type {OriginalNativeDelivery} from './original-native-delivery.js';
+export type {OriginalTestLogInput} from './original-test-log.js';
 export {preserveOriginalTestState} from './original-test-state.js';
 export {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 import {createOriginalTestFiles} from './original-test-files.js';
@@ -1714,7 +1717,7 @@ export type FirstSliceRepository = import('./original-admin-session.js').Origina
   matchesOriginalWorkspaceNumber(input: import('./original-workspace-number.js').OriginalWorkspaceNumberScope & {workspaceNumber:string}): Promise<boolean>;
   findOriginalTestNumber(input: {testNumber:string;tenantId:string;workspaceId:string;participantSessionId:string}): Promise<import('./original-test-number.js').OriginalTestNumberRecord|null>;
   /** Append native Test logs under current metadata ownership, without rewriting its Run. */
-  appendOriginalTestLogs(input: import('./original-test-number.js').OriginalTestNumberRecord, logs: ParticipantTestLog[]): Promise<void>;
+  appendOriginalTestLogs(input: import('./original-test-log.js').OriginalTestLogInput, logs: ParticipantTestLog[]): Promise<void>;
   lockOriginalTest(input: import('./original-test-number.js').OriginalTestNumberRecord, timestamp: string): Promise<void>;
   getOrCreateOriginalTestNumber(input: import('./original-test-number.js').OriginalTestNumberInput): Promise<string>;
   saveTestRun(testRun: TestRun): Promise<void>;

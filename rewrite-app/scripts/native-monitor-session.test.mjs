@@ -36,6 +36,14 @@ test('a current verification of revoked credentials retires the actor and a stal
 }));
 async function fixture(run,token){const oldFetch=globalThis.fetch,oldStorage=globalThis.localStorage,oldTabStorage=globalThis.sessionStorage,oldSecure=globalThis.isSecureContext,values=new Map(token?[[storageKey,token]]:[]),tabValues=new Map();globalThis.localStorage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};globalThis.sessionStorage={getItem:key=>tabValues.get(key)??null,setItem:(key,value)=>tabValues.set(key,value),removeItem:key=>tabValues.delete(key)};globalThis.isSecureContext=true;try{await run(values,tabValues);}finally{globalThis.fetch=oldFetch;globalThis.localStorage=oldStorage;globalThis.sessionStorage=oldTabStorage;globalThis.isSecureContext=oldSecure;}}
 
+test('native terminal log delivery metadata is scoped to Test-log PUTs and retains the captured credential',()=>fixture(async()=>{
+ const requests=[];globalThis.fetch=async(path,options)=>{requests.push({path,options});return path.startsWith('/session')?response(access('current')):response('');};
+ const session=new NativeMonitorSessionService();await session.login('owned','password');const id='11111111-1111-4111-8111-111111111111',body=[{key:'command executed',content:'terminate lock',timeStamp:1}];
+ await session.text('PUT','/test/9007199254740995/log',body,'current',false,undefined,undefined,id);
+ const saved=requests.at(-1);assert.equal(saved.options.headers['X-Native-Delivery-Id'],id);assert.equal(saved.options.headers.AuthToken,'current');assert.equal(saved.options.body,JSON.stringify(body));const count=requests.length;
+ for(const [method,path,deliveryId] of [['PUT','/test/1/log','invalid'],['GET','/test/1/log',id],['PUT','/monitor/command',id]])await assert.rejects(session.text(method,path,body,'current',false,undefined,undefined,deliveryId),/Invalid native Test log delivery/);
+ assert.equal(requests.length,count);assert.equal(session.access().token,'current');
+}));
 test('late native restoration cannot replace a newer real login',()=>fixture(async values=>{
  const pending=deferred(),requests=[];globalThis.fetch=async(path,options)=>{requests.push({path,options});return options.method==='GET'?pending.promise:response(access('new'));};const session=new NativeMonitorSessionService();assert.equal(session.restoring(),true);
  await session.login('owned','password');pending.resolve(response(access('old')));await settle();assert.equal(session.access().token,'new');assert.equal(values.get(storageKey),'new');assert.equal(session.restoring(),false);

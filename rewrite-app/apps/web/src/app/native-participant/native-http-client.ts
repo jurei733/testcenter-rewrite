@@ -80,6 +80,8 @@ export class NativeHttpClient {
    const operation=AbortSignal.any([signal,abort.signal,AbortSignal.timeout(20000)]);
    // All retries send the same captured bytes and timestamp, never later edits.
    const payload=options.nativePayload??(body===undefined?undefined:JSON.stringify(body));
+   const testWrite=method==='PATCH'&&url.pathname===`/test/${this.runTestId}/state`||method==='PUT'&&url.pathname===`/test/${this.runTestId}/log`;
+   const deliveryId=options.nativeDeliveryId??(testWrite?crypto.randomUUID():undefined);
    const current=()=>!subscriber.closed&&!signal.aborted&&scope===this.session.accessSignal;
    const retire=()=>subscriber.complete();signal.addEventListener('abort',retire,{once:true});
    const wait=(delay:number)=>new Promise<void>((resolve,reject)=>{
@@ -91,7 +93,7 @@ export class NativeHttpClient {
     for(let attempt=0;;attempt++){
      try{
       operation.throwIfAborted();
-      const response=await fetch(url,{method,cache:'no-store',credentials:'omit',redirect:'error',signal:operation,headers:{AuthToken:token,...(payload===undefined?{}:{'Content-Type':'application/json'}),...(options.nativeDeliveryId?{'X-Native-Delivery-Id':options.nativeDeliveryId}:{})},...(payload===undefined?{}:{body:payload})});
+      const response=await fetch(url,{method,cache:'no-store',credentials:'omit',redirect:'error',signal:operation,headers:{AuthToken:token,...(payload===undefined?{}:{'Content-Type':'application/json'}),...(deliveryId?{'X-Native-Delivery-Id':deliveryId}:{})},...(payload===undefined?{}:{body:payload})});
       let text:string;
       if(response.ok&&response.body&&options.observe==='events'&&options.reportProgress){
        const reader=response.body.getReader(),decoder=new TextDecoder(),chunks:string[]=[];

@@ -309,6 +309,15 @@ test('native retries use the Original finite delays and frozen response bytes be
  for(const delay of[50,500,1000,2000]){t.mock.timers.tick(delay-1);await turn();const before=calls.length;t.mock.timers.tick(1);await turn();assert.equal(calls.length,before+1);}
  assert.equal(await done,null);assert.deepEqual(calls.map(c=>c.at-start),[0,50,550,1550,3550]);assert.equal(new Set(calls.map(c=>c.body)).size,1);assert.equal(JSON.parse(calls[4].body).dataParts.answer,'original Ω');
 });
+for(const kind of ['state','log'])test('native Test '+kind+' retries retain one delivery identity and frozen bytes, while a new packet gets its own identity',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});session();const client=new NativeHttpClient(),calls=[],body=[{key:'OWNED',content:'first Ω',timeStamp:111}];t.after(()=>client.ngOnDestroy());
+ globalThis.fetch=async(url,options)=>{calls.push({url:String(url),headers:options.headers,body:options.body});return new Response(calls.length<5?'Temporary':'',{status:calls.length<5?503:kind==='state'?200:201});};
+ const send=()=>rx.firstValueFrom(kind==='state'?client.patch('/test/1/state',body):client.put('/test/1/log',body)),done=send();await turn();body[0].content='later edit';
+ for(const delay of[50,500,1000,2000]){t.mock.timers.tick(delay);await turn();}await done;
+ const id=calls[0].headers['X-Native-Delivery-Id'];assert.match(id,/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
+ assert.equal(calls.length,5);assert.ok(calls.every(row=>row.headers['X-Native-Delivery-Id']===id&&row.headers.AuthToken==='actor-A'));assert.equal(new Set(calls.map(row=>row.body)).size,1);assert.equal(JSON.parse(calls[4].body)[0].content,'first Ω');
+ await send();assert.notEqual(calls[5].headers['X-Native-Delivery-Id'],id);assert.equal(JSON.parse(calls[5].body)[0].content,'later edit');
+});
 test('exhausted native retries retain status/error metadata and route only to their original owner',async t=>{
  t.mock.timers.enable({apis:['setTimeout','Date']});session();const delivered=[];bindings.set(tokens.NATIVE_ERROR_RECEIVER,error=>delivered.push(error));const client=new NativeHttpClient();let calls=0;
  t.after(()=>{client.ngOnDestroy();bindings.set(tokens.NATIVE_ERROR_RECEIVER,null);});
@@ -362,6 +371,8 @@ test('terminal log retries retain the captured test, actor, bytes and one logica
  const lease=f.service.begin('9007199254740995','terminate lock'),done=lease.complete();await settle();t.mock.timers.tick(50);await settle();t.mock.timers.tick(500);await done;
  assert.equal(attempts.length,3);assert.equal(new Set(attempts.map(a=>JSON.stringify(a[2]))).size,1);assert.equal(new Set(attempts.map(a=>a[5])).size,1);
  assert.ok(attempts.every(a=>a[1]==='/test/9007199254740995/log'&&a[3]==='actor-A'));
+ assert.match(attempts[0][7],/^[a-f0-9-]{36}$/);assert.equal(new Set(attempts.map(a=>a[7])).size,1);
+ await f.service.begin('9007199254740995','terminate lock').complete();assert.notEqual(attempts[3][7],attempts[0][7]);
 });
 test('cancelled or invalid terminal completion leases cannot send a log',async t=>{
  const f=terminalCompletions(t),lease=f.service.begin('9007199254740995','terminate');lease.cancel();await lease.complete();

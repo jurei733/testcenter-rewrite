@@ -27,6 +27,7 @@ export class NativeTerminalCompletionService implements OnDestroy {
    if(finished||!current()){cancel();return Promise.resolve();}
    const operation=AbortSignal.any([scope,cancelRequest.signal,AbortSignal.timeout(20000)]);
    const body=[Object.freeze({key:'command executed',timeStamp:Date.now(),content:command})];
+   const deliveryId=crypto.randomUUID();
    const wait=(ms:number)=>new Promise<void>((resolve,reject)=>{
     const abort=()=>{clearTimeout(timer);operation.removeEventListener('abort',abort);reject(operation.reason);};
     const timer=setTimeout(()=>{operation.removeEventListener('abort',abort);resolve();},ms);
@@ -35,7 +36,7 @@ export class NativeTerminalCompletionService implements OnDestroy {
    completion=(async()=>{try{
     for(let attempt=0;;attempt++){
      if(!current())return;operation.throwIfAborted();
-     try{await this.session.text('PUT',`/test/${testId}/log`,body,token,false,operation);return;}
+     try{await this.session.text('PUT',`/test/${testId}/log`,body,token,false,operation,undefined,deliveryId);return;}
      catch(error){
       if(!current()||cancelRequest.signal.aborted)return;
       if(operation.aborted||attempt===nativeTestRetryDelays.length||error instanceof NativeMonitorHttpError&&nativeRetryExcludedStatus.some(status=>status===error.status))throw error;
