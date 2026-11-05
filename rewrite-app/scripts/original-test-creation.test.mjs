@@ -14,6 +14,7 @@ import {createPostgresFirstSliceStorage, POSTGRES_FIRST_SLICE_SCHEMA_VERSION} fr
 import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
 import {formatOriginalLogReport} from '../packages/application/dist/packages/application/src/original-workspace-report-wire.js';
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
+import {verifyOriginalUnitDeliveries} from './original-unit-delivery-checks.mjs';
 
 const evidence = new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-creation/', import.meta.url);
 const manifest = JSON.parse(await readFile(new URL('manifest.json', evidence), 'utf8'));
@@ -220,7 +221,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
     await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-native-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'en',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
     await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.NATIVE.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-native-player@1.2.3">Owned definition</Definition>'));
     await upload('assigned.xml',booklet('OWNED.ASSIGNED','Assigned',true));await upload('unassigned.xml',booklet(native.bookletName,labels.firstLabel));
-    const namesOwned=['owned-create','owned-other','owned-entry','owned-atomic','owned-review','owned-after-delete','owned-legacy','owned-cross-writer','owned-unit-native','owned-unit-peer'];
+    const namesOwned=['owned-create','owned-other','owned-entry','owned-atomic','owned-review','owned-after-delete','owned-legacy','owned-cross-writer','owned-unit-native','owned-unit-peer','owned-unit-delivery'];
     await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="Owned.Create" label="Owned create">'+namesOwned.map(name=>`<Login name="${name}" pw="${password}" mode="${name==='owned-review'?'run-review':'run-hot-return'}"><Booklet codes="Owned">OWNED.ASSIGNED</Booklet></Login>`).join('')+'</Group>')});
     const auth=async name=>{const login=await services.originalAuthentication.login({name,password});return{login,person:await services.originalAuthentication.person({loginToken:login.token,code:'Owned'})};};
     const main=await auth('owned-create'),other=await auth('owned-other');let number,run,nativeWorkspaceNumber;
@@ -1075,6 +1076,8 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       finally{await exec(kind==='sqlite'?'DROP TRIGGER owned_number_failure':'DROP TRIGGER owned_number_failure ON original_test_numbers; DROP FUNCTION owned_number_failure()');}
       assert.match(await request(session,native.bookletName),/^[1-9][0-9]*$/);
     });
+    await verifyOriginalUnitDeliveries({t,kind,file,url,auth,bookletName:native.bookletName,reopen,
+      repository:()=>repository,services:()=>services,createServices:repo=>createFirstSliceServices({repository:repo,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'})});
     await t.test('native group deletion retires number mappings while keeping the global number monotonic',async()=>{
       const before=await repository.getParticipantSessionById(run.participantSessionId),saved=await repository.getTestRunById(run.testRunId);
       await repository.deleteOriginalGroupResults({...ids,groups:['Owned.Create']});

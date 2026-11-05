@@ -72,6 +72,9 @@ export class TestLoaderService extends BookletParserService<Unit, Testlet, Bookl
 
     this.tcs.workspaceId = testData.workspaceId;
     this.tcs.testMode = new TestMode(testData.mode);
+    // Complete actor-bound recovery before any Unit response is read or a Player
+    // can accept input, including first-start external-definition shortcuts.
+    await this.bs.prepareUnitJournal(this.tcs.testMode.saveResponses);
     this.presetBookletStates = testData.presetBookletStates;
 
     this.getBookletFromXml(testData.xml);

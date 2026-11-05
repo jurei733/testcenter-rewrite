@@ -5,7 +5,7 @@ import {originalParticipantGroupKeysEqual} from './original-participant-group.js
 import {assertOriginalTestState,parseOriginalTestStatePatch} from './original-test-state.js';
 
 export type OriginalUnitScope=Pick<TestRun,'testRunId'|'participantSessionId'|'tenantId'|'workspaceId'|'contentReleaseId'>;
-export type OriginalUnitInput=OriginalUnitScope&{unitName:string};
+export type OriginalUnitInput=OriginalUnitScope&{unitName:string;delivery?:import('./original-unit-delivery.js').OriginalUnitDelivery};
 export type OriginalUnitEffect={unit?:OriginalNativeUnit;logs:ParticipantTestLog[]};
 export type OriginalUnitTransform=(previous:OriginalNativeUnit|null)=>OriginalUnitEffect;
 const keys=['testRunId','participantSessionId','tenantId','workspaceId','contentReleaseId'] as const;

@@ -67,6 +67,8 @@ export class BackendService {
     return this.http.get<TestData>(`${this.backendUrl}test/${testId}`);
   }
 
+  prepareUnitJournal(saving:boolean):Promise<void>{return this.http.prepareUnitJournal(saving);}
+
   getUnitData(testId: string, unitid: string, unitalias: string): Observable<UnitData> {
     return this.http.get<UnitData>(`${this.backendUrl}test/${testId}/unit/${unitid}/alias/${unitalias}`);
   }
@@ -80,8 +82,8 @@ export class BackendService {
   }
 
   patchUnitState(stateUpdate: UnitStateUpdate, originalUnitId: string): Observable<void> {
-    return this.http.patch<void>(
-      `${this.backendUrl}test/${stateUpdate.testId}/unit/${stateUpdate.unitAlias}/state`,
+    return this.http.unitWrite<void>(
+      'state',stateUpdate.testId,stateUpdate.unitAlias,
       { newState: stateUpdate.state, originalUnitId }
     );
   }
@@ -92,7 +94,7 @@ export class BackendService {
     originalUnitId: string,
     logEntries: StateReportEntry<string>[]
   ): Subscription {
-    return this.http.put<void>(`${this.backendUrl}test/${testId}/unit/${unitName}/log`, {
+    return this.http.unitWrite<void>('log',testId,unitName, {
       logEntries,
       originalUnitId
     }).subscribe();
@@ -117,7 +119,7 @@ export class BackendService {
     responseType: string
   ): Observable<void> {
     const timeStamp = Date.now();
-    return this.http.put<void>(`${this.backendUrl}test/${testId}/unit/${unitAlias}/response`, {
+    return this.http.unitWrite<void>('response',testId,unitAlias, {
       timeStamp, dataParts, originalUnitId, responseType
     });
   }

@@ -1,5 +1,6 @@
 import {originalParticipantGroupKeysEqual} from '@testcenter-rewrite-app/application';
-import type {OriginalNativeUnit,TestRun} from '@testcenter-rewrite-app/domain';
+import type {OriginalNativeUnit,ParticipantProgressDelivery,TestRun} from '@testcenter-rewrite-app/domain';
+import {prepareOriginalUnitDelivery} from '@testcenter-rewrite-app/application';
 import {assertOriginalUnitInput,assertOriginalUnitRecord,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitParentMatches,resultParentUnavailable,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from '@testcenter-rewrite-app/application';
 import {withResultArtifactParent} from './result-artifact-parent.js';
 import type {DatabaseSync} from 'node:sqlite';
@@ -23,11 +24,18 @@ export function readOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitI
 }
 export function mutateOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput,transform:OriginalUnitTransform):OriginalNativeUnit|null{
  assertOriginalUnitInput(input);return withResultArtifactParent(database,input,()=>{
-  const previous=readOriginalNativeUnitInTransaction(database,input),effect=prepareOriginalUnitMutation(input,previous,transform);
+  const previous=readOriginalNativeUnitInTransaction(database,input);
+  const saved=input.delivery?database.prepare('SELECT * FROM participant_progress_deliveries WHERE test_run_id=? AND delivery_id=?').get(input.testRunId,input.delivery.deliveryId):undefined;
+  if(saved&&(['tenant_id','workspace_id','participant_session_id','content_release_id'] as const).some((key,index)=>saved[key]!==[input.tenantId,input.workspaceId,input.participantSessionId,input.contentReleaseId][index]))throw resultParentUnavailable();
+  const receipt=input.delivery?prepareOriginalUnitDelivery(input,input.delivery,saved?JSON.parse(String(saved.delivery_json)) as ParticipantProgressDelivery:undefined):undefined;
+  if(receipt===null)return previous;
+  const effect=prepareOriginalUnitMutation(input,previous,transform);
   if(effect.unit){const unit=effect.unit;database.prepare(`INSERT INTO original_native_units(test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,unit_name,unit_json) VALUES(?,?,?,?,?,?,?)
    ON CONFLICT(test_run_id,unit_name) DO UPDATE SET unit_json=excluded.unit_json`).run(unit.testRunId,unit.participantSessionId,unit.tenantId,unit.workspaceId,unit.contentReleaseId,unit.unitName,JSON.stringify(unit));}
   for(const log of effect.logs)database.prepare(`INSERT INTO participant_test_logs(participant_test_log_id,tenant_id,workspace_id,participant_session_id,test_run_id,unit_key,original_unit_id,log_key,log_content,timestamp,recorded_at,original_timestamp)
    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(log.participantTestLogId,log.tenantId,log.workspaceId,log.participantSessionId,log.testRunId,log.unitKey,log.originalUnitId,log.logKey,log.logContent,log.timestamp,log.recordedAt,log.originalTimestamp??null);
+  if(receipt)database.prepare(`INSERT INTO participant_progress_deliveries(test_run_id,delivery_id,tenant_id,workspace_id,participant_session_id,content_release_id,delivery_json) VALUES(?,?,?,?,?,?,?)`)
+   .run(receipt.testRunId,receipt.deliveryId,receipt.tenantId,receipt.workspaceId,receipt.participantSessionId,receipt.contentReleaseId,JSON.stringify(receipt));
   return effect.unit??previous;
  });
 }

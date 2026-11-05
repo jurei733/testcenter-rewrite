@@ -42,6 +42,8 @@ export type {OriginalUnitPort,OriginalUnitRead} from './original-unit.js';
 export {readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from './original-unit-collections.js';
 export {originalUnitHistoryUnavailable,assertOriginalUnitParent,assertOriginalUnitInput,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitRecordKey,selectOriginalUnitName,prepareOriginalUnitMutation,patchOriginalUnitState,patchOriginalUnitParts} from './original-unit-record.js';
 export type {OriginalUnitScope,OriginalUnitInput,OriginalUnitEffect,OriginalUnitTransform} from './original-unit-record.js';
+export {originalUnitDelivery,prepareOriginalUnitDelivery} from './original-unit-delivery.js';
+export type {OriginalUnitDelivery} from './original-unit-delivery.js';
 export {preserveOriginalTestState} from './original-test-state.js';
 export {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 import {createOriginalTestFiles} from './original-test-files.js';

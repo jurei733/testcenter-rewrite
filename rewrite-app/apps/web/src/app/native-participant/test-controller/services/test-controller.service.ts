@@ -382,11 +382,12 @@ export class TestControllerService {
           !unit.dataParts[dataPartId] ||
           (unit.dataParts[dataPartId] !== dataParts[dataPartId])
         ) {
-          unit.dataParts[dataPartId] = dataParts[dataPartId];
           changedParts[dataPartId] = dataParts[dataPartId];
         }
       });
     if (Object.keys(changedParts).length) {
+      if(this.testMode.saveResponses)this.nativeHttp.captureUnitResponse(unit.alias,unit.id,changedParts,unitStateDataType);
+      Object.assign(unit.dataParts,changedParts);
       this.unitDataPartsBuffer$.next({
         testId: this.testId,
         unitAlias: unit.alias,
@@ -423,6 +424,7 @@ export class TestControllerService {
         }
         return true;
       });
+    if(changedStates.length&&this.testMode.saveResponses)this.nativeHttp.captureUnitState(unit.alias,unit.id,changedStates);
     changedStates
       .forEach(changedState => setUnitState(changedState.key, changedState.content));
     if (changedStates.length) {

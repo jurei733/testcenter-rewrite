@@ -1,6 +1,7 @@
 import {NATIVE_RUN_TEST_ID,NATIVE_RENDER_NOTIFY,NATIVE_ERROR_RECEIVER} from './native-tokens';
 import {Injectable,inject} from '@angular/core';
-import {Observable} from 'rxjs';
+import {Observable,firstValueFrom} from 'rxjs';
+import {NativeUnitJournal,type NativeUnitDelivery} from './native-unit-journal';
 import {HttpResponse,HttpHeaders,HttpEventType,HttpErrorResponse} from '@angular/common/http';
 import {parseNativeParticipantJson} from './native-wire';
 import {NativeMonitorSessionService} from '../native-monitor/native-session.service';
@@ -16,14 +17,54 @@ export class NativeHttpClient {
  private readonly lifetime=new AbortController();
  readonly accessSignal=AbortSignal.any([this.ownerScope,this.lifetime.signal]);
  private credential=this.session.access()?.token;
+ private unitJournal?:NativeUnitJournal;
+ private journalPreparation?:Promise<void>;
  verifyAccess(owner:AbortSignal){return this.session.verifyAccess(owner);}
  get isCurrent(){return !!this.credential&&!this.accessSignal.aborted&&this.ownerScope===this.session.accessSignal;}
- private retire=()=>{this.credential=undefined;this.lifetime.abort();};
+ private retire=()=>{this.unitJournal?.close();this.unitJournal=undefined;this.credential=undefined;this.lifetime.abort();};
  constructor(){this.ownerScope.addEventListener('abort',this.retire,{once:true});}
  ngOnDestroy(){this.ownerScope.removeEventListener('abort',this.retire);this.retire();}
  ownError<T>(error:T):T {
   if(this.receiveError&&error&&typeof error==='object')ownAsyncError(error,()=>this.receiveError?.(error));
   return error;
+ }
+ prepareUnitJournal(saving:boolean):Promise<void>{
+  if(!saving)return Promise.resolve();
+  return this.journalPreparation??=this.recoverUnitJournal().catch(error=>{throw this.ownError(error);});
+ }
+ private async recoverUnitJournal():Promise<void>{
+  if(!this.isCurrent||!this.credential)throw Error('Native run retired.');
+  const journal=await NativeUnitJournal.open({token:this.credential,testId:this.runTestId,storage:localStorage,locks:navigator.locks,crypto});
+  if(!this.isCurrent){journal.close();throw Error('Native run retired.');}
+  this.unitJournal=journal;
+  for(const entry of journal.recoveries()){
+   if(!this.isCurrent)throw Error('Native run retired.');
+   const base=`/test/${this.runTestId}/unit/${encodeURIComponent(entry.unitAlias)}`;
+   if(entry.kind==='response'){
+    // A crash may precede the Unit-state window too. Empty initialization creates
+    // no logs, preserves existing state and uses a separate idempotency namespace.
+    await firstValueFrom(this.request('PATCH',base+'/state',{newState:[],originalUnitId:entry.originalUnitId},{nativeDeliveryId:entry.id}));
+   }
+   await firstValueFrom(this.request(entry.kind==='state'?'PATCH':'PUT',base+'/'+entry.kind,undefined,
+    {nativePayload:entry.payload,nativeDeliveryId:entry.id,nativeAccepted:()=>journal.acknowledge(entry)}));
+  }
+ }
+ captureUnitResponse(unitAlias:string,originalUnitId:string,dataParts:Record<string,string>,responseType:string):void{
+  if(!this.isCurrent||!this.unitJournal)throw this.ownError(new Error('Lokale Antwortsicherung ist noch nicht bereit.'));
+  try{this.unitJournal.captureResponse(unitAlias,originalUnitId,dataParts,responseType);}catch(error){throw this.ownError(error);}
+ }
+ captureUnitState(unitAlias:string,originalUnitId:string,state:unknown[]):void{
+  if(!this.isCurrent||!this.unitJournal)throw this.ownError(new Error('Lokale Antwortsicherung ist noch nicht bereit.'));
+  try{this.unitJournal.captureState(unitAlias,originalUnitId,state);}catch(error){throw this.ownError(error);}
+ }
+ unitWrite<T>(kind:NativeUnitDelivery['kind'],testId:string,unitAlias:string,body:Record<string,unknown>):Observable<T>{
+  if(testId!==this.runTestId||!this.isCurrent)return new Observable(subscriber=>subscriber.error(this.ownError(new Error('Native request outside its authenticated scope.'))));
+  const path=`/test/${this.runTestId}/unit/${encodeURIComponent(unitAlias)}/${kind}`;
+  if(!this.unitJournal)return this.request(kind==='state'?'PATCH':'PUT',path,body);
+  try{
+   const journal=this.unitJournal,entry=journal.freeze(kind,unitAlias,body);
+   return this.request(kind==='state'?'PATCH':'PUT',path,undefined,{nativePayload:entry.payload,nativeDeliveryId:entry.id,nativeAccepted:()=>journal.acknowledge(entry)});
+  }catch(error){return new Observable(subscriber=>subscriber.error(this.ownError(error)));}
  }
  get<T=unknown>(url:string,options?:any):Observable<any>{return this.request('GET',url,undefined,options);}
  patch<T=unknown>(url:string,body:unknown,options?:any):Observable<T>{return this.request('PATCH',url,body,options);}
@@ -38,7 +79,7 @@ export class NativeHttpClient {
    if((target&&target[1]!==this.runTestId)||!token||signal.aborted||scope!==this.session.accessSignal||url.origin!==location.origin||!(/^\/(?:test|file|session)(?:\/|$)/.test(url.pathname)||url.pathname==='/system/status')){subscriber.error(this.ownError(new Error('Native request outside its authenticated scope.')));return;}
    const operation=AbortSignal.any([signal,abort.signal,AbortSignal.timeout(20000)]);
    // All retries send the same captured bytes and timestamp, never later edits.
-   const payload=body===undefined?undefined:JSON.stringify(body);
+   const payload=options.nativePayload??(body===undefined?undefined:JSON.stringify(body));
    const current=()=>!subscriber.closed&&!signal.aborted&&scope===this.session.accessSignal;
    const retire=()=>subscriber.complete();signal.addEventListener('abort',retire,{once:true});
    const wait=(delay:number)=>new Promise<void>((resolve,reject)=>{
@@ -50,7 +91,7 @@ export class NativeHttpClient {
     for(let attempt=0;;attempt++){
      try{
       operation.throwIfAborted();
-      const response=await fetch(url,{method,cache:'no-store',credentials:'omit',redirect:'error',signal:operation,headers:{AuthToken:token,...(payload===undefined?{}:{'Content-Type':'application/json'})},...(payload===undefined?{}:{body:payload})});
+      const response=await fetch(url,{method,cache:'no-store',credentials:'omit',redirect:'error',signal:operation,headers:{AuthToken:token,...(payload===undefined?{}:{'Content-Type':'application/json'}),...(options.nativeDeliveryId?{'X-Native-Delivery-Id':options.nativeDeliveryId}:{})},...(payload===undefined?{}:{body:payload})});
       let text:string;
       if(response.ok&&response.body&&options.observe==='events'&&options.reportProgress){
        const reader=response.body.getReader(),decoder=new TextDecoder(),chunks:string[]=[];
@@ -68,6 +109,7 @@ export class NativeHttpClient {
        throw new HttpErrorResponse({status:response.status,statusText:response.statusText,headers:new HttpHeaders(headers),url:safeUrl,error:errorBody});
       }
       const value=options.responseType==='text'?text:text.length?parseNativeParticipantJson(url.pathname,text):null;
+      options.nativeAccepted?.();
       const result=new HttpResponse({body:value,status:response.status,headers:new HttpHeaders(headers),url:url.href});
       subscriber.next(options.observe==='events'||options.observe==='response'?result:value);subscriber.complete();this.notify();return;
      }catch(error){

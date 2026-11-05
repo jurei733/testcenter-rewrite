@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {nativeUnitJournalFixture} from './native-unit-journal.test.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
@@ -73,6 +74,25 @@ test('native resource progress counts actual UTF8 bytes and returns unmodified t
 });
 test('native 401 retires the actor even with an empty response body',async()=>{
  const owner=session(),client=new NativeHttpClient();globalThis.fetch=async()=>new Response('',{status:401});let completed=false;client.get('/test/1/commands').subscribe({complete:()=>completed=true});await settle();await settle();assert.equal(owner.access(),null);assert.equal(completed,true);
+});
+test('actual native transport keeps a newer pre-buffer draft when an older write is acknowledged, then recovers it with durable IDs',async t=>{
+ const f=nativeUnitJournalFixture();t.after(()=>f.close());const priorStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage'),priorNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,value:f.storage});Object.defineProperty(globalThis,'navigator',{configurable:true,value:{locks:f.manager}});
+ t.after(()=>{if(priorStorage)Object.defineProperty(globalThis,'localStorage',priorStorage);else delete globalThis.localStorage;if(priorNavigator)Object.defineProperty(globalThis,'navigator',priorNavigator);else delete globalThis.navigator;});
+ session();const client=new NativeHttpClient();await client.prepareUnitJournal(true);let release;const requests=[];
+ globalThis.fetch=async(url,options)=>{requests.push({url:String(url),headers:options.headers,payload:options.body});return new Promise(done=>{release=done;});};
+ client.captureUnitResponse('UNIT_A','ORIGINAL',{answer:'old'},'owned');
+ const done=rx.firstValueFrom(client.unitWrite('response','1','UNIT_A',{timeStamp:111,dataParts:{answer:'old'},responseType:'owned',originalUnitId:'ORIGINAL'}));await turn();
+ assert.equal(requests.length,1);assert.match(requests[0].headers['X-Native-Delivery-Id'],/^[a-f0-9-]{36}$/);assert.equal(requests[0].headers.AuthToken,'actor-A');
+ client.captureUnitResponse('UNIT_A','ORIGINAL',{answer:'new before buffer'},'owned');release(new Response('',{status:201}));await done;client.ngOnDestroy();await turn();
+ const resumed=new NativeHttpClient();t.after(()=>resumed.ngOnDestroy());globalThis.fetch=async(url,options)=>{requests.push({url:String(url),headers:options.headers,payload:options.body});return new Response('',{status:201});};
+ await resumed.prepareUnitJournal(true);assert.equal(requests.length,3);assert.ok(requests[1].url.endsWith('/state'));assert.ok(requests[2].url.endsWith('/response'));
+ assert.equal(JSON.parse(requests[2].payload).dataParts.answer,'new before buffer');assert.notEqual(requests[2].headers['X-Native-Delivery-Id'],requests[0].headers['X-Native-Delivery-Id']);
+ assert.equal(requests[1].headers['X-Native-Delivery-Id'],requests[2].headers['X-Native-Delivery-Id']);assert.equal(f.storage.length,0);
+});
+test('native durable writes reject a mutable foreign Run before creating a delivery or sending it',async t=>{
+ session();const client=new NativeHttpClient();t.after(()=>client.ngOnDestroy());let requests=0;globalThis.fetch=async()=>{requests++;return new Response('');};
+ await assert.rejects(rx.firstValueFrom(client.unitWrite('response','2','UNIT_A',{timeStamp:1,dataParts:{answer:'foreign'},responseType:'owned',originalUnitId:'ORIGINAL'})));assert.equal(requests,0);
 });
 function commands(t){
  t.mock.timers.enable({apis:['setTimeout','setInterval','Date']});const scope=new AbortController(),started=[],tcs={testId:'1',state$:new rx.BehaviorSubject('INIT'),testMode:{receiveRemoteCommands:false}};

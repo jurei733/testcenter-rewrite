@@ -1,9 +1,10 @@
-import type {OriginalNativeUnit,ParticipantSession,ParticipantTestLog,TestRun,WorkspaceReview,WorkspaceActivityEvent} from '@testcenter-rewrite-app/domain';
+import type {OriginalNativeUnit,ParticipantSession,ParticipantTestLog,ParticipantProgressDelivery,TestRun,WorkspaceReview,WorkspaceActivityEvent} from '@testcenter-rewrite-app/domain';
+import {prepareOriginalUnitDelivery} from './original-unit-delivery.js';
 import {assertOriginalUnitParent,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitRecordKey,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from './original-unit-record.js';
 import {selectOriginalSavedUnitKeys} from './original-saved-unit-projection.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 type Collection<Row>=Map<string,Row>|Record<string,Row>;
-type State={originalNativeUnits:Collection<OriginalNativeUnit>;testRuns:Collection<TestRun>;participantSessions:Collection<ParticipantSession>;participantTestLogs:Collection<ParticipantTestLog>;workspaceReviews:Collection<WorkspaceReview>;workspaceActivityEvents:Collection<WorkspaceActivityEvent>};
+type State={originalNativeUnits:Collection<OriginalNativeUnit>;testRuns:Collection<TestRun>;participantSessions:Collection<ParticipantSession>;participantTestLogs:Collection<ParticipantTestLog>;participantProgressDeliveries?:Collection<ParticipantProgressDelivery>;workspaceReviews:Collection<WorkspaceReview>;workspaceActivityEvents:Collection<WorkspaceActivityEvent>};
 const get=<Row>(collection:Collection<Row>,key:string):Row|undefined=>collection instanceof Map?collection.get(key):Object.hasOwn(collection,key)?collection[key]:undefined;
 const set=<Row>(collection:Collection<Row>,key:string,row:Row):void=>{if(collection instanceof Map)collection.set(key,row);else collection[key]=row;};
 const values=<Row>(collection:Collection<Row>):Row[]=>collection instanceof Map?[...collection.values()]:Object.values(collection);
@@ -26,10 +27,16 @@ export function invalidateOriginalUnitCollection(state:Pick<State,'originalNativ
  }
 }
 export function mutateOriginalUnitCollection(state:State,input:OriginalUnitInput,transform:OriginalUnitTransform):OriginalNativeUnit|null{
- const previous=readOriginalUnitCollection(state,input),effect=prepareOriginalUnitMutation(input,previous,transform);
+ const previous=readOriginalUnitCollection(state,input);
+ const receiptKey=input.delivery?JSON.stringify([input.testRunId,input.delivery.deliveryId]):undefined;
+ if(input.delivery&&!state.participantProgressDeliveries)throw Error('Native delivery storage is unavailable.');
+ const receipt=input.delivery?prepareOriginalUnitDelivery(input,input.delivery,get(state.participantProgressDeliveries!,receiptKey!)):undefined;
+ if(receipt===null)return previous;
+ const effect=prepareOriginalUnitMutation(input,previous,transform);
  if(effect.logs.some(row=>get(state.participantTestLogs,row.participantTestLogId)))throw Error('Native Unit log identity collision.');
  // All validation happens before publishing either state or logs.
  if(effect.unit)set(state.originalNativeUnits,originalUnitRecordKey(effect.unit),effect.unit);
  for(const log of effect.logs)set(state.participantTestLogs,log.participantTestLogId,log);
+ if(receipt)set(state.participantProgressDeliveries!,receiptKey!,receipt);
  return structuredClone(effect.unit??previous);
 }

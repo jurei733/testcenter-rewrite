@@ -53,7 +53,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   if(commands){const wire=await input.services.originalCommand.poll({token,testNumber:commands[1]!,body});await input.subscribe?.({channel:'commands',testNumber:commands[1]!},token);input.raw(200,wire,'application/json');return true;}
   if(lock){await input.services.originalTest.patchLock({token,testNumber:lock[1]!,body});input.raw(200,'','text/html; charset=UTF-8');return true;}
   if(log){await input.services.originalTest.putLog({token,testNumber:log[1]!,body});input.raw(201,'','text/html; charset=UTF-8');return true;}
-  if(unitWrite){const request={token,testNumber:unitWrite[1]!,unitName:unitWrite[2]!,body};
+  if(unitWrite){const request={token,testNumber:unitWrite[1]!,unitName:unitWrite[2]!,body,deliveryId:input.request.headers['x-native-delivery-id']};
    if(unitWrite[3]==='state')await input.services.originalUnit.patchState(request);else if(unitWrite[3]==='response')await input.services.originalUnit.putResponse(request);else await input.services.originalUnit.putLog(request);
    input.raw(unitWrite[3]==='state'?200:201,'','text/html; charset=UTF-8');return true;}
   if(state){await input.services.originalTest.patchState({token,testNumber:state[1]!,patch:body});input.raw(200,'','text/html; charset=UTF-8');return true;}
