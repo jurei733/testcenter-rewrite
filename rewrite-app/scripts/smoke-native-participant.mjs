@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {reportSmokePhase} from './supervised-smoke.mjs';
-import {randomBytes,createHash} from 'node:crypto';
+import {randomBytes,randomUUID,createHash} from 'node:crypto';
 const app=fileURLToPath(new URL('..',import.meta.url));
 export async function runNativeParticipantSmoke(artifactRoot){
 reportSmokePhase('prepare-owned-native-participant-fixtures');
@@ -25,6 +25,9 @@ qualificationFiles.push('apps/api/src/original-review-http.ts','apps/api/dist/ap
 for(const name of ['original-unit','original-unit-record','original-unit-collections','original-unit-delivery'])qualificationFiles.push(`packages/application/src/${name}.ts`,`packages/application/dist/packages/application/src/${name}.js`);
 qualificationFiles.push('apps/api/src/original-test-http.ts','apps/api/dist/apps/api/src/original-test-http.js');
 qualificationFiles.push('scripts/finite-animation-ready.mjs');
+for(const file of ['original-native-write-state','original-result-state','original-test-state','original-test-lock','participant-run-mutation','original-command','original-command-queue'])qualificationFiles.push(`packages/application/src/${file}.ts`,`packages/application/dist/packages/application/src/${file}.js`);
+for(const name of ['sqlite-store','postgres-store'])qualificationFiles.push(`packages/${name}/src/original-command-queue.ts`,`packages/${name}/dist/packages/${name}/src/original-command-queue.js`);
+qualificationFiles.push('packages/domain/src/index.ts','packages/domain/dist/packages/domain/src/index.js');
 
 const hashQualification=async()=>Object.fromEntries(await Promise.all(qualificationFiles.map(async path=>[path,createHash('sha256').update(await readFile(join(app,path))).digest('hex')])));
 const qualificationHashes=await hashQualification();
@@ -92,6 +95,29 @@ try{
  const sharedSaved=page.waitForResponse(r=>/\/test\/9007199254740993\/state$/.test(new URL(r.url()).pathname)&&r.request().method()==='PATCH'&&r.status()===200&&r.request().postDataJSON()?.some(row=>row.key==='SHARED_PARAMETERS'&&row.content===JSON.stringify(shared)));
  await player.getByRole('textbox',{name:'Shared key',exact:true}).fill(shared[0].key);await player.getByRole('textbox',{name:'Shared value',exact:true}).fill(shared[0].value);await player.getByRole('button',{name:'Share parameter',exact:true}).click();await sharedSaved;mark('opaque-native-player-shared-parameters-reach-real-test-state-storage');
  const sharedAttempts=await testReceipts('lost-shared-state-ack','state');assert.deepEqual(sharedAttempts.map(row=>row.status),[503,200]);assert.equal(sharedAttempts[0].backendStatus,200);assert.equal(sharedAttempts[0].deliveryId,sharedAttempts[1].deliveryId);assert.match(sharedAttempts[0].deliveryId,/^[a-f0-9-]{36}$/);assert.equal(sharedAttempts[0].body,sharedAttempts[1].body);assert.equal(logCount('9007199254740993','SHARED_PARAMETERS'),sharedBefore+1);mark('real-committed-Test-state-lost-ack-retries-once-without-a-duplicate-state-log');
+ assert.ok(sharedAttempts.every(row=>row.stateBase===sharedAttempts[0].stateBase));assert.equal(JSON.parse(sharedAttempts[1].stateResult).superseded,false);
+ // Retire a real document before its next Test-state window. Another owned
+ // client advances navigation in between; recovery must keep that control while
+ // accepting the independent shared parameter and retaining both history rows.
+ await configure('native-test-pre-buffer-recovery',0);
+ const readTestState=()=>{const own=new DatabaseSync(file,{readOnly:true});try{own.exec('PRAGMA busy_timeout=1000');return JSON.parse(own.prepare('SELECT original_test_state_json FROM test_runs WHERE test_run_id=(SELECT test_run_id FROM original_test_numbers WHERE test_number=?)').get('9007199254740993').original_test_state_json);}finally{own.close();}};
+ const sharedRecoveryLogBefore=logCount('9007199254740993','SHARED_PARAMETERS'),recoveredShared=[...shared,{key:'owned-reload',value:'pre-buffer Ω'}];
+ await page.locator('[data-cy=unit-navigation-forward]').click();await page.waitForURL(/\/native-test\/9007199254740993\/u\/2(?:\?|$)/);await input.waitFor();await player.locator('body[data-started=true]').waitFor();
+ await player.getByRole('textbox',{name:'Shared key',exact:true}).fill('owned-reload');await player.getByRole('textbox',{name:'Shared value',exact:true}).fill('pre-buffer Ω');await player.getByRole('button',{name:'Share parameter',exact:true}).click();
+ const pendingState=await page.waitForFunction(expected=>{
+  for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key?.startsWith('testcenter-native-test-journal:v1:'))continue;
+   const doc=JSON.parse(localStorage.getItem(key));if(doc.testId!=='9007199254740993')continue;
+   const entry=doc.entries.find(row=>row.kind==='state'&&row.phase==='staged'&&JSON.parse(row.payload).some(item=>item.key==='SHARED_PARAMETERS'&&item.content===expected));if(entry)return{id:entry.id,base:entry.base,containsNavigation:JSON.parse(entry.payload).some(item=>item.key==='CURRENT_UNIT_ID')};
+  }return false;
+ },JSON.stringify(recoveredShared)).then(handle=>handle.jsonValue());
+ assert.ok(['OWNED.UNIT','OWNED.SECOND'].includes(readTestState().CURRENT_UNIT_ID));assert.equal(readTestState().SHARED_PARAMETERS,JSON.stringify(shared));mark('real-Test-state-and-independent-parameter-are-durable-before-the-Source-buffer-dispatches');
+ const actorToken=await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session'));
+ const peerRead=await fetch(base+'/test/9007199254740993',{headers:{AuthToken:actorToken,'X-Native-State-Protocol':'1'}});assert.equal(peerRead.status,200);await peerRead.text();
+ const peerState=await fetch(base+'/test/9007199254740993/state',{method:'PATCH',headers:{AuthToken:actorToken,'Content-Type':'application/json','X-Native-Delivery-Id':randomUUID(),'X-Native-State-Base':peerRead.headers.get('x-native-state-base')},body:JSON.stringify([{key:'CURRENT_UNIT_ID',content:'OWNED.UNIT',timeStamp:Date.now()}])});assert.equal(peerState.status,200);await peerState.text();
+ await page.reload();await page.waitForURL(/\/native-test\/9007199254740993\/u\/1(?:\?|$)/);await input.waitFor();await player.locator('body[data-started=true]').waitFor();
+ assert.equal(await player.locator('#shared-start').textContent(),JSON.stringify(recoveredShared));assert.equal(readTestState().CURRENT_UNIT_ID,'OWNED.UNIT');assert.equal(readTestState().SHARED_PARAMETERS,JSON.stringify(recoveredShared));
+ const recoveredPacket=testWriteReceipts.find(row=>row.phase==='native-test-pre-buffer-recovery'&&row.deliveryId===pendingState.id);assert.ok(recoveredPacket);assert.deepEqual(JSON.parse(recoveredPacket.stateBase),pendingState.base);assert.equal(JSON.parse(recoveredPacket.stateResult).superseded,pendingState.containsNavigation);assert.equal(logCount('9007199254740993','SHARED_PARAMETERS'),sharedRecoveryLogBefore+1);
+ shared.push(recoveredShared[1]);mark('hard-reload-recovers-independent-Test-state-and-history-without-rewinding-newer-peer-navigation');
  const binaryLoaded=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/Resource/owned-data.bin'));void binaryLoaded.catch(()=>{});
  await player.getByRole('button',{name:'Load owned resources',exact:true}).click();
  await player.locator('#resource-result').getByText(String([...resourceBytes]),{exact:true}).waitFor();

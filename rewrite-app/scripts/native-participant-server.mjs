@@ -21,12 +21,13 @@ const proxy=createServer((incoming,outgoing)=>{
  if(responseWrite||testRead)outgoing.once('finish',()=>process.send?.({nativeResponse:{...record,status:outgoing.statusCode}}));
  if(sessionRead)outgoing.once('finish',()=>process.send?.({nativeSession:{...record,status:outgoing.statusCode}}));
  if(commandAck)outgoing.once('finish',()=>process.send?.({nativeCommand:{...record,status:outgoing.statusCode}}));
- if(testStateWrite||testLogWrite)outgoing.once('finish',()=>process.send?.({nativeTestWrite:{...record,deliveryId:incoming.headers['x-native-delivery-id'],status:outgoing.statusCode}}));
+ if(testStateWrite||testLogWrite)outgoing.once('finish',()=>process.send?.({nativeTestWrite:{...record,deliveryId:incoming.headers['x-native-delivery-id'],stateBase:incoming.headers['x-native-state-base'],status:outgoing.statusCode}}));
  const forward=(body,loseAcknowledgement=false)=>{
   if(outgoing.destroyed||incoming.aborted)return;
   const port=backend.address().port,headers={...incoming.headers,host:'127.0.0.1:'+port,connection:'close'};
   if(body!==undefined){delete headers['transfer-encoding'];headers['content-length']=body.length;}
   const forwarded=request({hostname:'127.0.0.1',port,path:incoming.url,method:incoming.method,headers},response=>{
+   if(testStateWrite)record.stateResult=response.headers['x-native-state-result'];
    if(loseAcknowledgement&&response.statusCode>=200&&response.statusCode<300){record.backendStatus=response.statusCode;response.once('end',()=>fail());response.resume();return;}
    outgoing.writeHead(response.statusCode,response.headers);response.pipe(outgoing);
   });

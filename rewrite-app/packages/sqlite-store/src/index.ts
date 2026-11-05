@@ -3994,8 +3994,11 @@ export const createSqliteFirstSliceStorage = (
         const deliveryRow = input.deliveryId ? database.prepare("SELECT delivery_json FROM participant_progress_deliveries WHERE test_run_id = ? AND delivery_id = ?")
           .get(input.testRunId, input.deliveryId) : undefined;
         const progressDelivery = deliveryRow ? JSON.parse(String(deliveryRow.delivery_json)) as ParticipantProgressDelivery : null;
+        const precedingDeliveryRow = input.precedingDeliveryId ? database.prepare("SELECT delivery_json FROM participant_progress_deliveries WHERE test_run_id = ? AND delivery_id = ?")
+          .get(input.testRunId, input.precedingDeliveryId) : undefined;
+        const precedingProgressDelivery = precedingDeliveryRow ? JSON.parse(String(precedingDeliveryRow.delivery_json)) as ParticipantProgressDelivery : null;
         const prepared = prepareParticipantRunMutation(input,
-          testRun && participantSession ? { testRun, participantSession, testRuns, progressDelivery } : null, transform);
+          testRun && participantSession ? { testRun, participantSession, testRuns, progressDelivery, precedingProgressDelivery } : null, transform);
         if (prepared?.effect) {
           const effect = prepared.effect;
           if (effect.progressDelivery) {

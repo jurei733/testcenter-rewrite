@@ -1172,6 +1172,23 @@ export type ParticipantProgressDelivery = {
   deliveryId: string;
   payloadSha256: string;
   acceptedAt: string;
+  nativeStateWriteResult?: OriginalNativeStateWriteResult;
+};
+
+/** Server-owned causal evidence; client wall clocks are not write versions. */
+export type OriginalNativeWriteGuard = {
+  version: 1; revision: number; controlEpoch: number; fields: Record<string, number>;
+};
+export type OriginalNativeStateWriteBase = {
+  version: 1; revision: number; controlEpoch: number; previousDeliveryId?: string;
+  /** Later entries may follow an acknowledged remote command, without rebasing earlier entries. */
+  segments?: Array<{start: number; revision: number; controlEpoch: number}>;
+};
+export type OriginalNativeStateWriteResult = {
+  version: 1; revision: number; controlEpoch: number;
+  fieldBases: Record<string, number>; controlBase: number;
+  appliedKeys: string[]; supersededKeys: string[];
+  currentSuperseded?: boolean;
 };
 
 /** Original's first Test identity and opened/state evidence are independent of Run.updatedAt.
@@ -1185,6 +1202,7 @@ export type OriginalTestResultState = {
   /** Source tests.timestamp_server also advances on lock/open without nonempty state. */
   lastTestModifiedAt?: string | null;
   hasTestState?: boolean;
+  nativeWriteGuard?: OriginalNativeWriteGuard;
 };
 
 export type TestRun = {

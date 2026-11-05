@@ -109,6 +109,18 @@ for(const kind of process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:['memo
   await t.test('store restart retains locks, raw logs, native identities and current monitor bearer',async()=>{
    await change([Number(firstId)]);const before=await run(),beforeLogs=await logs();if(kind!=='memory'){await storage.shutdown();await open();}assert.deepEqual(await run(),before);assert.deepEqual(await logs(),beforeLogs);await change([Number(firstId)],false);
   });
+  await t.test('selected native monitor lock unlock and same-value ABA invalidate a captured control base without losing independent parameters',async()=>{
+   const target={token:owner.token,testNumber:firstId},base=(await services.originalTest.read({...target,nativeStateProtocol:'1'})).nativeStateBase;
+   await change([Number(firstId)]);await change([Number(firstId)]);await change([Number(firstId)],false);
+   const afterLocks=await run();assert.equal(afterLocks.locked,false);assert.equal(afterLocks.originalResultState.nativeWriteGuard.controlEpoch,base.controlEpoch+3);
+   const result=await services.originalTest.patchState({...target,stateBase:base,deliveryId:randomUUID(),patch:[{key:'CURRENT_UNIT_ID',content:'stale',timeStamp:1},{key:'SHARED_PARAMETERS',content:'independent',timeStamp:1}]});
+   assert.deepEqual(result.supersededKeys,['CURRENT_UNIT_ID']);assert.equal((await run()).originalTestState.CURRENT_UNIT_ID,afterLocks.originalTestState.CURRENT_UNIT_ID);assert.equal((await run()).originalTestState.SHARED_PARAMETERS,'independent');
+   await services.originalCommand.send({token:monitor.token,body:{keyword:'terminate',arguments:['lock'],timestamp:1,testIds:[Number(firstId)]}});
+   const command=(await repository.listOriginalCommands(scopeMap,null)).at(-1),guard=(await run()).originalResultState.nativeWriteGuard;
+   const ack=await services.originalCommand.acknowledge({...target,commandNumber:command.id,nativeStateProtocol:'1'});
+   assert.deepEqual(ack,{reason:'OK',nativeStateBase:{version:1,revision:guard.revision,controlEpoch:guard.controlEpoch}});
+   assert.equal((await services.originalCommand.acknowledge({...target,commandNumber:command.id,nativeStateProtocol:'1'})).reason,'OK, was already marked as executed');
+  });
   if(kind==='sqlite'||kind==='postgres')await t.test('real protected HTTP uses literal empty success, strict raw types and authorization before path/body decoding',async()=>{
    const env={FIRST_SLICE_STORE:kind,FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',REQUIRE_LOGIN_PASSWORD:'false',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'participant,second_code',FIRST_SLICE_PROOF_OF_WORK_SECRET:'owned-lock-http-challenge-secret-not-production',FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET:'',FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER:'12',...(url?{FIRST_SLICE_POSTGRES_URL:url.toString()}:{})};const previous=new Map(Object.keys(env).map(key=>[key,process.env[key]]));try{Object.assign(process.env,env);server=await createProductionApiServer();}finally{for(const[key,value]of previous)if(value===undefined)delete process.env[key];else process.env[key]=value;}
    await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port,path='/monitor/group/'+group+'/tests/lock';

@@ -16,6 +16,7 @@ import {formatOriginalLogReport} from '../packages/application/dist/packages/app
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
 import {verifyOriginalUnitDeliveries} from './original-unit-delivery-checks.mjs';
 import {verifyOriginalTestDeliveries} from './original-test-delivery-checks.mjs';
+import {verifyOriginalTestCausalState} from './original-test-causal-state-checks.mjs';
 
 const evidence = new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-creation/', import.meta.url);
 const manifest = JSON.parse(await readFile(new URL('manifest.json', evidence), 'utf8'));
@@ -1081,6 +1082,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       repository:()=>repository,services:()=>services,createServices:repo=>createFirstSliceServices({repository:repo,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'})});
     await verifyOriginalTestDeliveries({t,kind,file,url,auth,bookletName:native.bookletName,reopen,
       repository:()=>repository,services:()=>services,createServices:repo=>createFirstSliceServices({repository:repo,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'})});
+    await verifyOriginalTestCausalState({t,kind,file,url,auth,bookletName:native.bookletName,reopen,repository:()=>repository,services:()=>services});
     await t.test('native group deletion retires number mappings while keeping the global number monotonic',async()=>{
       const before=await repository.getParticipantSessionById(run.participantSessionId),saved=await repository.getTestRunById(run.testRunId);
       await repository.deleteOriginalGroupResults({...ids,groups:['Owned.Create']});

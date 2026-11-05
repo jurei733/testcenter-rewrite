@@ -43,11 +43,14 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   const token=input.request.headers.authtoken;if(typeof token!=='string'||!token)throw new FirstSliceError(401,'original_token_missing','Auth Header not sufficient: '+((log||lock||nativeCommand)?(typeof token==='string'?'empty':'missing'):'missing or empty'));
   if(producer)await input.services.originalCommand.requireMonitor({token});else await input.services.originalTest.requirePerson({token});
   if(commands||executed)await input.services.originalCommand.requireOwner({token,testNumber:(commands??executed)![1]!});
-  if(executed){input.reason(await input.services.originalCommand.acknowledge({token,testNumber:executed[1]!,commandNumber:executed[2]!}));input.raw(200,'','text/html; charset=UTF-8');return true;}
+  if(executed){const result=await input.services.originalCommand.acknowledge({token,testNumber:executed[1]!,commandNumber:executed[2]!,nativeStateProtocol:input.request.headers['x-native-state-protocol']});
+   if(typeof result==='object'){input.header('X-Native-State-Base',JSON.stringify(result.nativeStateBase));input.reason(result.reason);}else input.reason(result);input.raw(200,'','text/html; charset=UTF-8');return true;}
   if(log||lock)await input.services.originalTest.requireOwner({token,testNumber:(log??lock)![1]!});
   if(unitRead){const result=await input.services.originalUnit.read({token,testNumber:unitRead[1]!,unitName:unitRead[2]!,...(unitRead[3]===undefined?{}:{alias:unitRead[3]})});input.raw(200,formatOriginalUnitReadJson(result),'application/json');return true;}
   if(read){const testNumber=read[1]!;
-   input.raw(200,formatOriginalTestReadJson(await input.services.originalTest.read({token,testNumber})),'application/json');return true;}
+   const result=await input.services.originalTest.read({token,testNumber,nativeStateProtocol:input.request.headers['x-native-state-protocol']});
+   if(result.nativeStateBase)input.header('X-Native-State-Base',JSON.stringify(result.nativeStateBase));
+   input.raw(200,formatOriginalTestReadJson(result),'application/json');return true;}
   let body:unknown;try{body=await input.readBody(Boolean(log||lock||nativeCommand),(log||lock||nativeCommand)?decodeOriginalTestLogJson:undefined);}catch(error){if(error instanceof SyntaxError){if(log||lock||nativeCommand){sendNativeTestWriteError(input,500,'Internal error.');return true;}throw new FirstSliceError(400,'original_json_invalid','Request body must be valid JSON.');}throw error;}
   if(producer){await input.services.originalCommand.send({token,body});input.raw(201,'','text/html; charset=UTF-8');return true;}
   if(commands){const wire=await input.services.originalCommand.poll({token,testNumber:commands[1]!,body});await input.subscribe?.({channel:'commands',testNumber:commands[1]!},token);input.raw(200,wire,'application/json');return true;}
@@ -56,7 +59,9 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   if(unitWrite){const request={token,testNumber:unitWrite[1]!,unitName:unitWrite[2]!,body,deliveryId:input.request.headers['x-native-delivery-id']};
    if(unitWrite[3]==='state')await input.services.originalUnit.patchState(request);else if(unitWrite[3]==='response')await input.services.originalUnit.putResponse(request);else await input.services.originalUnit.putLog(request);
    input.raw(unitWrite[3]==='state'?200:201,'','text/html; charset=UTF-8');return true;}
-  if(state){await input.services.originalTest.patchState({token,testNumber:state[1]!,patch:body,deliveryId:input.request.headers['x-native-delivery-id']});input.raw(200,'','text/html; charset=UTF-8');return true;}
+  if(state){const result=await input.services.originalTest.patchState({token,testNumber:state[1]!,patch:body,deliveryId:input.request.headers['x-native-delivery-id'],stateBase:input.request.headers['x-native-state-base']});
+   if(result)input.header('X-Native-State-Result',JSON.stringify({version:result.version,revision:result.revision,controlEpoch:result.controlEpoch,superseded:result.supersededKeys.length>0,
+    ...(result.currentSuperseded===undefined?{}:{currentSuperseded:result.currentSuperseded})}));input.raw(200,'','text/html; charset=UTF-8');return true;}
   if(body===null||typeof body!=='object'||Array.isArray(body)||typeof(body as Record<string,unknown>).bookletName!=='string')throw new FirstSliceError(400,'original_request_invalid','Required body-parameter is missing: `bookletName`');
   input.raw(201,await input.services.originalTest.create({token,bookletName:(body as {bookletName:string}).bookletName}),'text/html; charset=UTF-8');
  }catch(error){

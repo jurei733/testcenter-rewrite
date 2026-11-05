@@ -5,6 +5,8 @@ import type {OriginalCommandActor} from './original-command-queue.js';
 import {parseOriginalCommandFields,prepareOriginalCommandInsert,readOriginalLastCommandId,formatOriginalCommandsJson,originalCommandInteger} from './original-command-codec.js';
 import {resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
 import {FirstSliceError} from './first-slice-error.js';
+import type {OriginalNativeStateWriteBase} from '@testcenter-rewrite-app/domain';
+type AcknowledgementReason='OK'|'OK, was already marked as executed';
 export type OriginalCommandPort={
  requireMonitor(input:{token:string}):Promise<void>;
  requireOwner(input:{token:string;testNumber:string}):Promise<void>;
@@ -12,7 +14,7 @@ export type OriginalCommandPort={
  poll(input:{token:string;testNumber:string;body:unknown}):Promise<string>;
  pending(input:{token:string;testNumber:string}):Promise<string>;
  connectionLost(input:{token:string;testNumber:string;stillDisconnected:()=>boolean}):Promise<void>;
- acknowledge(input:{token:string;testNumber:string;commandNumber:string}):Promise<'OK'|'OK, was already marked as executed'>;
+ acknowledge(input:{token:string;testNumber:string;commandNumber:string;nativeStateProtocol?:unknown}):Promise<AcknowledgementReason|{reason:AcknowledgementReason;nativeStateBase:OriginalNativeStateWriteBase}>;
 };
 export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort;repository:FirstSliceRepository;now:()=>string;id:()=>string}):OriginalCommandPort{
  const monitor=async(token:string):Promise<OriginalCommandActor>=>{const state=await input.auth.read({token});if(state.kind!=='person'||state.participantSession.originalOperationalMode!=='monitor-group'||state.participantSession.originalLoginKey===undefined)throw new FirstSliceError(403,'original_monitor_forbidden','A current native group monitor is required.');const person=state.participantSession;return{tenantId:person.tenantId,workspaceId:person.workspaceId,participantSessionId:person.participantSessionId,originalLoginKey:person.originalLoginKey!,groupKey:person.groupKey};};
@@ -59,11 +61,14 @@ export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort
    }]);
    return wire;
   },
-  async acknowledge({token,testNumber,commandNumber}){
+  async acknowledge({token,testNumber,commandNumber,nativeStateProtocol}){
    const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber),number=originalCommandInteger(commandNumber).toString();
-   const outcome=await input.repository.acknowledgeOriginalCommand(scope,number);
+   if(nativeStateProtocol!==undefined&&nativeStateProtocol!=='1')throw new FirstSliceError(400,'original_state_protocol_invalid','Invalid native Test-state protocol.');
+   const result=await input.repository.acknowledgeOriginalCommand(scope,number,nativeStateProtocol==='1');
+   const outcome=typeof result==='object'&&result?result.outcome:result;
    if(outcome===null)throw new FirstSliceError(404,'original_command_missing',`Command \`${number}\` not found on test \`${scope.testNumber}\``);
-   return outcome==='executed'?'OK':'OK, was already marked as executed';
+   const reason=outcome==='executed'?'OK' as const:'OK, was already marked as executed' as const;
+   return typeof result==='object'&&result?{reason,nativeStateBase:result.nativeStateBase}:reason;
   }
  };
 }

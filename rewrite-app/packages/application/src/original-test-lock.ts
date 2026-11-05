@@ -3,11 +3,12 @@ import {assertOriginalTestLogInput} from './original-test-log.js';
 import {selectOwnedOriginalTestNumber, type OriginalTestNumberRecord} from './original-test-number.js';
 import {resultParentUnavailable} from './result-artifact-parent.js';
 import {FirstSliceError} from './first-slice-error.js';
+import {advanceOriginalNativeWriteGuard} from './original-native-write-state.js';
 
 /** The Source updates only its lock and server timestamp, even on repeated locks.
  * Keep this write separate from construction/insertion of the subsequent log:
  * actual production Source57 leaves the lock committed when that step fails. */
-export function prepareOriginalTestLock(timestamp: string, before: OriginalTestResultState | undefined): {
+export function prepareOriginalTestLock(timestamp: string, before: OriginalTestResultState | undefined, advanceControl=true): {
   locked: true; updatedAt: string; originalResultState: OriginalTestResultState;
 } {
   if (typeof timestamp !== 'string' || !Number.isFinite(Date.parse(timestamp))) throw new TypeError('Native Test lock requires a server timestamp.');
@@ -23,7 +24,8 @@ export function prepareOriginalTestLock(timestamp: string, before: OriginalTestR
     }
   }
   const updatedAt = new Date(timestamp).toISOString();
-  return {locked: true, updatedAt, originalResultState: {...structuredClone(before), lastTestModifiedAt: updatedAt}};
+  return {locked: true, updatedAt, originalResultState: {...structuredClone(before), lastTestModifiedAt: updatedAt,
+    ...(before.nativeWriteGuard && advanceControl ? {nativeWriteGuard: advanceOriginalNativeWriteGuard(before.nativeWriteGuard, [], true)} : {})}};
 }
 
 type Collection<Row> = Map<string, Row> | Record<string, Row>;

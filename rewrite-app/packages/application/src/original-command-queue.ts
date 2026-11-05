@@ -9,6 +9,8 @@ import {prepareOriginalTestLock} from './original-test-lock.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {resultParentUnavailable} from './result-artifact-parent.js';
+import {readOriginalNativeStateBase} from './original-native-write-state.js';
+import type {OriginalNativeStateWriteBase} from '@testcenter-rewrite-app/domain';
 
 export type OriginalCommandActor=Pick<ParticipantSession,'tenantId'|'workspaceId'|'participantSessionId'|'groupKey'> & {originalLoginKey:string};
 export type OriginalCommandDelivery=OriginalTestNumberRecord & OriginalCommandPacket & {commanderParticipantSessionId:string|null;executed:boolean};
@@ -17,7 +19,7 @@ export type OriginalCommandRepository={
   findOriginalCommandTarget(actor:OriginalCommandActor,testNumber:string):Promise<OriginalTestNumberRecord|null>;
   appendOriginalCommand(actor:OriginalCommandActor,command:OriginalCommandPacket,targets:OriginalTestNumberRecord[]):Promise<void>;
   listOriginalCommands(scope:OriginalTestNumberRecord,lastCommandId:string|null):Promise<OriginalCommandPacket[]>;
-  acknowledgeOriginalCommand(scope:OriginalTestNumberRecord,commandNumber:string):Promise<'executed'|'already'|null>;
+  acknowledgeOriginalCommand(scope:OriginalTestNumberRecord,commandNumber:string,nativeStateProtocol?:boolean):Promise<'executed'|'already'|{outcome:'executed'|'already';nativeStateBase:OriginalNativeStateWriteBase}|null>;
   touchOriginalCommandPolling(scope:OriginalTestNumberRecord,timestamp:string):Promise<boolean>;
 };
 type Collection<Row>=Map<string,Row>|Record<string,Row>;
@@ -83,9 +85,11 @@ export function selectOriginalCommands(rows:OriginalCommandDelivery[],lastComman
 export function listOriginalCommandsCollection(state:OriginalCommandCollections,scope:OriginalTestNumberRecord,lastCommandId:string|null):OriginalCommandPacket[]{
   currentMapping(state,scope);return selectOriginalCommands(values(state.originalNativeCommands).filter(row=>row.testNumber===scope.testNumber&&row.testRunId===scope.testRunId&&row.participantSessionId===scope.participantSessionId&&row.tenantId===scope.tenantId&&row.workspaceId===scope.workspaceId&&row.contentReleaseId===scope.contentReleaseId),lastCommandId);
 }
-export function acknowledgeOriginalCommandCollection(state:OriginalCommandCollections,scope:OriginalTestNumberRecord,commandNumber:string):'executed'|'already'|null{
+export function acknowledgeOriginalCommandCollection(state:OriginalCommandCollections,scope:OriginalTestNumberRecord,commandNumber:string,nativeStateProtocol=false):'executed'|'already'|{outcome:'executed'|'already';nativeStateBase:OriginalNativeStateWriteBase}|null{
   currentMapping(state,scope);const key=JSON.stringify([scope.testRunId,commandNumber]),row=get(state.originalNativeCommands,key);if(!row||row.testNumber!==scope.testNumber||row.participantSessionId!==scope.participantSessionId||row.tenantId!==scope.tenantId||row.workspaceId!==scope.workspaceId||row.contentReleaseId!==scope.contentReleaseId)return null;
-  if(row.executed)return'already';put(state.originalNativeCommands,key,{...row,executed:true});return'executed';
+  const nativeStateBase=nativeStateProtocol?readOriginalNativeStateBase(get(state.testRuns,scope.testRunId)?.originalResultState):undefined;
+  const outcome=row.executed?'already':'executed';if(!row.executed)put(state.originalNativeCommands,key,{...row,executed:true});
+  return nativeStateBase?{outcome,nativeStateBase}:outcome;
 }
 export function prepareOriginalCommandPolling(timestamp:string,state:unknown,before:TestRun['originalResultState']):Pick<TestRun,'updatedAt'|'originalResultState'>|null{
   // Canonical controller entry can leave the native state projection unknown.
@@ -95,7 +99,7 @@ export function prepareOriginalCommandPolling(timestamp:string,state:unknown,bef
   const connection=Object.hasOwn(state,'CONNECTION')?(state as Record<string,unknown>).CONNECTION:undefined;
   // Source uses PHP loose comparison with its nonempty LOST string.
   if(connection!=='LOST'&&connection!==true)return null;
-  const {updatedAt,originalResultState}=prepareOriginalTestLock(timestamp,before);return{updatedAt,originalResultState};
+  const {updatedAt,originalResultState}=prepareOriginalTestLock(timestamp,before,false);return{updatedAt,originalResultState};
 }
 export function touchOriginalCommandPollingCollection(state:OriginalCommandCollections,scope:OriginalTestNumberRecord,timestamp:string):boolean{
   currentMapping(state,scope);const run=get(state.testRuns,scope.testRunId)!,effect=prepareOriginalCommandPolling(timestamp,run.originalTestState,run.originalResultState);if(!effect)return false;put(state.testRuns,scope.testRunId,{...run,...effect});return true;

@@ -45,6 +45,7 @@ export type {OriginalUnitScope,OriginalUnitInput,OriginalUnitEffect,OriginalUnit
 export {originalUnitDelivery,prepareOriginalUnitDelivery} from './original-unit-delivery.js';
 export type {OriginalUnitDelivery} from './original-unit-delivery.js';
 export {originalTestDelivery,prepareOriginalNativeDelivery} from './original-native-delivery.js';
+export {readOriginalNativeStateBase} from './original-native-write-state.js';
 export type {OriginalNativeDelivery} from './original-native-delivery.js';
 export type {OriginalTestLogInput} from './original-test-log.js';
 export {preserveOriginalTestState} from './original-test-state.js';

@@ -94,6 +94,41 @@ test('native durable writes reject a mutable foreign Run before creating a deliv
  session();const client=new NativeHttpClient();t.after(()=>client.ngOnDestroy());let requests=0;globalThis.fetch=async()=>{requests++;return new Response('');};
  await assert.rejects(rx.firstValueFrom(client.unitWrite('response','2','UNIT_A',{timeStamp:1,dataParts:{answer:'foreign'},responseType:'owned',originalUnitId:'ORIGINAL'})));assert.equal(requests,0);
 });
+function testJournalStorage(t){
+ const f=nativeUnitJournalFixture(),priorStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage'),priorNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,value:f.storage});Object.defineProperty(globalThis,'navigator',{configurable:true,value:{locks:f.manager}});
+ t.after(()=>{f.close();if(priorStorage)Object.defineProperty(globalThis,'localStorage',priorStorage);else delete globalThis.localStorage;if(priorNavigator)Object.defineProperty(globalThis,'navigator',priorNavigator);else delete globalThis.navigator;});return f;
+}
+const nativeBase={version:1,revision:0,controlEpoch:0};
+const stateAck=(superseded=false)=>new Response('',{headers:{'X-Native-State-Result':JSON.stringify({version:1,revision:1,controlEpoch:1,superseded})}});
+test('actual native transport recovers pre-buffer Test state with the original base and predecessor before accepting new input',async t=>{
+ const f=testJournalStorage(t);session();let currentBase=nativeBase;const calls=[];
+ globalThis.fetch=async(url,options)=>{calls.push({url:String(url),headers:options.headers,body:options.body});return options.method==='GET'?new Response('{"workspaceId":1}',{headers:{'X-Native-State-Base':JSON.stringify(currentBase)}}):stateAck();};
+ const first=new NativeHttpClient();await rx.firstValueFrom(first.get('/test/1',{nativeStateProtocol:true}));assert.equal(calls[0].headers['X-Native-State-Protocol'],'1');assert.equal(await first.prepareJournals(true),false);
+ first.captureTestState([{key:'CURRENT_UNIT_ID',content:'first',timeStamp:1}]);await rx.firstValueFrom(first.testWrite('state','1',[{key:'CURRENT_UNIT_ID',content:'first',timeStamp:1}]));
+ const sent=calls.at(-1);first.captureTestState([{key:'CURRENT_UNIT_ID',content:'pre-buffer',timeStamp:2}]);first.ngOnDestroy();await turn();
+ const resumed=new NativeHttpClient();t.after(()=>resumed.ngOnDestroy());currentBase={version:1,revision:7,controlEpoch:3};await rx.firstValueFrom(resumed.get('/test/1',{nativeStateProtocol:true}));
+ assert.equal(await resumed.prepareJournals(true),true);const recovered=calls.at(-1);assert.equal(JSON.parse(recovered.body)[0].content,'pre-buffer');assert.deepEqual(JSON.parse(recovered.headers['X-Native-State-Base']),{...nativeBase,previousDeliveryId:sent.headers['X-Native-Delivery-Id']});
+ await rx.firstValueFrom(resumed.get('/test/1',{nativeStateProtocol:true}));resumed.captureTestState([{key:'FOCUS',content:'HAS',timeStamp:3}]);await rx.firstValueFrom(resumed.testWrite('state','1',[{key:'FOCUS',content:'HAS',timeStamp:3}]));
+ assert.deepEqual(JSON.parse(calls.at(-1).headers['X-Native-State-Base']),currentBase);assert.equal(f.storage.length,0);
+});
+test('a superseded normal state is acknowledged locally and raises one reload error without retrying an accepted packet',async t=>{
+ const f=testJournalStorage(t);session();let writes=0;globalThis.fetch=async(_url,options)=>options.method==='GET'?new Response('{"workspaceId":1}',{headers:{'X-Native-State-Base':JSON.stringify(nativeBase)}}):(writes++,stateAck(true));
+ const client=new NativeHttpClient();t.after(()=>client.ngOnDestroy());await rx.firstValueFrom(client.get('/test/1',{nativeStateProtocol:true}));await client.prepareJournals(true);
+ client.captureTestState([{key:'CONTROLLER',content:'RUNNING',timeStamp:1}]);await assert.rejects(rx.firstValueFrom(client.testWrite('state','1',[{key:'CONTROLLER',content:'RUNNING',timeStamp:1}])),error=>error.code===409&&error.description.includes('neu laden'));assert.equal(writes,1);assert.equal(f.storage.length,0);
+});
+test('a real command ACK changes only future event contexts and obsolete earlier entries do not block command completion',async t=>{
+ const f=testJournalStorage(t);session();const calls=[],newBase={version:1,revision:7,controlEpoch:5};
+ globalThis.fetch=async(url,options)=>{calls.push({path:new URL(url).pathname,options});
+  if(options.method==='GET')return new Response('{"workspaceId":1}',{headers:{'X-Native-State-Base':JSON.stringify(nativeBase)}});
+  if(String(url).endsWith('/executed'))return new Response('',{headers:{'X-Native-State-Base':JSON.stringify(newBase)}});
+  return new Response('',{headers:{'X-Native-State-Result':JSON.stringify({...newBase,revision:8,controlEpoch:6,superseded:true,currentSuperseded:false})}});
+ };
+ const client=new NativeHttpClient();t.after(()=>client.ngOnDestroy());await rx.firstValueFrom(client.get('/test/1',{nativeStateProtocol:true}));await client.prepareJournals(true);
+ const old={key:'CURRENT_UNIT_ID',content:'old',timeStamp:1},fresh={key:'CONTROLLER',content:'TERMINATED',timeStamp:2};client.captureTestState([old]);
+ await rx.firstValueFrom(client.patch('/test/1/command/9007199254740993/executed',{}));assert.equal(calls.at(-1).options.headers['X-Native-State-Protocol'],'1');client.captureTestState([fresh]);
+ await rx.firstValueFrom(client.testWrite('state','1',[old,fresh]));assert.deepEqual(JSON.parse(calls.at(-1).options.headers['X-Native-State-Base']),{...nativeBase,segments:[{start:1,revision:7,controlEpoch:5}]});assert.equal(f.storage.length,0);
+});
 function commands(t){
  t.mock.timers.enable({apis:['setTimeout','setInterval','Date']});const scope=new AbortController(),started=[],tcs={testId:'1',state$:new rx.BehaviorSubject('INIT'),testMode:{receiveRemoteCommands:false}};
  const client={accessSignal:scope.signal,get isCurrent(){return !scope.signal.aborted;},patch(path,body){const response=new rx.Subject();started.push({path,body,response,time:Date.now()});return response;}};
@@ -223,11 +258,18 @@ const {TestControllerService:NativeController}=load('test-controller/services/te
 function nativeBuffers(){
  bindings.set(tokens.NATIVE_RUN_TEST_ID,'9223372036854775807');
  const f=overlays(),requests={unitData:new rx.Subject(),unitState:new rx.Subject(),testState:new rx.Subject()},calls=[];
+ const capturedTestStates=[];bindings.get(NativeHttpClient).captureTestState=state=>capturedTestStates.push(structuredClone(state));
  const backend={updateDataParts:(...args)=>{calls.push(['unitData',...args]);return requests.unitData;},patchUnitState:(...args)=>{calls.push(['unitState',...args]);return requests.unitState;},patchTestState:(...args)=>{calls.push(['testState',...args]);return requests.testState;}};
  const controller=new NativeController({},backend,{}, {},{}, {},{});controller.testId='9223372036854775807';controller.testMode={saveResponses:true};controller.units={1:{id:'original-unit',alias:'UNIT_A'}};controller.unitAliasMap={UNIT_A:1};controller.updateVariables=()=>false;
  const finish=()=>{controller.ngOnDestroy();f.owner.abort();f.dialog.ngOnDestroy();f.snack.ngOnDestroy();};
- return{...f,controller,requests,calls,finish,enqueue(){controller.unitDataPartsBuffer$.next({unitAlias:'UNIT_A',dataParts:{answer:'raw Ω'},unitStateDataType:'native'});controller.unitStateBuffer$.next({testId:controller.testId,unitAlias:'UNIT_A',state:[{key:'PRESENTATION',content:'complete',timeStamp:11}]});controller.addToTestStateBuffer('FOCUS','HAS');}};
+ return{...f,controller,requests,calls,capturedTestStates,finish,enqueue(){controller.unitDataPartsBuffer$.next({unitAlias:'UNIT_A',dataParts:{answer:'raw Ω'},unitStateDataType:'native'});controller.unitStateBuffer$.next({testId:controller.testId,unitAlias:'UNIT_A',state:[{key:'PRESENTATION',content:'complete',timeStamp:11}]});controller.addToTestStateBuffer('FOCUS','HAS');}};
 }
+test('a failed pre-buffer capture leaves the actual controller cache and Subject unchanged',()=>{
+ const f=nativeBuffers();try{const before=structuredClone(f.controller.testState),events=[];f.controller.testStateBuffer$.subscribe(event=>events.push(event));
+  bindings.get(NativeHttpClient).captureTestState=()=>{throw Error('owned persistence failure');};
+  assert.throws(()=>f.controller.addToTestStateBuffer('CURRENT_UNIT_ID','2'),/owned persistence failure/);assert.deepEqual(f.controller.testState,before);assert.deepEqual(events,[]);
+ }finally{f.finish();}
+});
 test('native internal navigation preserves only the immutable owned run, including unsafe integer IDs',async()=>{
  const {DefaultUrlSerializer}=await import(pathToFileURL(require.resolve('@angular/router')).href);
  navigationTypes.PRIMARY_OUTLET='primary';
@@ -382,4 +424,17 @@ test('retirement during terminal-log backoff cancels the retry without an unhand
  t.mock.timers.enable({apis:['setTimeout']});const f=terminalCompletions(t);let requests=0;
  f.session.text=async()=>{requests++;throw new HttpError(503,'temporary');};
  const lease=f.service.begin('9007199254740995','terminate'),done=lease.complete();await settle();f.session.replace();await done;t.mock.timers.tick(5000);await settle();assert.equal(requests,1);
+});
+test('terminal completion retains the real journal after view destruction and recovers an exhausted log with exact identity and bytes',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=testJournalStorage(t),owner=session(),attempts=[];
+ globalThis.fetch=async()=>new Response('{"workspaceId":1}',{headers:{'X-Native-State-Base':JSON.stringify(nativeBase)}});
+ const client=new NativeHttpClient();await rx.firstValueFrom(client.get('/test/1',{nativeStateProtocol:true}));await client.prepareJournals(true);
+ owner.text=async(...args)=>{attempts.push(args);assert.equal(f.storage.length,1);throw new HttpError(503,'temporary');};
+ const service=new NativeTerminalCompletionService();t.after(()=>service.ngOnDestroy());const completion=service.begin('1','terminate lock',client.retainTestJournal());
+ client.ngOnDestroy();assert.equal(f.storage.length,0);const pending=completion.complete().then(()=>assert.fail('Unexpected success'),error=>error);
+ await turn();for(const delay of[50,500,1000,2000]){t.mock.timers.tick(delay);await turn();}assert.equal((await pending).status,503);await service.whenSettled(owner.accessSignal);
+ assert.equal(attempts.length,5);assert.equal(f.manager.active.size,0);assert.equal(f.storage.length,1);
+ const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url:String(url),options});return options.method==='GET'?new Response('{"workspaceId":1}',{headers:{'X-Native-State-Base':JSON.stringify(nativeBase)}}):new Response('',{status:201});};
+ const resumed=new NativeHttpClient();t.after(()=>resumed.ngOnDestroy());await rx.firstValueFrom(resumed.get('/test/1',{nativeStateProtocol:true}));assert.equal(await resumed.prepareJournals(true),false);
+ assert.equal(calls[1].options.headers['X-Native-Delivery-Id'],attempts[0][7]);assert.equal(calls[1].options.body,JSON.stringify(attempts[0][2]));assert.equal(f.storage.length,0);
 });

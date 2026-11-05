@@ -7,17 +7,20 @@ import { withParticipantRunRevision } from "./participant-run-revision.js";
 import { withParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
 
 export type ParticipantRunMutationInput = Pick<TestRun,
-  "testRunId" | "participantSessionId" | "tenantId" | "workspaceId" | "contentReleaseId"> & { deliveryId?: string };
+  "testRunId" | "participantSessionId" | "tenantId" | "workspaceId" | "contentReleaseId"> & { deliveryId?: string; precedingDeliveryId?: string };
 export type ParticipantRunMutationContext = {
   testRun: TestRun;
   participantSession: ParticipantSession;
   testRuns: TestRun[];
   progressDelivery?: ParticipantProgressDelivery | null;
+  precedingProgressDelivery?: ParticipantProgressDelivery | null;
 };
 export type ParticipantRunMutationEffect = ParticipantRunCommandEffect & {
   /** Queue an intent in the same transaction as its Run projection and audit. */
   commandInput?: ParticipantRunCommandInput;
   progressDelivery?: ParticipantProgressDelivery;
+  originalNativeStateKeys?: string[];
+  initializeOriginalNativeWriteGuard?: true;
 };
 export type ParticipantRunMutationResult = {
   superseded?: true;
@@ -36,7 +39,7 @@ export const prepareParticipantRunMutation = (
     const value = input[key];
     if (typeof value !== "string" || !value.trim()) throw new Error("Participant Run mutations require non-empty scoped identifiers.");
   }
-  if (input.deliveryId !== undefined && (typeof input.deliveryId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(input.deliveryId))) {
+  if ([input.deliveryId, input.precedingDeliveryId].some(id => id !== undefined && (typeof id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(id)))) {
     throw new Error("Participant progress mutations require a valid scoped delivery identifier.");
   }
   if (!context || !matchesParticipantRunCommandScope(context.testRun, input) ||
@@ -45,11 +48,13 @@ export const prepareParticipantRunMutation = (
     context.participantSession.tenantId !== input.tenantId || context.participantSession.workspaceId !== input.workspaceId ||
     context.participantSession.contentReleaseId !== input.contentReleaseId ||
     context.progressDelivery && (!matchesParticipantRunCommandScope(context.progressDelivery, input) ||
-      context.progressDelivery.contentReleaseId !== input.contentReleaseId || context.progressDelivery.deliveryId !== input.deliveryId)) return null;
+      context.progressDelivery.contentReleaseId !== input.contentReleaseId || context.progressDelivery.deliveryId !== input.deliveryId) ||
+    context.precedingProgressDelivery && (!matchesParticipantRunCommandScope(context.precedingProgressDelivery, input) ||
+      context.precedingProgressDelivery.contentReleaseId !== input.contentReleaseId || context.precedingProgressDelivery.deliveryId !== input.precedingDeliveryId)) return null;
   const { testRun, participantSession } = context;
   const effect = structuredClone(transform(structuredClone(context)));
   if (effect?.terminationNoop !== undefined && (effect.terminationNoop !== true || effect.controllerDispatch !== undefined ||
-      effect.controllerEntryActive !== undefined || effect.originalResultOpenedAt !== undefined || effect.originalResultTestStateAt !== undefined || effect.originalResultModifiedAt !== undefined || effect.originalTestState !== undefined || effect.participantSession !== undefined || effect.commandInput !== undefined ||
+      effect.controllerEntryActive !== undefined || effect.originalResultOpenedAt !== undefined || effect.originalResultTestStateAt !== undefined || effect.originalResultModifiedAt !== undefined || effect.originalTestState !== undefined || effect.originalNativeStateKeys !== undefined || effect.initializeOriginalNativeWriteGuard !== undefined || effect.participantSession !== undefined || effect.commandInput !== undefined ||
       JSON.stringify(effect.testRun) !== JSON.stringify(testRun) || effect.activityEvents.length > 0 ||
       effect.testLogs.some(log => log.logKey !== "command executed"))) {
     throw new Error("A terminal early return cannot change its Run, parent, entry, dispatch highwater or state artifacts.");
@@ -74,10 +79,12 @@ export const prepareParticipantRunMutation = (
   }
   if (effect && participantControllerDispatchSuperseded(testRun, effect.controllerDispatch)) {
     effect.testRun = testRun; delete effect.participantSession; delete effect.controllerEntryActive; delete effect.originalResultOpenedAt; delete effect.originalResultTestStateAt; delete effect.originalResultModifiedAt; delete effect.originalTestState;
+    delete effect.originalNativeStateKeys; delete effect.initializeOriginalNativeWriteGuard;
     effect.testLogs = effect.testLogs.filter(log => log.logKey === "command executed"); effect.activityEvents = []; effect.superseded = true;
   }
   if (effect) effect.testRun = withOriginalResultState(testRun, effect.testRun,
-    {openedAt: effect.originalResultOpenedAt, testStateAt: effect.originalResultTestStateAt, modifiedAt: effect.originalResultModifiedAt, nativeTestState: effect.originalTestState});
+    {openedAt: effect.originalResultOpenedAt, testStateAt: effect.originalResultTestStateAt, modifiedAt: effect.originalResultModifiedAt, nativeTestState: effect.originalTestState,
+      nativeStateKeys: effect.originalNativeStateKeys, initializeNativeWriteGuard: effect.initializeOriginalNativeWriteGuard});
   if (effect) effect.testRun = withParticipantRunRevision(testRun,
     withParticipantControllerDispatch(testRun, withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive), effect.controllerDispatch));
   return { result: structuredClone({ testRun: effect?.testRun ?? testRun,

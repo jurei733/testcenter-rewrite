@@ -64,21 +64,22 @@ export class BackendService {
   }
 
   getTestData(testId: string): Observable<TestData> {
-    return this.http.get<TestData>(`${this.backendUrl}test/${testId}`);
+    return this.http.get<TestData>(`${this.backendUrl}test/${testId}`,{nativeStateProtocol:true});
   }
 
   prepareUnitJournal(saving:boolean):Promise<void>{return this.http.prepareUnitJournal(saving);}
+  prepareJournals(saving:boolean):Promise<boolean>{return this.http.prepareJournals(saving);}
 
   getUnitData(testId: string, unitid: string, unitalias: string): Observable<UnitData> {
     return this.http.get<UnitData>(`${this.backendUrl}test/${testId}/unit/${unitid}/alias/${unitalias}`);
   }
 
   patchTestState(patch: TestStateUpdate): Observable<string> {
-    return this.http.patch<string>(`${this.backendUrl}test/${patch.testId}/state`, patch.state);
+    return this.http.testWrite<string>('state',patch.testId,patch.state);
   }
 
   addTestLog(testId: string, logEntries: StateReportEntry<string>[]): Subscription {
-    return this.http.put(`${this.backendUrl}test/${testId}/log`, logEntries).subscribe();
+    return this.http.testWrite('log',testId,logEntries).subscribe();
   }
 
   patchUnitState(stateUpdate: UnitStateUpdate, originalUnitId: string): Observable<void> {

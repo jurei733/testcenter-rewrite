@@ -3833,8 +3833,10 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           .rows.map(mapTestRun).filter((run): run is TestRun => run !== null);
         const deliveryRow = input.deliveryId ? await client.query("SELECT delivery_json FROM participant_progress_deliveries WHERE test_run_id = $1 AND delivery_id = $2", [input.testRunId, input.deliveryId]) : null;
         const progressDelivery = (deliveryRow?.rows[0]?.delivery_json ?? null) as ParticipantProgressDelivery | null;
+        const precedingDeliveryRow = input.precedingDeliveryId ? await client.query("SELECT delivery_json FROM participant_progress_deliveries WHERE test_run_id = $1 AND delivery_id = $2", [input.testRunId, input.precedingDeliveryId]) : null;
+        const precedingProgressDelivery = (precedingDeliveryRow?.rows[0]?.delivery_json ?? null) as ParticipantProgressDelivery | null;
         const prepared = prepareParticipantRunMutation(input,
-          testRun && participantSession ? { testRun, participantSession, testRuns, progressDelivery } : null, transform);
+          testRun && participantSession ? { testRun, participantSession, testRuns, progressDelivery, precedingProgressDelivery } : null, transform);
         if (prepared?.effect) {
           const effect = prepared.effect;
           if (effect.progressDelivery) {

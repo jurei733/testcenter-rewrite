@@ -1,4 +1,5 @@
 import {assertOriginalTestState} from './original-test-state.js';
+import {advanceOriginalNativeWriteGuard, assertOriginalNativeWriteGuard, initialOriginalNativeWriteGuard, isOriginalNativeControlKey} from './original-native-write-state.js';
 import { defaultParticipantExecutionMode, participantExecutionModeDefinitions } from "@testcenter-rewrite-app/domain";
 import type { OriginalTestResultState, TestRun } from '@testcenter-rewrite-app/domain';
 
@@ -19,7 +20,8 @@ const time = (value: unknown): string => {
  * Unit answers, Unit logs/reviews and Run.updatedAt alone do not advance the
  * Original's Test timestamp. Legacy unknown evidence is never fabricated. */
 export function withOriginalResultState(previous: TestRun, projected: TestRun,
-  input: {openedAt?: string; testStateAt?: string; modifiedAt?: string; nativeTestState?: Record<string,unknown>} = {}): TestRun {
+  input: {openedAt?: string; testStateAt?: string; modifiedAt?: string; nativeTestState?: Record<string,unknown>;
+    nativeStateKeys?: string[]; initializeNativeWriteGuard?: true} = {}): TestRun {
   const before = previous.originalResultState;
   if (before !== undefined && (!before || typeof before !== 'object' || Array.isArray(before) ||
     before.hasTestState !== undefined && typeof before.hasTestState !== 'boolean')) {
@@ -33,6 +35,7 @@ export function withOriginalResultState(previous: TestRun, projected: TestRun,
     if (before?.[field] !== undefined && before[field] !== null) time(before[field]);
   }
   const openedAt = input.openedAt === undefined ? undefined : time(input.openedAt);
+  if (before?.nativeWriteGuard !== undefined) assertOriginalNativeWriteGuard(before.nativeWriteGuard);
   if(input.nativeTestState!==undefined)assertOriginalTestState(input.nativeTestState);
   let stateAt = input.nativeTestState!==undefined?time(projected.updatedAt):input.testStateAt === undefined ? undefined : time(input.testStateAt);
   const mode = previous.executionMode && Object.hasOwn(participantExecutionModeDefinitions, previous.executionMode)
@@ -48,7 +51,7 @@ export function withOriginalResultState(previous: TestRun, projected: TestRun,
   if(input.nativeTestState!==undefined)result.originalTestState=structuredClone(input.nativeTestState);
   else if(previous.originalTestState!==undefined&&stateAt===undefined)result.originalTestState=structuredClone(previous.originalTestState);
   else delete result.originalTestState;
-  if (before === undefined && openedAt === undefined && stateAt === undefined && modifiedAt === undefined) {
+  if (before === undefined && openedAt === undefined && stateAt === undefined && modifiedAt === undefined && !input.initializeNativeWriteGuard) {
     delete result.originalResultState;
     return result;
   }
@@ -56,5 +59,14 @@ export function withOriginalResultState(previous: TestRun, projected: TestRun,
     ...(openedAt === undefined ? {} : {lastOpenedAt: openedAt}),
     ...(stateAt === undefined ? {} : {lastTestStateAt: stateAt, hasTestState: input.nativeTestState===undefined?true:Object.keys(input.nativeTestState).length>0}),
     ...(modifiedAt === undefined ? {} : {lastTestModifiedAt: modifiedAt})};
+  if (before?.nativeWriteGuard || input.initializeNativeWriteGuard) {
+    const guard = before?.nativeWriteGuard ?? initialOriginalNativeWriteGuard();
+    const canonicalKeys = testFields.filter(key => JSON.stringify(fieldValue(previous, key)) !== JSON.stringify(fieldValue(projected, key)));
+    const control = canonicalKeys.some(key => key !== 'sharedParameters') || (previous.locked ?? false) !== (projected.locked ?? false);
+    const changedNativeKeys = [...new Set([...Object.keys(previous.originalTestState ?? {}), ...Object.keys(result.originalTestState ?? {})])]
+      .filter(key => JSON.stringify(previous.originalTestState?.[key]) !== JSON.stringify(result.originalTestState?.[key]));
+    const touchedKeys = [...new Set([...(input.nativeStateKeys ?? changedNativeKeys), ...(canonicalKeys.includes('sharedParameters') ? ['SHARED_PARAMETERS'] : [])])];
+    evidence.nativeWriteGuard = advanceOriginalNativeWriteGuard(guard, touchedKeys, control || touchedKeys.some(isOriginalNativeControlKey));
+  }
   return {...result, originalResultState: evidence};
 }

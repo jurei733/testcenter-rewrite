@@ -137,7 +137,7 @@ export class TestControllerComponent implements OnInit, OnDestroy {
         )
         .subscribe((command: Command) => {
           const completion=command.keyword.toLowerCase()==='terminate'?
-            this.terminalCompletions.begin(this.ownedTestId,CommandService.commandToString(command)):undefined;
+            this.terminalCompletions.begin(this.ownedTestId,CommandService.commandToString(command),this.nativeHttp.retainTestJournal()):undefined;
           this.handleCommand(command.keyword, command.arguments)
             .then(() => {
               if(completion)return completion.complete();

@@ -1673,7 +1673,7 @@ const createFileRepository = (
     async findOriginalCommandTarget(actor,testNumber){return findOriginalCommandTargetCollection(await getState(),actor,testNumber);},
     async appendOriginalCommand(actor,command,targets){await mutate(state=>appendOriginalCommandCollection(state,actor,command,targets));},
     async listOriginalCommands(scope,lastCommandId){return listOriginalCommandsCollection(await getState(),scope,lastCommandId);},
-    async acknowledgeOriginalCommand(scope,commandNumber){return mutate(state=>acknowledgeOriginalCommandCollection(state,scope,commandNumber));},
+    async acknowledgeOriginalCommand(scope,commandNumber,nativeStateProtocol){return mutate(state=>acknowledgeOriginalCommandCollection(state,scope,commandNumber,nativeStateProtocol));},
     async touchOriginalCommandPolling(scope,timestamp){return mutate(state=>touchOriginalCommandPollingCollection(state,scope,timestamp));},
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
       const state = await getState();
@@ -1923,10 +1923,11 @@ const createFileRepository = (
       const participantSession = state.participantSessions[input.participantSessionId];
       const prepared = prepareParticipantRunMutation(input, testRun && participantSession ? { testRun, participantSession,
         progressDelivery: input.deliveryId ? state.participantProgressDeliveries[JSON.stringify([input.testRunId, input.deliveryId])] ?? null : null,
+        precedingProgressDelivery: input.precedingDeliveryId ? state.participantProgressDeliveries[JSON.stringify([input.testRunId, input.precedingDeliveryId])] ?? null : null,
         testRuns: Object.values(state.testRuns).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
       if (prepared?.effect) {
         const effect = prepared.effect;
-        if(effect.originalTestState!==undefined&&(effect.testLogs.some(row=>Object.hasOwn(state.participantTestLogs,row.participantTestLogId))||effect.activityEvents.some(row=>Object.hasOwn(state.workspaceActivityEvents,row.activityEventId))||new Set(effect.testLogs.map(row=>row.participantTestLogId)).size!==effect.testLogs.length||new Set(effect.activityEvents.map(row=>row.activityEventId)).size!==effect.activityEvents.length))throw Error('Run mutation artifact identity already exists.');
+        if((effect.originalTestState!==undefined||effect.progressDelivery?.nativeStateWriteResult!==undefined)&&(effect.testLogs.some(row=>Object.hasOwn(state.participantTestLogs,row.participantTestLogId))||effect.activityEvents.some(row=>Object.hasOwn(state.workspaceActivityEvents,row.activityEventId))||new Set(effect.testLogs.map(row=>row.participantTestLogId)).size!==effect.testLogs.length||new Set(effect.activityEvents.map(row=>row.activityEventId)).size!==effect.activityEvents.length))throw Error('Run mutation artifact identity already exists.');
         const command = effect.commandInput ? appendParticipantRunCommand(effect.commandInput, effect.testRun, {
           existing: state.participantRunCommands[JSON.stringify([input.testRunId, effect.commandInput.commandId])] ?? null,
           lastSequence: Object.values(state.participantRunCommands).reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)

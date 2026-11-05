@@ -42,9 +42,9 @@ export function originalPhpMap(entries:Array<[string,unknown]>):string{
 export function preserveOriginalTestState(next:TestRun,previous:Pick<TestRun,'testRunId'|'participantSessionId'|'tenantId'|'workspaceId'|'contentReleaseId'|'originalTestState'|'originalResultState'|'stateRevision'>|null):TestRun{
  if(!previous)return next;
  const result={...next};delete result.originalTestState;
- if(previous.originalTestState!==undefined){
+ if(previous.originalTestState!==undefined||previous.originalResultState?.nativeWriteGuard){
   if((['testRunId','participantSessionId','tenantId','workspaceId','contentReleaseId'] as const).some(key=>previous[key]!==next[key]))throw new FirstSliceError(409,'original_test_scope_changed','The native Test scope changed.');
-  result.originalTestState=structuredClone(previous.originalTestState);
+  if(previous.originalTestState!==undefined)result.originalTestState=structuredClone(previous.originalTestState);
   if(previous.originalResultState!==undefined)result.originalResultState=structuredClone(previous.originalResultState);
   if(previous.stateRevision!==undefined)result.stateRevision=previous.stateRevision;
  }

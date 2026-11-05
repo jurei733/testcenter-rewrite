@@ -302,11 +302,13 @@ export class TestControllerService {
 
   addToTestStateBuffer(key: TestStateKey, content: string): void {
     if (this.testState[key] === content) return;
+    const state=[{ key, content, timeStamp: Date.now() }];
+    if(this.testMode.saveResponses)this.nativeHttp.captureTestState(state);
     this.testState[key] = content;
     this.testStateBuffer$.next(<TestStateUpdate>{
       testId: this.testId,
       unitAlias: '',
-      state: [{ key, content, timeStamp: Date.now() }]
+      state
     });
   }
 

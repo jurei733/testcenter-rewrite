@@ -1,5 +1,5 @@
 import type {Pool,PoolClient} from 'pg';
-import {assertOriginalCommandActorMetadata,assertOriginalCommandPacket,assertOriginalTestLogInput,selectOriginalCommands,prepareOriginalCommandPolling,originalParticipantGroupKeysEqual,resultParentUnavailable,type OriginalCommandActor,type OriginalCommandRepository,type OriginalCommandDelivery,type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
+import {readOriginalNativeStateBase,assertOriginalCommandActorMetadata,assertOriginalCommandPacket,assertOriginalTestLogInput,selectOriginalCommands,prepareOriginalCommandPolling,originalParticipantGroupKeysEqual,resultParentUnavailable,type OriginalCommandActor,type OriginalCommandRepository,type OriginalCommandDelivery,type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactBatch,withResultArtifactParent} from './result-artifact-parent.js';
 
 async function actor(db:Pool|PoolClient,input:OriginalCommandActor):Promise<void>{
@@ -37,6 +37,13 @@ export function createOriginalCommandRepository(pool:Pool):OriginalCommandReposi
   await client.query('COMMIT');
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}},
  async listOriginalCommands(input,lastCommandId){return withResultArtifactParent(pool,input,async client=>{await owner(client,input);const rows=(await client.query('SELECT command_number::text AS id,keyword,arguments_json,timestamp_seconds::text AS timestamp,executed FROM original_native_commands WHERE test_number=$1 ORDER BY timestamp_seconds,command_number',[input.testNumber])).rows;return selectOriginalCommands(rows.map(row=>({id:String(row.id),keyword:String(row.keyword),arguments:row.arguments_json,timestamp:String(row.timestamp),executed:row.executed} as OriginalCommandDelivery)),lastCommandId);});},
- async acknowledgeOriginalCommand(input,number){return withResultArtifactParent(pool,input,async client=>{await owner(client,input);const row=(await client.query('SELECT executed FROM original_native_commands WHERE test_number=$1 AND command_number=$2 FOR UPDATE',[input.testNumber,number])).rows[0];if(!row)return null;if(row.executed)return'already';await client.query('UPDATE original_native_commands SET executed=TRUE WHERE test_number=$1 AND command_number=$2',[input.testNumber,number]);return'executed';});},
+ async acknowledgeOriginalCommand(input,number,nativeStateProtocol=false){return withResultArtifactParent(pool,input,async client=>{
+  await owner(client,input);const row=(await client.query('SELECT executed FROM original_native_commands WHERE test_number=$1 AND command_number=$2 FOR UPDATE',[input.testNumber,number])).rows[0];if(!row)return null;
+  const metadata=nativeStateProtocol?(await client.query('SELECT original_result_state_json FROM test_runs WHERE test_run_id=$1 FOR SHARE',[input.testRunId])).rows[0]:undefined;
+  const raw=metadata?.original_result_state_json,nativeStateBase=metadata?readOriginalNativeStateBase(typeof raw==='string'?JSON.parse(raw):raw??undefined):undefined;
+  const outcome=row.executed?'already' as const:'executed' as const;
+  if(!row.executed)await client.query('UPDATE original_native_commands SET executed=TRUE WHERE test_number=$1 AND command_number=$2',[input.testNumber,number]);
+  return nativeStateBase?{outcome,nativeStateBase}:outcome;
+ });},
  async touchOriginalCommandPolling(input,timestamp){return withResultArtifactParent(pool,input,async client=>{await owner(client,input);const row=(await client.query('SELECT original_test_state_json,original_result_state_json FROM test_runs WHERE test_run_id=$1',[input.testRunId])).rows[0];const effect=prepareOriginalCommandPolling(timestamp,typeof row.original_test_state_json==='string'?JSON.parse(row.original_test_state_json):row.original_test_state_json??undefined,typeof row.original_result_state_json==='string'?JSON.parse(row.original_result_state_json):row.original_result_state_json??undefined);if(!effect)return false;await client.query('UPDATE test_runs SET updated_at=$1,original_result_state_json=$2::jsonb WHERE test_run_id=$3',[effect.updatedAt,JSON.stringify(effect.originalResultState),input.testRunId]);return true;},true);}
 };}

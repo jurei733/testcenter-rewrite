@@ -850,7 +850,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async findOriginalCommandTarget(actor,testNumber){return findOriginalCommandTargetCollection(state,actor,testNumber);},
     async appendOriginalCommand(actor,command,targets){appendOriginalCommandCollection(state,actor,command,targets);},
     async listOriginalCommands(scope,lastCommandId){return listOriginalCommandsCollection(state,scope,lastCommandId);},
-    async acknowledgeOriginalCommand(scope,commandNumber){return acknowledgeOriginalCommandCollection(state,scope,commandNumber);},
+    async acknowledgeOriginalCommand(scope,commandNumber,nativeStateProtocol){return acknowledgeOriginalCommandCollection(state,scope,commandNumber,nativeStateProtocol);},
     async touchOriginalCommandPolling(scope,timestamp){return touchOriginalCommandPollingCollection(state,scope,timestamp);},
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
       return structuredClone(state.originalOperationalLogins.get(`${tenantId}::${workspaceId}`) ?? []);
@@ -1062,10 +1062,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const participantSession = state.participantSessions.get(input.participantSessionId);
       const prepared = prepareParticipantRunMutation(input, testRun && participantSession ? { testRun, participantSession,
         progressDelivery: input.deliveryId ? state.participantProgressDeliveries.get(JSON.stringify([input.testRunId, input.deliveryId])) ?? null : null,
+        precedingProgressDelivery: input.precedingDeliveryId ? state.participantProgressDeliveries.get(JSON.stringify([input.testRunId, input.precedingDeliveryId])) ?? null : null,
         testRuns: Array.from(state.testRuns.values()).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
       if (prepared?.effect) {
         const effect = prepared.effect;
-        if(effect.originalTestState!==undefined&&(effect.testLogs.some(row=>state.participantTestLogs.has(row.participantTestLogId))||effect.activityEvents.some(row=>state.workspaceActivityEvents.has(row.activityEventId))||new Set(effect.testLogs.map(row=>row.participantTestLogId)).size!==effect.testLogs.length||new Set(effect.activityEvents.map(row=>row.activityEventId)).size!==effect.activityEvents.length))throw Error('Run mutation artifact identity already exists.');
+        if((effect.originalTestState!==undefined||effect.progressDelivery?.nativeStateWriteResult!==undefined)&&(effect.testLogs.some(row=>state.participantTestLogs.has(row.participantTestLogId))||effect.activityEvents.some(row=>state.workspaceActivityEvents.has(row.activityEventId))||new Set(effect.testLogs.map(row=>row.participantTestLogId)).size!==effect.testLogs.length||new Set(effect.activityEvents.map(row=>row.activityEventId)).size!==effect.activityEvents.length))throw Error('Run mutation artifact identity already exists.');
         const command = effect.commandInput ? appendParticipantRunCommand(effect.commandInput, effect.testRun, {
           existing: state.participantRunCommands.get(JSON.stringify([input.testRunId, effect.commandInput.commandId])) ?? null,
           lastSequence: Array.from(state.participantRunCommands.values()).reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)

@@ -11,6 +11,8 @@ import type {OriginalBookletFiles} from './original-test-files.js';
 import {parseOriginalNativeTestNumber,readOriginalPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
 import {defaultParticipantExecutionMode,type ParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
 import {originalTestDelivery,prepareOriginalNativeDelivery} from './original-native-delivery.js';
+import type {OriginalNativeStateWriteBase, OriginalNativeStateWriteResult} from '@testcenter-rewrite-app/domain';
+import {parseOriginalNativeStateWriteBase, prepareOriginalNativeStateWrite} from './original-native-write-state.js';
 
 /** PHP TestName preserves first key position while duplicate values replace it. */
 function orderedName(input:string):{name:string;fileId:string;states:Map<string,string>}{
@@ -25,7 +27,7 @@ function orderedName(input:string):{name:string;fileId:string;states:Map<string,
   return {fileId, name: fileId + (states.size ? '#' + [...states].map(([key, value]) => `${key}:${value}`).join(';') : ''), states};
 }
 export function parseOriginalTestName(input:string):{name:string;fileId:string;states:Record<string,string>}{const parsed=orderedName(input);return{...parsed,states:Object.fromEntries(parsed.states)};}
-export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode|NonNullable<ParticipantSession['originalOperationalMode']>;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>};
+export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode|NonNullable<ParticipantSession['originalOperationalMode']>;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>;nativeStateBase?:OriginalNativeStateWriteBase};
 export function formatOriginalTestReadJson(value:OriginalTestRead):string{
  const resources=Object.entries(value.resources);
  const resourceJson=originalPhpMap(resources);
@@ -38,8 +40,8 @@ export type OriginalTestPort = {
   putLog(input:{token:string;testNumber:string;body:unknown;deliveryId?:unknown}):Promise<void>;
   patchLock(input:{token:string;testNumber:string;body:unknown}):Promise<void>;
   create(input: {token: string; bookletName: string}): Promise<string>;
-  read(input:{token:string;testNumber:string}):Promise<OriginalTestRead>;
-  patchState(input:{token:string;testNumber:string;patch:unknown;deliveryId?:unknown}):Promise<void>;
+  read(input:{token:string;testNumber:string;nativeStateProtocol?:unknown}):Promise<OriginalTestRead>;
+  patchState(input:{token:string;testNumber:string;patch:unknown;deliveryId?:unknown;stateBase?:unknown}):Promise<OriginalNativeStateWriteResult|void>;
   resource(input:{groupToken:string;workspaceNumber:string;path:string}):Promise<{bytes:Uint8Array;contentType:string}>;
 };
 const unavailable = () => new FirstSliceError(409, 'original_test_history_unknown', 'The Original Test identity is unavailable.');
@@ -102,27 +104,49 @@ export function createOriginalTestPort(input: {
   const unlocked=(run:TestRun,testNumber:string)=>{if(run.locked)throw new FirstSliceError(423,'original_test_locked',`Test #${testNumber} \`${run.originalResultState?.bookletLabel??''}\` is locked.`);};
   const savedState=(run:TestRun)=>{if(run.originalTestState!==undefined){assertOriginalTestState(run.originalTestState);return structuredClone(run.originalTestState);}if(run.originalResultState?.hasTestState===false)return{};throw new FirstSliceError(409,'original_test_state_unknown','The historical saved Test state is unavailable.');};
   return {
-    async read({token,testNumber:raw}){
+    async read({token,testNumber:raw,nativeStateProtocol}){
       const{person,run,testNumber}=await owned(token,raw);unlocked(run,testNumber);
+      if(nativeStateProtocol!==undefined&&nativeStateProtocol!=='1')throw new FirstSliceError(400,'original_state_protocol_invalid','Invalid native Test-state protocol.');
       const identity=run.originalResultState;if(typeof identity?.bookletName!=='string'||identity.lastOpenedAt===undefined)throw unavailable();savedState(run);
       const entry=(await input.repository.listParticipantRosterEntriesByWorkspace(person.tenantId,person.workspaceId)).find(row=>row.originalLoginIdentity===true&&row.loginKey===person.originalLoginKey);if(!entry&&person.originalOperationalMode===undefined)throw new FirstSliceError(410,'original_login_gone','The Original login is no longer available.');
       const workspaceId=await input.repository.getOrCreateOriginalWorkspaceNumber(person),fileId=orderedName(identity.bookletName).fileId;
       let files:OriginalBookletFiles;try{files=await input.readBooklet(person,fileId);}catch(error){if(error instanceof FirstSliceError&&error.statusCode===404)throw new FirstSliceError(404,'original_booklet_unavailable',`No Booklet with id \`${fileId}\` found on workspace \`${workspaceId}\`!`);throw error;}
+      let firstStart=false;
       const result=await input.repository.mutateParticipantRun(run,context=>{unlocked(context.testRun,testNumber);savedState(context.testRun);
-        if(context.testRun.originalResultState?.lastOpenedAt===undefined)throw unavailable();if(context.testRun.originalResultState.lastOpenedAt!==null)return null;
-        const timestamp=input.now();return{testRun:{...context.testRun,updatedAt:timestamp},testLogs:[],activityEvents:[],originalResultOpenedAt:timestamp};});
+        if(context.testRun.originalResultState?.lastOpenedAt===undefined)throw unavailable();firstStart=context.testRun.originalResultState.lastOpenedAt===null;
+        const initialize=nativeStateProtocol==='1'&&!context.testRun.originalResultState.nativeWriteGuard;
+        if(!firstStart&&!initialize)return null;
+        const timestamp=firstStart?input.now():undefined;
+        return{testRun:timestamp?{...context.testRun,updatedAt:timestamp}:context.testRun,testLogs:[],activityEvents:[],
+          ...(timestamp?{originalResultOpenedAt:timestamp}:{}),...(initialize?{initializeOriginalNativeWriteGuard:true as const}:{})};});
       if(!result)throw forbidden(raw);
-      return{...files,workspaceId,mode:person.originalOperationalMode??entry?.executionMode??defaultParticipantExecutionMode,laststate:savedState(result.testRun),firstStart:result.applied,presetBookletStates:orderedName(identity.bookletName).states};
+      const guard=result.testRun.originalResultState?.nativeWriteGuard;
+      return{...files,workspaceId,mode:person.originalOperationalMode??entry?.executionMode??defaultParticipantExecutionMode,laststate:savedState(result.testRun),firstStart,presetBookletStates:orderedName(identity.bookletName).states,
+        ...(nativeStateProtocol==='1'&&guard?{nativeStateBase:{version:1 as const,revision:guard.revision,controlEpoch:guard.controlEpoch}}:{})};
     },
-    async patchState({token,testNumber:raw,patch,deliveryId}){
-      const{run,testNumber}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch),delivery=originalTestDelivery({id:deliveryId,kind:'state',scope:{...run,testNumber},entries,now:input.now});
-      const result=await input.repository.mutateParticipantRun({...run,...(delivery?{deliveryId:delivery.deliveryId}:{})},context=>{
+    async patchState({token,testNumber:raw,patch,deliveryId,stateBase}){
+      const{run,testNumber}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch),base=parseOriginalNativeStateWriteBase(stateBase);
+      if(base&&(deliveryId===undefined||base.previousDeliveryId===deliveryId))throw new FirstSliceError(400,'original_state_base_invalid','A causal state packet requires its own native delivery identity.');
+      const delivery=originalTestDelivery({id:deliveryId,kind:'state',scope:{...run,testNumber},entries:base?{entries,base}:entries,now:input.now});
+      let writeResult:OriginalNativeStateWriteResult|undefined;
+      const result=await input.repository.mutateParticipantRun({...run,...(delivery?{deliveryId:delivery.deliveryId}:{}),
+        ...(base?.previousDeliveryId?{precedingDeliveryId:'native-test-state:'+base.previousDeliveryId}:{})},context=>{
         const receipt=delivery?prepareOriginalNativeDelivery(run,delivery,context.progressDelivery??undefined,'test'):undefined;
-        if(receipt===null)return null;
-        const values=applyOriginalTestStatePatch(savedState(context.testRun),entries),timestamp=input.now();
+        if(receipt===null){writeResult=context.progressDelivery?.nativeStateWriteResult;return null;}
+        let applicable=entries;
+        if(base){
+          const guard=context.testRun.originalResultState?.nativeWriteGuard;
+          if(!guard)throw new FirstSliceError(409,'original_state_protocol_required','Read the current native Test-state base before writing.');
+          const prepared=prepareOriginalNativeStateWrite(guard,base,entries,context.precedingProgressDelivery?.nativeStateWriteResult);
+          applicable=prepared.entries;writeResult=prepared.result;
+          if(receipt)receipt.nativeStateWriteResult=writeResult;
+        }
+        const values=applyOriginalTestStatePatch(savedState(context.testRun),applicable),timestamp=input.now();
         const testLogs=entries.map(entry=>({participantTestLogId:originalTestStateLogIdPrefix+input.id(),tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,testRunId:run.testRunId,unitKey:null,originalUnitId:null,logKey:entry.key,logContent:encodeOriginalReportJson(entry.content),timestamp:entry.timeStamp,recordedAt:timestamp,...(entry.timeStamp===0?{originalTimestamp:0 as const}:{})}));
-        return{testRun:{...context.testRun,updatedAt:timestamp},originalTestState:values,originalResultModifiedAt:timestamp,testLogs,activityEvents:[],...(receipt?{progressDelivery:receipt}:{})};});
+        return{...(base&&!writeResult?.appliedKeys.length?{testRun:context.testRun}:{testRun:{...context.testRun,updatedAt:timestamp},originalTestState:values,originalResultModifiedAt:timestamp}),
+          originalNativeStateKeys:applicable.filter(entry=>entry.timeStamp>0).map(entry=>entry.key),testLogs,activityEvents:[],...(receipt?{progressDelivery:receipt}:{})};});
       if(!result)throw forbidden(raw);
+      return writeResult;
     },
     async requireOwner({token,testNumber}){await resolveOriginalOwnedTestScope(input,token,testNumber);},
     async patchLock({token,testNumber,body}){
