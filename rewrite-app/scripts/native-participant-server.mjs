@@ -17,13 +17,16 @@ const proxy=createServer((incoming,outgoing)=>{
  const testStateWrite=incoming.method==='PATCH'&&/^\/test\/[^/]+\/state$/.test(path),testLogWrite=incoming.method==='PUT'&&/^\/test\/[^/]+\/log$/.test(path);
  const resourceRead=incoming.method==='GET'&&/^\/file\//.test(path);
  const record={phase,time:Date.now(),method:incoming.method,path:resourceRead?path.replace(/^(\/file\/)[^/]+/,'$1[resource-capability]'):path,hasNativeToken:!!incoming.headers.authtoken,...(responseWrite?{deliveryId:incoming.headers['x-native-delivery-id']}:{})};
- const trace=(event,extra={})=>{if(record.phase==='native-background-locked')process.send?.({nativeBackgroundNetwork:{event,phase:record.phase,time:Date.now(),method:record.method,path:record.path,deliveryId:incoming.headers['x-native-delivery-id'],...extra}});};
+ const trace=(event,extra={})=>{if(['native-background-locked','native-startup-recovery'].includes(record.phase))process.send?.({nativeBackgroundNetwork:{event,phase:record.phase,time:Date.now(),method:record.method,path:record.path,deliveryId:incoming.headers['x-native-delivery-id'],...extra}});};
  trace('ingress');incoming.once('aborted',()=>trace('incoming-aborted'));outgoing.once('close',()=>trace('outgoing-close',{finished:outgoing.writableFinished}));
  if(resourceRead)outgoing.once('finish',()=>process.send?.({nativeResource:{...record,origin:incoming.headers.origin,status:outgoing.statusCode}}));
  if(responseWrite||testRead)outgoing.once('finish',()=>process.send?.({nativeResponse:{...record,status:outgoing.statusCode}}));
  if(sessionRead)outgoing.once('finish',()=>process.send?.({nativeSession:{...record,status:outgoing.statusCode}}));
  if(commandAck)outgoing.once('finish',()=>process.send?.({nativeCommand:{...record,status:outgoing.statusCode}}));
  if(testStateWrite||testLogWrite)outgoing.once('finish',()=>process.send?.({nativeTestWrite:{...record,deliveryId:incoming.headers['x-native-delivery-id'],stateBase:incoming.headers['x-native-state-base'],status:outgoing.statusCode}}));
+ const hold=(key,deliver)=>{const value={outgoing,forward:deliver};held.set(key,value);outgoing.once('close',()=>{if(held.get(key)===value){held.delete(key);process.send?.({nativeHeldCancelled:key});}});process.send?.({nativeHeld:key});};
+ const holdStartupRead=testRead&&target==='startup-worker-state'&&remaining>0;
+ if(holdStartupRead)remaining--;
  const forward=(body,loseAcknowledgement=false)=>{
   if(outgoing.destroyed||incoming.aborted)return;
   const port=backend.address().port,headers={...incoming.headers,host:'127.0.0.1:'+port,connection:'close'};
@@ -32,6 +35,14 @@ const proxy=createServer((incoming,outgoing)=>{
   const forwarded=request({hostname:'127.0.0.1',port,path:incoming.url,method:incoming.method,headers},response=>{
    trace('backend-headers',{status:response.statusCode});response.once('end',()=>trace('backend-end'));
    if(testStateWrite)record.stateResult=response.headers['x-native-state-result'];
+   if(holdStartupRead){
+    const chunks=[];let bytes=0,tooLarge=false;
+    response.on('data',chunk=>{bytes+=chunk.length;if(bytes>1024*1024){tooLarge=true;if(!outgoing.headersSent)outgoing.writeHead(502);outgoing.end('Owned Test snapshot exceeds its fixture limit');}else chunks.push(chunk);});
+    response.once('end',()=>{if(tooLarge||outgoing.destroyed)return;const captured=Buffer.concat(chunks);let shared;try{shared=JSON.parse(captured.toString('utf8')).laststate?.SHARED_PARAMETERS??'[]';}catch{shared='invalid owned Test JSON';}
+     process.send?.({nativeStartupRead:{phase:record.phase,path,status:response.statusCode,shared}});
+     hold(record.phase+'-test-read',()=>{if(outgoing.destroyed)return;const headers={...response.headers,'content-length':captured.length};delete headers['transfer-encoding'];outgoing.writeHead(response.statusCode,headers);outgoing.end(captured);});
+    });return;
+   }
    if(loseAcknowledgement&&response.statusCode>=200&&response.statusCode<300){record.backendStatus=response.statusCode;response.once('end',()=>fail());response.resume();return;}
    outgoing.writeHead(response.statusCode,response.headers);response.pipe(outgoing);
   });
@@ -53,6 +64,7 @@ const proxy=createServer((incoming,outgoing)=>{
   incoming.once('end',()=>{
    trace('body-end');
    const body=Buffer.concat(chunks);record.body=body.toString('utf8');
+   if(testStateWrite&&target==='startup-worker-state'&&incoming.headers['x-native-delivery-id']===matchDeliveryId){hold(record.phase,()=>forward(body));return;}
    if(testStateWrite&&target==='test-state-lost-ack'||testLogWrite&&(target==='test-log-lost-ack'||target==='terminal-log-lost-ack')){
     const entries=JSON.parse(record.body);record.probe=Array.isArray(entries)&&entries.some(entry=>testStateWrite?entry.key==='SHARED_PARAMETERS':entry.key==='command executed'&&entry.content===(target==='terminal-log-lost-ack'?'terminate lock':'pause'));
     if(record.probe&&remaining>0){remaining--;forward(body,true);return;}

@@ -13,6 +13,7 @@ export class NativeBackgroundContext {
  readonly ready:Promise<void>;
  private actor='';private preferredUnitAlias?:string;
  private readonly writes=new Map<string,Promise<void>>();
+ private readonly recoveredTestStates=new Set<string>();
  private reconciling?:Promise<void>;private reconcileRequested=0;private sealRequested=false;
  private worker:ServiceWorker|null=null;
  private readonly onPageHide=()=>{this.kick();};
@@ -49,6 +50,7 @@ export class NativeBackgroundContext {
     if(accepted?.actor===this.actor&&accepted.testId===value.testId&&accepted.receipts){
      const keep=[];for(const entry of value.document.entries){
       if(accepted.receipts[entry.id]!==await this.api.entryFingerprint(entry))keep.push(entry);
+      else if(value.kind==='test'&&entry.kind==='state')this.recoveredTestStates.add(value.testId);
      }
      if(keep.length!==value.document.entries.length){
       value.document.entries=keep;value.document.revision=Math.max(value.revision,accepted.revision)+1;content=JSON.stringify(value.document);changed=true;
@@ -84,7 +86,15 @@ export class NativeBackgroundContext {
   this.writes.set(bucket,next);void next.catch(()=>{});
  };
  async settled():Promise<void>{await this.ready;await Promise.all([...this.writes.values()]);}
- async recover<T>(testId:string,operation:()=>Promise<T>):Promise<T>{await this.ready;this.owner.throwIfAborted();return this.api.runRecovery(this.actor,testId,this.owner,operation);}
+ async recover(testId:string,operation:()=>Promise<boolean>):Promise<boolean>{
+  await this.ready;this.owner.throwIfAborted();return this.api.runRecovery(this.actor,testId,this.owner,async()=>{
+   // A receipt scan may have removed the only local evidence of a Test-state
+   // write after the loader's first GET. Join it before claiming documents and
+   // retain that invalidation until a successful foreground recovery consumes it.
+   await this.reconcile(false);const recovered=await operation();
+   const workerRecovered=this.recoveredTestStates.delete(testId);return recovered||workerRecovered;
+  });
+ }
  kick():void{
   if(this.owner.aborted)return;
   if(!this.post({action:'drain'}))void this.api.drain().then(()=>this.reconcile(false),()=>this.reconcile(false)).catch(()=>{});
