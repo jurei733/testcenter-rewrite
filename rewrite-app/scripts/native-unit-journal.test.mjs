@@ -120,3 +120,14 @@ test('capacity applies to independent actor/run/Unit identities across the entir
  const f=fixture();t.after(()=>f.close());const other=await f.open('other actor','9007199254740992');for(let i=0;i<200;i++)other.captureResponse('A'+i,'ORIGINAL',{answer:'retained '+i},'owned',100);other.close();await flush();const before=[...f.storage.values];
  const current=await f.open();assert.throws(()=>current.captureResponse('CURRENT','ORIGINAL',{answer:'201st'},'owned',200));assert.deepEqual([...f.storage.values],before);
 });
+
+test('a two-MiB live answer survives three MiB already pending in the same view without evicting secured bytes',async t=>{
+ const f=fixture();t.after(()=>f.close());const mirrors=[],sealed=[],view=await f.open(undefined,undefined,{retainUnsecured:true,mirror:(key,text)=>mirrors.push([key,text]),seal:(key,text)=>sealed.push([key,text])});
+ const older='P'.repeat(3*1024*1024),large='G'.repeat(2*1024*1024);
+ view.captureResponse('OLDER','ORIGINAL',{answer:older},'owned',100);const old=view.freeze('response','OLDER',body(older,100)),durable=[...f.storage.values],mirrorCount=mirrors.length;
+ view.captureResponse('LIVE','ORIGINAL',{answer:large},'owned',200);assert.equal(view.hasUnsecured,true);assert.deepEqual([...f.storage.values],durable);assert.equal(mirrors.length,mirrorCount);
+ assert.deepEqual(view.readyOwnDeliveries('LIVE').map(row=>row.unitAlias),['OLDER'],'Capture must preserve the Source flush window');
+ const current=view.freeze('response','LIVE',body(large,200));assert.deepEqual(view.readyOwnDeliveries('LIVE').map(row=>row.id),[current.id,old.id]);assert.equal(JSON.parse(view.snapshot('LIVE')[0].payload).dataParts.answer,large);
+ view.acknowledge(current);assert.equal(view.hasUnsecured,false);assert.equal(JSON.parse(view.snapshot('OLDER')[0].payload).dataParts.answer,older);assert.equal(view.snapshot('OLDER')[0].id,old.id);assert.equal(view.snapshot('OLDER')[0].payload,old.payload);
+ view.close();assert.ok(sealed.every(([,text])=>!text.includes('G'.repeat(1024))));await flush();const next=await f.open();assert.equal(next.recoveries()[0].payload,old.payload);
+});

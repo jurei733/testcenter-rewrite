@@ -1,5 +1,6 @@
 import {bindNativeSmokeServerOwner} from './native-monitor-smoke-io.mjs';
 import {createServer,request} from 'node:http';
+import {createHash} from 'node:crypto';
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
 
 // Only the real API consumes its IncomingMessage. The owned proxy records the
@@ -20,7 +21,7 @@ const proxy=createServer((incoming,outgoing)=>{
  const trace=(event,extra={})=>{if(['native-background-locked','native-startup-recovery'].includes(record.phase))process.send?.({nativeBackgroundNetwork:{event,phase:record.phase,time:Date.now(),method:record.method,path:record.path,deliveryId:incoming.headers['x-native-delivery-id'],...extra}});};
  trace('ingress');incoming.once('aborted',()=>trace('incoming-aborted'));outgoing.once('close',()=>trace('outgoing-close',{finished:outgoing.writableFinished}));
  if(resourceRead)outgoing.once('finish',()=>process.send?.({nativeResource:{...record,origin:incoming.headers.origin,status:outgoing.statusCode}}));
- if(responseWrite||testRead)outgoing.once('finish',()=>process.send?.({nativeResponse:{...record,status:outgoing.statusCode}}));
+ if(responseWrite||testRead)outgoing.once('finish',()=>process.send?.({nativeResponse:{...record,...(record.body?.length>1024*1024?{body:undefined,bodyBytes:Buffer.byteLength(record.body),bodySha256:createHash('sha256').update(record.body).digest('hex')}:{}),status:outgoing.statusCode}}));
  if(sessionRead)outgoing.once('finish',()=>process.send?.({nativeSession:{...record,status:outgoing.statusCode}}));
  if(commandAck)outgoing.once('finish',()=>process.send?.({nativeCommand:{...record,status:outgoing.statusCode}}));
  if(testStateWrite||testLogWrite)outgoing.once('finish',()=>process.send?.({nativeTestWrite:{...record,deliveryId:incoming.headers['x-native-delivery-id'],stateBase:incoming.headers['x-native-state-base'],status:outgoing.statusCode}}));
@@ -59,9 +60,10 @@ const proxy=createServer((incoming,outgoing)=>{
   });return;
  }
  if(responseWrite||commandAck||testStateWrite||testLogWrite){
-  const chunks=[];let bytes=0;
-  incoming.on('data',chunk=>{bytes+=chunk.length;if(bytes>1024*1024){outgoing.writeHead(413).end();incoming.destroy();}else chunks.push(chunk);});
+  const chunks=[];let bytes=0,tooLarge=false;const limit=responseWrite?64*1024*1024:1024*1024;
+  incoming.on('data',chunk=>{if(tooLarge)return;bytes+=chunk.length;if(bytes>limit){tooLarge=true;outgoing.writeHead(413).end();}else chunks.push(chunk);});
   incoming.once('end',()=>{
+   if(tooLarge)return;
    trace('body-end');
    const body=Buffer.concat(chunks);record.body=body.toString('utf8');
    if(responseWrite&&target==='stars-offline'&&selectedTests.includes(path.split('/')[2])){fail();return;}

@@ -5022,7 +5022,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
       if (await handleOriginalTestHttp({request, pathname, services,subscribe,
         reason: text => {response.statusMessage=text;},
-        readBody: (allowEmpty = false, decode) => readJsonBody<unknown>(request, runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),
+        readBody: (allowEmpty = false, decode, purpose) => readJsonBody<unknown>(request, purpose === 'unit-progress' ? runtime.config.maxParticipantProgressJsonBodyBytes : runtime.config.maxJsonBodyBytes, allowEmpty, decode), header: (name, value) => response.setHeader(name, value),
         send: (status, value) => sendJson(response, status, value),
         raw: (status, text, contentType) => {response.writeHead(status, {...securityHeaders, "content-type": contentType}); endResponse(response,text);},
         // Only successfully capability-authorized native Resource bytes reach this

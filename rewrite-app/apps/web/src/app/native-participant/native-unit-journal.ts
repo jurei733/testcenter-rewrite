@@ -1,5 +1,9 @@
 export const NATIVE_UNIT_JOURNAL_PREFIX='testcenter-native-unit-journal:v1:';
 const maxUnits=200,maxEntries=10_000,maxChars=4_500_000;
+// Synchronous browser storage keeps its existing small budget. A live view may
+// retain a larger bounded overlay while prior packets consume that budget;
+// callers must expose that overlay as unsecured and protect departure.
+const maxUnsecuredChars=64*1024*1024;
 type Kind='state'|'response'|'log';
 type Entry={id:string;kind:Kind;unitAlias:string;originalUnitId:string;queuedAt:number;phase:'staged'|'ready';payload:string};
 type Document={version:1;actor:string;testId:string;entries:Entry[];revision?:number};
@@ -81,7 +85,7 @@ export class NativeUnitJournal {
  }
  private write(key:string,doc:Document):void{
   this.current();const revision=Math.max(this.revisions.get(key)??0,doc.revision??0)+1;if(!Number.isSafeInteger(revision))throw failure();doc={...doc,revision};this.validate(doc);
-  const serialized=JSON.stringify(doc);if(serialized.length>maxChars)throw failure();
+  const serialized=JSON.stringify(doc);if(serialized.length>(this.retainUnsecured&&key===this.ownBucket?maxUnsecuredChars:maxChars))throw failure();
   const identity=(bucket:string,alias:string)=>bucket.slice(0,bucket.lastIndexOf(':'))+':'+alias;
   let chars=0,count=doc.entries.length;const units=new Set(doc.entries.map(row=>identity(key,row.unitAlias))),before=new Set<string>();
   for(const existing of this.keys().filter(name=>name.startsWith(NATIVE_UNIT_JOURNAL_PREFIX))){
