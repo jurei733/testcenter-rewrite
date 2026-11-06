@@ -1,3 +1,5 @@
+@use '@angular/material' as mat;
+
 :root[data-interface-mode='original']:has(#originalWorkspaceFileFrame),
 :root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame) { height:100%; overflow:hidden; }
 :root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame) { background:white; color-scheme:light; }
@@ -19,3 +21,8 @@
  dt { margin-top:12px; font-weight:700; } dd { margin-top:4px; margin-inline-start:0; }
  .logout-button { margin-top:12px; border:1px solid var(--secondary); }
 }
+// Pinned Source theme/material-overrides.scss keeps raised cards on the surface.
+:root[data-interface-mode='original'] #originalWorkspaceFileFrame {
+ @include mat.card-overrides((elevated-container-color: var(--mat-sys-surface)));
+}
+

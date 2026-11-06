@@ -24,6 +24,7 @@ const basename = (value:string):string => value.split(/[\\/]/).at(-1) ?? value;
  * await. Selection and file bytes never enter persisted shell state. */
 export class OriginalWorkspaceFilesController {
   files:OriginalWorkspaceFile[]=[];
+  dependencySizesCalculated=false;
   overview:WorkspaceOverview|null=null;
   busy=false;
   problem='';
@@ -104,13 +105,14 @@ export class OriginalWorkspaceFilesController {
     if(response.workspaceOverview.tenant.tenantKey!==owner.tenantKey || response.workspaceOverview.workspace.workspaceKey!==owner.workspaceKey ||
       response.workspaceOverview.workspace.tenantId!==response.workspaceOverview.tenant.tenantId)throw Error('Der Arbeitsbereich konnte nicht zugeordnet werden.');
     this.overview=response.workspaceOverview;
+    this.dependencySizesCalculated=catalog.dependencySizesCalculated;
     this.files=catalog.items.map(file=>({...file,name:basename(file.fileName),isChecked:false}));
     this.selectedRowId='';this.order();
   }
   async connect():Promise<void> {
     const scope=this.current();this.epoch++;
     const owner={epoch:this.epoch,token:scope.token,tenantKey:scope.tenantKey,workspaceKey:scope.workspaceKey};this.owner=owner;
-    this.grouped.clear();this.files=[];this.overview=null;this.uploads=[];this.deletionReport=null;this.problem='';this.notice='';this.selectedRowId='';
+    this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.problem='';this.notice='';this.selectedRowId='';
     this.busy=!!owner.token && !!owner.tenantKey && !!owner.workspaceKey;this.changed();
     if(!this.busy)return;
     try { await this.load(owner); }
@@ -195,5 +197,5 @@ export class OriginalWorkspaceFilesController {
     return {path:this.path(owner,productionApiRoutes.workspace.downloadWorkspaceFile,file.sourcePackageId),name:file.name,token:owner.token,
       current:()=>this.owns(owner)};
   }
-  destroy():void {this.destroyed=true;this.epoch++;this.owner=null;this.grouped.clear();this.files=[];this.overview=null;this.uploads=[];this.deletionReport=null;this.selectedRowId='';this.busy=false;this.problem='';this.notice='';this.changed();}
+  destroy():void {this.destroyed=true;this.epoch++;this.owner=null;this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.selectedRowId='';this.busy=false;this.problem='';this.notice='';this.changed();}
 }

@@ -87,6 +87,10 @@ export async function runNativeWorkspaceZipSmoke({browser, base, out, fixture, m
     assert.equal(await page.locator('[data-cy=archive-upload-report] .subheading-2').count(),4);
     assert.equal(await page.locator('[data-cy=upload-report] .subheading-2.error').count(),2);
     assert.equal(await page.locator('[data-cy=archive-upload-report] .alert-error').count(),2);
+    const schemaHighlight=page.locator('[data-cy=archive-upload-report] .highlight').filter({hasText:'https://w3id.org/iqb/spec/unit-xml/'});
+    assert.equal(await schemaHighlight.textContent(),'https://w3id.org/iqb/spec/unit-xml/<version>');
+    assert.equal(await schemaHighlight.locator('*').count(),0,'Schema placeholders must stay literal text, never parsed markup.');
+    assert.equal(await page.locator('[data-cy=archive-upload-report] .highlight').filter({hasText:'geometry.xml'}).count(),1);
     await page.mouse.move(1180,80);await page.getByRole('tooltip').waitFor({state:'hidden'});
     await page.locator('[data-cy=upload-report]').scrollIntoViewIfNeeded();
     await page.screenshot({path:join(out,'native-root-zip-partial-report.png'),fullPage:true});
@@ -109,7 +113,7 @@ export async function runNativeWorkspaceZipSmoke({browser, base, out, fixture, m
     assert.deepEqual(await writer.catalog(),current); assert.deepEqual(errors,[]);
     mark('root-ZIP-upload-denies-readonly-anonymous-and-foreign-workspace-writers');
     await writeFile(join(out,'native-root-zip-browser-upload.json'),JSON.stringify({success:true,actualFileReader:true,actualProtectedHttp:true,
-      noAssessmentFilesSeeded:true,noVisibleRootContainer:true,largeResponseObservedThroughActualUI:true,nativeWarningAndInfoChannelsRendered:true,originalMissingSchemaAndOverwriteReportsVerified:true,nativeSourceHeadingsAndLexicalUiOrderVerified:true,allFiles:downloads,partial:partial.archiveReport,invalidStatus:400,
+      noAssessmentFilesSeeded:true,noVisibleRootContainer:true,largeResponseObservedThroughActualUI:true,nativeWarningAndInfoChannelsRendered:true,originalMissingSchemaAndOverwriteReportsVerified:true,nativeSourceHeadingsAndLexicalUiOrderVerified:true,pairedTicksRenderedAsSafeTextSpans:true,allFiles:downloads,partial:partial.archiveReport,invalidStatus:400,
       readOnlyStatus:403,anonymousStatus:401,foreignWorkspaceStatus:403,originalPublicationPreserved:true,wire,errors},null,2));
   } catch(error) {
     await page?.screenshot({path:join(out,'native-root-zip-failure.png'),fullPage:true}).catch(()=>{});

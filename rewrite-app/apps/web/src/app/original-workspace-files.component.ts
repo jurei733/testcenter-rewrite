@@ -104,12 +104,21 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    if(bytes<=0)return '0';const index=Math.floor(Math.log(bytes)/Math.log(1024));
    return `${(bytes/1024**index).toFixed(1)} ${['B','KB','MB','GB','TB','PB'][index]}`;
  }
- errors(file:OriginalWorkspaceFile):string[] {
+ fileErrors(file:OriginalWorkspaceFile):string[] {
    const errors=(file.validationDiagnostics??[]).filter(row=>row.severity==='error').map(row=>row.message);
    if(file.unresolvedReferences.length)errors.push(...file.unresolvedReferences.map(row=>`Fehlende oder mehrdeutige Abhängigkeit: ${row.reference}`));
+   return errors;
+ }
+ errors(file:OriginalWorkspaceFile):string[] {
+   const errors=this.fileErrors(file);
    const major=Number.parseInt(file.metadata.veronaVersion??'',10);
    if(Number.isFinite(major) && (major<2 || major>6))errors.push(`Verona Version \`${major}\` is not supported (only versions between \`2\` and \`6\`)`);
    return errors;
+ }
+ // Source computes its aggregate before loading dependency DTOs. That second
+ // response replaces per-row frontend checks; over1000files it is skipped.
+ rowErrors(file:OriginalWorkspaceFile):string[] {
+   return this.controller.dependencySizesCalculated?this.fileErrors(file):this.errors(file);
  }
  warnings(file:OriginalWorkspaceFile):string[] {
    return (file.validationDiagnostics??[]).filter(row=>row.severity==='warning').map(row=>row.message);

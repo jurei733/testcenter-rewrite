@@ -100,7 +100,7 @@
                     <button mat-button [attr.data-cy]="file.name"
                       (click)="download(file)">{{file.name}}</button>
                     <span class="vertical-align-middle">
-                      @if (errors(file).length) {
+                      @if (rowErrors(file).length) {
                         <mat-icon originalWorkspaceFileIcon class="report-error"
                           name="error" />
                       } @else if (warnings(file).length || neverUsed(file)) {
@@ -128,7 +128,7 @@
                           <app-original-workspace-file-notice level="warning"
                             [text]="file.fileType+' is never used.'" />
                         }
-                        @for (message of errors(file); track $index) {
+                        @for (message of rowErrors(file); track $index) {
                           <app-original-workspace-file-notice level="error" [text]="message" />
                         }
                         @for (message of warnings(file); track $index) {

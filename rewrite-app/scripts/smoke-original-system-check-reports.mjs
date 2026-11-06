@@ -80,7 +80,8 @@ try{
  }
  const expected=await api(scope+'/exports/system-check-reports.csv?checkId=CHECK.A&checkId=CHECK.B');
  assert.equal((expected.toString('utf8').match(/owned-title-/g)??[]).length,504);
- browser=await chromium.launch({headless:process.env.CI==='true' && process.env.UI_SMOKE_HEADFUL!=='true'});
+ browser=await chromium.launch({channel:process.env.UI_SMOKE_BROWSER_CHANNEL||undefined,headless:process.env.CI==='true' && process.env.UI_SMOKE_HEADFUL!=='true'});
+ console.log('native_syscheck_reports_browser='+browser.version());
  for(const theme of ['Primar','Sekundar','Erwachsene'])for(const width of [1280,390]){
   await api('/api/v1/admin/original-interface/application-settings',{themeName:theme},'PATCH');
   const context=await browser.newContext({viewport:{width,height:844},locale:'de-DE',timezoneId:'Europe/Berlin'}),errors=[];

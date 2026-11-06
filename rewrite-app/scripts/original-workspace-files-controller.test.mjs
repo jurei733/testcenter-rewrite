@@ -21,6 +21,23 @@ const fixture=(handler,initial=scope())=>{
  return {controller,calls,changes,setScope:value=>{current=value;}};
 };
 const normal=(call,rows=[file()])=>call.path.endsWith('/files')?{items:rows,totalCount:rows.length,dependencySizesCalculated:true}:overview();
+test('dependency phase is owned by the current catalog and resets on logout/destruction',async()=>{
+ let calculated=true;
+ const f=fixture(call=>call.path.endsWith('/files')?{items:[file()],totalCount:1,dependencySizesCalculated:calculated}:overview());
+ await f.controller.connect();assert.equal(f.controller.dependencySizesCalculated,true);
+ calculated=false;await f.controller.refresh();assert.equal(f.controller.dependencySizesCalculated,false);
+ calculated=true;await f.controller.refresh();assert.equal(f.controller.dependencySizesCalculated,true);
+ f.setScope(scope('a',''));await f.controller.connect();assert.equal(f.controller.dependencySizesCalculated,false);
+ f.setScope(scope());await f.controller.connect();assert.equal(f.controller.dependencySizesCalculated,true);
+ f.controller.destroy();assert.equal(f.controller.dependencySizesCalculated,false);
+});
+test('a stale dependency response cannot replace the new workspace phase',async()=>{
+ const held=pending();let count=0;
+ const f=fixture(call=>++count<=2?held.promise:call.path.endsWith('/files')?{items:[file('NEW')],dependencySizesCalculated:false}:overview('b'));
+ const old=f.controller.connect();f.setScope(scope('b'));await f.controller.connect();
+ held.resolve({items:[file('OLD')],dependencySizesCalculated:true,...overview()});await old;
+ assert.equal(f.controller.dependencySizesCalculated,false);assert.deepEqual(f.controller.files.map(file=>file.sourcePackageId),['NEW']);
+});
 test('resolved workspace UUIDs determine write access; readonly, foreign grants and monitors cannot upload or delete',async()=>{
  for(const roles of [[role('a','read_only')],[role('b')],[{role:'study_monitor'}],[]]){
   const f=fixture(call=>normal(call),scope('a','owned-token',roles));await f.controller.connect();
