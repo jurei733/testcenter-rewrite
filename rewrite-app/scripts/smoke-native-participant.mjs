@@ -1,3 +1,4 @@
+import {runNativeStarsCapacitySmoke} from './native-stars-capacity-smoke.mjs';
 import {runNativeParticipantReviewSmoke} from './native-participant-review-smoke.mjs';
 import {runNativeBackgroundLockedSmoke} from './native-background-locked-smoke.mjs';
 import {runNativeStartupRecoverySmoke} from './native-startup-recovery-smoke.mjs';
@@ -12,7 +13,7 @@ import {pathToFileURL,fileURLToPath} from 'node:url';
 import {reportSmokePhase} from './supervised-smoke.mjs';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 const app=fileURLToPath(new URL('..',import.meta.url));
-export async function runNativeParticipantSmoke(artifactRoot,{backgroundOnly=false,starsOnly=false}={}){
+export async function runNativeParticipantSmoke(artifactRoot,{backgroundOnly=false,starsOnly=false,capacityOnly=false}={}){
 reportSmokePhase('prepare-owned-native-participant-fixtures');
 const out=join(artifactRoot,'native-monitor','native-participant');await mkdir(out,{recursive:true});
 const require=createRequire(join(app,'package.json')),{chromium}=require('playwright');
@@ -28,7 +29,7 @@ for(const [name,files]of [['application',['index','original-group-deletion','ori
 qualificationFiles.push('apps/api/src/original-review-http.ts','apps/api/dist/apps/api/src/original-review-http.js');
 for(const name of ['original-unit','original-unit-record','original-unit-collections','original-unit-delivery'])qualificationFiles.push(`packages/application/src/${name}.ts`,`packages/application/dist/packages/application/src/${name}.js`);
 qualificationFiles.push('apps/api/src/original-test-http.ts','apps/api/dist/apps/api/src/original-test-http.js');
-qualificationFiles.push('scripts/finite-animation-ready.mjs');
+qualificationFiles.push('scripts/finite-animation-ready.mjs','scripts/native-stars-capacity-smoke.mjs','scripts/run-native-stars-capacity-smoke.mjs');
 qualificationFiles.push('scripts/native-unit-restore.test.mjs','scripts/native-unit-journal.test.mjs','scripts/native-background-runtime.test.mjs','scripts/native-participant-lifecycle.test.mjs','scripts/original-unit-delivery-checks.mjs','scripts/original-test-creation.test.mjs');
 for(const file of ['original-native-write-state','original-result-state','original-test-state','original-test-lock','participant-run-mutation','original-command','original-command-queue'])qualificationFiles.push(`packages/application/src/${file}.ts`,`packages/application/dist/packages/application/src/${file}.js`);
 for(const name of ['sqlite-store','postgres-store'])qualificationFiles.push(`packages/${name}/src/original-command-queue.ts`,`packages/${name}/dist/packages/${name}/src/original-command-queue.js`);
@@ -89,7 +90,7 @@ try{
  await page.addInitScript(()=>{window.__ownedErrorEvents=[];addEventListener('error',event=>window.__ownedErrorEvents.push({code:event.error?.code,label:event.error?.label}));addEventListener('unhandledrejection',event=>window.__ownedErrorEvents.push({code:event.reason?.code,label:event.reason?.label}));});
  page.on('pageerror',error=>errors.push(String(error)));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text().replace(/(\/file\/)[^/]+/g,'$1[resource-capability]'));});
  page.on('request',r=>{const p=new URL(r.url()).pathname;if(/^\/(?:session|test|file)(?:\/|$)/.test(p))wire.push({method:r.method(),path:p.replace(/^(\/file\/)[^/]+/,'$1[resource-capability]')});});
- if(!backgroundOnly&&!starsOnly){
+ if(!backgroundOnly&&!starsOnly&&!capacityOnly){
  await page.goto(base+'/app/native-start?ui=original');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('native-code');await page.locator('[data-cy=login-user]').click();
  await page.getByLabel('Kennwort',{exact:true}).fill(password);await page.locator('[data-cy=login-user]').click();await page.locator('[data-cy=code-input]').waitFor();mark('actual-ui-password-work-to-native-code-input');
  await page.locator('[data-cy=code-input]').fill('sHaReD');await page.locator('[data-cy=continue]').click();
@@ -297,14 +298,15 @@ try{
 
 
  }
- if(!starsOnly){
+ if(!starsOnly&&!capacityOnly){
  await runNativeBackgroundLockedSmoke({browser,base,file,out,password,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,serverMessages});
  await runNativeStartupRecoverySmoke({browser,base,file,out,password,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,serverMessages});
  }
- if(starsFixture)await runNativeStarsRecoverySmoke({browser,base,file,out,mark,fixture:starsFixture,responseReceipts,configure});
+ if(capacityOnly)await runNativeStarsCapacitySmoke({browser,base,file,out,mark,fixture:starsFixture,responseReceipts,configure});
+ else if(starsFixture){await runNativeStarsRecoverySmoke({browser,base,file,out,mark,fixture:starsFixture,responseReceipts,configure});await runNativeStarsCapacitySmoke({browser,base,file,out,mark,fixture:starsFixture,responseReceipts,configure});}
  assert.deepEqual(consoleErrors.filter(x=>/NG\d{4}|TypeError|ReferenceError|SyntaxError|Error retrieving icon/.test(x)),[]);
  assert.deepEqual(await hashSources(),sourceHashes);assert.deepEqual(await hashQualification(),qualificationHashes,'Participant harness and actual API build must remain unchanged during qualification');
- await writeFile(join(out,'result.json'),JSON.stringify({success:true,diagnosticOnly:backgroundOnly||starsOnly,browser:browser.version(),checks,errors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,sourceHashes,qualificationHashes,scope:starsOnly?'Diagnostic native Original STARS fixture; excludes the existing76native cases.':backgroundOnly?'Only background closure and startup recovery controls against owned production SQLite; excludes the prior70native cases.':'Local uncommitted full native UI path including official Original STARS56/28-to21 against owned production native SQLite API, actual Source Starter card/controller/unit host; not whole-project/visual qualification.'},null,2));
+ await writeFile(join(out,'result.json'),JSON.stringify({success:true,diagnosticOnly:backgroundOnly||starsOnly||capacityOnly,browser:browser.version(),checks,errors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,sourceHashes,qualificationHashes,scope:capacityOnly?'Diagnostic native Original STARS capacity case only; excludes the prior82native cases.':starsOnly?'Diagnostic native Original STARS fixture; excludes the existing76native cases.':backgroundOnly?'Only background closure and startup recovery controls against owned production SQLite; excludes the prior70native cases.':'Local uncommitted full native UI path including official Original STARS56/28-to21/200-to201 against owned production native SQLite API, actual Source Starter card/controller/unit host; not whole-project/visual qualification.'},null,2));
 }catch(error){if(monitor){await monitor.screenshot({path:join(out,'monitor-failure.png')}).catch(()=>{});await writeFile(join(out,'monitor-failure.html'),await monitor.content().catch(()=>''));}await page?.screenshot({path:join(out,'failure.png')}).catch(()=>{});const dom=await page?.content().catch(()=>'');if(dom)await writeFile(join(out,'failure.html'),dom);await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),checks,errors,consoleErrors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,url:page?.url(),monitorUrl:monitor?.url()},null,2));throw error;}
 finally{await browser?.close();if(server)await stopNativeSmokeServer(server);}
 

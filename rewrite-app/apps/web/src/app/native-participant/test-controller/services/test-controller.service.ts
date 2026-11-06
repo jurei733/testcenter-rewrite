@@ -81,6 +81,7 @@ export class TestControllerService {
   private readonly nativeCloseTimers=new Set<ReturnType<typeof setTimeout>>();
   private nativeRetired=false;
   private recoveryToast?:{dismiss:()=>void};
+  private recoveryToastMode='none';
   private get nativeCurrent(){return !this.nativeRetired&&this.nativeHttp.isCurrent;}
   private readonly retireNative=()=>{
     if(this.nativeRetired)return;
@@ -181,11 +182,17 @@ export class TestControllerService {
   ) {
     this.nativeHttp.accessSignal.addEventListener('abort',this.retireNative,{once:true});
     if(!this.nativeHttp.isCurrent){this.retireNative();return;}
-    this.nativeSubscriptions.add(this.nativeHttp.unitRecoveryPending$.subscribe(pending=>{
-      if(!pending){this.recoveryToast?.dismiss();this.recoveryToast=undefined;return;}
-      if(!this.nativeCurrent||this.recoveryToast)return;
-      const toast=this.messageService.openSnackbar('Antworten sind lokal gesichert. Die Übertragung steht noch aus.','Erneut speichern',0);this.recoveryToast=toast;
-      this.nativeSubscriptions.add(toast.afterDismissed$.subscribe(()=>{if(this.recoveryToast===toast)this.recoveryToast=undefined;if(this.nativeCurrent)void this.nativeHttp.retryPendingUnits();}));
+    this.nativeSubscriptions.add(combineLatest([this.nativeHttp.unitRecoveryPending$,this.nativeHttp.unitStorageUnsecured$]).subscribe(([pending,unsecured])=>{
+      const mode=unsecured?'unsecured':pending?'local':'none';
+      if(mode!==this.recoveryToastMode||mode==='none'){this.recoveryToast?.dismiss();this.recoveryToast=undefined;this.recoveryToastMode=mode;}
+      if(!this.nativeCurrent||mode==='none'||this.recoveryToast)return;
+      const text=unsecured?'Die Antwort konnte nicht lokal gesichert werden. Bitte diesen Tab geöffnet lassen.':'Antworten sind lokal gesichert. Die Übertragung steht noch aus.';
+      const toast=this.messageService.openSnackbar(text,'Erneut speichern',0);this.recoveryToast=toast;
+      this.nativeSubscriptions.add(toast.afterDismissed$.subscribe(()=>{
+        if(this.recoveryToast===toast)this.recoveryToast=undefined;if(!this.nativeCurrent)return;
+        if(this.nativeHttp.hasUnsecuredUnitWrites)void this.closeAllBuffers('retry unsecured native response').then(()=>this.nativeHttp.retryPendingUnits());
+        else void this.nativeHttp.retryPendingUnits();
+      }));
     }));
     this.setupUnitDataPartsBuffer();
     this.setupUnitStateBuffer();
@@ -1193,6 +1200,7 @@ export class TestControllerService {
   private pendingUnitDeactivationCheck: { navigationId: number; result$: Observable<boolean> } | null = null;
 
   getUnitDeactivationCheck(nextStateUrl: string): Observable<boolean> {
+    if(this.nativeHttp.hasUnsecuredUnitWrites)return of(false);
     const navigationId = this.router.getCurrentNavigation()?.id ?? -1;
     if (!this.pendingUnitDeactivationCheck || this.pendingUnitDeactivationCheck.navigationId !== navigationId) {
       this.pendingUnitDeactivationCheck = {

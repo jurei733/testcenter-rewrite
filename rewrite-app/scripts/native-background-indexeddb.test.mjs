@@ -176,3 +176,13 @@ test('a receipt scan started inside foreground recovery cannot steal the real Un
   });}finally{releaseRead();owner.abort();}return captured;
  });assert.deepEqual(result,['exact pending answer'],'Receipt reconciliation must not make a recoverable document look like a live peer tab');
 });
+
+test('closing an opted-in capacity view seals only secured bytes and never promotes its201st in-memory response',async t=>{
+ const page=await pageFixture(t);const result=await page.evaluate(async()=>{
+  const owner=new AbortController(),view=new AbortController(),context=NativeBridge.nativeBackground(token,owner.signal);await context.ready;await context.holdUnits('9007199254740993',view.signal);
+  const document=documentFor(Array.from({length:200},(_,i)=>make('SECURED_'+i,'exact '+i))),text=JSON.stringify(document);localStorage.setItem(bucket,text);
+  const journal=await NativeUnitJournal.open({token,testId:'9007199254740993',storage:localStorage,locks:navigator.locks,crypto,retainUnsecured:true,mirror:context.mirror,seal:context.seal});journal.captureResponse('UNSECURED','ORIGINAL',{owned:'must stay only in this view'},'owned',Date.now());
+  const packet=journal.freeze('response','UNSECURED',{originalUnitId:'ORIGINAL',timeStamp:Date.now(),dataParts:{owned:'must stay only in this view'},responseType:'owned'});const unsafe=journal.hasUnsecured;journal.close();await context.settled();await sendWorker({action:'drain'});
+  const pending=(await rt.pending()).filter(row=>row.actor===actor),entries=pending.flatMap(row=>row.document.entries),secured=entries.length,mirroredUnsafe=entries.some(row=>row.id===packet.id||row.unitAlias==='UNSECURED'),retained=localStorage.getItem(bucket)===text;owner.abort();return{unsafe,secured,mirroredUnsafe,retained};
+ });assert.deepEqual(result,{unsafe:true,secured:200,mirroredUnsafe:false,retained:true});assert.equal(ownRequests(page).some(row=>row.path.includes('/unit/UNSECURED/')),false);
+});

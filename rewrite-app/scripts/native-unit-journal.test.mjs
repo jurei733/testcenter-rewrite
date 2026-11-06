@@ -103,3 +103,20 @@ test('invalid capture identities fail before mutating previously retained data',
  for(const alias of ['','../foreign','bad\\alias','bad\nname'])assert.throws(()=>a.captureResponse(alias,'ORIGINAL',{answer:'invalid'},'owned',100));
  assert.deepEqual([...f.storage.values],before);
 });
+
+test('opted-in capacity retention keeps the201st Unit in this view without evicting or mirroring any secured entry',async t=>{
+ const f=fixture();t.after(()=>f.close());const a=await f.open();for(let i=0;i<200;i++)a.captureResponse('SECURED_'+i,'ORIGINAL',{answer:'exact '+i},'owned',100);a.close();await flush();
+ const old=[...f.storage.values],mirrors=[],sealed=[],states=[],view=await f.open(undefined,'9007199254740992',{retainUnsecured:true,unsecuredChanged:pending=>states.push(pending),mirror:(key,text)=>mirrors.push([key,JSON.parse(text)]),seal:(key,text)=>sealed.push([key,JSON.parse(text)])});
+ view.captureResponse('LIVE','ORIGINAL',{answer:'201st'},'owned',200);assert.equal(view.hasUnsecured,true);assert.deepEqual([...f.storage.values],old);assert.deepEqual(mirrors,[]);assert.equal(view.snapshot('LIVE').length,1);assert.deepEqual(view.unsecuredDeliveries(),[],'A capture alone must not trigger an early flush');
+ const packet=view.freeze('response','LIVE',body('201st',200));assert.equal(view.unsecuredDeliveries()[0].id,packet.id);assert.deepEqual([...f.storage.values],old);assert.deepEqual(mirrors,[]);
+ view.acknowledge(packet);assert.equal(view.hasUnsecured,false);assert.deepEqual([...f.storage.values],old);assert.equal(mirrors.length,1);assert.deepEqual(mirrors[0][1].entries,[]);assert.ok(states.includes(true));view.close();assert.ok(sealed.every(([,doc])=>doc.entries.length===0));
+});
+test('unsecured updates preserve staged merging and immutable IDs through a failed write then an older ACK',async t=>{
+ const f=fixture();t.after(()=>f.close());const view=await f.open(undefined,undefined,{retainUnsecured:true});view.captureResponse('A','ORIGINAL',{left:'secured'},'first',100);const durable=[...f.storage.values];
+ f.storage.failing=true;view.captureResponse('A','ORIGINAL',{right:'pending'},'second',200);const first=view.freeze('response','A',{originalUnitId:'ORIGINAL',timeStamp:200,dataParts:{left:'secured',right:'pending'},responseType:'first'});view.captureResponse('A','ORIGINAL',{right:'newer'},'third',300);assert.deepEqual([...f.storage.values],durable);assert.equal(view.hasUnsecured,true);
+ f.storage.failing=false;view.acknowledge(first);assert.equal(view.hasUnsecured,false);assert.equal(view.snapshot('A').length,1);assert.equal(JSON.parse(view.snapshot('A')[0].payload).dataParts.right,'newer');assert.notEqual(view.snapshot('A')[0].id,first.id);view.close();await flush();const restored=await f.open();assert.equal(restored.recoveries().length,1);assert.equal(JSON.parse(restored.recoveries()[0].payload).dataParts.right,'newer');
+});
+test('capacity applies to independent actor/run/Unit identities across the entire local outbox',async t=>{
+ const f=fixture();t.after(()=>f.close());const other=await f.open('other actor','9007199254740992');for(let i=0;i<200;i++)other.captureResponse('A'+i,'ORIGINAL',{answer:'retained '+i},'owned',100);other.close();await flush();const before=[...f.storage.values];
+ const current=await f.open();assert.throws(()=>current.captureResponse('CURRENT','ORIGINAL',{answer:'201st'},'owned',200));assert.deepEqual([...f.storage.values],before);
+});

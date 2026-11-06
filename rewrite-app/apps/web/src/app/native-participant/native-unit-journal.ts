@@ -13,16 +13,18 @@ const failure=()=>new Error('Die Antwort konnte nicht im lokalen Speicher gesich
 export class NativeUnitJournal {
  private readonly leases=new Map<string,Lease>();
  private closed=false;
+ private unsecuredOwn?:Document;
  private readonly revisions=new Map<string,number>();
  private constructor(private readonly storage:Storage,private readonly locks:LockManager,private readonly crypto:Crypto,private readonly actor:string,private readonly testId:string,private readonly prefix:string,private readonly ownBucket:string,
-  private readonly mirror?:(key:string,text:string)=>void,private readonly seal?:(key:string,text:string)=>void){}
+  private readonly mirror?:(key:string,text:string)=>void,private readonly seal?:(key:string,text:string)=>void,
+  private readonly retainUnsecured=false,private readonly unsecuredChanged?:(pending:boolean)=>void){}
 
- static async open(input:{token:string;testId:string;storage:Storage;locks:LockManager;crypto:Crypto;mirror?:(key:string,text:string)=>void;seal?:(key:string,text:string)=>void}):Promise<NativeUnitJournal>{
+ static async open(input:{token:string;testId:string;storage:Storage;locks:LockManager;crypto:Crypto;retainUnsecured?:boolean;unsecuredChanged?:(pending:boolean)=>void;mirror?:(key:string,text:string)=>void;seal?:(key:string,text:string)=>void}):Promise<NativeUnitJournal>{
   if(!input.token||!/^[1-9]\d*$/.test(input.testId)||BigInt(input.testId)>9223372036854775807n||!input.locks?.request||!input.crypto?.subtle||!input.crypto.randomUUID)throw failure();
   const hash=await input.crypto.subtle.digest('SHA-256',new TextEncoder().encode(input.token));
   const actor=Array.from(new Uint8Array(hash),byte=>byte.toString(16).padStart(2,'0')).join('');
   const prefix=NATIVE_UNIT_JOURNAL_PREFIX+actor+':'+input.testId+':';
-  const journal=new NativeUnitJournal(input.storage,input.locks,input.crypto,actor,input.testId,prefix,prefix+input.crypto.randomUUID(),input.mirror,input.seal);
+  const journal=new NativeUnitJournal(input.storage,input.locks,input.crypto,actor,input.testId,prefix,prefix+input.crypto.randomUUID(),input.mirror,input.seal,input.retainUnsecured,input.unsecuredChanged);
   try{
    // A lock lives only as long as this document. Reload/crash releases it; an
    // active peer tab retains its own buffer window and cannot be replayed here.
@@ -33,7 +35,7 @@ export class NativeUnitJournal {
  }
 
  close():void{if(this.closed)return;
-  for(const key of this.leases.keys())try{const doc=this.read(key);if(doc.entries.length||(doc.revision??0)>0)this.seal?.(key,JSON.stringify(doc));}catch{/* Keep the original local bytes if final mirroring is unavailable. */}
+  for(const key of this.leases.keys())try{const doc=key===this.ownBucket&&this.unsecuredOwn?this.readStored(key):this.read(key);if(doc.entries.length||(doc.revision??0)>0)this.seal?.(key,JSON.stringify(doc));}catch{/* Keep the original local bytes if final mirroring is unavailable. */}
   this.closed=true;for(const lease of this.leases.values())lease.release();this.leases.clear();}
  private current():void{if(this.closed)throw failure();}
  private keys():string[]{const keys:string[]=[];for(let i=0;i<this.storage.length;i++){const key=this.storage.key(i);if(key)keys.push(key);}return keys;}
@@ -47,7 +49,17 @@ export class NativeUnitJournal {
    void held.catch(reject);
   });
  }
+ get hasUnsecured():boolean{return !!this.unsecuredOwn;}
+ retryPersistence():void{if(this.unsecuredOwn)this.write(this.ownBucket,this.read(this.ownBucket));}
+ unsecuredDeliveries(preferredUnitAlias?:string):NativeUnitDelivery[]{return this.unsecuredOwn?this.readyOwnDeliveries(preferredUnitAlias):[];}
+ readyOwnDeliveries(preferredUnitAlias?:string):NativeUnitDelivery[]{
+  return this.read(this.ownBucket).entries.filter(row=>row.phase==='ready').map(row=>Object.freeze({...row,bucket:this.ownBucket})).sort((a,b)=>Number(b.unitAlias===preferredUnitAlias)-Number(a.unitAlias===preferredUnitAlias)||a.queuedAt-b.queuedAt);
+ }
  private read(key:string):Document{
+  this.current();if(key===this.ownBucket&&this.unsecuredOwn)return structuredClone(this.unsecuredOwn);
+  return this.readStored(key);
+ }
+ private readStored(key:string):Document{
   this.current();if(!this.leases.has(key)||!key.startsWith(this.prefix)||!uuid.test(key.slice(this.prefix.length)))throw failure();
   const text=this.storage.getItem(key);
   if(text===null)return{version:1,actor:this.actor,testId:this.testId,entries:[],revision:this.revisions.get(key)??0};
@@ -68,15 +80,23 @@ export class NativeUnitJournal {
   return doc;
  }
  private write(key:string,doc:Document):void{
-  this.current();const revision=Math.max(this.revisions.get(key)??0,doc.revision??0)+1;if(!Number.isSafeInteger(revision))throw failure();doc={...doc,revision};this.validate(doc);let chars=0,count=doc.entries.length;const units=new Set(doc.entries.map(row=>row.unitAlias)),serialized=JSON.stringify(doc);
-  for(const existing of this.keys().filter(name=>name.startsWith(NATIVE_UNIT_JOURNAL_PREFIX)&&name!==key)){
-   const value=this.storage.getItem(existing);if(value===null)continue;chars+=value.length;
-   if(existing.startsWith(this.prefix)){
-    const peer=JSON.parse(value);if(!Array.isArray(peer?.entries))throw failure();count+=peer.entries.length;for(const row of peer.entries)units.add(row.unitAlias);
-   }
+  this.current();const revision=Math.max(this.revisions.get(key)??0,doc.revision??0)+1;if(!Number.isSafeInteger(revision))throw failure();doc={...doc,revision};this.validate(doc);
+  const serialized=JSON.stringify(doc);if(serialized.length>maxChars)throw failure();
+  const identity=(bucket:string,alias:string)=>bucket.slice(0,bucket.lastIndexOf(':'))+':'+alias;
+  let chars=0,count=doc.entries.length;const units=new Set(doc.entries.map(row=>identity(key,row.unitAlias))),before=new Set<string>();
+  for(const existing of this.keys().filter(name=>name.startsWith(NATIVE_UNIT_JOURNAL_PREFIX))){
+   const value=this.storage.getItem(existing);if(value===null)continue;const peer=JSON.parse(value);if(!Array.isArray(peer?.entries))throw failure();
+   for(const row of peer.entries){if(typeof row?.unitAlias!=='string')throw failure();before.add(identity(existing,row.unitAlias));if(existing!==key)units.add(identity(existing,row.unitAlias));}
+   if(existing!==key){chars+=value.length;if(existing.startsWith(this.prefix))count+=peer.entries.length;}
   }
-  if(units.size>maxUnits||count>maxEntries||chars+serialized.length>maxChars)throw failure();
-  try{if(doc.entries.length)this.storage.setItem(key,serialized);else this.storage.removeItem(key);}catch{throw failure();}
+  const capacity=doc.entries.length>0&&(units.size>maxUnits&&units.size>before.size||count>maxEntries||chars+serialized.length>maxChars);
+  let persisted=false;
+  if(!capacity)try{if(doc.entries.length)this.storage.setItem(key,serialized);else this.storage.removeItem(key);persisted=true;}catch{/* Retain only this view's latest document when the caller can expose that it is not durable. */}
+  if(!persisted){
+   if(!this.retainUnsecured||key!==this.ownBucket||new Set(doc.entries.map(row=>row.unitAlias)).size>maxUnits)throw failure();
+   this.unsecuredOwn=structuredClone(doc);this.revisions.set(key,revision);this.unsecuredChanged?.(true);return;
+  }
+  if(key===this.ownBucket){this.unsecuredOwn=undefined;this.unsecuredChanged?.(false);}
   this.revisions.set(key,revision);this.mirror?.(key,serialized);
  }
  private stage(kind:Kind,unitAlias:string,originalUnitId:string,body:Record<string,unknown>,now:number):void{

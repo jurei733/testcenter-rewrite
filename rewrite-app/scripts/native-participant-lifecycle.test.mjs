@@ -258,7 +258,7 @@ const {TestControllerService:NativeController}=load('test-controller/services/te
 function nativeBuffers(){
  bindings.set(tokens.NATIVE_RUN_TEST_ID,'9223372036854775807');
  const f=overlays(),requests={unitData:new rx.Subject(),unitState:new rx.Subject(),testState:new rx.Subject()},calls=[];
- bindings.get(NativeHttpClient).unitRecoveryPending$=rx.EMPTY;
+ bindings.get(NativeHttpClient).unitRecoveryPending$=rx.EMPTY;bindings.get(NativeHttpClient).unitStorageUnsecured$=rx.of(false);
  const capturedTestStates=[];bindings.get(NativeHttpClient).captureTestState=state=>capturedTestStates.push(structuredClone(state));
  const backend={updateDataParts:(...args)=>{calls.push(['unitData',...args]);return requests.unitData;},patchUnitState:(...args)=>{calls.push(['unitState',...args]);return requests.unitState;},patchTestState:(...args)=>{calls.push(['testState',...args]);return requests.testState;}};
  const controller=new NativeController({},backend,{}, {},{}, {},{});controller.testId='9223372036854775807';controller.testMode={saveResponses:true};controller.units={1:{id:'original-unit',alias:'UNIT_A'}};controller.unitAliasMap={UNIT_A:1};controller.updateVariables=()=>false;
@@ -456,4 +456,42 @@ test('a Unit GET captured before recovery ACK still restores its pending answer;
  const pendingRead=rx.firstValueFrom(client.get('/test/1/unit/ORIGINAL/alias/A',{nativeUnitRead:{alias:'A',originalUnitId:'ORIGINAL'}}));await readStarted;releasePut();await client.retryPendingUnits();assert.equal(f.storage.length,0);
  releaseRead();const first=await pendingRead;assert.equal(first.dataParts.answer,'pending Ω');assert.equal(first.unitResponseType,'pending/type');assert.equal(Object.hasOwn(first,'nativeClocks'),false);
  const next=await rx.firstValueFrom(client.get('/test/1/unit/ORIGINAL/alias/A',{nativeUnitRead:{alias:'A',originalUnitId:'ORIGINAL'}}));assert.equal(next.dataParts.answer,'newer remote');assert.equal(next.unitResponseType,'remote/type');
+});
+
+test('the real native transport keeps an unsecured failed packet pending until explicit retry ACK and storage cleanup',async t=>{
+ const f=nativeUnitJournalFixture();t.after(()=>f.close());const priorStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage'),priorNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,value:f.storage});Object.defineProperty(globalThis,'navigator',{configurable:true,value:{locks:f.manager}});
+ t.after(()=>{if(priorStorage)Object.defineProperty(globalThis,'localStorage',priorStorage);else delete globalThis.localStorage;if(priorNavigator)Object.defineProperty(globalThis,'navigator',priorNavigator);else delete globalThis.navigator;});
+ t.mock.timers.enable({apis:['setTimeout']});session();const client=new NativeHttpClient();t.after(()=>client.ngOnDestroy());await client.prepareUnitJournal(true);let offline=true,completed=0,failed=0;const sent=[];
+ globalThis.fetch=async(url,options)=>{sent.push({url:String(url),options});return new Response('',{status:options.method==='PATCH'?200:offline?503:201});};
+ f.storage.failing=true;client.captureUnitResponse('A','ORIGINAL',{answer:'keep current Ω'},'owned/type');assert.equal(client.hasUnsecuredUnitWrites,true);
+ const body={originalUnitId:'ORIGINAL',timeStamp:200,dataParts:{answer:'keep current Ω'},responseType:'owned/type'};client.unitWrite('response','1','A',body).subscribe({complete:()=>completed++,error:()=>failed++});await settle();
+ for(const delay of [50,500,1000,2000]){t.mock.timers.tick(delay);await settle();await settle();}
+ assert.equal(sent.length,5);assert.equal(completed,0,'A failed unsecured save must not emit the Source saved event');assert.equal(failed,0,'Storage capacity must not become a fatal Player error');assert.equal(f.storage.length,0);assert.equal(client.hasUnsecuredUnitWrites,true);
+ const id=sent[0].options.headers['X-Native-Delivery-Id'];assert.ok(sent.every(row=>row.options.headers['X-Native-Delivery-Id']===id&&row.options.body===JSON.stringify(body)));
+ offline=false;await client.retryPendingUnits();assert.equal(completed,1);assert.equal(failed,0);assert.equal(client.hasUnsecuredUnitWrites,true,'A server ACK cannot claim local cleanup when storage is still unavailable');assert.equal(sent.filter(row=>row.options.method==='PUT').length,6);assert.equal(sent.at(-1).options.body,JSON.stringify(body));assert.equal(sent.at(-1).options.headers['X-Native-Delivery-Id'],id);
+ f.storage.failing=false;await client.retryPendingUnits();assert.equal(client.hasUnsecuredUnitWrites,false);assert.equal(completed,1);assert.equal(sent.filter(row=>row.options.method==='PUT').length,6,'Cleanup must not invent another server delivery');
+});
+
+test('restored local storage before retry must still deliver the previously unsecured ready packet',async t=>{
+ const f=nativeUnitJournalFixture();t.after(()=>f.close());const priorStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage'),priorNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,value:f.storage});Object.defineProperty(globalThis,'navigator',{configurable:true,value:{locks:f.manager}});
+ t.after(()=>{if(priorStorage)Object.defineProperty(globalThis,'localStorage',priorStorage);else delete globalThis.localStorage;if(priorNavigator)Object.defineProperty(globalThis,'navigator',priorNavigator);else delete globalThis.navigator;});
+ t.mock.timers.enable({apis:['setTimeout']});session();const client=new NativeHttpClient();t.after(()=>client.ngOnDestroy());await client.prepareUnitJournal(true);let offline=true,completed=0;const sent=[];
+ globalThis.fetch=async(url,options)=>{sent.push({url:String(url),options});return new Response('',{status:options.method==='PATCH'?200:offline?503:201});};f.storage.failing=true;
+ client.captureUnitResponse('A','ORIGINAL',{answer:'still deliver'},'owned');client.unitWrite('response','1','A',{originalUnitId:'ORIGINAL',timeStamp:200,dataParts:{answer:'still deliver'},responseType:'owned'}).subscribe({complete:()=>completed++});await settle();for(const delay of [50,500,1000,2000]){t.mock.timers.tick(delay);await settle();await settle();}assert.equal(completed,0);
+ offline=false;f.storage.failing=false;await client.retryPendingUnits();assert.equal(completed,1,'Persisting a ready packet must not remove it from the explicit retry');assert.equal(sent.filter(row=>row.options.method==='PUT').length,6);assert.equal(f.storage.length,0);
+});
+
+for(const storageRestored of [false,true])test(`an unsecured current Unit retries before abandoned Units, storage restored=${storageRestored}`,async t=>{
+ const f=nativeUnitJournalFixture();t.after(()=>f.close());const priorStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage'),priorNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,value:f.storage});Object.defineProperty(globalThis,'navigator',{configurable:true,value:{locks:f.manager}});
+ t.after(()=>{if(priorStorage)Object.defineProperty(globalThis,'localStorage',priorStorage);else delete globalThis.localStorage;if(priorNavigator)Object.defineProperty(globalThis,'navigator',priorNavigator);else delete globalThis.navigator;});
+ const old=await f.open('actor-A','1');for(const alias of ['OLDER_A','OLDER_B'])old.captureResponse(alias,'ORIGINAL',{answer:alias},'owned',1);old.close();await settle();
+ session();let offline=true,completed=0;const sent=[];globalThis.fetch=async(url,options)=>{sent.push({url:String(url),options});if(options.method==='GET')return new Response('{"workspaceId":1,"laststate":{"CURRENT_UNIT_ID":"LIVE"}}',{headers:{'X-Native-State-Base':'{"version":1,"revision":0,"controlEpoch":0}'}});return new Response('',{status:options.method==='PATCH'?200:offline?503:201});};
+ const client=new NativeHttpClient();t.after(()=>client.ngOnDestroy());await rx.firstValueFrom(client.get('/test/1',{nativeStateProtocol:true}));await client.prepareUnitJournal(true);await client.retryPendingUnits();const before=[...f.storage.values];
+ t.mock.timers.enable({apis:['setTimeout']});f.storage.failing=true;client.captureUnitResponse('LIVE','ORIGINAL',{answer:'current'},'owned');client.unitWrite('response','1','LIVE',{originalUnitId:'ORIGINAL',timeStamp:200,dataParts:{answer:'current'},responseType:'owned'}).subscribe({complete:()=>completed++});await settle();for(const delay of [50,500,1000,2000]){t.mock.timers.tick(delay);await settle();await settle();}assert.equal(completed,0);
+ const offset=sent.length;offline=false;f.storage.failing=!storageRestored;await client.retryPendingUnits();assert.equal(completed,1);const delivered=sent.slice(offset).filter(row=>row.options.method==='PUT');assert.ok(delivered[0].url.endsWith('/unit/LIVE/response'));
+ if(storageRestored){assert.deepEqual(delivered.map(row=>row.url.split('/').at(-2)),['LIVE','OLDER_A','OLDER_B']);assert.equal(f.storage.length,0);}
+ else{assert.deepEqual([...f.storage.values],before,'An unrelated storage failure must preserve every abandoned packet');f.storage.failing=false;await client.retryPendingUnits();assert.equal(f.storage.length,0);}
 });

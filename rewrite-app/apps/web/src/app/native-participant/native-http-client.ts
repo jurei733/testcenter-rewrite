@@ -1,6 +1,6 @@
 import {NATIVE_RUN_TEST_ID,NATIVE_RENDER_NOTIFY,NATIVE_ERROR_RECEIVER} from './native-tokens';
 import {Injectable,inject} from '@angular/core';
-import {Observable,BehaviorSubject,firstValueFrom} from 'rxjs';
+import {Observable,BehaviorSubject,firstValueFrom,type Subscriber,type Subscription} from 'rxjs';
 import {NativeUnitJournal,type NativeUnitDelivery} from './native-unit-journal';
 import {NativeTestJournal,parseNativeTestStateBase,type NativeTestStateBase,type NativeTestDelivery} from './native-test-journal';
 import {HttpResponse,HttpHeaders,HttpEventType,HttpErrorResponse} from '@angular/common/http';
@@ -26,6 +26,12 @@ export class NativeHttpClient {
  private readonly foregroundUnits=this.background?.holdUnits(this.runTestId,this.accessSignal);
  private preferredUnitAlias?:string;
  private unitJournal?:NativeUnitJournal;
+ private readonly unitWaiters=new Map<string,Set<Subscriber<any>>>();
+ private readonly unitRequests=new Map<string,Subscription>();
+ private readonly unitStorageUnsecured=new BehaviorSubject(false);
+ readonly unitStorageUnsecured$=this.unitStorageUnsecured.asObservable();
+ get hasUnsecuredUnitWrites(){return this.unitJournal?.hasUnsecured??false;}
+ private readonly beforeUnload=(event:BeforeUnloadEvent)=>{if(this.isCurrent&&this.hasUnsecuredUnitWrites){event.preventDefault();event.returnValue='';}};
  private unitRecovery?:Promise<void>;
  private unitRecoveryRequested=0;
  private readonly unitRecoveryPending=new BehaviorSubject(false);
@@ -43,11 +49,13 @@ export class NativeHttpClient {
   this.unitJournal?.close();this.unitJournal=undefined;
   if(!this.releasedTestJournal){this.releasedTestJournal=true;this.releaseTestJournal();}
   if(this.ownerScope.aborted){this.testJournal?.close();this.testJournal=undefined;}
-  this.unitRecoveryPending.complete();this.credential=undefined;this.lifetime.abort();
+  this.unitRecoveryPending.complete();this.unitStorageUnsecured.complete();this.credential=undefined;this.lifetime.abort();
+  for(const request of this.unitRequests.values())request.unsubscribe();this.unitRequests.clear();
+  for(const waiters of this.unitWaiters.values())for(const subscriber of waiters)subscriber.complete();this.unitWaiters.clear();
  };
  private readonly pageHide=(event:PageTransitionEvent)=>{if(!event.persisted)this.retire();};
- constructor(){void this.foregroundUnits?.catch(()=>{});this.ownerScope.addEventListener('abort',this.retire,{once:true});window.addEventListener?.('pagehide',this.pageHide);window.addEventListener?.('online',this.onOnline);}
- ngOnDestroy(){this.ownerScope.removeEventListener('abort',this.retire);window.removeEventListener?.('pagehide',this.pageHide);window.removeEventListener?.('online',this.onOnline);this.retire();}
+ constructor(){void this.foregroundUnits?.catch(()=>{});this.ownerScope.addEventListener('abort',this.retire,{once:true});window.addEventListener?.('pagehide',this.pageHide);window.addEventListener?.('online',this.onOnline);window.addEventListener?.('beforeunload',this.beforeUnload);}
+ ngOnDestroy(){this.ownerScope.removeEventListener('abort',this.retire);window.removeEventListener?.('pagehide',this.pageHide);window.removeEventListener?.('online',this.onOnline);window.removeEventListener?.('beforeunload',this.beforeUnload);this.retire();}
  ownError<T>(error:T):T {
   if(this.receiveError&&error&&typeof error==='object')ownAsyncError(error,()=>this.receiveError?.(error));
   return error;
@@ -108,7 +116,7 @@ export class NativeHttpClient {
  private async recoverUnitJournal():Promise<void>{
   if(!this.isCurrent||!this.credential)throw Error('Native run retired.');
   await this.foregroundUnits;
-  const journal=await NativeUnitJournal.open({token:this.credential,testId:this.runTestId,storage:localStorage,locks:navigator.locks,crypto,mirror:this.background?.mirror,seal:this.background?.seal});
+  const journal=await NativeUnitJournal.open({token:this.credential,testId:this.runTestId,storage:localStorage,locks:navigator.locks,crypto,retainUnsecured:true,unsecuredChanged:pending=>{if(this.isCurrent){this.unitStorageUnsecured.next(pending);this.notify();}},mirror:this.background?.mirror,seal:this.background?.seal});
   if(!this.isCurrent){journal.close();throw Error('Native run retired.');}
   this.unitJournal=journal;
   void this.retryPendingUnits();
@@ -119,13 +127,13 @@ export class NativeHttpClient {
    const requested=this.unitRecoveryRequested,journal=this.unitJournal;
    if(!this.isCurrent||!journal)return;
    const blocked=new Set<string>();let failed=false;
-   try{for(const entry of journal.recoveries(this.preferredUnitAlias)){
-    if(!this.isCurrent)return;if(blocked.has(entry.unitAlias))continue;
+   try{journal.retryPersistence();let abandoned:NativeUnitDelivery[]=[];try{abandoned=journal.recoveries(this.preferredUnitAlias);}catch{failed=true;}for(const entry of [...abandoned,...journal.readyOwnDeliveries(this.preferredUnitAlias)].sort((a,b)=>Number(b.unitAlias===this.preferredUnitAlias)-Number(a.unitAlias===this.preferredUnitAlias)||(a.kind==='state'?0:1)-(b.kind==='state'?0:1)||a.queuedAt-b.queuedAt)){
+    if(!this.isCurrent)return;if(blocked.has(entry.unitAlias)||this.unitRequests.has(entry.id))continue;
     const base=`/test/${this.runTestId}/unit/${encodeURIComponent(entry.unitAlias)}`;
     try{
      if(entry.kind==='response')await firstValueFrom(this.request('PATCH',base+'/state',{newState:[],originalUnitId:entry.originalUnitId},{nativeDeliveryId:entry.id,nativeNoRetry:true}));
      await firstValueFrom(this.request(entry.kind==='state'?'PATCH':'PUT',base+'/'+entry.kind,undefined,
-      {nativePayload:entry.payload,nativeDeliveryId:entry.id,nativeNoRetry:true,nativeAccepted:()=>journal.acknowledge(entry)}));
+      {nativePayload:entry.payload,nativeDeliveryId:entry.id,nativeNoRetry:true,nativeAccepted:()=>this.unitAccepted(journal,entry)}));
     }catch{if(!this.isCurrent)return;failed=true;blocked.add(entry.unitAlias);}
    }}catch{failed=true;}
    if(this.isCurrent){this.unitRecoveryPending.next(failed);this.notify();}
@@ -147,8 +155,24 @@ export class NativeHttpClient {
   if(!this.unitJournal)return this.request(kind==='state'?'PATCH':'PUT',path,body);
   try{
    const journal=this.unitJournal,entry=journal.freeze(kind,unitAlias,body);
-   return this.request(kind==='state'?'PATCH':'PUT',path,undefined,{nativePayload:entry.payload,nativeDeliveryId:entry.id,nativeAccepted:()=>journal.acknowledge(entry)});
+   return new Observable(subscriber=>{
+    let waiters=this.unitWaiters.get(entry.id);if(!waiters){waiters=new Set();this.unitWaiters.set(entry.id,waiters);}waiters.add(subscriber);
+    if(!this.unitRequests.has(entry.id)){
+     const request=this.request(kind==='state'?'PATCH':'PUT',path,undefined,{nativePayload:entry.payload,nativeDeliveryId:entry.id,nativeAccepted:()=>this.unitAccepted(journal,entry)}).subscribe({
+      error:error=>{this.unitRequests.delete(entry.id);if(this.isCurrent&&journal.hasUnsecured){this.unitStorageUnsecured.next(true);this.notify();return;}this.failUnit(entry.id,error);},
+      complete:()=>this.unitRequests.delete(entry.id)
+     });if(!request.closed)this.unitRequests.set(entry.id,request);
+    }
+    return()=>{waiters.delete(subscriber);if(!waiters.size){this.unitWaiters.delete(entry.id);this.unitRequests.get(entry.id)?.unsubscribe();this.unitRequests.delete(entry.id);}};
+   });
   }catch(error){return new Observable(subscriber=>subscriber.error(this.ownError(error)));}
+ }
+ private unitAccepted(journal:NativeUnitJournal,entry:NativeUnitDelivery):void{
+  journal.acknowledge(entry);const waiters=this.unitWaiters.get(entry.id);this.unitWaiters.delete(entry.id);this.unitRequests.delete(entry.id);
+  for(const subscriber of waiters??[]){subscriber.next(null);subscriber.complete();}
+ }
+ private failUnit(id:string,error:unknown):void{
+  const waiters=this.unitWaiters.get(id);this.unitWaiters.delete(id);for(const subscriber of waiters??[])subscriber.error(error);
  }
  get<T=unknown>(url:string,options?:any):Observable<any>{return this.request('GET',url,undefined,options);}
  patch<T=unknown>(url:string,body:unknown,options?:any):Observable<T>{return this.request('PATCH',url,body,options);}
