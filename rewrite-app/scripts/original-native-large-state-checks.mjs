@@ -8,10 +8,10 @@ const mib=1024*1024;
 // Opaque Verona content shaped like a GeoGebra export. This does not claim to
 // execute GeoGebra itself; the Original LONGTEXT change specifically concerns
 // retaining large opaque response strings without decoding or truncating them.
-export function nativeLargeState(){
+export function nativeLargeState(bytes=2*mib){
  const suffix='Ω / "quoted" \\ \n  ';
  const overhead=Buffer.byteLength(JSON.stringify({id:'geogebra-state',value:suffix}));
- return JSON.stringify({id:'geogebra-state',value:'G'.repeat(2*mib-overhead)+suffix});
+ return JSON.stringify({id:'geogebra-state',value:'G'.repeat(bytes-overhead)+suffix});
 }
 const hash=value=>createHash('sha256').update(value).digest('hex');
 

@@ -15,7 +15,8 @@ function json(value:unknown,depth=0):void{
 }
 export function assertOriginalTestState(value:unknown):asserts value is OriginalTestState{
   if(!value||typeof value!=='object'||Array.isArray(value))throw invalid();json(value);
-  if(Object.keys(value).length>10000||Buffer.byteLength(encodeOriginalReportJson(value),'utf8')>5*1024*1024)throw invalid();
+  // A saved map accumulates independently bounded requests over time.
+  if(Object.keys(value).length>10000)throw invalid();
 }
 export function parseOriginalTestStatePatch(input:unknown):OriginalTestStateEntry[]{
   if(!Array.isArray(input))throw new FirstSliceError(400,'original_test_state_invalid','body has to be an array');

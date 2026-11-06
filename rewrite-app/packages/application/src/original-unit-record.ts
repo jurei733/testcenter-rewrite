@@ -40,7 +40,8 @@ export function assertOriginalUnitRecord(unit:OriginalNativeUnit):void{
  for(const key of Object.keys(unit.state))if(!Object.hasOwn(unit.stateClocks,key))throw invalid();
  if(!Array.isArray(unit.parts)||unit.parts.length>10000||new Set(unit.parts.map(part=>part.id)).size!==unit.parts.length)throw invalid();
  for(const part of unit.parts){originalUnitText(part.id,50);originalUnitText(part.responseType,50);if(part.content!==null)originalUnitText(part.content);if(!Number.isSafeInteger(part.ts))throw invalid();}
- if(Buffer.byteLength(JSON.stringify(unit),'utf8')>5*1024*1024)throw invalid();
+ // Source stores independent text parts. Their accumulated size can exceed
+ // one progress request; the native HTTP reader bounds each incoming packet.
 }
 export function prepareOriginalUnitMutation(input:OriginalUnitInput,previous:OriginalNativeUnit|null,transform:OriginalUnitTransform):OriginalUnitEffect{
  assertOriginalUnitInput(input);if(previous){assertOriginalUnitRecord(previous);if(!originalUnitParentMatches(input,previous)||!originalParticipantGroupKeysEqual(previous.unitName,input.unitName))throw invalid();}

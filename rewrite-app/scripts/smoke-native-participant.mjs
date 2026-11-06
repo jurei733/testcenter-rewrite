@@ -30,7 +30,7 @@ for(const [name,files]of [['application',['index','original-group-deletion','ori
 qualificationFiles.push('apps/api/src/original-review-http.ts','apps/api/dist/apps/api/src/original-review-http.js');
 for(const name of ['original-unit','original-unit-record','original-unit-collections','original-unit-delivery'])qualificationFiles.push(`packages/application/src/${name}.ts`,`packages/application/dist/packages/application/src/${name}.js`);
 qualificationFiles.push('apps/api/src/original-test-http.ts','apps/api/dist/apps/api/src/original-test-http.js');
-qualificationFiles.push('scripts/native-large-state-smoke.mjs','scripts/run-native-large-state-smoke.mjs','scripts/original-native-large-state-checks.mjs');
+qualificationFiles.push('scripts/native-large-state-smoke.mjs','scripts/run-native-large-state-smoke.mjs','scripts/original-native-large-state-checks.mjs','scripts/original-native-unit-capacity-checks.mjs');
 qualificationFiles.push('scripts/finite-animation-ready.mjs','scripts/native-stars-capacity-smoke.mjs','scripts/run-native-stars-capacity-smoke.mjs');
 qualificationFiles.push('scripts/native-unit-restore.test.mjs','scripts/native-unit-journal.test.mjs','scripts/native-background-runtime.test.mjs','scripts/native-participant-lifecycle.test.mjs','scripts/original-unit-delivery-checks.mjs','scripts/original-test-creation.test.mjs');
 for(const file of ['original-native-write-state','original-result-state','original-test-state','original-test-lock','participant-run-mutation','original-command','original-command-queue'])qualificationFiles.push(`packages/application/src/${file}.ts`,`packages/application/dist/packages/application/src/${file}.js`);
