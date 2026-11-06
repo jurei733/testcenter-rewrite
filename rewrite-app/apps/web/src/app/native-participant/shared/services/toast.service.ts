@@ -29,7 +29,11 @@ export class ToastService {
   private dismissSubjects = new Map<number, Subject<void>>();
 
   showSnackbar(text: ToastContent, actionText: string = 'Schließen', duration: number = 5000): Observable<void> {
-    if(this.retired||!this.http.isCurrent)return EMPTY;
+    return this.openSnackbar(text,actionText,duration).afterDismissed$;
+  }
+
+  openSnackbar(text:ToastContent,actionText='Schließen',duration=5000):{afterDismissed$:Observable<void>;dismiss:()=>void}{
+    if(this.retired||!this.http.isCurrent)return {afterDismissed$:EMPTY,dismiss:()=>{}};
     this.toastIdCounter += 1;
     const id = this.toastIdCounter;
     const dismissed$ = new Subject<void>();
@@ -39,7 +43,7 @@ export class ToastService {
     if (duration > 0) {
       this.timers.set(id,setTimeout((): void => this.dismissToast(id), duration));
     }
-    return dismissed$.asObservable();
+    return {afterDismissed$:dismissed$.asObservable(),dismiss:()=>this.dismissToast(id,false)};
   }
 
   private static toSegments(text: ToastContent): ToastSegment[] {
@@ -51,12 +55,12 @@ export class ToastService {
     );
   }
 
-  dismissToast(id: number): void {
+  dismissToast(id: number,notify=true): void {
     const timeout=this.timers.get(id);if(timeout!==undefined)clearTimeout(timeout);this.timers.delete(id);
     this.toasts.update(toasts => toasts.filter(toast => toast.id !== id));
     const dismissed$ = this.dismissSubjects.get(id);
     if (dismissed$) {
-      if(!this.retired&&this.http.isCurrent)dismissed$.next();
+      if(notify&&!this.retired&&this.http.isCurrent)dismissed$.next();
       dismissed$.complete();
       this.dismissSubjects.delete(id);
     }

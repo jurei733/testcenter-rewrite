@@ -80,10 +80,12 @@ export class TestControllerService {
   private readonly nativeRetired$=new Subject<void>();
   private readonly nativeCloseTimers=new Set<ReturnType<typeof setTimeout>>();
   private nativeRetired=false;
+  private recoveryToast?:{dismiss:()=>void};
   private get nativeCurrent(){return !this.nativeRetired&&this.nativeHttp.isCurrent;}
   private readonly retireNative=()=>{
     if(this.nativeRetired)return;
     this.nativeRetired=true;
+    this.recoveryToast?.dismiss();this.recoveryToast=undefined;
     this.nativeSubscriptions.unsubscribe();
     for(const name of Object.keys(this.subscriptions))this.destroySubscription(name);
     this.timerIntervalSubscription?.unsubscribe();this.timerIntervalSubscription=null;
@@ -179,6 +181,12 @@ export class TestControllerService {
   ) {
     this.nativeHttp.accessSignal.addEventListener('abort',this.retireNative,{once:true});
     if(!this.nativeHttp.isCurrent){this.retireNative();return;}
+    this.nativeSubscriptions.add(this.nativeHttp.unitRecoveryPending$.subscribe(pending=>{
+      if(!pending){this.recoveryToast?.dismiss();this.recoveryToast=undefined;return;}
+      if(!this.nativeCurrent||this.recoveryToast)return;
+      const toast=this.messageService.openSnackbar('Antworten sind lokal gesichert. Die Übertragung steht noch aus.','Erneut speichern',0);this.recoveryToast=toast;
+      this.nativeSubscriptions.add(toast.afterDismissed$.subscribe(()=>{if(this.recoveryToast===toast)this.recoveryToast=undefined;if(this.nativeCurrent)void this.nativeHttp.retryPendingUnits();}));
+    }));
     this.setupUnitDataPartsBuffer();
     this.setupUnitStateBuffer();
     this.setupTestStateBuffer();

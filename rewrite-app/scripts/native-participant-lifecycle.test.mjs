@@ -86,7 +86,7 @@ test('actual native transport keeps a newer pre-buffer draft when an older write
  assert.equal(requests.length,1);assert.match(requests[0].headers['X-Native-Delivery-Id'],/^[a-f0-9-]{36}$/);assert.equal(requests[0].headers.AuthToken,'actor-A');
  client.captureUnitResponse('UNIT_A','ORIGINAL',{answer:'new before buffer'},'owned');release(new Response('',{status:201}));await done;client.ngOnDestroy();await turn();
  const resumed=new NativeHttpClient();t.after(()=>resumed.ngOnDestroy());globalThis.fetch=async(url,options)=>{requests.push({url:String(url),headers:options.headers,payload:options.body});return new Response('',{status:201});};
- await resumed.prepareUnitJournal(true);assert.equal(requests.length,3);assert.ok(requests[1].url.endsWith('/state'));assert.ok(requests[2].url.endsWith('/response'));
+ await resumed.prepareUnitJournal(true);await resumed.retryPendingUnits();assert.equal(requests.length,3);assert.ok(requests[1].url.endsWith('/state'));assert.ok(requests[2].url.endsWith('/response'));
  assert.equal(JSON.parse(requests[2].payload).dataParts.answer,'new before buffer');assert.notEqual(requests[2].headers['X-Native-Delivery-Id'],requests[0].headers['X-Native-Delivery-Id']);
  assert.equal(requests[1].headers['X-Native-Delivery-Id'],requests[2].headers['X-Native-Delivery-Id']);assert.equal(f.storage.length,0);
 });
@@ -258,6 +258,7 @@ const {TestControllerService:NativeController}=load('test-controller/services/te
 function nativeBuffers(){
  bindings.set(tokens.NATIVE_RUN_TEST_ID,'9223372036854775807');
  const f=overlays(),requests={unitData:new rx.Subject(),unitState:new rx.Subject(),testState:new rx.Subject()},calls=[];
+ bindings.get(NativeHttpClient).unitRecoveryPending$=rx.EMPTY;
  const capturedTestStates=[];bindings.get(NativeHttpClient).captureTestState=state=>capturedTestStates.push(structuredClone(state));
  const backend={updateDataParts:(...args)=>{calls.push(['unitData',...args]);return requests.unitData;},patchUnitState:(...args)=>{calls.push(['unitState',...args]);return requests.unitState;},patchTestState:(...args)=>{calls.push(['testState',...args]);return requests.testState;}};
  const controller=new NativeController({},backend,{}, {},{}, {},{});controller.testId='9223372036854775807';controller.testMode={saveResponses:true};controller.units={1:{id:'original-unit',alias:'UNIT_A'}};controller.unitAliasMap={UNIT_A:1};controller.updateVariables=()=>false;
@@ -437,4 +438,22 @@ test('terminal completion retains the real journal after view destruction and re
  const calls=[];globalThis.fetch=async(url,options)=>{calls.push({url:String(url),options});return options.method==='GET'?new Response('{"workspaceId":1}',{headers:{'X-Native-State-Base':JSON.stringify(nativeBase)}}):new Response('',{status:201});};
  const resumed=new NativeHttpClient();t.after(()=>resumed.ngOnDestroy());await rx.firstValueFrom(resumed.get('/test/1',{nativeStateProtocol:true}));assert.equal(await resumed.prepareJournals(true),false);
  assert.equal(calls[1].options.headers['X-Native-Delivery-Id'],attempts[0][7]);assert.equal(calls[1].options.body,JSON.stringify(attempts[0][2]));assert.equal(f.storage.length,0);
+});
+
+test('a Unit GET captured before recovery ACK still restores its pending answer; newer remote clocks win on the next GET',async t=>{
+ const f=nativeUnitJournalFixture();t.after(()=>f.close());const priorStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage'),priorNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,value:f.storage});Object.defineProperty(globalThis,'navigator',{configurable:true,value:{locks:f.manager}});
+ t.after(()=>{if(priorStorage)Object.defineProperty(globalThis,'localStorage',priorStorage);else delete globalThis.localStorage;if(priorNavigator)Object.defineProperty(globalThis,'navigator',priorNavigator);else delete globalThis.navigator;});
+ const old=await f.open('actor-A','1');old.freeze('response','A',{originalUnitId:'ORIGINAL',timeStamp:200,dataParts:{answer:'pending Ω'},responseType:'pending/type'});old.close();await settle();
+ session();let putEntered,releasePut,readEntered,releaseRead;const putStarted=new Promise(done=>{putEntered=done;}),putGate=new Promise(done=>{releasePut=done;}),readStarted=new Promise(done=>{readEntered=done;}),readGate=new Promise(done=>{releaseRead=done;});let reads=0;
+ const value=(answer,clock)=>({state:{},dataParts:{answer},unitResponseType:'remote/type',definition:'opaque definition',definitionType:'owned',nativeClocks:{version:1,stateClocks:{},partClocks:{answer:clock}}});
+ globalThis.fetch=async(_url,options)=>{
+  if(options.method==='PUT'){putEntered();await putGate;return new Response('',{status:201});}
+  if(options.method==='PATCH')return new Response('',{status:200});
+  assert.equal(options.headers['X-Native-Unit-Protocol'],'1');if(reads++===0){readEntered();await readGate;return new Response(JSON.stringify(value('old snapshot',100)));}return new Response(JSON.stringify(value('newer remote',300)));
+ };
+ const client=new NativeHttpClient();t.after(()=>{releasePut();releaseRead();client.ngOnDestroy();});await client.prepareUnitJournal(true);await putStarted;
+ const pendingRead=rx.firstValueFrom(client.get('/test/1/unit/ORIGINAL/alias/A',{nativeUnitRead:{alias:'A',originalUnitId:'ORIGINAL'}}));await readStarted;releasePut();await client.retryPendingUnits();assert.equal(f.storage.length,0);
+ releaseRead();const first=await pendingRead;assert.equal(first.dataParts.answer,'pending Ω');assert.equal(first.unitResponseType,'pending/type');assert.equal(Object.hasOwn(first,'nativeClocks'),false);
+ const next=await rx.firstValueFrom(client.get('/test/1/unit/ORIGINAL/alias/A',{nativeUnitRead:{alias:'A',originalUnitId:'ORIGINAL'}}));assert.equal(next.dataParts.answer,'newer remote');assert.equal(next.unitResponseType,'remote/type');
 });

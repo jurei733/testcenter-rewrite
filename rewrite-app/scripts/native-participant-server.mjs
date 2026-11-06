@@ -6,7 +6,7 @@ import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js'
 // actual bytes and can defer an older retry while a newer response is committed.
 const backend=await createProductionApiServer();
 await new Promise(resolve=>backend.listen(0,'127.0.0.1',resolve));
-let remaining=0,phase='normal',target='response',firstBody,matchDeliveryId;
+let remaining=0,phase='normal',target='response',firstBody,matchDeliveryId,selectedTests=[];
 const held=new Map();
 const proxy=createServer((incoming,outgoing)=>{
  const path=new URL(incoming.url,'http://localhost').pathname;
@@ -64,6 +64,8 @@ const proxy=createServer((incoming,outgoing)=>{
   incoming.once('end',()=>{
    trace('body-end');
    const body=Buffer.concat(chunks);record.body=body.toString('utf8');
+   if(responseWrite&&target==='stars-offline'&&selectedTests.includes(path.split('/')[2])){fail();return;}
+   if(responseWrite&&target==='stars-interrupted'&&selectedTests.includes(path.split('/')[2])&&JSON.parse(record.body).dataParts?.ownedRecovery?.startsWith('nativeInterrupted:')){if(remaining===0){fail();return;}remaining--;}
    if(testStateWrite&&target==='startup-worker-state'&&incoming.headers['x-native-delivery-id']===matchDeliveryId){hold(record.phase,()=>forward(body));return;}
    if(testStateWrite&&target==='test-state-lost-ack'||testLogWrite&&(target==='test-log-lost-ack'||target==='terminal-log-lost-ack')){
     const entries=JSON.parse(record.body);record.probe=Array.isArray(entries)&&entries.some(entry=>testStateWrite?entry.key==='SHARED_PARAMETERS':entry.key==='command executed'&&entry.content===(target==='terminal-log-lost-ack'?'terminate lock':'pause'));
@@ -92,7 +94,7 @@ const proxy=createServer((incoming,outgoing)=>{
  forward();
 });
 process.on('message',message=>{
- if(message?.nativeFault){phase=message.nativeFault.phase;remaining=message.nativeFault.failures;target=message.nativeFault.target??'response';matchDeliveryId=message.nativeFault.matchDeliveryId;firstBody=undefined;process.send?.({faultReady:phase});}
+ if(message?.nativeFault){phase=message.nativeFault.phase;remaining=message.nativeFault.failures;target=message.nativeFault.target??'response';matchDeliveryId=message.nativeFault.matchDeliveryId;selectedTests=message.nativeFault.testIds??[];firstBody=undefined;process.send?.({faultReady:phase});}
  if(message?.nativeRelease){const value=held.get(message.nativeRelease);held.delete(message.nativeRelease);value?.forward();process.send?.({nativeReleased:message.nativeRelease,released:!!value});}
 });
 proxy.listen(0,'127.0.0.1',()=>process.send?.({port:proxy.address().port}));

@@ -1,0 +1,41 @@
+{
+  "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "legacyCanonicalFixtureSourceCommit": "94b04751abfe024eb1d354c29718f90b4740c4c6",
+  "files": {
+    "player": {
+      "sourcePath": "sampledata/system-test/load-player/stars/iqb-player-stars-0.6.40.html",
+      "sha256": "04cc96dc343bc4c2f4f248669569a9673fadd104685a8e3232ee3214a09d4cd5",
+      "fixture": "players/iqb-player-stars-0.6.40.html.br.base64",
+      "encoding": "brotli-base64"
+    },
+    "definition": {
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.voud",
+      "sha256": "d2de55691182b7277a3ba80c6e96a787e95e00f45fead9cfadc5ce470f99a131",
+      "fixture": "definitions/stars-CY-StarsUnit-001.voud.base64",
+      "encoding": "base64"
+    },
+    "metadata": {
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.vomd",
+      "sha256": "6109866263bb49ff2ced5f8ff28c12a55b80c32b043037f4fc96b2b0aba32007",
+      "fixture": "definitions/stars-CY-StarsUnit-001.vomd.base64",
+      "encoding": "base64"
+    },
+    "unit": {
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.xml",
+      "sha256": "9e3eb1bbe3b14931230d2189b2eaaffc50d77d65f129875dc03c4775ce9cf2d4",
+      "fixture": "native-stars/CY-StarsUnit-001.xml"
+    },
+    "booklet": {
+      "sourcePath": "sampledata/system-test/load-player/stars/CY_Bklt_Stars.xml",
+      "sha256": "2c57d4c3c727257332137c19e2756266d5a99052bc4c5879d84c950c6bfd8533",
+      "fixture": "native-stars/CY_Bklt_Stars.xml"
+    },
+    "roster": {
+      "sourcePath": "sampledata/system-test/load-player/stars/CY_Logins_Stars.xml",
+      "sha256": "63401d260a84e71e0270b84faea4f53f64c7c94f7f4a3b9a96bda3faedba83f0",
+      "fixture": "rosters/CY_Logins_Stars.xml",
+      "encoding": null
+    }
+  }
+}

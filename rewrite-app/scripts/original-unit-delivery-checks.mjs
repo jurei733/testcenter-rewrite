@@ -98,6 +98,14 @@ export async function verifyOriginalUnitDeliveries(input){
     reply=await fetch(base+'/'+kind,options);assert.equal(reply.status,status);assert.equal(await reply.text(),'');assert.deepEqual(await snapshot(),before);
     reply=await fetch(base+'/'+kind,{...options,body:JSON.stringify({...body,changed:true})});assert.equal(reply.status,409);await reply.text();assert.deepEqual(await snapshot(),before);
    }
+   const readUrl='http://127.0.0.1:'+server.address().port+'/test/'+testNumber+'/unit/OWNED.NATIVE.UNIT/alias/'+unitName;
+   let reply=await fetch(readUrl,{headers:{authtoken:token}});assert.equal(reply.status,200);const legacy=await reply.text();assert.equal(Object.hasOwn(JSON.parse(legacy),'nativeClocks'),false);
+   reply=await fetch(readUrl,{headers:{authtoken:token,'X-Native-Unit-Protocol':'1'}});assert.equal(reply.status,200);const native=await reply.json(),stored=await unit();
+   assert.deepEqual(native.nativeClocks,{version:1,stateClocks:stored.stateClocks,partClocks:Object.fromEntries(stored.parts.map(part=>[part.id,part.ts]))});
+   delete native.nativeClocks;assert.deepEqual(native,JSON.parse(legacy));
+   await reopen();reply=await fetch(readUrl,{headers:{authtoken:token,'X-Native-Unit-Protocol':'1'}});assert.deepEqual((await reply.json()).nativeClocks.partClocks,Object.fromEntries(stored.parts.map(part=>[part.id,part.ts])));
+   reply=await fetch(readUrl,{headers:{authtoken:token,'X-Native-Unit-Protocol':'2'}});assert.equal(reply.status,400);await reply.text();
+   const peer=await auth('owned-unit-peer');reply=await fetch(readUrl,{headers:{authtoken:peer.person.token,'X-Native-Unit-Protocol':'1'}});assert.equal(reply.status,403);await reply.text();
   }finally{await new Promise(done=>server.close(done));}
  });
  await t.test('late durable failure rolls back the receipt, state and appended logs together',async()=>{

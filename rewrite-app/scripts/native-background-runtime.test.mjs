@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {randomUUID,createHash,webcrypto} from 'node:crypto';
 const require=createRequire(import.meta.url);
-const {createRuntime,snapshot,order,runLock}=require('../apps/web/src/native-save-runtime/runtime.js');
+const {createRuntime,snapshot,order,runLock,unitLock}=require('../apps/web/src/native-save-runtime/runtime.js');
 const token='owned-native-background-A',actor=createHash('sha256').update(token).digest('hex'),testId='9007199254740993';
 const state=(alias,clock=1)=>({id:randomUUID(),kind:'state',unitAlias:alias,originalUnitId:'ORIGINAL',queuedAt:clock,phase:'ready',payload:JSON.stringify({newState:[{key:'PRESENTATION_PROGRESS',content:'complete',timeStamp:clock}],originalUnitId:'ORIGINAL'})});
 const response=(alias,value,clock=1)=>({id:randomUUID(),kind:'response',unitAlias:alias,originalUnitId:'ORIGINAL',queuedAt:clock,phase:'staged',payload:JSON.stringify({timeStamp:clock,dataParts:{owned:value},responseType:'owned/type',originalUnitId:'ORIGINAL'})});
@@ -18,7 +18,7 @@ function fixture(rows){
  const run=send=>runtime.drain({pending:async()=>[...records.values()],readRecord:async key=>structuredClone(records.get(key)),readGrant:async key=>structuredClone(grants.get(key)),locked,
   retireGrant:async()=>{grants.set(actor,{active:false});},send:async(url,options)=>{sent.push({url:String(url),options});return send(url,options);},
   acknowledge:async(row,entry)=>{const current=records.get(row.bucket);assert.equal(current.revision,row.revision);current.document.entries=current.document.entries.filter(e=>e.id!==entry.id);current.pending=Number(current.document.entries.length>0);acks.push(entry.id);}});
- return {records,grants,held,sent,acks,run};
+ return {records,grants,held,sent,acks,run,runtime};
 }
 const ok=(status=201)=>new Response('',{status});
 test('unsealed mirrors never dispatch merely because a document lease disappeared',async()=>{
@@ -82,4 +82,18 @@ test('a failed predecessor retains descendants while independent Test logs still
 test('malformed snapshots and cycles remain intact and never degrade into an empty queue',()=>{
  const value=record([response('A','retained')]);for(const text of ['broken',JSON.stringify({...value.document,actor:'0'.repeat(64)}),JSON.stringify({...value.document,revision:-1})])assert.throws(()=>snapshot(value.bucket,text));
  const first={id:randomUUID(),kind:'state',queuedAt:1,phase:'ready',payload:'[]',base:{version:1,revision:0,controlEpoch:0}},next={...first,id:randomUUID()};first.base={...first.base,previousDeliveryId:next.id};next.base={...next.base,previousDeliveryId:first.id};assert.throws(()=>order(record([first,next],{kind:'test'})));
+});
+
+
+test('a foreground Unit lease preserves queued answers while allowing causal Test state and other runs to drain',async()=>{
+ const unit=record([response('A','retained')]),testEntry={id:randomUUID(),kind:'state',queuedAt:1,phase:'ready',payload:'[{"key":"FOCUS","content":"HAS","timeStamp":1}]',base:{version:1,revision:0,controlEpoch:0}},testRecord=record([testEntry],{kind:'test'}),other=record([response('B','independent')],{run:'9007199254740992'}),f=fixture([unit,testRecord,other]);
+ f.held.add(unitLock(actor,testId));await assert.rejects(f.run((_url,options)=>options.headers['X-Native-State-Base']?new Response('',{headers:{'X-Native-State-Result':'{"version":1,"revision":1,"controlEpoch":0,"superseded":false}'}}):ok()),/remain queued/);
+ assert.equal(f.records.get(unit.bucket).pending,1);assert.equal(f.records.get(testRecord.bucket).pending,0);assert.equal(f.records.get(other.bucket).pending,0);assert.deepEqual(new Set(f.acks),new Set([testEntry.id,other.document.entries[0].id]));
+});
+test('foreground Unit handoff aborts only the captured actor/run Unit delivery and keeps its exact packet',async()=>{
+ const entry=response('A','pending'),value=record([entry]),f=fixture([value]);let started,signal;const entered=new Promise(done=>{started=done;});
+ const pending=f.run((_url,options)=>{if(options.method==='PATCH')return ok();signal=options.signal;started();return new Promise((_done,reject)=>signal.addEventListener('abort',()=>reject(Error('yielded')),{once:true}));}).catch(error=>error);await entered;
+ f.runtime.yieldUnits(actor,'9007199254740992');assert.equal(signal.aborted,false);f.runtime.yieldUnits('f'.repeat(64),testId);assert.equal(signal.aborted,false);
+ f.runtime.yieldUnits(actor,testId);assert.match((await pending).message,/remain queued/);assert.equal(signal.aborted,true);assert.deepEqual(f.records.get(value.bucket).document.entries,[entry]);assert.deepEqual(f.acks,[]);
+ await f.run(()=>ok());assert.deepEqual(f.acks,[entry.id]);assert.equal(f.sent.filter(row=>row.options.method==='PUT').at(-1).options.body,entry.payload);
 });

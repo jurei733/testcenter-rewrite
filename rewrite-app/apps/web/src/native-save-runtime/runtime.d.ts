@@ -8,8 +8,10 @@ export type NativeSaveRuntime = {
  readRecord(bucket:string):Promise<NativeSaveRecord|undefined>;
  pending():Promise<NativeSaveRecord[]>;
  drain(options?:Record<string,unknown>):Promise<void>;
+ yieldUnits(actor:string,testId:string):void;
  runRecovery<T>(actor:string,testId:string,signal:AbortSignal,operation:()=>Promise<T>):Promise<T>;
 };
 export function createRuntime(env:{indexedDB:IDBFactory;crypto:Crypto;locks:LockManager;fetch:typeof fetch;origin:string}):NativeSaveRuntime;
 export function runLock(actor:string,testId:string):string;
+export function unitLock(actor:string,testId:string):string;
 export function snapshot(bucket:string,text:string):Pick<NativeSaveRecord,'bucket'|'kind'|'actor'|'testId'|'revision'|'document'>;

@@ -10,6 +10,7 @@
  const token=t=>typeof t==='string'&&/^[\x21-\x7e]{1,4096}$/.test(t);
  const invalid=()=>Error('Invalid native background save.');
  const runLock=(actor,testId)=>'testcenter-native-recovery:'+actor+':'+testId;
+ const unitLock=(actor,testId)=>'testcenter-native-foreground-unit:'+actor+':'+testId;
  function stateBase(base,length){
   if(!base||base.version!==1||!integer(base.revision)||!integer(base.controlEpoch)||base.controlEpoch>base.revision||JSON.stringify(base).length>8192||
    Object.keys(base).some(k=>!['version','revision','controlEpoch','previousDeliveryId','segments'].includes(k))||base.previousDeliveryId!==undefined&&!UUID.test(base.previousDeliveryId))throw invalid();
@@ -61,7 +62,7 @@
   const controllers=new Map();let draining,requested=0;
   const authorize=async value=>{const actor=await actorHash(env.crypto,value);await transaction(GRANTS,'readwrite',s=>s.put({actor,token:value,active:true}));return actor;};
   const retire=async value=>{
-   const actor=await actorHash(env.crypto,value);controllers.get(actor)?.abort();
+   const actor=await actorHash(env.crypto,value);controllers.get(actor)?.controller.abort();
    await transaction(GRANTS,'readwrite',s=>s.put({actor,active:false}));
   };
   const putSnapshot=async(bucket,text,sealed=false,preferredUnitAlias)=>{
@@ -69,7 +70,7 @@
     const request=s.get(bucket);request.onsuccess=()=>{
      const previous=request.result;
      if(previous&&(previous.revision>value.revision||previous.revision===value.revision&&(previous.sealed||!sealed)))return;
-     s.put({...value,sealed:!!sealed,pending:Number(value.document.entries.length>0),receipts:value.document.entries.length?(previous?.receipts??{}):{},...(typeof preferredUnitAlias==='string'?{preferredUnitAlias}:{} )});
+     s.put({...value,sealed:!!sealed,pending:Number(value.document.entries.length>0),receipts:value.document.entries.length?(previous?.receipts??{}):{},...(typeof preferredUnitAlias==='string'?{preferredUnitAlias}:previous?.preferredUnitAlias?{preferredUnitAlias:previous.preferredUnitAlias}:{} )});
     };
    });
   };
@@ -89,6 +90,9 @@
    if(!HASH.test(actor)||!/^\d+$/.test(testId)||!env.locks?.request)throw invalid();
    return env.locks.request(runLock(actor,testId),{signal},operation);
   };
+  const yieldUnits=(actor,testId)=>{
+   const active=controllers.get(actor);if(active?.testId===testId&&active.kind==='unit')active.controller.abort();
+  };
   const drainOnce=async options=>{
    const io={pending,readRecord:bucket=>read(DOCUMENTS,bucket),readGrant:actor=>read(GRANTS,actor),acknowledge,send:env.fetch,retireGrant:retire,locked,...options};
    const records=await io.pending(),runs=new Map();let retry=false;
@@ -99,10 +103,11 @@
    for(const group of runs.values())try{
     const first=group[0],result=await io.locked(runLock(first.actor,first.testId),async()=>{
      const grant=await io.readGrant(first.actor);if(!grant?.active||!token(grant.token)||await actorHash(env.crypto,grant.token)!==first.actor)return true;
-     const controller=new AbortController();controllers.set(first.actor,controller);
+     const active={controller:new AbortController(),testId:first.testId,kind:undefined};controllers.set(first.actor,active);
      try{
       for(const original of group){
-       const accepted=await io.locked(original.bucket,async()=>{
+       active.kind=original.kind;const controller=active.controller=new AbortController();
+       const deliver=()=>io.locked(original.bucket,async()=>{
         const record=await io.readRecord(original.bucket);if(!record?.sealed||!record.pending)return true;
         const checked=snapshot(record.bucket,JSON.stringify(record.document));
         if(['actor','testId','kind','revision'].some(key=>checked[key]!==record[key])||record.actor!==first.actor||record.testId!==first.testId)throw invalid();
@@ -126,9 +131,10 @@
          await io.acknowledge(record,entry);
          }catch{retry=true;blocked.add(record.kind==='unit'?entry.unitAlias:entry.id);}
         }return true;
-       });if(accepted===false)retry=true;
+       });
+       const accepted=original.kind==='unit'?await io.locked(unitLock(first.actor,first.testId),deliver):await deliver();if(accepted===false)retry=true;
       }
-     }finally{if(controllers.get(first.actor)===controller)controllers.delete(first.actor);}
+     }finally{if(controllers.get(first.actor)===active)controllers.delete(first.actor);}
      return true;
     });if(result===false)retry=true;
    }catch{retry=true;}
@@ -142,7 +148,7 @@
     if(observed!==requested)continue;if(failure)throw failure;return;
    }
   })().finally(()=>{draining=undefined;});};
-  return {authorize,retire,putSnapshot,drain,runRecovery,readRecord:bucket=>read(DOCUMENTS,bucket),pending,actorHash:value=>actorHash(env.crypto,value),entryFingerprint:entry=>entryFingerprint(env.crypto,entry)};
+  return {authorize,retire,putSnapshot,drain,runRecovery,yieldUnits,readRecord:bucket=>read(DOCUMENTS,bucket),pending,actorHash:value=>actorHash(env.crypto,value),entryFingerprint:entry=>entryFingerprint(env.crypto,entry)};
  }
  function order(record){
   const entries=[...record.document.entries];
@@ -167,6 +173,7 @@
     if(m.action==='seal'){await runtime.putSnapshot(m.bucket,m.text,true,m.preferredUnitAlias);return runtime.drain();}
     if(m.action==='authorize'){grants=grants.catch(()=>{}).then(()=>runtime.authorize(m.token));await grants;return runtime.drain();}
     if(m.action==='retire'){grants=grants.catch(()=>{}).then(()=>runtime.retire(m.token));return grants;}
+    if(m.action==='yield-units'){runtime.yieldUnits(await runtime.actorHash(m.token),m.testId);return;}
     if(m.action==='drain')return runtime.drain();
     throw invalid();
    };
@@ -178,5 +185,5 @@
   });
   worker.addEventListener('sync',event=>{if(event.tag===SYNC_TAG)event.waitUntil(runtime.drain().finally(notify));});
  }
- return {DATABASE,SYNC_TAG,snapshot,order,runLock,createRuntime,installWorker};
+ return {DATABASE,SYNC_TAG,snapshot,order,runLock,unitLock,createRuntime,installWorker};
 });

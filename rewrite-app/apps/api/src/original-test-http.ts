@@ -46,7 +46,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   if(executed){const result=await input.services.originalCommand.acknowledge({token,testNumber:executed[1]!,commandNumber:executed[2]!,nativeStateProtocol:input.request.headers['x-native-state-protocol']});
    if(typeof result==='object'){input.header('X-Native-State-Base',JSON.stringify(result.nativeStateBase));input.reason(result.reason);}else input.reason(result);input.raw(200,'','text/html; charset=UTF-8');return true;}
   if(log||lock)await input.services.originalTest.requireOwner({token,testNumber:(log??lock)![1]!});
-  if(unitRead){const result=await input.services.originalUnit.read({token,testNumber:unitRead[1]!,unitName:unitRead[2]!,...(unitRead[3]===undefined?{}:{alias:unitRead[3]})});input.raw(200,formatOriginalUnitReadJson(result),'application/json');return true;}
+  if(unitRead){const result=await input.services.originalUnit.read({token,testNumber:unitRead[1]!,unitName:unitRead[2]!,nativeUnitProtocol:input.request.headers['x-native-unit-protocol'],...(unitRead[3]===undefined?{}:{alias:unitRead[3]})});input.raw(200,formatOriginalUnitReadJson(result),'application/json');return true;}
   if(read){const testNumber=read[1]!;
    const result=await input.services.originalTest.read({token,testNumber,nativeStateProtocol:input.request.headers['x-native-state-protocol']});
    if(result.nativeStateBase)input.header('X-Native-State-Base',JSON.stringify(result.nativeStateBase));

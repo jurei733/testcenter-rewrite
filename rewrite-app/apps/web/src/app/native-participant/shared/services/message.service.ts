@@ -31,6 +31,8 @@ export class MessageService {
     return this.toastService.showSnackbar(text, actionText, duration);
   }
 
+  openSnackbar(text:ToastContent,actionText:string,duration:number){return this.toastService.openSnackbar(text,actionText,duration);}
+
   showConfirmDialog(dialogData: ConfirmDialogData): Observable<boolean> {
     // Any kind of admin or group-monitor is assumed to be adult and gets
     // the unsafe mode, regardless of the theme.

@@ -103,6 +103,11 @@ export class NativeUnitJournal {
   doc.entries=doc.entries.filter(row=>row!==previous);doc.entries.push(entry);this.write(this.ownBucket,doc);
   return Object.freeze({...entry,bucket:this.ownBucket});
  }
+ snapshot(unitAlias:string):NativeUnitDelivery[]{
+  const pending:NativeUnitDelivery[]=[];
+  for(const key of this.leases.keys())for(const row of this.read(key).entries)if(row.unitAlias===unitAlias)pending.push(Object.freeze({...row,bucket:key}));
+  return pending.sort((a,b)=>a.queuedAt-b.queuedAt);
+ }
  recoveries(preferredUnitAlias?:string):NativeUnitDelivery[]{
   const pending:NativeUnitDelivery[]=[];
   for(const key of this.leases.keys()){

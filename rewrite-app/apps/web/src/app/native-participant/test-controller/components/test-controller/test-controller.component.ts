@@ -1,3 +1,4 @@
+import {ToastContainerComponent} from '../../../shared/components/toast/toast-container.component';
 import {AsyncPipe,NgIf} from '@angular/common';
 import {RouterOutlet} from '@angular/router';
 import {MatButton,MatIconButton} from '@angular/material/button';
@@ -47,7 +48,7 @@ import { MessageService } from '../../../shared/services/message.service';
   templateUrl: './test-controller.component.html',
   styleUrls: ['./test-controller.component.css'],
   standalone: true,
-  imports:[AsyncPipe,NgIf,RouterOutlet,NativeRunOutletDirective,MatButton,MatIconButton,MatMenu,MatMenuTrigger,MatTooltip,MatSidenav,MatSidenavContainer,MatSidenavContent,NativeMonitorIconComponent,UnitMenuComponent,NavigationComponent,DebugPaneComponent,LoadingProgressComponent,ReviewPanelComponent]
+  imports:[ToastContainerComponent,AsyncPipe,NgIf,RouterOutlet,NativeRunOutletDirective,MatButton,MatIconButton,MatMenu,MatMenuTrigger,MatTooltip,MatSidenav,MatSidenavContainer,MatSidenavContent,NativeMonitorIconComponent,UnitMenuComponent,NavigationComponent,DebugPaneComponent,LoadingProgressComponent,ReviewPanelComponent]
 })
 export class TestControllerComponent implements OnInit, OnDestroy {
   private readonly nativeHttp=inject(NativeHttpClient);

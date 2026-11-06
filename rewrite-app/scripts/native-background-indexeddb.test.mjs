@@ -12,20 +12,24 @@ const inputs={
  'scripts/native-background-indexeddb.test.mjs':new URL(import.meta.url)
 };
 const hashInputs=async()=>Object.fromEntries(await Promise.all(Object.entries(inputs).map(async([path,url])=>[path,createHash('sha256').update(await readFile(url)).digest('hex')])));
+inputs['apps/web/src/app/native-participant/native-unit-journal.ts']=new URL('../apps/web/src/app/native-participant/native-unit-journal.ts',import.meta.url);
 const inputHashes=await hashInputs();
 const source=await readFile(new URL('../apps/web/src/native-save-runtime/runtime.js',import.meta.url),'utf8');
 const bridge=ts.transpileModule(await readFile(new URL('../apps/web/src/app/native-participant/native-background.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const bridgeScript=`(()=>{const exports={};const require=name=>{if(name==='../../native-save-runtime/runtime.js')return TestcenterNativeSave;throw Error('Unknown fixture module');};${bridge};globalThis.NativeBridge=exports;})();`;
+const journalCode=ts.transpileModule(await readFile(inputs['apps/web/src/app/native-participant/native-unit-journal.ts'],'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const journalScript=`(()=>{const exports={};${journalCode};globalThis.NativeUnitJournal=exports.NativeUnitJournal;})();`;
 let browser,server,base,requests=[],failUnit;
 before(async()=>{
  server=createServer(async(req,res)=>{
   if(req.url==='/runtime.js'){res.writeHead(200,{'Content-Type':'application/javascript'});res.end(source);return;}
+  if(req.url==='/unit-journal.js'){res.writeHead(200,{'Content-Type':'application/javascript'});res.end(journalScript);return;}
   if(req.url==='/bridge.js'){res.writeHead(200,{'Content-Type':'application/javascript'});res.end(bridgeScript);return;}
   if(req.url==='/worker.js'){res.writeHead(200,{'Content-Type':'application/javascript','Service-Worker-Allowed':'/'});res.end("importScripts('/runtime.js');TestcenterNativeSave.installWorker(self);self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));");return;}
   if(req.url.startsWith('/test/')){let body='';for await(const chunk of req)body+=chunk;requests.push({path:req.url,method:req.method,headers:req.headers,body});
    const status=failUnit&&req.url.includes('/unit/'+failUnit+'/')?503:req.method==='PATCH'?200:201;
    res.writeHead(status,{'Content-Type':'text/plain',...(req.url.endsWith('/state')?{'X-Native-State-Result':'{"version":1,"revision":1,"controlEpoch":0,"superseded":false}'}:{})});res.end('');return;}
-  res.writeHead(200,{'Content-Type':'text/html'});res.end('<!doctype html><title>Owned native IndexedDB fixture</title><script src="/runtime.js"></script><script src="/bridge.js"></script>');
+  res.writeHead(200,{'Content-Type':'text/html'});res.end('<!doctype html><title>Owned native IndexedDB fixture</title><script src="/runtime.js"></script><script src="/bridge.js"></script><script src="/unit-journal.js"></script>');
  });await new Promise(done=>server.listen(0,'127.0.0.1',done));base='http://127.0.0.1:'+server.address().port;
  const channel=process.env.UI_SMOKE_BROWSER_CHANNEL??(process.env.CI==='true'?undefined:'chrome');browser=await chromium.launch({...(channel?{channel}:{}),headless:true});
 });
@@ -145,4 +149,30 @@ test('abort during initialization and late worker registration cannot reauthoriz
   release({active:{postMessage:message=>posted.push(message.action)}});await new Promise(done=>setTimeout(done,0));
   return posted;
  });assert.deepEqual(result,['retire']);
+});
+
+
+test('the real foreground Unit lease defers worker answers but preserves Test-state receipts and releases on view retirement',async t=>{
+ const page=await pageFixture(t);const result=await page.evaluate(async()=>{
+  const owner=new AbortController(),view=new AbortController(),context=NativeBridge.nativeBackground(token,owner.signal);await context.ready;await context.holdUnits('9007199254740993',view.signal);
+  const unit=documentFor([make('A','pending foreground')]);await rt.putSnapshot(bucket,JSON.stringify(unit),true);
+  const entry={id:crypto.randomUUID(),kind:'state',queuedAt:1,phase:'ready',payload:'[{"key":"FOCUS","content":"HAS","timeStamp":1}]',base:{version:1,revision:0,controlEpoch:0}},testKey='testcenter-native-test-journal:v1:'+actor+':9007199254740993:'+crypto.randomUUID();await rt.putSnapshot(testKey,JSON.stringify(documentFor([entry])),true);
+  const held=await sendWorker({action:'drain'}),unitPending=(await rt.readRecord(bucket)).pending,testPending=(await rt.readRecord(testKey)).pending;
+  view.abort();await sendWorker({action:'drain'});const after=(await rt.readRecord(bucket)).pending;owner.abort();return{held,unitPending,testPending,after};
+ });assert.deepEqual(result,{held:{ok:false},unitPending:1,testPending:0,after:0});const sent=ownRequests(page);assert.equal(sent.filter(row=>row.path.endsWith('/unit/A/response')).length,1);assert.equal(sent.filter(row=>/^\/test\/[^/]+\/state$/.test(row.path)).length,1);
+});
+
+
+test('a receipt scan started inside foreground recovery cannot steal the real Unit journal document lease',async t=>{
+ const page=await pageFixture(t);const result=await page.evaluate(async()=>{
+  const owner=new AbortController(),context=new NativeBridge.NativeBackgroundContext(rt,token,owner.signal);await context.ready;
+  const doc=documentFor([make('A','exact pending answer')]);localStorage.setItem(bucket,JSON.stringify(doc));await rt.putSnapshot(bucket,JSON.stringify(doc),false);
+  let inside=false,enteredRead,releaseRead;const started=new Promise(done=>{enteredRead=done;}),gate=new Promise(done=>{releaseRead=done;}),read=rt.readRecord.bind(rt);
+  rt.readRecord=async key=>{if(inside&&key===bucket){enteredRead();await gate;}return read(key);};let captured;
+  try{await context.recover('9007199254740993',async()=>{
+   inside=true;const scan=context.reconcile(false);await Promise.race([started,scan]);
+   const journal=await NativeUnitJournal.open({token,testId:'9007199254740993',storage:localStorage,locks:navigator.locks,crypto});
+   captured=journal.snapshot('A').map(row=>JSON.parse(row.payload).dataParts.owned);releaseRead();await scan;journal.close();return false;
+  });}finally{releaseRead();owner.abort();}return captured;
+ });assert.deepEqual(result,['exact pending answer'],'Receipt reconciliation must not make a recoverable document look like a live peer tab');
 });

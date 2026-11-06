@@ -71,7 +71,7 @@ export class BackendService {
   prepareJournals(saving:boolean):Promise<boolean>{return this.http.prepareJournals(saving);}
 
   getUnitData(testId: string, unitid: string, unitalias: string): Observable<UnitData> {
-    return this.http.get<UnitData>(`${this.backendUrl}test/${testId}/unit/${unitid}/alias/${unitalias}`);
+    return this.http.get<UnitData>(`${this.backendUrl}test/${testId}/unit/${unitid}/alias/${unitalias}`,{nativeUnitRead:{alias:unitalias,originalUnitId:unitid}});
   }
 
   patchTestState(patch: TestStateUpdate): Observable<string> {

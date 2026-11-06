@@ -1,6 +1,7 @@
 import {runNativeParticipantReviewSmoke} from './native-participant-review-smoke.mjs';
 import {runNativeBackgroundLockedSmoke} from './native-background-locked-smoke.mjs';
 import {runNativeStartupRecoverySmoke} from './native-startup-recovery-smoke.mjs';
+import {prepareNativeStarsFixture,runNativeStarsRecoverySmoke} from './native-stars-recovery-smoke.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
@@ -11,7 +12,7 @@ import {pathToFileURL,fileURLToPath} from 'node:url';
 import {reportSmokePhase} from './supervised-smoke.mjs';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 const app=fileURLToPath(new URL('..',import.meta.url));
-export async function runNativeParticipantSmoke(artifactRoot,{backgroundOnly=false}={}){
+export async function runNativeParticipantSmoke(artifactRoot,{backgroundOnly=false,starsOnly=false}={}){
 reportSmokePhase('prepare-owned-native-participant-fixtures');
 const out=join(artifactRoot,'native-monitor','native-participant');await mkdir(out,{recursive:true});
 const require=createRequire(join(app,'package.json')),{chromium}=require('playwright');
@@ -28,12 +29,13 @@ qualificationFiles.push('apps/api/src/original-review-http.ts','apps/api/dist/ap
 for(const name of ['original-unit','original-unit-record','original-unit-collections','original-unit-delivery'])qualificationFiles.push(`packages/application/src/${name}.ts`,`packages/application/dist/packages/application/src/${name}.js`);
 qualificationFiles.push('apps/api/src/original-test-http.ts','apps/api/dist/apps/api/src/original-test-http.js');
 qualificationFiles.push('scripts/finite-animation-ready.mjs');
+qualificationFiles.push('scripts/native-unit-restore.test.mjs','scripts/native-unit-journal.test.mjs','scripts/native-background-runtime.test.mjs','scripts/native-participant-lifecycle.test.mjs','scripts/original-unit-delivery-checks.mjs','scripts/original-test-creation.test.mjs');
 for(const file of ['original-native-write-state','original-result-state','original-test-state','original-test-lock','participant-run-mutation','original-command','original-command-queue'])qualificationFiles.push(`packages/application/src/${file}.ts`,`packages/application/dist/packages/application/src/${file}.js`);
 for(const name of ['sqlite-store','postgres-store'])qualificationFiles.push(`packages/${name}/src/original-command-queue.ts`,`packages/${name}/dist/packages/${name}/src/original-command-queue.js`);
 qualificationFiles.push('packages/domain/src/index.ts','packages/domain/dist/packages/domain/src/index.js');
 
 const hashQualification=async()=>Object.fromEntries(await Promise.all(qualificationFiles.map(async path=>[path,createHash('sha256').update(await readFile(join(app,path))).digest('hex')])));
-const qualificationHashes=await hashQualification();
+let qualificationHashes=await hashQualification();
 const mod=async name=>import(pathToFileURL(require.resolve(name)).href);
 const {createFirstSliceServices}=await mod('@testcenter-rewrite-app/application');
 const {createSqliteFirstSliceStorage}=await mod('@testcenter-rewrite-app/sqlite-store');
@@ -68,6 +70,8 @@ for(const id of scrollBooklets)await upload(id+'.xml',xml('Booklet',`<Metadata><
 const scrollProfiles=scrollBooklets.map((_,i)=>'scroll'+(i+1));
 const password='Owned native auth password';
 await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers',`<Metadata/><CustomTexts><CustomText key="booklet_pausedmessage">Owned remote pause Ω</CustomText></CustomTexts><Profiles><GroupMonitor><Profile id="full" label="Vollständig" view="full" groupColumn="show"/>${scrollProfiles.map(id=>`<Profile id="${id}" label="Owned Monitor ${id}" view="full" groupColumn="show"/>`).join('')}</GroupMonitor></Profiles><Group id="OWNED.AUTH" label="Owned Native Group"><Login name="native-monitor" pw="${password}" mode="monitor-group"><Profile id="full"/></Login><Login name="native-code" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login><Login name="native-direct" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login><Login name="native-seed" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group><Group id="OWNED.BACKGROUND" label="Owned Native Background Group"><Login name="native-background" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group><Group id="OWNED.STARTUP" label="Owned Native Startup Group"><Login name="native-startup" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group><Group id="OWNED.REVIEWS" label="Owned Native Review Group"><Login name="native-review-trial" pw="${password}" mode="run-trial"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login><Login name="native-review-review" pw="${password}" mode="run-review"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login></Group><Group id="OWNED.SCROLL" label="Owned Starter Scroll Group"><Login name="native-scroll" pw="${password}" mode="run-hot-return">${scrollBooklets.map(id=>`<Booklet>${id}</Booklet>`).join('')}</Login></Group><Group id="OWNED.SCROLL.MONITOR" label="Owned Monitor Scroll Group"><Login name="native-scroll-monitor" pw="${password}" mode="monitor-group">${scrollProfiles.map(id=>`<Profile id="${id}"/>`).join('')}</Login></Group>`)});
+const starsFixture=!backgroundOnly?await prepareNativeStarsFixture({services,tenantKey:tenant.tenantKey,app}):undefined;
+if(starsFixture){qualificationFiles.push('scripts/native-stars-recovery-smoke.mjs','scripts/run-native-stars-recovery-smoke.mjs',...starsFixture.fixturePaths);qualificationHashes=await hashQualification();}
 const seed=await services.originalSession.login({name:'native-seed',password:''});await services.originalTest.create({token:seed.token,bookletName:'OWNED.BROWSER'});await storage.shutdown();
 const {DatabaseSync}=await import('node:sqlite'),db=new DatabaseSync(file);assert.equal(db.prepare('UPDATE original_test_number_counter SET last_number=? WHERE singleton=1').run('9007199254740992').changes,1);assert.equal(db.prepare('UPDATE original_native_command_counter SET last_number=? WHERE singleton=1').run('9007199254740992').changes,1);assert.equal(db.prepare('UPDATE original_native_review_counters SET last_number=?').run('9007199254740992').changes,2);db.close();
 const checks=[],errors=[],wire=[],consoleErrors=[],responseReceipts=[],commandReceipts=[],testWriteReceipts=[],resourceReceipts=[],monitorWire=[],serverMessages=[];let server,browser,page,monitor;
@@ -76,7 +80,7 @@ try{
  server=spawn(process.execPath,[join(app,'scripts/native-participant-server.mjs')],{cwd:app,stdio:['ignore','ignore','inherit','ipc'],env:{...process.env,FIRST_SLICE_STORE:'sqlite',FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'participant,second_code',FIRST_SLICE_PROOF_OF_WORK_SECRET:randomBytes(32).toString('hex'),FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET:'',FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER:'12',FIRST_SLICE_PROOF_OF_WORK_TTL_MS:'60000',REQUIRE_LOGIN_PASSWORD:'false'}});
  server.on('message',message=>{serverMessages.push(message);if(message?.nativeResponse)responseReceipts.push(message.nativeResponse);if(message?.nativeCommand)commandReceipts.push(message.nativeCommand);if(message?.nativeTestWrite)testWriteReceipts.push(message.nativeTestWrite);if(message?.nativeResource)resourceReceipts.push(message.nativeResource);});
  const serverEvent=async(key,value)=>{const end=Date.now()+20000;while(Date.now()<end){const found=serverMessages.find(m=>m?.[key]===value);if(found)return found;await new Promise(done=>setTimeout(done,10));}throw Error('Owned server event deadline: '+key);};
- const configure=(phase,failures,target='response',matchDeliveryId)=>new Promise((resolve,reject)=>{const listener=message=>{if(message?.faultReady===phase){clearTimeout(timer);server.removeListener('message',listener);resolve();}};const timer=setTimeout(()=>{server.removeListener('message',listener);reject(Error('Owned fault configuration deadline'));},20000);server.on('message',listener);server.send({nativeFault:{phase,failures,target,matchDeliveryId}});});
+ const configure=(phase,failures,target='response',matchDeliveryId,options={})=>new Promise((resolve,reject)=>{const listener=message=>{if(message?.faultReady===phase){clearTimeout(timer);server.removeListener('message',listener);resolve();}};const timer=setTimeout(()=>{server.removeListener('message',listener);reject(Error('Owned fault configuration deadline'));},20000);server.on('message',listener);server.send({nativeFault:{phase,failures,target,matchDeliveryId,...options}});});
  const receipts=async(phase,count)=>{const end=Date.now()+20000;while(Date.now()<end){const found=responseReceipts.filter(r=>r.phase===phase);if(found.length>=count)return found;await new Promise(done=>setTimeout(done,10));}throw Error('Native receipt observation deadline');};
  const testReceipts=async(phase,kind)=>{const end=Date.now()+20000;while(Date.now()<end){const found=testWriteReceipts.filter(row=>row.phase===phase&&row.probe&&row.path.endsWith('/'+kind));if(found.length>=2)return found;await new Promise(done=>setTimeout(done,10));}throw Error('Native Test delivery receipt deadline');};
  const logCount=(testNumber,key)=>{const own=new DatabaseSync(file,{readOnly:true});try{own.exec('PRAGMA busy_timeout=1000');return own.prepare('SELECT count(*) AS n FROM participant_test_logs WHERE test_run_id=(SELECT test_run_id FROM original_test_numbers WHERE test_number=?) AND log_key=?').get(testNumber,key).n;}finally{own.close();}};
@@ -85,7 +89,7 @@ try{
  await page.addInitScript(()=>{window.__ownedErrorEvents=[];addEventListener('error',event=>window.__ownedErrorEvents.push({code:event.error?.code,label:event.error?.label}));addEventListener('unhandledrejection',event=>window.__ownedErrorEvents.push({code:event.reason?.code,label:event.reason?.label}));});
  page.on('pageerror',error=>errors.push(String(error)));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text().replace(/(\/file\/)[^/]+/g,'$1[resource-capability]'));});
  page.on('request',r=>{const p=new URL(r.url()).pathname;if(/^\/(?:session|test|file)(?:\/|$)/.test(p))wire.push({method:r.method(),path:p.replace(/^(\/file\/)[^/]+/,'$1[resource-capability]')});});
- if(!backgroundOnly){
+ if(!backgroundOnly&&!starsOnly){
  await page.goto(base+'/app/native-start?ui=original');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('native-code');await page.locator('[data-cy=login-user]').click();
  await page.getByLabel('Kennwort',{exact:true}).fill(password);await page.locator('[data-cy=login-user]').click();await page.locator('[data-cy=code-input]').waitFor();mark('actual-ui-password-work-to-native-code-input');
  await page.locator('[data-cy=code-input]').fill('sHaReD');await page.locator('[data-cy=continue]').click();
@@ -293,11 +297,14 @@ try{
 
 
  }
+ if(!starsOnly){
  await runNativeBackgroundLockedSmoke({browser,base,file,out,password,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,serverMessages});
  await runNativeStartupRecoverySmoke({browser,base,file,out,password,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,serverMessages});
+ }
+ if(starsFixture)await runNativeStarsRecoverySmoke({browser,base,file,out,mark,fixture:starsFixture,responseReceipts,configure});
  assert.deepEqual(consoleErrors.filter(x=>/NG\d{4}|TypeError|ReferenceError|SyntaxError|Error retrieving icon/.test(x)),[]);
  assert.deepEqual(await hashSources(),sourceHashes);assert.deepEqual(await hashQualification(),qualificationHashes,'Participant harness and actual API build must remain unchanged during qualification');
- await writeFile(join(out,'result.json'),JSON.stringify({success:true,diagnosticOnly:backgroundOnly,browser:browser.version(),checks,errors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,sourceHashes,qualificationHashes,scope:backgroundOnly?'Only background closure and startup recovery controls against owned production SQLite; excludes the prior70native cases.':'Local uncommitted full native UI path against owned production native SQLite API, actual Source Starter card/controller/unit host; not whole-project/visual qualification.'},null,2));
+ await writeFile(join(out,'result.json'),JSON.stringify({success:true,diagnosticOnly:backgroundOnly||starsOnly,browser:browser.version(),checks,errors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,sourceHashes,qualificationHashes,scope:starsOnly?'Diagnostic native Original STARS fixture; excludes the existing76native cases.':backgroundOnly?'Only background closure and startup recovery controls against owned production SQLite; excludes the prior70native cases.':'Local uncommitted full native UI path including official Original STARS56/28-to21 against owned production native SQLite API, actual Source Starter card/controller/unit host; not whole-project/visual qualification.'},null,2));
 }catch(error){if(monitor){await monitor.screenshot({path:join(out,'monitor-failure.png')}).catch(()=>{});await writeFile(join(out,'monitor-failure.html'),await monitor.content().catch(()=>''));}await page?.screenshot({path:join(out,'failure.png')}).catch(()=>{});const dom=await page?.content().catch(()=>'');if(dom)await writeFile(join(out,'failure.html'),dom);await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),checks,errors,consoleErrors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,url:page?.url(),monitorUrl:monitor?.url()},null,2));throw error;}
 finally{await browser?.close();if(server)await stopNativeSmokeServer(server);}
 
