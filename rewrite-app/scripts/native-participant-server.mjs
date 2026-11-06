@@ -7,11 +7,13 @@ import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js'
 // actual bytes and can defer an older retry while a newer response is committed.
 const backend=await createProductionApiServer();
 await new Promise(resolve=>backend.listen(0,'127.0.0.1',resolve));
-let remaining=0,phase='normal',target='response',firstBody,matchDeliveryId,selectedTests=[];
+let remaining=0,phase='normal',target='response',firstBody,matchDeliveryId,selectedTests=[],closureIds=[],closureGated=new Set();
 const held=new Map();
 const proxy=createServer((incoming,outgoing)=>{
  const path=new URL(incoming.url,'http://localhost').pathname;
  const responseWrite=incoming.method==='PUT'&&/^\/test\/[^/]+\/unit\/[^/]+\/response$/.test(path);
+ const testNumber=path.split('/')[2],offlineAtStart=responseWrite&&target==='stars-offline'&&selectedTests.includes(testNumber);
+ const closureGate=responseWrite&&target==='stars-closure'&&selectedTests.includes(testNumber)&&closureIds.includes(incoming.headers['x-native-delivery-id'])?{key:phase+':'+testNumber,seen:closureGated}:undefined;
  const testRead=incoming.method==='GET'&&/^\/test\/[^/]+$/.test(path);
  const sessionRead=incoming.method==='GET'&&path==='/session';
  const commandAck=incoming.method==='PATCH'&&/^\/test\/[^/]+\/command\/[^/]+\/executed$/.test(path);
@@ -66,7 +68,8 @@ const proxy=createServer((incoming,outgoing)=>{
    if(tooLarge)return;
    trace('body-end');
    const body=Buffer.concat(chunks);record.body=body.toString('utf8');
-   if(responseWrite&&target==='stars-offline'&&selectedTests.includes(path.split('/')[2])){fail();return;}
+   if(offlineAtStart){fail();return;}
+   if(closureGate&&!closureGate.seen.has(testNumber)){closureGate.seen.add(testNumber);hold(closureGate.key,()=>forward(body));return;}
    if(responseWrite&&target==='stars-interrupted'&&selectedTests.includes(path.split('/')[2])&&JSON.parse(record.body).dataParts?.ownedRecovery?.startsWith('nativeInterrupted:')){if(remaining===0){fail();return;}remaining--;}
    if(testStateWrite&&target==='startup-worker-state'&&incoming.headers['x-native-delivery-id']===matchDeliveryId){hold(record.phase,()=>forward(body));return;}
    if(testStateWrite&&target==='test-state-lost-ack'||testLogWrite&&(target==='test-log-lost-ack'||target==='terminal-log-lost-ack')){
@@ -96,7 +99,7 @@ const proxy=createServer((incoming,outgoing)=>{
  forward();
 });
 process.on('message',message=>{
- if(message?.nativeFault){phase=message.nativeFault.phase;remaining=message.nativeFault.failures;target=message.nativeFault.target??'response';matchDeliveryId=message.nativeFault.matchDeliveryId;selectedTests=message.nativeFault.testIds??[];firstBody=undefined;process.send?.({faultReady:phase});}
+ if(message?.nativeFault){phase=message.nativeFault.phase;remaining=message.nativeFault.failures;target=message.nativeFault.target??'response';matchDeliveryId=message.nativeFault.matchDeliveryId;selectedTests=message.nativeFault.testIds??[];closureIds=message.nativeFault.closureIds??[];closureGated=new Set();firstBody=undefined;process.send?.({faultReady:phase});}
  if(message?.nativeRelease){const value=held.get(message.nativeRelease);held.delete(message.nativeRelease);value?.forward();process.send?.({nativeReleased:message.nativeRelease,released:!!value});}
 });
 proxy.listen(0,'127.0.0.1',()=>process.send?.({port:proxy.address().port}));

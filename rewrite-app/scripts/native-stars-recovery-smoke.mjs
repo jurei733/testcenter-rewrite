@@ -18,7 +18,16 @@ export async function prepareNativeStarsFixture({services,tenantKey,app}){
  }
  for(const kind of ['player','definition','metadata','unit','booklet'])await services.contentIntake.uploadWorkspaceFile({...scope,fileName:basename(source[kind].sourcePath),sourceDocument:documents[kind],mediaType:kind==='player'?'text/html':kind==='definition'||kind==='metadata'?'application/json':'application/xml'});
  const imported=await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:documents.roster});
- return {source,hashes,scope,imported,fixturePaths:[corpusPath,manifestPath,...Object.values(source).filter(value=>value?.fixture).map(value=>'test-fixtures/original-testcenter/'+value.fixture)]};
+ // A separate operational fixture leaves the pinned official participant XML
+ // and its four imported participant records unchanged.
+ assert.match(documents.roster,/<Group id="group1" label="Group-1">/);
+ const observer={name:'owned-stars-monitor',password:'Owned STARS closure control',groupKey:'group1'};
+ const observerXml=`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Profiles><GroupMonitor><Profile id="full" label="Owned STARS observer" view="full"/></GroupMonitor></Profiles><Group id="group1" label="Group-1"><Login name="${observer.name}" pw="${observer.password}" mode="monitor-group"><Profile id="full"/></Login></Group></Testtakers>`;
+ const before=(await services.workspaceAdminRead.listParticipantRoster(scope)).items;
+ await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:observerXml});
+ assert.deepEqual((await services.workspaceAdminRead.listParticipantRoster(scope)).items,before,'Operational observer must not alter official participant records');
+ observer.rosterSha256=createHash('sha256').update(observerXml).digest('hex');
+ return {source,hashes,scope,imported,observer,fixturePaths:[corpusPath,manifestPath,...Object.values(source).filter(value=>value?.fixture).map(value=>'test-fixtures/original-testcenter/'+value.fixture)]};
 }
 
 export async function runNativeStarsRecoverySmoke({browser,base,out,mark,fixture,responseReceipts,configure}){
