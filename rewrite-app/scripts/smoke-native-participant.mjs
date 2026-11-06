@@ -34,6 +34,7 @@ for(const name of ['original-unit','original-unit-record','original-unit-collect
 qualificationFiles.push('apps/api/src/original-test-http.ts','apps/api/dist/apps/api/src/original-test-http.js');
 qualificationFiles.push('scripts/native-stars-closure-smoke.mjs','scripts/run-native-stars-closure-smoke.mjs');
 qualificationFiles.push('scripts/native-geogebra-smoke.mjs','scripts/run-native-geogebra-smoke.mjs','scripts/original-resource-package.test.mjs');
+qualificationFiles.push('scripts/native-resource-upload-smoke.mjs');
 qualificationFiles.push('apps/api/src/original-resource-delivery.ts','apps/api/dist/apps/api/src/original-resource-delivery.js');
 qualificationFiles.push('scripts/original-resource-delivery.test.mjs');
 for(const name of ['original-resource-package','original-test-files','original-test-files.test','workspace-file-catalog','workspace-file-catalog.test'])qualificationFiles.push(`packages/application/src/${name}.ts`,`packages/application/dist/packages/application/src/${name}.js`);

@@ -3,6 +3,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {join,basename,dirname} from 'node:path';
 import {brotliDecompressSync,inflateRawSync} from 'node:zlib';
+import {runNativeResourceUploadSmoke} from './native-resource-upload-smoke.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
@@ -90,13 +91,24 @@ export async function prepareNativeGeoGebraFixture({services,tenantKey,app,passw
   const scope={tenantKey,workspaceKey:workspace.workspaceKey};
   const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType});
   await upload('iqb-player-aspect-2.12.6.html',player.toString('utf8'),'text/html');
-  const resource=await upload('GeoGebra.itcr.zip','data:application/zip;base64,'+runtime.toString('base64'),'application/zip');
-  assert.equal(resource.sourcePackage.status,'accepted');
+  // Leave the archive absent until the real administration browser uploads it.
   await upload('geometry.xml',xml('Unit','<Metadata><Id>NATIVE.GEOMETRY</Id><Label>Native GeoGebra</Label></Metadata><Definition player="iqb-player-aspect@2.12"><![CDATA['+document+']]></Definition>'));
   await upload('geometry-large.xml',xml('Unit','<Metadata><Id>NATIVE.GEOMETRY.LARGE</Id><Label>Native GeoGebra large</Label></Metadata><Definition player="iqb-player-aspect@2.12"><![CDATA['+largeDocument+']]></Definition>'));
   await upload('geometry-booklet.xml',xml('Booklet','<Metadata><Id>NATIVE.GEOGEBRA</Id><Label>Native GeoGebra recovery</Label></Metadata><Units><Unit id="NATIVE.GEOMETRY" alias="1" label="Geometry one"/><Unit id="NATIVE.GEOMETRY.LARGE" alias="2" label="Geometry two"/></Units>'));
   await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="Owned.Geometry" label="Owned geometry"><Login name="native-geogebra" pw="'+password+'" mode="run-hot-return"><Booklet>NATIVE.GEOGEBRA</Booklet></Login></Group>')});
+  const bootstrap={username:'native-geometry-root',password:'Owned geometry bootstrap password-1!'};
+  await services.adminAuth.bootstrapAdminUser(bootstrap);
+  const rootSession=(await services.adminAuth.signIn(bootstrap)).adminSession.token;
+  const operators={};
+  for(const [key,accessMode]of [['writer','read_write'],['reader','read_only']]){
+    const initial={username:'native-geometry-'+key,password:'Owned geometry '+key+' initial password-1!'};
+    await services.adminDirectory.createAdminUser({...initial,sessionToken:rootSession,roleAssignments:[{role:'workspace_admin',...scope,accessMode}]});
+    const session=(await services.adminAuth.signIn(initial)).adminSession.token;
+    const password='Owned geometry '+key+' changed password-2!';
+    await services.adminAuth.changeOwnPassword({sessionToken:session,password});operators[key]={username:initial.username,password};
+  }
   return {scope,manifest,definitionSha256:hash(document),largeDefinitionSha256:hash(largeDocument),login:'native-geogebra',password,
+    resourceUpload:{bytes:runtime,...operators},
     fixturePaths:['test-fixtures/original-testcenter/native-geogebra/manifest.json','test-fixtures/original-testcenter/native-geogebra/geogebra.base64',
       'test-fixtures/original-testcenter/native-geogebra/web3d.nocache.js.base64',
       'test-fixtures/original-testcenter/'+source.playerFixture,'test-fixtures/original-testcenter/'+source.definitionFixture]};
@@ -153,6 +165,8 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
   };
   let testId;
   try {
+    await configure('native-geogebra-administration',0);
+    await runNativeResourceUploadSmoke({browser,base,out,fixture,mark});
     await configure('native-geogebra',0);
     await page.goto(base+'/app/native-start?ui=original');
     await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill(fixture.login);await page.locator('[data-cy=login-user]').click();
