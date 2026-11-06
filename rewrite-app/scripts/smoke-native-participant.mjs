@@ -38,6 +38,7 @@ qualificationFiles.push('scripts/native-geogebra-smoke.mjs','scripts/run-native-
 qualificationFiles.push('scripts/native-resource-upload-smoke.mjs');
 qualificationFiles.push('scripts/run-native-workspace-zip-smoke.mjs','scripts/native-workspace-zip-smoke.mjs','scripts/workspace-zip-fixture.mjs','scripts/original-workspace-archive.test.mjs','packages/application/src/original-workspace-archive.ts','packages/application/dist/packages/application/src/original-workspace-archive.js');
 qualificationFiles.push(...await collect('test-fixtures/original-testcenter/source-workspace-results/native-workspace-zip-http'));
+qualificationFiles.push(...await collect('test-fixtures/original-testcenter/source-workspace-results/native-workspace-zip-reports-http'));
 qualificationFiles.push('apps/api/src/original-resource-delivery.ts','apps/api/dist/apps/api/src/original-resource-delivery.js');
 qualificationFiles.push('scripts/original-resource-delivery.test.mjs');
 for(const name of ['original-resource-package','original-test-files','original-test-files.test','workspace-file-catalog','workspace-file-catalog.test'])qualificationFiles.push(`packages/application/src/${name}.ts`,`packages/application/dist/packages/application/src/${name}.js`);

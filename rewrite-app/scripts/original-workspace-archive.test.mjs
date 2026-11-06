@@ -96,6 +96,22 @@ for(const kind of kinds)test(kind+': ordinary native ZIPs materialize physical f
       assert.equal(long.archiveReport.entries.find(row=>row.status==='rejected').errorCode,'source_package_file_name_too_long');
       assert.ok((await catalog(owner)).items.some(row=>row.fileName==='Resource/short.txt'));
     });
+    await t.test('actual Source per-member upload reports retain errors, warnings and information at the native validation phase',async()=>{
+      const reportRoot=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-workspace-zip-reports-http/',import.meta.url);
+      const oracle=JSON.parse(await readFile(new URL('observations.json',reportRoot))),manifest=JSON.parse(await readFile(new URL('manifest.json',reportRoot)));
+      assert.equal(oracle.verified,true);assert.equal(oracle.sourceFilesVerifiedBeforeAndAfter,137);assert.equal(oracle.vendor.installedPackages,19);
+      for(const [path,expected]of Object.entries(manifest.files))assert.equal(hash(await readFile(new URL(path,reportRoot))),expected,path);
+      const owners={full:await prepare('reports-full'),metadata:await prepare('reports-metadata'),errors:await prepare('reports-errors'),duplicates:await prepare('reports-duplicates'),deprecated:await prepare('reports-deprecated')};
+      for(const [label,key]of [['complete-warnings','full'],['replace-unit','full'],['replace-player','full'],['metadata-forms','metadata'],['missing-dependencies','errors'],['duplicate-ids','duplicates'],['deprecated-unit','deprecated']]){
+        const archive=Buffer.from(await readFile(new URL(label+'.zip.base64',reportRoot),'utf8'),'base64');
+        const result=await services.contentIntake.uploadWorkspaceFile({...owners[key].scope,fileName:label+'.zip',mediaType:'application/zip',sourceDocument:'data:application/zip;base64,'+archive.toString('base64')});
+        const expected=oracle.rows.find(row=>row.label===label);
+        assert.equal(result.archiveReport.rejectedCount>0,expected.status===207,label);
+        const actual=Object.fromEntries(result.archiveReport.entries.map(row=>[label+'.zip_Extract/'+row.entryName,row.validationReport??{}]));
+        const wanted=Object.fromEntries(Object.entries(expected.value).map(([path,report])=>[path,Array.isArray(report)?{}:report]));
+        assert.deepEqual(actual,wanted,label);
+      }
+    });
     await t.test('member provenance, active files and saved native state survive reopening',async()=>{
       const before=await catalog(own);await reopen();assert.deepEqual(await catalog(own),before);assert.deepEqual((await services.originalUnit.read(request)).dataParts,saved.dataParts);
       const events=await repository.listWorkspaceActivityEventsByWorkspace(tenant.tenantId,own.workspace.workspaceId);assert.ok(events.some(event=>event.details.archiveFileName==='overwrite-same-id.zip'&&event.details.archiveEntryName==='unit.xml'&&event.details.replacementMode==='workspace_file'));

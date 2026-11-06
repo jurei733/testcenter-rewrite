@@ -7,7 +7,7 @@ export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; works
 export type OriginalWorkspaceFilesTransport = <T>(method:string,path:string,body:unknown,token:string)=>Promise<T>;
 export type OriginalWorkspaceFile = WorkspaceCatalogFile & {name:string; isChecked:boolean};
 export type OriginalWorkspaceUpload = {name:string; type:string; read:()=>Promise<string>};
-export type OriginalWorkspaceUploadResult = {name:string; status:'queued'|'uploading'|'completed'|'error'; message:string;archiveEntries?:WorkspaceArchiveUploadReport['entries']};
+export type OriginalWorkspaceUploadResult = {name:string; status:'queued'|'uploading'|'completed'|'error'; message:string;publicationProblem?:string;archiveEntries?:WorkspaceArchiveUploadReport['entries']};
 type Owner = {epoch:number; token:string; tenantKey:string; workspaceKey:string};
 const sameScope = (a:Owner,b:OriginalWorkspaceFilesScope):boolean =>
   a.token===b.token && a.tenantKey===b.tenantKey && a.workspaceKey===b.workspaceKey;
@@ -140,10 +140,11 @@ export class OriginalWorkspaceFilesController {
           if(result.archiveReport){
             const report=result.archiveReport;
             const availability=result.workspaceAvailability?.status;
-            row.status=report.rejectedCount||availability==='failed'||availability==='conflict'?'error':'completed';row.archiveEntries=report.entries;
+            row.status=report.rejectedCount||availability==='failed'||availability==='conflict'?'error':'completed';row.archiveEntries=[...report.entries].sort((a,b)=>a.entryName<b.entryName?-1:a.entryName>b.entryName?1:0);
             row.message=`${report.importedCount+report.replacedCount} Datei${report.importedCount+report.replacedCount===1?'':'en'} importiert, ${report.rejectedCount} abgewiesen.`;
-            if(availability==='failed')row.message+=' Die Bereitstellung für Teilnehmende ist fehlgeschlagen.';
-            if(availability==='conflict')row.message+=' Gleichzeitige Änderungen haben die Bereitstellung verhindert.';
+            if(availability==='failed')row.publicationProblem='Die Bereitstellung für Teilnehmende ist fehlgeschlagen.';
+            if(availability==='conflict')row.publicationProblem='Gleichzeitige Änderungen haben die Bereitstellung verhindert.';
+            if(row.publicationProblem)row.message+=' '+row.publicationProblem;
             this.changed();continue;
           }
           const availability=result.workspaceAvailability?.status;

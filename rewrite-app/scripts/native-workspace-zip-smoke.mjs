@@ -54,9 +54,16 @@ export async function runNativeWorkspaceZipSmoke({browser, base, out, fixture, m
     assert.equal((await writer.catalog()).totalCount,0,'No assessment file was seeded in the root ZIP workspace');
     const result = await upload(page,'native-assessment.zip',fixture.rootArchive.bytes,201);
     assert.equal(result,null);
-    assert.match(await page.locator('[data-cy=upload-report]').innerText(),/6 Dateien importiert, 0 abgewiesen/);
-    assert.equal(await page.locator('[data-cy=archive-upload-report] h3').count(),6);
+    assert.deepEqual(await page.locator('[data-cy=archive-upload-report] .subheading-2').allTextContents().then(rows=>rows.map(value=>value.trim())),fixture.rootArchive.entries.map(([path])=>'native-assessment.zip_Extract/'+path+' - Erfolgreich hochgeladen').sort());
+    assert.equal(await page.locator('[data-cy=archive-upload-report] .subheading-2').count(),6);
     assert.equal(await page.locator('[data-cy=upload-report] .subheading-2.error').count(),0);
+    assert.match(await page.locator('[data-cy=archive-upload-report]').innerText(),/Contains 484 files\./);
+    assert.match(await page.locator('[data-cy=archive-upload-report]').innerText(),/Verona-Version:/);
+    assert.ok(await page.locator('[data-cy=archive-upload-report] .alert-info').count()>=2);
+    assert.ok(await page.locator('[data-cy=archive-upload-report] .alert-warning').count()>=4);
+    await page.mouse.move(1180,80);await page.getByRole('tooltip').waitFor({state:'hidden'});
+    await page.locator('[data-cy=upload-report]').scrollIntoViewIfNeeded();
+    await page.screenshot({path:join(out,'native-root-zip-complete-report.png'),fullPage:true});
     await page.locator('[data-cy=close-upload-report]').click();
     const published = await writer.catalog(); assert.equal(published.totalCount,6);
     assert.ok(published.items.every(file=>file.fileType!=='Package'));
@@ -75,8 +82,10 @@ export async function runNativeWorkspaceZipSmoke({browser, base, out, fixture, m
       ['geometry.xml',fixture.rootArchive.entries.find(([name])=>name.endsWith('/geometry.xml'))[1].toString().replace('NATIVE.GEOMETRY','OTHER.GEOMETRY')]]);
     const partial = await upload(page,'partial.zip',partialBytes,207);
     assert.equal(partial.archiveReport.importedCount,2); assert.equal(partial.archiveReport.rejectedCount,2);
-    assert.equal(await page.locator('[data-cy=archive-upload-report] h3').count(),4);
-    assert.equal(await page.locator('[data-cy=upload-report] .subheading-2.error').count(),1);
+    assert.deepEqual(partial.archiveReport.entries.find(row=>row.fileName==='bad.xml').validationReport,{warning:['Unit is never used'],error:['File has no link to XSD-schema. Expected a schema URL like `https://w3id.org/iqb/spec/unit-xml/<version>` with major version 17 to 17.']});
+    assert.match(partial.archiveReport.entries.find(row=>row.fileName==='geometry.xml').validationReport.error[0],/^File of name `geometry\.xml`/);
+    assert.equal(await page.locator('[data-cy=archive-upload-report] .subheading-2').count(),4);
+    assert.equal(await page.locator('[data-cy=upload-report] .subheading-2.error').count(),2);
     assert.equal(await page.locator('[data-cy=archive-upload-report] .alert-error').count(),2);
     await page.mouse.move(1180,80);await page.getByRole('tooltip').waitFor({state:'hidden'});
     await page.locator('[data-cy=upload-report]').scrollIntoViewIfNeeded();
@@ -100,7 +109,7 @@ export async function runNativeWorkspaceZipSmoke({browser, base, out, fixture, m
     assert.deepEqual(await writer.catalog(),current); assert.deepEqual(errors,[]);
     mark('root-ZIP-upload-denies-readonly-anonymous-and-foreign-workspace-writers');
     await writeFile(join(out,'native-root-zip-browser-upload.json'),JSON.stringify({success:true,actualFileReader:true,actualProtectedHttp:true,
-      noAssessmentFilesSeeded:true,noVisibleRootContainer:true,largeResponseObservedThroughActualUI:true,allFiles:downloads,partial:partial.archiveReport,invalidStatus:400,
+      noAssessmentFilesSeeded:true,noVisibleRootContainer:true,largeResponseObservedThroughActualUI:true,nativeWarningAndInfoChannelsRendered:true,originalMissingSchemaAndOverwriteReportsVerified:true,nativeSourceHeadingsAndLexicalUiOrderVerified:true,allFiles:downloads,partial:partial.archiveReport,invalidStatus:400,
       readOnlyStatus:403,anonymousStatus:401,foreignWorkspaceStatus:403,originalPublicationPreserved:true,wire,errors},null,2));
   } catch(error) {
     await page?.screenshot({path:join(out,'native-root-zip-failure.png'),fullPage:true}).catch(()=>{});

@@ -133,8 +133,10 @@ for(const availability of ['available','failed','conflict'])test('root ZIP repor
  const report={fileName:'root.zip',sha256:'owned',importedCount:1,replacedCount:0,rejectedCount:1,entries};
  const f=fixture(call=>call.method==='POST'?{sourcePackage:null,archiveReport:report,workspaceAvailability:{status:availability}}:normal(call));
  await f.controller.connect();await f.controller.upload([{name:'root.zip',type:'application/zip',read:async()=>'data:application/zip;base64,owned'}]);
- assert.equal(f.controller.uploads[0].status,'error');assert.deepEqual(f.controller.uploads[0].archiveEntries,entries);
+ assert.equal(f.controller.uploads[0].status,'error');assert.deepEqual(f.controller.uploads[0].archiveEntries,[entries[1],entries[0]]);
+ assert.deepEqual(entries.map(row=>row.entryName),['nested/good.txt','bad.xml'],'Server report order remains untouched');
  assert.match(f.controller.uploads[0].message,/1 Datei importiert, 1 abgewiesen/);
- if(availability!=='available')assert.match(f.controller.uploads[0].message,/Bereitstellung/);
+ if(availability!=='available'){assert.match(f.controller.uploads[0].message,/Bereitstellung/);assert.match(f.controller.uploads[0].publicationProblem,/Bereitstellung/);}
+ else assert.equal(f.controller.uploads[0].publicationProblem,undefined);
  assert.equal(f.controller.files.length,1);assert.equal(f.controller.problem,'');
 });

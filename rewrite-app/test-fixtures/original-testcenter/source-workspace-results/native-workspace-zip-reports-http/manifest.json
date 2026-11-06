@@ -1,0 +1,23 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceRuntimeFilesVerifiedBeforeAndAfter": 137,
+  "composerPackages": 19,
+  "scope": "Actual protected Source HTTP upload reports, seven ZIP uploads across five owned workspaces; includes current/legacy/context metadata, missingreferences/schema, duplicateIDs, overwrite, seven repeated deprecatedDependency warnings with aggregation and actual attachmentcountinfo. StrictXSD/testmodefalse,137runtimefiles/19vendorpackages rechecked. Six separate actualSourceFolderreaddir probes on/tmpandownedDatavolume show stableleftwinnerforoneambiguouscase; globalorder andwinnercontract remain unqualified, nofixture-specific rank.",
+  "files": {
+    "missing-dependencies.zip.base64": "5ee2e132ad1f0cc0292d562e729a46ac141df462361c63755a83dcd43e5a799f",
+    "deprecated-unit.zip.base64": "37be60c2cae455625275de4cbbee9227bfa98c0c2cbcaf3195161cdc58045663",
+    "ordering.json": "9a5b493cfa44e066e8fa04fdf52ee375a492c03d3cd9cf7846cc07d903a41776",
+    "capture.mjs": "30a8a836a0c84243649e80c102d2385d9ebb95b186c312988548ca877be518de",
+    "duplicate-ids.zip.base64": "47df08e9e2428a3b500fa57a060908afe4ed927697981c3b76c45fa366238c54",
+    "ordering.zip.base64": "9eee20676c2b32df1ecb7220ffc5a9aa88c2d2cd5b650e801f2c3040cb82ce38",
+    "ordering-capture.mjs": "59fed4107e647aa23dbaafc33aef25a44228d41929cc9414ace2b525931cedba",
+    "inputs.json": "8a9e8a3c61cf43a7d30889e0f89344e21deeab2b31b4c66e6f0fbc3ca19ec093",
+    "observations.json": "b52422862fa3801b53d2acd94c930809b44f07958ac4eed89091a10c86b2e4d0",
+    "complete-warnings.zip.base64": "6cc23f3e254958fd196c31350ff258c2b2adebb553fb2987edbfb6f3cfce24c9",
+    "replace-player.zip.base64": "b7900d4a74dd221a7155e15dcad6ad9bbf932b1d336af7f0bca564f68d5c2190",
+    "replace-unit.zip.base64": "e6a095ef38994181204b044408bf4ac83c48c11ec08e98b50e45dd87c76b2cf9",
+    "metadata-forms.zip.base64": "6c03afd21f972b53a2a58543d4e61d09ad4b20dbe526cd16f6cab2d781126156"
+  },
+  "isolatedLoginAndGroupNamesPerCapture": true
+}

@@ -39,6 +39,7 @@ export const sourcePackageStatuses = [
   "accepted",
   "rejected"
 ] as const satisfies readonly SourcePackageStatus[];
+export type WorkspaceFileValidationReport={error?:string[];warning?:string[];info?:string[]};
 export type WorkspaceArchiveUploadReport = {
   fileName:string;
   sha256:string;
@@ -52,6 +53,7 @@ export type WorkspaceArchiveUploadReport = {
     sourcePackageId:string|null;
     message:string;
     errorCode?:string;
+    validationReport?:WorkspaceFileValidationReport;
   }>;
 };
 

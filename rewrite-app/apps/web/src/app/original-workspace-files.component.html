@@ -190,23 +190,42 @@
         <mat-card-header><mat-card-title>Upload-Report</mat-card-title></mat-card-header>
         <mat-card-content data-cy="upload-report">
           @for (upload of controller.uploads; track $index) {
-            <h2 class="subheading-2" [class.success]="upload.status === 'completed'"
-              [class.error]="upload.status === 'error'">{{upload.name}}</h2>
-            @if (upload.status === 'uploading' || upload.status === 'queued') {
-              <mat-progress-bar mode="indeterminate" />
-            } @else {
-              <app-original-workspace-file-notice
-                [level]="upload.status === 'error' ? 'error' : 'success'"
-                [text]="upload.message" />
-              @if (upload.archiveEntries) {
-                <section data-cy="archive-upload-report">
-                  @for (entry of upload.archiveEntries; track entry.entryName) {
-                    <h3>{{entry.entryName}}</h3>
+            @if (upload.archiveEntries) {
+              <section data-cy="archive-upload-report">
+                @for (entry of upload.archiveEntries; track entry.entryName) {
+                  <div class="subheading-2" [class.error]="entry.status === 'rejected'"
+                    [class.success]="entry.status !== 'rejected'">
+                    {{upload.name}}_Extract/{{entry.entryName}} - {{entry.status === 'rejected' ? 'Abgelehnt' : 'Erfolgreich hochgeladen'}}
+                  </div>
+                  @if (entry.validationReport) {
+                    @for (message of entry.validationReport.error ?? []; track $index) {
+                      <app-original-workspace-file-notice level="error" [text]="message" />
+                    }
+                    @for (message of entry.validationReport.info ?? []; track $index) {
+                      <app-original-workspace-file-notice level="info" [text]="message" />
+                    }
+                    @for (message of entry.validationReport.warning ?? []; track $index) {
+                      <app-original-workspace-file-notice level="warning" [text]="message" />
+                    }
+                  } @else {
                     <app-original-workspace-file-notice
                       [level]="entry.status === 'rejected' ? 'error' : entry.status === 'replaced' ? 'warning' : 'success'"
                       [text]="entry.message" />
                   }
-                </section>
+                }
+              </section>
+              @if (upload.publicationProblem) {
+                <app-original-workspace-file-notice level="error" [text]="upload.publicationProblem" />
+              }
+            } @else {
+              <h2 class="subheading-2" [class.success]="upload.status === 'completed'"
+                [class.error]="upload.status === 'error'">{{upload.name}}</h2>
+              @if (upload.status === 'uploading' || upload.status === 'queued') {
+                <mat-progress-bar mode="indeterminate" />
+              } @else {
+                <app-original-workspace-file-notice
+                  [level]="upload.status === 'error' ? 'error' : 'success'"
+                  [text]="upload.message" />
               }
             }
           }

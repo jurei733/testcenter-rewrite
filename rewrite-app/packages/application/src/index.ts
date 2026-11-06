@@ -1,3 +1,4 @@
+import {readWorkspaceFileReport,appendWorkspaceFileReport,workspaceFileReportErrors} from './original-workspace-file-report.js';
 import {createOriginalWorkspaceArchives,assertWorkspaceUploadName,applyWorkspaceArchiveTimestamps,type WorkspaceArchiveOrigin} from './original-workspace-archive.js';
 import {originalResourceMediaType} from './original-resource-media-type.js';
 import type {WorkspaceArchiveUploadReport} from '@testcenter-rewrite-app/domain';
@@ -27434,18 +27435,36 @@ export const createFirstSliceServices = (
       const fileName=member.entryName.split('/').at(-1)!,mediaType=originalResourceMediaType(fileName);
       const probe:SourcePackage={...archive,sourcePackageId:'unpersisted-member-'+index,fileName:/\.zip$/i.test(fileName)&&!/\.itcr\.zip$/i.test(fileName)?'Resource/'+fileName:fileName,
         mediaType,sourceDocument:'data:'+mediaType+';base64,'+member.bytes.toString('base64')};
-      const kind=projectWorkspaceFile(probe).fileType;
-      const order=kind==='Resource'?0:kind==='Unit'?1:kind==='Booklet'?2:kind==='Testtakers'?3:kind==='SysCheck'?4:5;
-      return{...member,index,fileName,mediaType,sourceDocument:probe.sourceDocument!,order};
+      const projected=projectWorkspaceFile(probe),kind=projected.fileType;
+      const order=/\.xml$/i.test(fileName)&&!['Unit','Booklet','Testtakers','SysCheck'].includes(kind)?5:kind==='Resource'?0:kind==='Unit'?1:kind==='Booklet'?2:kind==='Testtakers'?3:kind==='SysCheck'?4:5;
+      return{...member,index,fileName,mediaType,sourceDocument:probe.sourceDocument!,order,projected};
     }).sort((a,b)=>a.order-b.order||a.index-b.index);
+    // Original validates Resource+Unit as a category before Booklet and roster.
+    // Its upload-time unused warnings describe that cache, not the final graph.
+    const [initialSources,initialEvents]=await Promise.all([repository.listSourcePackagesByWorkspace(workspace.tenantId,workspace.workspaceId),repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId,workspace.workspaceId)]);
+    const categoryInputs=selectCurrentWorkspaceFiles(initialSources,initialEvents).filter(value=>value.status!=='rejected').map(projectWorkspaceFile)
+      .filter(value=>value.fileType==='Resource'||candidates.some(member=>member.order===1)&&value.fileType==='Unit');
+    const categoryByName=new Map(categoryInputs.map(file=>[file.fileType+'/'+file.fileName.split('/').at(-1),file]));
+    for(const member of candidates.filter(value=>value.order<=1))categoryByName.set(member.projected.fileType+'/'+member.fileName,member.projected);
+    const categoryCatalog=buildWorkspaceFileCatalog([...categoryByName.values()]),categoryFiles=new Map(categoryCatalog.items.map(file=>[file.sourcePackageId,file]));
+    const usedResourceIds=new Set<string>();
+    if(candidates.some(member=>member.order===1))for(const file of categoryCatalog.items.filter(value=>value.fileType==='Unit'))for(const relation of file.dependencies){
+      const target=categoryFiles.get(relation.sourcePackageId);if(target?.fileType==='Resource')usedResourceIds.add((relation.relationship==='usesPlayer'?target.fileName.split('/').at(-1)!:target.metadata.identifier).replace(/[a-z]/g,letter=>letter.toUpperCase()));
+    }
+    const finalResourceCandidate=new Map(candidates.filter(member=>member.order===0).map(member=>[workspaceFileReplacementIdentity(member.projected).identifier,member]));
     for(const member of candidates){
       const origin:WorkspaceArchiveOrigin={archiveFileName:input.fileName,archiveSha256:report.sha256,archiveEntryName:member.entryName,...(member.modifiedAt?{archiveEntryModifiedAt:member.modifiedAt}:{})};
+      const identity=workspaceFileReplacementIdentity(member.projected);
+      const unused=member.order===1||member.order===2||member.order===0&&finalResourceCandidate.get(identity.identifier)===member&&!usedResourceIds.has(identity.identifier);
+      const validationReport=readWorkspaceFileReport(member.projected,{unused,...(/\.itcr\.zip$/i.test(member.fileName)?{archiveEntries:readZipEntries(member.bytes,10_000)?.length}:{})});
       try{
         const result=await uploadPhysicalWorkspaceFile({...input,fileName:member.fileName,mediaType:member.mediaType,sourceDocument:member.sourceDocument},origin);
         const failed=result.importJob?.status==='failed';
         const messages=result.importJob?.diagnostics.filter(d=>d.severity==='error').map(d=>d.message)??[];
         const status=failed?'rejected':result.replacedSourcePackageId?'replaced':'imported';
-        report.entries.push({entryName:member.entryName,fileName:member.fileName,status,sourcePackageId:result.sourcePackage.sourcePackageId,
+        if(failed)for(const message of messages)appendWorkspaceFileReport(validationReport,'error',message);
+        if(status==='replaced')appendWorkspaceFileReport(validationReport,'warning',`File of name \`${member.fileName}\` did already exist and was overwritten.`);
+        report.entries.push({entryName:member.entryName,fileName:member.fileName,status,validationReport,sourcePackageId:result.sourcePackage.sourcePackageId,
           message:failed?messages.join('\n')||'Import fehlgeschlagen.':status==='replaced'?'Datei aktualisiert.':'Datei hochgeladen.',...(failed?{errorCode:'workspace_archive_member_import_failed'}:{})});
         if(status==='rejected')report.rejectedCount++;else if(status==='replaced')report.replacedCount++;else report.importedCount++;
       }catch(error){
@@ -27453,9 +27472,14 @@ export const createFirstSliceServices = (
         // optimistic-concurrency failures remain request failures.
         if(!(error instanceof FirstSliceError)||![400,409,413,422].includes(error.statusCode)||
           ['workspace_file_upload_conflict','source_package_replacement_conflict','workspace_file_replacement_conflict'].includes(error.errorCode))throw error;
-        const diagnostics=error.details&&typeof error.details==='object'&&'diagnostics'in error.details&&Array.isArray(error.details.diagnostics)
-          ?error.details.diagnostics.filter((d:unknown):d is {severity:'error';message:string}=>!!d&&typeof d==='object'&&'severity'in d&&d.severity==='error'&&'message'in d&&typeof d.message==='string').map(d=>d.message):[];
-        report.entries.push({entryName:member.entryName,fileName:member.fileName,status:'rejected',sourcePackageId:null,message:diagnostics.join('\n')||error.message,errorCode:error.errorCode});report.rejectedCount++;
+        const diagnostics=workspaceFileReportErrors(member.projected,error);
+        if(error.errorCode==='workspace_file_identifier_duplicate'){
+          const id=error.details&&typeof error.details==='object'&&'conflictingSourcePackageId'in error.details?error.details.conflictingSourcePackageId:null;
+          const duplicate=typeof id==='string'?await repository.getSourcePackageById(id):null;
+          if(duplicate)diagnostics.splice(0,diagnostics.length,`Duplicate ${member.projected.fileType}-Id: \`${identity.identifier}\` (${duplicate.fileName.split('/').at(-1)})`);
+        }
+        for(const message of diagnostics)appendWorkspaceFileReport(validationReport,'error',message);
+        report.entries.push({entryName:member.entryName,fileName:member.fileName,status:'rejected',validationReport,sourcePackageId:null,message:diagnostics.join('\n')||error.message,errorCode:error.errorCode});report.rejectedCount++;
       }
     }
     return{sourcePackage:null,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null,archiveReport:report,
