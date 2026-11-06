@@ -4,12 +4,14 @@ import {buildWorkspaceFileCatalog,selectCurrentWorkspaceFiles,type WorkspaceCata
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {originalResourceMediaType} from './original-resource-media-type.js';
+import {originalResourcePackagePrefix} from './original-resource-package.js';
 import {createWorkspaceFilePublicationRevision} from './workspace-file-publication.js';
 import {DOMParser,type Element} from '@xmldom/xmldom';
 import {normalizeWorkspacePlayerResourceId} from './workspace-file-catalog.js';
 type Scope={tenantId:string;workspaceId:string};
 export type OriginalBookletFiles={xml:string;resources:Record<string,Record<string,string[]>>};
-export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;project:(source:SourcePackage)=>WorkspaceCatalogInput;decode:(source:SourcePackage)=>{bytes:Uint8Array}|null}){
+export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;project:(source:SourcePackage)=>WorkspaceCatalogInput;decode:(source:SourcePackage)=>{bytes:Uint8Array}|null;
+ readPackage:(source:SourcePackage,path:string)=>Uint8Array|null}){
  const cache=new Map<string,{revision:string;catalog:WorkspaceFileCatalog;bytes:number}>();let retainedBytes=0;
  const current=async(scope:Scope)=>{
   const[sources,events]=await Promise.all([deps.repository.listSourcePackagesByWorkspace(scope.tenantId,scope.workspaceId),deps.repository.listWorkspaceActivityEventsByWorkspace(scope.tenantId,scope.workspaceId)]);
@@ -82,8 +84,16 @@ export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;pr
    if(!path.startsWith('Resource/'))throw new FirstSliceError(403,'original_resource_forbidden',`Access to file \`${path}\` not allowed with group-token.`);
    const segments=path.split('/');if(segments.some(part=>!part||part==='.'||part==='..')||/[\\\u0000-\u001f\u007f]/.test(path))throw new FirstSliceError(404,'original_resource_unavailable',`File not found: \`${path}\``);
    const[sources,events]=await Promise.all([deps.repository.listSourcePackagesByWorkspace(scope.tenantId,scope.workspaceId),deps.repository.listWorkspaceActivityEventsByWorkspace(scope.tenantId,scope.workspaceId)]);
-   const matches=selectCurrentWorkspaceFiles(sources,events).filter(row=>row.status!=='rejected'&&row.fileName===path);
-   if(matches.length!==1)throw new FirstSliceError(404,'original_resource_unavailable',`File not found: \`${path}\``);const decoded=deps.decode(matches[0]!);
+   const current=selectCurrentWorkspaceFiles(sources,events).filter(row=>row.status!=='rejected'&&row.fileName.startsWith('Resource/'));
+   const matches=current.filter(row=>row.fileName===path);
+   const packages=current.filter(row=>/\.itcr\.zip$/i.test(row.fileName)&&path.startsWith(originalResourcePackagePrefix(row.fileName)+'/'));
+   if(matches.length+packages.length!==1)throw new FirstSliceError(404,'original_resource_unavailable',`File not found: \`${path}\``);
+   if(packages.length){const source=packages[0]!,prefix=originalResourcePackagePrefix(source.fileName);
+    const bytes=deps.readPackage(source,path.slice(prefix.length+1));
+    if(!bytes)throw new FirstSliceError(404,'original_resource_unavailable',`File not found: \`${path}\``);
+    return{bytes,contentType:originalResourceMediaType(path)};
+   }
+   const decoded=deps.decode(matches[0]!);
    if(!decoded)throw new FirstSliceError(404,'original_resource_unavailable',`File not found: \`${path}\``);
    return{bytes:decoded.bytes,contentType:originalResourceMediaType(path)};
   }

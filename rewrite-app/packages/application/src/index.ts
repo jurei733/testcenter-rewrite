@@ -1,3 +1,4 @@
+import {createOriginalResourcePackages} from './original-resource-package.js';
 import {createOriginalReportTextComparator} from './original-report-collation.js';
 import {readOriginalReviewReports,type OriginalReviewReportProjection} from './original-review-report.js';
 import {originalReviewReportCategoryKeys,encodeOriginalReportJson,formatOriginalResponseReport,formatOriginalUnitStateReport} from './original-workspace-report-wire.js';
@@ -15742,7 +15743,7 @@ const decodeZipFileName = (
   return fileName;
 };
 
-const readZipEntries = (zipBuffer: Buffer): ZipEntry[] | null => {
+const readZipEntries = (zipBuffer: Buffer, maximumEntries = Number.MAX_SAFE_INTEGER): ZipEntry[] | null => {
   const endOfCentralDirectoryOffset =
     findZipEndOfCentralDirectoryOffset(zipBuffer);
   if (endOfCentralDirectoryOffset < 0) {
@@ -15784,6 +15785,7 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] | null => {
     zip64Metadata?.centralDirectoryEnd ??
     resolvedCentralDirectoryOffset + resolvedCentralDirectorySize;
   if (
+    resolvedEntryCount > maximumEntries ||
     diskNumber !== 0 ||
     centralDirectoryDisk !== 0 ||
     (usesZip64 && !zip64Metadata) ||
@@ -27359,12 +27361,16 @@ export const createFirstSliceServices = (
       sourceText:decoded ? readPersistedSourceText(source,decoded) : null,
       resourceIdentifier:/\.html$/i.test(source.fileName) ? readStandaloneVeronaPlayerResourceId(source) : null};
   };
-  const originalTestFiles=createOriginalTestFiles({repository,project:projectWorkspaceFile,decode:decodePersistedSourceDocument});
+  const originalResourcePackages=createOriginalResourcePackages({decode:decodePersistedSourceDocument,
+    entries:readZipEntries,read:readZipEntryBuffer,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath});
+  const originalTestFiles=createOriginalTestFiles({repository,project:projectWorkspaceFile,decode:decodePersistedSourceDocument,
+    readPackage:(source,path)=>originalResourcePackages.read(source,path)});
   const validateWorkspaceFile = (source: SourcePackage) => {
     const decoded = decodePersistedSourceDocument(source);
     if (source.sourceDocument === null || !decoded) throw new FirstSliceError(400,
       'workspace_file_document_invalid', 'A workspace file requires actual source bytes.');
     const file = projectWorkspaceFile(source);
+    if (/\.itcr\.zip$/i.test(source.fileName)) originalResourcePackages.validate(source);
     if (/\.xml$/i.test(source.fileName)) {
       const diagnostics = [
         ...(/^data:/i.test(source.sourceDocument) ? validateXmlEncoding(decoded.bytes,file.sourceText ?? '',source.fileName,decoded.mediaType) : []),
@@ -27410,7 +27416,7 @@ export const createFirstSliceServices = (
       fileName:input.fileName,mediaType:normalizeSourcePackageText(input.mediaType,'mediaType','source_package_media_type_required'),
       sourceDocument:input.sourceDocument,contentStructure:null,status:'uploaded',uploadedAt:now()};
     const file = validateWorkspaceFile(sourcePackage);
-    if (file.fileType==='Package' || /\.zip$/i.test(input.fileName)) throw new FirstSliceError(400,
+    if (file.fileType==='Package' || /\.zip$/i.test(input.fileName) && !/\.itcr\.zip$/i.test(input.fileName)) throw new FirstSliceError(400,
       'workspace_file_container_upload_unsupported','This loose-file endpoint does not yet materialize ZIP archive members.');
     // Type folders let a Unit and Booklet share their original basename.
     sourcePackage.fileName = file.fileType+'/'+input.fileName;
@@ -27533,8 +27539,7 @@ export const createFirstSliceServices = (
       if (/\.xml$/i.test(replacementSourcePackage.fileName)) replacementSourcePackage.mediaType='application/xml';
       const conflict = workspaceFileReplacementConflict(oldFile, newFile);
       if (conflict) throw new FirstSliceError(409, conflict.code, conflict.message);
-      independentWorkspaceFile = newFile.fileType === 'Unit' ||
-        (newFile.fileType === 'Resource' && !/\.zip$/i.test(replacementSourcePackage.fileName));
+      independentWorkspaceFile = newFile.fileType === 'Unit' || newFile.fileType === 'Resource';
       if (newFile.fileType==='Unit') assertWorkspaceFileDependencies(replacementSourcePackage,sourcePackages,activityEvents,
         replacedSourcePackage.sourcePackageId);
       // A valid loose file is accepted in the same reservation as its lineage.

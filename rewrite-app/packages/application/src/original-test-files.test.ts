@@ -20,7 +20,8 @@ function fixture() {
   const repository = {listSourcePackagesByWorkspace:async(tenantId:string,workspaceId:string)=>sources.filter(source=>source.tenantId===tenantId&&source.workspaceId===workspaceId),
     listWorkspaceActivityEventsByWorkspace:async()=>[]} as unknown as FirstSliceRepository;
   return {add,sources,files:createOriginalTestFiles({repository,project:source=>projections.get(source.sourcePackageId)!,
-    decode:source=>({bytes:Buffer.from(source.sourceDocument!)})})};
+    decode:source=>({bytes:Buffer.from(source.sourceDocument!)}),
+    readPackage:()=>assert.fail('A loose definition must not read an archive')})};
 }
 const unit = (definition:string) => `<Unit><Metadata><Id>G8-GEO</Id></Metadata>${definition}</Unit>`;
 

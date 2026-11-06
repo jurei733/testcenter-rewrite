@@ -1,0 +1,55 @@
+{
+  "sourceRepository": "https://github.com/iqb-berlin/verona-modules-aspect",
+  "sourceCommit": "b281f3353ee12b3d70d48cdca4a441d569f6763b",
+  "player": {
+    "playerFixture": "players/iqb-player-aspect-2.12.6.html.br.base64",
+    "playerEncoding": "brotli-base64",
+    "playerSha256": "147563ed3129f03aa6d204b2a8195c0da9caa2c5f6a2fc6581abdc1b76403bb8",
+    "playerByteSize": 3605455,
+    "playerSourceUrl": "https://github.com/iqb-berlin/verona-modules-aspect/releases/download/editor/2.12.6%2Bplayer/2.12.6/iqb-player-aspect-2.12.6.html",
+    "playerApiVersion": "6.0",
+    "unitStateType": "iqb-standard@1.0"
+  },
+  "definition": {
+    "fixture": "geogebra.base64",
+    "sourcePath": "example_data/geogebra/geogebra.base64",
+    "gitBlob": "c2368f5df45de61932606ab94bcbc8491988e8d6",
+    "sha256": "a53c826fb7eb3e1a754dd62f588f2e590996fe09f69c9ecaf63ef72846940478",
+    "decodedGgbSha256": "7c25a473ad1edd337592cc87b6d8f30c0601333824c04ef4c42fbe9c383af789"
+  },
+  "runtime": {
+    "sourceUrl": "https://download.geogebra.org/installers/5.4/geogebra-math-apps-bundle-5-4-934-0.zip",
+    "bytes": 33399930,
+    "sha256": "bb55da6967d949949204c20b598bd5c6dc2116100b1908efd9461ffa7f6ce1d0",
+    "expandedBytes": 120911714,
+    "entries": 484,
+    "bootstrap": {
+      "sourcePath": "GeoGebra/HTML5/5.0/web3d/web3d.nocache.js",
+      "fixture": "web3d.nocache.js.base64",
+      "bytes": 5455,
+      "sha256": "59d5c0d479f30f75a586df86fb76449ec96e68079cf352803c910fc86b1d8e2b",
+      "encoding": "base64"
+    },
+    "gwtCache": {
+      "sourcePath": "GeoGebra/HTML5/5.0/web3d/89EAAC7096ECFDF6F8E851E8D8B0340A.cache.js",
+      "bytes": 7908883,
+      "sha256": "440cd572322de7876a1a6eb4b140d3b47b5335e77f9afc72ec623098df6304a9",
+      "cookieReferences": 3
+    }
+  },
+  "definitionBuilder": "Source-derived geometry definition from pinned Aspect4.11sample scaffold and GeometryProperties; not a byte-exact Original sample Unit.",
+  "sourceFileGitBlobs": {
+    "geometry.component.ts": "bbbacf41cf03e70e708b6c894fddc685d8e7efdb",
+    "geometry.ts": "ba804eab930fff65c01e4b6c048b973f33887d0b",
+    "geometry-builders.ts": "b40f81b407c08e2e7afdd00b357722cec5239ae9",
+    "external-resource.service.ts": "89dbbc4e484adf434606dff4219bbd8ab7ee6513",
+    "environment.ts": "c2695c9d96453a1256623ea702052f071413f6d8",
+    "geogebra.base64": "c2368f5df45de61932606ab94bcbc8491988e8d6"
+  },
+  "largeGeometry": {
+    "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-modules-aspect/b281f3353ee12b3d70d48cdca4a441d569f6763b/example_data/geogebra/milchstrasze.ggb",
+    "bytes": 1747937,
+    "gitBlob": "4db5a68a2aa944178530b39d7b0cfd5361bc4d7f",
+    "sha256": "b3a83b7d45284b7c248ceaf858455bb70e214e047522238fd90c689d5e56ee1e"
+  }
+}

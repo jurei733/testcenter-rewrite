@@ -28,7 +28,11 @@ export function selectCurrentWorkspaceFiles<T extends Pick<SourcePackage,'source
     if (event.eventType !== 'source_package_replaced') continue;
     const replacement = typeof event.details.replacementSourcePackageId === 'string'
       ? byId.get(event.details.replacementSourcePackageId) : undefined;
-    if (replacement && replacement.status !== 'rejected') replaced.add(event.subjectId);
+    // A physical file replacement and its accepted row commit atomically.
+    // Once that row is deleted its predecessor must not become live again,
+    // including the interval before the later deletion activity is recorded.
+    if (replacement && replacement.status !== 'rejected' ||
+        !replacement && event.details.replacementMode === 'workspace_file') replaced.add(event.subjectId);
   }
   return sourcePackages.filter(source => !generated.has(source.sourcePackageId) && !replaced.has(source.sourcePackageId));
 }

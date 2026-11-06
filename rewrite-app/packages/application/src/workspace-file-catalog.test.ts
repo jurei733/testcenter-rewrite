@@ -145,3 +145,14 @@ test('current-file selection retains immutable originals until a present non-rej
   assert.deepEqual(selectCurrentWorkspaceFiles(sources, events).map(item => item.sourcePackageId), ['new', 'failed-old', 'failed', 'absent-old']);
   assert.equal(sources.length, 6); assert.equal(events.length, 4);
 });
+
+test('a deleted physical replacement cannot resurrect its predecessor before a deletion event is recorded', () => {
+  const old = {sourcePackageId: 'old', status: 'accepted' as const};
+  const unrelated = {sourcePackageId: 'unrelated', status: 'accepted' as const};
+  const event = {eventType: 'source_package_replaced' as const, subjectId: 'old',
+    details: {replacementSourcePackageId: 'deleted-current', replacementMode: 'workspace_file'}};
+  assert.deepEqual(selectCurrentWorkspaceFiles([old, unrelated], [event]), [unrelated]);
+  // Rejected generic imports have not published a new physical file.
+  assert.deepEqual(selectCurrentWorkspaceFiles([old, unrelated], [{...event,
+    details: {replacementSourcePackageId: 'never-published'}}]), [old, unrelated]);
+});

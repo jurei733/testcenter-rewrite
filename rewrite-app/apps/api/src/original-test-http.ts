@@ -1,5 +1,6 @@
 import type {IncomingMessage} from 'node:http';
 import {randomUUID} from 'node:crypto';
+import {originalResourceDelivery} from './original-resource-delivery.js';
 import {FirstSliceError,formatOriginalTestReadJson,formatOriginalUnitReadJson,type FirstSliceServices} from '@testcenter-rewrite-app/application';
 import {encodeOriginalReportJson,decodeOriginalTestLogJson} from '@testcenter-rewrite-app/application';
 export const originalTestCreationPath='/test';
@@ -39,7 +40,11 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
  if(input.request.method!==method){input.header('allow',method);if(log||lock||nativeCommand)sendNativeTestWriteError(input,405,'Method not allowed. Must be one of: '+method);else input.send(405,'Method not allowed');return true;}
  try{
   if(file){const groupToken=file[1]!,workspaceNumber=file[2]!,path=file[3]!;
-   const result=await input.services.originalTest.resource({groupToken,workspaceNumber,path});input.header('cache-control','private');input.header('x-source','backend');input.binary(result.bytes,result.contentType);return true;}
+   const result=await input.services.originalTest.resource({groupToken,workspaceNumber,path});
+   const delivery=originalResourceDelivery(path,result.bytes,input.request.headers['sec-fetch-dest']);
+   if(delivery.varyByDestination)input.header('Vary','Sec-Fetch-Dest');
+   if(delivery.adapter)input.header('X-Testcenter-Resource-Adapter',delivery.adapter);
+   input.header('cache-control','private');input.header('x-source','backend');input.binary(delivery.bytes,result.contentType);return true;}
   const token=input.request.headers.authtoken;if(typeof token!=='string'||!token)throw new FirstSliceError(401,'original_token_missing','Auth Header not sufficient: '+((log||lock||nativeCommand)?(typeof token==='string'?'empty':'missing'):'missing or empty'));
   if(producer)await input.services.originalCommand.requireMonitor({token});else await input.services.originalTest.requirePerson({token});
   if(commands||executed)await input.services.originalCommand.requireOwner({token,testNumber:(commands??executed)![1]!});
