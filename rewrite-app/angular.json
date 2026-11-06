@@ -21,6 +21,11 @@
             "tsConfig": "apps/web/tsconfig.app.json",
             "assets": [
               {
+                "glob": "runtime.js",
+                "input": "apps/web/src/native-save-runtime",
+                "output": "/native-save-runtime"
+              },
+              {
                 "glob": "service-worker.js",
                 "input": "apps/web/src",
                 "output": "/"

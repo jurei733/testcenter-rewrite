@@ -2,7 +2,7 @@ export const NATIVE_TEST_JOURNAL_PREFIX = 'testcenter-native-test-journal:v1:';
 export type NativeTestStateBase = {version: 1; revision: number; controlEpoch: number; previousDeliveryId?: string;
  segments?:Array<{start:number;revision:number;controlEpoch:number}>};
 type Entry = {id: string; kind: 'state' | 'log'; queuedAt: number; phase: 'staged' | 'ready'; payload: string; base?: NativeTestStateBase};
-type Document = {version: 1; actor: string; testId: string; entries: Entry[]};
+type Document = {version: 1; actor: string; testId: string; entries: Entry[]; revision?:number};
 export type NativeTestDelivery = Readonly<Entry & {bucket: string}>;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const maxEntries = 10_000, maxChars = 4_500_000;
@@ -34,23 +34,26 @@ export class NativeTestJournal {
  private readonly leases = new Map<string, () => void>();
  private closed = false;
  private previousStateId?: string;
+ private readonly revisions=new Map<string,number>();
  private constructor(private readonly storage: Storage, private readonly locks: LockManager, private readonly crypto: Crypto,
   private readonly actor: string, private readonly testId: string, private readonly prefix: string, private readonly ownBucket: string,
-  private base: NativeTestStateBase) {}
- static async open(input: {token: string; testId: string; storage: Storage; locks: LockManager; crypto: Crypto; base: NativeTestStateBase}): Promise<NativeTestJournal> {
+  private base: NativeTestStateBase,private readonly mirror?:(key:string,text:string)=>void,private readonly seal?:(key:string,text:string)=>void) {}
+ static async open(input: {token: string; testId: string; storage: Storage; locks: LockManager; crypto: Crypto; base: NativeTestStateBase;mirror?:(key:string,text:string)=>void;seal?:(key:string,text:string)=>void}): Promise<NativeTestJournal> {
   if (!input.token || !/^[1-9]\d*$/.test(input.testId) || BigInt(input.testId) > 9223372036854775807n ||
     !input.locks?.request || !input.crypto?.subtle || !input.crypto.randomUUID) throw failure();
   const base = parseNativeTestStateBase(input.base), hash = await input.crypto.subtle.digest('SHA-256', new TextEncoder().encode(input.token));
   const actor = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
   const prefix = NATIVE_TEST_JOURNAL_PREFIX + actor + ':' + input.testId + ':';
-  const journal = new NativeTestJournal(input.storage, input.locks, input.crypto, actor, input.testId, prefix, prefix + input.crypto.randomUUID(), base);
+  const journal = new NativeTestJournal(input.storage, input.locks, input.crypto, actor, input.testId, prefix, prefix + input.crypto.randomUUID(), base,input.mirror,input.seal);
   try {
    for (const key of journal.keys().filter(key => key.startsWith(prefix))) if (await journal.claim(key)) journal.read(key);
    if (!await journal.claim(journal.ownBucket)) throw failure();
    return journal;
   } catch { journal.close(); throw failure(); }
  }
- close(): void { if (this.closed) return; this.closed = true; for (const release of this.leases.values()) release(); this.leases.clear(); }
+ close(): void { if (this.closed) return;
+  for(const key of this.leases.keys())try{const doc=this.read(key);if(doc.entries.length||(doc.revision??0)>0)this.seal?.(key,JSON.stringify(doc));}catch{/* Local bytes remain authoritative on a failed handoff. */}
+  this.closed = true; for (const release of this.leases.values()) release(); this.leases.clear(); }
  private current(): void { if (this.closed) throw failure(); }
  private keys(): string[] { const keys: string[] = []; for (let i=0; i<this.storage.length; i++) { const key=this.storage.key(i); if(key)keys.push(key); } return keys; }
  private claim(key: string): Promise<boolean> {
@@ -62,7 +65,7 @@ export class NativeTestJournal {
   });
  }
  private validate(doc: Document): Document {
-  if (!doc || doc.version !== 1 || doc.actor !== this.actor || doc.testId !== this.testId || !Array.isArray(doc.entries) ||
+  if (!doc || doc.version !== 1 || doc.actor !== this.actor || doc.testId !== this.testId || doc.revision!==undefined&&(!integer(doc.revision)) || !Array.isArray(doc.entries) ||
     doc.entries.length > maxEntries || new Set(doc.entries.map(row => row?.id)).size !== doc.entries.length) throw failure();
   for (const row of doc.entries) {
    if (!row || !uuid.test(row.id) || !['state','log'].includes(row.kind) || !['staged','ready'].includes(row.phase) ||
@@ -74,17 +77,18 @@ export class NativeTestJournal {
  }
  private read(key: string): Document {
   this.current(); if (!this.leases.has(key) || !key.startsWith(this.prefix) || !uuid.test(key.slice(this.prefix.length))) throw failure();
-  const text = this.storage.getItem(key); if (text === null) return {version: 1, actor: this.actor, testId: this.testId, entries: []};
-  if (text.length > maxChars) throw failure(); return this.validate(JSON.parse(text));
+  const text = this.storage.getItem(key); if (text === null) return {version: 1, actor: this.actor, testId: this.testId, entries: [],revision:this.revisions.get(key)??0};
+  if (text.length > maxChars) throw failure();const doc=this.validate(JSON.parse(text));this.revisions.set(key,Math.max(this.revisions.get(key)??0,doc.revision??0));return doc;
  }
  private write(key: string, doc: Document): void {
-  this.current(); this.validate(doc); const serialized=JSON.stringify(doc); let chars=serialized.length, count=doc.entries.length;
+  this.current();const revision=Math.max(this.revisions.get(key)??0,doc.revision??0)+1;if(!integer(revision))throw failure();doc={...doc,revision}; this.validate(doc); const serialized=JSON.stringify(doc); let chars=serialized.length, count=doc.entries.length;
   for (const other of this.keys().filter(name=>name.startsWith(NATIVE_TEST_JOURNAL_PREFIX)&&name!==key)) {
    const value=this.storage.getItem(other);if(value===null)continue;chars+=value.length;
    if(other.startsWith(this.prefix)) { const peer=JSON.parse(value);if(!Array.isArray(peer?.entries))throw failure();count+=peer.entries.length; }
   }
   if(chars>maxChars||count>maxEntries)throw failure();
   try { if(doc.entries.length)this.storage.setItem(key,serialized);else this.storage.removeItem(key); } catch { throw failure(); }
+  this.revisions.set(key,revision);this.mirror?.(key,serialized);
  }
  captureState(entries: unknown[], now=Date.now()): void {
   const doc=this.read(this.ownBucket),previous=doc.entries.find(row=>row.kind==='state'&&row.phase==='staged');

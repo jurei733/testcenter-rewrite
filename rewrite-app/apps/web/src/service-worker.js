@@ -1,3 +1,5 @@
+if(typeof importScripts==='function')importScripts('./native-save-runtime/runtime.js');
+if(globalThis.TestcenterNativeSave)globalThis.TestcenterNativeSave.installWorker(self);
 const CACHE_PREFIX = "testcenter-rewrite-app-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}v2`;
 const APP_SHELL_URL = new URL("./", self.registration.scope).href;

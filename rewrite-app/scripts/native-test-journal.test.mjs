@@ -7,14 +7,19 @@ const exports={};new Function('exports',ts.transpileModule(readFileSync(new URL(
 const {NativeTestJournal,parseNativeTestStateBase}=exports,base={version:1,revision:7,controlEpoch:2};
 const state=(content,timeStamp=123)=>[{key:'CURRENT_UNIT_ID',content,timeStamp}];
 const turn=()=>new Promise(done=>setImmediate(done));
-function fixture(){
+function fixture(options={}){
  const values=new Map(),active=new Set(),opened=[];
  const storage={failing:false,get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:key=>values.get(key)??null,
   setItem(key,value){if(this.failing)throw Error('owned quota failure');values.set(key,value);},removeItem(key){if(this.failing)throw Error('owned quota failure');values.delete(key);}};
  const locks={async request(key,options,callback){assert.equal(options.ifAvailable,true);if(active.has(key))return callback(null);active.add(key);try{return await callback({name:key});}finally{active.delete(key);}}};
- const open=async(token='private-capability-never-persist',testId='9007199254740993',writeBase=base)=>{const journal=await NativeTestJournal.open({storage,locks,crypto:webcrypto,base:writeBase,token,testId});opened.push(journal);return journal;};
+ const open=async(token='private-capability-never-persist',testId='9007199254740993',writeBase=base)=>{const journal=await NativeTestJournal.open({storage,locks,crypto:webcrypto,base:writeBase,token,testId,...options});opened.push(journal);return journal;};
  return{storage,values,active,open,close(){for(const journal of opened)journal.close();}};
 }
+test('native Test snapshots retain monotone revisions, causal bases and a final sealed log after earlier state ACKs',async t=>{
+ const mirrored=[],sealed=[],f=fixture({mirror:(key,text)=>mirrored.push({key,doc:JSON.parse(text)}),seal:(key,text)=>sealed.push({key,doc:JSON.parse(text)})});t.after(()=>f.close());const a=await f.open();
+ a.captureState(state('first'));const packet=a.freeze('state',state('first'));a.acknowledge(packet);const log=a.freeze('log',[{key:'command executed',content:'terminate',timeStamp:123}]);assert.deepEqual(sealed,[]);a.close();
+ assert.deepEqual(mirrored.map(row=>row.doc.revision),[1,2,3,4]);assert.equal(sealed.length,1);assert.equal(sealed[0].doc.revision,4);assert.equal(sealed[0].doc.entries[0].id,log.id);assert.equal(sealed[0].doc.entries[0].payload,log.payload);
+});
 test('pre-buffer Test state survives reload with every Source entry, captured base and exact signed-int64 Run ownership',async t=>{
  const f=fixture();t.after(()=>f.close());const a=await f.open();a.captureState(state('first',200),200);a.captureState(state('second',100),100);
  assert.ok(!JSON.stringify([...f.values]).includes('private-capability-never-persist'));a.close();await turn();

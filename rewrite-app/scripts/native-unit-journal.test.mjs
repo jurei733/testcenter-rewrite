@@ -20,8 +20,8 @@ function locks(){
 }
 export function nativeUnitJournalFixture(){
  const storage=new Storage(),manager=locks(),opened=[];
- const open=async(token='owned-capability-never-persist-as-plaintext',testId='9007199254740993')=>{
-  const journal=await NativeUnitJournal.open({token,testId,storage,locks:manager,crypto:webcrypto});opened.push(journal);return journal;
+ const open=async(token='owned-capability-never-persist-as-plaintext',testId='9007199254740993',options={})=>{
+  const journal=await NativeUnitJournal.open({token,testId,storage,locks:manager,crypto:webcrypto,...options});opened.push(journal);return journal;
  };
  return{storage,manager,open,close(){for(const journal of opened)journal.close();}};
 }
@@ -29,6 +29,16 @@ const fixture=nativeUnitJournalFixture;
 const flush=()=>new Promise(done=>setImmediate(done));
 const state=[{key:'PRESENTATION_PROGRESS',content:'some',timeStamp:111}];
 const body=(value,timeStamp=500)=>({timeStamp,dataParts:{answer:value},responseType:'owned/first',originalUnitId:'ORIGINAL'});
+test('native Unit mirrors are monotone across empty acknowledgements and only closure seals the final Source snapshot',async t=>{
+ const f=fixture(),mirrors=[],sealed=[];t.after(()=>f.close());const a=await f.open(undefined,undefined,{mirror:(key,text)=>mirrors.push({key,doc:JSON.parse(text)}),seal:(key,text)=>sealed.push({key,doc:JSON.parse(text)})});
+ a.captureResponse('A','ORIGINAL',{answer:'first'},'owned',100);const sent=a.freeze('response','A',body('first'));a.acknowledge(sent);a.captureResponse('A','ORIGINAL',{answer:'after empty ACK'},'owned',200);
+ assert.deepEqual(mirrors.map(row=>row.doc.revision),[1,2,3,4]);assert.equal(mirrors[2].doc.entries.length,0);assert.deepEqual(sealed,[]);a.close();
+ assert.equal(sealed.length,1);assert.equal(sealed[0].doc.revision,4);assert.equal(JSON.parse(sealed[0].doc.entries[0].payload).dataParts.answer,'after empty ACK');assert.equal(sealed[0].doc.entries[0].phase,'staged');
+});
+test('native recovery prioritizes the visible Unit before other Unit states and answers',async t=>{
+ const f=fixture();t.after(()=>f.close());const a=await f.open();for(const alias of ['A','B']){a.captureState(alias,'ORIGINAL',state,100);a.captureResponse(alias,'ORIGINAL',{answer:alias},'owned',101);}a.close();await flush();
+ const b=await f.open();assert.deepEqual(b.recoveries('B').map(row=>[row.unitAlias,row.kind]),[['B','state'],['B','response'],['A','state'],['A','response']]);
+});
 test('native pre-buffer drafts survive document destruction with original clocks and Source first response type',async t=>{
  const f=fixture();t.after(()=>f.close());const a=await f.open();
  a.captureResponse('B','ORIGINAL',{answer:'first',extra:'exact Ω\n  '},'owned/first',110);

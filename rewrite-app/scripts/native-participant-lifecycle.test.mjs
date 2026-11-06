@@ -16,7 +16,7 @@ const bindings=new Map(),cache=new Map();class Session{}class Tcs{}class HttpErr
 const navigationTypes={NavigationEnd:class{constructor(id){this.id=id;}},NavigationCancel:class{constructor(id){this.id=id;}},NavigationError:class{constructor(id){this.id=id;}}};
 const angular={signal,EnvironmentInjector:OwnedEnvironment,Injectable:()=>value=>value,InjectionToken:class{constructor(name){this.name=name;}},inject:key=>{assert.ok(bindings.has(key),'missing '+String(key?.name));return bindings.get(key);}};
 function load(file){
- file=resolve(root,file);if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);
+ file=resolve(root,file);if(file.endsWith('.js'))return require(file);if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);
  const source=file.endsWith('/native-owned-router.ts')&&process.env.NATIVE_PARTICIPANT_ROUTER_SOURCE_FILE?readFileSync(process.env.NATIVE_PARTICIPANT_ROUTER_SOURCE_FILE,'utf8'):readFileSync(file,'utf8');
  const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
  new Function('exports','require',code)(exports,spec=>{
@@ -29,7 +29,7 @@ function load(file){
   if(spec.endsWith('worker.util'))return{createTicker:()=>{throw Error('Unexpected worker in buffer fixture');}};
   if(spec==='@iqb/responses')return require(spec);
   if(spec.startsWith('.')&&spec.endsWith('.json'))return {default:JSON.parse(readFileSync(resolve(dirname(file),spec),'utf8'))};
-  if(spec.startsWith('.'))return load(resolve(dirname(file),spec+'.ts'));return require(spec);
+  if(spec.startsWith('.'))return load(resolve(dirname(file),spec.endsWith('.js')?spec:spec+'.ts'));return require(spec);
  });return exports;
 }
 const tokens=load('native-tokens.ts'),{NativeHttpClient}=load('native-http-client.ts'),{CommandService}=load('test-controller/services/command.service.ts');

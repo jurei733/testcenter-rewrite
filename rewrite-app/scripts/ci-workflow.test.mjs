@@ -1111,7 +1111,9 @@ test('native monitor keeps protected real-browser coverage and all numeric, reco
  const row=workflow.jobs.quick.strategy.matrix.include.find(row=>row.check==='native-monitor');
  assert.equal(row.command,'npm run smoke:ui:native-monitor:built');
  assert.equal(workflow.jobs.quick.env.UI_SMOKE_HEADFUL,'true');
- assert.equal(scripts['smoke:ui:native-monitor:built'],'node scripts/smoke-native-monitor.mjs');
+ assert.equal(scripts['smoke:ui:native-monitor:built'],'npm run test:native-background-browser && node scripts/smoke-native-monitor.mjs');
+ assert.equal(scripts['smoke:ui:native-participant:built'],'npm run test:native-background-browser && node scripts/run-native-participant-smoke.mjs');
+ assert.equal(scripts['test:native-background-browser'],'node --test scripts/native-background-indexeddb.test.mjs');
  for(const file of ['native-monitor-wire','native-monitor-number','native-monitor-views','native-monitor-session','native-monitor-lifecycle'])assert.ok(scripts['test:frontend-state'].split(/\s+/).includes('scripts/'+file+'.test.mjs'));
  const driver=read('./smoke-native-monitor.mjs');
  for(const marker of ['real-native-protected-login-and-profile-choice','literal-int64-snapshots-real-booklet-and-profile-rendering','same-browser-workspace-switch-does-not-reuse-private-booklet-or-selection','real-empty-native-snapshot-clears-previous-rows','current-native-role-revocation-clears-monitor-and-local-bearer'])assert.ok(driver.includes(marker));

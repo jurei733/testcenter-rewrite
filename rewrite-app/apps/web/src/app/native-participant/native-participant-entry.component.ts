@@ -23,6 +23,7 @@ import {NativeStarterComponent} from './starter/native-starter.component';
 import {CodeInputComponent} from './shared/components/code-input/code-input.component';
 import {AssetService} from './shared/services/asset.service';
 import {NativeTerminalCompletionService} from './native-terminal-completion.service';
+import {NativeBackgroundService} from './native-background.service';
 import {CustomtextService} from './shared/services/customtext/customtext.service';
 import type {CodeInputType} from './app.interfaces';
 @Component({selector:'app-native-participant-entry',standalone:true,
@@ -51,7 +52,7 @@ export class NativeParticipantEntryComponent {
  readonly loginProblem=signal('');readonly loginProblemCode=signal(0);readonly loginProblemLevel=signal<'error'|'warning'>('error');
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
- constructor(){inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access();untracked(()=>this.bindTexts(access?.customTexts??{}));});
+ constructor(){inject(NativeBackgroundService);inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access();untracked(()=>this.bindTexts(access?.customTexts??{}));});
   if(this.session.access()&&!this.codeRequired)void this.refreshStarter();
  }
  async refreshStarter(){

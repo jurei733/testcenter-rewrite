@@ -2,7 +2,7 @@ export const NATIVE_UNIT_JOURNAL_PREFIX='testcenter-native-unit-journal:v1:';
 const maxUnits=200,maxEntries=10_000,maxChars=4_500_000;
 type Kind='state'|'response'|'log';
 type Entry={id:string;kind:Kind;unitAlias:string;originalUnitId:string;queuedAt:number;phase:'staged'|'ready';payload:string};
-type Document={version:1;actor:string;testId:string;entries:Entry[]};
+type Document={version:1;actor:string;testId:string;entries:Entry[];revision?:number};
 export type NativeUnitDelivery=Readonly<Entry&{bucket:string}>;
 type Lease={release:()=>void};
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
@@ -13,14 +13,16 @@ const failure=()=>new Error('Die Antwort konnte nicht im lokalen Speicher gesich
 export class NativeUnitJournal {
  private readonly leases=new Map<string,Lease>();
  private closed=false;
- private constructor(private readonly storage:Storage,private readonly locks:LockManager,private readonly crypto:Crypto,private readonly actor:string,private readonly testId:string,private readonly prefix:string,private readonly ownBucket:string){}
+ private readonly revisions=new Map<string,number>();
+ private constructor(private readonly storage:Storage,private readonly locks:LockManager,private readonly crypto:Crypto,private readonly actor:string,private readonly testId:string,private readonly prefix:string,private readonly ownBucket:string,
+  private readonly mirror?:(key:string,text:string)=>void,private readonly seal?:(key:string,text:string)=>void){}
 
- static async open(input:{token:string;testId:string;storage:Storage;locks:LockManager;crypto:Crypto}):Promise<NativeUnitJournal>{
+ static async open(input:{token:string;testId:string;storage:Storage;locks:LockManager;crypto:Crypto;mirror?:(key:string,text:string)=>void;seal?:(key:string,text:string)=>void}):Promise<NativeUnitJournal>{
   if(!input.token||!/^[1-9]\d*$/.test(input.testId)||BigInt(input.testId)>9223372036854775807n||!input.locks?.request||!input.crypto?.subtle||!input.crypto.randomUUID)throw failure();
   const hash=await input.crypto.subtle.digest('SHA-256',new TextEncoder().encode(input.token));
   const actor=Array.from(new Uint8Array(hash),byte=>byte.toString(16).padStart(2,'0')).join('');
   const prefix=NATIVE_UNIT_JOURNAL_PREFIX+actor+':'+input.testId+':';
-  const journal=new NativeUnitJournal(input.storage,input.locks,input.crypto,actor,input.testId,prefix,prefix+input.crypto.randomUUID());
+  const journal=new NativeUnitJournal(input.storage,input.locks,input.crypto,actor,input.testId,prefix,prefix+input.crypto.randomUUID(),input.mirror,input.seal);
   try{
    // A lock lives only as long as this document. Reload/crash releases it; an
    // active peer tab retains its own buffer window and cannot be replayed here.
@@ -30,7 +32,9 @@ export class NativeUnitJournal {
   }catch{journal.close();throw failure();}
  }
 
- close():void{if(this.closed)return;this.closed=true;for(const lease of this.leases.values())lease.release();this.leases.clear();}
+ close():void{if(this.closed)return;
+  for(const key of this.leases.keys())try{const doc=this.read(key);if(doc.entries.length||(doc.revision??0)>0)this.seal?.(key,JSON.stringify(doc));}catch{/* Keep the original local bytes if final mirroring is unavailable. */}
+  this.closed=true;for(const lease of this.leases.values())lease.release();this.leases.clear();}
  private current():void{if(this.closed)throw failure();}
  private keys():string[]{const keys:string[]=[];for(let i=0;i<this.storage.length;i++){const key=this.storage.key(i);if(key)keys.push(key);}return keys;}
  private claim(key:string):Promise<boolean>{
@@ -46,12 +50,12 @@ export class NativeUnitJournal {
  private read(key:string):Document{
   this.current();if(!this.leases.has(key)||!key.startsWith(this.prefix)||!uuid.test(key.slice(this.prefix.length)))throw failure();
   const text=this.storage.getItem(key);
-  if(text===null)return{version:1,actor:this.actor,testId:this.testId,entries:[]};
+  if(text===null)return{version:1,actor:this.actor,testId:this.testId,entries:[],revision:this.revisions.get(key)??0};
   if(text.length>maxChars)throw failure();
-  return this.validate(JSON.parse(text));
+  const doc=this.validate(JSON.parse(text));this.revisions.set(key,Math.max(this.revisions.get(key)??0,doc.revision??0));return doc;
  }
  private validate(doc:Document):Document{
-  if(!doc||doc.version!==1||doc.actor!==this.actor||doc.testId!==this.testId||!Array.isArray(doc.entries)||doc.entries.length>maxEntries||new Set(doc.entries.map(row=>row?.id)).size!==doc.entries.length)throw failure();
+  if(!doc||doc.version!==1||doc.actor!==this.actor||doc.testId!==this.testId||doc.revision!==undefined&&(!Number.isSafeInteger(doc.revision)||doc.revision<0)||!Array.isArray(doc.entries)||doc.entries.length>maxEntries||new Set(doc.entries.map(row=>row?.id)).size!==doc.entries.length)throw failure();
   for(const row of doc.entries){
    if(!row||!uuid.test(row.id)||!['state','response','log'].includes(row.kind)||!['staged','ready'].includes(row.phase)||
     typeof row.unitAlias!=='string'||!row.unitAlias.length||Array.from(row.unitAlias).length>255||/[\/\\\u0000-\u001f\u007f]/.test(row.unitAlias)||
@@ -64,7 +68,7 @@ export class NativeUnitJournal {
   return doc;
  }
  private write(key:string,doc:Document):void{
-  this.current();this.validate(doc);let chars=0,count=doc.entries.length;const units=new Set(doc.entries.map(row=>row.unitAlias)),serialized=JSON.stringify(doc);
+  this.current();const revision=Math.max(this.revisions.get(key)??0,doc.revision??0)+1;if(!Number.isSafeInteger(revision))throw failure();doc={...doc,revision};this.validate(doc);let chars=0,count=doc.entries.length;const units=new Set(doc.entries.map(row=>row.unitAlias)),serialized=JSON.stringify(doc);
   for(const existing of this.keys().filter(name=>name.startsWith(NATIVE_UNIT_JOURNAL_PREFIX)&&name!==key)){
    const value=this.storage.getItem(existing);if(value===null)continue;chars+=value.length;
    if(existing.startsWith(this.prefix)){
@@ -73,6 +77,7 @@ export class NativeUnitJournal {
   }
   if(units.size>maxUnits||count>maxEntries||chars+serialized.length>maxChars)throw failure();
   try{if(doc.entries.length)this.storage.setItem(key,serialized);else this.storage.removeItem(key);}catch{throw failure();}
+  this.revisions.set(key,revision);this.mirror?.(key,serialized);
  }
  private stage(kind:Kind,unitAlias:string,originalUnitId:string,body:Record<string,unknown>,now:number):void{
   const doc=this.read(this.ownBucket),previous=doc.entries.find(row=>row.phase==='staged'&&row.kind===kind&&row.unitAlias===unitAlias);
@@ -98,7 +103,7 @@ export class NativeUnitJournal {
   doc.entries=doc.entries.filter(row=>row!==previous);doc.entries.push(entry);this.write(this.ownBucket,doc);
   return Object.freeze({...entry,bucket:this.ownBucket});
  }
- recoveries():NativeUnitDelivery[]{
+ recoveries(preferredUnitAlias?:string):NativeUnitDelivery[]{
   const pending:NativeUnitDelivery[]=[];
   for(const key of this.leases.keys()){
    if(key===this.ownBucket)continue;
@@ -108,7 +113,7 @@ export class NativeUnitJournal {
   }
   // Recreate any captured Unit state before its responses. Existing independent
   // field clocks arbitrate unsent older state/answers against newer remote data.
-  return pending.sort((a,b)=>(a.kind==='state'?0:1)-(b.kind==='state'?0:1)||a.queuedAt-b.queuedAt);
+  return pending.sort((a,b)=>Number(b.unitAlias===preferredUnitAlias)-Number(a.unitAlias===preferredUnitAlias)||(a.kind==='state'?0:1)-(b.kind==='state'?0:1)||a.queuedAt-b.queuedAt);
  }
  acknowledge(delivery:NativeUnitDelivery):void{
   const doc=this.read(delivery.bucket),row=doc.entries.find(entry=>entry.id===delivery.id);

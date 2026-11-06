@@ -9,6 +9,7 @@ import {NativeMonitorSessionService} from '../native-monitor/native-session.serv
 import {nativeTestRetryDelays,nativeRetryExcludedStatus,nativeRequestError} from './native-http-policy';
 import {ownAsyncError} from '../owned-error-routing';
 import {AppError} from './app.interfaces';
+import {nativeBackground} from './native-background';
 class NativeStateSupersededError extends AppError { constructor(){super({code:409,label:'Testzustand geändert',type:'backend',description:'Der Testzustand wurde inzwischen geändert. Bitte den Test neu laden.'});} }
 @Injectable()
 export class NativeHttpClient {
@@ -20,6 +21,8 @@ export class NativeHttpClient {
  private readonly lifetime=new AbortController();
  readonly accessSignal=AbortSignal.any([this.ownerScope,this.lifetime.signal]);
  private credential=this.session.access()?.token;
+ private readonly background=nativeBackground(this.credential,this.ownerScope);
+ private preferredUnitAlias?:string;
  private unitJournal?:NativeUnitJournal;
  private journalPreparation?:Promise<void>;
  private testJournal?:NativeTestJournal;
@@ -35,8 +38,9 @@ export class NativeHttpClient {
   if(this.ownerScope.aborted){this.testJournal?.close();this.testJournal=undefined;}
   this.credential=undefined;this.lifetime.abort();
  };
- constructor(){this.ownerScope.addEventListener('abort',this.retire,{once:true});}
- ngOnDestroy(){this.ownerScope.removeEventListener('abort',this.retire);this.retire();}
+ private readonly pageHide=(event:PageTransitionEvent)=>{if(!event.persisted)this.retire();};
+ constructor(){this.ownerScope.addEventListener('abort',this.retire,{once:true});window.addEventListener?.('pagehide',this.pageHide);}
+ ngOnDestroy(){this.ownerScope.removeEventListener('abort',this.retire);window.removeEventListener?.('pagehide',this.pageHide);this.retire();}
  ownError<T>(error:T):T {
   if(this.receiveError&&error&&typeof error==='object')ownAsyncError(error,()=>this.receiveError?.(error));
   return error;
@@ -47,12 +51,13 @@ export class NativeHttpClient {
  }
  prepareJournals(saving:boolean):Promise<boolean>{
   if(!saving)return Promise.resolve(false);
-  return this.testJournalPreparation??=this.recoverTestJournal().then(async recovered=>{await this.prepareUnitJournal(true);return recovered;})
+  const recover=()=>this.recoverTestJournal().then(async recovered=>{await this.prepareUnitJournal(true);return recovered;});
+  return this.testJournalPreparation??=(this.background?this.background.recover(this.runTestId,recover):recover())
    .catch(error=>{throw this.ownError(error);});
  }
  private async recoverTestJournal():Promise<boolean>{
   if(!this.isCurrent||!this.credential||!this.testStateBase)throw Error('Native Test-state base unavailable.');
-  const journal=await NativeTestJournal.open({token:this.credential,testId:this.runTestId,base:this.testStateBase,storage:localStorage,locks:navigator.locks,crypto});
+  const journal=await NativeTestJournal.open({token:this.credential,testId:this.runTestId,base:this.testStateBase,storage:localStorage,locks:navigator.locks,crypto,mirror:this.background?.mirror,seal:this.background?.seal});
   if(!this.isCurrent){journal.close();throw Error('Native run retired.');}
   this.testJournal=journal;let recoveredState=false;
   for(const entry of journal.recoveries()){
@@ -69,7 +74,9 @@ export class NativeHttpClient {
  }
  captureTestState(state:unknown[]):void{
   if(!this.isCurrent||!this.testJournal)throw this.ownError(Error('Lokale Testsicherung ist noch nicht bereit.'));
-  try{this.testJournal.captureState(state);}catch(error){throw this.ownError(error);}
+  try{this.testJournal.captureState(state);
+   for(const row of state)if(row&&typeof row==='object'&&'key'in row&&row.key==='CURRENT_UNIT_ID'&&'content'in row&&typeof row.content==='string'){this.preferredUnitAlias=row.content;this.background?.preferUnit(row.content);}
+  }catch(error){throw this.ownError(error);}
  }
  testWrite<T>(kind:'state'|'log',testId:string,body:unknown[]):Observable<T>{
   if(testId!==this.runTestId||!this.isCurrent)return new Observable(subscriber=>subscriber.error(this.ownError(Error('Native request outside its authenticated scope.'))));
@@ -93,10 +100,10 @@ export class NativeHttpClient {
  }
  private async recoverUnitJournal():Promise<void>{
   if(!this.isCurrent||!this.credential)throw Error('Native run retired.');
-  const journal=await NativeUnitJournal.open({token:this.credential,testId:this.runTestId,storage:localStorage,locks:navigator.locks,crypto});
+  const journal=await NativeUnitJournal.open({token:this.credential,testId:this.runTestId,storage:localStorage,locks:navigator.locks,crypto,mirror:this.background?.mirror,seal:this.background?.seal});
   if(!this.isCurrent){journal.close();throw Error('Native run retired.');}
   this.unitJournal=journal;
-  for(const entry of journal.recoveries()){
+  for(const entry of journal.recoveries(this.preferredUnitAlias)){
    if(!this.isCurrent)throw Error('Native run retired.');
    const base=`/test/${this.runTestId}/unit/${encodeURIComponent(entry.unitAlias)}`;
    if(entry.kind==='response'){
@@ -176,6 +183,8 @@ export class NativeHttpClient {
       if(options.nativeStateProtocol){
        this.testStateBase=parseNativeTestStateBase(response.headers.get('x-native-state-base'));
        this.testJournal?.useFreshBase(this.testStateBase);
+       const alias=(value as {laststate?:{CURRENT_UNIT_ID?:unknown}}|null)?.laststate?.CURRENT_UNIT_ID;
+       if(typeof alias==='string'){this.preferredUnitAlias=alias;this.background?.preferUnit(alias);}
       }
       if(commandBase)this.testJournal?.useCommandBase(parseNativeTestStateBase(response.headers.get('x-native-state-base')));
       options.nativeAccepted?.(response.headers);

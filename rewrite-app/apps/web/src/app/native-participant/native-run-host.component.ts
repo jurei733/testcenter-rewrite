@@ -12,6 +12,7 @@ import {OriginalOverlayStylesComponent} from '../original-overlay-styles.compone
 import {NativeRunRuntime} from './native-run-runtime.service';
 import type {NativeRunContext} from './native-run-context';
 import {HeaderService} from './shared/services/header.service';
+import {NativeBackgroundService} from './native-background.service';
 @Component({selector:'app-native-run-host',standalone:true,imports:[NgTemplateOutlet,RouterLink,MatTooltip,MatToolbar,MatButton,OriginalOverlayStylesComponent],
  template:`<app-original-overlay-styles />
  @if(!header?.isHeaderHidden){<header><mat-toolbar data-cy="header"><div class="side"></div><div class="center">@if(header?.title){<h1>{{header?.title}}</h1>}</div><div class="side logo"><ng-container [ngTemplateOutlet]="logo" /></div></mat-toolbar></header>}
@@ -29,6 +30,7 @@ export class NativeRunHostComponent implements AfterViewInit {
  ownedContext:NativeRunContext|undefined;
  private readonly route=inject(ActivatedRoute);private readonly children=inject(ChildrenOutletContexts);private readonly router=inject(Router);
  constructor(){
+  inject(NativeBackgroundService);
   inject(InterfaceModeService).select('original');this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(p=>this.testId.set(p.get('t')??''));
   effect(()=>{if(!this.ready()||this.session.restoring()||this.session.busy())return;const access=this.session.access(),id=this.testId();untracked(()=>{
    if(!access){this.ownedContext?.destroy();return;}
