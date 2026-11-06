@@ -1,7 +1,7 @@
 export type {OriginalGroupResult} from './original-group-results.js';
 export {originalSessionPaths} from './original-session.js';
 export type {OriginalAccessSet, OriginalTestAccess, OriginalWorkChallenge, OriginalWorkSolution} from './original-session.js';
-import type {WorkspaceFileAvailability} from "@testcenter-rewrite-app/domain";
+import type {WorkspaceFileAvailability,WorkspaceArchiveUploadReport} from "@testcenter-rewrite-app/domain";
 import type {
   WorkspaceFileCatalog,
   AdminAuditEvent,
@@ -449,7 +449,8 @@ export type ReplaceSourcePackageRequest = CreateSourcePackageRequest;
 export type UploadWorkspaceFileRequest = {fileName: string; mediaType: string; sourceDocument: string};
 export type UploadWorkspaceFileResponse = {
   workspaceAvailability?: WorkspaceFileAvailability;
-  sourcePackage: SourcePackage; replacedSourcePackageId: string | null;
+  sourcePackage: SourcePackage|null; replacedSourcePackageId: string | null;
+  archiveReport?:WorkspaceArchiveUploadReport;
   importJob: ImportJob | null; stagedContentRelease: ContentRelease | null;
   participantRosterImport?: ReplaceSourcePackageResponse['participantRosterImport'];
 };

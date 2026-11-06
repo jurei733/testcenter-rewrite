@@ -1,3 +1,6 @@
+import {createOriginalWorkspaceArchives,assertWorkspaceUploadName,applyWorkspaceArchiveTimestamps,type WorkspaceArchiveOrigin} from './original-workspace-archive.js';
+import {originalResourceMediaType} from './original-resource-media-type.js';
+import type {WorkspaceArchiveUploadReport} from '@testcenter-rewrite-app/domain';
 import {createOriginalResourcePackages} from './original-resource-package.js';
 import {createOriginalReportTextComparator} from './original-report-collation.js';
 import {readOriginalReviewReports,type OriginalReviewReportProjection} from './original-review-report.js';
@@ -466,13 +469,19 @@ export type ContentIntakePort = {
   }): Promise<ActivateContentReleaseResult>;
 };
 
-export type UploadWorkspaceFileResult = {
+export type SingleWorkspaceFileUploadResult = {
+  archiveReport?:never;
   workspaceAvailability?: WorkspaceFileAvailability;
   sourcePackage: SourcePackage;
   replacedSourcePackageId: string | null;
   importJob: ImportJob | null;
   stagedContentRelease: ContentRelease | null;
   participantRosterImport?: CreateImportJobResult['participantRosterImport'];
+};
+
+export type UploadWorkspaceFileResult = SingleWorkspaceFileUploadResult | {
+  sourcePackage:null; replacedSourcePackageId:null; importJob:null; stagedContentRelease:null;
+  archiveReport:WorkspaceArchiveUploadReport; workspaceAvailability?:WorkspaceFileAvailability;
 };
 
 export type ReplaceWorkspaceFileResult = Omit<Awaited<ReturnType<ContentIntakePort['replaceSourcePackage']>>, 'importJob'> & {importJob: ImportJob | null; workspaceAvailability?: WorkspaceFileAvailability};
@@ -15509,6 +15518,7 @@ type ZipEntry = {
   compressedSize: number;
   uncompressedSize: number;
   localHeaderOffset: number;
+  modifiedAt?:string;
 };
 
 type ZipManifestExtractionResult =
@@ -15882,6 +15892,10 @@ const readZipEntries = (zipBuffer: Buffer, maximumEntries = Number.MAX_SAFE_INTE
     }
 
     entries.push({
+      // Source PHP/libzip1.7.3 uses the central DOS time for stat/extract.
+      // Its measured behavior normalizes zero dates and ignores UT/NTFS times.
+      modifiedAt:new Date(Date.UTC(1980+(zipBuffer.readUInt16LE(offset+14)>>9),((zipBuffer.readUInt16LE(offset+14)>>5)&15)-1,
+        zipBuffer.readUInt16LE(offset+14)&31,zipBuffer.readUInt16LE(offset+12)>>11,(zipBuffer.readUInt16LE(offset+12)>>5)&63,(zipBuffer.readUInt16LE(offset+12)&31)*2)).toISOString(),
       fileName,
       rawFileName,
       generalPurposeBitFlag,
@@ -27353,13 +27367,16 @@ export const createFirstSliceServices = (
   // hint or a supplied runtime structure. The decoded bytes remain unchanged.
   const projectWorkspaceFile = (source: SourcePackage) => {
     const decoded = decodePersistedSourceDocument(source);
+    // Catalogs never inspect ZIP bytes as text. Decoding a large ITCR archive
+    // into a throwaway UTF-8 string on every dependency pass is expensive.
+    const sourceText=decoded&&!/\.zip$/i.test(source.fileName)?readPersistedSourceText(source,decoded):null;
     return {sourcePackageId:source.sourcePackageId, fileName:source.fileName,
       fileType:/\.xml$/i.test(source.fileName) ? classifyWorkspaceSourcePackage(
         {...source, mediaType:'application/xml', contentStructure:null}, decoded ? {...decoded,mediaType:'application/xml'} : null)
-        : /\.zip$/i.test(source.fileName) && !/\.itcr\.zip$/i.test(source.fileName) ? 'Package' as const : 'Resource' as const,
+        : /\.zip$/i.test(source.fileName) && !/\.itcr\.zip$/i.test(source.fileName) && !source.fileName.startsWith('Resource/') ? 'Package' as const : 'Resource' as const,
       status:source.status, uploadedAt:source.uploadedAt, fileSizeBytes:decoded?.bytes.byteLength ?? null,
-      sourceText:decoded ? readPersistedSourceText(source,decoded) : null,
-      resourceIdentifier:/\.html$/i.test(source.fileName) ? readStandaloneVeronaPlayerResourceId(source) : null};
+      sourceText,
+      resourceIdentifier:/\.html$/i.test(source.fileName)&&sourceText!==null ? readVeronaPlayerResourceId(sourceText,source.fileName) : null};
   };
   const originalResourcePackages=createOriginalResourcePackages({decode:decodePersistedSourceDocument,
     entries:readZipEntries,read:readZipEntryBuffer,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath});
@@ -27402,22 +27419,58 @@ export const createFirstSliceServices = (
     if (duplicate) throw new FirstSliceError(409,'workspace_file_identifier_duplicate',
       'A current file of the same type already uses this identifier.',{conflictingSourcePackageId:duplicate.sourcePackageId});
   };
+  const workspaceArchives=createOriginalWorkspaceArchives({decode:decodePersistedSourceDocument,
+    entries:readZipEntries,read:readZipEntryBuffer,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath});
   const uploadWorkspaceFile = async (input: Parameters<ContentIntakePort['uploadWorkspaceFile']>[0]): Promise<UploadWorkspaceFileResult> => {
+    if(typeof input.fileName!=='string'||!/\.zip$/i.test(input.fileName)||/\.itcr\.zip$/i.test(input.fileName))return uploadPhysicalWorkspaceFile(input);
+    const workspace=await requireWorkspace(repository,input.tenantKey,input.workspaceKey);assertWorkspaceUploadName(input.fileName);
+    if(typeof input.sourceDocument!=='string')throw new FirstSliceError(400,'workspace_file_document_invalid','A workspace file requires a string or encoded bytes.');
+    const archive:SourcePackage={sourcePackageId:'unpersisted-archive-input',tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,
+      fileName:input.fileName,mediaType:normalizeSourcePackageText(input.mediaType,'mediaType','source_package_media_type_required'),
+      sourceDocument:input.sourceDocument,contentStructure:null,status:'uploaded',uploadedAt:now()};
+    const members=workspaceArchives.read(archive),decoded=decodePersistedSourceDocument(archive)!;
+    const report:WorkspaceArchiveUploadReport={fileName:input.fileName,sha256:createHash('sha256').update(decoded.bytes).digest('hex'),importedCount:0,replacedCount:0,rejectedCount:0,entries:[]};
+    const candidates=members.map((member,index)=>{
+      const fileName=member.entryName.split('/').at(-1)!,mediaType=originalResourceMediaType(fileName);
+      const probe:SourcePackage={...archive,sourcePackageId:'unpersisted-member-'+index,fileName:/\.zip$/i.test(fileName)&&!/\.itcr\.zip$/i.test(fileName)?'Resource/'+fileName:fileName,
+        mediaType,sourceDocument:'data:'+mediaType+';base64,'+member.bytes.toString('base64')};
+      const kind=projectWorkspaceFile(probe).fileType;
+      const order=kind==='Resource'?0:kind==='Unit'?1:kind==='Booklet'?2:kind==='Testtakers'?3:kind==='SysCheck'?4:5;
+      return{...member,index,fileName,mediaType,sourceDocument:probe.sourceDocument!,order};
+    }).sort((a,b)=>a.order-b.order||a.index-b.index);
+    for(const member of candidates){
+      const origin:WorkspaceArchiveOrigin={archiveFileName:input.fileName,archiveSha256:report.sha256,archiveEntryName:member.entryName,...(member.modifiedAt?{archiveEntryModifiedAt:member.modifiedAt}:{})};
+      try{
+        const result=await uploadPhysicalWorkspaceFile({...input,fileName:member.fileName,mediaType:member.mediaType,sourceDocument:member.sourceDocument},origin);
+        const failed=result.importJob?.status==='failed';
+        const messages=result.importJob?.diagnostics.filter(d=>d.severity==='error').map(d=>d.message)??[];
+        const status=failed?'rejected':result.replacedSourcePackageId?'replaced':'imported';
+        report.entries.push({entryName:member.entryName,fileName:member.fileName,status,sourcePackageId:result.sourcePackage.sourcePackageId,
+          message:failed?messages.join('\n')||'Import fehlgeschlagen.':status==='replaced'?'Datei aktualisiert.':'Datei hochgeladen.',...(failed?{errorCode:'workspace_archive_member_import_failed'}:{})});
+        if(status==='rejected')report.rejectedCount++;else if(status==='replaced')report.replacedCount++;else report.importedCount++;
+      }catch(error){
+        // Validation failures belong to this member. Infrastructure, scope and
+        // optimistic-concurrency failures remain request failures.
+        if(!(error instanceof FirstSliceError)||![400,409,413,422].includes(error.statusCode)||
+          ['workspace_file_upload_conflict','source_package_replacement_conflict','workspace_file_replacement_conflict'].includes(error.errorCode))throw error;
+        const diagnostics=error.details&&typeof error.details==='object'&&'diagnostics'in error.details&&Array.isArray(error.details.diagnostics)
+          ?error.details.diagnostics.filter((d:unknown):d is {severity:'error';message:string}=>!!d&&typeof d==='object'&&'severity'in d&&d.severity==='error'&&'message'in d&&typeof d.message==='string').map(d=>d.message):[];
+        report.entries.push({entryName:member.entryName,fileName:member.fileName,status:'rejected',sourcePackageId:null,message:diagnostics.join('\n')||error.message,errorCode:error.errorCode});report.rejectedCount++;
+      }
+    }
+    return{sourcePackage:null,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null,archiveReport:report,
+      ...((report.importedCount+report.replacedCount)>0?{workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)}:{})};
+  };
+  const uploadPhysicalWorkspaceFile = async (input: Parameters<ContentIntakePort['uploadWorkspaceFile']>[0], archiveOrigin?:WorkspaceArchiveOrigin): Promise<SingleWorkspaceFileUploadResult> => {
     const workspace = await requireWorkspace(repository,input.tenantKey,input.workspaceKey);
-    if (typeof input.fileName!=='string' || !input.fileName.trim() || /[\\/\x00-\x1f\x7f]/.test(input.fileName) ||
-        input.fileName==='.' || input.fileName==='..') throw new FirstSliceError(400,
-      'workspace_file_name_invalid','A workspace file requires a basename without paths or control characters.');
-    // Keep authored whitespace; Source limits the basename to 120 UTF-8 bytes.
-    if (Buffer.byteLength(input.fileName,'utf8')>ORIGINAL_SOURCE_PACKAGE_FILE_NAME_MAX_BYTES) throw new FirstSliceError(400,
-      'source_package_file_name_too_long','Source package file names must not exceed 120 UTF-8 bytes.');
+    assertWorkspaceUploadName(input.fileName);
     if (typeof input.sourceDocument!=='string') throw new FirstSliceError(400,
       'workspace_file_document_invalid','A workspace file requires a string or encoded bytes.');
     const sourcePackage: SourcePackage = {sourcePackageId:idGenerator(),tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,
       fileName:input.fileName,mediaType:normalizeSourcePackageText(input.mediaType,'mediaType','source_package_media_type_required'),
       sourceDocument:input.sourceDocument,contentStructure:null,status:'uploaded',uploadedAt:now()};
+    if(archiveOrigin&&/\.zip$/i.test(input.fileName)&&!/\.itcr\.zip$/i.test(input.fileName))sourcePackage.fileName='Resource/'+input.fileName;
     const file = validateWorkspaceFile(sourcePackage);
-    if (file.fileType==='Package' || /\.zip$/i.test(input.fileName) && !/\.itcr\.zip$/i.test(input.fileName)) throw new FirstSliceError(400,
-      'workspace_file_container_upload_unsupported','This loose-file endpoint does not yet materialize ZIP archive members.');
     // Type folders let a Unit and Booklet share their original basename.
     sourcePackage.fileName = file.fileType+'/'+input.fileName;
     if (/\.xml$/i.test(input.fileName)) sourcePackage.mediaType='application/xml';
@@ -27430,7 +27483,7 @@ export const createFirstSliceServices = (
       value.fileName.split(/[\\/]/).at(-1)===input.fileName);
     if (sameName) {
       const result = await replaceSourcePackageInternal({...input,sourcePackageId:sameName.sourcePackageId},true,
-        createWorkspaceSourcePackageReferenceRevision({sourcePackages:[sameName],activityEvents:[]}));
+        createWorkspaceSourcePackageReferenceRevision({sourcePackages:[sameName],activityEvents:[]}),archiveOrigin);
       return {sourcePackage:result.replacementSourcePackage,replacedSourcePackageId:sameName.sourcePackageId,
         importJob:result.importJob,stagedContentRelease:result.stagedContentRelease,workspaceAvailability:result.workspaceAvailability,
         ...(result.participantRosterImport ? {participantRosterImport:result.participantRosterImport} : {})};
@@ -27443,22 +27496,22 @@ export const createFirstSliceServices = (
     const createdActivityEvent: WorkspaceActivityEvent = {activityEventId:idGenerator(),tenantId:workspace.tenantId,
       workspaceId:workspace.workspaceId,eventType:'source_package_created',actorId:null,subjectType:'source_package',
       subjectId:sourcePackage.sourcePackageId,occurredAt:now(),summary:`Workspace file '${input.fileName}' uploaded.`,
-      details:{fileName:sourcePackage.fileName,mediaType:sourcePackage.mediaType,intakeMode:'workspace_file'}};
+      details:{fileName:sourcePackage.fileName,mediaType:sourcePackage.mediaType,intakeMode:'workspace_file',...(archiveOrigin??{})}};
     if (!await repository.reserveWorkspaceFileUpload({sourcePackage,createdActivityEvent,
       expectedWorkspaceSourcePackageReferenceRevision:createWorkspaceSourcePackageReferenceRevision({sourcePackages,activityEvents})})) {
       throw new FirstSliceError(409,'workspace_file_upload_conflict','Workspace files changed during upload. Refresh and retry.');
     }
-    if (independent) return {sourcePackage,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null, workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
+    if (independent) return {sourcePackage,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null, ...(archiveOrigin?{}:{workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)})};
     const result = await createImportJobWithRelease({tenantKey:input.tenantKey,workspaceKey:input.workspaceKey,
       sourcePackageId:sourcePackage.sourcePackageId},{currentWorkspaceFilesOnly:true});
     return {...result,sourcePackage:(await repository.getSourcePackageById(sourcePackage.sourcePackageId)) ?? sourcePackage,
-      replacedSourcePackageId:null, workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
+      replacedSourcePackageId:null,...(archiveOrigin?{}:{workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)})};
   };
 
-  function replaceSourcePackageInternal(input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile: true, expectedSourceRevision?: string): Promise<ReplaceWorkspaceFileResult>;
+  function replaceSourcePackageInternal(input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile: true, expectedSourceRevision?: string, archiveOrigin?:WorkspaceArchiveOrigin): Promise<ReplaceWorkspaceFileResult>;
   function replaceSourcePackageInternal(input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile?: false): ReturnType<ContentIntakePort['replaceSourcePackage']>;
   async function replaceSourcePackageInternal(
-    input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile = false, expectedSourceRevision?: string
+    input: Parameters<ContentIntakePort['replaceSourcePackage']>[0], workspaceFile = false, expectedSourceRevision?: string, archiveOrigin?:WorkspaceArchiveOrigin
   ): Promise<ReplaceWorkspaceFileResult> {
     const workspace = await requireWorkspace(
       repository,
@@ -27570,7 +27623,7 @@ export const createFirstSliceServices = (
         ? `Workspace file '${replacedSourcePackage.fileName}' replaced by '${replacementSourcePackage.fileName}'.`
         : `Source package '${replacedSourcePackage.fileName}' replacement reserved for '${replacementSourcePackage.fileName}'.`,
       details: {
-        ...(workspaceFile ? {replacementMode:'workspace_file'} : {}),
+        ...(workspaceFile ? {replacementMode:'workspace_file'} : {}),...(archiveOrigin??{}),
         replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
         replacementSourcePackageId:
           replacementSourcePackage.sourcePackageId,
@@ -27596,7 +27649,7 @@ export const createFirstSliceServices = (
       );
     }
     if (independentWorkspaceFile) return {replacedSourcePackage, replacementSourcePackage,
-      importJob:null, stagedContentRelease:null,workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)};
+      importJob:null, stagedContentRelease:null,...(archiveOrigin?{}:{workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)})};
     const result = await createImportJobWithRelease({
       tenantKey: input.tenantKey,
       workspaceKey: input.workspaceKey,
@@ -30555,7 +30608,7 @@ export const createFirstSliceServices = (
           event.eventType==='source_package_replaced' && event.details.replacementMode==='workspace_file' &&
             typeof event.details.replacementSourcePackageId==='string' ? [event.details.replacementSourcePackageId] : []));
         const currentFiles=selectCurrentWorkspaceFiles(sourcePackages,activityEvents);
-        const catalog=buildWorkspaceFileCatalog(currentFiles
+        const catalog=buildWorkspaceFileCatalog(applyWorkspaceArchiveTimestamps(currentFiles
           .map(source => {
             if (sourceFileIds.has(source.sourcePackageId)) return projectWorkspaceFile(source);
             const decoded = decodePersistedSourceDocument(source);
@@ -30564,7 +30617,7 @@ export const createFirstSliceServices = (
               uploadedAt: source.uploadedAt, fileSizeBytes: decoded?.bytes.byteLength ?? null,
               sourceText: decoded ? readPersistedSourceText(source, decoded) : null,
               resourceIdentifier: readStandaloneVeronaPlayerResourceId(source)};
-          }));
+          }),activityEvents));
         const byId=new Map(currentFiles.map(source=>[source.sourcePackageId,source]));
         for (const file of catalog.items) {
           const source=byId.get(file.sourcePackageId);

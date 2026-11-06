@@ -1,3 +1,4 @@
+import {applyWorkspaceArchiveTimestamps} from './original-workspace-archive.js';
 import type {SourcePackage,WorkspaceFileCatalog} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import {buildWorkspaceFileCatalog,selectCurrentWorkspaceFiles,type WorkspaceCatalogInput} from './workspace-file-catalog.js';
@@ -18,7 +19,7 @@ export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;pr
   const physical=selectCurrentWorkspaceFiles(sources,events).filter(source=>source.status!=='rejected');
   const revision=createWorkspaceFilePublicationRevision({sourcePackages:sources,activityEvents:events}),key=JSON.stringify([scope.tenantId,scope.workspaceId]),known=cache.get(key);
   if(known?.revision===revision)return{physical,catalog:known.catalog};
-  const catalog=buildWorkspaceFileCatalog(physical.map(deps.project),{requireDependencies:true}),bytes=Buffer.byteLength(JSON.stringify(catalog),'utf8');
+  const catalog=buildWorkspaceFileCatalog(applyWorkspaceArchiveTimestamps(physical.map(deps.project),events),{requireDependencies:true}),bytes=Buffer.byteLength(JSON.stringify(catalog),'utf8');
   if(known){retainedBytes-=known.bytes;cache.delete(key);}if(bytes<=64*1024*1024){cache.set(key,{revision,catalog,bytes});retainedBytes+=bytes;
    while(cache.size>16||retainedBytes>64*1024*1024){const oldest=cache.keys().next().value!;retainedBytes-=cache.get(oldest)!.bytes;cache.delete(oldest);}}
   return{physical,catalog};

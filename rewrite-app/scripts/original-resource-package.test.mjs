@@ -131,7 +131,7 @@ for(const kind of kinds)test(kind+': installed resource archives preserve scope,
         await assert.rejects(put(own,bytes),denied(400,'workspace_resource_package_invalid'));assert.deepEqual(await count(),before);
         assert.equal(Buffer.from((await own.resource('Resource/GeoGebra/GeoGebra/deployggb.js')).bytes).toString(),'/* first Ω */');
       }
-      await assert.rejects(put(own,first,'regular.zip'),denied(400,'workspace_file_container_upload_unsupported'));
+      const ordinary=await put(own,first,'regular.zip');assert.equal(ordinary.sourcePackage,null);assert.equal(ordinary.archiveReport.importedCount,3);assert.equal(ordinary.archiveReport.rejectedCount,0);
       await assert.rejects(put(own,first,'.itcr.zip'),denied(400,'workspace_resource_package_invalid'));
     });
     await t.test('replacement makes only the current archive visible and keeps old source bytes immutable',async()=>{

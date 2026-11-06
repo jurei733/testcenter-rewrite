@@ -1,13 +1,13 @@
 import {productionApiRoutes, resolveRoutePath, type DeleteSourcePackagesResponse,
   type GetWorkspaceFileCatalogResponse, type GetWorkspaceOverviewResponse,
   type PublicAdminRoleAssignment, type UploadWorkspaceFileResponse} from '@testcenter-rewrite-app/contracts';
-import type {WorkspaceCatalogFile, WorkspaceOverview, WorkspaceFileType} from '@testcenter-rewrite-app/domain';
+import type {WorkspaceCatalogFile, WorkspaceOverview, WorkspaceFileType,WorkspaceArchiveUploadReport} from '@testcenter-rewrite-app/domain';
 
 export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; workspaceKey:string; roles:PublicAdminRoleAssignment[]};
 export type OriginalWorkspaceFilesTransport = <T>(method:string,path:string,body:unknown,token:string)=>Promise<T>;
 export type OriginalWorkspaceFile = WorkspaceCatalogFile & {name:string; isChecked:boolean};
 export type OriginalWorkspaceUpload = {name:string; type:string; read:()=>Promise<string>};
-export type OriginalWorkspaceUploadResult = {name:string; status:'queued'|'uploading'|'completed'|'error'; message:string};
+export type OriginalWorkspaceUploadResult = {name:string; status:'queued'|'uploading'|'completed'|'error'; message:string;archiveEntries?:WorkspaceArchiveUploadReport['entries']};
 type Owner = {epoch:number; token:string; tenantKey:string; workspaceKey:string};
 const sameScope = (a:Owner,b:OriginalWorkspaceFilesScope):boolean =>
   a.token===b.token && a.tenantKey===b.tenantKey && a.workspaceKey===b.workspaceKey;
@@ -137,6 +137,15 @@ export class OriginalWorkspaceFilesController {
           if(!this.canWrite){this.cancelPendingUploads();return;}
           const result=await this.request<UploadWorkspaceFileResponse>(owner,'POST',productionApiRoutes.workspace.uploadWorkspaceFile,
             {fileName:file.name,mediaType:file.type||'application/octet-stream',sourceDocument});
+          if(result.archiveReport){
+            const report=result.archiveReport;
+            const availability=result.workspaceAvailability?.status;
+            row.status=report.rejectedCount||availability==='failed'||availability==='conflict'?'error':'completed';row.archiveEntries=report.entries;
+            row.message=`${report.importedCount+report.replacedCount} Datei${report.importedCount+report.replacedCount===1?'':'en'} importiert, ${report.rejectedCount} abgewiesen.`;
+            if(availability==='failed')row.message+=' Die Bereitstellung für Teilnehmende ist fehlgeschlagen.';
+            if(availability==='conflict')row.message+=' Gleichzeitige Änderungen haben die Bereitstellung verhindert.';
+            this.changed();continue;
+          }
           const availability=result.workspaceAvailability?.status;
           row.status=result.importJob?.status==='failed' || availability==='failed' || availability==='conflict'?'error':'completed';
           row.message=result.importJob?.status==='failed'?'Import fehlgeschlagen.':

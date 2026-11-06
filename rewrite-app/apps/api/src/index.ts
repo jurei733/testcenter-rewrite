@@ -6767,7 +6767,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
         const result=await services.contentIntake.uploadWorkspaceFile({tenantKey,workspaceKey,
           fileName:body.fileName,mediaType:body.mediaType,sourceDocument:body.sourceDocument});
-        sendJson<UploadWorkspaceFileResponse>(response,201,result); return;
+        sendJson<UploadWorkspaceFileResponse>(response,result.archiveReport?.rejectedCount?207:201,result); return;
       }
       const workspaceFileReplacementMatch = workspaceFileReplacementPattern.exec(pathname);
       if (request.method === 'POST' && workspaceFileReplacementMatch?.groups) {

@@ -39,6 +39,22 @@ export const sourcePackageStatuses = [
   "accepted",
   "rejected"
 ] as const satisfies readonly SourcePackageStatus[];
+export type WorkspaceArchiveUploadReport = {
+  fileName:string;
+  sha256:string;
+  importedCount:number;
+  replacedCount:number;
+  rejectedCount:number;
+  entries:Array<{
+    entryName:string;
+    fileName:string;
+    status:'imported'|'replaced'|'rejected';
+    sourcePackageId:string|null;
+    message:string;
+    errorCode?:string;
+  }>;
+};
+
 export type WorkspaceFileType =
   | "Testtakers"
   | "Booklet"

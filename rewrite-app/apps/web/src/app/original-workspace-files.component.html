@@ -198,6 +198,16 @@
               <app-original-workspace-file-notice
                 [level]="upload.status === 'error' ? 'error' : 'success'"
                 [text]="upload.message" />
+              @if (upload.archiveEntries) {
+                <section data-cy="archive-upload-report">
+                  @for (entry of upload.archiveEntries; track entry.entryName) {
+                    <h3>{{entry.entryName}}</h3>
+                    <app-original-workspace-file-notice
+                      [level]="entry.status === 'rejected' ? 'error' : entry.status === 'replaced' ? 'warning' : 'success'"
+                      [text]="entry.message" />
+                  }
+                </section>
+              }
             }
           }
         </mat-card-content>

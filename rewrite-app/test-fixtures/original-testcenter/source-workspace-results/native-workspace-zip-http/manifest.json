@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "runtime": {
+    "php": "8.3.36",
+    "postgres": "PostgreSQL 18.4 (Debian 18.4-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "redis": "Redis server v=8.0.6 sha=00000000:1 malloc=jemalloc-5.3.0 bits=64 build=811b7822f01653c5"
+  },
+  "configuration": {
+    "xmlSchemaValidation": true,
+    "allowTestMode": false,
+    "bruteForceProtection": [
+      "login",
+      "person"
+    ],
+    "staticTime": "now"
+  },
+  "sqlSeedsOrDaoStubs": false,
+  "mutationsOverActualHttp": true,
+  "scope": "Actual ordinary rootZIPupload/materialization, partial validation, overwrite, UTF16, filename boundaries, missing-dependency cascades and scope behavior;52actualHTTProws plus8timestamp probes. Filesystem-dependent duplicate-basename winner/order remains unqualified. No new visual oracle.",
+  "files": {
+    "duplicates.zip.base64": "9eee20676c2b32df1ecb7220ffc5a9aa88c2d2cd5b650e801f2c3040cb82ce38",
+    "overwrite-wrong-id.zip.base64": "61bfa896352fd534a0d39b43d41d971ffe7ffe887d520feb8db339069ff2ce2e",
+    "all-shuffled.zip.base64": "381531243a564245138916b4e401b94e81c521d9703ebe2794d8822d4fe7f146",
+    "nested.zip.base64": "f9905b80b0632a30ca2fd954349cb8f7cf10dc204564f193366318b34ab9e655",
+    "capture.mjs": "59f7e61940e31aa5cb4685ed228c94df744b8f979205ff63491cf8c8305952b5",
+    "overwrite-same-id.zip.base64": "b3a1f64ee57276a8caea728f2ec391a619029c0295cc85190d9d59749bba4486",
+    "mixed.zip.base64": "848f46aef16a0ed12d695984d53f6785052d2f54b926de43571dc8d4b89c6a09",
+    "inputs.json": "4874c3ee756bea7c988a7ff20a368626e852208799abbb24d26b6eba0a10b587",
+    "read-only-denied.zip.base64": "68dfb8610245bcc5ad47862352fa30c17f926f6d7df2c44b01e3b27cbb610920",
+    "zip-timestamps.json": "fa9be7d91e8bddc74f1653ae3c006604c9d2de498d139ebeeb77540a0fd72e66",
+    "observations.json": "764af932714453dd9baaace75540208aef9d2d1302467cb9ae9ef741fa79fbac",
+    "overwrite-initial.zip.base64": "53b1ff24ba4c0e54025d40736393c90790b3dd79239e17c552aabc301c2ead58",
+    "compose.yml": "f16f2e4f9b9a31ff7284688bb06d91afa6029c1209b1043a6dfa7ccd8c28bb62",
+    "extra/directories.zip.base64": "7253173ea76f3067cdbb2cf27f8ae1ef80153f231c3940980e89400a1a547f3a",
+    "extra/empty.zip.base64": "bd02de9f0e0c4e28ff44836b0f2bbf49040d0499b8955c27cd2f3f6554deecf0",
+    "extra/utf16.zip.base64": "9fdf754ad4e3af20f91a0582bad0ab5b1b36d3c6d68a5cbe1d830140f533b1e2",
+    "extra/capture.mjs": "4a38c6a95663512bb172fe98953a104cfdf31706af312ee56a4b2aa2e4af6822",
+    "extra/cascade.zip.base64": "da1916fb19b6ea9f20199bb42b460a4bc63265421fe4a5cfe69f8d3e79d9f74c",
+    "extra/inputs.json": "d8894814e3696c6f88d909c62f314f8a9b54ec8d4cf05acda43266c1f5bf7b81",
+    "extra/observations.json": "db09687520d22f1a352955d553cdd86d93178724e5bafcc4d11db93dee1b2972",
+    "extra/long-basename.zip.base64": "ad5cadecb3a895d153ea5912360b186d089e05e9e45be0d9f917f3d8160a3ead",
+    "timestamps-capture.mjs": "2d4b0cb242c7ad56d9e37d06cbafe4d181ab92482f4080e0f856e5f37190f28a"
+  },
+  "timestampScope": "Actual pinnedPHP/libzip1.7.3 DOS/zero-DOS/UT/NTFS statIndex probes; centralDOSmatchesSource extraction time. Modificationtimeprojection verified inMemory/File/SQLite.",
+  "additionalSourceOracle": {
+    "rows": 11,
+    "cases": [
+      "empty",
+      "directories",
+      "cascade",
+      "utf16",
+      "long-basename"
+    ],
+    "unchangedRuntimeFiles": 137
+  }
+}

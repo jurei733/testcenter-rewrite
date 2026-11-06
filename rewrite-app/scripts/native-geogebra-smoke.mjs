@@ -4,6 +4,8 @@ import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {join,basename,dirname} from 'node:path';
 import {brotliDecompressSync,inflateRawSync} from 'node:zlib';
 import {runNativeResourceUploadSmoke} from './native-resource-upload-smoke.mjs';
+import {runNativeWorkspaceZipSmoke} from './native-workspace-zip-smoke.mjs';
+import {workspaceZip} from './workspace-zip-fixture.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
@@ -96,19 +98,31 @@ export async function prepareNativeGeoGebraFixture({services,tenantKey,app,passw
   await upload('geometry-large.xml',xml('Unit','<Metadata><Id>NATIVE.GEOMETRY.LARGE</Id><Label>Native GeoGebra large</Label></Metadata><Definition player="iqb-player-aspect@2.12"><![CDATA['+largeDocument+']]></Definition>'));
   await upload('geometry-booklet.xml',xml('Booklet','<Metadata><Id>NATIVE.GEOGEBRA</Id><Label>Native GeoGebra recovery</Label></Metadata><Units><Unit id="NATIVE.GEOMETRY" alias="1" label="Geometry one"/><Unit id="NATIVE.GEOMETRY.LARGE" alias="2" label="Geometry two"/></Units>'));
   await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="Owned.Geometry" label="Owned geometry"><Login name="native-geogebra" pw="'+password+'" mode="run-hot-return"><Booklet>NATIVE.GEOGEBRA</Booklet></Login></Group>')});
+  const archiveWorkspace=await services.platform.createWorkspace({tenantKey,workspaceKey:'native-root-zip',displayName:'Owned whole ZIP'});
+  const foreignWorkspace=await services.platform.createWorkspace({tenantKey,workspaceKey:'native-root-zip-foreign',displayName:'Owned foreign ZIP boundary'});
+  const archiveScope={tenantKey,workspaceKey:archiveWorkspace.workspaceKey};
+  const archiveEntries=[
+    ['people/root-people.xml',xml('Testtakers','<Metadata/><Group id="Owned.RootZip" label="Owned whole ZIP"><Login name="native-root-zip" pw="'+password+'" mode="run-hot-return"><Booklet>NATIVE.GEOGEBRA</Booklet></Login></Group>')],
+    ['books/geometry-booklet.xml',xml('Booklet','<Metadata><Id>NATIVE.GEOGEBRA</Id><Label>Native GeoGebra recovery</Label></Metadata><Units><Unit id="NATIVE.GEOMETRY" alias="1" label="Geometry one"/><Unit id="NATIVE.GEOMETRY.LARGE" alias="2" label="Geometry two"/></Units>')],
+    ['units/geometry.xml',xml('Unit','<Metadata><Id>NATIVE.GEOMETRY</Id><Label>Native GeoGebra</Label></Metadata><Definition player="iqb-player-aspect@2.12"><![CDATA['+document+']]></Definition>')],
+    ['units/geometry-large.xml',xml('Unit','<Metadata><Id>NATIVE.GEOMETRY.LARGE</Id><Label>Native GeoGebra large</Label></Metadata><Definition player="iqb-player-aspect@2.12"><![CDATA['+largeDocument+']]></Definition>')],
+    ['players/iqb-player-aspect-2.12.6.html',player],['assets/GeoGebra.itcr.zip',runtime]
+  ].map(([name,value])=>[name,Buffer.from(value)]);
   const bootstrap={username:'native-geometry-root',password:'Owned geometry bootstrap password-1!'};
   await services.adminAuth.bootstrapAdminUser(bootstrap);
   const rootSession=(await services.adminAuth.signIn(bootstrap)).adminSession.token;
   const operators={};
   for(const [key,accessMode]of [['writer','read_write'],['reader','read_only']]){
     const initial={username:'native-geometry-'+key,password:'Owned geometry '+key+' initial password-1!'};
-    await services.adminDirectory.createAdminUser({...initial,sessionToken:rootSession,roleAssignments:[{role:'workspace_admin',...scope,accessMode}]});
+    await services.adminDirectory.createAdminUser({...initial,sessionToken:rootSession,roleAssignments:[{role:'workspace_admin',...scope,accessMode},{role:'workspace_admin',...archiveScope,accessMode}]});
     const session=(await services.adminAuth.signIn(initial)).adminSession.token;
     const password='Owned geometry '+key+' changed password-2!';
     await services.adminAuth.changeOwnPassword({sessionToken:session,password});operators[key]={username:initial.username,password};
   }
   return {scope,manifest,definitionSha256:hash(document),largeDefinitionSha256:hash(largeDocument),login:'native-geogebra',password,
     resourceUpload:{bytes:runtime,...operators},
+    rootZipFixture:{scope:archiveScope,manifest,definitionSha256:hash(document),largeDefinitionSha256:hash(largeDocument),login:'native-root-zip',password,
+      resourceUpload:{...operators},rootArchive:{bytes:workspaceZip(archiveEntries),entries:archiveEntries,foreignWorkspaceKey:foreignWorkspace.workspaceKey}},
     fixturePaths:['test-fixtures/original-testcenter/native-geogebra/manifest.json','test-fixtures/original-testcenter/native-geogebra/geogebra.base64',
       'test-fixtures/original-testcenter/native-geogebra/web3d.nocache.js.base64',
       'test-fixtures/original-testcenter/'+source.playerFixture,'test-fixtures/original-testcenter/'+source.definitionFixture]};
@@ -166,7 +180,8 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
   let testId;
   try {
     await configure('native-geogebra-administration',0);
-    await runNativeResourceUploadSmoke({browser,base,out,fixture,mark});
+    if(fixture.rootArchive)await runNativeWorkspaceZipSmoke({browser,base,out,fixture,mark});
+    else await runNativeResourceUploadSmoke({browser,base,out,fixture,mark});
     await configure('native-geogebra',0);
     await page.goto(base+'/app/native-start?ui=original');
     await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill(fixture.login);await page.locator('[data-cy=login-user]').click();
@@ -239,23 +254,35 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
       }
     },'the exact real large construction is captured in its production local journal');
     const pendingBytes=Buffer.byteLength(pending.entry.payload);assert.ok(pendingBytes>1024*1024);
-    await wait(()=>page.evaluate(async({key,id})=>{
+    await wait(()=>page.evaluate(async({key,id,payload})=>{
       const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('testcenter-native-save-v1',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
-      try{return await new Promise((resolve,reject)=>{const request=db.transaction('documents').objectStore('documents').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.bucket===key&&row.document.entries.some(entry=>entry.id===id)));request.onerror=()=>reject(request.error);});}finally{db.close();}
-    },{key:pending.key,id:pending.entry.id}),'production IndexedDB mirror of the actual large draft');
+      try{return await new Promise((resolve,reject)=>{const request=db.transaction('documents').objectStore('documents').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.bucket===key&&row.document.entries.some(entry=>entry.id===id&&entry.payload===payload)));request.onerror=()=>reject(request.error);});}finally{db.close();}
+    },{key:pending.key,id:pending.entry.id,payload:pending.entry.payload}),'production IndexedDB mirror of the actual large draft');
     const captureElapsedMs=Date.now()-gestureAt;assert.ok(captureElapsedMs<5000,'Close the durable draft before the Source response window expires');
     mark('native-real-large-GeoGebra-draft-enters-production-IndexedDB-before-the-five-second-response-window');
     await configure('native-geogebra-large-closed',0,'stars-closure',undefined,{testIds:[testId],closureIds:[pending.entry.id]});
     const worker=context.serviceWorkers()[0];assert.ok(worker);
     page.on('dialog',dialog=>dialog.accept());const closed=page.waitForEvent('close');await page.close({runBeforeUnload:true});await closed;
     assert.equal(context.pages().length,0);
+    const closedElapsedMs=Date.now()-gestureAt;assert.ok(closedElapsedMs<5000,'The actor page actually closes before the Source response window');
     await wait(()=>serverMessages.some(message=>message.nativeHeld==='native-geogebra-large-closed:'+testId),'actual worker reaches the held large response');
+    // A staged draft may coalesce another real Player notification, including
+    // beforeunload. The sealed revision is the immutable delivery contract.
+    // Read it while the actual worker request is held, before any acknowledgement.
+    const sealed=await worker.evaluate(async({key,id})=>{
+      const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('testcenter-native-save-v1',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+      try{return await new Promise((resolve,reject)=>{const request=db.transaction('documents').objectStore('documents').get(key);request.onsuccess=()=>{const row=request.result;resolve(row?{sealed:row.sealed,revision:row.revision,entry:row.document.entries.find(entry=>entry.id===id)}:null);};request.onerror=()=>reject(request.error);});}finally{db.close();}
+    },{key:pending.key,id:pending.entry.id});
+    assert.equal(sealed?.sealed,true);assert.ok(sealed.entry);assert.equal(sealed.entry.id,pending.entry.id);
+    assert.equal(emittedPoint(JSON.parse(sealed.entry.payload).dataParts),pendingPoint.pointCoordinates);
+    await writeFile(join(out,'native-geogebra-large-sealed.json'),JSON.stringify({deliveryId:pending.entry.id,zeroActorPages:context.pages().length===0,closedElapsedMs,captureElapsedMs,
+      draftPayloadSha256:hash(pending.entry.payload),sealedPayloadSha256:hash(sealed.entry.payload),revision:sealed.revision,stagedDraftCoalescedBeforeSeal:pending.entry.payload!==sealed.entry.payload},null,2));
     assert.equal(writes.filter(row=>row.deliveryId===pending.entry.id).length,0);
     assert.equal(await release('native-geogebra-large-closed:'+testId),true);
     await wait(()=>writes.some(row=>row.deliveryId===pending.entry.id),'worker receives the real large response acknowledgement');
     const delivered=writes.filter(row=>row.deliveryId===pending.entry.id);assert.equal(delivered.length,1);
     assert.equal(delivered[0].worker,true);assert.equal(delivered[0].zeroActorPagesAtReply,true);
-    assert.deepEqual(delivered[0].body,JSON.parse(pending.entry.payload));
+    assert.ok(JSON.stringify(delivered[0].body)===sealed.entry.payload,'Actual worker must deliver the exact sealed journal bytes');
     assert.equal(delivered[0].actorHash,pending.actor);assert.equal(pending.actor,hash(token));
     const deliveredRead=await readUnit();
     await writeFile(join(out,'native-geogebra-large-worker-comparison.json'),JSON.stringify({largeBytes,pendingBytes,captureElapsedMs,deliveryId:pending.entry.id,actorHash:pending.actor,worker:delivered[0].worker,zeroActorPagesAtReply:delivered[0].zeroActorPagesAtReply,packetClock:delivered[0].body.timeStamp,nativeClocks:deliveredRead.nativeClocks,packetPoint:emittedPoint(delivered[0].body.dataParts),storedPoint:emittedPoint(deliveredRead.dataParts),parts:Object.fromEntries(Object.entries(delivered[0].body.dataParts).map(([key,value])=>[key,{packet:hash(value),stored:hash(deliveredRead.dataParts[key]||'')}]))},null,2));
@@ -283,7 +310,7 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     await page.screenshot({path:join(out,'native-geogebra-large-worker-restored.png')});
     await writeFile(join(out,'native-geogebra-large-recovered.json'),JSON.stringify({success:true,testId,actualPointerEdit:true,largeBytes,pendingBytes,captureElapsedMs,
       editedPoint:largeEdited.pointCoordinates,reloadedPoint:largeRestored.pointCoordinates,pendingPoint:pendingPoint.pointCoordinates,restoredAfterWorker:afterWorker.pointCoordinates,
-      deliveryId:pending.entry.id,actorHash:pending.actor,payloadSha256:hash(pending.entry.payload),unchangedPartsAndClocksPreserved:true,foreignUnitUnchanged:true,reopenedQueuesEmpty:true,worker:true,zeroActorPagesAtReply:true,manualWorkerWake:false,queue,
+      deliveryId:pending.entry.id,actorHash:pending.actor,payloadSha256:hash(sealed.entry.payload),draftPayloadSha256:hash(pending.entry.payload),closedElapsedMs,stagedDraftCoalescedBeforeSeal:pending.entry.payload!==sealed.entry.payload,unchangedPartsAndClocksPreserved:true,foreignUnitUnchanged:true,reopenedQueuesEmpty:true,worker:true,zeroActorPagesAtReply:true,manualWorkerWake:false,queue,
       partHashes:Object.fromEntries(Object.entries(delivered[0].body.dataParts).map(([key,value])=>[key,hash(value)])),largeSource:fixture.manifest.largeGeometry,
       largeDefinitionSha256:fixture.largeDefinitionSha256,errors},null,2));
   } catch(error) {

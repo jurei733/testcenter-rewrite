@@ -9,14 +9,15 @@ import {prepareNativeStarsFixture,runNativeStarsRecoverySmoke} from './native-st
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
-import {mkdtemp,readFile,writeFile,mkdir,readdir} from 'node:fs/promises';
+import {mkdtemp,readFile,writeFile,mkdir,readdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {reportSmokePhase} from './supervised-smoke.mjs';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 const app=fileURLToPath(new URL('..',import.meta.url));
-export async function runNativeParticipantSmoke(artifactRoot,{backgroundOnly=false,starsOnly=false,capacityOnly=false,largeStateOnly=false,starsClosureOnly=false,geoGebraOnly=false}={}){
+export async function runNativeParticipantSmoke(artifactRoot,{backgroundOnly=false,starsOnly=false,capacityOnly=false,largeStateOnly=false,starsClosureOnly=false,geoGebraOnly=false,rootZipOnly=false}={}){
+const geometryOnly=geoGebraOnly||rootZipOnly;
 reportSmokePhase('prepare-owned-native-participant-fixtures');
 const out=join(artifactRoot,'native-monitor','native-participant');await mkdir(out,{recursive:true});
 const require=createRequire(join(app,'package.json')),{chromium}=require('playwright');
@@ -35,6 +36,8 @@ qualificationFiles.push('apps/api/src/original-test-http.ts','apps/api/dist/apps
 qualificationFiles.push('scripts/native-stars-closure-smoke.mjs','scripts/run-native-stars-closure-smoke.mjs');
 qualificationFiles.push('scripts/native-geogebra-smoke.mjs','scripts/run-native-geogebra-smoke.mjs','scripts/original-resource-package.test.mjs');
 qualificationFiles.push('scripts/native-resource-upload-smoke.mjs');
+qualificationFiles.push('scripts/run-native-workspace-zip-smoke.mjs','scripts/native-workspace-zip-smoke.mjs','scripts/workspace-zip-fixture.mjs','scripts/original-workspace-archive.test.mjs','packages/application/src/original-workspace-archive.ts','packages/application/dist/packages/application/src/original-workspace-archive.js');
+qualificationFiles.push(...await collect('test-fixtures/original-testcenter/source-workspace-results/native-workspace-zip-http'));
 qualificationFiles.push('apps/api/src/original-resource-delivery.ts','apps/api/dist/apps/api/src/original-resource-delivery.js');
 qualificationFiles.push('scripts/original-resource-delivery.test.mjs');
 for(const name of ['original-resource-package','original-test-files','original-test-files.test','workspace-file-catalog','workspace-file-catalog.test'])qualificationFiles.push(`packages/application/src/${name}.ts`,`packages/application/dist/packages/application/src/${name}.js`);
@@ -45,7 +48,15 @@ for(const file of ['original-native-write-state','original-result-state','origin
 for(const name of ['sqlite-store','postgres-store'])qualificationFiles.push(`packages/${name}/src/original-command-queue.ts`,`packages/${name}/dist/packages/${name}/src/original-command-queue.js`);
 qualificationFiles.push('packages/domain/src/index.ts','packages/domain/dist/packages/domain/src/index.js');
 
-const hashQualification=async()=>Object.fromEntries(await Promise.all(qualificationFiles.map(async path=>[path,createHash('sha256').update(await readFile(join(app,path))).digest('hex')])));
+const hashQualification=async()=>Object.fromEntries(await Promise.all([...new Set(qualificationFiles)].map(async path=>[path,createHash('sha256').update(await readFile(join(app,path))).digest('hex')])));
+// Bind the served frontend bundles and all current backend source/JavaScript,
+// including dependencies outside the original targeted qualification list.
+qualificationFiles.push(...await collect('dist/apps/web'),...await collect('apps/api/src'));
+qualificationFiles.push(...(await collect('apps/api/dist/apps/api/src')).filter(path=>path.endsWith('.js')));
+for(const name of ['domain','contracts','application','memory-store','file-store','sqlite-store','postgres-store']){
+ qualificationFiles.push(...await collect(`packages/${name}/src`));
+ qualificationFiles.push(...(await collect(`packages/${name}/dist/packages/${name}/src`)).filter(path=>path.endsWith('.js')));
+}
 let qualificationHashes=await hashQualification();
 const mod=async name=>import(pathToFileURL(require.resolve(name)).href);
 const {createFirstSliceServices}=await mod('@testcenter-rewrite-app/application');
@@ -81,14 +92,14 @@ for(const id of scrollBooklets)await upload(id+'.xml',xml('Booklet',`<Metadata><
 const scrollProfiles=scrollBooklets.map((_,i)=>'scroll'+(i+1));
 const password='Owned native auth password';
 await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers',`<Metadata/><CustomTexts><CustomText key="booklet_pausedmessage">Owned remote pause Ω</CustomText></CustomTexts><Profiles><GroupMonitor><Profile id="full" label="Vollständig" view="full" groupColumn="show"/>${scrollProfiles.map(id=>`<Profile id="${id}" label="Owned Monitor ${id}" view="full" groupColumn="show"/>`).join('')}</GroupMonitor></Profiles><Group id="OWNED.AUTH" label="Owned Native Group"><Login name="native-monitor" pw="${password}" mode="monitor-group"><Profile id="full"/></Login><Login name="native-code" pw="${password}" mode="run-hot-return"><Booklet codes="Shared">OWNED.BROWSER</Booklet></Login><Login name="native-direct" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login><Login name="native-seed" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group><Group id="OWNED.LARGE" label="Owned Large State"><Login name="native-large-state" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group><Group id="OWNED.BACKGROUND" label="Owned Native Background Group"><Login name="native-background" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group><Group id="OWNED.STARTUP" label="Owned Native Startup Group"><Login name="native-startup" pw="${password}" mode="run-hot-return"><Booklet>OWNED.BROWSER</Booklet></Login></Group><Group id="OWNED.REVIEWS" label="Owned Native Review Group"><Login name="native-review-trial" pw="${password}" mode="run-trial"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login><Login name="native-review-review" pw="${password}" mode="run-review"><Booklet>OWNED.BROWSER</Booklet><Booklet>OWNED.OTHER</Booklet></Login></Group><Group id="OWNED.SCROLL" label="Owned Starter Scroll Group"><Login name="native-scroll" pw="${password}" mode="run-hot-return">${scrollBooklets.map(id=>`<Booklet>${id}</Booklet>`).join('')}</Login></Group><Group id="OWNED.SCROLL.MONITOR" label="Owned Monitor Scroll Group"><Login name="native-scroll-monitor" pw="${password}" mode="monitor-group">${scrollProfiles.map(id=>`<Profile id="${id}"/>`).join('')}</Login></Group>`)});
-const starsFixture=!backgroundOnly&&!largeStateOnly&&!geoGebraOnly?await prepareNativeStarsFixture({services,tenantKey:tenant.tenantKey,app}):undefined;
+const starsFixture=!backgroundOnly&&!largeStateOnly&&!geometryOnly?await prepareNativeStarsFixture({services,tenantKey:tenant.tenantKey,app}):undefined;
 if(starsFixture){qualificationFiles.push('scripts/native-stars-recovery-smoke.mjs','scripts/run-native-stars-recovery-smoke.mjs',...starsFixture.fixturePaths);qualificationHashes=await hashQualification();}
-const fullCohort=!(backgroundOnly||starsOnly||capacityOnly||largeStateOnly||starsClosureOnly||geoGebraOnly);
-const geoGebraFixture=geoGebraOnly||fullCohort?await prepareNativeGeoGebraFixture({services,tenantKey:tenant.tenantKey,app,password}):undefined;
+const fullCohort=!(backgroundOnly||starsOnly||capacityOnly||largeStateOnly||starsClosureOnly||geometryOnly);
+const geoGebraFixture=geometryOnly||fullCohort?await prepareNativeGeoGebraFixture({services,tenantKey:tenant.tenantKey,app,password}):undefined;
 if(geoGebraFixture){qualificationFiles.push(...geoGebraFixture.fixturePaths);qualificationHashes=await hashQualification();}
 const seed=await services.originalSession.login({name:'native-seed',password:''});await services.originalTest.create({token:seed.token,bookletName:'OWNED.BROWSER'});await storage.shutdown();
 const {DatabaseSync}=await import('node:sqlite'),db=new DatabaseSync(file);assert.equal(db.prepare('UPDATE original_test_number_counter SET last_number=? WHERE singleton=1').run('9007199254740992').changes,1);assert.equal(db.prepare('UPDATE original_native_command_counter SET last_number=? WHERE singleton=1').run('9007199254740992').changes,1);assert.equal(db.prepare('UPDATE original_native_review_counters SET last_number=?').run('9007199254740992').changes,2);db.close();
-const checks=[],errors=[],wire=[],consoleErrors=[],responseReceipts=[],commandReceipts=[],testWriteReceipts=[],resourceReceipts=[],monitorWire=[],serverMessages=[];let server,browser,page,monitor;
+const checks=[],errors=[],wire=[],consoleErrors=[],responseReceipts=[],commandReceipts=[],testWriteReceipts=[],resourceReceipts=[],monitorWire=[],serverMessages=[];let server,browser,page,monitor,completed=false;
 const mark=name=>{checks.push(name);console.log('native_participant_ui='+name+':passed');reportSmokePhase(name);};
 try{
  server=spawn(process.execPath,[join(app,'scripts/native-participant-server.mjs')],{cwd:app,stdio:['ignore','ignore','inherit','ipc'],env:{...process.env,FIRST_SLICE_STORE:'sqlite',FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'participant,second_code',FIRST_SLICE_PROOF_OF_WORK_SECRET:randomBytes(32).toString('hex'),FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET:'',FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER:'12',FIRST_SLICE_PROOF_OF_WORK_TTL_MS:'60000',REQUIRE_LOGIN_PASSWORD:'false'}});
@@ -103,7 +114,7 @@ try{
  await page.addInitScript(()=>{window.__ownedErrorEvents=[];addEventListener('error',event=>window.__ownedErrorEvents.push({code:event.error?.code,label:event.error?.label}));addEventListener('unhandledrejection',event=>window.__ownedErrorEvents.push({code:event.reason?.code,label:event.reason?.label}));});
  page.on('pageerror',error=>errors.push(String(error)));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text().replace(/(\/file\/)[^/]+/g,'$1[resource-capability]'));});
  page.on('request',r=>{const p=new URL(r.url()).pathname;if(/^\/(?:session|test|file)(?:\/|$)/.test(p))wire.push({method:r.method(),path:p.replace(/^(\/file\/)[^/]+/,'$1[resource-capability]')});});
- if(!backgroundOnly&&!starsOnly&&!capacityOnly&&!largeStateOnly&&!starsClosureOnly&&!geoGebraOnly){
+ if(!backgroundOnly&&!starsOnly&&!capacityOnly&&!largeStateOnly&&!starsClosureOnly&&!geometryOnly){
  await page.goto(base+'/app/native-start?ui=original');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('native-code');await page.locator('[data-cy=login-user]').click();
  await page.getByLabel('Kennwort',{exact:true}).fill(password);await page.locator('[data-cy=login-user]').click();await page.locator('[data-cy=code-input]').waitFor();mark('actual-ui-password-work-to-native-code-input');
  await page.locator('[data-cy=code-input]').fill('sHaReD');await page.locator('[data-cy=continue]').click();
@@ -311,19 +322,25 @@ try{
 
 
  }
- if(!starsOnly&&!capacityOnly&&!largeStateOnly&&!starsClosureOnly&&!geoGebraOnly){
+ if(!starsOnly&&!capacityOnly&&!largeStateOnly&&!starsClosureOnly&&!geometryOnly){
  await runNativeBackgroundLockedSmoke({browser,base,file,out,password,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,serverMessages});
  await runNativeStartupRecoverySmoke({browser,base,file,out,password,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,serverMessages});
  }
  if(capacityOnly)await runNativeStarsCapacitySmoke({browser,base,file,out,mark,fixture:starsFixture,responseReceipts,configure});
  else if(starsFixture&&!starsClosureOnly){await runNativeStarsRecoverySmoke({browser,base,file,out,mark,fixture:starsFixture,responseReceipts,configure});await runNativeStarsCapacitySmoke({browser,base,file,out,mark,fixture:starsFixture,responseReceipts,configure});}
- if(largeStateOnly||!backgroundOnly&&!starsOnly&&!capacityOnly&&!starsClosureOnly&&!geoGebraOnly)await runNativeLargeStateSmoke({browser,base,out,password,mark,configure,responseReceipts});
- if(starsClosureOnly||!backgroundOnly&&!starsOnly&&!capacityOnly&&!largeStateOnly&&!geoGebraOnly)await runNativeStarsClosedRunsSmoke({browser,base,file,out,fixture:starsFixture,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,testWriteReceipts,serverMessages});
- if(geoGebraFixture)await runNativeGeoGebraSmoke({browser,base,out,fixture:geoGebraFixture,mark,configure,responseReceipts,resourceReceipts,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},serverMessages});
+ if(largeStateOnly||!backgroundOnly&&!starsOnly&&!capacityOnly&&!starsClosureOnly&&!geometryOnly)await runNativeLargeStateSmoke({browser,base,out,password,mark,configure,responseReceipts});
+ if(starsClosureOnly||!backgroundOnly&&!starsOnly&&!capacityOnly&&!largeStateOnly&&!geometryOnly)await runNativeStarsClosedRunsSmoke({browser,base,file,out,fixture:starsFixture,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,testWriteReceipts,serverMessages});
+ if(geoGebraFixture){
+   const geometryControls={browser,base,configure,responseReceipts,resourceReceipts,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},serverMessages};
+   if(!rootZipOnly)await runNativeGeoGebraSmoke({...geometryControls,out,fixture:geoGebraFixture,mark});
+   const archiveOut=join(out,'root-zip');await mkdir(archiveOut,{recursive:true});
+   await runNativeGeoGebraSmoke({...geometryControls,out:archiveOut,fixture:geoGebraFixture.rootZipFixture,mark:name=>mark('native-root-zip-'+name.replace(/^native-/,''))});
+ }
  assert.deepEqual(consoleErrors.filter(x=>/NG\d{4}|TypeError|ReferenceError|SyntaxError|Error retrieving icon/.test(x)),[]);
  assert.deepEqual(await hashSources(),sourceHashes);assert.deepEqual(await hashQualification(),qualificationHashes,'Participant harness and actual API build must remain unchanged during qualification');
- await writeFile(join(out,'result.json'),JSON.stringify({success:true,diagnosticOnly:backgroundOnly||starsOnly||capacityOnly||largeStateOnly||starsClosureOnly||geoGebraOnly,browser:browser.version(),checks,errors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,sourceHashes,qualificationHashes,scope:geoGebraOnly?'Only actual native Aspect/GeoGebra resource execution; excludes the existing95native cases.':starsClosureOnly?'Only official STARS56 closed-worker case; excludes existing92native cases.':largeStateOnly?'Diagnostic opaque native Verona large state and pressure controls; not an executed GeoGebra application.':capacityOnly?'Diagnostic native Original STARS capacity case only; excludes the prior82native cases.':starsOnly?'Diagnostic native Original STARS fixture; excludes the existing76native cases.':backgroundOnly?'Only background closure and startup recovery controls against owned production SQLite; excludes the prior70native cases.':'Local uncommitted full native UI path including official Original STARS56/28-to21/200-to201 against owned production native SQLite API, actual Source Starter card/controller/unit host; not whole-project/visual qualification.'},null,2));
+ await writeFile(join(out,'result.json'),JSON.stringify({success:true,diagnosticOnly:backgroundOnly||starsOnly||capacityOnly||largeStateOnly||starsClosureOnly||geometryOnly,browser:browser.version(),checks,errors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,sourceHashes,qualificationHashes,scope:rootZipOnly?'Diagnostic11wholeZIPadministration+actualAspect/GeoGebra controls; excludes the prior106native controls.':geometryOnly?'Diagnostic22geometryandwholeZIPcontrols; excludes the other95fullcohort controls.':starsClosureOnly?'Only official STARS56 closed-worker case; excludes existing92native cases.':largeStateOnly?'Diagnostic opaque native Verona large state and pressure controls; not an executed GeoGebra application.':capacityOnly?'Diagnostic native Original STARS capacity case only; excludes the prior82native cases.':starsOnly?'Diagnostic native Original STARS fixture; excludes the existing76native cases.':backgroundOnly?'Only background closure and startup recovery controls against owned production SQLite; excludes the prior70native cases.':'Local uncommitted full native UI path including official Original STARS56/28-to21/200-to201 against owned production native SQLite API, actual Source Starter card/controller/unit host; not whole-project/visual qualification.'},null,2));
+completed=true;
 }catch(error){if(monitor){await monitor.screenshot({path:join(out,'monitor-failure.png')}).catch(()=>{});await writeFile(join(out,'monitor-failure.html'),await monitor.content().catch(()=>''));}await page?.screenshot({path:join(out,'failure.png')}).catch(()=>{});const dom=await page?.content().catch(()=>'');if(dom)await writeFile(join(out,'failure.html'),dom);await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),checks,errors,consoleErrors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,url:page?.url(),monitorUrl:monitor?.url()},null,2));throw error;}
-finally{await browser?.close();if(server)await stopNativeSmokeServer(server);}
+finally{await browser?.close();if(server)await stopNativeSmokeServer(server);if(completed)await rm(scratch,{recursive:true,force:true});}
 
 }
