@@ -43,6 +43,11 @@ import { createFirstSliceServices, type FirstSliceRepository } from "@testcenter
 import type { MonitorRunCommandResult, ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 
 import { createProductionApiServer } from "./index.js";
+
+const applicationAssetPngBytes = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=', 'base64');
+const applicationAssetWebpBytes = Buffer.from(
+  'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA', 'base64');
 import { ProofOfWorkManager } from "./proof-of-work.js";
 import { localDemoSourcePackage } from "./local-demo-bootstrap.js";
 
@@ -4543,9 +4548,7 @@ test("platform application settings are public, durable, validated, and audited"
     body: {
       originalName: "global-login.png",
       mediaType: "image/png",
-      dataBase64: Buffer.from([
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
-      ]).toString("base64")
+      dataBase64: applicationAssetPngBytes.toString("base64")
     }
   });
   assert.equal(globalAssetUpload.status, 201);
@@ -4777,7 +4780,7 @@ test("platform application settings are public, durable, validated, and audited"
   // Uploaded names are valid Unicode. HTTP headers require an ASCII fallback
   // and RFC 5987 encoding; raw non-Latin-1 names previously produced HTTP 500.
   for (const originalName of ["Bild Ω 中文 🙂.png", "Bild ä.png", "Bild \"(')*.png"]) {
-    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const bytes = applicationAssetPngBytes;
     const uploaded = await requestJson<{applicationAsset: {applicationAssetId: string}}>(
       "/api/v1/admin/application-assets", {method: "POST", headers: {authorization},
         body: {originalName, mediaType: "image/png", dataBase64: bytes.toString("base64")}});
@@ -20359,14 +20362,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       originalName: "school.png",
       mediaType: "image/png",
-      dataBase64: Buffer.from([
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
-      ]).toString("base64")
+      dataBase64: applicationAssetPngBytes.toString("base64")
     },
     {
       originalName: "start.webp",
       mediaType: "image/webp",
-      dataBase64: Buffer.from("RIFF0000WEBP", "ascii").toString("base64")
+      dataBase64: applicationAssetWebpBytes.toString("base64")
     }
   ]) {
     const upload = await requestJson<{
@@ -20405,7 +20406,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
   assert.equal(schoolAssetDownload.headers.get("cache-control"), "public, max-age=300");
   assert.deepEqual(
     Buffer.from(await schoolAssetDownload.arrayBuffer()),
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    applicationAssetPngBytes
   );
   const assetAssignmentsRoster = await requestJson(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,

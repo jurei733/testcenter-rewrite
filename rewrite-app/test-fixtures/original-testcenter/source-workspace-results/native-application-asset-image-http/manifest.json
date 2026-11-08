@@ -1,0 +1,16 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "captureMode": "Actual protected Source HTTP; no SQL seeds or DAO stubs; isolated existing stack; owned assets removed; prior catalog retained",
+  "phpRuntime": "8.3.36",
+  "cases": 50,
+  "httpRequests": 81,
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "lockedComposerPackages": 19,
+  "files": {
+    "inputs.json": "2db98d715b7ab26924c85bf35b6cd212c83c3f8051fb4521bd462e04300b3ca2",
+    "observations.json": "b716184ef7116fb09a9170a45bb7839ef97d66faba16f6e05a6eb02d91267525",
+    "capture.mjs": "586b2a394573427fdfaa6ad955e9e94e4d177db9dfc7cfa28e962f48dfa583a9"
+  },
+  "wholeOriginalParityProven": false
+}

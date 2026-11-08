@@ -1,0 +1,402 @@
+[
+  {
+    "label": "png-complete",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "f3ec9e14b9c085b55edc96155f7bd26b6fdeda2462f02af4e0279d8319b365e3"
+  },
+  {
+    "label": "png-prefix-8",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 8,
+    "base64": "iVBORw0KGgo=",
+    "sha256": "4c4b6a3be1314ab86138bef4314dde022e600960d8689a2c8f8631802d20dab6"
+  },
+  {
+    "label": "png-prefix-12",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 12,
+    "base64": "iVBORw0KGgoAAAAN",
+    "sha256": "218ad85a233eff829618a6865ab681222b734c62d35a32b3eabd5c37d8945f86"
+  },
+  {
+    "label": "png-prefix-16",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 16,
+    "base64": "iVBORw0KGgoAAAANSUhEUg==",
+    "sha256": "02a3e298f1533f62558c58e4c70edcab9af5a50d62d925fd5390942020fb0fb8"
+  },
+  {
+    "label": "png-prefix-20",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 20,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAE=",
+    "sha256": "d51696591e6a664adeecee08d772d017975c6d8d466d015246afd911ca06d7e8"
+  },
+  {
+    "label": "png-prefix-24",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 24,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+    "sha256": "a930c2bb4e61c0682068f71c4ef427eefbb07098ecea9390e445e7af4b66a384"
+  },
+  {
+    "label": "png-prefix-25",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 25,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCA==",
+    "sha256": "2b323eb197dc0c5c418fa590cb473a211d34c03d8f189125e9884b47fec4a18d"
+  },
+  {
+    "label": "png-prefix-32",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 32,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAw=",
+    "sha256": "3a858797f590e342cb67cd046077f54ba7d72eab02c18047a8e75f16bc5ee3b3"
+  },
+  {
+    "label": "png-prefix-33",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 33,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC",
+    "sha256": "c6143a55ef7224ebcdae13cca72550a2feb063757340d4f8b8f6888ca2af5593"
+  },
+  {
+    "label": "png-zero-width",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAAAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "4f6dba275f055e3cc6806bfd0be98b2ae9ef408b4f73d86b69a37edf721985c0"
+  },
+  {
+    "label": "png-zero-height",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAACAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "9553215bfcacc5ac7acfaa4bc7499b9f383dcfd5d282161ff1fc82c2ab9e1cae"
+  },
+  {
+    "label": "png-non-ihdr",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANSlVOSwAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "c9d685c23a7ad7c3f67e271064e76840a75bac7da1933432b3f9711a06d9c01e"
+  },
+  {
+    "label": "png-zero-ihdr-length",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAAASUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "67d565efe0030516cbe77e4fd97dca009f5d9b284c6615f95ff6906cc1aa8a92"
+  },
+  {
+    "label": "png-huge-ihdr-length",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgr/////SUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "396d734b50ce37ba86b1b0e44d42b474420b0b7e6e4a0e0d98cf9426983dde91"
+  },
+  {
+    "label": "png-high-bit-ihdr",
+    "extension": "png",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANyUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "3e032d3cd35c954de7c092be75cf05cbd4544d7119eaa7fce5946259288f2d89"
+  },
+  {
+    "label": "png-as-jpg",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "f3ec9e14b9c085b55edc96155f7bd26b6fdeda2462f02af4e0279d8319b365e3"
+  },
+  {
+    "label": "png-wrong-client-mime",
+    "extension": "png",
+    "declaredMediaType": "text/plain",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "f3ec9e14b9c085b55edc96155f7bd26b6fdeda2462f02af4e0279d8319b365e3"
+  },
+  {
+    "label": "png-bad-extension",
+    "extension": "txt",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "f3ec9e14b9c085b55edc96155f7bd26b6fdeda2462f02af4e0279d8319b365e3"
+  },
+  {
+    "label": "png-upper-extension",
+    "extension": "PNG",
+    "declaredMediaType": "image/png",
+    "bytes": 68,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=",
+    "sha256": "f3ec9e14b9c085b55edc96155f7bd26b6fdeda2462f02af4e0279d8319b365e3"
+  },
+  {
+    "label": "jpeg-sof0",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 23,
+    "base64": "/9j/wAARCAACAAMDAREAAhEAAxEA/9k=",
+    "sha256": "f83b333f2139129a3acdbc68f1f2c47fc48cd15e777ac85e4ed9555a730cc8b9"
+  },
+  {
+    "label": "jpeg-sof2",
+    "extension": "jpeg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 23,
+    "base64": "/9j/wgARCAACAAMDAREAAhEAAxEA/9k=",
+    "sha256": "7bbd096433d65cb2f68d0322af63ab8f7ba52cd9497174aa38dc5b6e1160501a"
+  },
+  {
+    "label": "jpeg-sof1",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 23,
+    "base64": "/9j/wQARCAACAAMDAREAAhEAAxEA/9k=",
+    "sha256": "386710aae28d433bd5c7cdcebb47fb01faa13160faa8c4169e1cf0d3ac0da53c"
+  },
+  {
+    "label": "jpeg-sof3",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 23,
+    "base64": "/9j/wwARCAACAAMDAREAAhEAAxEA/9k=",
+    "sha256": "88448e3af2443e4209c86347f6f152839fd4ad4b3b020201209c86c6257c8acc"
+  },
+  {
+    "label": "jpeg-prefix-3",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 3,
+    "base64": "/9j/",
+    "sha256": "6e568e1f67fba258184c78181539e5e8fdee447e49bb706fc0ea34fbf12336a5"
+  },
+  {
+    "label": "jpeg-prefix-4",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 4,
+    "base64": "/9j/wA==",
+    "sha256": "495e2be811efdc7c478c69561827af04bc2de7f922e51bdfcdcfb1f182a1fbfb"
+  },
+  {
+    "label": "jpeg-prefix-5",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 5,
+    "base64": "/9j/wAA=",
+    "sha256": "5abc152b9ce3276550f02bc166ec315350d14905faa216396b54836a27fc00d1"
+  },
+  {
+    "label": "jpeg-prefix-6",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 6,
+    "base64": "/9j/wAAR",
+    "sha256": "03a06c8f7a4be2d73581ff5a0b522b2cca4280e951951f7df047645371ad188d"
+  },
+  {
+    "label": "jpeg-prefix-7",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 7,
+    "base64": "/9j/wAARCA==",
+    "sha256": "f127188cd57bd3b329fd7a7415e97b97abb3cdfb7f34cb91b21c08cd25f9cd2b"
+  },
+  {
+    "label": "jpeg-prefix-8",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 8,
+    "base64": "/9j/wAARCAA=",
+    "sha256": "f48450337acfb5d12d3ce55bd259709c6c5b3d6a5260fa6f6a182c34df5f84df"
+  },
+  {
+    "label": "jpeg-prefix-11",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 11,
+    "base64": "/9j/wAARCAACAAM=",
+    "sha256": "d84e75ead11430abdb30f0b8e558dcfcf6581e8e60ba0fe35168be262d11f78f"
+  },
+  {
+    "label": "jpeg-prefix-12",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 12,
+    "base64": "/9j/wAARCAACAAMD",
+    "sha256": "36a05bc586176b40ca245498379b9ac41043cdf9abe8e9b0f1ed1a43547c116b"
+  },
+  {
+    "label": "jpeg-invalid-app-length",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 15,
+    "base64": "/9j/4QAA/8AAEQgAAgAD",
+    "sha256": "4afad904fef3aedf1dd30b83d4dd0db275b3086bd741c0f0d320115606d44827"
+  },
+  {
+    "label": "jpeg-with-app",
+    "extension": "jpg",
+    "declaredMediaType": "image/jpeg",
+    "bytes": 31,
+    "base64": "/9j/4QAGAQIDBP/AABEIAAIAAwMBEQACEQADEQD/2Q==",
+    "sha256": "566dd0334be0573069083d14a816b71a27b763ba06150e69667cdf5f6358cec1"
+  },
+  {
+    "label": "webp-vp8",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRhYAAABXRUJQVlA4IAoAAAAwAQCdASoDAAIA",
+    "sha256": "59b0270bc0c37fe0f068092c5f4cd4f4f9e2dfc33b4fe484e042012157d5332c"
+  },
+  {
+    "label": "webp-vp8l",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 26,
+    "base64": "UklGRhIAAABXRUJQVlA4TAUAAAAvAkAAAAA=",
+    "sha256": "1cf035565566583208a45f4338cf1e28231a4fef750898d7a1a3d4b9e36502bf"
+  },
+  {
+    "label": "webp-vp8x",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRhYAAABXRUJQVlA4WAoAAAAAAAAAAgAAAQAA",
+    "sha256": "86a8153a57a7aaa0c523ba204d31607ca88af8a862d4a1f562c5e2ce60eddada"
+  },
+  {
+    "label": "webp-prefix-12",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 12,
+    "base64": "UklGRhYAAABXRUJQ",
+    "sha256": "a3ddbd3ab742746f8e4f873ba8a4fdac94e4aa6f602f86ee632c40fdf3f0a48a"
+  },
+  {
+    "label": "webp-prefix-16",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 16,
+    "base64": "UklGRhYAAABXRUJQVlA4IA==",
+    "sha256": "d80868b1af17f9e90e6358a0c1c4e947df8cdffef384831096bf993fa97e1fc0"
+  },
+  {
+    "label": "webp-prefix-20",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 20,
+    "base64": "UklGRhYAAABXRUJQVlA4IAoAAAA=",
+    "sha256": "f357840060f7541eba21e1a9bf9f5c83873a2e826d16c0631e7e815a6bd16111"
+  },
+  {
+    "label": "webp-prefix-25",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 25,
+    "base64": "UklGRhYAAABXRUJQVlA4IAoAAAAwAQCdAQ==",
+    "sha256": "8fd115d9e708998e361aeeea017fdf2281cb1445309b561cdb5de97092bb7495"
+  },
+  {
+    "label": "webp-prefix-29",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 29,
+    "base64": "UklGRhYAAABXRUJQVlA4IAoAAAAwAQCdASoDAAI=",
+    "sha256": "d8b890dac8500ec6c27e876bc944315a96ebbcc1bae9456f9675115e051569df"
+  },
+  {
+    "label": "webp-vp8-bad-start",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRhYAAABXRUJQVlA4IAoAAAAwAQAAASoDAAIA",
+    "sha256": "73b2ae3febfa3789d68b9e1120f81137145f58b165f4270f4704a8ba51be90e7"
+  },
+  {
+    "label": "webp-vp8l-bad-signature",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 26,
+    "base64": "UklGRhIAAABXRUJQVlA4TAUAAAAAAkAAAAA=",
+    "sha256": "0bb14af2474b71555989bcf601e9cd86e694141b6ae255af85f3f645f3fe021f"
+  },
+  {
+    "label": "webp-vp8l-padded",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRhIAAABXRUJQVlA4TAUAAAAvAkAAAAAAAAAA",
+    "sha256": "50adb5894c5c1025f1ae4f45eed859a4ec5681a80b8170eb7ac83c6bcaa91038"
+  },
+  {
+    "label": "webp-bad-riff-length",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRgAAAABXRUJQVlA4IAoAAAAwAQCdASoDAAIA",
+    "sha256": "6f567c2cf3c3e6b52213a5c7aff89cc48827321488bc39870a42393190dce596"
+  },
+  {
+    "label": "webp-high-bit-riff",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "0klGRhYAAABXRUJQVlA4IAoAAAAwAQCdASoDAAIA",
+    "sha256": "9786556410b5acfc0685278b51a66ae467c8d11d2a86abe8c2e8eec07256f519"
+  },
+  {
+    "label": "webp-high-bit-webp",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRhYAAADXRUJQVlA4IAoAAAAwAQCdASoDAAIA",
+    "sha256": "bae245fb135fccb91b22f2c3c01374a9a84d0e885bb50750cede2e192747324c"
+  },
+  {
+    "label": "webp-high-bit-vp8",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRhYAAABXRUJQ1lA4IAoAAAAwAQCdASoDAAIA",
+    "sha256": "984d40a2b5cafdab104697e809f3dd57c119c8da0b118eec85116bf61f9b7fdb"
+  },
+  {
+    "label": "webp-vp8x-zero-reserved",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRhYAAABXRUJQVlA4WAoAAAAAAAAAAgAAAQAA",
+    "sha256": "86a8153a57a7aaa0c523ba204d31607ca88af8a862d4a1f562c5e2ce60eddada"
+  },
+  {
+    "label": "webp-unknown-chunk",
+    "extension": "webp",
+    "declaredMediaType": "image/webp",
+    "bytes": 30,
+    "base64": "UklGRhYAAABXRUJQSlVOSwoAAAAAAAAAAAAAAAAA",
+    "sha256": "cc32bac50f0035e7eff88bd6977aec72c8f3741ac7f5c14e66d23ebea6385be0"
+  }
+]

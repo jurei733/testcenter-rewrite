@@ -1,3 +1,4 @@
+import {applicationAssetImageType} from './application-asset-image.js';
 import {readWorkspaceFileReport,appendWorkspaceFileReport,workspaceFileReportErrors} from './original-workspace-file-report.js';
 import {createOriginalWorkspaceArchives,assertWorkspaceUploadName,applyWorkspaceArchiveTimestamps,type WorkspaceArchiveOrigin} from './original-workspace-archive.js';
 import {originalResourceMediaType} from './original-resource-media-type.js';
@@ -5778,14 +5779,6 @@ const normalizeApplicationAssetInput = (input: {
       "Application asset filenames must contain between 1 and 255 characters."
     );
   }
-  const mediaType = input.mediaType.trim().toLowerCase();
-  if (!(["image/png", "image/jpeg", "image/webp"] as string[]).includes(mediaType)) {
-    throw new FirstSliceError(
-      400,
-      "application_asset_media_type_invalid",
-      "Application assets must be PNG, JPEG, or WebP images."
-    );
-  }
   const dataBase64 = input.dataBase64.replace(/\s+/g, "");
   if (
     !dataBase64 ||
@@ -5807,30 +5800,24 @@ const normalizeApplicationAssetInput = (input: {
       "Application assets must contain data and must not exceed 2 MiB."
     );
   }
-  const validSignature =
-    mediaType === "image/png"
-      ? bytes.length >= 8 &&
-        bytes.subarray(0, 8).equals(
-          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-        )
-      : mediaType === "image/jpeg"
-        ? bytes.length >= 3 &&
-          bytes[0] === 0xff &&
-          bytes[1] === 0xd8 &&
-          bytes[2] === 0xff
-        : bytes.length >= 12 &&
-          bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
-          bytes.subarray(8, 12).toString("ascii") === "WEBP";
-  if (!validSignature) {
+  const mediaType = applicationAssetImageType(bytes);
+  if (!mediaType) {
     throw new FirstSliceError(
       400,
       "application_asset_image_signature_invalid",
-      "Application asset data does not match its declared media type."
+      "Application asset data must contain readable PNG, JPEG, or WebP image headers."
+    );
+  }
+  if (!/\.(?:png|jpe?g|webp)$/i.test(originalName)) {
+    throw new FirstSliceError(
+      400,
+      "application_asset_extension_invalid",
+      "Application assets require a PNG, JPEG, or WebP filename extension."
     );
   }
   return {
     originalName,
-    mediaType: mediaType as ApplicationAsset["mediaType"],
+    mediaType,
     dataBase64,
     byteLength: bytes.length
   };

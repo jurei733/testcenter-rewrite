@@ -24,7 +24,7 @@ for(const kind of kinds)test(kind+': protected HTTP asset cascade preserves unre
    const value=await response.json();assert.equal(response.status,expected,method+' '+path+': '+JSON.stringify(value));return value;
   };
   token=(await api('/api/v1/admin/auth/sign-in',{username:'demo-admin',password:'demo-admin-password'})).sessionToken;
-  const image={originalName:'owned-cascade.png',mediaType:'image/png',dataBase64:Buffer.from([137,80,78,71,13,10,26,10]).toString('base64')};
+  const image={originalName:'owned-cascade.png',mediaType:'image/png',dataBase64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII='};
   const asset=(await api('/api/v1/admin/application-assets',image,'POST',201)).applicationAsset;
   const other=(await api('/api/v1/admin/application-assets',{...image,originalName:'owned-keep.png'},'POST',201)).applicationAsset;
   await api('/api/v1/admin/application-settings',{appTitle:'Owned cascade title',globalWarningText:'Retain this warning',customTexts:{login_subtitle:'  Authored Ω  '},assetAssignments:{logo:asset.originalName,loginIllustration:other.originalName}},'PATCH');
