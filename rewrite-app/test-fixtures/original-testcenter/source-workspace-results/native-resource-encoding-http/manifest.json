@@ -1,0 +1,26 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceRuntimeFilesVerifiedBeforeAndAfter": 137,
+  "composerPackages": 19,
+  "httpRows": 37,
+  "uploads": 9,
+  "xmlSchemaValidation": true,
+  "allowTestMode": false,
+  "sqlSeedsOrDaoStubs": false,
+  "scope": "Actual protected Source HTTP uploads and final Resource catalog DTOs. UTF-8/no-charset defaults, declared/BOM encodings, PHP version/zero-value semantics, archive count including directories, and exact archive comment. Numeric specVersion is recorded as a Source 500 with no installed file; Rewrite intentionally rejects it as safe 400 before persistence.",
+  "files": {
+    "capture.mjs": "7d1f26e3d8a0b0a247a37eac8cca2d2c059e721a317fbbd9a0111af081a4a01a",
+    "inputs.json": "68f25576e1bdead298aebbc260202ac68d5e441ca1ebb355ade2f67d32e59968",
+    "latin1-meta.zip.base64": "6c0ed31c1d471b4f312653441f5ca5d10086d9282bb1504fbd2fc18261299e5b",
+    "null-schema.zip.base64": "b638b5f4631785d9b10a8fad14300674d2141e428a107804dc719aab535e98f8",
+    "observations.json": "5952400f9c2140f49c01fdd15a848e5427492643d37960879076bf86955e182e",
+    "scientific-version.zip.base64": "115b3b6328ea16e3889da83e88d8506ca47f38d8e6f659970e4142699516d4b9",
+    "utf16-bom.zip.base64": "d8344917548c83ed005b37069637e16d52ce1d6b10bd61453e7acf9c641dc42f",
+    "utf8-bom.zip.base64": "755118427b04ad79a9b2c9b0711bf3ae3576835b99143cb1107512a01377970a",
+    "utf8-equivalent.zip.base64": "ae1f71b9fcb1c66f96eac2d4e5e882ae66bcb10159fd8fdeb935d5683b7ea294",
+    "utf8-meta.zip.base64": "78b979e63a180704c78f131a729cee921b12d966bee898d1279fca0028ae8ca0",
+    "xml-encoding.zip.base64": "cfc0be74b62b937df3fe068568d68b6bbfd027e261c1846e0d85ae69f96bfc61",
+    "zero-strings.zip.base64": "a556cdef6777e043306f0524fc50bca9f894a22157a33227bcb50767427eeed7"
+  }
+}

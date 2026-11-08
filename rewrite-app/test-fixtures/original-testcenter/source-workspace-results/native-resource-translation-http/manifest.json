@@ -1,0 +1,27 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceRuntimeFilesVerifiedBeforeAndAfter": 137,
+  "composerPackages": 19,
+  "httpRows": 41,
+  "uploads": 10,
+  "xmlSchemaValidation": true,
+  "allowTestMode": false,
+  "sqlSeedsOrDaoStubs": false,
+  "scope": "Actual protected Source HTTP metadata translation list/object/null/type cases. Five malformed cases return Source500 with no installed file; Rewrite safely rejects those bytes as400 without state mutation. Five accepted cases preserve exact catalog text and reports.",
+  "files": {
+    "capture.mjs": "9b8a27e3dcc9ff0984ba3463ce20b349901725097384283fc7aeb4f06f5dbfbb",
+    "context-list.zip.base64": "002e0189c6fb3233d7b61179160e3dd42b7e7a67270e5ece8add4e5f07f55680",
+    "context-null-fallback.zip.base64": "bbe12af40383133dca5f231e3f817a99a5b465bdde6e74c3fd00ad40b1c8b9fb",
+    "context-string.zip.base64": "2fa0324991e2c8c861250d6f4ff2d068920239e46a8849a974bcc0c8af9d3802",
+    "inputs.json": "3f03ed68ba47a018945f4397c1cf9ed0d2d9c9a9a8acf1c439a3c387a6f8a130",
+    "name-integer-value.zip.base64": "3c232c495eebe5b0f66c9fa933f7d9cda393162558a4b942ad5b7f3a5ceb6d6a",
+    "name-integer.zip.base64": "c2b8f79b7f19e7f019a9eb05bb9a7e4f374295585aa25c1983c89cbcaf323872",
+    "name-missing-lang.zip.base64": "6ca5fd37729baa52a1d2ae26628ca65f1df9e951c28baf46a9992590ea87f620",
+    "name-null.zip.base64": "9a663d432b2a48a5006d87e1dd48034849b5fce845855cfd98bbe575f706a88b",
+    "name-object-entry.zip.base64": "1f2b387e803679b299bab7fc4843e25c5f8f18035391660b338913b5457c0387",
+    "name-object-string.zip.base64": "fbf16952d95b741ef0e987d5bcdac8324177c215cc443f4f32fffd7f862674da",
+    "name-string.zip.base64": "bc9f485c1227c56b891e3b85c219b70072e467b77db7b556bf9da290d73d1dcb",
+    "observations.json": "3d7f36d8bee44b05b1df0a222f8d348de00a8217ea8054c76c1a5a7a6beb8a45"
+  }
+}

@@ -1,0 +1,41 @@
+[
+  {
+    "label": "zero-unversioned",
+    "name": "zero-unversioned.zip",
+    "archiveSha256": "f244ed9e37701977df4cb232c67dfd95a2bb8442a78154515cc355df5b8f232a",
+    "archiveBytes": 450,
+    "entries": [
+      {
+        "name": "plain.html",
+        "base64": "PGh0bWw+PGhlYWQ+PHRpdGxlPk93bmVkIHRpdGxlPC90aXRsZT48c2NyaXB0IHR5cGU9ImFwcGxpY2F0aW9uL2xkK2pzb24iPnsiJHNjaGVtYSI6Imh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS92ZXJvbmEtaW50ZXJmYWNlcy9tZXRhZGF0YS9tYXN0ZXIvdmVyb25hLW1vZHVsZS1tZXRhZGF0YS5qc29uIiwiaWQiOiJpZ25vcmVkIiwidmVyc2lvbiI6IjAuMC4wIiwic3BlY1ZlcnNpb24iOiI2LjAiLCJ0eXBlIjoicGxheWVyIiwibmFtZSI6W10sImRlc2NyaXB0aW9uIjpbXX08L3NjcmlwdD48L2hlYWQ+PGJvZHk+T3duZWQgaW5lcnQgcGxheWVyPC9ib2R5PjwvaHRtbD4=",
+        "sha256": "f404442f4e5096be36d1948ddf2e5e237cb6eade5c4427b710a87af4e1aa886c"
+      }
+    ]
+  },
+  {
+    "label": "zero-label-unversioned",
+    "name": "zero-label-unversioned.zip",
+    "archiveSha256": "1d6774ab3439e96adaabcb2a12c4272163cab599932d1c050f4c8faf1f83b0ca",
+    "archiveBytes": 452,
+    "entries": [
+      {
+        "name": "plain.html",
+        "base64": "PGh0bWw+PGhlYWQ+PHRpdGxlPk93bmVkIHRpdGxlPC90aXRsZT48c2NyaXB0IHR5cGU9ImFwcGxpY2F0aW9uL2xkK2pzb24iPnsiJHNjaGVtYSI6Imh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS92ZXJvbmEtaW50ZXJmYWNlcy9tZXRhZGF0YS9tYXN0ZXIvdmVyb25hLW1vZHVsZS1tZXRhZGF0YS5qc29uIiwiaWQiOiJpZ25vcmVkIiwidmVyc2lvbiI6IjAuMC4wLTAiLCJzcGVjVmVyc2lvbiI6IjYuMCIsInR5cGUiOiJwbGF5ZXIiLCJuYW1lIjpbXSwiZGVzY3JpcHRpb24iOltdfTwvc2NyaXB0PjwvaGVhZD48Ym9keT5Pd25lZCBpbmVydCBwbGF5ZXI8L2JvZHk+PC9odG1sPg==",
+        "sha256": "edd97da2483356aaac73b634af74eccac62c4532bf4663c66089052ecaf294fa"
+      }
+    ]
+  },
+  {
+    "label": "zero-empty-type",
+    "name": "zero-empty-type.zip",
+    "archiveSha256": "d5da5a6dd17a1a2cbefb1f4ded89a5338aa956816973ddfe8b00040d378b4abb",
+    "archiveBytes": 444,
+    "entries": [
+      {
+        "name": "plain.html",
+        "base64": "PGh0bWw+PGhlYWQ+PHRpdGxlPk93bmVkIHRpdGxlPC90aXRsZT48c2NyaXB0IHR5cGU9ImFwcGxpY2F0aW9uL2xkK2pzb24iPnsiJHNjaGVtYSI6Imh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS92ZXJvbmEtaW50ZXJmYWNlcy9tZXRhZGF0YS9tYXN0ZXIvdmVyb25hLW1vZHVsZS1tZXRhZGF0YS5qc29uIiwiaWQiOiJpZ25vcmVkIiwidmVyc2lvbiI6IjAuMC4wIiwic3BlY1ZlcnNpb24iOiI2LjAiLCJ0eXBlIjoiIiwibmFtZSI6W10sImRlc2NyaXB0aW9uIjpbXX08L3NjcmlwdD48L2hlYWQ+PGJvZHk+T3duZWQgaW5lcnQgcGxheWVyPC9ib2R5PjwvaHRtbD4=",
+        "sha256": "433fed898d95d7969bf6413eab3d4620b39e309c6c3b0d231e1a73ea2d400033"
+      }
+    ]
+  }
+]

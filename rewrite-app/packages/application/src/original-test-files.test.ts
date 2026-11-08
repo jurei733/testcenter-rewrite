@@ -16,7 +16,10 @@ function fixture() {
     sources.push(source);projections.set(sourcePackageId,{sourcePackageId,fileName:name,fileType,status:'uploaded',uploadedAt:source.uploadedAt,
       sourceText,fileSizeBytes:Buffer.byteLength(sourceText),resourceIdentifier});return source;
   };
-  add('Resource/player.html','Resource','<html/>','owned-player-1.0');
+  add('Resource/player.html','Resource','<html><script type="application/ld+json">'+JSON.stringify({
+    $schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',
+    id:'owned-player',version:'1.0.3',specVersion:'6.0',type:'player'
+  })+'</script></html>','owned-player-1.0');
   const repository = {listSourcePackagesByWorkspace:async(tenantId:string,workspaceId:string)=>sources.filter(source=>source.tenantId===tenantId&&source.workspaceId===workspaceId),
     listWorkspaceActivityEventsByWorkspace:async()=>[]} as unknown as FirstSliceRepository;
   return {add,sources,files:createOriginalTestFiles({repository,project:source=>projections.get(source.sourcePackageId)!,

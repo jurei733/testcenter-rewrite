@@ -1,0 +1,20 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceRuntimeFilesVerifiedBeforeAndAfter": 137,
+  "composerPackages": 19,
+  "httpRows": 13,
+  "uploads": 3,
+  "xmlSchemaValidation": true,
+  "allowTestMode": false,
+  "sqlSeedsOrDaoStubs": false,
+  "scope": "Actual Source HTTP null-version/fallback catalog serialization. With a nonempty module type, null Version::asString becomes an empty public version string. Empty module type omits version fields. No production change was needed after this oracle contradicted an initial null assumption.",
+  "files": {
+    "capture.mjs": "0393cbb9421cf2f659a7ab283bc26d6542092e47db5d2bb142cda0e6dff74d06",
+    "inputs.json": "2542532fefaec222df5bca98b2e4b744fd3a833b64753a6635c32ba5d06d77ec",
+    "observations.json": "4e7b833f5f0b65a40e7c63c783a5bb6a9b3a6c6f78e87ad62097f675faa32ad1",
+    "zero-empty-type.zip.base64": "9777556b1068267c063dd7f0f2700185d9289d21d4851be5ed9d1ffd032cb80a",
+    "zero-label-unversioned.zip.base64": "d9bfc921ba701647486e9c6ed93fc7f12e31afcf381afe762415f0915b66a380",
+    "zero-unversioned.zip.base64": "13e68ba7a368d52ee60acbb9f06f5d67605def0d08dcad9729ce6d3547e01cd1"
+  }
+}

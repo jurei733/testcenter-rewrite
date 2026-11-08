@@ -222,7 +222,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
     const workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'owned',displayName:'Owned native create'});
     const scope={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey},ids={tenantId:tenant.tenantId,workspaceId:workspace.workspaceId};
     const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType});
-    await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-native-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'en',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
+    await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-native-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'en',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
     await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.NATIVE.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-native-player@1.2.3">Owned definition</Definition>'));
     await upload('assigned.xml',booklet('OWNED.ASSIGNED','Assigned',true));await upload('unassigned.xml',booklet(native.bookletName,labels.firstLabel));
     const namesOwned=['owned-create','owned-other','owned-entry','owned-atomic','owned-review','owned-after-delete','owned-legacy','owned-cross-writer','owned-unit-native','owned-unit-peer','owned-unit-delivery','owned-test-delivery','owned-large-state'];
@@ -666,7 +666,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       const wireWorkspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'native-log-wire',displayName:'Owned native Testlog'});
       const wireScope={tenantKey:tenant.tenantKey,workspaceKey:wireWorkspace.workspaceKey};
       const uploadWire=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...wireScope,fileName,sourceDocument,mediaType});
-      const metadata={id:'owned-pow-player',version:'6.0.4',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned proof player'}]};
+      const metadata={$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-pow-player',version:'6.0.4',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned proof player'}]};
       await uploadWire('player.html','<!doctype html><html><script type="application/ld+json">'+JSON.stringify(metadata)+'</script><main>Owned fixture</main></html>','text/html');
       await uploadWire('unit.xml',xml('Unit','<Metadata><Id>ORACLE.POW.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="owned-pow-player@6.0.4">Owned definition</Definition>'));
       await uploadWire('booklet.xml',xml('Booklet','<Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned proof booklet</Label></Metadata><Units><Unit id="ORACLE.POW.UNIT" label="Owned unit"/></Units>'));

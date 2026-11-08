@@ -1,6 +1,7 @@
-import {DOMParser,type Element} from '@xmldom/xmldom';
+import {DOMParser} from '@xmldom/xmldom';
+import {inspectOriginalHtmlResource} from './original-resource-metadata.js';
 import type {WorkspaceFileValidationReport} from '@testcenter-rewrite-app/domain';
-import {workspaceFileReplacementIdentity,normalizeWorkspacePlayerResourceId,type WorkspaceCatalogInput} from './workspace-file-catalog.js';
+import {normalizeWorkspacePlayerResourceId,type WorkspaceCatalogInput} from './workspace-file-catalog.js';
 import {originalXmlSchemaPolicy} from './original-xml-schema.js';
 
 /** Source File::report keeps four messages and an aggregate in position five.
@@ -17,29 +18,12 @@ export function readWorkspaceFileReport(input:WorkspaceCatalogInput,{unused=fals
   const add=(level:'error'|'warning'|'info',message:string)=>appendWorkspaceFileReport(report,level,message);
   const name=input.fileName.split('/').at(-1)!;
   if(input.fileType==='Resource'&&/\.html$/i.test(name)){
-    let document;
-    try{document=new DOMParser({onError(){}}).parseFromString(input.sourceText??'','text/html');}catch{}
-    const scripts=document?.getElementsByTagName('script');let raw:string|undefined;
-    for(let i=0;i<(scripts?.length??0);i++)if(scripts!.item(i)?.getAttribute('type')==='application/ld+json'){raw=scripts!.item(i)?.textContent??'';break;}
-    let metadata:Record<string,unknown>|undefined,problem='No Metadata Element';
-    if(raw!==undefined){try{const value:unknown=JSON.parse(raw);if(value&&typeof value==='object'&&!Array.isArray(value)){
-      metadata=value as Record<string,unknown>;problem=metadata.$schema===undefined?'Could not read metadata: $schema missing':`Wrong metadata-schema: ${String(metadata.$schema)}`;
-    }else problem='Could not read metadata: invalid object';}catch{problem='Could not read metadata: invalid JSON';}}
-    const current=metadata?.$schema==='https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json';
-    const context=!current&&metadata?.['@context']==='https://w3id.org/iqb/verona-modules';
-    const tags=document?.getElementsByTagName('meta');let legacy:Element|undefined;
-    if(!current&&!context)for(let i=0;i<(tags?.length??0);i++){const tag=tags!.item(i);if(tag?.getAttribute('name')==='application-name'&&tag.getAttribute('content')){legacy=tag;break;}}
-    if(context)add('warning','Deprecated meta-data-format found!');
-    else if(legacy)add('warning','Metadata in meta-tag is deprecated!');
-    else if(!current)add('warning',problem);
-    const version=current||context?metadata?.version:legacy?.getAttribute('data-version');
-    if(typeof version!=='string'||!version||/^0\.0\.0$/.test(version))add('warning','Metadata missing. Version guessed from Filename.');
-    const spec=current?metadata?.specVersion:context?metadata?.apiVersion:legacy?.getAttribute('data-api-version');
-    if(spec)add('info',`Verona-Version: ${String(spec)}`);
-    const identity=workspaceFileReplacementIdentity(input);
-    if(identity.moduleId&&identity.version){const recommended=`${identity.moduleId}-${identity.identifier.match(/-(\d+\.\d+)$/)?.[1]??'0.0'}.html`;
-      if(name!==recommended)add('warning',`Non-Standard-Filename: \`${recommended}\` expected.`);}
+    const parsed=inspectOriginalHtmlResource(input.fileName,input.sourceText??'',input.sourceBytes);
+    for(const message of parsed.errors)add('error',message);
+    for(const message of parsed.warnings)add('warning',message);
+    for(const message of parsed.info)add('info',message);
   }
+
   if(input.fileType==='Resource'&&/\.itcr\.zip$/i.test(name)&&archiveEntries!==undefined)add('info',`Contains ${archiveEntries} files.`);
   if(input.sourceText&&!/<!DOCTYPE\b/i.test(input.sourceText)&&['Unit','Booklet','Testtakers','SysCheck'].includes(input.fileType)){
     let document;

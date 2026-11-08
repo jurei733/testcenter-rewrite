@@ -113,11 +113,9 @@
                         <mat-card-header><mat-card-title>
                           {{file.metadata.label}}
                           @if (file.metadata.identifier !== file.name.toUpperCase()) {
-                            <span [style.color]="file.metadata.label ? 'silver' : ''">#{{file.metadata.identifier}}</span>
+                            <span [style.color]="file.metadata.label ? 'silver' : ''"> #{{file.metadata.identifier}} </span>
                           }
-                        </mat-card-title><mat-card-subtitle>
-                          {{file.metadata.description}}
-                        </mat-card-subtitle></mat-card-header>
+                        </mat-card-title><mat-card-subtitle>{{file.metadata.description}}</mat-card-subtitle></mat-card-header>
                       }
                       <mat-card-content>
                         @if (file.metadata.participantCount) {
@@ -133,6 +131,9 @@
                         }
                         @for (message of warnings(file); track $index) {
                           <app-original-workspace-file-notice level="warning" [text]="message" />
+                        }
+                        @for (message of information(file); track $index) {
+                          <app-original-workspace-file-notice level="info" [text]="message" />
                         }
                       </mat-card-content>
                     </mat-card>

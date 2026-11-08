@@ -1,4 +1,5 @@
 import { DOMParser, type Element } from '@xmldom/xmldom';
+import {inspectOriginalHtmlResource,guessOriginalResourceName} from './original-resource-metadata.js';
 import type { SourcePackage, WorkspaceActivityEvent, SourcePackageStatus, WorkspaceFileType, WorkspaceFileReference,
   WorkspaceCatalogFile, WorkspaceFileCatalog } from '@testcenter-rewrite-app/domain';
 
@@ -11,13 +12,13 @@ export type WorkspaceCatalogInput = {
   fileSizeBytes: number | null;
   sourceText: string | null;
   resourceIdentifier: string | null;
+  sourceBytes?: Uint8Array;
 };
 
 export function normalizeWorkspacePlayerResourceId(reference: string): string | null {
-  const baseName = reference.split(/[\\/]/).at(-1) ?? reference;
-  const stem = baseName.replace(/\.html?$/i, '');
-  const versioned = /^(.+?)[@-](\d+)\.(\d+)(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/.exec(stem);
-  return versioned?.[1] ? `${versioned[1]}-${Number.parseInt(versioned[2]!, 10)}.${Number.parseInt(versioned[3]!, 10)}` : null;
+  if(!reference||reference==='0')return null;
+  const guessed=guessOriginalResourceName(reference);
+  return `${guessed.moduleId}-${guessed.major}.${guessed.minor}`;
 }
 
 export function selectCurrentWorkspaceFiles<T extends Pick<SourcePackage,'sourcePackageId'|'status'>>(sourcePackages: T[], activityEvents: Pick<WorkspaceActivityEvent,'eventType'|'subjectId'|'details'>[]): T[] {
@@ -49,21 +50,10 @@ const first = (node: Element | undefined, name: string): Element | undefined => 
 // not change case there; JavaScript's full Unicode uppercase would change IDs.
 const sourceUpper = (value: string): string => value.replace(/[a-z]/g, letter => letter.toUpperCase());
 const sourceId = (value: string): string => sourceUpper(value).replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, '');
-const translated = (value: unknown): string => {
-  if (Array.isArray(value)) {
-    const rows = value.filter(row => row && typeof row === 'object' && typeof row.value === 'string');
-    return (rows.find(row => row.lang === 'de') ?? rows.find(row => row.lang === 'en') ?? rows[0])?.value ?? '';
-  }
-  if (value && typeof value === 'object') {
-    const values = value as Record<string, unknown>;
-    const chosen = values.de ?? values.en ?? Object.values(values)[0];
-    return typeof chosen === 'string' ? chosen : '';
-  }
-  return '';
-};
 
 function inspect(input: WorkspaceCatalogInput): {
   metadata: WorkspaceCatalogFile['metadata']; references: WorkspaceFileReference[]; moduleId: string;
+  diagnostics?: WorkspaceCatalogFile['validationDiagnostics'];
 } {
   const metadata: WorkspaceCatalogFile['metadata'] = {
     identifier: sourceUpper(input.resourceIdentifier ?? input.fileName.split(/[\\/]/).at(-1) ?? input.fileName),
@@ -74,55 +64,16 @@ function inspect(input: WorkspaceCatalogInput): {
   if (input.sourceText === null || input.fileType === 'Package') return { metadata, references, moduleId };
   if (input.fileType === 'Resource') {
     if (!/\.html$/i.test(input.fileName)) return {metadata, references, moduleId};
-    // HTML is data here: no document/window, script execution or URL fetching.
-    // The established Player validator supplies the normalized resource ID.
-    let document;
-    try { document = new DOMParser({ onError() {} }).parseFromString(input.sourceText, 'text/html'); }
-    catch { return { metadata, references, moduleId }; }
-    const scripts = document.getElementsByTagName('script');
-    let jsonLd: string | undefined;
-    for (let i = 0; i < scripts.length; i++) if (scripts.item(i)?.getAttribute('type') === 'application/ld+json') {
-      jsonLd = scripts.item(i)?.textContent ?? ''; break;
-    }
-    let knownMetadata = false;
-    if (jsonLd) {
-      try {
-        const value = JSON.parse(jsonLd);
-        if (value && typeof value === 'object' && !Array.isArray(value) &&
-          (value.$schema === 'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json' ||
-           value['@context'] === 'https://w3id.org/iqb/verona-modules')) {
-          knownMetadata = true;
-          metadata.label = translated(value.name);
-          metadata.description = translated(value.description);
-          metadata.moduleVersion = typeof value.version === 'string' ? value.version : null;
-          metadata.veronaVersion = typeof value.specVersion === 'string' ? value.specVersion
-            : typeof value.apiVersion === 'string' ? value.apiVersion : null;
-          const id = typeof value.id === 'string' ? value.id : typeof value['@id'] === 'string' ? value['@id'] : '';
-          moduleId = id;
-          if (!metadata.label && id) metadata.label = id + (metadata.moduleVersion ? '-' + metadata.moduleVersion : '');
-        }
-      } catch { /* Invalid metadata remains the responsibility of real import validation. */ }
-    }
-    if (!knownMetadata) {
-      const tags = document.getElementsByTagName('meta');
-      for (let i = 0; i < tags.length; i++) {
-        const tag = tags.item(i);
-        if (tag?.getAttribute('name') !== 'application-name') continue;
-        moduleId = tag.getAttribute('content') ?? '';
-        metadata.label = document.getElementsByTagName('title').item(0)?.textContent ?? '';
-        metadata.description = tag.getAttribute('data-description') ?? '';
-        metadata.moduleVersion = tag.getAttribute('data-version') || null;
-        metadata.veronaVersion = tag.getAttribute('data-api-version') || null;
-        if (!metadata.label) metadata.label = (tag.getAttribute('content') ?? '') +
-          (metadata.moduleVersion ? '-' + metadata.moduleVersion : '');
-        break;
-      }
-    }
-    if (!metadata.moduleVersion && input.resourceIdentifier) {
-      moduleId = input.resourceIdentifier.replace(/-\d+\.\d+$/, '');
-    }
-    return { metadata, references, moduleId };
+    const parsed=inspectOriginalHtmlResource(input.fileName,input.sourceText,input.sourceBytes);
+    Object.assign(metadata,{identifier:parsed.identifier,label:parsed.label,description:parsed.description,
+      moduleVersion:parsed.moduleVersion,veronaVersion:parsed.veronaVersion});
+    return{metadata,references,moduleId:parsed.moduleId,diagnostics:[
+      ...parsed.errors.map(message=>({code:'workspace_resource_metadata_invalid',severity:'error' as const,message})),
+      ...parsed.catalogWarnings.map(message=>({code:'workspace_resource_metadata_warning',severity:'warning' as const,message})),
+      ...parsed.info.map(message=>({code:'workspace_resource_metadata_info',severity:'info' as const,message}))
+    ]};
   }
+
   // External entity declarations never enter the metadata parser. Rejected or
   // malformed XML stays listable without exposing any raw document or secrets.
   if (/<!DOCTYPE\b/i.test(input.sourceText)) return { metadata, references, moduleId };
@@ -191,10 +142,10 @@ export function buildWorkspaceFileCatalog(inputs: WorkspaceCatalogInput[], optio
     }
   }
   const dependencySizesCalculated = options.requireDependencies === true || inputs.length <= 1000;
-  const items: WorkspaceCatalogFile[] = inspected.map(({ input, metadata, references }) => ({
+  const items: WorkspaceCatalogFile[] = inspected.map(({ input, metadata, references, diagnostics }) => ({
     sourcePackageId: input.sourcePackageId, fileName: input.fileName, fileType: input.fileType,
     status: input.status, uploadedAt: input.uploadedAt, fileSizeBytes: input.fileSizeBytes,
-    metadata, dependencies: [], unresolvedReferences: references.flatMap(reference => {
+    metadata, ...(diagnostics?.length?{validationDiagnostics:diagnostics}:{}), dependencies: [], unresolvedReferences: references.flatMap(reference => {
       const candidates = [...(index.get(key(reference.fileType, reference.reference)) ?? [])];
       return candidates.length === 1 ? [] : [{ ...reference,
         candidateSourcePackageIds: candidates.map(at => inputs[at]!.sourcePackageId) }];
@@ -235,23 +186,12 @@ export function buildWorkspaceFileCatalog(inputs: WorkspaceCatalogInput[], optio
  * affect compatibility, while Verona module IDs remain case-sensitive.
  */
 export function workspaceFileReplacementIdentity(input: WorkspaceCatalogInput) {
+  if(input.fileType==='Resource'&&/\.html$/i.test(input.fileName)&&input.sourceText!==null){
+    const parsed=inspectOriginalHtmlResource(input.fileName,input.sourceText,input.sourceBytes);
+    return{fileType:input.fileType,identifier:parsed.identifier,moduleId:parsed.moduleId,version:parsed.effectiveVersion};
+  }
   const {metadata, moduleId: inspectedModuleId} = inspect(input);
   let moduleId = inspectedModuleId, identifier = metadata.identifier, version = '';
-  if (input.fileType === 'Resource' && /\.html$/i.test(input.fileName)) {
-    const integer = (value: string | undefined) => Number.parseInt(value ?? '', 10) || 0;
-    const parsed = (metadata.moduleVersion ?? '').split(/[.-]/);
-    let major = integer(parsed[0]), minor = integer(parsed[1]), patch = integer(parsed[2]), label = parsed[3] ?? '';
-    // ResourceFile::readVeronaMetaData falls back even for explicit 0.0.0.
-    // Preserve Version::guessFromFileName's legacy V/major-only naming rules.
-    if (!(major || minor || patch || label)) {
-      const name = input.fileName.split(/[\\/]/).at(-1) ?? input.fileName;
-      const guessed = /^(\D+?)[@V-]?((\d+)(\.\d+)?(\.\d+)?(-\S+?)?)?(.\D{3,4})?$/.exec(name);
-      moduleId = guessed?.[1] ?? '';
-      major = integer(guessed?.[3]); minor = integer(guessed?.[4]?.slice(1)); patch = integer(guessed?.[5]?.slice(1));
-      label = guessed?.[6]?.slice(1) ?? '';
-    }
-    identifier = sourceUpper(`${moduleId}-${major}.${minor}`);
-    version = major || minor || patch || label ? `${major}.${minor}.${patch}${label ? '-' + label : ''}` : '';
-  }
+
   return {fileType: input.fileType, identifier, moduleId, version};
 }

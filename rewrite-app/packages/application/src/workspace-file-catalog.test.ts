@@ -16,7 +16,12 @@ const fixture = () => [
   file('booklet2', 'Booklet', 2048, xml('Booklet', 'B2', '<Units><Unit id="U"/></Units>')),
   file('check', 'SysCheck', 384, xml('SysCheck', 'CHECK', '<Config unit="U"/>')),
   file('unit', 'Unit', 1536, xml('Unit', 'U', '<Definition player="owned-player@1.2.9"><![CDATA[private-unit-definition]]></Definition>')),
-  file('player', 'Resource', 4096, '<html><script>private-player-body</script></html>', { resourceIdentifier: 'owned-player-1.2' })
+  // The pinned Source uses the filename when metadata is absent. Supply real
+  // current metadata here so this size-graph fixture actually defines its ID.
+  file('player', 'Resource', 4096, '<html><script type="application/ld+json">'+JSON.stringify({
+    $schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',
+    id:'owned-player',version:'1.2.9',specVersion:'6.0',type:'player'
+  })+'</script><script>private-player-body</script></html>', { resourceIdentifier: 'owned-player-1.2' })
 ];
 const byId = (catalog: ReturnType<typeof buildWorkspaceFileCatalog>, id: string) => catalog.items.find(item => item.sourcePackageId === id)!;
 
@@ -118,7 +123,7 @@ test('rejected, malformed and entity-declaring documents remain listable and can
 
 test('Player metadata prefers German, then English, then authored first entry and ignores commented scripts', () => {
   const metadata = {$schema: 'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',
-    id: 'owned-player', version: '1.2.9', specVersion: '6.0',
+    id: 'owned-player', version: '1.2.9', specVersion: '6.0', type:'player',
     name: [{lang: 'fr', value: 'français'}, {lang: 'en', value: 'English'}, {lang: 'de', value: 'Deutsch'}],
     description: [{lang: 'fr', value: 'Premier'}]};
   const html = '<!-- <script type="application/ld+json">{"name":"private-imposter"}</script> -->' +

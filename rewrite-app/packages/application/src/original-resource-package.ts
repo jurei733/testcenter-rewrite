@@ -21,8 +21,9 @@ export function createOriginalResourcePackages<E extends Entry>(deps: {
   read: (bytes: Buffer, entry: E, maximumBytes: number) => Buffer | null;
   safe: (path: string, directory: boolean) => boolean;
   normalize: (path: string) => string;
+  comment?: (bytes: Buffer) => string;
 }) {
-  const cache = new Map<string, {document: string; bytes: Buffer; members: Map<string, E>}>();
+  const cache = new Map<string, {document: string; bytes: Buffer; members: Map<string, E>; entryCount: number; comment: string}>();
   let retainedBytes = 0;
   const invalid = () => new FirstSliceError(400, 'workspace_resource_package_invalid',
     'The resource archive is invalid.');
@@ -68,7 +69,7 @@ export function createOriginalResourcePackages<E extends Entry>(deps: {
     for (const entry of entries) {
       if (!deps.read(bytes, entry, entry.fileName.endsWith('/') ? 0 : memberLimit)) throw invalid();
     }
-    const archive = {document: source.sourceDocument, bytes, members};
+    const archive = {document: source.sourceDocument, bytes, members, entryCount:entries.length, comment:deps.comment?.(bytes)??''};
     if (cached) {retainedBytes -= cached.bytes.length; cache.delete(key);}
     cache.set(key, archive); retainedBytes += bytes.length;
     while (cache.size > 8 || retainedBytes > archiveLimit) {
@@ -79,6 +80,10 @@ export function createOriginalResourcePackages<E extends Entry>(deps: {
   };
   return {
     validate(source: SourcePackage): void {open(source);},
+    metadata(source: SourcePackage): {entryCount:number;comment:string} {
+      const archive=open(source);
+      return{entryCount:archive.entryCount,comment:archive.comment};
+    },
     read(source: SourcePackage, path: string): Buffer | null {
       const archive = open(source), entry = archive.members.get(path);
       if (!entry) return null;

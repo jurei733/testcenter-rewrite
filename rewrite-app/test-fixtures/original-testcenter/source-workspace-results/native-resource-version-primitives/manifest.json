@@ -1,0 +1,13 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "references": 12,
+  "versions": 15,
+  "integerPartsEncodedAsDecimalStrings": true,
+  "readOnlyContainer": true,
+  "network": "none",
+  "files": {
+    "capture.mjs": "86488fc1e2b3c65b960b10de8578b15d978824d2a29e94ba9735fc4d729d5bba",
+    "observations.json": "42a081bd32fb95d621437be20c109f781b6026c8636acceaa2e4396d305a1089"
+  }
+}

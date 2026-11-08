@@ -1,0 +1,309 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "readOnlyContainer": true,
+  "network": "none",
+  "sourceFilesMatched": true,
+  "sourceHashes": {
+    "backend/src/helper/Version.class.php": "d5757233ce2a70919b005d1292201219d9bee5527639c0fc91c8d67de502878b",
+    "backend/src/helper/FileID.class.php": "8c490045d4e1af66639e2af191502a87f6062fada54d1ef57c523a7fe806214e"
+  },
+  "references": [
+    {
+      "input": "owned-player@1.2.9",
+      "guess": {
+        "module": "owned-player",
+        "full": "1.2.9",
+        "major": "1",
+        "minor": "2",
+        "patch": "9",
+        "label": ""
+      },
+      "id": "OWNED-PLAYER-1.2"
+    },
+    {
+      "input": "source-r85-player@1.0.0",
+      "guess": {
+        "module": "source-r",
+        "full": "85-player@1.0.0",
+        "major": "85",
+        "minor": "0",
+        "patch": "0",
+        "label": "player@1.0.0"
+      },
+      "id": "SOURCE-R-85.0"
+    },
+    {
+      "input": "source-r85-player.html",
+      "guess": {
+        "module": "source-r",
+        "full": "85-player",
+        "major": "85",
+        "minor": "0",
+        "patch": "0",
+        "label": "player"
+      },
+      "id": "SOURCE-R-85.0"
+    },
+    {
+      "input": "unversioned",
+      "guess": {
+        "module": "unvers",
+        "full": "",
+        "major": "0",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "id": "UNVERS-0.0"
+    },
+    {
+      "input": "Resource/owned-player@1.0.0",
+      "guess": {
+        "module": "Resource/owned-player",
+        "full": "1.0.0",
+        "major": "1",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "id": "RESOURCE/OWNED-PLAYER-1.0"
+    },
+    {
+      "input": "v2-player@6.1.0",
+      "guess": {
+        "module": "v",
+        "full": "2-player@6.1.0",
+        "major": "2",
+        "minor": "0",
+        "patch": "0",
+        "label": "player@6.1.0"
+      },
+      "id": "V-2.0"
+    },
+    {
+      "input": "ä-player@1.0.0",
+      "guess": {
+        "module": "ä-player",
+        "full": "1.0.0",
+        "major": "1",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "id": "ä-PLAYER-1.0"
+    },
+    {
+      "input": "module-1e3.2.0",
+      "guess": {
+        "module": "",
+        "full": "",
+        "major": "0",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "id": "-0.0"
+    },
+    {
+      "input": "moduleV2.3.html",
+      "guess": {
+        "module": "module",
+        "full": "2.3",
+        "major": "2",
+        "minor": "3",
+        "patch": "0",
+        "label": ""
+      },
+      "id": "MODULE-2.3"
+    },
+    {
+      "input": "name-9007199254740993.0.html",
+      "guess": {
+        "module": "name",
+        "full": "9007199254740993.0",
+        "major": "9007199254740993",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "id": "NAME-9007199254740993.0"
+    },
+    {
+      "input": "0",
+      "guess": {
+        "module": "",
+        "full": "",
+        "major": "0",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "id": "-0.0"
+    },
+    {
+      "input": "",
+      "guess": {
+        "module": "",
+        "full": "",
+        "major": "0",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "id": "-0.0"
+    }
+  ],
+  "versions": [
+    {
+      "input": "0.0.0-0",
+      "parts": {
+        "major": "0",
+        "minor": "0",
+        "patch": "0",
+        "label": "0"
+      },
+      "text": null
+    },
+    {
+      "input": "1.2.3-0",
+      "parts": {
+        "major": "1",
+        "minor": "2",
+        "patch": "3",
+        "label": "0"
+      },
+      "text": "1.2.3"
+    },
+    {
+      "input": "0.0.0-preview",
+      "parts": {
+        "major": "0",
+        "minor": "0",
+        "patch": "0",
+        "label": "preview"
+      },
+      "text": "0.0.0-preview"
+    },
+    {
+      "input": "01.002.0003-beta-more",
+      "parts": {
+        "major": "1",
+        "minor": "2",
+        "patch": "3",
+        "label": "beta"
+      },
+      "text": "1.2.3-beta"
+    },
+    {
+      "input": "1e3.2.0",
+      "parts": {
+        "major": "1000",
+        "minor": "2",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "1000.2.0"
+    },
+    {
+      "input": "1e999.0.0",
+      "parts": {
+        "major": "0",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": null
+    },
+    {
+      "input": "9007199254740993.0.0",
+      "parts": {
+        "major": "9007199254740993",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "9007199254740993.0.0"
+    },
+    {
+      "input": "9223372036854775808.0.0",
+      "parts": {
+        "major": "9223372036854775807",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "9223372036854775807.0.0"
+    },
+    {
+      "input": "1e19.0.0",
+      "parts": {
+        "major": "9223372036854775807",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "9223372036854775807.0.0"
+    },
+    {
+      "input": "1e20.0.0",
+      "parts": {
+        "major": "9223372036854775807",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "9223372036854775807.0.0"
+    },
+    {
+      "input": "1e308.0.0",
+      "parts": {
+        "major": "9223372036854775807",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "9223372036854775807.0.0"
+    },
+    {
+      "input": "9e18.0.0",
+      "parts": {
+        "major": "9000000000000000000",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "9000000000000000000.0.0"
+    },
+    {
+      "input": "1e309.0.0",
+      "parts": {
+        "major": "0",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": null
+    },
+    {
+      "input": "123foo.0.0",
+      "parts": {
+        "major": "123",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "123.0.0"
+    },
+    {
+      "input": "9223372036854775808foo.0.0",
+      "parts": {
+        "major": "9223372036854775807",
+        "minor": "0",
+        "patch": "0",
+        "label": ""
+      },
+      "text": "9223372036854775807.0.0"
+    }
+  ]
+}

@@ -1,0 +1,1071 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "sourceHashes": {
+    "backend/index.php": "a4152e0457971f2047200478114e313a7a80ec58b37540baeaa8e18a0ab247d5",
+    "backend/initialize.php": "5c4c28147e1665f1ad430f1829423654fd9a0e5afbe7caf211f870d64f0656ef",
+    "backend/routes.php": "8ecafc8e25edaf2cd0453c180a23be8a8d0568f048000eb033d7772af1b3a213",
+    "backend/src/controller/AssetAssignmentController.class.php": "e307afb12e1df37a6580f14ca4fdcf02980ae022f0c35e5cb8138f95400126db",
+    "backend/src/controller/AssetController.class.php": "076a80c5d748228b81cdde4ad4241d47f951fb68fd6c963edba65b89edb7db74",
+    "backend/src/controller/AttachmentController.class.php": "9cd7d14166925fc342f31a0269e601ba7dba719717a4eee85d332f54022003fd",
+    "backend/src/controller/BookletController.class.php": "17c269fe37d01c1fc0aff7e5b0c76edb9026c9603ccedb9956d14446aca52661",
+    "backend/src/controller/Controller.class.php": "5737a5309104cdd8c38f581b8126cffe60a7c455dbd275ee950fa6d28669930b",
+    "backend/src/controller/MonitorController.class.php": "6cbde3f3eb4c7eec6f38aa1e6c2012488f46614e69fa688e81ad0411af92fc44",
+    "backend/src/controller/ReviewController.class.php": "29aeebea8fa3edecbfc471d4ca9e14ceadb64e9b9852cfa76fe39d20e96bad3a",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/controller/SpeedtestController.class.php": "2cc8b0b62510e1c9f39cc3b86dec2fe6134aedc0e948af04e2f01568bceb90c3",
+    "backend/src/controller/SystemController.class.php": "ef72f6dc675ba3962243bcddd11a41acca0085b70969700996e6bfeba62327a9",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/controller/UserController.class.php": "4db2b090b786c61801e589a3c984f98d06cdd46198d29e9120bddb386ca359db",
+    "backend/src/controller/WorkspaceController.class.php": "f9cb336fc05ad115d1ebfca923d48eb397ed94cd065ccbdd83c359849233a6b4",
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/AssetDAO.class.php": "68523d5f3133ae70c6c528ff34ddd37f963b83f35325f15716d7821fe78b2481",
+    "backend/src/dao/DAO.class.php": "76eea068ed1a0a4f98bfbcc78f063432b5af6ed122de8fa5b098076f500c8fe0",
+    "backend/src/dao/InitDAO.class.php": "dccb2452cc7768e767ce59d525339d1c7af11e0be3a8627f00e5f77e68cfb67d",
+    "backend/src/dao/ReviewDAO.class.php": "4dd27f0f2790ef50f8a02ad76ab6300ede0ecb79690eea357e2bc734eafdb3bb",
+    "backend/src/dao/SessionDAO.class.php": "e80d05dc2558d0d678f309c4d15ecdf9efab54a43148acf59c92978ead76020f",
+    "backend/src/dao/SuperAdminDAO.class.php": "9df7e3672e8fbb84a568e77ff5660737bd0f664a6de43918f78bbe727b1f8f18",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/dao/WorkspaceDAO.class.php": "74e8df283418921640d4e4ddb780ce95483f319bca974b7464a17f5d1bb341f4",
+    "backend/src/data-collection/AccessObject.class.php": "c4f0ce85985a62ce07a20de5bb2e88b7304103de2dfbb9f77897cde2522efa05",
+    "backend/src/data-collection/AccessObjectType.enum.php": "755f588bcf2777b64242d1cf9d865552f1ea4b644f54549eb0b1e51edfa57470",
+    "backend/src/data-collection/AccessSet.class.php": "e76d5c03c642a8d178c583766ffc66b27355c3606bb34add287e55ccb6cdca6c",
+    "backend/src/data-collection/Admin.class.php": "7a4591b4f0cfea0a77077ca0a712642145f1bf56de545610b610672e70dbd5b8",
+    "backend/src/data-collection/Attachment.class.php": "b5cd413287ce9ed7f494660fa053d8e115f80a3996a67764ca63cb2aad877bd4",
+    "backend/src/data-collection/AuthToken.class.php": "490b1bb7c8e2ec222b4575093eacedfb03065cad60f82ed7961110de4c736757",
+    "backend/src/data-collection/Command.class.php": "ad229250685b1219c8e30a85abab4f62c75c19da5d89f36fa35adef953cbf742",
+    "backend/src/data-collection/DataCollection.class.php": "7405639c008e69237aa61469d537d65a9c33390d3b8171fe9ab421ac2f81a593",
+    "backend/src/data-collection/DataCollectionTypeSafe.class.php": "6ccc2c21ceac3a43f52fd4a7463b9207c2115c3bcd3152eb8c9a667b1a1a0ec8",
+    "backend/src/data-collection/ExpirationState.class.php": "3b2358989cc58677e9fc28eb459dec5726d940c426ac382c413b839a16c2d96a",
+    "backend/src/data-collection/ExpirationStateType.enum.php": "6721b483572334023ec9b766cb1f0b6c290151da4f676746bc5e030768964afb",
+    "backend/src/data-collection/FailedLogin.enum.php": "0ef2529cb59a72ed130184c38d36262fa1158dfc9e868f5563fef57032ad153e",
+    "backend/src/data-collection/FileData.class.php": "b74f6346353ea262a0c94fb51d36759442a59da6bba4d55a9d9105b62a5742c0",
+    "backend/src/data-collection/FileDeletionReport.php": "d59827f9ad3b1a50f986573f79ecea3194f2c5bb23461aa4fb6b4ded9e4699d2",
+    "backend/src/data-collection/FileRelation.class.php": "2f4212cb1c4fcfb50ebcc014175a96767a3dc540487031e444295696d77a54e1",
+    "backend/src/data-collection/FileRelationshipType.class.php": "6a19b6def6f8c56916a6da4ad0761ff5693ad2ae93d175d82f69bfb89efec623",
+    "backend/src/data-collection/FileType.enum.php": "3363f79ab4c02c9f1ad6c21c3a22df7e107218fc4b116ee99dfb5eac9f6dffd2",
+    "backend/src/data-collection/Group.class.php": "a7f72e4e18ab1853512f902ecf52a44bda30305efe6a6b7bdae02ae38669d067",
+    "backend/src/data-collection/GroupResultStats.class.php": "79afaea436ee3a283e95e1ba37b244eb6e0224523888962de7cd7fd7769e1e33",
+    "backend/src/data-collection/InstallationArguments.class.php": "32518b1003a56e4117eb45a132eccff4c38ee6276d23b3ac49cbc5d5bac9bc3e",
+    "backend/src/data-collection/Login.class.php": "e33fdd4458b8d429b93341bb1294931415cfe3004f3ca3610af9ccbc8affda3c",
+    "backend/src/data-collection/LoginArray.class.php": "98b67dfe641d39e1ffe34ed9845541d3f3ec059ede0b86bd418d6e97545ae0be",
+    "backend/src/data-collection/LoginSession.class.php": "b4dccca03d7cc8241ceef4061550cd315d5cf1b68670c39a47ba66fd21c847c5",
+    "backend/src/data-collection/ModeCapability.enum.php": "4f89ea43dc814aa134f0bd31ba0ceecfe3fd6216b84108311a0b309b9198a8b3",
+    "backend/src/data-collection/Person.class.php": "d6d6dd0ece78a171e330c9258a7313ce77a25b95e36b958116a4f1a7bb83882f",
+    "backend/src/data-collection/PersonSession.class.php": "e1b577384df193b147dec4ed39c6430f16a93f7d91ff1f99e09fa1e835fd4926",
+    "backend/src/data-collection/ReportFormat.php": "3fb41e925c59daf7800a132187fb324f31a20562fbadd5932e464d90ea180f94",
+    "backend/src/data-collection/ReportType.php": "e6ca8b7b6a202f1348f2fb6f663de126ff4e03d8b7ef2aa99daec01f6488e69e",
+    "backend/src/data-collection/RequestedAttachment.class.php": "2f5fbc026e866c61ef811c2a22148dd355487973a9fb82db572c1854aa52bd20",
+    "backend/src/data-collection/SessionChangeMessage.class.php": "f73461197c01ee1f074c2b059b28d395b726f8fbc5c9fd0584a7d3cd2f3111f1",
+    "backend/src/data-collection/SessionChangeMessageArray.class.php": "9cbb9ee45e64272c3e236e3d29f5a45d0d32b3ccb7489beed1fced160091617c",
+    "backend/src/data-collection/SysCheckMode.php": "6ed3dc350af687ec1de0f12b455c18ee10e9a2810f9d6231bf3366b0e1f647b4",
+    "backend/src/data-collection/SysCheckReport.class.php": "a7321fe98b9535cca435d3df12276ecd210ed343de56e2a9742b74efba0b95ba",
+    "backend/src/data-collection/SystemCheck.php": "11f966345af3357d2763eaa7de7833b94a5e424b109c5ab5983a2c82052723c8",
+    "backend/src/data-collection/SystemCheckAccessObject.class.php": "7d5e973c7d7a8591437acc0041f82f101071d4fcc602683a9aa0be22c992f4af",
+    "backend/src/data-collection/TestData.class.php": "e7dbcd111dbd1b5287edc7122948965ce2db74ed5df865f2aa0eef983113faec",
+    "backend/src/data-collection/TestLog.class.php": "a7d19bd78ee744ebe26d41b3034d48b2ef80d637d7a5c560a22e875cde82574a",
+    "backend/src/data-collection/TestName.class.php": "9cc3de2c85f03ab3464cda4b2b1fa5539f4675cc86c418df068fefd6ced6922e",
+    "backend/src/data-collection/TestSession.class.php": "a7beb6d00a1a05ce03c8bdca62ae6e4a888bedac041326a6a15bdcffad1dc5eb",
+    "backend/src/data-collection/UnitLog.php": "351139441c71cd3dd29597383f656abe7e77875873b5ce27104f9725b60449db",
+    "backend/src/data-collection/WorkspaceData.class.php": "44d8e40be003b5c6a129368170dac233bb0db17eb812007aa79665f43b4db3f3",
+    "backend/src/data-collection/WorkspaceRole.enum.php": "54ba8baef3b71f91f6bc17ba01c699a5498eb73439d29d3bbb7862925c969cb8",
+    "backend/src/exception/DbConnectionException.class.php": "caea94e9e78998b723b954164ac9ee35090a9b7661d98b654b5884d3d674507f",
+    "backend/src/exception/HttpError.class.php": "9afa5b6ecdb2b116b96926d228eea0789339737a3a81ce8293e94ebbb0a5e0c7",
+    "backend/src/files/File.class.php": "f1628add4bad358e9e5f3cc2cf8110bde426dfdb595504ec6991e70ca9a976e5",
+    "backend/src/files/ResourceFile.class.php": "519d5cd82482f936af87ccfa394ea139a3085d089e80ea38f8f894a803693d8e",
+    "backend/src/files/SysCheckReportFile.class.php": "1dc05fadecedd8ee23e75cab3249fbd7b72f4a3a44d532044a0bff00e822e5d3",
+    "backend/src/files/XMLFile.class.php": "517dc5ca052e52bcc569c9c4f974240094647eaaf3758125c0a0eb702ff70c61",
+    "backend/src/files/XMLFileBooklet.class.php": "95cefab11030f5aa237941311874f46b4def068bcdd009638dfaec01b151bfa1",
+    "backend/src/files/XMLFileSysCheck.class.php": "d7857437a97847d01c6054bda9fd3bbe1580c2cb6a8b561aac3a738fc747626e",
+    "backend/src/files/XMLFileTesttakers.class.php": "20bd5e27314507982ba81f9f947b488ab86655290d8bf714c6ab7a9f8ba221f7",
+    "backend/src/files/XMLFileUnit.class.php": "56e42c9860d562f94d317e3c32c5a66b1cf62a9b2b378a7926df1cf5ab7ed017",
+    "backend/src/helper/AssetStorage.class.php": "353420c059912ee6d40137ef63c4f0cfa221c97f6450888ad1fc58589dbc864d",
+    "backend/src/helper/AttachmentFiles.class.php": "76d467373fbcb24a282034fcabab4aaadeb4cf4fe3a0caf6df89302425e9f0d5",
+    "backend/src/helper/AttachmentTemplate.class.php": "df91b9d6ac59440d366dca837681394b504a6ca911e57fb71b2deb293c01d4b2",
+    "backend/src/helper/BroadcastService.class.php": "874facc8417cb24276e3e9997ea76aad5dfba473f7c46da3f3f0cc7b4a300a55",
+    "backend/src/helper/CLI.class.php": "5be4fffdb473d5b104c9a630b5f7b6dacdf35abe837839a7f1675b136cd6f635",
+    "backend/src/helper/CSV.class.php": "77d3e0cfca1a99e37efccb49480b68d1737ea63ead252f25d18662ebe997bb84",
+    "backend/src/helper/CacheService.class.php": "0b793acfe34a6bdb20729e2c76dc95c186103553406aba3f9ec29aaa06a0cdbd",
+    "backend/src/helper/DB.class.php": "ce53c415910ee5c51141fde64fb109e44479d78337f1b89e6ff952c6c23028c5",
+    "backend/src/helper/DBSchema.class.php": "d4da64210ef5358a893a065893d719e2ff00d4ede2446e6a73e054206999b45e",
+    "backend/src/helper/ExternalFile.class.php": "3aaf2d056b318d06357fe1e9122a5a1638f3f5e87b36ef80724620911c711eae",
+    "backend/src/helper/FileExt.class.php": "6babc2ccdb0f4a05b379876cb7100629e61e456ecea05fa8f57c325a1ce27156",
+    "backend/src/helper/FileID.class.php": "8c490045d4e1af66639e2af191502a87f6062fada54d1ef57c523a7fe806214e",
+    "backend/src/helper/FileResponse.class.php": "1896bc0a2822d324a7a424fc744ab8d296aac1220fa2ee013e5183db9524bdb2",
+    "backend/src/helper/FileService.class.php": "6ff5eb664f975befc6b498b85a727ed11792d6cf2ac1e397482ce00f89312b28",
+    "backend/src/helper/FileSize.class.php": "020f42d9559680afa675b82a7893086a6a43cd0ea7f8cabe3bb8897af525b70d",
+    "backend/src/helper/FileTime.class.php": "ac428d00e95b5ab08253e492347afcde143b3ef715991fd15f8ad2c849c142f5",
+    "backend/src/helper/Folder.class.php": "d3e1d59460ab519bfa299992a5e12458d17a0ccbed8e7a8ccdcbbd4a1114b9f7",
+    "backend/src/helper/JSON.class.php": "bb2a79d8853f35a82c80b71ab769f857ae03d268ae1a5919dab72f14000bfeda",
+    "backend/src/helper/Mode.class.php": "bacc300340201d9698bb7a8fe96588403a8ac490dbb9c73677954a1a4d2a2b85",
+    "backend/src/helper/Password.class.php": "6f807473c2014ad8ece505448cea1375a9cce6fc8c688a1b9892676c8a016643",
+    "backend/src/helper/Random.class.php": "d36a65e5c516e5238229b16ab08c26e788f800a350283379e79a7ab387dfca7d",
+    "backend/src/helper/RequestHelper.class.php": "c5aab20fff896d13afb2c969346d91c3749e40936849e6d4d51ba74e0d2ab57f",
+    "backend/src/helper/ReviewCSVFormatter.php": "5db29ee7680ffa8ddf01febe71a95c0d5fc580091a4f5111ba819cc37123df2e",
+    "backend/src/helper/Server.class.php": "f173d96749355ed7aaf307f2fcb4d76ad948533964e31250eedb84de0d0e0835",
+    "backend/src/helper/State.class.php": "62475f6edc2adda96097658c33e67e2c5a7ad534ed5addb9d9a57b638e329c91",
+    "backend/src/helper/SystemConfig.class.php": "2f97c265453d34d1d7be465afd2b58ac2422f60fbdcf7e970352b60bc23e957d",
+    "backend/src/helper/TestEnvironment.class.php": "8f6262e0fcbd78d0693a3de98189b8368f6fa24f45b504958060e59b6970b70b",
+    "backend/src/helper/TimeStamp.class.php": "eba4eb49ca3dbe8aa99733a55b40b9259823edb05e0f67267e946c8bcac87a7d",
+    "backend/src/helper/Token.class.php": "d57516492d6f68fecfb070d3a9fd81edb245bd7c365c389c419504bcbaa87cf9",
+    "backend/src/helper/Version.class.php": "d5757233ce2a70919b005d1292201219d9bee5527639c0fc91c8d67de502878b",
+    "backend/src/helper/XMLSchema.class.php": "dd20acac130fa86736d8cb68238ea65b3d23f438be3126ade14226017d26a20b",
+    "backend/src/helper/ZIP.class.php": "a072bd47e570174bc501d0634ad6ab29ccf6accc45e0f0b1e5a654a083557069",
+    "backend/src/middleware/ErrorHandler.class.php": "94f8fd5a5a501ff03fb440f5201230b92e22224f59a0cabf7d4fc0dbc045965f",
+    "backend/src/middleware/HandleCorsPreflight.class.php": "074e0c47627ea9f67ecf5cc0e218b942d26e173f25ac91c2e69bfae68535c7fb",
+    "backend/src/middleware/HandleOptionalToken.class.php": "e30ee7e4365cb145b14bf45c34413564f6fe7257a5b05da152a19e2aef2d9537",
+    "backend/src/middleware/IsGroupMonitor.class.php": "49a0b75d3efaac0a3ad10d0dec9577b2ef54d319727ccaaaf573c5a065f1031a",
+    "backend/src/middleware/IsSuperAdmin.class.php": "68f1e80cdbed7970f9f4cc0303cba0f453a4175d8619808c1d10978bffa07739",
+    "backend/src/middleware/IsSuperAdminOrSelf.php": "143d9d19942c2ed34506db97eaec9090591155e666ca8095a0a6fbcf04ef6fd5",
+    "backend/src/middleware/IsTestOwner.class.php": "f2b8f79c3588801f0ddd057027682e2a554c791cae05cdf5242519a9b3b26316",
+    "backend/src/middleware/IsWorkspaceBlocked.class.php": "be88cd772f3459d3c5fdce17d08f051ae3868442f0a35321926752769d5789f4",
+    "backend/src/middleware/IsWorkspacePermitted.class.php": "c9db6d848266796d6bf29ed4468425a89db08c34278d947c110ecd9d2119c569",
+    "backend/src/middleware/MayModifyAttachments.class.php": "4e1f434570aa0ef71be83ffe7157ab6879e17a6be6ac5f840553600f48aeab5c",
+    "backend/src/middleware/MayReview.class.php": "7612d5376f23b89c6c4db859fe6644fd88e74e779907d684ad516fd8ea3823f2",
+    "backend/src/middleware/RequireToken.class.php": "f2d19714051837e46c07adec45bc1c52205cc9a282b37441a248bf9916f3c35a",
+    "backend/src/workspace/LogReportOutput.php": "cfcb2fd3418195fdac8bc6b7dcfeafeb53da36745c7fa1f37194e9fbf9da8b86",
+    "backend/src/workspace/Report.php": "f81129e75bfb3550205d3668fb2de1821967f20994c604cc0d41b380a13e543f",
+    "backend/src/workspace/ReportOutputFactory.php": "a94287404a75d0c933cd726c0b5a714503d7bd91dbaf56c416d1d20b63380f1a",
+    "backend/src/workspace/ResponseReportOutput.php": "0c88a1742d3e321cccb4c62c6fc34ca1627faa9b9e2763227310dc2dd1187466",
+    "backend/src/workspace/ReviewReportOutput.php": "d1f39523e236b0f2265da3a1892775f1bd5977fdc50da4c2091afab48282ba59",
+    "backend/src/workspace/SysCheckReportOutput.php": "a95e341b85194ddf65256cd33889925b680e249d246c669b23ade1b7862eb3da",
+    "backend/src/workspace/SysChecksFolder.class.php": "d5aa8f49861b6d36184de3c377d969312d65655a10daf15be570054141c0085e",
+    "backend/src/workspace/UploadedFilesHandler.class.php": "a7e4a8f062059ea7b49f5eb1dde4028edfc5120b3e399ef9b7686bf04dbe89e4",
+    "backend/src/workspace/Workspace.class.php": "5866681acead26a9dc570e0fd50a32a963e6e8f1b4098b98f3803d3d5a378ac0",
+    "backend/src/workspace/WorkspaceCache.class.php": "d4145a784fbb1397adb609380a9c1b10beaef371850ac7f537f2624d9fc5c4ac",
+    "backend/src/workspace/WorkspaceInitializer.class.php": "62343bd5e53ec4aefe8725438fb44f0bd2a658e9f5f9320c0d3af1655796c340",
+    "definitions/testtaker/custom-texts.json": "201f23fa1140265e84b47da978881269e4583c01a8e52dee22a731dc5af96edc",
+    "definitions/testtaker/mode-options.json": "4ad95c15ee7bbe78e475a03a4b37c6a86e102f7b26d83429536e6c37d854d339",
+    "definitions/testtaker/test-mode.json": "abbd8746a1f304b5ea6f01177a297b27fbd7c04742b687cfd13bffea1658619e",
+    "definitions/testtaker/testtaker.json": "eeb5ce41bedd00f4e91d1adfe3e90e187f3a798c290a6944cdb7593907188f34",
+    "scripts/database/full.sql": "9ac4b941ba40d75a563cbe4fb9d55075f27e46894902eb50100eb7263594ed08"
+  },
+  "vendor": {
+    "sourceComposerLockSha256": "47c7dda51f6d27fbbc93aaedc99d364b9eeb299d80f92d68226b0218a436b708",
+    "installedMetadataSha256": "a36c0ba39721cefd2628912f2e5213a197e4ee86c0eb4b354ecf33be248d64b4",
+    "installedPackages": 19,
+    "requiredProductionPackages": 19,
+    "allInstalledVersionsAndSourceReferencesMatchPinnedLock": true
+  },
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "configuration": {
+    "xmlSchemaValidation": true,
+    "allowTestMode": false
+  },
+  "sqlSeedsOrDaoStubs": false,
+  "mutationsOverActualHttp": true,
+  "rows": [
+    {
+      "label": "admin-r88",
+      "method": "PUT",
+      "path": "/session/admin",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "25626a6a795c7b152b655871cdf30bf68260edecb7fe958890ad13d04788f877",
+      "value": {
+        "token": "[owned-token-1]",
+        "displayName": "super",
+        "loginName": "super",
+        "groupLabel": null,
+        "id": 1,
+        "pwSetByAdmin": false,
+        "customTexts": {},
+        "flags": [],
+        "claims": {
+          "workspaceAdmin": [
+            {
+              "id": "20",
+              "type": "workspaceAdmin",
+              "label": "Owned R86 reports r86-full 1793961632145",
+              "flags": {
+                "mode": "RW"
+              }
+            },
+            {
+              "id": "21",
+              "type": "workspaceAdmin",
+              "label": "Owned R86 reports r86-metadata 1793961632340",
+              "flags": {
+                "mode": "RW"
+              }
+            },
+            {
+              "id": "22",
+              "type": "workspaceAdmin",
+              "label": "Owned R86 reports r86-errors 1793961632441",
+              "flags": {
+                "mode": "RW"
+              }
+            },
+            {
+              "id": "23",
+              "type": "workspaceAdmin",
+              "label": "Owned R86 reports r86-duplicates 1793961632539",
+              "flags": {
+                "mode": "RW"
+              }
+            },
+            {
+              "id": "24",
+              "type": "workspaceAdmin",
+              "label": "Owned R86 reports r86-deprecated 1793961632629",
+              "flags": {
+                "mode": "RW"
+              }
+            }
+          ],
+          "superAdmin": []
+        },
+        "groupToken": null,
+        "viewSettings": [],
+        "access": {
+          "workspaceAdmin": [
+            "20",
+            "21",
+            "22",
+            "23",
+            "24"
+          ],
+          "superAdmin": []
+        }
+      },
+      "rawText": "{\"token\":\"[owned-token-1]\",\"displayName\":\"super\",\"loginName\":\"super\",\"groupLabel\":null,\"id\":1,\"pwSetByAdmin\":false,\"customTexts\":{},\"flags\":[],\"claims\":{\"workspaceAdmin\":[{\"id\":\"20\",\"type\":\"workspaceAdmin\",\"label\":\"Owned R86 reports r86-full 1793961632145\",\"flags\":{\"mode\":\"RW\"}},{\"id\":\"21\",\"type\":\"workspaceAdmin\",\"label\":\"Owned R86 reports r86-metadata 1793961632340\",\"flags\":{\"mode\":\"RW\"}},{\"id\":\"22\",\"type\":\"workspaceAdmin\",\"label\":\"Owned R86 reports r86-errors 1793961632441\",\"flags\":{\"mode\":\"RW\"}},{\"id\":\"23\",\"type\":\"workspaceAdmin\",\"label\":\"Owned R86 reports r86-duplicates 1793961632539\",\"flags\":{\"mode\":\"RW\"}},{\"id\":\"24\",\"type\":\"workspaceAdmin\",\"label\":\"Owned R86 reports r86-deprecated 1793961632629\",\"flags\":{\"mode\":\"RW\"}}],\"superAdmin\":[]},\"groupToken\":null,\"viewSettings\":[],\"access\":{\"workspaceAdmin\":[\"20\",\"21\",\"22\",\"23\",\"24\"],\"superAdmin\":[]}}"
+    },
+    {
+      "label": "create-current-translation",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "b7a56873cd771f2c446d369b649430b65a756ba278ff97ec81bb6f55b2e73569",
+      "value": 25,
+      "rawText": "25"
+    },
+    {
+      "label": "grant-25-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "current-translation",
+      "method": "POST",
+      "path": "/workspace/25/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "6fd8d56dd5404dfaa180f1a4edf900f3251c2e94c4b8577b048c1ee7921f2a18",
+      "value": {
+        "current-translation.zip_Extract/preferred-player-2.4.html": {
+          "info": [
+            "Verona-Version: 6.0"
+          ],
+          "warning": [
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"current-translation.zip_Extract\\/preferred-player-2.4.html\":{\"info\":[\"Verona-Version: 6.0\"],\"warning\":[\"Resource is never used\"]}}"
+    },
+    {
+      "label": "current-translation-files",
+      "method": "GET",
+      "path": "/workspace/25/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "d6e9edcd9af1d5d5bcf1f0d53c0ead2bad94c4a2020b8bc2337db3be68e330a3",
+      "value": {
+        "Resource": [
+          {
+            "name": "preferred-player-2.4.html",
+            "size": 493,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "PREFERRED-PLAYER-2.4",
+            "report": {
+              "info": [
+                "Verona-Version: 6.0"
+              ],
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "  Deutsch Î©  ",
+              "description": "  Authored description  ",
+              "veronaModuleType": "player",
+              "veronaVersion": "6.0",
+              "version": "2.4.1"
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"preferred-player-2.4.html\",\"size\":493,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"PREFERRED-PLAYER-2.4\",\"report\":{\"info\":[\"Verona-Version: 6.0\"],\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"  Deutsch \\u00ce\\u00a9  \",\"description\":\"  Authored description  \",\"veronaModuleType\":\"player\",\"veronaVersion\":\"6.0\",\"version\":\"2.4.1\"}}]}"
+    },
+    {
+      "label": "create-zero-version",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "5f9c4ab08cac7457e9111a30e4664920607ea2c115a1433d7be98e97e64244ca",
+      "value": 26,
+      "rawText": "26"
+    },
+    {
+      "label": "grant-26-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "zero-version",
+      "method": "POST",
+      "path": "/workspace/26/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "2bc82f920e33cb0ae54caff539c0ff7b59936e30edee44bf5775cc9a6efa33cd",
+      "value": {
+        "zero-version.zip_Extract/guessedV2.3.html": {
+          "warning": [
+            "Metadata missing. Version guessed from Filename.",
+            "Non-Standard-Filename: `guessed-2.3.html` expected.",
+            "Resource is never used"
+          ],
+          "info": [
+            "Verona-Version: 6.0"
+          ]
+        }
+      },
+      "rawText": "{\"zero-version.zip_Extract\\/guessedV2.3.html\":{\"warning\":[\"Metadata missing. Version guessed from Filename.\",\"Non-Standard-Filename: `guessed-2.3.html` expected.\",\"Resource is never used\"],\"info\":[\"Verona-Version: 6.0\"]}}"
+    },
+    {
+      "label": "zero-version-files",
+      "method": "GET",
+      "path": "/workspace/26/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "cdee0ee989fd3791379f5aa9747db2621973e77a1c35a046d00a22e9bd70bf72",
+      "value": {
+        "Resource": [
+          {
+            "name": "guessedV2.3.html",
+            "size": 338,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "GUESSED-2.3",
+            "report": {
+              "warning": [
+                "Metadata missing. Version guessed from Filename.",
+                "Non-Standard-Filename: `guessed-2.3.html` expected."
+              ],
+              "info": [
+                "Verona-Version: 6.0"
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "guessed-2.3.0",
+              "description": "",
+              "veronaModuleType": "player",
+              "veronaVersion": "6.0",
+              "version": "2.3.0"
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"guessedV2.3.html\",\"size\":338,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"GUESSED-2.3\",\"report\":{\"warning\":[\"Metadata missing. Version guessed from Filename.\",\"Non-Standard-Filename: `guessed-2.3.html` expected.\"],\"info\":[\"Verona-Version: 6.0\"]},\"dependencies\":[],\"info\":{\"label\":\"guessed-2.3.0\",\"description\":\"\",\"veronaModuleType\":\"player\",\"veronaVersion\":\"6.0\",\"version\":\"2.3.0\"}}]}"
+    },
+    {
+      "label": "create-zero-label",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "670671cd97404156226e507973f2ab8330d3022ca96e0c93bdbdb320c41adcaf",
+      "value": 27,
+      "rawText": "27"
+    },
+    {
+      "label": "grant-27-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "zero-label",
+      "method": "POST",
+      "path": "/workspace/27/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "928f03b9653864d5bbe0b182839c7fbde68e469f39639ff61272bbc98772ccc9",
+      "value": {
+        "zero-label.zip_Extract/guessed-zero-4.2.html": {
+          "warning": [
+            "Metadata missing. Version guessed from Filename.",
+            "Resource is never used"
+          ],
+          "info": [
+            "Verona-Version: 6.0"
+          ]
+        }
+      },
+      "rawText": "{\"zero-label.zip_Extract\\/guessed-zero-4.2.html\":{\"warning\":[\"Metadata missing. Version guessed from Filename.\",\"Resource is never used\"],\"info\":[\"Verona-Version: 6.0\"]}}"
+    },
+    {
+      "label": "zero-label-files",
+      "method": "GET",
+      "path": "/workspace/27/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "018ea658c9550b31fcd1717887eeef2e7f020ea1ce9eabf92d052eec8c143479",
+      "value": {
+        "Resource": [
+          {
+            "name": "guessed-zero-4.2.html",
+            "size": 340,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "GUESSED-ZERO-4.2",
+            "report": {
+              "warning": [
+                "Metadata missing. Version guessed from Filename."
+              ],
+              "info": [
+                "Verona-Version: 6.0"
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "guessed-zero-4.2.0",
+              "description": "",
+              "veronaModuleType": "player",
+              "veronaVersion": "6.0",
+              "version": "4.2.0"
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"guessed-zero-4.2.html\",\"size\":340,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"GUESSED-ZERO-4.2\",\"report\":{\"warning\":[\"Metadata missing. Version guessed from Filename.\"],\"info\":[\"Verona-Version: 6.0\"]},\"dependencies\":[],\"info\":{\"label\":\"guessed-zero-4.2.0\",\"description\":\"\",\"veronaModuleType\":\"player\",\"veronaVersion\":\"6.0\",\"version\":\"4.2.0\"}}]}"
+    },
+    {
+      "label": "create-preview-version",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "59e19706d51d39f66711c2653cd7eb1291c94d9b55eb14bda74ce4dc636d015a",
+      "value": 28,
+      "rawText": "28"
+    },
+    {
+      "label": "grant-28-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "preview-version",
+      "method": "POST",
+      "path": "/workspace/28/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "4519468e4c54b1f7770cd013da115ae7a8cd5a3a51cdb917d5885abf6c6b9826",
+      "value": {
+        "preview-version.zip_Extract/preview-0.0.html": {
+          "info": [
+            "Verona-Version: 6.0"
+          ],
+          "warning": [
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"preview-version.zip_Extract\\/preview-0.0.html\":{\"info\":[\"Verona-Version: 6.0\"],\"warning\":[\"Resource is never used\"]}}"
+    },
+    {
+      "label": "preview-version-files",
+      "method": "GET",
+      "path": "/workspace/28/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "f599621f14e22594cc257560cb88147f2ea4508a307988dc074a0faae99c1808",
+      "value": {
+        "Resource": [
+          {
+            "name": "preview-0.0.html",
+            "size": 340,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "PREVIEW-0.0",
+            "report": {
+              "info": [
+                "Verona-Version: 6.0"
+              ],
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "preview-0.0.0-preview",
+              "description": "",
+              "veronaModuleType": "player",
+              "veronaVersion": "6.0",
+              "version": "0.0.0-preview"
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"preview-0.0.html\",\"size\":340,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"PREVIEW-0.0\",\"report\":{\"info\":[\"Verona-Version: 6.0\"],\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"preview-0.0.0-preview\",\"description\":\"\",\"veronaModuleType\":\"player\",\"veronaVersion\":\"6.0\",\"version\":\"0.0.0-preview\"}}]}"
+    },
+    {
+      "label": "create-leading-zero-version",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "35135aaa6cc23891b40cb3f378c53a17a1127210ce60e125ccf03efcfdaec458",
+      "value": 29,
+      "rawText": "29"
+    },
+    {
+      "label": "grant-29-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "leading-zero-version",
+      "method": "POST",
+      "path": "/workspace/29/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "4758a77a25fcadaaad7e7208d27153f82725d0d96a7f17e847611d64ad93dd34",
+      "value": {
+        "leading-zero-version.zip_Extract/leading-1.2.html": {
+          "info": [
+            "Verona-Version: 6.0"
+          ],
+          "warning": [
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"leading-zero-version.zip_Extract\\/leading-1.2.html\":{\"info\":[\"Verona-Version: 6.0\"],\"warning\":[\"Resource is never used\"]}}"
+    },
+    {
+      "label": "leading-zero-version-files",
+      "method": "GET",
+      "path": "/workspace/29/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "e7e2ae95b6c578af76c9b4123f51627dbdc194fa1ebd4ad46cbe7940758c9b05",
+      "value": {
+        "Resource": [
+          {
+            "name": "leading-1.2.html",
+            "size": 348,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "LEADING-1.2",
+            "report": {
+              "info": [
+                "Verona-Version: 6.0"
+              ],
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "leading-1.2.3-beta",
+              "description": "",
+              "veronaModuleType": "player",
+              "veronaVersion": "6.0",
+              "version": "1.2.3-beta"
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"leading-1.2.html\",\"size\":348,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"LEADING-1.2\",\"report\":{\"info\":[\"Verona-Version: 6.0\"],\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"leading-1.2.3-beta\",\"description\":\"\",\"veronaModuleType\":\"player\",\"veronaVersion\":\"6.0\",\"version\":\"1.2.3-beta\"}}]}"
+    },
+    {
+      "label": "create-wrong-schema",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "624b60c58c9d8bfb6ff1886c2fd605d2adeb6ea4da576068201b6c6958ce93f4",
+      "value": 30,
+      "rawText": "30"
+    },
+    {
+      "label": "grant-30-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "wrong-schema",
+      "method": "POST",
+      "path": "/workspace/30/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "a027cbcb9c4b46fb1842f4859411518c77fa5545741f315dad315bdb245ec6ce",
+      "value": {
+        "wrong-schema.zip_Extract/wrong-2.3.html": {
+          "warning": [
+            "Wrong metadata-schema: https://example.invalid/owned-schema-marker",
+            "Metadata missing. Version guessed from Filename.",
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"wrong-schema.zip_Extract\\/wrong-2.3.html\":{\"warning\":[\"Wrong metadata-schema: https:\\/\\/example.invalid\\/owned-schema-marker\",\"Metadata missing. Version guessed from Filename.\",\"Resource is never used\"]}}"
+    },
+    {
+      "label": "wrong-schema-files",
+      "method": "GET",
+      "path": "/workspace/30/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "352111bb2fde9402fcff25c08c1e3756041d5882a8d9deeef281a1e1e7d750e7",
+      "value": {
+        "Resource": [
+          {
+            "name": "wrong-2.3.html",
+            "size": 286,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "WRONG-2.3",
+            "report": {
+              "warning": [
+                "Wrong metadata-schema: https://example.invalid/owned-schema-marker",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned title",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"wrong-2.3.html\",\"size\":286,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"WRONG-2.3\",\"report\":{\"warning\":[\"Wrong metadata-schema: https:\\/\\/example.invalid\\/owned-schema-marker\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"Owned title\",\"description\":\"\"}}]}"
+    },
+    {
+      "label": "create-invalid-json",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "eb1e33e8a81b697b75855af6bfcdbcbf7cbbde9f94962ceaec1ed8af21f5a50f",
+      "value": 31,
+      "rawText": "31"
+    },
+    {
+      "label": "grant-31-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "invalid-json",
+      "method": "POST",
+      "path": "/workspace/31/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "cb0e23f6c6fd1f3cdf7d355cf1c5735f9a468f81b7a0a8b7ae46b62f7af2ef6f",
+      "value": {
+        "invalid-json.zip_Extract/invalid-2.3.html": {
+          "warning": [
+            "Could not read metadata: JSON Error: Syntax error, malformed JSON",
+            "Metadata missing. Version guessed from Filename.",
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"invalid-json.zip_Extract\\/invalid-2.3.html\":{\"warning\":[\"Could not read metadata: JSON Error: Syntax error, malformed JSON\",\"Metadata missing. Version guessed from Filename.\",\"Resource is never used\"]}}"
+    },
+    {
+      "label": "invalid-json-files",
+      "method": "GET",
+      "path": "/workspace/31/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "e2c029fc2ac6cb511ec79b341c5a6408b8df791621320d98b4e75f79c4ee6796",
+      "value": {
+        "Resource": [
+          {
+            "name": "invalid-2.3.html",
+            "size": 106,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "INVALID-2.3",
+            "report": {
+              "warning": [
+                "Could not read metadata: JSON Error: Syntax error, malformed JSON",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned invalid JSON title",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"invalid-2.3.html\",\"size\":106,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"INVALID-2.3\",\"report\":{\"warning\":[\"Could not read metadata: JSON Error: Syntax error, malformed JSON\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"Owned invalid JSON title\",\"description\":\"\"}}]}"
+    },
+    {
+      "label": "create-array-json",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e29c9c180c6279b0b02abd6a1801c7c04082cf486ec027aa13515e4f3884bb6b",
+      "value": 32,
+      "rawText": "32"
+    },
+    {
+      "label": "grant-32-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "array-json",
+      "method": "POST",
+      "path": "/workspace/32/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "5c39f226e4d1a588b649bdddb6f891be2a940bf3607080ca37d0682b4d2b7de1",
+      "value": {
+        "array-json.zip_Extract/array-2.3.html": {
+          "warning": [
+            "Could not read metadata: $schema missing",
+            "Metadata missing. Version guessed from Filename.",
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"array-json.zip_Extract\\/array-2.3.html\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\",\"Resource is never used\"]}}"
+    },
+    {
+      "label": "array-json-files",
+      "method": "GET",
+      "path": "/workspace/32/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "5b993a3de51f747409d6d5621631c741f09f9a7f476edea223dbb0b494d7047e",
+      "value": {
+        "Resource": [
+          {
+            "name": "array-2.3.html",
+            "size": 91,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "ARRAY-2.3",
+            "report": {
+              "warning": [
+                "Could not read metadata: $schema missing",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned array title",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"array-2.3.html\",\"size\":91,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"ARRAY-2.3\",\"report\":{\"warning\":[\"Could not read metadata: $schema missing\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"Owned array title\",\"description\":\"\"}}]}"
+    },
+    {
+      "label": "create-schema-object",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "c6f3ac57944a531490cd39902d0f777715fd005efac9a30622d5f5205e7f6894",
+      "value": 33,
+      "rawText": "33"
+    },
+    {
+      "label": "grant-33-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "schema-object",
+      "method": "POST",
+      "path": "/workspace/33/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "8524494991039d0856ccdde991bc04a5b085dc8cf0188975a3ad7e1b1a6aeb7d",
+      "value": {
+        "schema-object.zip_Extract/object-2.3.html": {
+          "warning": [
+            "Wrong metadata-schema: Array",
+            "Metadata missing. Version guessed from Filename.",
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"schema-object.zip_Extract\\/object-2.3.html\":{\"warning\":[\"Wrong metadata-schema: Array\",\"Metadata missing. Version guessed from Filename.\",\"Resource is never used\"]}}"
+    },
+    {
+      "label": "schema-object-files",
+      "method": "GET",
+      "path": "/workspace/33/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "e9640b8b3942bdb072fc5c6d023533caca68386e503dde70c661b2efa4a332d2",
+      "value": {
+        "Resource": [
+          {
+            "name": "object-2.3.html",
+            "size": 282,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "OBJECT-2.3",
+            "report": {
+              "warning": [
+                "Wrong metadata-schema: Array",
+                "Metadata missing. Version guessed from Filename."
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "Owned title",
+              "description": ""
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"object-2.3.html\",\"size\":282,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"OBJECT-2.3\",\"report\":{\"warning\":[\"Wrong metadata-schema: Array\",\"Metadata missing. Version guessed from Filename.\"]},\"dependencies\":[],\"info\":{\"label\":\"Owned title\",\"description\":\"\"}}]}"
+    },
+    {
+      "label": "create-numeric-spec",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "86e50149658661312a9e0b35558d84f6c6d3da797f552a9657fe0558ca40cdef",
+      "value": 34,
+      "rawText": "34"
+    },
+    {
+      "label": "grant-34-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "numeric-spec",
+      "method": "POST",
+      "path": "/workspace/34/file",
+      "status": 500,
+      "contentType": "text/html;charset=UTF-8",
+      "bodySha256": "a8615a04da3b1a4c340854ecf19048fc2a16b6e1ae8243c763a6b84ad7573986",
+      "value": "Internal error.",
+      "rawText": "Internal error."
+    },
+    {
+      "label": "numeric-spec-files",
+      "method": "GET",
+      "path": "/workspace/34/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "value": [],
+      "rawText": "[]"
+    },
+    {
+      "label": "create-legacy-title",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "9f14025af0065b30e47e23ebb3b491d39ae8ed17d33739e5ff3827ffb3634953",
+      "value": 35,
+      "rawText": "35"
+    },
+    {
+      "label": "grant-35-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "legacy-title",
+      "method": "POST",
+      "path": "/workspace/35/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "f5f98f782441f97abe9cc270025304aa3595c0467fa204ca857c4548bfa71318",
+      "value": {
+        "legacy-title.zip_Extract/legacy-owned-1.0.html": {
+          "warning": [
+            "Metadata in meta-tag is deprecated!",
+            "Resource is never used"
+          ],
+          "info": [
+            "Verona-Version: 3.0"
+          ]
+        }
+      },
+      "rawText": "{\"legacy-title.zip_Extract\\/legacy-owned-1.0.html\":{\"warning\":[\"Metadata in meta-tag is deprecated!\",\"Resource is never used\"],\"info\":[\"Verona-Version: 3.0\"]}}"
+    },
+    {
+      "label": "legacy-title-files",
+      "method": "GET",
+      "path": "/workspace/35/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "4f469406406ef1d700c2f6155729f2f493b88bb71843bead8825c375492e5794",
+      "value": {
+        "Resource": [
+          {
+            "name": "legacy-owned-1.0.html",
+            "size": 185,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "LEGACY-OWNED-1.0",
+            "report": {
+              "warning": [
+                "Metadata in meta-tag is deprecated!"
+              ],
+              "info": [
+                "Verona-Version: 3.0"
+              ]
+            },
+            "dependencies": [],
+            "info": {
+              "label": "  Alter & Î©  ",
+              "description": "  Legacy description  ",
+              "veronaModuleType": "player",
+              "veronaVersion": "3.0",
+              "version": "1.0.1"
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"legacy-owned-1.0.html\",\"size\":185,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"LEGACY-OWNED-1.0\",\"report\":{\"warning\":[\"Metadata in meta-tag is deprecated!\"],\"info\":[\"Verona-Version: 3.0\"]},\"dependencies\":[],\"info\":{\"label\":\"  Alter & \\u00ce\\u00a9  \",\"description\":\"  Legacy description  \",\"veronaModuleType\":\"player\",\"veronaVersion\":\"3.0\",\"version\":\"1.0.1\"}}]}"
+    },
+    {
+      "label": "create-archive-comment",
+      "method": "PUT",
+      "path": "/workspace",
+      "status": 201,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "76a50887d8f1c2e9301755428990ad81479ee21c25b43215cf524541e0503269",
+      "value": 36,
+      "rawText": "36"
+    },
+    {
+      "label": "grant-36-RW",
+      "method": "PATCH",
+      "path": "/user/1/workspaces",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "value": "",
+      "rawText": ""
+    },
+    {
+      "label": "archive-comment",
+      "method": "POST",
+      "path": "/workspace/36/file",
+      "status": 201,
+      "contentType": "application/json",
+      "bodySha256": "1ab1757d52099394f17fa16b063fb3adbb4e8d825495610fc6deeb2bc720d629",
+      "value": {
+        "archive-comment.zip_Extract/commented.itcr.zip": {
+          "info": [
+            "Contains 3 files."
+          ],
+          "warning": [
+            "Resource is never used"
+          ]
+        }
+      },
+      "rawText": "{\"archive-comment.zip_Extract\\/commented.itcr.zip\":{\"info\":[\"Contains 3 files.\"],\"warning\":[\"Resource is never used\"]}}"
+    },
+    {
+      "label": "archive-comment-files",
+      "method": "GET",
+      "path": "/workspace/36/files",
+      "status": 200,
+      "contentType": "application/json",
+      "bodySha256": "b40d14c21bfb4f291cd5b5d2bbf04a6dabceb4cba5fb48026c6bf9418bb786d5",
+      "value": {
+        "Resource": [
+          {
+            "name": "commented.itcr.zip",
+            "size": 343,
+            "modificationTime": 312768000,
+            "type": "Resource",
+            "id": "COMMENTED.ITCR.ZIP",
+            "report": {
+              "info": [
+                "Contains 3 files."
+              ],
+              "warning": []
+            },
+            "dependencies": [],
+            "info": {
+              "label": "",
+              "description": "  Owned archive Ω\n\"quoted\"  "
+            }
+          }
+        ]
+      },
+      "rawText": "{\"Resource\":[{\"name\":\"commented.itcr.zip\",\"size\":343,\"modificationTime\":312768000,\"type\":\"Resource\",\"id\":\"COMMENTED.ITCR.ZIP\",\"report\":{\"info\":[\"Contains 3 files.\"],\"warning\":[]},\"dependencies\":[],\"info\":{\"label\":\"\",\"description\":\"  Owned archive \\u03a9\\n\\\"quoted\\\"  \"}}]}"
+    }
+  ]
+}

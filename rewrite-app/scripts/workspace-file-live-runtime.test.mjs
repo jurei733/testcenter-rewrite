@@ -42,6 +42,25 @@ for(const kind of kinds)test(kind+': Source files become live without manual act
  const scope={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey};
  const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType}).catch(error=>assert.fail(JSON.stringify({fileName,code:error.errorCode,details:error.details})));
  let parent,run,initialOrigin,protectedFields;
+ await t.test('Source filename-derived Player IDs resolve through actual live publication and participant resources',async()=>{
+  const fallbackScope={tenantKey:tenant.tenantKey,workspaceKey:'filename-player'};
+  await services.platform.createWorkspace({...fallbackScope,displayName:'Owned filename Player'});
+  const html='<html><title>Owned filename Player</title><main>Exact fallback Player bytes</main></html>';
+  const put=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...fallbackScope,fileName,sourceDocument,mediaType});
+  await put('unvers.html',html,'text/html');
+  await put('unit.xml',xml('Unit','FALLBACK.UNIT','<Definition player="unversioned">Owned fallback definition</Definition>'));
+  const uploaded=await put('booklet.xml',xml('Booklet','FALLBACK.BOOK','<Units><Unit id="FALLBACK.UNIT" label="Fallback"/></Units>'));
+  assert.equal(uploaded.importJob.status,'completed',JSON.stringify(uploaded.importJob.diagnostics));
+  assert.equal(uploaded.workspaceAvailability.status,'available',JSON.stringify(uploaded.workspaceAvailability));
+  await put('people.xml',xml('Testtakers','',
+   '<Group id="fallback" label="Owned fallback"><Login name="fallback-person" mode="run-hot-return"><Booklet>FALLBACK.BOOK</Booklet></Login></Group>'));
+  const person=await services.participantRuntime.signIn({...fallbackScope,loginKey:'fallback-person'});
+  const run=await services.participantRuntime.launch({participantSessionId:person.participantSessionId,bookletKey:'FALLBACK.BOOK'});
+  const state=await services.participantRuntime.getCurrentRunState({participantSessionId:person.participantSessionId,testRunId:run.testRunId,includeBookletAssets:true});
+  assert.ok(JSON.stringify(state.bookletAssets).includes(html),'The actual live snapshot must contain the selected Player bytes.');
+  const resource=await services.participantRuntime.getResource({participantSessionId:person.participantSessionId,resourcePath:'unvers.html'});
+  assert.equal(Buffer.from(resource.dataBase64,'base64').toString(),html);
+ });
  await t.test('a normal Source upload makes the whole workspace available without calling activateContentRelease',async()=>{
   await upload('player.html',player('Player version one'),'text/html');
   await upload('unit.xml',unit('Definition version one'));

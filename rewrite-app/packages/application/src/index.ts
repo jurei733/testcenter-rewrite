@@ -128,6 +128,7 @@ import type {ContentReleaseActivationCommit} from "./content-release-activation.
 import { workspaceFileReplacementConflict } from './workspace-file-replacement.js';
 import { FirstSliceError } from "./first-slice-error.js";
 import { buildWorkspaceFileCatalog, selectCurrentWorkspaceFiles, normalizeWorkspacePlayerResourceId, workspaceFileReplacementIdentity } from './workspace-file-catalog.js';
+import { inspectOriginalHtmlResource } from './original-resource-metadata.js';
 import type { WorkspaceFileCatalog } from '@testcenter-rewrite-app/domain';
 export { FirstSliceError } from "./first-slice-error.js";
 export { prepareApplicationAssetDeletion, validateApplicationAssetReferences } from "./application-asset-mutation.js";
@@ -4215,20 +4216,26 @@ const readStandaloneTestcenterFileIdentity = (
   );
 };
 
-const inferVeronaPlayerResourceIdFromFileName = (
-  fileName: string
-): string | null => normalizeWorkspacePlayerResourceId(fileName);
+const normalizeCanonicalPlayerResourceId = (reference: string): string | null => {
+  const baseName = reference.split(/[\\/]/).at(-1) ?? reference;
+  const stem = baseName.replace(/\.html?$/i, '');
+  const versioned = /^(.+?)[@-](\d+)\.(\d+)(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/.exec(stem);
+  return versioned?.[1] ? `${versioned[1]}-${Number.parseInt(versioned[2]!,10)}.${Number.parseInt(versioned[3]!,10)}` : null;
+};
 
 const readVeronaPlayerResourceId = (
   playerHtml: string,
   fileName: string
 ): string | null => {
+  // The canonical package API supports historical metadata without $schema.
+  // Physical Original files use inspectOriginalHtmlResource in their catalog
+  // and reservation gates instead; do not replace this compatibility identity.
   const metadata = validateVeronaPlayerMetadata(playerHtml);
-  if (metadata.status === "valid") {
-    const moduleVersion = normalizeVeronaMajorMinorVersion(metadata.version);
-    return moduleVersion ? `${metadata.id}-${moduleVersion}` : null;
+  if (metadata.status === 'valid') {
+    const version = normalizeVeronaMajorMinorVersion(metadata.version);
+    return version ? `${metadata.id}-${version}` : null;
   }
-  return inferVeronaPlayerResourceIdFromFileName(fileName);
+  return normalizeCanonicalPlayerResourceId(fileName);
 };
 
 const readStandaloneVeronaPlayerResourceId = (
@@ -16646,13 +16653,20 @@ const xmlAttribute = (value: string): string =>
     .replace(/>/g, "&gt;");
 
 const collectAssemblyResourceIdentifiers = (
-  entry: SourcePackageAssemblyEntry
+  entry: SourcePackageAssemblyEntry,
+  originalFileIds = false
 ): string[] => {
   const fileName = entry.fileName;
   const baseName = fileName.split("/").at(-1) ?? fileName;
   const stem = baseName.replace(/\.(?:html?|xml|json)$/i, "");
   const identifiers = new Set([fileName, baseName, stem].filter(Boolean));
   const text = decodeSourceTextBytes(entry.bytes);
+  if (originalFileIds && /\.html?$/i.test(baseName)) {
+    // Native Unit FileIDs and the catalog must resolve to the same physical
+    // Player, including filename-derived IDs when Source ignores its schema.
+    const resource = inspectOriginalHtmlResource(fileName, text, entry.bytes);
+    if (resource.errors.length === 0) identifiers.add(resource.identifier);
+  }
   if (/^\s*(?:<\?xml[^>]*>\s*)?<(?:Booklet|Unit|SysCheck)\b/i.test(text)) {
     const metadataId = text.match(
       /<Metadata\b[^>]*>[\s\S]*?<Id\b[^>]*>([^<]+)<\/Id>/i
@@ -16703,12 +16717,13 @@ const collectAssemblyResourceIdentifiers = (
 };
 
 const createAssemblyManifest = (
-  entries: SourcePackageAssemblyEntry[]
+  entries: SourcePackageAssemblyEntry[],
+  originalFileIds = false
 ): string => {
   const resources: string[] = [];
   const identifiers = new Map<string, string>();
   for (const entry of entries) {
-    for (const identifier of collectAssemblyResourceIdentifiers(entry)) {
+    for (const identifier of collectAssemblyResourceIdentifiers(entry, originalFileIds)) {
       const normalizedIdentifier = identifier.toLowerCase();
       if (identifiers.has(normalizedIdentifier)) {
         continue;
@@ -16730,7 +16745,8 @@ const createAssemblyManifest = (
 };
 
 const assembleSourcePackageArchive = (
-  sourcePackages: SourcePackage[]
+  sourcePackages: SourcePackage[],
+  originalFileIds = false
 ): { archive: Buffer; members: SourcePackageAssemblyEntry[] } => {
   const members = sourcePackages.map(sourcePackage => {
     const decodedDocument = decodePersistedSourceDocument(sourcePackage);
@@ -16794,7 +16810,7 @@ const assembleSourcePackageArchive = (
       : [
           {
             fileName: "imsmanifest.xml",
-            bytes: Buffer.from(createAssemblyManifest(members), "utf8")
+            bytes: Buffer.from(createAssemblyManifest(members, originalFileIds), "utf8")
           }
         ]),
     ...members.map(member => ({ fileName: member.fileName, bytes: member.bytes }))
@@ -16803,7 +16819,8 @@ const assembleSourcePackageArchive = (
 };
 
 const collectLooseSourcePackageDependencyReferences = (
-  sourcePackage: SourcePackage
+  sourcePackage: SourcePackage,
+  originalFileIds = false
 ): string[] => {
   const decodedDocument = decodePersistedSourceDocument(sourcePackage);
   if (
@@ -16870,7 +16887,9 @@ const collectLooseSourcePackageDependencyReferences = (
       xmlChildrenNamed(root, "DefinitionRef")[0] ??
       xmlChildrenNamed(root, "Definition")[0];
     const playerReference = definition?.getAttribute("player");
-    addReference(playerReference ? normalizeWorkspacePlayerResourceId(playerReference) ?? playerReference : null);
+    addReference(playerReference ? (originalFileIds
+      ? normalizeWorkspacePlayerResourceId(playerReference)
+      : normalizeCanonicalPlayerResourceId(playerReference)) ?? playerReference : null);
     if (definition && xmlElementLocalName(definition) === "DefinitionRef") {
       addReference(
         ["href", "path", "src", "uri", "file", "fileName", "filename"]
@@ -17054,9 +17073,11 @@ const resolveWorkspaceDependencySourcePackages = (input: {
   workspaceSourcePackages: SourcePackage[];
   dependencySourcePackageIds?: string[];
   dependencySelectionRevision?: string;
+  originalFileIds?: boolean;
 }): WorkspaceDependencySourceResolution => {
   const rootReferences = collectLooseSourcePackageDependencyReferences(
-    input.rootSourcePackage
+    input.rootSourcePackage,
+    input.originalFileIds
   );
   if (rootReferences.length === 0) {
     return { status: "not_applicable" };
@@ -17093,7 +17114,7 @@ const resolveWorkspaceDependencySourcePackages = (input: {
         assemblyEntry.fileName.split("/").at(-1) ?? assemblyEntry.fileName;
       const identifierKeys = new Set(
         (metadataReadable
-          ? collectAssemblyResourceIdentifiers(assemblyEntry)
+          ? collectAssemblyResourceIdentifiers(assemblyEntry, input.originalFileIds)
           : [assemblyEntry.fileName, fileBaseName]
         ).flatMap(workspaceDependencyReferenceKeys)
       );
@@ -17186,7 +17207,8 @@ const resolveWorkspaceDependencySourcePackages = (input: {
       )
     );
     for (const reference of collectLooseSourcePackageDependencyReferences(
-      currentSourcePackage
+      currentSourcePackage,
+      input.originalFileIds
     )) {
       const referenceKeys = workspaceDependencyReferenceKeys(reference);
       const exactReferenceKey = reference.trim().toLowerCase();
@@ -17402,6 +17424,10 @@ const collectWorkspaceSourcePackageReferences = (input: {
     sourcePackage =>
       !replacementBySourcePackageId.has(sourcePackage.sourcePackageId)
   );
+  const originalFileIdSources = new Set(input.activityEvents.flatMap(event =>
+    event.eventType === 'source_package_created' && event.details.intakeMode === 'workspace_file' ? [event.subjectId] :
+    event.eventType === 'source_package_replaced' && event.details.replacementMode === 'workspace_file' &&
+      typeof event.details.replacementSourcePackageId === 'string' ? [event.details.replacementSourcePackageId] : []));
   const references = new Map<
     string,
     { sourcePackageId: string; referencingSourcePackageId: string }
@@ -17434,7 +17460,8 @@ const collectWorkspaceSourcePackageReferences = (input: {
       }
       resolution = resolveWorkspaceDependencySourcePackages({
         rootSourcePackage,
-        workspaceSourcePackages: activeRootSourcePackages
+        workspaceSourcePackages: activeRootSourcePackages,
+        originalFileIds: originalFileIdSources.has(rootSourcePackage.sourcePackageId)
       });
     } catch {
       continue;
@@ -24477,7 +24504,7 @@ export const createFirstSliceServices = (
   const workspaceFiles = createWorkspaceFileRuntime({repository, now, id: idGenerator,
     project: source => projectWorkspaceFile(source),
     compile: (sources, scope) => {
-      const {archive, members} = assembleSourcePackageArchive(sources);
+      const {archive, members} = assembleSourcePackageArchive(sources, true);
       const sourcePackage: SourcePackage = {sourcePackageId: idGenerator(), ...scope,
         fileName: 'workspace-files.zip', mediaType: 'application/zip', contentStructure: null,
         sourceDocument: 'data:application/zip;base64,' + archive.toString('base64'), status: 'accepted', uploadedAt: now()};
@@ -26009,14 +26036,16 @@ export const createFirstSliceServices = (
           workspaceSourcePackages: selectCurrentWorkspaceFiles(workspaceSourcePackages, workspaceActivityEvents)
             .filter(source => !options.currentWorkspaceFilesOnly || source.status !== 'rejected'),
           dependencySourcePackageIds,
-          dependencySelectionRevision: input.dependencySelectionRevision
+          dependencySelectionRevision: input.dependencySelectionRevision,
+          originalFileIds: options.currentWorkspaceFilesOnly === true
         });
       if (workspaceDependencyResolution.status === "blocked") {
         workspaceDependencyDiagnostic = workspaceDependencyResolution.diagnostic;
       }
       if (workspaceDependencyResolution.status === "resolved") {
         const { archive, members } = assembleSourcePackageArchive(
-          workspaceDependencyResolution.sourcePackages
+          workspaceDependencyResolution.sourcePackages,
+          options.currentWorkspaceFilesOnly === true
         );
         const sourceBaseName = (sourcePackage.fileName
           .replace(/\\/g, "/")
@@ -27376,11 +27405,15 @@ export const createFirstSliceServices = (
         {...source, mediaType:'application/xml', contentStructure:null}, decoded ? {...decoded,mediaType:'application/xml'} : null)
         : /\.zip$/i.test(source.fileName) && !/\.itcr\.zip$/i.test(source.fileName) && !source.fileName.startsWith('Resource/') ? 'Package' as const : 'Resource' as const,
       status:source.status, uploadedAt:source.uploadedAt, fileSizeBytes:decoded?.bytes.byteLength ?? null,
-      sourceText,
-      resourceIdentifier:/\.html$/i.test(source.fileName)&&sourceText!==null ? readVeronaPlayerResourceId(sourceText,source.fileName) : null};
+      sourceText,...(decoded&&/\.html$/i.test(source.fileName)?{sourceBytes:decoded.bytes}:{}),
+      resourceIdentifier:null};
   };
   const originalResourcePackages=createOriginalResourcePackages({decode:decodePersistedSourceDocument,
-    entries:readZipEntries,read:readZipEntryBuffer,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath});
+    entries:readZipEntries,read:readZipEntryBuffer,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath,
+    comment:bytes=>{
+      const offset=findZipEndOfCentralDirectoryOffset(bytes);
+      return offset<0?'':bytes.subarray(offset+22,offset+22+bytes.readUInt16LE(offset+20)).toString('utf8');
+    }});
   const originalTestFiles=createOriginalTestFiles({repository,project:projectWorkspaceFile,decode:decodePersistedSourceDocument,
     readPackage:(source,path)=>originalResourcePackages.read(source,path)});
   const validateWorkspaceFile = (source: SourcePackage) => {
@@ -27389,6 +27422,10 @@ export const createFirstSliceServices = (
       'workspace_file_document_invalid', 'A workspace file requires actual source bytes.');
     const file = projectWorkspaceFile(source);
     if (/\.itcr\.zip$/i.test(source.fileName)) originalResourcePackages.validate(source);
+    if(file.fileType==='Resource'&&/\.html$/i.test(file.fileName)){
+      const metadata=buildWorkspaceFileCatalog([file]).items[0]!;
+      if(metadata.validationDiagnostics?.some(row=>row.severity==='error'))throw new FirstSliceError(400,'workspace_file_validation_failed','The file did not pass Testcenter metadata validation.',{diagnostics:metadata.validationDiagnostics});
+    }
     if (/\.xml$/i.test(source.fileName)) {
       const diagnostics = [
         ...(/^data:/i.test(source.sourceDocument) ? validateXmlEncoding(decoded.bytes,file.sourceText ?? '',source.fileName,decoded.mediaType) : []),
@@ -30640,12 +30677,25 @@ export const createFirstSliceServices = (
               fileType: classifyWorkspaceSourcePackage(source, decoded), status: source.status,
               uploadedAt: source.uploadedAt, fileSizeBytes: decoded?.bytes.byteLength ?? null,
               sourceText: decoded ? readPersistedSourceText(source, decoded) : null,
-              resourceIdentifier: readStandaloneVeronaPlayerResourceId(source)};
+              ...(decoded&&/\.html$/i.test(source.fileName)?{sourceBytes:decoded.bytes}:{}),
+              resourceIdentifier: null};
           }),activityEvents));
         const byId=new Map(currentFiles.map(source=>[source.sourcePackageId,source]));
         for (const file of catalog.items) {
           const source=byId.get(file.sourcePackageId);
-          if (!source || !/\.xml$/i.test(source.fileName)) continue;
+          if(!source)continue;
+          if(file.fileType==='Resource'&&/\.itcr\.zip$/i.test(source.fileName)){
+            try{
+              const metadata=originalResourcePackages.metadata(source);
+              file.metadata.description=metadata.comment;
+              file.validationDiagnostics=[{code:'workspace_resource_archive_info',severity:'info',message:`Contains ${metadata.entryCount} files.`}];
+            }catch{
+              // Legacy/canonical rows remain listable without publishing raw
+              // archive errors, contents, paths or unbounded parser messages.
+              file.validationDiagnostics=[{code:'workspace_resource_archive_invalid',severity:'error',message:'Das Ressourcenarchiv konnte nicht gelesen werden.'}];
+            }
+          }
+          if (!/\.xml$/i.test(source.fileName)) continue;
           const decoded=decodePersistedSourceDocument(source), text=decoded ? readPersistedSourceText(source,decoded) ?? '' : '';
           const diagnostics=[
             ...(decoded && /^data:/i.test(source.sourceDocument ?? '') ? validateXmlEncoding(decoded.bytes,text,source.fileName,decoded.mediaType) : []),
@@ -30666,6 +30716,14 @@ export const createFirstSliceServices = (
           };
           file.validationDiagnostics=diagnostics.map(({code,severity})=>({code,severity,
             message:messages[code]??'Die XML-Datei konnte nicht vollständig geprüft werden.'}));
+          // The notice generator emits only fixed deprecation paths and an
+          // attachment count for XML; raw validation/roster text stays private.
+          const notices=readWorkspaceFileReport({sourcePackageId:source.sourcePackageId,fileName:source.fileName,
+            fileType:file.fileType,status:source.status,uploadedAt:source.uploadedAt,fileSizeBytes:file.fileSizeBytes,
+            sourceText:text,resourceIdentifier:null});
+          for(const level of ['warning','info'] as const)for(const message of notices[level]??[]){
+            file.validationDiagnostics.push({code:'workspace_xml_'+level,severity:level,message});
+          }
         }
         return catalog;
       },

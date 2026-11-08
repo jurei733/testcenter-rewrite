@@ -1,0 +1,29 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceRuntimeFilesVerifiedBeforeAndAfter": 137,
+  "composerPackages": 19,
+  "httpRows": 49,
+  "uploads": 12,
+  "xmlSchemaValidation": true,
+  "allowTestMode": false,
+  "sqlSeedsOrDaoStubs": false,
+  "scope": "Actual protected Source HTTP uploads and final Resource catalog DTOs. UTF-8/no-charset defaults, declared/BOM encodings, PHP version/zero-value semantics, archive count including directories, and exact archive comment. Numeric specVersion is recorded as a Source 500 with no installed file; Rewrite intentionally rejects it as safe 400 before persistence.",
+  "files": {
+    "archive-comment.zip.base64": "11d5c2400f577d925cb8e6d9516b55209dc3fb0a7a4ae0272e6458f6b1ebf4b8",
+    "array-json.zip.base64": "4783baea26679a8ed624bbafcbd65ad313139350488d57db97bb459ec38a0e6f",
+    "capture.mjs": "834ec0dee8a7401464ff775a96cca06bce84734524f90d86f6e81b7ec36b6073",
+    "current-translation.zip.base64": "90d7161c7275acb7422f5227a83e9d171f74893d5c7ea0aea466793b4d17f607",
+    "inputs.json": "3e913738bd83ab02a86437f3eb4808bd6c5a5518b5aff9dcc6155f2077979ed3",
+    "invalid-json.zip.base64": "21a51adf4c557ae5776a626594d82996f372f52f4dc147a3841086c9a7d6eb47",
+    "leading-zero-version.zip.base64": "731d08b1d7ffcb3320c2c1ef95e1cc02259b24ced3f4df501ec34876a9ff8db4",
+    "legacy-title.zip.base64": "e4f6ff6c5ac8f06f4e2653a0ba1f3bf45f3a04ce3237cb6328c469b4f4b49cd3",
+    "numeric-spec.zip.base64": "8416b4083fa5cfacc7b47986d7e016cbd5b82edf595bd8f1fcc2fe2bd6e26f4b",
+    "observations.json": "2abc663be7c131475d47aafca9ab73f1357c95d7297ab9b8064bbd0ba104d705",
+    "preview-version.zip.base64": "eae7e28cbe1a1f5abec743282b06745bf9f89725e8e49126f76821807effcb9b",
+    "schema-object.zip.base64": "8691161e92b46c3cb0ea0432aa19f1651400fdbc3326086fae1793627d99f610",
+    "wrong-schema.zip.base64": "604a8861a961b37919eeabc9f7b2869b1ebe1341890b31cfbe620555184c61f4",
+    "zero-label.zip.base64": "21b4b91cee0a4c07389c28aa63316a15788cd5b4641ac90fb30883358ae27f98",
+    "zero-version.zip.base64": "206ec64d84ab99f59d5a8b968e2c24fd9598adf18d7c2efa27538699298b0e99"
+  }
+}

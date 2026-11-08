@@ -88,7 +88,7 @@ for(const kind of kinds)test(kind+': installed resource archives preserve scope,
       const workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:key,displayName:key});
       const scope={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey};
       const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType});
-      await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-resource-player',version:'1.0.0',metadataVersion:'2.0',specVersion:'6.0',type:'player',name:[{lang:'en',value:'Owned'}]})+'</script></html>','text/html');
+      await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-resource-player',version:'1.0.0',metadataVersion:'2.0',specVersion:'6.0',type:'player',name:[{lang:'en',value:'Owned'}]})+'</script></html>','text/html');
       await upload('unit.xml',xml('Unit','<Metadata><Id>RESOURCE.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-resource-player@1.0.0">Owned definition</Definition>'));
       await upload('booklet.xml',xml('Booklet','<Metadata><Id>RESOURCE.BOOKLET</Id><Label>Owned Booklet</Label></Metadata><Units><Unit id="RESOURCE.UNIT" label="Owned Unit"/></Units>'));
       const name='owned-resource-'+randomUUID(),password='Owned resource package control';

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
@@ -69,7 +70,7 @@ test('a first-upload reservation rejects a changed workspace without orphan file
 });
 
 const kinds=['memory','file','sqlite',...(process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:[])];
-for(const kind of kinds)test(kind+': complete protected file catalog preserves bytes, metadata, read-only scope and immutable history',async()=>{
+for(const kind of kinds)test(kind+': complete protected file catalog preserves bytes, metadata, read-only scope and immutable history',async t=>{
   const folder=await mkdtemp(join(tmpdir(),'owned-file-catalog-'));
   const schema='owned_catalog_'+randomUUID().replaceAll('-','');
   let pool,server;
@@ -427,6 +428,69 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
     assert.deepEqual(await api(reportScope+'/activity-events?limit=500'),reportEvents);
     assert.equal((await api(reportScope+'/import-jobs?limit=500')).items.length,0);
     assert.equal((await api(reportScope+'/content-releases?limit=500')).items.length,0);
+
+    for(const fixture of ['native-resource-catalog-http','native-resource-encoding-http','native-resource-translation-http','native-resource-version-fallback-http']){
+      const fixtureRoot=resolve('test-fixtures/original-testcenter/source-workspace-results',fixture);
+      const load=name=>readFileSync(join(fixtureRoot,name));
+      const manifest=JSON.parse(load('manifest.json'));
+      assert.equal(manifest.sourceCommit,'eedae41840cbe90e5547c0211da818bdf620f5aa');
+      assert.equal(manifest.sourceRuntimeFilesVerifiedBeforeAndAfter,137);
+      assert.equal(manifest.composerPackages,19);
+      assert.equal(manifest.xmlSchemaValidation,true);assert.equal(manifest.allowTestMode,false);
+      for(const [name,sha]of Object.entries(manifest.files))assert.equal(createHash('sha256').update(load(name)).digest('hex'),sha,name);
+      const inputs=JSON.parse(load('inputs.json')),observations=JSON.parse(load('observations.json'));
+      for(const input of inputs)await t.test(fixture+': '+input.label,async()=>{
+        const key='metadata-'+input.label;
+        await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey:key,displayName:key},'POST',201);
+        const caseScope='/api/v1/tenants/demo-tenant/workspaces/'+key;
+        const observed=observations.rows.find(row=>row.label===input.label);
+        const expectedFiles=observations.rows.find(row=>row.label===input.label+'-files').value;
+        const archive=Buffer.from(load(input.label+'.zip.base64').toString().trim(),'base64');
+        assert.equal(archive.length,input.archiveBytes);
+        assert.equal(createHash('sha256').update(archive).digest('hex'),input.archiveSha256);
+        if(observed.status===500){
+          // Source crashes on a numeric typed module field, without installing
+          // a file. Reject the same bytes explicitly before reserving state.
+          assert.deepEqual(expectedFiles,[]);
+          const entry=input.entries[0];
+          const routes=['source-packages','activity-events','import-jobs','content-releases'];
+          const before=await Promise.all(routes.map(route=>api(caseScope+'/'+route+'?limit=500')));
+          const rejected=await api(caseScope+'/files',{fileName:entry.name,mediaType:'text/html',
+            sourceDocument:'data:text/html;base64,'+entry.base64},'POST',400);
+          assert.equal(rejected.error,'workspace_file_validation_failed');
+          assert.equal((await api(caseScope+'/files')).totalCount,0);
+          assert.deepEqual(await Promise.all(routes.map(route=>api(caseScope+'/'+route+'?limit=500'))),before,
+            'Rejected metadata must not create sources, activity events, jobs or releases.');
+          return;
+        }
+        assert.equal(observed.status,201);
+        const uploaded=await api(caseScope+'/files',{fileName:input.name,mediaType:'application/zip',
+          sourceDocument:'data:application/zip;base64,'+archive.toString('base64')},'POST',201);
+        assert.equal(uploaded.sourcePackage,null);
+        assert.equal(uploaded.archiveReport.importedCount,1);assert.equal(uploaded.archiveReport.rejectedCount,0);
+        const originalReport=Object.values(observed.value)[0];
+        assert.deepEqual(uploaded.archiveReport.entries[0].validationReport,originalReport);
+        const catalog=await api(caseScope+'/files');assert.equal(catalog.totalCount,1);
+        const file=catalog.items[0],expected=expectedFiles.Resource[0];
+        assert.deepEqual(file.metadata,{identifier:expected.id,label:expected.info.label,description:expected.info.description,
+          participantCount:null,veronaVersion:expected.info.veronaVersion??null,moduleVersion:expected.info.version??null});
+        for(const level of ['info','warning']){
+          const notices=file.validationDiagnostics?.filter(row=>row.severity===level).map(row=>row.message)??[];
+          const originalNotices=expected.report[level]??[];
+          // Public metadata never echoes an arbitrary unsupported schema.
+          const safeNotices=originalNotices.map(message=>message.startsWith('Wrong metadata-schema: ')?'Die Metadaten verwenden kein unterstütztes Schema.':message);
+          assert.deepEqual(notices,safeNotices,level);
+        }
+        const raw=JSON.stringify(catalog);
+        for(const privateField of ['sourceBytes','sourceText','sourceDocument','base64','owned-schema-marker','owned-schema-object-marker'])
+          assert.ok(!raw.includes(privateField),privateField);
+        const downloaded=await fetch(base+caseScope+'/source-packages/'+file.sourcePackageId+'/download',{headers:{authorization:'Bearer '+token}});
+        assert.equal(downloaded.status,200);
+        assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()),Buffer.from(input.entries[0].base64,'base64'));
+        await api(caseScope+'/files',undefined,'GET',401,null);
+        await api(caseScope+'/files',undefined,'GET',403,readOnly);
+      });
+    }
 
     if(kind==='memory'){
       for(let i=0;i<1001;i++)await api(scope+'/source-packages',{
