@@ -19,6 +19,7 @@ import {verifyOriginalNativeLargeState} from './original-native-large-state-chec
 import {verifyOriginalNativeUnitCapacity} from './original-native-unit-capacity-checks.mjs';
 import {verifyOriginalTestDeliveries} from './original-test-delivery-checks.mjs';
 import {verifyOriginalTestCausalState} from './original-test-causal-state-checks.mjs';
+import {verifyOriginalUnitStateSource} from './original-unit-state-source-checks.mjs';
 
 const evidence = new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-creation/', import.meta.url);
 const manifest = JSON.parse(await readFile(new URL('manifest.json', evidence), 'utf8'));
@@ -1085,6 +1086,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
     await verifyOriginalTestDeliveries({t,kind,file,url,auth,bookletName:native.bookletName,reopen,
       repository:()=>repository,services:()=>services,createServices:repo=>createFirstSliceServices({repository:repo,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'})});
     await verifyOriginalTestCausalState({t,kind,file,url,auth,bookletName:native.bookletName,reopen,repository:()=>repository,services:()=>services});
+    await verifyOriginalUnitStateSource({t,auth,bookletName:native.bookletName,reopen,repository:()=>repository,services:()=>services});
     await verifyOriginalNativeLargeState({t,kind,file,url,auth,bookletName:native.bookletName,reopen,services:()=>services});
     await verifyOriginalNativeUnitCapacity({t,kind,file,url,auth,bookletName:native.bookletName,reopen,services:()=>services});
     await t.test('native group deletion retires number mappings while keeping the global number monotonic',async()=>{

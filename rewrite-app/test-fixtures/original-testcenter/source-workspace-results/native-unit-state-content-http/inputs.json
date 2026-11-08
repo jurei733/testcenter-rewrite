@@ -1,0 +1,359 @@
+{
+  "cases": [
+    {
+      "label": "string",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": "Owned changed Ω /",
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "json-string",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": "{\"answer\":\"Ω\",\"path\":\"/owned\",\"nested\":[1,true]}",
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "empty-string",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": "",
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "object",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": {
+              "answer": "Ω",
+              "nested": {
+                "path": "/owned",
+                "list": [
+                  1,
+                  true
+                ]
+              }
+            },
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "empty-object",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": {},
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "array",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": [
+              "Owned",
+              {
+                "answer": "Ω"
+              }
+            ],
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "empty-array",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": [],
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "integer",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": 7,
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "zero",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": 0,
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "float",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": 0.5,
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "boolean-true",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": true,
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "boolean-false",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": false,
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "null",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": null,
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "missing-content",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "object-stale",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": {
+              "stale": "Owned"
+            },
+            "timeStamp": 50
+          }
+        ]
+      }
+    },
+    {
+      "label": "string-stale",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": "Owned stale",
+            "timeStamp": 50
+          }
+        ]
+      }
+    },
+    {
+      "label": "object-then-string",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": {
+              "owned": "first"
+            },
+            "timeStamp": 200
+          },
+          {
+            "key": "OTHER",
+            "content": "Owned other",
+            "timeStamp": 201
+          }
+        ]
+      }
+    },
+    {
+      "label": "string-then-object",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "OTHER",
+            "content": "Owned other",
+            "timeStamp": 200
+          },
+          {
+            "key": "STATE",
+            "content": {
+              "owned": "second"
+            },
+            "timeStamp": 201
+          }
+        ]
+      }
+    },
+    {
+      "label": "object-then-missing",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": {
+              "owned": "first"
+            },
+            "timeStamp": 200
+          },
+          {
+            "key": "OTHER",
+            "timeStamp": 201
+          }
+        ]
+      }
+    },
+    {
+      "label": "legacy-string",
+      "body": [
+        {
+          "key": "STATE",
+          "content": "Owned legacy Ω",
+          "timeStamp": 200
+        }
+      ]
+    },
+    {
+      "label": "duplicate-clocks",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": "Owned lower",
+            "timeStamp": 200
+          },
+          {
+            "key": "STATE",
+            "content": "Owned higher",
+            "timeStamp": 300
+          },
+          {
+            "key": "STATE",
+            "content": "Owned stale",
+            "timeStamp": 250
+          }
+        ]
+      }
+    },
+    {
+      "label": "prototype-key",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "__proto__",
+            "content": "Owned proto",
+            "timeStamp": 200
+          },
+          {
+            "key": "constructor",
+            "content": "Owned constructor",
+            "timeStamp": 201
+          }
+        ]
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "owned-state-player-1.0.html",
+      "base64": "PGh0bWw+PHNjcmlwdCB0eXBlPSJhcHBsaWNhdGlvbi9sZCtqc29uIj57IiRzY2hlbWEiOiJodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vdmVyb25hLWludGVyZmFjZXMvbWV0YWRhdGEvbWFzdGVyL3Zlcm9uYS1tb2R1bGUtbWV0YWRhdGEuanNvbiIsImlkIjoib3duZWQtc3RhdGUtcGxheWVyIiwidmVyc2lvbiI6IjEuMC4wIiwic3BlY1ZlcnNpb24iOiI2LjAiLCJ0eXBlIjoicGxheWVyIiwibmFtZSI6W3sibGFuZyI6ImRlIiwidmFsdWUiOiJPd25lZCBTVEFURSBQbGF5ZXIifV0sImRlc2NyaXB0aW9uIjpbXX08L3NjcmlwdD48bWFpbj5Pd25lZCBpbmVydCBQbGF5ZXI8L21haW4+PC9odG1sPg==",
+      "sha256": "743c4af3e551914177abb61050f0264a58b454dbe977fca8c7f234bccf96ce95"
+    },
+    {
+      "name": "owned-state-unit.xml",
+      "base64": "PFVuaXQgeG1sbnM6eHNpPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYS1pbnN0YW5jZSIgeHNpOm5vTmFtZXNwYWNlU2NoZW1hTG9jYXRpb249Imh0dHBzOi8vdzNpZC5vcmcvaXFiL3NwZWMvdW5pdC14bWwvMTcuNiI+PE1ldGFkYXRhPjxJZD5PV05FRC5TVEFURS5VTklUPC9JZD48TGFiZWw+T3duZWQgc3RhdGUgVW5pdDwvTGFiZWw+PC9NZXRhZGF0YT48RGVmaW5pdGlvbiBwbGF5ZXI9Im93bmVkLXN0YXRlLXBsYXllckAxLjAuMCI+T3duZWQgc3RhdGUgZGVmaW5pdGlvbjwvRGVmaW5pdGlvbj48L1VuaXQ+",
+      "sha256": "54cdf43c9a3606631561d915478463d7ef2bc988db60c200eb3132558a0126c3"
+    },
+    {
+      "name": "owned-state-book.xml",
+      "base64": "PEJvb2tsZXQgeG1sbnM6eHNpPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYS1pbnN0YW5jZSIgeHNpOm5vTmFtZXNwYWNlU2NoZW1hTG9jYXRpb249Imh0dHBzOi8vdzNpZC5vcmcvaXFiL3NwZWMvdGVzdGNlbnRlci1ib29rbGV0LXhtbC8xOC4wIj48TWV0YWRhdGE+PElkPk9XTkVELlNUQVRFLkJPT0s8L0lkPjxMYWJlbD5Pd25lZCBzdGF0ZSBCb29rbGV0PC9MYWJlbD48L01ldGFkYXRhPjxVbml0cz48VW5pdCBpZD0iT1dORUQuU1RBVEUuVU5JVCIgbGFiZWw9Ik93bmVkIHN0YXRlIFVuaXQiLz48L1VuaXRzPjwvQm9va2xldD4=",
+      "sha256": "24b94ccf78aa1ae4c297371a7f92fbbc6e56095ac9b8f72be36bd2e3680d6ad5"
+    },
+    {
+      "name": "owned-state-people.xml",
+      "base64": "PFRlc3R0YWtlcnMgeG1sbnM6eHNpPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYS1pbnN0YW5jZSIgeHNpOm5vTmFtZXNwYWNlU2NoZW1hTG9jYXRpb249Imh0dHBzOi8vdzNpZC5vcmcvaXFiL3NwZWMvdGVzdGNlbnRlci10ZXN0dGFrZXIteG1sLzE4LjAiPjxNZXRhZGF0YS8+PEdyb3VwIGlkPSJSOTAuTVc4RFRRWjMiIGxhYmVsPSJPd25lZCBzdGF0ZSBncm91cCI+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1zdHJpbmciIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1qc29uLXN0cmluZyIgbW9kZT0icnVuLWhvdC1yZXR1cm4iPjxCb29rbGV0Pk9XTkVELlNUQVRFLkJPT0s8L0Jvb2tsZXQ+PC9Mb2dpbj48TG9naW4gbmFtZT0ib3duZWQtc3RhdGUtcjkwLW13OGR0cXozLWVtcHR5LXN0cmluZyIgbW9kZT0icnVuLWhvdC1yZXR1cm4iPjxCb29rbGV0Pk9XTkVELlNUQVRFLkJPT0s8L0Jvb2tsZXQ+PC9Mb2dpbj48TG9naW4gbmFtZT0ib3duZWQtc3RhdGUtcjkwLW13OGR0cXozLW9iamVjdCIgbW9kZT0icnVuLWhvdC1yZXR1cm4iPjxCb29rbGV0Pk9XTkVELlNUQVRFLkJPT0s8L0Jvb2tsZXQ+PC9Mb2dpbj48TG9naW4gbmFtZT0ib3duZWQtc3RhdGUtcjkwLW13OGR0cXozLWVtcHR5LW9iamVjdCIgbW9kZT0icnVuLWhvdC1yZXR1cm4iPjxCb29rbGV0Pk9XTkVELlNUQVRFLkJPT0s8L0Jvb2tsZXQ+PC9Mb2dpbj48TG9naW4gbmFtZT0ib3duZWQtc3RhdGUtcjkwLW13OGR0cXozLWFycmF5IiBtb2RlPSJydW4taG90LXJldHVybiI+PEJvb2tsZXQ+T1dORUQuU1RBVEUuQk9PSzwvQm9va2xldD48L0xvZ2luPjxMb2dpbiBuYW1lPSJvd25lZC1zdGF0ZS1yOTAtbXc4ZHRxejMtZW1wdHktYXJyYXkiIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1pbnRlZ2VyIiBtb2RlPSJydW4taG90LXJldHVybiI+PEJvb2tsZXQ+T1dORUQuU1RBVEUuQk9PSzwvQm9va2xldD48L0xvZ2luPjxMb2dpbiBuYW1lPSJvd25lZC1zdGF0ZS1yOTAtbXc4ZHRxejMtemVybyIgbW9kZT0icnVuLWhvdC1yZXR1cm4iPjxCb29rbGV0Pk9XTkVELlNUQVRFLkJPT0s8L0Jvb2tsZXQ+PC9Mb2dpbj48TG9naW4gbmFtZT0ib3duZWQtc3RhdGUtcjkwLW13OGR0cXozLWZsb2F0IiBtb2RlPSJydW4taG90LXJldHVybiI+PEJvb2tsZXQ+T1dORUQuU1RBVEUuQk9PSzwvQm9va2xldD48L0xvZ2luPjxMb2dpbiBuYW1lPSJvd25lZC1zdGF0ZS1yOTAtbXc4ZHRxejMtYm9vbGVhbi10cnVlIiBtb2RlPSJydW4taG90LXJldHVybiI+PEJvb2tsZXQ+T1dORUQuU1RBVEUuQk9PSzwvQm9va2xldD48L0xvZ2luPjxMb2dpbiBuYW1lPSJvd25lZC1zdGF0ZS1yOTAtbXc4ZHRxejMtYm9vbGVhbi1mYWxzZSIgbW9kZT0icnVuLWhvdC1yZXR1cm4iPjxCb29rbGV0Pk9XTkVELlNUQVRFLkJPT0s8L0Jvb2tsZXQ+PC9Mb2dpbj48TG9naW4gbmFtZT0ib3duZWQtc3RhdGUtcjkwLW13OGR0cXozLW51bGwiIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1taXNzaW5nLWNvbnRlbnQiIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1vYmplY3Qtc3RhbGUiIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1zdHJpbmctc3RhbGUiIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1vYmplY3QtdGhlbi1zdHJpbmciIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1zdHJpbmctdGhlbi1vYmplY3QiIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1vYmplY3QtdGhlbi1taXNzaW5nIiBtb2RlPSJydW4taG90LXJldHVybiI+PEJvb2tsZXQ+T1dORUQuU1RBVEUuQk9PSzwvQm9va2xldD48L0xvZ2luPjxMb2dpbiBuYW1lPSJvd25lZC1zdGF0ZS1yOTAtbXc4ZHRxejMtbGVnYWN5LXN0cmluZyIgbW9kZT0icnVuLWhvdC1yZXR1cm4iPjxCb29rbGV0Pk9XTkVELlNUQVRFLkJPT0s8L0Jvb2tsZXQ+PC9Mb2dpbj48TG9naW4gbmFtZT0ib3duZWQtc3RhdGUtcjkwLW13OGR0cXozLWR1cGxpY2F0ZS1jbG9ja3MiIG1vZGU9InJ1bi1ob3QtcmV0dXJuIj48Qm9va2xldD5PV05FRC5TVEFURS5CT09LPC9Cb29rbGV0PjwvTG9naW4+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkdHF6My1wcm90b3R5cGUta2V5IiBtb2RlPSJydW4taG90LXJldHVybiI+PEJvb2tsZXQ+T1dORUQuU1RBVEUuQk9PSzwvQm9va2xldD48L0xvZ2luPjwvR3JvdXA+PC9UZXN0dGFrZXJzPg==",
+      "sha256": "b1eb1f34976aeeaacaed7cc5b8254f385c7b7ef85123f944e7caaf16bd0bea48"
+    }
+  ]
+}

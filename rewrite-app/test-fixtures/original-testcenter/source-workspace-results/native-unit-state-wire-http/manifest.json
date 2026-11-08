@@ -1,0 +1,18 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceRuntimeFilesVerifiedBeforeAndAfter": 137,
+  "composerPackages": 19,
+  "httpRows": 95,
+  "typedCases": 2,
+  "wireCases": 14,
+  "xmlSchemaValidation": true,
+  "allowTestMode": false,
+  "sqlSeedsOrDaoStubs": false,
+  "scope": "Actual protected native Unit STATE wire responses including authentication, missing fields, malformed JSON, empty body, empty legacy array and method guards. Source echoes live tokens; fixtures redact these and Rewrite must retain its redaction gate.",
+  "files": {
+    "capture.mjs": "ee6aa9be2fda8a95e55186cf7dbef792e5770eb4ec11deb402605ae4433ce618",
+    "inputs.json": "986c0b28461bf976f6ce34ebc83c8894bac46ae1b5b76314a6f777bf70b2d3fa",
+    "observations.json": "a9826462e39560d2d2fb74023c761889a7f104ba081aa29f76274b0ce58d80cc"
+  }
+}

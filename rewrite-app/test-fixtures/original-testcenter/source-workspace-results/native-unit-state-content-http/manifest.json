@@ -1,0 +1,18 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "runtimeImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceRuntimeFilesVerifiedBeforeAndAfter": 137,
+  "composerPackages": 19,
+  "httpRows": 185,
+  "typedCases": 22,
+  "wireCases": 0,
+  "xmlSchemaValidation": true,
+  "allowTestMode": false,
+  "sqlSeedsOrDaoStubs": false,
+  "scope": "Actual protected Unit STATE string/typed content with before/after state and logs. Non-string content can cause Source500 after partial state persistence; stronger atomic Rewrite validation is a retained safety boundary.",
+  "files": {
+    "capture.mjs": "4b466c7747948b248f46991549b9d59114c31c4ec0a762a56ca63dcaf699c93a",
+    "inputs.json": "5f1cae66ff6de49d85f6f5550c0c74d4b33db11adb8e04c5bc01407be9405e61",
+    "observations.json": "bb55eb85dafdc4e02b08961f9d9247a36b9f9710a424f4a27f6027f0c0b6db5b"
+  }
+}

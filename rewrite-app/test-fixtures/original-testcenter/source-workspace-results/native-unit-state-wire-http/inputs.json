@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "label": "wire-owner",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": "Owned owner",
+            "timeStamp": 200
+          }
+        ]
+      }
+    },
+    {
+      "label": "wire-peer",
+      "body": {
+        "originalUnitId": "OWNED.R90.ORIGINAL",
+        "newState": [
+          {
+            "key": "STATE",
+            "content": "Owned peer",
+            "timeStamp": 200
+          }
+        ]
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "owned-state-player-1.0.html",
+      "base64": "PGh0bWw+PHNjcmlwdCB0eXBlPSJhcHBsaWNhdGlvbi9sZCtqc29uIj57IiRzY2hlbWEiOiJodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vdmVyb25hLWludGVyZmFjZXMvbWV0YWRhdGEvbWFzdGVyL3Zlcm9uYS1tb2R1bGUtbWV0YWRhdGEuanNvbiIsImlkIjoib3duZWQtc3RhdGUtcGxheWVyIiwidmVyc2lvbiI6IjEuMC4wIiwic3BlY1ZlcnNpb24iOiI2LjAiLCJ0eXBlIjoicGxheWVyIiwibmFtZSI6W3sibGFuZyI6ImRlIiwidmFsdWUiOiJPd25lZCBTVEFURSBQbGF5ZXIifV0sImRlc2NyaXB0aW9uIjpbXX08L3NjcmlwdD48bWFpbj5Pd25lZCBpbmVydCBQbGF5ZXI8L21haW4+PC9odG1sPg==",
+      "sha256": "743c4af3e551914177abb61050f0264a58b454dbe977fca8c7f234bccf96ce95"
+    },
+    {
+      "name": "owned-state-unit.xml",
+      "base64": "PFVuaXQgeG1sbnM6eHNpPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYS1pbnN0YW5jZSIgeHNpOm5vTmFtZXNwYWNlU2NoZW1hTG9jYXRpb249Imh0dHBzOi8vdzNpZC5vcmcvaXFiL3NwZWMvdW5pdC14bWwvMTcuNiI+PE1ldGFkYXRhPjxJZD5PV05FRC5TVEFURS5VTklUPC9JZD48TGFiZWw+T3duZWQgc3RhdGUgVW5pdDwvTGFiZWw+PC9NZXRhZGF0YT48RGVmaW5pdGlvbiBwbGF5ZXI9Im93bmVkLXN0YXRlLXBsYXllckAxLjAuMCI+T3duZWQgc3RhdGUgZGVmaW5pdGlvbjwvRGVmaW5pdGlvbj48L1VuaXQ+",
+      "sha256": "54cdf43c9a3606631561d915478463d7ef2bc988db60c200eb3132558a0126c3"
+    },
+    {
+      "name": "owned-state-book.xml",
+      "base64": "PEJvb2tsZXQgeG1sbnM6eHNpPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYS1pbnN0YW5jZSIgeHNpOm5vTmFtZXNwYWNlU2NoZW1hTG9jYXRpb249Imh0dHBzOi8vdzNpZC5vcmcvaXFiL3NwZWMvdGVzdGNlbnRlci1ib29rbGV0LXhtbC8xOC4wIj48TWV0YWRhdGE+PElkPk9XTkVELlNUQVRFLkJPT0s8L0lkPjxMYWJlbD5Pd25lZCBzdGF0ZSBCb29rbGV0PC9MYWJlbD48L01ldGFkYXRhPjxVbml0cz48VW5pdCBpZD0iT1dORUQuU1RBVEUuVU5JVCIgbGFiZWw9Ik93bmVkIHN0YXRlIFVuaXQiLz48L1VuaXRzPjwvQm9va2xldD4=",
+      "sha256": "24b94ccf78aa1ae4c297371a7f92fbbc6e56095ac9b8f72be36bd2e3680d6ad5"
+    },
+    {
+      "name": "owned-state-people.xml",
+      "base64": "PFRlc3R0YWtlcnMgeG1sbnM6eHNpPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYS1pbnN0YW5jZSIgeHNpOm5vTmFtZXNwYWNlU2NoZW1hTG9jYXRpb249Imh0dHBzOi8vdzNpZC5vcmcvaXFiL3NwZWMvdGVzdGNlbnRlci10ZXN0dGFrZXIteG1sLzE4LjAiPjxNZXRhZGF0YS8+PEdyb3VwIGlkPSJSOTAuTVc4RFhTMlUiIGxhYmVsPSJPd25lZCBzdGF0ZSBncm91cCI+PExvZ2luIG5hbWU9Im93bmVkLXN0YXRlLXI5MC1tdzhkeHMydS13aXJlLW93bmVyIiBtb2RlPSJydW4taG90LXJldHVybiI+PEJvb2tsZXQ+T1dORUQuU1RBVEUuQk9PSzwvQm9va2xldD48L0xvZ2luPjxMb2dpbiBuYW1lPSJvd25lZC1zdGF0ZS1yOTAtbXc4ZHhzMnUtd2lyZS1wZWVyIiBtb2RlPSJydW4taG90LXJldHVybiI+PEJvb2tsZXQ+T1dORUQuU1RBVEUuQk9PSzwvQm9va2xldD48L0xvZ2luPjwvR3JvdXA+PC9UZXN0dGFrZXJzPg==",
+      "sha256": "99fb9316c9dd696b6d6f46c3327641f8542fed70ffae725c09c138857387f30f"
+    }
+  ]
+}
