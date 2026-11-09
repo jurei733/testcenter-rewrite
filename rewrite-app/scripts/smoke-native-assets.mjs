@@ -18,7 +18,7 @@ const slots=['logo','loginIllustration','codeInputIllustration','codeInputCompan
 const frozen=process.env.NATIVE_ASSET_INPUT_FREEZE?JSON.parse(await readFile(process.env.NATIVE_ASSET_INPUT_FREEZE,'utf8')):null;
 const verifyInputs=async()=>{if(frozen)for(const [path,hash]of Object.entries(frozen.hashes))assert.equal(sha(await readFile(resolve(path))),hash,path);};
 await verifyInputs();
-const rows=[],errors=[],wire=[],checks=[],responses=[];let browser,server,releasePlayer,observedPage;
+const publicBitmapFormats=[],rows=[],errors=[],wire=[],checks=[],responses=[];let browser,server,releasePlayer,observedPage;
 try{
  reportSmokePhase('native-assets-owned-server');
  const module=pathToFileURL(resolve('apps/api/dist/apps/api/src/index.js')).href,owner=pathToFileURL(resolve('scripts/native-monitor-smoke-io.mjs')).href;
@@ -48,6 +48,21 @@ try{
   await page.waitForFunction(({selector,url})=>{const n=document.querySelector(selector);return n instanceof HTMLImageElement&&n.complete&&n.naturalWidth===1&&n.src===url;},{selector,url:base+'/'+asset.url});
   return page.locator(selector).first().evaluate(n=>({src:new URL(n.src).pathname,complete:n.complete,naturalWidth:n.naturalWidth,naturalHeight:n.naturalHeight}));
  };
+ // Actual browser decoding also covers the Source's accepted mismatch
+ // between PNG fileinfo bytes and generated JPEG/WebP URL extensions.
+ const formatContext=await browser.newContext(),formatPage=await formatContext.newPage();
+ formatPage.on('pageerror',error=>errors.push({scope:'public-bitmap-formats',error:String(error)}));
+ try{
+  await formatPage.goto(base+'/app/native-start?ui=original');
+  for(const extension of ['png','webp','jpeg','jpg']){
+   reportSmokePhase('native-assets-public-bitmap-'+extension);
+   const body=new FormData();body.append('file',new Blob([png],{type:'image/png'}),'owned-public-bitmap.'+extension);
+   const asset=await api('POST','/assets',body),url=base+'/'+asset.url;
+   const response=formatPage.waitForResponse(r=>r.url()===url);void response.catch(()=>{});
+   const dimensions=await formatPage.evaluate(url=>new Promise((done,reject)=>{const image=new Image();image.onload=()=>done({width:image.naturalWidth,height:image.naturalHeight});image.onerror=()=>reject(Error('Public image did not decode.'));image.src=url;document.body.append(image);}),url);
+   const reply=await response;assert.equal(reply.status(),200);assert.equal(await reply.headerValue('content-type'),extension==='png'?'image/png':extension==='webp'?'image/webp':'image/jpeg');assert.equal(await reply.headerValue('cache-control'),'public, max-age=31536000, immutable');assert.equal(sha(await reply.body()),sha(png));assert.deepEqual(dimensions,{width:1,height:1});publicBitmapFormats.push({extension,dimensions,mimeType:await reply.headerValue('content-type'),bytesSha256:sha(png)});
+  }
+ }finally{await formatContext.close();}
  for(const theme of ['Primar','Sekundar','Erwachsene'])for(const width of [390,1280]){
   reportSmokePhase('native-assets-'+theme+'-'+width);
   await api('PATCH','/api/v1/admin/original-interface/application-settings',{themeName:theme},false);
@@ -76,7 +91,7 @@ try{
  }
  await verifyInputs();
  const downloaded=await Promise.all(responses);for(const row of downloaded){assert.equal(row.status,200);assert.equal(row.sha256,sha(png));}assert.equal(errors.length,0);
- await writeFile(join(out,'result.json'),JSON.stringify({success:true,functionalOnly:true,visualParityProven:false,diagnosticScreenshotsOnly:true,inputFreezeSha256:frozen?sha(await readFile(process.env.NATIVE_ASSET_INPUT_FREEZE)):null,inputFilesVerified:frozen?Object.keys(frozen.hashes).length:null,browser:browser.version(),rows,checks,wire,downloads:downloaded,errors,wholeOriginalParityProven:false},null,2)+'\n');console.log(JSON.stringify({success:true,cohorts:rows.length,browser:browser.version()}));
+ await writeFile(join(out,'result.json'),JSON.stringify({success:true,functionalOnly:true,visualParityProven:false,diagnosticScreenshotsOnly:true,inputFreezeSha256:frozen?sha(await readFile(process.env.NATIVE_ASSET_INPUT_FREEZE)):null,inputFilesVerified:frozen?Object.keys(frozen.hashes).length:null,browser:browser.version(),publicBitmapFormats,rows,checks,wire,downloads:downloaded,errors,wholeOriginalParityProven:false},null,2)+'\n');console.log(JSON.stringify({success:true,cohorts:rows.length,browser:browser.version()}));
 }catch(error){const ui=observedPage&&!observedPage.isClosed()?await observedPage.evaluate(()=>({path:location.pathname,inputs:[...document.querySelectorAll('input')].map(n=>({type:n.type,name:n.name,dataCy:n.getAttribute('data-cy'),placeholder:n.placeholder})),alerts:[...document.querySelectorAll('[role=alert]')].map(n=>n.textContent)})).catch(()=>undefined):undefined;if(observedPage&&!observedPage.isClosed())await observedPage.screenshot({path:join(out,'failure.png')}).catch(()=>{});await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),ui,rows,checks,wire,errors},null,2)+'\n');throw error;}
 finally{releasePlayer?.();await browser?.close();if(server)await stopNativeSmokeServer(server);}
 }

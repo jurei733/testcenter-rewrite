@@ -1,5 +1,16 @@
 # Testcenter Rewrite App
 
+Native application images are managed through `/assets` and
+`/asset-assignments`; writes require a Root administrator. Assignment responses
+use `private, no-store`. Generated public image URLs support HEAD, ETag and HTTP
+date validators, and single/multipart byte ranges. Their immutable one-year
+cache policy follows the Original file server. Replacing an image produces a
+new URL and retires the previous URL; the numeric asset ID remains stable.
+The existing response security headers also apply to these public images.
+`npm run test:application-assets` replays pinned actual Source HTTP captures
+against the stores. Two rejected-MIME error strings still have status/write
+effect coverage only; the public-image replay does not prove full UI parity.
+
 The Original workspace now exposes the implemented **Dateien** and
 **Systemcheck Berichte** tabs. Reports show complete counts and OS/browser
 versions, select multiple Checks, download their complete CSV, and confirm
@@ -8,9 +19,9 @@ confirmation; the protected API rejects deletion with 403 and preserves the
 report table/selection for export. Requests,
 confirmations and downloads belong to the exact signed-in workspace; changing
 tabs drops report selection. `?tab=syscheck` restores the report tab on reload.
-The two other Original tabs, results/answers and individual test deletion, are
-still missing. The current two-tab surface is not complete four-tab or visual
-parity. Run `npm run smoke:ui:original-system-check-reports` for the real protected
+The **Ergebnisse/Antworten** and **Tests löschen** tabs provide result downloads
+and protected group or individual test deletion. All four tabs are implemented;
+full functional and visual Original parity remains open. Run `npm run smoke:ui:original-system-check-reports` for the real protected
 SQLite/browser journey, or `npm run test:system-check-reports` for fresh-core
 all-store export/statistics tests. See `docs/ORIGINAL-UI-PARITY.md` for scope.
 

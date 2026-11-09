@@ -1,0 +1,92 @@
+{
+  "verified": true,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceFilesVerified": 137,
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "fileServerImage": "sha256:fd978c82b29860d3c14d3e30895b189c487d9bc3fe94f91f9daa54386a072d9f",
+  "actualSourcePublicImageBytes": true,
+  "rows": [
+    {
+      "channel": "chrome",
+      "browser": "156.0.8078.80",
+      "extension": "png",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "mimeType": "image/png"
+    },
+    {
+      "channel": "chrome",
+      "browser": "156.0.8078.80",
+      "extension": "webp",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "mimeType": "image/webp"
+    },
+    {
+      "channel": "chrome",
+      "browser": "156.0.8078.80",
+      "extension": "jpeg",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "mimeType": "image/jpeg"
+    },
+    {
+      "channel": "chrome",
+      "browser": "156.0.8078.80",
+      "extension": "jpg",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "mimeType": "image/jpeg"
+    },
+    {
+      "channel": "chromium",
+      "browser": "147.0.7727.15",
+      "extension": "png",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "mimeType": "image/png"
+    },
+    {
+      "channel": "chromium",
+      "browser": "147.0.7727.15",
+      "extension": "webp",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "mimeType": "image/webp"
+    },
+    {
+      "channel": "chromium",
+      "browser": "147.0.7727.15",
+      "extension": "jpeg",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "mimeType": "image/jpeg"
+    },
+    {
+      "channel": "chromium",
+      "browser": "147.0.7727.15",
+      "extension": "jpg",
+      "dimensions": {
+        "width": 1,
+        "height": 1
+      },
+      "mimeType": "image/jpeg"
+    }
+  ],
+  "functionalOnly": true,
+  "visualParityProven": false
+}

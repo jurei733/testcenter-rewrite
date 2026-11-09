@@ -1,3 +1,4 @@
+import {originalAssetFile} from './original-asset-file.js';
 import type {IncomingMessage} from 'node:http';
 import {randomUUID} from 'node:crypto';
 import {FirstSliceError,type FirstSliceServices} from '@testcenter-rewrite-app/application';
@@ -9,12 +10,14 @@ export function originalAssetRouteLabel(method:string,pathname:string):string|nu
   return pathname==='/assets'||pathname==='/asset-assignments'?method+' '+pathname:asset.test(pathname)?method+' /assets/:assetId':file.test(pathname)?method+' /public/uploaded_assets/:storedName':null;
 }
 const noFile=()=>new FirstSliceError(400,'original_asset_file_missing','No file uploaded');
+const failedUpload=()=>new FirstSliceError(400,'original_asset_upload_failed','Upload failed');
 /** One bounded multipart request, with binary-safe delimiters and UTF8 names.
- * PHP uses the final `file` field when the name is repeated. */
+ * Source retains the final upload with a nonempty filename. Ordinary text
+ * fields and empty filenames do not replace it; a final file array does. */
 export function originalAssetMultipart(contentType:string,body:Buffer):{originalName:string;mediaType:string;dataBase64:string} {
   const match=/(?:^|;)\s*boundary=(?:"([^"\r\n]+)"|([^;\s]+))/i.exec(contentType),boundary=match?.[1]??match?.[2];
   if(!boundary||boundary.length>200)throw noFile();
-  const marker=Buffer.from('--'+boundary),next=Buffer.from('\r\n--'+boundary);let cursor=body.indexOf(marker),result:ReturnType<typeof originalAssetMultipart>|undefined;
+  const marker=Buffer.from('--'+boundary),next=Buffer.from('\r\n--'+boundary);let cursor=body.indexOf(marker),result:ReturnType<typeof originalAssetMultipart>|undefined,arrayField=false;
   while(cursor>=0){
     cursor+=marker.length;
     if(body.subarray(cursor,cursor+2).equals(Buffer.from('--')))break;
@@ -26,15 +29,19 @@ export function originalAssetMultipart(contentType:string,body:Buffer):{original
     const filename=/(?:^|;)\s*filename="([^"]*)"/i.exec(disposition)?.[1];
     let stop=body.indexOf(next,end+4);
     while(stop>=0&&!['\r\n','--'].includes(body.toString('latin1',stop+next.length,stop+next.length+2)))stop=body.indexOf(next,stop+1);
-    if(stop<0)throw noFile();
-    if(field==='file'&&filename!==undefined&&filename!=='')result={originalName:filename,mediaType:/^content-type:\s*([^;\r\n]+)/im.exec(headers)?.[1]?.trim()??'application/octet-stream',dataBase64:body.subarray(end+4,stop).toString('base64')};
+    if(stop<0)throw filename!==undefined&&filename!==''&&(field==='file'||field?.startsWith('file['))?failedUpload():noFile();
+    if(filename!==undefined&&filename!==''){
+      if(field==='file'){arrayField=false;result={originalName:filename,mediaType:/^content-type:\s*([^;\r\n]+)/im.exec(headers)?.[1]?.trim()??'application/octet-stream',dataBase64:body.subarray(end+4,stop).toString('base64')};}
+      else if(field?.startsWith('file[')){arrayField=true;result=undefined;}
+    }
     cursor=stop+2;
   }
+  if(arrayField)throw new FirstSliceError(500,'original_asset_file_array','Internal error.');
   if(!result)throw noFile();return result;
 }
 export async function handleOriginalAssetHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;
   readBody:()=>Promise<unknown>;readBuffer:(limit:number)=>Promise<Buffer>;header:(name:string,value:string)=>void;
-  raw:(status:number,value:string,contentType:string)=>void;binary:(bytes:Buffer,contentType:string)=>void;
+  raw:(status:number,value:string,contentType:string)=>void;binary:(status:number,bytes:Buffer,headers:Record<string,string>)=>void;
   propagateError:(error:unknown)=>boolean;reportError:(receipt:{errorId:string;statusCode:number;errorCode:string})=>void}):Promise<boolean>{
   const item=asset.exec(input.pathname),stored=file.exec(input.pathname);
   const allowed=stored?['GET']:item?['DELETE']:input.pathname==='/assets'?['GET','POST']:input.pathname==='/asset-assignments'?['GET','POST']:undefined;
@@ -42,12 +49,13 @@ export async function handleOriginalAssetHttp(input:{request:IncomingMessage;pat
   input.header('cache-control','private, no-store');
   try{
     const method=input.request.method??'';
-    if(!allowed.includes(method)){input.header('allow',allowed.join(', '));throw new FirstSliceError(405,'original_method_not_allowed','Method not allowed. Must be one of: '+allowed.join(', '));}
     if(stored){
-      const value=await input.services.originalAssets.file({storedName:stored[1]!});
-      if(!value)throw new FirstSliceError(404,'original_asset_not_found','Not found');
-      input.binary(Buffer.from(value.dataBase64,'base64'),value.mediaType);return true;
+      const value=['GET','HEAD','POST'].includes(method)?await input.services.originalAssets.file({storedName:stored[1]!}):null;
+      const reply=originalAssetFile(method,input.request.headers,value,stored[1]!);
+      if(reply.status>=400)input.reportError({errorId:'error-'+randomUUID(),statusCode:reply.status,errorCode:'original_asset_file_'+reply.status});
+      input.binary(reply.status,reply.bytes,reply.headers);return true;
     }
+    if(!allowed.includes(method)){input.header('allow',allowed.join(', '));throw new FirstSliceError(405,'original_method_not_allowed','Method not allowed. Must be one of: '+allowed.join(', '));}
     const token=input.request.headers.authtoken;
     if(input.pathname==='/asset-assignments'&&method==='GET'){
       input.raw(200,JSON.stringify(await input.services.originalAssets.getAssignments({token:typeof token==='string'?token:undefined})),'application/json');return true;
@@ -64,6 +72,7 @@ export async function handleOriginalAssetHttp(input:{request:IncomingMessage;pat
       const type=input.request.headers['content-type']??'';
       if(!/^multipart\/form-data(?:;|$)/i.test(type))throw noFile();
       const uploaded=originalAssetMultipart(type,await input.readBuffer(2*1024*1024+65536));
+      if(uploaded.dataBase64==='')throw new FirstSliceError(400,'original_asset_file_type_invalid','Invalid file type: `application/x-empty`');
       try{input.raw(200,JSON.stringify(await input.services.originalAssets.upload({token,...uploaded})),'application/json');}
       catch(error){
         if(error instanceof FirstSliceError){

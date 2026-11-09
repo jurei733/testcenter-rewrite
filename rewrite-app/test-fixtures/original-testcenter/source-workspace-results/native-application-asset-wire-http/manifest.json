@@ -1,0 +1,13 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "actualApiRequests": 88,
+  "recordedApiResponses": 44,
+  "actualPublicFileRequests": 55,
+  "additionalBitmapBrowserCases": 8,
+  "publicFileServerHttpProven": true,
+  "files": {
+    "capture.mjs": "e54f2353ceae62d0cd73e0de29457db833d3f17b0fc9852d4d44a08f49af1d01",
+    "observations.json": "78d65b36e87cefbb416991a2059a14a47d960bb387dcb5f3902eba175f5de355",
+    "bitmap-observations.json": "2db1fda3590bf1820e72c696245e67728fd21d4edcbdbd0d632b6e427b31f35b"
+  }
+}

@@ -5008,7 +5008,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           logStructured(receipt.statusCode>=500?'error':'info','native_asset_error',{requestId,route:originalAssetRouteLabel(request.method??'',pathname),...receipt});},
         header:(name,value)=>response.setHeader(name,value),
         raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);},
-        binary:(bytes,contentType)=>{response.writeHead(200,{...securityHeaders,'content-type':contentType,'content-length':String(bytes.length)});endResponse(response,bytes);}}))return;
+        binary:(status,bytes,headers)=>{response.writeHead(status,{...securityHeaders,...headers});endResponse(response,bytes);}}))return;
       if(await handleOriginalAdminHttp({request,pathname,services,clean:()=>broadcaster?.clean(),reportError:receipt=>{
         if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
         logStructured(receipt.statusCode>=500?'error':'info','native_administration_error',{requestId,route:originalAdminRouteLabel(request.method??'',pathname),...receipt});
