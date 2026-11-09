@@ -1,4 +1,6 @@
-import {createRuntime,snapshot,unitLock,type NativeSaveRuntime} from '../../native-save-runtime/runtime.js';
+import {createRuntime,snapshot,unitLock,SYNC_TAG,type NativeSaveRuntime} from '../../native-save-runtime/runtime.js';
+
+type SyncRegistration=ServiceWorkerRegistration&{sync?:{register(tag:string):Promise<void>}};
 
 const contexts=new WeakMap<AbortSignal,NativeBackgroundContext>();
 const grants=new Map<string,Promise<unknown>>();
@@ -18,7 +20,9 @@ export class NativeBackgroundContext {
  private foregroundRecovering=false;private recoveryTail:Promise<unknown>=Promise.resolve();
  private reconciling?:Promise<void>;private reconcileRequested=0;private sealRequested=false;
  private worker:ServiceWorker|null=null;
- private readonly onPageHide=()=>{this.kick();};
+ private registration:SyncRegistration|null=null;
+ private readonly onBeforeUnload=()=>{this.armSync();};
+ private readonly onPageHide=()=>{this.armSync();this.kick();};
  private readonly onOnline=()=>{this.kick();};
  private readonly onReceipt=(event:MessageEvent)=>{
   if(event.source&&event.data?.type==='testcenter-native-save-receipt-v1'&&(event.source===this.worker||event.source===navigator.serviceWorker?.controller))void this.reconcile(false).catch(()=>{});
@@ -26,14 +30,14 @@ export class NativeBackgroundContext {
  constructor(private readonly api:NativeSaveRuntime,private readonly token:string,private readonly owner:AbortSignal){
   const serviceWorker=navigator.serviceWorker;
   this.worker=serviceWorker?.controller??null;
-  if(serviceWorker)void serviceWorker.ready.then(async registration=>{this.worker=registration.active??serviceWorker.controller;
+  if(serviceWorker)void serviceWorker.ready.then(async registration=>{this.registration=registration;this.worker=registration.active??serviceWorker.controller;
    for(const testId of this.unitClaims.keys())this.post({action:'yield-units',token,testId});
    let prepared=true;await this.ready.catch(()=>{prepared=false;});
    if(owner.aborted){if(latestOwners.get(token)===owner)this.post({action:'retire',token});}else if(prepared){this.post({action:'authorize',token});this.kick();}
   }).catch(()=>{});
   serviceWorker?.addEventListener?.('message',this.onReceipt);
   owner.addEventListener('abort',this.retire,{once:true});
-  window.addEventListener('online',this.onOnline);window.addEventListener('pagehide',this.onPageHide);
+  window.addEventListener('online',this.onOnline);window.addEventListener('pagehide',this.onPageHide);window.addEventListener('beforeunload',this.onBeforeUnload);
   const previous=grants.get(token)??Promise.resolve();this.ready=previous.catch(()=>{}).then(()=>this.prepare());grants.set(token,this.ready);void this.ready.catch(()=>{});
  }
  private async prepare():Promise<void>{
@@ -72,8 +76,14 @@ export class NativeBackgroundContext {
  private post(message:Record<string,unknown>):boolean{
   if(!this.worker)return false;this.worker.postMessage({type:'testcenter-native-save-v1',...message});return true;
  }
+ private armSync():void{
+  if(this.owner.aborted)return;
+  // Chrome cannot create a new sync registration after the final window is
+  // gone. Register while the durable draft still has its foreground owner.
+  try{void this.registration?.sync?.register(SYNC_TAG).catch(()=>{});}catch{/* Retain the local/IndexedDB packet when this optional capability is unavailable. */}
+ }
  private readonly retire=()=>{
-  window.removeEventListener('online',this.onOnline);window.removeEventListener('pagehide',this.onPageHide);
+  window.removeEventListener('online',this.onOnline);window.removeEventListener('pagehide',this.onPageHide);window.removeEventListener('beforeunload',this.onBeforeUnload);
   navigator.serviceWorker?.removeEventListener?.('message',this.onReceipt);
   for(const claim of this.unitClaims.values())claim.release();this.unitClaims.clear();
   this.post({action:'retire',token:this.token});const retired=this.ready.catch(()=>{}).then(()=>this.api.retire(this.token));grants.set(this.token,retired);void retired.catch(()=>{});
@@ -106,14 +116,14 @@ export class NativeBackgroundContext {
  mirror=(bucket:string,text:string):void=>{
   if(this.owner.aborted)return;
   const previous=this.writes.get(bucket)??Promise.resolve();
-  const next=previous.catch(()=>{}).then(()=>{this.owner.throwIfAborted();return this.api.putSnapshot(bucket,text,false,this.preference(bucket));});
+  const next=previous.catch(()=>{}).then(()=>{this.owner.throwIfAborted();return this.api.putSnapshot(bucket,text,false,this.preference(bucket));}).then(()=>this.armSync());
   this.writes.set(bucket,next);void next.catch(()=>{});
  };
  seal=(bucket:string,text:string):void=>{
   if(this.owner.aborted)return;
   // The worker owns this final snapshot's transaction after page closure. It
   // never promotes an older unsealed mirror merely because a lock disappeared.
-  this.post({action:'seal',bucket,text,preferredUnitAlias:this.preference(bucket)});
+  this.armSync();this.post({action:'seal',bucket,text,preferredUnitAlias:this.preference(bucket)});
   const previous=this.writes.get(bucket)??Promise.resolve();
   const next=previous.catch(()=>{}).then(()=>{this.owner.throwIfAborted();return this.api.putSnapshot(bucket,text,true,this.preference(bucket));}).then(()=>{this.kick();});
   this.writes.set(bucket,next);void next.catch(()=>{});

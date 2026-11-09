@@ -59,7 +59,7 @@
   };
   const read=(store,key)=>transaction(store,'readonly',(s,done)=>{const request=s.get(key);request.onsuccess=()=>done(request.result);});
   const pending=()=>transaction(DOCUMENTS,'readonly',(s,done)=>{const request=s.index('pending').getAll(1);request.onsuccess=()=>done(request.result);});
-  const controllers=new Map();let draining,requested=0;
+  const controllers=new Map();let draining,requested=0,deferUnsealed=false;
   const authorize=async value=>{const actor=await actorHash(env.crypto,value);await transaction(GRANTS,'readwrite',s=>s.put({actor,token:value,active:true}));return actor;};
   const retire=async value=>{
    const actor=await actorHash(env.crypto,value);controllers.get(actor)?.controller.abort();
@@ -96,7 +96,19 @@
   const drainOnce=async options=>{
    const io={pending,readRecord:bucket=>read(DOCUMENTS,bucket),readGrant:actor=>read(GRANTS,actor),acknowledge,send:env.fetch,retireGrant:retire,locked,...options};
    const records=await io.pending(),runs=new Map();let retry=false;
-   for(const row of records)try{if(!row?.sealed)continue;const checked=snapshot(row.bucket,JSON.stringify(row.document));
+   for(const row of records)try{
+    if(!row?.sealed){
+     // A sync opportunity must survive until its final handoff arrives. Keep
+     // the authored window intact: an unsealed draft is never dispatched.
+     if(options?.deferUnsealed&&row?.pending){
+      const checked=snapshot(row.bucket,JSON.stringify(row.document));
+      if(['actor','testId','kind','revision'].some(key=>checked[key]!==row[key]))throw invalid();
+      const grant=await io.readGrant(row.actor);
+      if(grant?.active&&token(grant.token)&&await actorHash(env.crypto,grant.token)===row.actor)retry=true;
+     }
+     continue;
+    }
+    const checked=snapshot(row.bucket,JSON.stringify(row.document));
     if(['actor','testId','kind','revision'].some(key=>checked[key]!==row[key]))throw invalid();
     const key=row.actor+':'+row.testId;if(!runs.has(key))runs.set(key,[]);runs.get(key).push(row);
    }catch{retry=true;}
@@ -140,14 +152,14 @@
    }catch{retry=true;}
    if(retry)throw Error('Native background saves remain queued.');
   };
-  const drain=options=>{requested++;return draining??=(async()=>{
+  const drain=options=>{deferUnsealed||=options?.deferUnsealed===true;requested++;return draining??=(async()=>{
    for(;;){
     const observed=requested;let failure;
-    try{await drainOnce(options);}catch(error){failure=error;}
+    try{await drainOnce({...options,deferUnsealed});}catch(error){failure=error;}
     // A late handoff still owns a pass when an older independent packet fails.
     if(observed!==requested)continue;if(failure)throw failure;return;
    }
-  })().finally(()=>{draining=undefined;});};
+  })().finally(()=>{draining=undefined;deferUnsealed=false;});};
   return {authorize,retire,putSnapshot,drain,runRecovery,yieldUnits,readRecord:bucket=>read(DOCUMENTS,bucket),pending,actorHash:value=>actorHash(env.crypto,value),entryFingerprint:entry=>entryFingerprint(env.crypto,entry)};
  }
  function order(record){
@@ -183,7 +195,7 @@
     event.ports?.[0]?.postMessage({ok:false});
    }));
   });
-  worker.addEventListener('sync',event=>{if(event.tag===SYNC_TAG)event.waitUntil(runtime.drain().finally(notify));});
+  worker.addEventListener('sync',event=>{if(event.tag===SYNC_TAG)event.waitUntil(runtime.drain({deferUnsealed:true}).finally(notify));});
  }
  return {DATABASE,SYNC_TAG,snapshot,order,runLock,unitLock,createRuntime,installWorker};
 });

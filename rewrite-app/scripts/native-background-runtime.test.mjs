@@ -15,14 +15,29 @@ function fixture(rows){
  const records=new Map(rows.map(row=>[row.bucket,structuredClone(row)])),grants=new Map([[actor,{active:true,token}]]),held=new Set(),sent=[],acks=[];
  const runtime=createRuntime({crypto:webcrypto,origin:'https://native.example'});
  const locked=async(name,work)=>{if(held.has(name))return false;held.add(name);try{return await work();}finally{held.delete(name);}};
- const run=send=>runtime.drain({pending:async()=>[...records.values()],readRecord:async key=>structuredClone(records.get(key)),readGrant:async key=>structuredClone(grants.get(key)),locked,
+ const run=(send,options={})=>runtime.drain({pending:async()=>[...records.values()],readRecord:async key=>structuredClone(records.get(key)),readGrant:async key=>structuredClone(grants.get(key)),locked,
   retireGrant:async()=>{grants.set(actor,{active:false});},send:async(url,options)=>{sent.push({url:String(url),options});return send(url,options);},
-  acknowledge:async(row,entry)=>{const current=records.get(row.bucket);assert.equal(current.revision,row.revision);current.document.entries=current.document.entries.filter(e=>e.id!==entry.id);current.pending=Number(current.document.entries.length>0);acks.push(entry.id);}});
+  acknowledge:async(row,entry)=>{const current=records.get(row.bucket);assert.equal(current.revision,row.revision);current.document.entries=current.document.entries.filter(e=>e.id!==entry.id);current.pending=Number(current.document.entries.length>0);acks.push(entry.id);},...options});
  return {records,grants,held,sent,acks,run,runtime};
 }
 const ok=(status=201)=>new Response('',{status});
 test('unsealed mirrors never dispatch merely because a document lease disappeared',async()=>{
  const value=record([response('A','not past its Source window')],{sealed:false}),f=fixture([value]);await f.run(()=>ok());assert.deepEqual(f.sent,[]);assert.equal(f.records.get(value.bucket).document.entries.length,1);
+});
+test('a scheduled sync retains an active unsealed draft without delivering it or changing ordinary drain semantics',async()=>{
+ const value=record([response('A','still inside its Source window')],{sealed:false}),f=fixture([value]);
+ await f.run(()=>assert.fail('An unsealed response dispatched'));
+ await assert.rejects(f.run(()=>assert.fail('A sync promoted an unsealed response'),{deferUnsealed:true}),/remain queued/);
+ assert.deepEqual(f.sent,[]);assert.deepEqual(f.records.get(value.bucket),value);
+ f.grants.set(actor,{active:false});await f.run(()=>assert.fail('A retired draft dispatched'),{deferUnsealed:true});
+ assert.deepEqual(f.records.get(value.bucket),value);
+});
+test('a sync joining an ordinary drain retains its deferred-draft requirement for the whole shared pass',async()=>{
+ const value=record([response('A','retained')],{sealed:false}),f=fixture([value]);
+ const ordinary=f.run(()=>assert.fail('Unsealed ordinary data dispatched'));
+ const scheduled=f.run(()=>assert.fail('Unsealed scheduled data dispatched'),{deferUnsealed:true});
+ await Promise.all([assert.rejects(ordinary,/remain queued/),assert.rejects(scheduled,/remain queued/)]);
+ assert.deepEqual(f.sent,[]);assert.deepEqual(f.records.get(value.bucket),value);
 });
 test('the active document lease and the per-Run recovery lease independently prevent background reads from racing a Player',async()=>{
  for(const name of ['document','run']){

@@ -20,6 +20,10 @@ const bridgeScript=`(()=>{const exports={};const require=name=>{if(name==='../..
 const journalCode=ts.transpileModule(await readFile(inputs['apps/web/src/app/native-participant/native-unit-journal.ts'],'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const journalScript=`(()=>{const exports={};${journalCode};globalThis.NativeUnitJournal=exports.NativeUnitJournal;})();`;
 let browser,server,base,requests=[],failUnit;
+const headful=['1','true','yes','on'].includes(String(process.env.UI_SMOKE_HEADFUL||'').toLowerCase());
+// The headless shell disables Background Sync. Use the full locked browser
+// even for a headless standalone run, and respect the native cohort's mode.
+const channel=process.env.UI_SMOKE_BROWSER_CHANNEL??(process.env.CI==='true'?'chromium':'chrome');
 before(async()=>{
  server=createServer(async(req,res)=>{
   if(req.url==='/runtime.js'){res.writeHead(200,{'Content-Type':'application/javascript'});res.end(source);return;}
@@ -31,9 +35,9 @@ before(async()=>{
    res.writeHead(status,{'Content-Type':'text/plain',...(req.url.endsWith('/state')?{'X-Native-State-Result':'{"version":1,"revision":1,"controlEpoch":0,"superseded":false}'}:{})});res.end('');return;}
   res.writeHead(200,{'Content-Type':'text/html'});res.end('<!doctype html><title>Owned native IndexedDB fixture</title><script src="/runtime.js"></script><script src="/bridge.js"></script><script src="/unit-journal.js"></script>');
  });await new Promise(done=>server.listen(0,'127.0.0.1',done));base='http://127.0.0.1:'+server.address().port;
- const channel=process.env.UI_SMOKE_BROWSER_CHANNEL??(process.env.CI==='true'?undefined:'chrome');browser=await chromium.launch({...(channel?{channel}:{}),headless:true});
+ browser=await chromium.launch({channel,headless:!headful});
 });
-after(async()=>{try{assert.deepEqual(await hashInputs(),inputHashes,'Actual worker fixture inputs changed during qualification');if(browser)console.log('native_background_inputs='+JSON.stringify({browser:browser.version(),hashes:inputHashes}));}finally{await browser?.close();await new Promise(done=>server?.close(done));}});
+after(async()=>{try{assert.deepEqual(await hashInputs(),inputHashes,'Actual worker fixture inputs changed during qualification');if(browser)console.log('native_background_inputs='+JSON.stringify({browser:browser.version(),channel,headless:!headful,hashes:inputHashes}));}finally{await browser?.close();await new Promise(done=>server?.close(done));}});
 async function pageFixture(t){
  requests=[];failUnit=undefined;const context=await browser.newContext();t.after(()=>context.close());await context.addCookies([{name:'ambient',value:'must-not-send',url:base}]);const page=await context.newPage();await page.goto(base);
  await page.evaluate(async()=>{
@@ -49,6 +53,23 @@ async function pageFixture(t){
  });page.ownedToken=await page.evaluate(()=>token);return page;
 }
 const ownRequests=page=>requests.filter(request=>request.headers.authtoken===page.ownedToken);
+test('a real durable mirror registers sync while its window exists and keeps the unsealed Source window intact',async t=>{
+ const page=await pageFixture(t);
+ const before=await page.evaluate(async()=>{
+  const owner=new AbortController(),context=NativeBridge.nativeBackground(token,owner.signal);await context.ready;
+  const journal=await NativeUnitJournal.open({token,testId:'9007199254740993',storage:localStorage,locks:navigator.locks,crypto,mirror:context.mirror,seal:context.seal});
+  journal.captureResponse('A','ORIGINAL',{owned:'Retained before its Source buffer deadline'},'owned/type');
+  await context.settled();window.ownedSyncOwner=owner;window.ownedSyncJournal=journal;
+  const key=Object.keys(localStorage).find(key=>key.startsWith('testcenter-native-unit-journal:v1:'));
+  return {key,local:localStorage.getItem(key)};
+ });
+ await page.waitForFunction(async()=>{const registration=await navigator.serviceWorker.ready;return(await registration.sync.getTags()).includes(TestcenterNativeSave.SYNC_TAG);});
+ const stored=await page.evaluate(key=>rt.readRecord(key),before.key);
+ assert.equal(stored.sealed,false);assert.equal(stored.document.entries.length,1);assert.equal(stored.document.entries[0].phase,'staged');
+ assert.deepEqual(ownRequests(page),[],'Scheduling a future retry must not deliver or seal an active draft.');
+ assert.equal(await page.evaluate(key=>localStorage.getItem(key),before.key),before.local);
+ await page.evaluate(()=>{ownedSyncOwner.abort();ownedSyncJournal.close();});
+});
 test('actual IndexedDB and Service Worker keep live and unsealed documents on their original buffer windows',async t=>{
  const page=await pageFixture(t);const result=await page.evaluate(async()=>{
   const doc=documentFor([make('A')]);await rt.putSnapshot(bucket,JSON.stringify(doc),false);

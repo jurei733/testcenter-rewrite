@@ -298,6 +298,8 @@
     "smoke:ui:original-session:built": "node ./scripts/smoke-original-session.mjs",
     "smoke:ui:original-session": "npm run build && npm run smoke:ui:original-session:built",
     "smoke:ui:native-participant:built": "npm run test:native-background-browser && node scripts/run-native-participant-smoke.mjs",
+    "smoke:ui:native-worker-restart": "npm run build && npm run smoke:ui:native-worker-restart:built",
+    "smoke:ui:native-worker-restart:built": "node scripts/run-native-worker-restart-smoke.mjs",
     "smoke:ui:original-workspace-results": "npm run build && npm run smoke:ui:original-workspace-results:built",
     "smoke:ui:original-workspace-results:built": "node scripts/smoke-original-workspace-results.mjs",
     "test:native-background-browser": "node --test scripts/native-background-indexeddb.test.mjs",

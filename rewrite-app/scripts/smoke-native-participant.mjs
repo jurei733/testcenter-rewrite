@@ -16,8 +16,8 @@ import {pathToFileURL,fileURLToPath} from 'node:url';
 import {reportSmokePhase} from './supervised-smoke.mjs';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 const app=fileURLToPath(new URL('..',import.meta.url));
-export async function runNativeParticipantSmoke(artifactRoot,{backgroundOnly=false,starsOnly=false,capacityOnly=false,largeStateOnly=false,starsClosureOnly=false,geoGebraOnly=false,rootZipOnly=false}={}){
-const geometryOnly=geoGebraOnly||rootZipOnly;
+export async function runNativeParticipantSmoke(artifactRoot,{backgroundOnly=false,starsOnly=false,capacityOnly=false,largeStateOnly=false,starsClosureOnly=false,geoGebraOnly=false,rootZipOnly=false,workerRestartOnly=false}={}){
+const geometryOnly=geoGebraOnly||rootZipOnly||workerRestartOnly;
 reportSmokePhase('prepare-owned-native-participant-fixtures');
 const out=join(artifactRoot,'native-monitor','native-participant');await mkdir(out,{recursive:true});
 const require=createRequire(join(app,'package.json')),{chromium}=require('playwright');
@@ -35,6 +35,7 @@ for(const name of ['original-unit','original-unit-record','original-unit-collect
 qualificationFiles.push('apps/api/src/original-test-http.ts','apps/api/dist/apps/api/src/original-test-http.js');
 qualificationFiles.push('scripts/native-stars-closure-smoke.mjs','scripts/run-native-stars-closure-smoke.mjs');
 qualificationFiles.push('scripts/native-geogebra-smoke.mjs','scripts/run-native-geogebra-smoke.mjs','scripts/original-resource-package.test.mjs');
+qualificationFiles.push('scripts/native-worker-restart-smoke.mjs','scripts/run-native-worker-restart-smoke.mjs');
 qualificationFiles.push('scripts/native-resource-upload-smoke.mjs');
 qualificationFiles.push('scripts/run-native-workspace-zip-smoke.mjs','scripts/native-workspace-zip-smoke.mjs','scripts/workspace-zip-fixture.mjs','scripts/original-workspace-archive.test.mjs','packages/application/src/original-workspace-archive.ts','packages/application/dist/packages/application/src/original-workspace-archive.js');
 qualificationFiles.push(...await collect('test-fixtures/original-testcenter/source-workspace-results/native-workspace-zip-http'));
@@ -333,13 +334,15 @@ try{
  if(starsClosureOnly||!backgroundOnly&&!starsOnly&&!capacityOnly&&!largeStateOnly&&!geometryOnly)await runNativeStarsClosedRunsSmoke({browser,base,file,out,fixture:starsFixture,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,testWriteReceipts,serverMessages});
  if(geoGebraFixture){
    const geometryControls={browser,base,configure,responseReceipts,resourceReceipts,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},serverMessages};
-   if(!rootZipOnly)await runNativeGeoGebraSmoke({...geometryControls,out,fixture:geoGebraFixture,mark});
-   const archiveOut=join(out,'root-zip');await mkdir(archiveOut,{recursive:true});
-   await runNativeGeoGebraSmoke({...geometryControls,out:archiveOut,fixture:geoGebraFixture.rootZipFixture,mark:name=>mark('native-root-zip-'+name.replace(/^native-/,''))});
+   if(!rootZipOnly)await runNativeGeoGebraSmoke({...geometryControls,out,fixture:geoGebraFixture,mark,workerRestart:workerRestartOnly});
+   if(!workerRestartOnly){
+     const archiveOut=join(out,'root-zip');await mkdir(archiveOut,{recursive:true});
+     await runNativeGeoGebraSmoke({...geometryControls,out:archiveOut,fixture:geoGebraFixture.rootZipFixture,mark:name=>mark('native-root-zip-'+name.replace(/^native-/,''))});
+   }
  }
  assert.deepEqual(consoleErrors.filter(x=>/NG\d{4}|TypeError|ReferenceError|SyntaxError|Error retrieving icon/.test(x)),[]);
  assert.deepEqual(await hashSources(),sourceHashes);assert.deepEqual(await hashQualification(),qualificationHashes,'Participant harness and actual API build must remain unchanged during qualification');
- await writeFile(join(out,'result.json'),JSON.stringify({success:true,diagnosticOnly:backgroundOnly||starsOnly||capacityOnly||largeStateOnly||starsClosureOnly||geometryOnly,browser:browser.version(),checks,errors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,sourceHashes,qualificationHashes,scope:rootZipOnly?'Diagnostic11wholeZIPadministration+actualAspect/GeoGebra controls; excludes the prior106native controls.':geometryOnly?'Diagnostic22geometryandwholeZIPcontrols; excludes the other95fullcohort controls.':starsClosureOnly?'Only official STARS56 closed-worker case; excludes existing92native cases.':largeStateOnly?'Diagnostic opaque native Verona large state and pressure controls; not an executed GeoGebra application.':capacityOnly?'Diagnostic native Original STARS capacity case only; excludes the prior82native cases.':starsOnly?'Diagnostic native Original STARS fixture; excludes the existing76native cases.':backgroundOnly?'Only background closure and startup recovery controls against owned production SQLite; excludes the prior70native cases.':'Local uncommitted full native UI path including official Original STARS56/28-to21/200-to201 against owned production native SQLite API, actual Source Starter card/controller/unit host; not whole-project/visual qualification.'},null,2));
+ await writeFile(join(out,'result.json'),JSON.stringify({success:true,diagnosticOnly:backgroundOnly||starsOnly||capacityOnly||largeStateOnly||starsClosureOnly||geometryOnly,browser:browser.version(),checks,errors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,sourceHashes,qualificationHashes,scope:workerRestartOnly?'Targeted actual GeoGebra worker termination and automatic retry; excludes the full117native cohort and whole-project/visual qualification.':rootZipOnly?'Diagnostic11wholeZIPadministration+actualAspect/GeoGebra controls; excludes the prior106native controls.':geometryOnly?'Diagnostic22geometryandwholeZIPcontrols; excludes the other95fullcohort controls.':starsClosureOnly?'Only official STARS56 closed-worker case; excludes existing92native cases.':largeStateOnly?'Diagnostic opaque native Verona large state and pressure controls; not an executed GeoGebra application.':capacityOnly?'Diagnostic native Original STARS capacity case only; excludes the prior82native cases.':starsOnly?'Diagnostic native Original STARS fixture; excludes the existing76native cases.':backgroundOnly?'Only background closure and startup recovery controls against owned production SQLite; excludes the prior70native cases.':'Local uncommitted full native UI path including official Original STARS56/28-to21/200-to201 against owned production native SQLite API, actual Source Starter card/controller/unit host; not whole-project/visual qualification.'},null,2));
 completed=true;
 }catch(error){if(monitor){await monitor.screenshot({path:join(out,'monitor-failure.png')}).catch(()=>{});await writeFile(join(out,'monitor-failure.html'),await monitor.content().catch(()=>''));}await page?.screenshot({path:join(out,'failure.png')}).catch(()=>{});const dom=await page?.content().catch(()=>'');if(dom)await writeFile(join(out,'failure.html'),dom);await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),checks,errors,consoleErrors,responseReceipts,commandReceipts,testWriteReceipts,resourceReceipts,monitorWire,wire,url:page?.url(),monitorUrl:monitor?.url()},null,2));throw error;}
 finally{await browser?.close();if(server)await stopNativeSmokeServer(server);if(completed)await rm(scratch,{recursive:true,force:true});}

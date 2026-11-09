@@ -12,6 +12,7 @@ export type NativeSaveRuntime = {
  runRecovery<T>(actor:string,testId:string,signal:AbortSignal,operation:()=>Promise<T>):Promise<T>;
 };
 export function createRuntime(env:{indexedDB:IDBFactory;crypto:Crypto;locks:LockManager;fetch:typeof fetch;origin:string}):NativeSaveRuntime;
+export const SYNC_TAG:string;
 export function runLock(actor:string,testId:string):string;
 export function unitLock(actor:string,testId:string):string;
 export function snapshot(bucket:string,text:string):Pick<NativeSaveRecord,'bucket'|'kind'|'actor'|'testId'|'revision'|'document'>;

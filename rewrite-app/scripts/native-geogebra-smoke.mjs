@@ -6,6 +6,7 @@ import {brotliDecompressSync,inflateRawSync} from 'node:zlib';
 import {runNativeResourceUploadSmoke} from './native-resource-upload-smoke.mjs';
 import {runNativeWorkspaceZipSmoke} from './native-workspace-zip-smoke.mjs';
 import {workspaceZip} from './workspace-zip-fixture.mjs';
+import {runNativeWorkerRestartSmoke} from './native-worker-restart-smoke.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
@@ -128,7 +129,7 @@ export async function prepareNativeGeoGebraFixture({services,tenantKey,app,passw
       'test-fixtures/original-testcenter/'+source.playerFixture,'test-fixtures/original-testcenter/'+source.definitionFixture]};
 }
 
-export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,configure,responseReceipts,release,serverMessages}) {
+export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,configure,responseReceipts,release,serverMessages,workerRestart=false}) {
   const context=await browser.newContext({viewport:{width:1280,height:900}}),errors=[],resources=[],writes=[];
   let page=await context.newPage();
   const resourceUrls=new Map();
@@ -278,8 +279,11 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     await writeFile(join(out,'native-geogebra-large-sealed.json'),JSON.stringify({deliveryId:pending.entry.id,zeroActorPages:context.pages().length===0,closedElapsedMs,captureElapsedMs,
       draftPayloadSha256:hash(pending.entry.payload),sealedPayloadSha256:hash(sealed.entry.payload),revision:sealed.revision,stagedDraftCoalescedBeforeSeal:pending.entry.payload!==sealed.entry.payload},null,2));
     assert.equal(writes.filter(row=>row.deliveryId===pending.entry.id).length,0);
-    assert.equal(await release('native-geogebra-large-closed:'+testId),true);
-    await wait(()=>writes.some(row=>row.deliveryId===pending.entry.id),'worker receives the real large response acknowledgement');
+    if(workerRestart)await runNativeWorkerRestartSmoke({browser,context,worker,configure,release,testId,entry:sealed.entry,revision:sealed.revision,out,wait,serverMessages,responseReceipts,writes,mark});
+    else {
+      assert.equal(await release('native-geogebra-large-closed:'+testId),true);
+      await wait(()=>writes.some(row=>row.deliveryId===pending.entry.id),'worker receives the real large response acknowledgement');
+    }
     const delivered=writes.filter(row=>row.deliveryId===pending.entry.id);assert.equal(delivered.length,1);
     assert.equal(delivered[0].worker,true);assert.equal(delivered[0].zeroActorPagesAtReply,true);
     assert.ok(JSON.stringify(delivered[0].body)===sealed.entry.payload,'Actual worker must deliver the exact sealed journal bytes');
