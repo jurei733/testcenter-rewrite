@@ -11,6 +11,21 @@ The existing response security headers also apply to these public images.
 against the stores. Two rejected-MIME error strings still have status/write
 effect coverage only; the public-image replay does not prove full UI parity.
 
+Native participant and monitor views apply validated per-login `ViewSettings.theme`
+over the global audience theme. Reload restores the verified actor's theme;
+credential retirement restores the global fallback immediately. Native code
+entry uses the Original form/illustration layout, theme-specific built-in
+illustrations, actor-bound image assignments and the logo action to leave code
+entry. Logout dialogs use the matching Original overlay theme and button order;
+monitor confirmations retain the Original adult behavior.
+`npm run smoke:ui:native-assets:built` includes the global/login theme matrix
+at 390/1280px with reload, real code login and logout. The pinned Source
+reference also records `sys-check-login`; that native login mode remains an
+open parity gap. Screenshots and functional theme checks alone do not establish
+full visual parity. Use `UI_SMOKE_BROWSER_CHANNEL=chrome` or `chromium`
+explicitly for complete local native qualification, and verify the reported
+browser version in every suite.
+
 The Original workspace now exposes the implemented **Dateien** and
 **Systemcheck Berichte** tabs. Reports show complete counts and OS/browser
 versions, select multiple Checks, download their complete CSV, and confirm

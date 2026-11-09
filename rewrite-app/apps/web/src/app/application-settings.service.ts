@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from "@angular/core";
+import { Injectable, computed, inject, signal } from "@angular/core";
 
 import type {
   GetApplicationSettingsResponse,
@@ -31,7 +31,10 @@ const defaultApplicationAssetNames: Record<ApplicationAssetSlotName, string> = {
 export class ApplicationSettingsService {
   private readonly api = inject(RewriteAppApiService);
   private warningExpirationTimer: ReturnType<typeof setTimeout> | null = null;
-  private participantThemeOverride: ApplicationSettings["themeName"] | null = null;
+  private readonly participantThemeOverride = signal<ApplicationSettings["themeName"] | null>(null);
+  // Undefined means no native view owns the theme. Null means an active native
+  // view uses global settings, independent of a retained canonical session.
+  private readonly nativeThemeOverride = signal<ApplicationSettings["themeName"] | null | undefined>(undefined);
   private participantAssetOverrides: Record<string, string> = {};
   private readonly nativeAssetUrls = signal<Record<string,string>|null>(null);
 
@@ -40,6 +43,10 @@ export class ApplicationSettingsService {
 
   readonly settings = signal<ApplicationSettings>({
     ...defaultApplicationSettings
+  });
+  readonly effectiveThemeName = computed(() => {
+    const native = this.nativeThemeOverride();
+    return (native === undefined ? this.participantThemeOverride() : native) ?? this.settings().themeName;
   });
   readonly activeWarningText = signal<string | null>(null);
   readonly loaded = signal(false);
@@ -81,16 +88,27 @@ export class ApplicationSettingsService {
   }
 
   applyParticipantTheme(theme?: string | null): void {
-    this.participantThemeOverride =
-      theme === "Primar" || theme === "Sekundar" || theme === "Erwachsene"
-        ? theme
-        : null;
+    this.participantThemeOverride.set(this.validTheme(theme));
     this.syncDocumentTheme();
   }
 
   clearParticipantTheme(): void {
-    this.participantThemeOverride = null;
+    this.participantThemeOverride.set(null);
     this.syncDocumentTheme();
+  }
+
+  setNativeTheme(theme?: unknown): void {
+    this.nativeThemeOverride.set(this.validTheme(theme));
+    this.syncDocumentTheme();
+  }
+
+  clearNativeTheme(): void {
+    this.nativeThemeOverride.set(undefined);
+    this.syncDocumentTheme();
+  }
+
+  private validTheme(theme: unknown): ApplicationSettings["themeName"] | null {
+    return theme === "Primar" || theme === "Sekundar" || theme === "Erwachsene" ? theme : null;
   }
 
   applyParticipantAssets(assetAssignments?: Record<string, string> | null): void {
@@ -116,8 +134,7 @@ export class ApplicationSettingsService {
     ) {
       return fallback;
     }
-    const themeName =
-      this.participantThemeOverride ?? this.settings().themeName;
+    const themeName = this.effectiveThemeName();
     const assetName =
       themeName === "Sekundar" && slot === "codeInputIllustration"
         ? "code-input-illustration-teens.png"
@@ -143,7 +160,7 @@ export class ApplicationSettingsService {
 
   private syncDocumentTheme(): void {
     document.documentElement.dataset["applicationTheme"] =
-      this.participantThemeOverride ?? this.settings().themeName;
+      this.effectiveThemeName();
   }
 
   private scheduleWarningExpiration(): void {

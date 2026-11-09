@@ -1,3 +1,4 @@
+import {NativeThemeContext} from '../native-theme-context.service';
 import {NativeAssetContext} from '../native-asset-context.service';
 import {filter,fromEvent,Subscription,take,takeUntil} from 'rxjs';
 import {BookletService} from './group-monitor/booklet/booklet.service';
@@ -50,7 +51,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
  private readonly router=inject(Router);private readonly route=inject(ActivatedRoute);private readonly dialog=inject(MatDialog);
- constructor(){this.assets.activate(this.view.signal);inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
+ constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
   const detector=inject(ChangeDetectorRef);
   this.router.events.pipe(filter(event=>event instanceof NavigationEnd),takeUntil(fromEvent(this.view.signal,'abort'))).subscribe(()=>{
    detector.markForCheck();
@@ -95,7 +96,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  }
  logout(){
   const scope=this.session.accessSignal;if(this.view.signal.aborted||scope.aborted||this.retireLogout)return;
-  const ref=this.dialog.open(OriginalParticipantLogoutDialogComponent,{data:{safeMode:false},autoFocus:'dialog'});
+  const ref=this.dialog.open(OriginalParticipantLogoutDialogComponent,{panelClass:'original-participant-logout-dialog',data:{safeMode:false},autoFocus:'dialog'});
   const subscription=new Subscription();
   const retire=()=>{subscription.unsubscribe();ref.close();if(this.retireLogout===retire)this.retireLogout=undefined;};
   this.retireLogout=retire;

@@ -113,3 +113,10 @@
 // This body-level Source dialog retains browser defaults beneath Material's own rules.
 :where(:root[data-interface-mode='original'] .original-native-login-error-dialog,
        :root[data-interface-mode='original'] .original-native-login-error-dialog *){box-sizing:content-box}
+
+// The Source code-login page uses browser content-box defaults. Material's
+// own component rules retain their higher specificity within this view.
+:where(:root[data-interface-mode='original'] app-native-code-login,
+       :root[data-interface-mode='original'] app-native-code-login *) {
+  box-sizing: content-box;
+}

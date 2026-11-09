@@ -1,3 +1,4 @@
+import {NativeThemeContext} from '../native-theme-context.service';
 import {NativeAssetContext} from '../native-asset-context.service';
 import {NgTemplateOutlet} from '@angular/common';
 import {MatTooltip} from '@angular/material/tooltip';
@@ -32,7 +33,7 @@ export class NativeRunHostComponent implements AfterViewInit {
  ownedContext:NativeRunContext|undefined;
  private readonly route=inject(ActivatedRoute);private readonly children=inject(ChildrenOutletContexts);private readonly router=inject(Router);
  constructor(){
-  this.assets.activate(this.view.signal);inject(NativeBackgroundService);
+  this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(NativeBackgroundService);
   inject(InterfaceModeService).select('original');this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(p=>this.testId.set(p.get('t')??''));
   effect(()=>{if(!this.ready()||!this.assets.ready()||this.session.restoring()||this.session.busy())return;const access=this.session.access(),id=this.testId();untracked(()=>{
    if(!access){this.ownedContext?.destroy();return;}

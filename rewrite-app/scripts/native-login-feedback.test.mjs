@@ -29,7 +29,7 @@ function fixture(Entry){
  const scope=new AbortController(),problem$=new rx.BehaviorSubject('');
  const failures=[];
  const session={access:core.signal(null),busy:core.signal(false),problem:core.signal(''),accessSignal:scope.signal};
- bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},ChangeDetectorRef:{markForCheck(){}},Router:{events:new rx.Subject(),navigate:async()=>true},ActivatedRoute:{firstChild:null},MatDialog:{},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},CustomtextService:{restoreDefault(){},addCustomTexts(){}},NativeTerminalCompletionService:{},NativeLoginFailureService:{show:async(error,owner)=>failures.push({error,owner})}}));
+ bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},ChangeDetectorRef:{markForCheck(){}},Router:{events:new rx.Subject(),navigate:async()=>true},ActivatedRoute:{firstChild:null},MatDialog:{},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},CustomtextService:{restoreDefault(){},addCustomTexts(){}},NativeTerminalCompletionService:{},NativeLoginFailureService:{show:async(error,owner)=>failures.push({error,owner})}}));
  bindings.set('NativeBackgroundService',{});
  const component=new Entry();component.name='owned-login';return {component,session,failures};
 }
@@ -107,4 +107,32 @@ test('a newer pending login failure supersedes the retired lazy import without o
 
 test('destroyed login error presenter cannot be reactivated by a later callback',async t=>{
  const f=dialogFixture(t);f.service.ngOnDestroy();await f.service.show(new HttpError(500),f.view.signal);assert.deepEqual(f.opens,[]);
+});
+
+for(const [globalTheme,effectiveTheme]of [['Erwachsene','Primar'],['Primar','Sekundar']])test('participant logout follows authored '+effectiveTheme+' rather than global '+globalTheme,()=>{
+ const Entry=entries.find(([name])=>name==='participant')[1],f=fixture(Entry),options=[],closed=new rx.Subject();
+ Object.assign(bindings.get('ApplicationSettingsService'),{settings:()=>({themeName:globalTheme}),effectiveThemeName:()=>effectiveTheme});
+ bindings.get('MatDialog').open=(_component,config)=>{options.push(config);return {afterClosed:()=>closed,close(){}};};
+ f.component.logout();assert.equal(options[0].panelClass,'original-participant-logout-dialog');assert.equal(options[0].data.safeMode,effectiveTheme==='Primar');f.component.ngOnDestroy();assert.equal(closed.observed,false);
+});
+for(const replacement of ['actor','view',null])test('code-login logo logout cannot expose a late error after '+String(replacement)+' retirement',async()=>{
+ const Entry=entries.find(([name])=>name==='participant')[1],f=fixture(Entry);let reject,calls=0;
+ f.session.access.set({token:'actor-A',flags:['codeRequired']});
+ f.session.logout=()=>{calls++;f.session.access.set(null);f.session.accessSignal=new AbortController().signal;return new Promise((_done,fail)=>{reject=fail;});};
+ f.component.logoClick();assert.equal(calls,1);assert.equal(f.session.access(),null);
+ if(replacement==='actor'){f.session.accessSignal=new AbortController().signal;f.session.access.set({token:'actor-B',flags:[]});}else if(replacement==='view')f.component.ngOnDestroy();
+ reject(Error('Owned logout failure'));await new Promise(done=>setImmediate(done));assert.equal(f.component.problem(),replacement===null?'Owned logout failure':'');f.component.ngOnDestroy();
+});
+test('the logo preserves a verified Starter session and a retired code view cannot log out',()=>{
+ const Entry=entries.find(([name])=>name==='participant')[1],f=fixture(Entry);let calls=0;f.session.logout=async()=>{calls++;};
+ f.session.access.set({token:'actor-A',flags:[]});f.component.logoClick();assert.equal(calls,0);
+ f.component.ngOnDestroy();f.session.access.set({token:'actor-A',flags:['codeRequired']});f.component.logoClick();assert.equal(calls,0);
+});
+
+for(const role of ['testGroupMonitor','workspaceAdmin','superAdmin'])test('general native entry preserves Source adult confirmation for a Primar '+role+' claim',()=>{
+ const Entry=entries.find(([name])=>name==='participant')[1],f=fixture(Entry),options=[],closed=new rx.Subject();
+ Object.assign(bindings.get('ApplicationSettingsService'),{settings:()=>({themeName:'Erwachsene'}),effectiveThemeName:()=> 'Primar'});
+ f.session.access.set({token:'owned-monitor',flags:[],claims:{[role]:[]}});
+ bindings.get('MatDialog').open=(_component,config)=>{options.push(config);return {afterClosed:()=>closed,close(){}};};
+ f.component.logout();assert.equal(options[0].data.safeMode,false);assert.equal(options[0].panelClass,'original-participant-logout-dialog');f.component.ngOnDestroy();assert.equal(closed.observed,false);
 });

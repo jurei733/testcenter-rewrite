@@ -9,6 +9,7 @@ import {chromium} from 'playwright';
 import {isSupervisedSmokeChild,runSupervisedSmoke,reportSmokePhase} from './supervised-smoke.mjs';
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 import {stopNativeSmokeServer} from './native-monitor-smoke-io.mjs';
+import {compareScreenshots} from './exact-rgba-comparison.mjs';
 const root=process.env.UI_SMOKE_ARTIFACT_DIR?resolve(process.env.UI_SMOKE_ARTIFACT_DIR):await mkdtemp(join(tmpdir(),'owned-native-assets-ui-'));
 if(!isSupervisedSmokeChild(import.meta.url))process.exitCode=await runSupervisedSmoke({entry:fileURLToPath(import.meta.url),artifactDirectory:join(root,'native-assets-supervision'),env:{...process.env,UI_SMOKE_ARTIFACT_DIR:root},phaseTimeoutMs:60000,totalTimeoutMs:240000});
 else{
@@ -18,7 +19,7 @@ const slots=['logo','loginIllustration','codeInputIllustration','codeInputCompan
 const frozen=process.env.NATIVE_ASSET_INPUT_FREEZE?JSON.parse(await readFile(process.env.NATIVE_ASSET_INPUT_FREEZE,'utf8')):null;
 const verifyInputs=async()=>{if(frozen)for(const [path,hash]of Object.entries(frozen.hashes))assert.equal(sha(await readFile(resolve(path))),hash,path);};
 await verifyInputs();
-const publicBitmapFormats=[],rows=[],errors=[],wire=[],checks=[],responses=[];let browser,server,releasePlayer,observedPage;
+const publicBitmapFormats=[],themeRows=[],monitorThemeRows=[],rows=[],errors=[],wire=[],checks=[],responses=[];let browser,server,releasePlayer,observedPage;
 try{
  reportSmokePhase('native-assets-owned-server');
  const module=pathToFileURL(resolve('apps/api/dist/apps/api/src/index.js')).href,owner=pathToFileURL(resolve('scripts/native-monitor-smoke-io.mjs')).href;
@@ -89,9 +90,83 @@ try{
   await page.getByRole('textbox',{name:'Anmeldename',exact:true}).waitFor();await image(page,'header .logo img',assets[0]);
   rows.push({theme,width,publicAndAuthenticatedSlots:true,loading,actualOpaquePlayerStarted:true,runReloadRetainsUserImage:true,logoutReturnsGlobalImage:true});checks.push('native-assets-'+theme+'-'+width);await context.close();
  }
+ // Authored themes use the same actor and image scope as the real session.
+ const themeSourcePath=resolve('test-fixtures/original-testcenter/source-workspace-results/native-login-theme-http/observations.json');
+ const themeSourceBytes=await readFile(themeSourcePath),themeSource=JSON.parse(themeSourceBytes);
+ assert.equal(themeSource.sourceCommit,'eedae41840cbe90e5547c0211da818bdf620f5aa');assert.equal(themeSource.actualSourceFrontend,true);assert.equal(themeSource.actualSourceBackend,true);assert.deepEqual(themeSource.errors,[]);
+ const themeReferences=themeSource.ui.filter(row=>row.loginTheme!==undefined&&!row.mode);assert.equal(themeReferences.length,24);
+ await api('POST','/asset-assignments',{assignments:slots.filter(slot=>slot!=='logo').map(slotName=>({slotName,assetID:null}))});
+ await upload('booklet.xml',xml('Booklet','<Metadata><Id>OWNED.ASSET.BOOK</Id><Label>Owned Theme Book</Label></Metadata><Units><Unit id="OWNED.ASSET.UNIT" label="Owned asset Unit"/></Units>'));
+ await upload('booklet2.xml',xml('Booklet','<Metadata><Id>OWNED.ASSET.BOOK2</Id><Label>Owned Theme Book2</Label></Metadata><Units><Unit id="OWNED.ASSET.UNIT" label="Owned asset Unit"/></Units>'));
+ const themeLogins=[null,'Primar','Sekundar','Erwachsene'].map(theme=>'<Login name="owned-theme-'+(theme??'global').toLowerCase()+'" pw="owned-assets-password" mode="run-hot-return"><Booklet codes="c1">OWNED.ASSET.BOOK</Booklet><Booklet codes="c1">OWNED.ASSET.BOOK2</Booklet>'+(theme==='Primar'?'<AssetAssignments>'+assignment('logo',assets[2])+'</AssetAssignments>':'')+(theme?'<ViewSettings><theme>'+theme+'</theme></ViewSettings>':'')+'</Login>').join('');
+ const monitorLogin='<Login name="owned-theme-monitor" pw="owned-assets-password" mode="monitor-group"><Profile id="full"/><AssetAssignments>'+assignment('logo',assets[2])+'</AssetAssignments><ViewSettings><theme>Primar</theme></ViewSettings></Login>';
+ const themeRoster=roster.replace('<Group id=', '<Profiles><GroupMonitor><Profile id="full" label="Owned" view="full"/></GroupMonitor></Profiles><Group id=').replace('</Group>',themeLogins+monitorLogin+'</Group>').replace('label="Owned asset UI"','label="Owned Theme Group"');await upload('people.xml',themeRoster);await api('POST',prefix+'/participant-roster',{rosterText:themeRoster},false,201);
+ const themeReady=async(page,theme,asset,code=false)=>{
+  await page.waitForFunction(({theme,url,code})=>{const logo=document.querySelector('header .logo img'),illustration=document.querySelector('app-native-code-login .illustration img');return document.documentElement.dataset.applicationTheme===theme&&logo instanceof HTMLImageElement&&logo.complete&&logo.naturalWidth===1&&logo.src===url&&(!code||illustration instanceof HTMLImageElement&&illustration.complete&&illustration.naturalWidth>0&&new URL(illustration.src).pathname.endsWith('/code-input-illustration-'+(theme==='Sekundar'?'teens':'kids')+'.png'));},{theme,url:base+'/'+asset.url,code});
+  await page.evaluate(()=>document.fonts.ready);
+  return page.locator('header mat-toolbar').evaluate(n=>({headerColor:getComputedStyle(n).backgroundColor,theme:document.documentElement.dataset.applicationTheme}));
+ };
+ for(const globalTheme of ['Primar','Sekundar','Erwachsene']){
+  await api('PATCH','/api/v1/admin/original-interface/application-settings',{themeName:globalTheme},false);
+  for(const loginTheme of [null,'Primar','Sekundar','Erwachsene'])for(const width of [390,1280]){
+   const expected=loginTheme??globalTheme,reference=themeReferences.find(row=>row.globalTheme===globalTheme&&row.loginTheme===loginTheme&&row.width===width);assert.ok(reference);
+   reportSmokePhase('native-authored-theme-'+globalTheme+'-'+(loginTheme??'global')+'-'+width);
+   const context=await browser.newContext({viewport:{width,height:844},locale:'de-DE',timezoneId:'Europe/Berlin'}),page=await context.newPage();observedPage=page;
+   page.on('pageerror',error=>errors.push({scope:'authored-themes',globalTheme,loginTheme,width,error:String(error)}));
+   try{
+    await page.goto(base+'/app/native-start?ui=original');await themeReady(page,globalTheme,assets[0]);
+    await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('owned-theme-'+(loginTheme??'global').toLowerCase());await page.locator('[data-cy=login-user]').click();
+    await page.locator('input[type=password]').fill('owned-assets-password');await page.locator('[data-cy=login-user]').click();await page.locator('tc-code-input').waitFor();
+    const actorAsset=assets[loginTheme==='Primar'?2:1],initial=await themeReady(page,expected,actorAsset,true);assert.equal(initial.headerColor,reference.initial.headerColor);assert.equal(await page.locator('header .account-button').count(),0);
+    await page.reload();await page.locator('tc-code-input').waitFor();const restored=await themeReady(page,expected,actorAsset,true);assert.equal(restored.headerColor,reference.restored.headerColor);
+    const illustration=await page.locator('app-native-code-login .illustration img').evaluate(n=>({path:new URL(n.src).pathname,naturalWidth:n.naturalWidth,naturalHeight:n.naturalHeight}));
+    const sourceIllustration=reference.restored.images.find(row=>row.src.includes('code-input-illustration-'));assert.equal(illustration.path.replace(/^\/app(?=\/assets\/)/,''),sourceIllustration.src);assert.equal(illustration.naturalWidth,sourceIllustration.width);
+    const stem=globalTheme+'-'+(loginTheme??'global')+'-'+width,codeScreenshot=await page.screenshot({path:join(out,stem+'-code.png'),fullPage:false});
+    if(width===1280&&loginTheme==='Sekundar'){
+     await page.getByRole('link',{name:'Gehe zur Startseite',exact:true}).click();await page.getByRole('textbox',{name:'Anmeldename',exact:true}).waitFor();await themeReady(page,globalTheme,assets[0]);
+     await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('owned-theme-sekundar');await page.locator('[data-cy=login-user]').click();await page.locator('input[type=password]').fill('owned-assets-password');await page.locator('[data-cy=login-user]').click();await page.locator('tc-code-input').waitFor();await themeReady(page,expected,actorAsset,true);
+    }
+    await page.locator('tc-code-input input').fill('c1');await page.locator('tc-code-input input').press('Enter');await page.locator('tc-test-card[data-cy="booklet-OWNED.ASSET.BOOK"]').waitFor();await themeReady(page,expected,actorAsset);
+    await page.locator('header .account-button').click();await page.locator('[data-cy=logout-button]').click();const dialog=page.locator('mat-dialog-container');await dialog.locator('[data-cy=dialog-confirm]').waitFor();
+    const buttons=await dialog.locator('button').evaluateAll(nodes=>nodes.map(n=>({text:n.textContent.trim(),filled:n.classList.contains('mat-mdc-unelevated-button')})));
+    assert.deepEqual(buttons,reference.logout.buttonClasses.map(row=>({text:row.text,filled:row.className.includes('mat-mdc-unelevated-button')})));
+    const dialogScreenshot=await dialog.screenshot({path:join(out,stem+'-dialog.png'),animations:'disabled'});
+    const visualDiagnostics={};
+    if(process.env.NATIVE_THEME_SOURCE_SCREENSHOTS){
+     for(const [surface,candidate]of [['code',codeScreenshot],['dialog',dialogScreenshot]]){
+      const name=stem+'-'+surface+'.png',source=await readFile(join(process.env.NATIVE_THEME_SOURCE_SCREENSHOTS,name));
+      assert.equal(sha(source),themeSource.screenshotHashes[name]);
+      try{visualDiagnostics[surface]=await compareScreenshots(page,source,candidate);}catch(error){visualDiagnostics[surface]={comparisonError:String(error)};}
+     }
+    }
+    await dialog.locator('[data-cy=dialog-confirm]').click();await page.getByRole('textbox',{name:'Anmeldename',exact:true}).waitFor();const loggedOut=await themeReady(page,globalTheme,assets[0]);assert.equal(loggedOut.headerColor,reference.loggedOut.headerColor);
+    themeRows.push({globalTheme,loginTheme,width,expected,initial,restored,illustration,logoutButtons:buttons,loggedOut,sourceMatched:true,visualDiagnostics});
+   }finally{await context.close();}
+  }
+ }
+
+
+ for(const entry of ['monitor','participant'])for(const width of [390,1280]){
+  reportSmokePhase('native-authored-monitor-theme-'+entry+'-'+width);
+  const reference=themeSource.ui.find(row=>row.mode==='monitor-group');assert.ok(reference);
+  const context=await browser.newContext({viewport:{width,height:844}}),page=await context.newPage();observedPage=page;
+  page.on('pageerror',error=>errors.push({scope:'authored-monitor-theme',width,error:String(error)}));
+  try{
+   await page.goto(base+(entry==='monitor'?'/app/group-monitor':'/app/native-start')+'?ui=original');await themeReady(page,'Erwachsene',assets[0]);
+   await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('owned-theme-monitor');await page.locator('[data-cy=login-user]').click();await page.locator('input[type=password]').fill('owned-assets-password');await page.locator('[data-cy=login-user]').click();
+   await page.locator('app-native-starter').waitFor();const initial=await themeReady(page,'Primar',assets[2]);assert.equal(initial.headerColor,reference.state.headerColor);
+   await page.reload();await page.locator('app-native-starter').waitFor();const restored=await themeReady(page,'Primar',assets[2]);assert.equal(restored.headerColor,reference.state.headerColor);
+   await page.locator('header .account-button').click();await page.locator('[data-cy=logout-button]').click();const dialog=page.locator('mat-dialog-container');await dialog.locator('[data-cy=dialog-confirm]').waitFor();
+   const buttons=await dialog.locator('button').evaluateAll(nodes=>nodes.map(n=>({text:n.textContent.trim(),filled:n.classList.contains('mat-mdc-unelevated-button')})));
+   assert.deepEqual(buttons,[{text:'Abmelden',filled:false},{text:'Hier bleiben',filled:false}]);
+   await dialog.locator('[data-cy=dialog-confirm]').click();await page.getByRole('textbox',{name:'Anmeldename',exact:true}).waitFor();await themeReady(page,'Erwachsene',assets[0]);
+   monitorThemeRows.push({entry,globalTheme:'Erwachsene',loginTheme:'Primar',width,initial,restored,logoutButtons:buttons,sourceMatched:true});
+  }finally{await context.close();}
+ }
+
  await verifyInputs();
  const downloaded=await Promise.all(responses);for(const row of downloaded){assert.equal(row.status,200);assert.equal(row.sha256,sha(png));}assert.equal(errors.length,0);
- await writeFile(join(out,'result.json'),JSON.stringify({success:true,functionalOnly:true,visualParityProven:false,diagnosticScreenshotsOnly:true,inputFreezeSha256:frozen?sha(await readFile(process.env.NATIVE_ASSET_INPUT_FREEZE)):null,inputFilesVerified:frozen?Object.keys(frozen.hashes).length:null,browser:browser.version(),publicBitmapFormats,rows,checks,wire,downloads:downloaded,errors,wholeOriginalParityProven:false},null,2)+'\n');console.log(JSON.stringify({success:true,cohorts:rows.length,browser:browser.version()}));
+ await writeFile(join(out,'result.json'),JSON.stringify({success:true,functionalOnly:true,visualParityProven:false,diagnosticScreenshotsOnly:true,inputFreezeSha256:frozen?sha(await readFile(process.env.NATIVE_ASSET_INPUT_FREEZE)):null,inputFilesVerified:frozen?Object.keys(frozen.hashes).length:null,browser:browser.version(),publicBitmapFormats,rows,themeRows,monitorThemeRows,themeSourceSha256:sha(themeSourceBytes),checks,wire,downloads:downloaded,errors,wholeOriginalParityProven:false},null,2)+'\n');console.log(JSON.stringify({success:true,cohorts:rows.length,authoredThemeCohorts:themeRows.length,authoredMonitorThemeCohorts:monitorThemeRows.length,browser:browser.version()}));
 }catch(error){const ui=observedPage&&!observedPage.isClosed()?await observedPage.evaluate(()=>({path:location.pathname,inputs:[...document.querySelectorAll('input')].map(n=>({type:n.type,name:n.name,dataCy:n.getAttribute('data-cy'),placeholder:n.placeholder})),alerts:[...document.querySelectorAll('[role=alert]')].map(n=>n.textContent)})).catch(()=>undefined):undefined;if(observedPage&&!observedPage.isClosed())await observedPage.screenshot({path:join(out,'failure.png')}).catch(()=>{});await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),ui,rows,checks,wire,errors},null,2)+'\n');throw error;}
 finally{releasePlayer?.();await browser?.close();if(server)await stopNativeSmokeServer(server);}
 }
