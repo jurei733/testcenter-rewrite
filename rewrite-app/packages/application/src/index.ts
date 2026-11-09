@@ -1,4 +1,9 @@
+import {decodeSourceBase64} from './source-base64.js';
+import {createOriginalAssetPort} from './original-asset.js';
+export type {OriginalAssetPort} from './original-asset.js';
 import {applicationAssetImageType} from './application-asset-image.js';
+export {prepareOriginalApplicationAssets,originalApplicationAssetScope} from './original-application-asset.js';
+export type {OriginalApplicationAssetIdentity,OriginalApplicationAssetSummary,OriginalApplicationAsset,OriginalApplicationAssetContext} from './original-application-asset.js';
 import {readWorkspaceFileReport,appendWorkspaceFileReport,workspaceFileReportErrors} from './original-workspace-file-report.js';
 import {createOriginalWorkspaceArchives,assertWorkspaceUploadName,applyWorkspaceArchiveTimestamps,type WorkspaceArchiveOrigin} from './original-workspace-archive.js';
 import {originalResourceMediaType} from './original-resource-media-type.js';
@@ -132,7 +137,7 @@ import { buildWorkspaceFileCatalog, selectCurrentWorkspaceFiles, normalizeWorksp
 import { inspectOriginalHtmlResource } from './original-resource-metadata.js';
 import type { WorkspaceFileCatalog } from '@testcenter-rewrite-app/domain';
 export { FirstSliceError } from "./first-slice-error.js";
-export { prepareApplicationAssetDeletion, validateApplicationAssetReferences } from "./application-asset-mutation.js";
+export { prepareApplicationAssetDeletion, validateApplicationAssetReferences, readOriginalAssetAssignmentLayers } from "./application-asset-mutation.js";
 export type { ApplicationAssetDeletionInput, ApplicationAssetDeletionContext, ApplicationAssetAssignmentRow } from "./application-asset-mutation.js";
 import { evaluateAdaptiveStates, buildParticipantDebugSnapshot } from "@testcenter-rewrite-app/contracts/participant-debug-runtime";
 import { evaluateParticipantDebugConditions, parseParticipantDebugConditionElement } from "@testcenter-rewrite-app/contracts/participant-debug-condition";
@@ -1371,6 +1376,7 @@ export type FirstSlicePorts = {
   originalUnit:import('./original-unit.js').OriginalUnitPort;
   originalReview:import('./original-review.js').OriginalReviewPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
+  originalAssets:import('./original-asset.js').OriginalAssetPort;
   originalAdminSession: import('./original-admin-session.js').OriginalAdminSessionPort;
   originalAdminDirectory: import('./original-admin-directory.js').OriginalAdminDirectoryPort;
   originalAdminPermissions: import('./original-admin-permissions.js').OriginalAdminPermissionsPort;
@@ -1515,7 +1521,9 @@ export type FirstSliceRepository = import('./original-admin-session.js').Origina
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
-  mutateApplicationSettings(transform: (previous: ApplicationSettings | null) => {settings:ApplicationSettings; auditEvent:AdminAuditEvent}): Promise<ApplicationSettings>;
+  mutateApplicationSettings(transform: (previous: ApplicationSettings | null, assets?: ReadonlyArray<import('./original-application-asset.js').OriginalApplicationAsset>) => {settings:ApplicationSettings; auditEvent:AdminAuditEvent}, originalAssets?:true): Promise<ApplicationSettings>;
+  getOriginalApplicationAssets(context?:import('./original-application-asset.js').OriginalApplicationAssetContext):Promise<{assets:import('./original-application-asset.js').OriginalApplicationAsset[];settings:ApplicationSettings|null;scopedAssignments:Record<string,string>}>;
+  getOriginalApplicationAssetByStoredName(storedName:string):Promise<ApplicationAsset|null>;
   listApplicationAssets(): Promise<ApplicationAsset[]>;
   getApplicationAssetById(
     applicationAssetId: string
@@ -1523,7 +1531,7 @@ export type FirstSliceRepository = import('./original-admin-session.js').Origina
   getApplicationAssetByOriginalName(
     originalName: string
   ): Promise<ApplicationAsset | null>;
-  saveApplicationAsset(applicationAsset: ApplicationAsset, replaceByOriginalName?: boolean): Promise<{ applicationAsset: ApplicationAsset; replaced: boolean }>;
+  saveApplicationAsset(applicationAsset: ApplicationAsset, replaceByOriginalName?: boolean): Promise<{ applicationAsset: ApplicationAsset; replaced: boolean; originalAsset: import('./original-application-asset.js').OriginalApplicationAsset }>;
   deleteApplicationAsset(applicationAssetId: string): Promise<boolean>;
   mutateApplicationAssetDeletion(input: import("./application-asset-mutation.js").ApplicationAssetDeletionInput): Promise<ApplicationAsset | null>;
   listAttachmentFilesByWorkspace(
@@ -2732,20 +2740,8 @@ const decodePersistedSourceDocument = (
   const mediaType = dataUrlMatch[1]?.trim() || sourcePackage.mediaType;
   const payload = dataUrlMatch[3] ?? "";
   if (dataUrlMatch[2]) {
-    const normalizedPayload = payload
-      .replace(/\s+/g, "")
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
-    if (
-      !/^[A-Za-z0-9+/]*={0,2}$/.test(normalizedPayload) ||
-      normalizedPayload.length % 4 === 1
-    ) {
-      return null;
-    }
-    return {
-      mediaType,
-      bytes: Buffer.from(normalizedPayload, "base64")
-    };
+    const bytes = decodeSourceBase64(payload);
+    return bytes === null ? null : {mediaType, bytes};
   }
 
   const bytes = decodePercentEncodedDataUrlPayload(payload);
@@ -5771,8 +5767,8 @@ const normalizeApplicationAssetInput = (input: {
   ApplicationAsset,
   "originalName" | "mediaType" | "dataBase64" | "byteLength"
 > => {
-  const originalName = input.originalName.trim().split(/[\\/]/).at(-1)?.trim() ?? "";
-  if (!originalName || originalName.length > 255) {
+  const originalName = input.originalName.split(/[\\/]/).at(-1) ?? "";
+  if (!originalName || [...originalName].length > 255 || originalName.includes("\0")) {
     throw new FirstSliceError(
       400,
       "application_asset_name_invalid",
@@ -16809,14 +16805,9 @@ const collectLooseSourcePackageDependencyReferences = (
   sourcePackage: SourcePackage,
   originalFileIds = false
 ): string[] => {
+  if (sourcePackage.fileName.toLowerCase().endsWith(".zip") || sourcePackage.mediaType.toLowerCase().includes("zip")) return [];
   const decodedDocument = decodePersistedSourceDocument(sourcePackage);
-  if (
-    !decodedDocument ||
-    sourcePackage.fileName.toLowerCase().endsWith(".zip") ||
-    sourcePackage.mediaType.toLowerCase().includes("zip")
-  ) {
-    return [];
-  }
+  if (!decodedDocument) return [];
 
   const sourceDocument = readPersistedSourceText(sourcePackage, decodedDocument);
   if (sourceDocument === null) {
@@ -16919,14 +16910,9 @@ const collectLooseSourcePackageDependencyReferences = (
 const collectLooseSchemaDeclaredBookletUnitReferences = (
   sourcePackage: SourcePackage
 ): TestcenterBookletUnitReference[] => {
+  if (sourcePackage.fileName.toLowerCase().endsWith(".zip") || sourcePackage.mediaType.toLowerCase().includes("zip")) return [];
   const decodedDocument = decodePersistedSourceDocument(sourcePackage);
-  if (
-    !decodedDocument ||
-    sourcePackage.fileName.toLowerCase().endsWith(".zip") ||
-    sourcePackage.mediaType.toLowerCase().includes("zip")
-  ) {
-    return [];
-  }
+  if (!decodedDocument) return [];
   const sourceDocument = readPersistedSourceText(sourcePackage, decodedDocument);
   return sourceDocument === null
     ? []
@@ -17050,6 +17036,74 @@ export const hasActiveSourcePackageReplacement = (input: {
   });
 };
 
+type WorkspaceDependencyCandidate = {
+  sourcePackage: SourcePackage; identifierKeys: Set<string>;
+  normalizedFileName: string; normalizedFileBaseName: string;
+};
+const projectWorkspaceDependencyCandidate = (
+  sourcePackage: SourcePackage, originalFileIds = false
+): WorkspaceDependencyCandidate | null => {
+  const decodedDocument = decodePersistedSourceDocument(sourcePackage);
+  if (!decodedDocument) {
+    return null;
+  }
+  const assemblyEntry: SourcePackageAssemblyEntry = {
+    sourcePackageId: sourcePackage.sourcePackageId,
+    fileName: sourcePackage.fileName.trim().replace(/\\/g, "/"),
+    bytes: /^data:/i.test(sourcePackage.sourceDocument ?? "")
+      ? decodedDocument.bytes
+      : encodeUnicodeSourceTextForAssembly(sourcePackage.sourceDocument ?? "")
+  };
+  const normalizedFileName = normalizeZipEntryPath(
+    assemblyEntry.fileName
+  ).toLowerCase();
+  const normalizedMediaType = sourcePackage.mediaType.toLowerCase();
+  const metadataReadable =
+    normalizedMediaType.startsWith("text/") ||
+    normalizedMediaType.includes("json") ||
+    normalizedMediaType.includes("xml") ||
+    /\.(?:html?|json|xml|manifest|imsmanifest)$/i.test(normalizedFileName);
+  const fileBaseName =
+    assemblyEntry.fileName.split("/").at(-1) ?? assemblyEntry.fileName;
+  const identifierKeys = new Set(
+    (metadataReadable
+      ? collectAssemblyResourceIdentifiers(assemblyEntry, originalFileIds)
+      : [assemblyEntry.fileName, fileBaseName]
+    ).flatMap(workspaceDependencyReferenceKeys)
+  );
+  return {
+    sourcePackage,
+    identifierKeys,
+    normalizedFileName,
+    normalizedFileBaseName:
+      normalizedFileName.split("/").at(-1) ?? normalizedFileName
+  };
+};
+type WorkspaceDependencyAnalysis = {
+  candidate: typeof projectWorkspaceDependencyCandidate;
+  references: typeof collectLooseSourcePackageDependencyReferences;
+};
+/** Reuse derived metadata only inside one synchronous workspace snapshot.
+ * FileID modes stay separate; no decoded archive buffers are retained. */
+const createWorkspaceDependencyAnalysis = (): WorkspaceDependencyAnalysis => {
+  const candidates = new WeakMap<SourcePackage, Map<boolean, WorkspaceDependencyCandidate | null>>();
+  const references = new WeakMap<SourcePackage, Map<boolean, string[]>>();
+  return {
+    candidate(source, originalFileIds = false) {
+      let modes = candidates.get(source);
+      if (!modes) {modes = new Map(); candidates.set(source, modes);}
+      if (!modes.has(originalFileIds)) modes.set(originalFileIds, projectWorkspaceDependencyCandidate(source, originalFileIds));
+      return modes.get(originalFileIds)!;
+    },
+    references(source, originalFileIds = false) {
+      let modes = references.get(source);
+      if (!modes) {modes = new Map(); references.set(source, modes);}
+      if (!modes.has(originalFileIds)) modes.set(originalFileIds, collectLooseSourcePackageDependencyReferences(source, originalFileIds));
+      return modes.get(originalFileIds)!;
+    }
+  };
+};
+
 type WorkspaceDependencySourceResolution =
   | { status: "not_applicable" }
   | { status: "resolved"; sourcePackages: SourcePackage[] }
@@ -17061,8 +17115,10 @@ const resolveWorkspaceDependencySourcePackages = (input: {
   dependencySourcePackageIds?: string[];
   dependencySelectionRevision?: string;
   originalFileIds?: boolean;
+  analysis?: WorkspaceDependencyAnalysis;
 }): WorkspaceDependencySourceResolution => {
-  const rootReferences = collectLooseSourcePackageDependencyReferences(
+  const references = input.analysis?.references ?? collectLooseSourcePackageDependencyReferences;
+  const rootReferences = references(
     input.rootSourcePackage,
     input.originalFileIds
   );
@@ -17076,49 +17132,10 @@ const resolveWorkspaceDependencySourcePackages = (input: {
         sourcePackage.sourcePackageId !== input.rootSourcePackage.sourcePackageId &&
         sourcePackage.sourceDocument
     )
-    .map(sourcePackage => {
-      const decodedDocument = decodePersistedSourceDocument(sourcePackage);
-      if (!decodedDocument) {
-        return null;
-      }
-      const assemblyEntry: SourcePackageAssemblyEntry = {
-        sourcePackageId: sourcePackage.sourcePackageId,
-        fileName: sourcePackage.fileName.trim().replace(/\\/g, "/"),
-        bytes: /^data:/i.test(sourcePackage.sourceDocument ?? "")
-          ? decodedDocument.bytes
-          : encodeUnicodeSourceTextForAssembly(sourcePackage.sourceDocument ?? "")
-      };
-      const normalizedFileName = normalizeZipEntryPath(
-        assemblyEntry.fileName
-      ).toLowerCase();
-      const normalizedMediaType = sourcePackage.mediaType.toLowerCase();
-      const metadataReadable =
-        normalizedMediaType.startsWith("text/") ||
-        normalizedMediaType.includes("json") ||
-        normalizedMediaType.includes("xml") ||
-        /\.(?:html?|json|xml|manifest|imsmanifest)$/i.test(normalizedFileName);
-      const fileBaseName =
-        assemblyEntry.fileName.split("/").at(-1) ?? assemblyEntry.fileName;
-      const identifierKeys = new Set(
-        (metadataReadable
-          ? collectAssemblyResourceIdentifiers(assemblyEntry, input.originalFileIds)
-          : [assemblyEntry.fileName, fileBaseName]
-        ).flatMap(workspaceDependencyReferenceKeys)
-      );
-      return {
-        sourcePackage,
-        identifierKeys,
-        normalizedFileName,
-        normalizedFileBaseName:
-          normalizedFileName.split("/").at(-1) ?? normalizedFileName
-      };
-    })
-    .filter(Boolean) as Array<{
-      sourcePackage: SourcePackage;
-      identifierKeys: Set<string>;
-      normalizedFileName: string;
-      normalizedFileBaseName: string;
-    }>;
+    .map(sourcePackage => input.analysis
+      ? input.analysis.candidate(sourcePackage, input.originalFileIds)
+      : projectWorkspaceDependencyCandidate(sourcePackage, input.originalFileIds))
+    .filter((candidate): candidate is WorkspaceDependencyCandidate => candidate !== null);
 
   const requestedDependencySourcePackageIds =
     input.dependencySourcePackageIds ?? [];
@@ -17193,7 +17210,7 @@ const resolveWorkspaceDependencySourcePackages = (input: {
         reference => [reference.unitId.toLowerCase(), reference]
       )
     );
-    for (const reference of collectLooseSourcePackageDependencyReferences(
+    for (const reference of references(
       currentSourcePackage,
       input.originalFileIds
     )) {
@@ -17436,19 +17453,20 @@ const collectWorkspaceSourcePackageReferences = (input: {
     });
   };
 
+  const analysis = createWorkspaceDependencyAnalysis();
   for (const rootSourcePackage of activeRootSourcePackages) {
     let resolution: WorkspaceDependencySourceResolution;
     try {
       if (
-        collectLooseSourcePackageDependencyReferences(rootSourcePackage)
-          .length === 0
+        analysis.references(rootSourcePackage).length === 0
       ) {
         continue;
       }
       resolution = resolveWorkspaceDependencySourcePackages({
         rootSourcePackage,
         workspaceSourcePackages: activeRootSourcePackages,
-        originalFileIds: originalFileIdSources.has(rootSourcePackage.sourcePackageId)
+        originalFileIds: originalFileIdSources.has(rootSourcePackage.sourcePackageId),
+        analysis
       });
     } catch {
       continue;
@@ -25698,7 +25716,7 @@ export const createFirstSliceServices = (
     const referencedAssetNames = Array.from(
       new Set(
         [...parsedEntries, ...operationalLoginCandidates].flatMap(entry =>
-          Object.values(entry.assetAssignments ?? {})
+          [...Object.values(entry.assetAssignments ?? {}),...Object.values(entry.originalAssetAssignmentLayers?.group??{}),...Object.values(entry.originalAssetAssignmentLayers?.user??{})]
         )
       )
     ).sort();
@@ -25800,6 +25818,7 @@ export const createFirstSliceServices = (
         validForMinutes: parsedEntry.validForMinutes ?? null,
         customTexts: parsedEntry.customTexts ?? {},
         viewSettings: parsedEntry.viewSettings ?? {},
+        ...(parsedEntry.originalAssetAssignmentLayers?{originalAssetAssignmentLayers:parsedEntry.originalAssetAssignmentLayers}:{}),
         ...(parsedEntry.assetAssignments &&
         Object.keys(parsedEntry.assetAssignments).length > 0
           ? { assetAssignments: parsedEntry.assetAssignments }
@@ -27279,10 +27298,10 @@ export const createFirstSliceServices = (
             : normalizeApplicationCustomTexts(originalPatch ? {...previousSettings.customTexts,...normalizeApplicationCustomTexts(input.customTexts)} : input.customTexts),
         assetAssignments: input.assetAssignments === undefined ? previousSettings.assetAssignments :
           Object.fromEntries(Object.entries(input.assetAssignments).map(([slot,originalName]) => {
-            if (!(applicationAssetSlotNames as readonly string[]).includes(slot) || typeof originalName !== "string" || !originalName.trim()) {
+            if ((!(applicationAssetSlotNames as readonly string[]).includes(slot) && (previousSettings.assetAssignments as Record<string,string>)[slot] !== originalName) || typeof originalName !== "string" || !originalName) {
               throw new FirstSliceError(400,"application_asset_assignment_invalid",`Application asset assignment '${slot}' is invalid.`);
             }
-            return [slot, originalName.trim()];
+            return [slot, originalName];
           })),
         globalWarningText: originalPatch && input.globalWarningText === undefined ? previousSettings.globalWarningText : normalizeGlobalWarningText(input.globalWarningText),
         globalWarningExpiresAt: originalPatch && input.globalWarningExpiresAt === undefined ? previousSettings.globalWarningExpiresAt : normalizeGlobalWarningExpiration(input.globalWarningExpiresAt),
@@ -28196,8 +28215,37 @@ export const createFirstSliceServices = (
     enter: (principal, code) => isOriginalOperationalLogin(principal.rosterEntry) ? enterOperational(principal,code) : signInParticipant({loginKey: principal.rosterEntry.loginKey, participantCode: code}, {...principal,rosterEntry:principal.rosterEntry})
   });
 
-  return {
-    applicationSettings: {
+  const uploadApplicationAsset=async(input:Parameters<ApplicationSettingsPort['uploadApplicationAsset']>[0])=>{
+    const currentSession = await requireActiveAdminSession(
+      repository,
+      input.sessionToken,
+      now()
+    );
+    requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+    const normalized = normalizeApplicationAssetInput(input);
+    const timestamp = now();
+    const candidate: ApplicationAsset = {
+      applicationAssetId: `asset:${idGenerator()}`,
+      ...normalized, createdAt: timestamp, updatedAt: timestamp
+    };
+    // Resolve filename identity under the same registry lock as deletion.
+    const { applicationAsset, replaced, originalAsset } = await repository.saveApplicationAsset(candidate, true);
+    await recordAdminAuditEvent({
+      eventType: "application_asset_uploaded",
+      actorAdminUserId: currentSession.adminUser.adminUserId,
+      summary: `Platform admin '${currentSession.adminUser.username}' ${replaced ? "replaced" : "uploaded"} application asset '${applicationAsset.originalName}'.`,
+      details: {
+        applicationAssetId: applicationAsset.applicationAssetId,
+        originalName: applicationAsset.originalName,
+        mediaType: applicationAsset.mediaType,
+        byteLength: applicationAsset.byteLength,
+        replaced
+      }
+    });
+    return {applicationAsset,originalAsset};
+  };
+
+  const applicationSettings:ApplicationSettingsPort = {
       async getApplicationSettings() {
         return (
           (await repository.getApplicationSettings()) ?? {
@@ -28216,7 +28264,7 @@ export const createFirstSliceServices = (
       },
       async getApplicationAsset(input) {
         const applicationAssetId = input.applicationAssetId?.trim();
-        const originalName = input.originalName?.trim();
+        const originalName = input.originalName;
         const applicationAsset = applicationAssetId
           ? await repository.getApplicationAssetById(applicationAssetId)
           : originalName
@@ -28232,33 +28280,7 @@ export const createFirstSliceServices = (
         return applicationAsset;
       },
       async uploadApplicationAsset(input) {
-        const currentSession = await requireActiveAdminSession(
-          repository,
-          input.sessionToken,
-          now()
-        );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
-        const normalized = normalizeApplicationAssetInput(input);
-        const timestamp = now();
-        const candidate: ApplicationAsset = {
-          applicationAssetId: `asset:${idGenerator()}`,
-          ...normalized, createdAt: timestamp, updatedAt: timestamp
-        };
-        // Resolve filename identity under the same registry lock as deletion.
-        const { applicationAsset, replaced } = await repository.saveApplicationAsset(candidate, true);
-        await recordAdminAuditEvent({
-          eventType: "application_asset_uploaded",
-          actorAdminUserId: currentSession.adminUser.adminUserId,
-          summary: `Platform admin '${currentSession.adminUser.username}' ${replaced ? "replaced" : "uploaded"} application asset '${applicationAsset.originalName}'.`,
-          details: {
-            applicationAssetId: applicationAsset.applicationAssetId,
-            originalName: applicationAsset.originalName,
-            mediaType: applicationAsset.mediaType,
-            byteLength: applicationAsset.byteLength,
-            replaced
-          }
-        });
-        return applicationAsset;
+        return (await uploadApplicationAsset(input)).applicationAsset;
       },
       async deleteApplicationAsset(input) {
         const currentSession = await requireActiveAdminSession(
@@ -28281,7 +28303,9 @@ export const createFirstSliceServices = (
       },
       updateApplicationSettings: input => updateApplicationSettings(input),
       patchOriginalApplicationSettings: input => updateApplicationSettings(input,true)
-    },
+    };
+  return {
+    applicationSettings,
     attachments: {
       async listAttachments(input) {
         const access = await requireAttachmentAccess({
@@ -32843,6 +32867,8 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantAccess,
     originalAuthentication,
+    originalAssets:createOriginalAssetPort({repository,settings:applicationSettings,upload:async request=>(await uploadApplicationAsset(request)).originalAsset,auth:originalAuthentication,now,id:idGenerator,
+      admin:async(token,root)=>{const session=await requireActiveAdminSession(repository,token,now(),{enforceAccessWindow:true});if(root)requireAdminRole(session.roleAssignments,['platform_admin']);return session.adminUser;}}),
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
     originalReview:createOriginalReviewPort({auth:originalAuthentication,repository,now,id:idGenerator,timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
     originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator}),

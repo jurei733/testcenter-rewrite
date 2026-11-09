@@ -142,3 +142,49 @@ test('timeout kills an owned detached grandchild and leaves an unrelated process
     if (grandchild) {try {process.kill(grandchild, 'SIGKILL');} catch (error) {if(error.code !== 'ESRCH') throw error;}}
   }
 });
+
+test('parallel sibling progress cannot keep an independently stalled suite alive', () => fixture(
+  `import {runSupervisedSmoke} from ${JSON.stringify(helper)};
+   import {writeFile} from 'node:fs/promises';import {fileURLToPath} from 'node:url';
+   const entry=name=>fileURLToPath(new URL(name,import.meta.url));
+   await writeFile(entry('busy.mjs'),${JSON.stringify(`import {reportSmokePhase} from ${JSON.stringify(helper)};
+     let n=0;const timer=setInterval(()=>{reportSmokePhase('busy-'+n++);if(n===20)clearInterval(timer);},25);`)});
+   await writeFile(entry('stalled.mjs'),${JSON.stringify(`import {reportSmokePhase} from ${JSON.stringify(helper)};
+     reportSmokePhase('stalled');setInterval(()=>{},1000);`)});
+   const codes=await Promise.all(['busy','stalled'].map(name=>runSupervisedSmoke({entry:entry(name+'.mjs'),artifactDirectory:entry(name),
+     phaseTimeoutMs:250,totalTimeoutMs:1500,killGraceMs:30,forwardPhases:name})));
+   process.exitCode=codes.every(code=>code===0)?0:1;`,
+  async (result, record, directory) => {
+    assert.equal(result,1);assert.equal(record.outcome,'failed');
+    const busy=JSON.parse(await readFile(join(directory,'busy','supervision.json'),'utf8'));
+    const stalled=JSON.parse(await readFile(join(directory,'stalled','supervision.json'),'utf8'));
+    assert.equal(busy.outcome,'passed');assert.equal(stalled.outcome,'phase-timeout');
+    assert.equal(stalled.phases.at(-1).phase,'stalled');
+    assert.ok(busy.phases.some(phase=>phase.at>stalled.failedAt),'The sibling must still be progressing after the stalled suite fails.');
+    assert.ok(record.phases.some(phase=>phase.phase.startsWith('busy:')));
+  },{phaseTimeoutMs:1000,totalTimeoutMs:3000}));
+
+test('the unchanged aggregate deadline reclaims nested supervised descendants and preserves unrelated work', async () => {
+  const sentinel=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});
+  let grandchild;
+  try {
+    await fixture(`import {runSupervisedSmoke} from ${JSON.stringify(helper)};
+      import {writeFile} from 'node:fs/promises';import {fileURLToPath} from 'node:url';
+      const entry=fileURLToPath(new URL('nested.mjs',import.meta.url));
+      await writeFile(entry,${JSON.stringify(`import {spawn} from 'node:child_process';import {reportSmokePhase} from ${JSON.stringify(helper)};
+        const child=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"],{detached:true,stdio:'ignore'});
+        reportSmokePhase('owned-grandchild:'+child.pid);setInterval(()=>reportSmokePhase('active'),25);`)});
+      process.exitCode=await runSupervisedSmoke({entry,artifactDirectory:entry+'.evidence',phaseTimeoutMs:5000,totalTimeoutMs:10000,killGraceMs:30,forwardPhases:'nested'});`,
+    async (result,record) => {
+      assert.equal(result,1);assert.equal(record.outcome,'total-timeout');
+      const phase=record.phases.find(phase=>phase.phase.startsWith('nested:owned-grandchild:'));assert.ok(phase);
+      grandchild=Number(phase.phase.split(':').at(-1));assert.ok(record.ownedPids.includes(grandchild));
+      assert.ok(record.ownedPids.length>=3);assert.ok(!record.ownedPids.includes(sentinel.pid));process.kill(sentinel.pid,0);
+      let state;try{state=execFileSync('ps',['-o','stat=','-p',String(grandchild)],{encoding:'utf8'}).trim();}catch{state='';}
+      assert.ok(!state||state.startsWith('Z'),'Nested supervision must not orphan the detached child.');
+    },{phaseTimeoutMs:1000,totalTimeoutMs:1500});
+  } finally {
+    sentinel.kill('SIGKILL');
+    if(grandchild)try{process.kill(grandchild,'SIGKILL');}catch(error){if(error.code!=='ESRCH')throw error;}
+  }
+});

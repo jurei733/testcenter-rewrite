@@ -36,6 +36,7 @@ export type ParsedParticipantRosterEntry = {
   viewSettings?: ParticipantViewSettings;
   /** Original asset filenames keyed by the Testtakers 18.0 slot name. */
   assetAssignments?: Record<string, string>;
+  originalAssetAssignmentLayers?:import("@testcenter-rewrite-app/domain").OriginalAssetAssignmentLayers;
 };
 
 export const originalTestcenterOperationalLoginModes = [
@@ -1759,13 +1760,8 @@ const parseParticipantRosterXmlText = (
       ) ?? readXmlChildText(content, "password", "pw", "passwort", "kennwort")
     );
     const viewSettings = readXmlParticipantViewSettings(content);
-    const assetAssignments = {
-      ...findNearestXmlAssetAssignments(
-        groupAssetAssignmentRanges,
-        entryOffset
-      ),
-      ...readXmlAssetAssignments(content)
-    };
+    const originalAssetAssignmentLayers={group:findNearestXmlAssetAssignments(groupAssetAssignmentRanges,entryOffset),user:readXmlAssetAssignments(content)};
+    const assetAssignments={...originalAssetAssignmentLayers.group,...originalAssetAssignmentLayers.user};
 
     entries.push({
       loginKey,
@@ -1790,6 +1786,7 @@ const parseParticipantRosterXmlText = (
       ...(password ? { password } : {}),
       ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
       ...(viewSettings ? { viewSettings } : {}),
+      ...(Object.keys(originalAssetAssignmentLayers.group).length||Object.keys(originalAssetAssignmentLayers.user).length?{originalAssetAssignmentLayers}:{}),
       ...(Object.keys(assetAssignments).length > 0
         ? { assetAssignments }
         : {}),
@@ -1903,13 +1900,8 @@ const parseParticipantRosterXmlText = (
       ) ?? readXmlChildText(content, "password", "pw", "passwort", "kennwort")
     );
     const viewSettings = readXmlParticipantViewSettings(content);
-    const assetAssignments = {
-      ...findNearestXmlAssetAssignments(
-        groupAssetAssignmentRanges,
-        entryOffset
-      ),
-      ...readXmlAssetAssignments(content)
-    };
+    const originalAssetAssignmentLayers={group:findNearestXmlAssetAssignments(groupAssetAssignmentRanges,entryOffset),user:readXmlAssetAssignments(content)};
+    const assetAssignments={...originalAssetAssignmentLayers.group,...originalAssetAssignmentLayers.user};
 
     entries.push({
       loginKey,
@@ -1934,6 +1926,7 @@ const parseParticipantRosterXmlText = (
       ...(password ? { password } : {}),
       ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
       ...(viewSettings ? { viewSettings } : {}),
+      ...(Object.keys(originalAssetAssignmentLayers.group).length||Object.keys(originalAssetAssignmentLayers.user).length?{originalAssetAssignmentLayers}:{}),
       ...(Object.keys(assetAssignments).length > 0
         ? { assetAssignments }
         : {}),
@@ -2342,13 +2335,8 @@ export const parseOriginalTestcenterOperationalLogins = (
       importedVisibility === "collapsed" || importedVisibility === "hidden"
         ? importedVisibility
         : "visible";
-    const assetAssignments = {
-      ...findNearestXmlAssetAssignments(
-        groupAssetAssignmentRanges,
-        entryOffset
-      ),
-      ...readXmlAssetAssignments(content)
-    };
+    const originalAssetAssignmentLayers={group:findNearestXmlAssetAssignments(groupAssetAssignmentRanges,entryOffset),user:readXmlAssetAssignments(content)};
+    const assetAssignments={...originalAssetAssignmentLayers.group,...originalAssetAssignmentLayers.user};
 
     candidates.push({
       loginKey,
@@ -2364,6 +2352,7 @@ export const parseOriginalTestcenterOperationalLogins = (
       monitorBookletVisibility,
       ...(Object.keys(readXmlParticipantViewSettings(content) ?? {}).length ? {viewSettings: readXmlParticipantViewSettings(content)} : {}),
       customTexts: { ...customTexts },
+      ...(Object.keys(originalAssetAssignmentLayers.group).length||Object.keys(originalAssetAssignmentLayers.user).length?{originalAssetAssignmentLayers}:{}),
       ...(Object.keys(assetAssignments).length > 0
         ? { assetAssignments }
         : {}),

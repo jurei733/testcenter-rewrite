@@ -404,6 +404,8 @@ export type ParticipantViewSettings = {
   };
 };
 
+export type OriginalAssetAssignmentLayers = {group:Record<string,string>;user:Record<string,string>};
+
 export type ParticipantRosterEntry = {
   participantRosterEntryId: string;
   tenantId: string;
@@ -428,6 +430,8 @@ export type ParticipantRosterEntry = {
   viewSettings?: ParticipantViewSettings;
   /** Original application asset filenames keyed by the Testtakers slot name. */
   assetAssignments?: Record<string, string>;
+  /** Authored layers retain the group fallback hidden by a user assignment. */
+  originalAssetAssignmentLayers?: OriginalAssetAssignmentLayers;
   importedAt: string;
 };
 
@@ -610,6 +614,8 @@ export type OperationalLoginMigrationCandidate = {
   customTexts: Record<string, string>;
   /** Original application asset filenames keyed by the Testtakers slot name. */
   assetAssignments?: Record<string, string>;
+  /** Authored layers retain the group fallback hidden by a user assignment. */
+  originalAssetAssignmentLayers?: OriginalAssetAssignmentLayers;
   unresolvedProfileIds: string[];
   validFrom?: string | null;
   validTo?: string | null;

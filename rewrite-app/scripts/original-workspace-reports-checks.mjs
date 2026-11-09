@@ -13,7 +13,7 @@ export async function verifyOriginalWorkspaceReports(t,{services,repository,scop
  const scope={tenantKey:parentScope.tenantKey,workspaceKey:workspace.workspaceKey},ids={tenantId:parentIds.tenantId,workspaceId:workspace.workspaceId};
  const report=(type,extra={})=>services.originalWorkspaceReport.read({...scope,type,dataIds:'',accept:'application/json',useNewVersion:false,...extra});
  const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType});
- await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-admin-player',version:'1.0.0',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned Player'}]})+'</script></html>','text/html');
+ await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-admin-player',version:'1.0.0',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned Player'}]})+'</script></html>','text/html');
  await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.ADM.UNIT</Id><Label>Owned administration Unit</Label></Metadata><Definition player="owned-admin-player@1.0.0">Owned definition</Definition>'));
  await upload('a.xml',booklet('OWNED.ADM.A','Report Booklet A Ω'));await upload('b.xml',booklet('OWNED.ADM.B','Report Booklet B Ä'));
  const ownerName='r57-'+randomUUID(),trialName='r57-'+randomUUID(),peerName='r57-'+randomUUID();

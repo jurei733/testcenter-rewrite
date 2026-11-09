@@ -42,11 +42,12 @@ export function createSmokeEvidenceWriter(snapshot, write) {
 // The supervisor has its own event loop: a blocked browser evaluation, route
 // cleanup or even child Node event loop cannot prevent timeout evidence.
 export async function runSupervisedSmoke({entry, artifactDirectory, env = process.env,
-  phaseTimeoutMs = 60_000, totalTimeoutMs = 480_000, killGraceMs = 2_000}) {
+  phaseTimeoutMs = 60_000, totalTimeoutMs = 480_000, killGraceMs = 2_000, forwardPhases}) {
   if (process.platform === 'win32') throw Error('Owned process supervision requires POSIX process groups');
   for (const value of [phaseTimeoutMs, totalTimeoutMs, killGraceMs]) {
     if (!Number.isSafeInteger(value) || value <= 0) throw Error('Smoke deadlines must be positive integer milliseconds');
   }
+  if (forwardPhases !== undefined && (typeof forwardPhases !== 'string' || !forwardPhases || forwardPhases.length > 60)) throw Error('Invalid parent smoke phase prefix');
   const directory = resolve(artifactDirectory);
   const actualEntry = await realpath(resolve(entry));
   await mkdir(directory, {recursive: true});
@@ -98,16 +99,20 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
       let evidenceError;
       try {await persist();} catch (error) {evidenceError = error;}
       console.error(`owned_smoke_supervision=${reason}; last_phase=${phases.at(-1)?.phase}; last_observation=${observations.at(-1)?.observation ?? 'none'}`);
+      // Signal the still-owned group before individual PIDs. Killing its
+      // leader first can race process-group teardown before Node emits exit.
+      const leader = rows.find(row => row.pid === child.pid && row.ppid === process.pid);
+      if (leader && child.exitCode === null && child.signalCode === null) signal(-child.pid, 'SIGTERM');
       for (const pid of [...owned].reverse()) signal(pid, 'SIGTERM');
-      if (child.exitCode === null && child.signalCode === null) signal(-child.pid, 'SIGTERM');
       await new Promise(done => setTimeout(done, killGraceMs));
       // Match creation time as well as PID before escalation: a recycled PID
       // must never turn an owned cleanup into a signal to an unrelated process.
       const current = await processTable();
+      if (leader && current.some(row => row.pid === leader.pid && row.ppid === process.pid && row.started === leader.started) &&
+          child.exitCode === null && child.signalCode === null) signal(-child.pid, 'SIGKILL');
       for (const row of rows.filter(row => owned.has(row.pid)).reverse()) {
         if (current.some(value => value.pid === row.pid && value.started === row.started)) signal(row.pid, 'SIGKILL');
       }
-      if (child.exitCode === null && child.signalCode === null) signal(-child.pid, 'SIGKILL');
       // A denied signal must not prevent cleanup of the remaining owned
       // descendants or the owned group. Preserve the exact failure as evidence
       // and still fail supervision after all permitted cleanup was attempted.
@@ -130,6 +135,9 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
     clearTimeout(phaseTimer);
     phaseTimer = setTimeout(() => {void stop('phase-timeout').catch(error => child.emit('error', error));}, phaseTimeoutMs);
     void persist().catch(error => child.emit('error', error));
+    // A parallel suite still owns this independent watchdog. Forward progress
+    // only to its aggregate parent; sibling activity cannot reset this timer.
+    if (forwardPhases !== undefined) reportSmokePhase(forwardPhases + ':' + value);
   };
   child.on('message', message => {
     if (message?.type === 'owned-smoke-phase' && typeof message.phase === 'string') phase(message.phase.slice(0, 200));

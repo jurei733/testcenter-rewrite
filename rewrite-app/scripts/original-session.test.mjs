@@ -59,7 +59,7 @@ const solve = challenge => {
   assert.fail('The actual native challenge must be solvable by the unchanged five-field client algorithm');
 };
 const uploadDependencies = async (services, scope) => {
-  const metadata = {id: 'owned-session-player', version: '6.0.4', specVersion: '6.0', metadataVersion: '2.0', type: 'player',
+  const metadata = {$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id: 'owned-session-player', version: '6.0.4', specVersion: '6.0', metadataVersion: '2.0', type: 'player',
     name: [{lang: 'de', value: 'Owned native session Player'}], description: [{lang: 'de', value: 'Owned fixture'}]};
   await services.contentIntake.uploadWorkspaceFile({...scope, fileName: 'player.html', mediaType: 'text/html',
     sourceDocument: '<html><script type="application/ld+json">' + JSON.stringify(metadata) + '</script><main>Owned Player</main></html>'});

@@ -209,5 +209,31 @@ for(const kind of kinds)test(kind+': Source files become live without manual act
   const current=await services.systemCheck.getSystemCheck({...other,checkId:'NATIVE.OTHER'});
   assert.equal(current.sourcePackageId,native.sourcePackage.sourcePackageId);assert.equal(current.unit.unitDefinition,'Current native Unit');
  });
+ await t.test('dependency snapshots retain published edges and see unpublished same-ID edits without timestamp changes',async()=>{
+  const other={tenantKey:tenant.tenantKey,workspaceKey:'reference-snapshots'};
+  await services.platform.createWorkspace({...other,displayName:'Owned dependency snapshots'});
+  const put=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...other,fileName,sourceDocument,mediaType});
+  await put('player.html',player('Owned reference Player'),'text/html');
+  const one=await put('one.xml',unit('Owned first').replaceAll('LIVE.UNIT','REF.ONE'));
+  const two=await put('two.xml',unit('Owned second').replaceAll('LIVE.UNIT','REF.TWO'));
+  const book=await put('book.xml',booklet('REF.BOOK').replaceAll('LIVE.UNIT','REF.ONE'));
+  const references=async asset=>(await services.workspaceAdminRead.getSourcePackageDeletionReadiness({...other,sourcePackageId:asset.sourcePackage.sourcePackageId})).blockingDependencies.filter(row=>row.dependencyType==='workspace_source_package_reference').map(row=>row.dependencyId).sort();
+  const original=await repository.getSourcePackageById(book.sourcePackage.sourcePackageId);
+  const before=[await references(one),await references(two)];assert.ok(before[0].includes(original.sourcePackageId));assert.ok(!before[1].includes(original.sourcePackageId));
+  assert.deepEqual([await references(one),await references(two)],before);
+  await repository.saveSourcePackage({...original,sourceDocument:original.sourceDocument.replaceAll('REF.ONE','REF.TWO')});
+  assert.ok((await references(one)).includes(original.sourcePackageId),'The recorded published dependency remains protected.');assert.ok((await references(two)).includes(original.sourcePackageId),'The new live body also contributes its current dependency.');
+  assert.equal((await repository.getSourcePackageById(original.sourcePackageId)).uploadedAt,original.uploadedAt);
+  await repository.saveSourcePackage(original);assert.deepEqual([await references(one),await references(two)],before);
+  // This root has no recorded assembly. It exercises canonical and native
+  // FileID modes together without weakening protection for published history.
+  const unpublished={...original,sourcePackageId:randomUUID(),fileName:'unpublished.xml',sourceDocument:original.sourceDocument.replace('<Id>REF.BOOK</Id>','<Id>REF.UNPUBLISHED</Id>')};
+  await repository.saveSourcePackage(unpublished);
+  const localBefore=[await references(one),await references(two)];assert.ok(localBefore[0].includes(unpublished.sourcePackageId));assert.ok(!localBefore[1].includes(unpublished.sourcePackageId));
+  await repository.saveSourcePackage({...unpublished,sourceDocument:unpublished.sourceDocument.replaceAll('REF.ONE','REF.TWO')});
+  assert.ok(!(await references(one)).includes(unpublished.sourcePackageId));assert.ok((await references(two)).includes(unpublished.sourcePackageId));
+  assert.equal((await repository.getSourcePackageById(unpublished.sourcePackageId)).uploadedAt,unpublished.uploadedAt);
+  await repository.saveSourcePackage(unpublished);assert.deepEqual([await references(one),await references(two)],localBefore);
+ });
  }finally{if(storage)await storage.shutdown();if(pool){await pool.query('DROP SCHEMA \"'+schema+'\" CASCADE');await pool.end();}await rm(folder,{recursive:true,force:true});}
 });

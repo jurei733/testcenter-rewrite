@@ -1,3 +1,4 @@
+import {NativeAssetContext} from '../native-asset-context.service';
 import {filter,fromEvent,Subscription,take,takeUntil} from 'rxjs';
 import {BookletService} from './group-monitor/booklet/booklet.service';
 import {TestSessionManager} from './group-monitor/test-session-manager/test-session-manager.service';
@@ -34,6 +35,7 @@ import {NativeStarterComponent} from '../native-participant/starter/native-start
 export class NativeMonitorEntryComponent implements OnDestroy {
  readonly backendProblem=signal('');
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
+ readonly assets=inject(NativeAssetContext);
  readonly header=inject(HeaderService);readonly backend=inject(BackendService);
  private readonly backendSubscription=this.backend.problem$.subscribe(problem=>this.backendProblem.set(problem));
  private readonly view=new AbortController();
@@ -48,7 +50,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
  private readonly router=inject(Router);private readonly route=inject(ActivatedRoute);private readonly dialog=inject(MatDialog);
- constructor(){inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
+ constructor(){this.assets.activate(this.view.signal);inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
   const detector=inject(ChangeDetectorRef);
   this.router.events.pipe(filter(event=>event instanceof NavigationEnd),takeUntil(fromEvent(this.view.signal,'abort'))).subscribe(()=>{
    detector.markForCheck();

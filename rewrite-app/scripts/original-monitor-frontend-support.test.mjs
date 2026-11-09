@@ -48,7 +48,7 @@ for(const kind of process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:['memo
   const tenant=await services.platform.createTenant({tenantKey:'owned-'+randomUUID(),displayName:'Owned frontend native'}),workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'owned',displayName:'Owned frontend native'});
   scope={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey};ids=[tenant.tenantId,workspace.workspaceId];
   const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType});
-  await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-frontend-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
+  await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-frontend-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
   await upload('unit.xml',xml('Unit','<Metadata><Id>ORACLE.POW.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-frontend-player@1.2.3">Owned</Definition>'));
   const book=xml('Booklet','<Metadata><Id>ORACLE.POW.BOOK</Id><Label>Owned Ω Booklet</Label></Metadata><Units><Unit id="ORACLE.POW.UNIT" label="Owned Unit"/></Units>');
   await upload('booklet.xml',book);
@@ -80,7 +80,7 @@ for(const kind of process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:['memo
    const changed=book.replace('Owned Ω Booklet','Current Ω XML');await upload('booklet.xml',changed);assert.equal(await booklet(),changed);
    const peer=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'foreign',displayName:'Owned foreign'});
    const foreignUpload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({tenantKey:tenant.tenantKey,workspaceKey:peer.workspaceKey,fileName,mediaType,sourceDocument});
-   await foreignUpload('foreign-player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-frontend-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned foreign Player'}]})+'</script><main>Owned foreign</main></html>','text/html');
+   await foreignUpload('foreign-player.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-frontend-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned foreign Player'}]})+'</script><main>Owned foreign</main></html>','text/html');
    await foreignUpload('foreign-unit.xml',xml('Unit','<Metadata><Id>ORACLE.POW.UNIT</Id><Label>Owned foreign Unit</Label></Metadata><Definition player="owned-frontend-player@1.2.3">Owned foreign</Definition>'));
    await foreignUpload('foreign.xml',book.replaceAll('ORACLE.POW.BOOK','ORACLE.ONLY.FOREIGN'));
    await assert.rejects(booklet('ORACLE.ONLY.FOREIGN'),denied(404));

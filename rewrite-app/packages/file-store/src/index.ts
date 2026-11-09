@@ -1,3 +1,5 @@
+import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
+import {prepareOriginalApplicationAssets,type OriginalApplicationAssetIdentity} from '@testcenter-rewrite-app/application';
 import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
 import {guardOriginalWorkspaceWriteCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
@@ -109,6 +111,8 @@ import type {
 
 type PersistedFirstSliceState = {
   applicationSettings: ApplicationSettings | null;
+  originalApplicationAssets: Record<string,OriginalApplicationAssetIdentity>;
+  originalApplicationAssetCounter:number;
   applicationAssets: Record<string, ApplicationAsset>;
   attachmentFiles: Record<string, AttachmentFile>;
   adminUsers: Record<string, AdminUser>;
@@ -187,6 +191,8 @@ type LoadedFirstSliceState = {
 
 const createInitialState = (): PersistedFirstSliceState => ({
   applicationSettings: null,
+  originalApplicationAssets: {},
+  originalApplicationAssetCounter:0,
   applicationAssets: {},
   attachmentFiles: {},
   adminUsers: {},
@@ -947,11 +953,13 @@ const createFileRepository = (
         state.applicationSettings = { ...settings };
       });
     },
-    async mutateApplicationSettings(transform) {
+    async mutateApplicationSettings(transform, originalAssets) {
       return mutate(state => {
-        const effect=transform(structuredClone(state.applicationSettings));
+        const native=originalAssets?prepareOriginalApplicationAssets(Object.values(state.applicationAssets),Object.values(state.originalApplicationAssets??{}),state.originalApplicationAssetCounter??0):undefined;
+        const effect=transform(structuredClone(state.applicationSettings),native?.catalog);
         if(state.adminAuditEvents[effect.auditEvent.adminAuditEventId])throw Error("Duplicate application settings audit event.");
         validateApplicationAssetReferences(effect.settings.assetAssignments,Object.values(state.applicationAssets));
+        if(native){state.originalApplicationAssets=Object.fromEntries(native.identities.map(row=>[row.applicationAssetId,row]));state.originalApplicationAssetCounter=native.counter;}
         state.applicationSettings=structuredClone(effect.settings);
         state.adminAuditEvents[effect.auditEvent.adminAuditEventId]=structuredClone(effect.auditEvent);
         return structuredClone(effect.settings);
@@ -973,13 +981,26 @@ const createFileRepository = (
         ) ?? null
       );
     },
+    async getOriginalApplicationAssets(context) {
+      const current=await getState();
+      const prepared=prepareOriginalApplicationAssets(Object.values(current.applicationAssets),Object.values(current.originalApplicationAssets??{}),current.originalApplicationAssetCounter??0);
+      if(!prepared.changed)return {assets:prepared.catalog,settings:current.applicationSettings,scopedAssignments:originalApplicationAssetScope(context,context?Object.values(current.participantRosterEntries).find(row=>row.tenantId===context.tenantId&&row.workspaceId===context.workspaceId&&row.loginKey===context.loginKey):null,context?current.operationalLoginMigrationCandidates[context.tenantId+'::'+context.workspaceId]:[],context?current.originalOperationalLogins?.[context.tenantId+'::'+context.workspaceId]:[])};
+      return mutate(state=>{const result=prepareOriginalApplicationAssets(Object.values(state.applicationAssets),Object.values(state.originalApplicationAssets??{}),state.originalApplicationAssetCounter??0);
+        state.originalApplicationAssets=Object.fromEntries(result.identities.map(row=>[row.applicationAssetId,row]));state.originalApplicationAssetCounter=result.counter;return {assets:result.catalog,settings:state.applicationSettings,scopedAssignments:originalApplicationAssetScope(context,context?Object.values(state.participantRosterEntries).find(row=>row.tenantId===context.tenantId&&row.workspaceId===context.workspaceId&&row.loginKey===context.loginKey):null,context?state.operationalLoginMigrationCandidates[context.tenantId+'::'+context.workspaceId]:[],context?state.originalOperationalLogins?.[context.tenantId+'::'+context.workspaceId]:[])};});
+    },
+    async getOriginalApplicationAssetByStoredName(storedName){
+      const state=await getState(),identity=Object.values(state.originalApplicationAssets??{}).find(row=>row.storedName===storedName);
+      return identity?state.applicationAssets[identity.applicationAssetId]??null:null;
+    },
     async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
       return mutate(state => {
         const existing=replaceByOriginalName?Object.values(state.applicationAssets).find(asset=>asset.originalName===applicationAsset.originalName):null;
         if(existing)applicationAsset={...applicationAsset,applicationAssetId:existing.applicationAssetId,createdAt:existing.createdAt};
+        const original=prepareOriginalApplicationAssets([...Object.values(state.applicationAssets).filter(row=>row.applicationAssetId!==applicationAsset.applicationAssetId),applicationAsset],Object.values(state.originalApplicationAssets??{}),state.originalApplicationAssetCounter??0,applicationAsset.applicationAssetId);
+        state.originalApplicationAssets=Object.fromEntries(original.identities.map(row=>[row.applicationAssetId,row]));state.originalApplicationAssetCounter=original.counter;
         state.applicationAssets[applicationAsset.applicationAssetId] =
           applicationAsset;
-        return { applicationAsset, replaced: Boolean(existing) };
+        return { applicationAsset, replaced: Boolean(existing), originalAsset: original.catalog.find(row=>row.applicationAssetId===applicationAsset.applicationAssetId)! };
       });
     },
     async mutateApplicationAssetDeletion(input) {
@@ -998,9 +1019,9 @@ const createFileRepository = (
         });
         if(!effect)return null;
         if(effect.settings)state.applicationSettings=effect.settings;
-        for(const row of effect.roster)state.participantRosterEntries[row.participantRosterEntryId]={...state.participantRosterEntries[row.participantRosterEntryId]!,assetAssignments:row.assetAssignments};
+        for(const row of effect.roster)state.participantRosterEntries[row.participantRosterEntryId]={...state.participantRosterEntries[row.participantRosterEntryId]!,assetAssignments:row.assetAssignments,...(row.originalAssetAssignmentLayers?{originalAssetAssignmentLayers:row.originalAssetAssignmentLayers}:{})};
         for(const group of effect.operational)state.operationalLoginMigrationCandidates[group.tenantId+"::"+group.workspaceId]=group.candidates;
-        delete state.applicationAssets[effect.asset.applicationAssetId];state.adminAuditEvents[effect.auditEvent.adminAuditEventId]=effect.auditEvent;
+        delete state.applicationAssets[effect.asset.applicationAssetId];delete state.originalApplicationAssets?.[effect.asset.applicationAssetId];state.adminAuditEvents[effect.auditEvent.adminAuditEventId]=effect.auditEvent;
         return effect.asset;
       });
     },
@@ -1008,7 +1029,7 @@ const createFileRepository = (
       let deleted = false;
       await mutate(state => {
         if (state.applicationAssets[applicationAssetId]) {
-          delete state.applicationAssets[applicationAssetId];
+          delete state.applicationAssets[applicationAssetId];delete state.originalApplicationAssets?.[applicationAssetId];
           deleted = true;
         }
       });
@@ -1659,7 +1680,7 @@ const createFileRepository = (
       const privateLogins = prepareOriginalOperationalLogins(candidates, nativeLogins);
       await mutate(state => {
         if(privateLogins.length && !Object.values(state.workspacesByScope).some(w=>w.tenantId===tenantId&&w.workspaceId===workspaceId))throw new Error('Native operational workspace no longer exists.');
-        for(const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Object.values(state.applicationAssets));
+        for(const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Object.values(state.applicationAssets),candidate.originalAssetAssignmentLayers);
         const modes=projectOriginalOperationalModes({tenantId,workspaceId},privateLogins,Object.values(state.participantSessions),Object.values(state.testRuns));
         for(const person of modes.participantSessions)state.participantSessions[person.participantSessionId]=person;
         for(const run of modes.testRuns)state.testRuns[run.testRunId]=run;
@@ -1689,7 +1710,7 @@ const createFileRepository = (
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await mutate(state => {
-        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Object.values(state.applicationAssets));
+        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Object.values(state.applicationAssets),participantRosterEntry.originalAssetAssignmentLayers);
         const modes=projectOriginalLoginMode(participantRosterEntry,Object.values(state.participantSessions),Object.values(state.testRuns));
         for(const person of modes.participantSessions)state.participantSessions[person.participantSessionId]=person;
         for(const run of modes.testRuns)state.testRuns[run.testRunId]=run;

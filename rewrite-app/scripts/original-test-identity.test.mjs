@@ -36,7 +36,7 @@ assert.equal(phase.loginTokenRetained,true);assert.equal(phase.passwordUpdatedBe
 
 assert.equal(native.existing.bookletName,native.newTest.bookletName);
 const id=native.existing.bookletName;
-const metadata={id:'owned-identity-player',version:'1.2.9',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned identity Player'}]};
+const metadata={$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-identity-player',version:'1.2.9',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned identity Player'}]};
 const schemas={Unit:'unit-xml/17.6',Booklet:'testcenter-booklet-xml/18.0',Testtakers:'testcenter-testtaker-xml/18.0'};
 const xml=(type,identity,label,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${schemas[type]}"><Metadata>${type==='Testtakers'?'':`<Id>${identity}</Id><Label>${label}</Label>`}</Metadata>${body}</${type}>`;
 const booklet=label=>xml('Booklet',id,label,'<Units><Unit id="OWNED.UNIT" label="Owned Unit"/></Units>');

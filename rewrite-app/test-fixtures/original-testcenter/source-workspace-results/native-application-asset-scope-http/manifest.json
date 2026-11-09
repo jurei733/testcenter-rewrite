@@ -1,0 +1,8 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "actualHttpRequests": 43,
+  "files": {
+    "capture.mjs": "d32bcb9aa6c423ba8c109816b4fb5178a65c9cf0774a2393e85c47a4e624c243",
+    "observations.json": "25c356bf0fd1c83a59f72bc52789e3ea8ef4488226370e67ed1dc32d8b614098"
+  }
+}

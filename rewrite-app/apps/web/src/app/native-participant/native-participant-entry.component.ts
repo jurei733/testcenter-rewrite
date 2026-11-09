@@ -1,3 +1,4 @@
+import {NativeAssetContext} from '../native-asset-context.service';
 import {Component,effect,inject,signal,untracked} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {Router,RouterLink} from '@angular/router';
@@ -40,6 +41,7 @@ import type {CodeInputType} from './app.interfaces';
  @else{<div class="native-login-outlet">@for(scope of ownerKeys;track scope){<app-native-starter />}</div>}@if(!session.access()){<app-original-footer />}`})
 export class NativeParticipantEntryComponent {
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
+ readonly assets=inject(NativeAssetContext);
  private readonly cts=inject(CustomtextService);private readonly router=inject(Router);private readonly dialog=inject(MatDialog);
  private readonly view=new AbortController();private logoutCleanup:(()=>void)|undefined;
  private readonly completions=inject(NativeTerminalCompletionService);
@@ -52,7 +54,7 @@ export class NativeParticipantEntryComponent {
  readonly loginProblem=signal('');readonly loginProblemCode=signal(0);readonly loginProblemLevel=signal<'error'|'warning'>('error');
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
- constructor(){inject(NativeBackgroundService);inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access();untracked(()=>this.bindTexts(access?.customTexts??{}));});
+ constructor(){this.assets.activate(this.view.signal);inject(NativeBackgroundService);inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access();untracked(()=>this.bindTexts(access?.customTexts??{}));});
   if(this.session.access()&&!this.codeRequired)void this.refreshStarter();
  }
  async refreshStarter(){

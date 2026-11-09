@@ -1,3 +1,4 @@
+import {handleOriginalAssetHttp,originalAssetRouteLabel} from './original-asset-http.js';
 import {handleOriginalAdminHttp,originalAdminRouteLabel} from './original-admin-http.js';
 import {handleOriginalWorkspaceHttp,originalWorkspaceRouteLabel} from './original-workspace-http.js';
 import {formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/application';
@@ -3341,6 +3342,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /system-check";
   }
 
+  const assetLabel=originalAssetRouteLabel(method,pathname);if(assetLabel)return assetLabel;
   const adminLabel=originalAdminRouteLabel(method,pathname);if(adminLabel)return adminLabel;
   const workspaceLabel=originalWorkspaceRouteLabel(method,pathname);if(workspaceLabel)return workspaceLabel;
   const monitorLabel=originalMonitorRouteLabel(method,pathname);if(monitorLabel)return monitorLabel;
@@ -4999,6 +5001,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      if(await handleOriginalAssetHttp({request,pathname,services,
+        readBody:()=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,true),readBuffer:limit=>readRequestBuffer(request,limit),
+        propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
+        reportError:receipt=>{if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
+          logStructured(receipt.statusCode>=500?'error':'info','native_asset_error',{requestId,route:originalAssetRouteLabel(request.method??'',pathname),...receipt});},
+        header:(name,value)=>response.setHeader(name,value),
+        raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);},
+        binary:(bytes,contentType)=>{response.writeHead(200,{...securityHeaders,'content-type':contentType,'content-length':String(bytes.length)});endResponse(response,bytes);}}))return;
       if(await handleOriginalAdminHttp({request,pathname,services,clean:()=>broadcaster?.clean(),reportError:receipt=>{
         if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
         logStructured(receipt.statusCode>=500?'error':'info','native_administration_error',{requestId,route:originalAdminRouteLabel(request.method??'',pathname),...receipt});
@@ -5156,7 +5166,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const applicationAssetId = url.searchParams
           .get("applicationAssetId")
           ?.trim();
-        const originalName = url.searchParams.get("originalName")?.trim();
+        const originalName = url.searchParams.get("originalName") ?? undefined;
         if (!applicationAssetId && !originalName) {
           sendError(
             response,

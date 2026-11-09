@@ -233,6 +233,10 @@ describe("parseParticipantRosterText", () => {
           assetAssignments: {
             logo: "school.png",
             starterCompanion: "student-start.jpg"
+          },
+          originalAssetAssignmentLayers: {
+            group: { logo: "school.png", starterCompanion: "group-start.webp" },
+            user: { starterCompanion: "student-start.jpg" }
           }
         }
       ]
@@ -598,6 +602,7 @@ describe("parseParticipantRosterText", () => {
         monitorBookletVisibility: "collapsed",
         customTexts: { gm_headline: "Custom monitor" },
         assetAssignments: { logo: "monitor-logo.webp" },
+        originalAssetAssignmentLayers: { group: { logo: "operator-logo.png" }, user: { logo: "monitor-logo.webp" } },
         unresolvedProfileIds: ["missing"],
         validFrom: "1/6/2023 10:00",
         validForMinutes: 45
@@ -612,6 +617,7 @@ describe("parseParticipantRosterText", () => {
         monitorBookletVisibility: "visible",
         customTexts: { gm_headline: "Custom monitor" },
         assetAssignments: { logo: "operator-logo.png" },
+        originalAssetAssignmentLayers: { group: { logo: "operator-logo.png" }, user: {} },
         unresolvedProfileIds: [],
         validFrom: "1/6/2023 10:00",
         validForMinutes: 45

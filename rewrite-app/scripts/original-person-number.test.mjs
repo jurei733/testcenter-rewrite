@@ -93,6 +93,7 @@ for (const kind of kinds) test(`${kind}: atomic native person numbers retain sco
         await storage.shutdown();
         control = kind === 'sqlite' ? new DatabaseSync(file) : new Pool({connectionString: url.toString()});
         const numberVersion=Number((await query("SELECT version FROM schema_migrations WHERE name='original_native_person_numbers'"))[0].version);
+        await query('DROP TABLE IF EXISTS original_application_assets');await query('DROP TABLE IF EXISTS original_application_asset_counter');await query('ALTER TABLE participant_roster_entries DROP COLUMN original_asset_assignment_layers_json');
         await query('DROP TABLE IF EXISTS original_admin_numbers');await query('DROP TABLE IF EXISTS original_admin_number_counter');
         await query('DROP TABLE IF EXISTS original_native_reviews');await query('DROP TABLE IF EXISTS original_native_review_counters');
         await query('DROP TABLE original_person_numbers'); await query('DROP TABLE original_person_number_counter');

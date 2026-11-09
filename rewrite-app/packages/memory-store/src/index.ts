@@ -1,3 +1,5 @@
+import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
+import {prepareOriginalApplicationAssets,type OriginalApplicationAssetIdentity} from '@testcenter-rewrite-app/application';
 import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
 import {guardOriginalWorkspaceWriteCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
@@ -90,6 +92,8 @@ import type {
 
 type InMemoryFirstSliceState = {
   applicationSettings: ApplicationSettings | null;
+  originalApplicationAssets: Map<string,OriginalApplicationAssetIdentity>;
+  originalApplicationAssetCounter:number;
   applicationAssets: Map<string, ApplicationAsset>;
   attachmentFiles: Map<string, AttachmentFile>;
   adminUsers: Map<string, AdminUser>;
@@ -146,6 +150,8 @@ type InMemoryFirstSliceState = {
 
 const createInitialState = (): InMemoryFirstSliceState => ({
   applicationSettings: null,
+  originalApplicationAssets: new Map(),
+  originalApplicationAssetCounter:0,
   applicationAssets: new Map(),
   attachmentFiles: new Map(),
   adminUsers: new Map(),
@@ -258,12 +264,14 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       validateApplicationAssetReferences(settings.assetAssignments,Array.from(state.applicationAssets.values()));
       state.applicationSettings = { ...settings };
     },
-    async mutateApplicationSettings(transform) {
+    async mutateApplicationSettings(transform, originalAssets) {
       {
-        const effect=transform(structuredClone(state.applicationSettings));
+        const native=originalAssets?prepareOriginalApplicationAssets(Array.from(state.applicationAssets.values()),Array.from(state.originalApplicationAssets.values()),state.originalApplicationAssetCounter):undefined;
+        const effect=transform(structuredClone(state.applicationSettings),native?.catalog);
         validateApplicationAssetReferences(effect.settings.assetAssignments,Array.from(state.applicationAssets.values()));
         const settings=structuredClone(effect.settings),audit=structuredClone(effect.auditEvent);
         if(state.adminAuditEvents.has(audit.adminAuditEventId))throw Error("Duplicate application settings audit event.");
+        if(native){state.originalApplicationAssets=new Map(native.identities.map(row=>[row.applicationAssetId,row]));state.originalApplicationAssetCounter=native.counter;}
         state.applicationSettings=settings;state.adminAuditEvents.set(audit.adminAuditEventId,audit);
         return structuredClone(effect.settings);
       }
@@ -281,15 +289,26 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         ) ?? null
       );
     },
+    async getOriginalApplicationAssets(context) {
+      const prepared=prepareOriginalApplicationAssets(Array.from(state.applicationAssets.values()),Array.from(state.originalApplicationAssets.values()),state.originalApplicationAssetCounter);
+      state.originalApplicationAssets=new Map(prepared.identities.map(row=>[row.applicationAssetId,row]));state.originalApplicationAssetCounter=prepared.counter;
+      return structuredClone({assets:prepared.catalog,settings:state.applicationSettings,scopedAssignments:originalApplicationAssetScope(context,context?Array.from(state.participantRosterEntries.values()).find(row=>row.tenantId===context.tenantId&&row.workspaceId===context.workspaceId&&row.loginKey===context.loginKey):null,context?state.operationalLoginMigrationCandidates.get(context.tenantId+'::'+context.workspaceId):[],context?state.originalOperationalLogins.get(context.tenantId+'::'+context.workspaceId):[])});
+    },
+    async getOriginalApplicationAssetByStoredName(storedName){
+      const identity=Array.from(state.originalApplicationAssets.values()).find(row=>row.storedName===storedName);
+      return identity?structuredClone(state.applicationAssets.get(identity.applicationAssetId)??null):null;
+    },
     async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
       const existing=replaceByOriginalName?Array.from(state.applicationAssets.values()).find(asset=>asset.originalName===applicationAsset.originalName):null;
       if(existing)applicationAsset={...applicationAsset,applicationAssetId:existing.applicationAssetId,createdAt:existing.createdAt};
+      const original=prepareOriginalApplicationAssets([...Array.from(state.applicationAssets.values()).filter(row=>row.applicationAssetId!==applicationAsset.applicationAssetId),applicationAsset],Array.from(state.originalApplicationAssets.values()),state.originalApplicationAssetCounter,applicationAsset.applicationAssetId);
+      state.originalApplicationAssets=new Map(original.identities.map(row=>[row.applicationAssetId,row]));state.originalApplicationAssetCounter=original.counter;
 
       state.applicationAssets.set(
         applicationAsset.applicationAssetId,
         applicationAsset
       );
-      return { applicationAsset, replaced: Boolean(existing) };
+      return { applicationAsset, replaced: Boolean(existing), originalAsset: original.catalog.find(row=>row.applicationAssetId===applicationAsset.applicationAssetId)! };
     },
     async mutateApplicationAssetDeletion(input) {
       const scopes=Array.from(state.workspacesByScope.values()).map(workspace=>({...workspace,
@@ -307,14 +326,14 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       if(!effect)return null;
       if(effect.settings)state.applicationSettings=effect.settings;
       for(const row of effect.roster){const previous=state.participantRosterEntries.get(row.participantRosterEntryId)!;
-        state.participantRosterEntries.set(row.participantRosterEntryId,{...previous,assetAssignments:row.assetAssignments});}
+        state.participantRosterEntries.set(row.participantRosterEntryId,{...previous,assetAssignments:row.assetAssignments,...(row.originalAssetAssignmentLayers?{originalAssetAssignmentLayers:row.originalAssetAssignmentLayers}:{})});}
       for(const group of effect.operational)state.operationalLoginMigrationCandidates.set(group.tenantId+"::"+group.workspaceId,group.candidates);
-      state.applicationAssets.delete(effect.asset.applicationAssetId);
+      state.applicationAssets.delete(effect.asset.applicationAssetId);state.originalApplicationAssets.delete(effect.asset.applicationAssetId);
       state.adminAuditEvents.set(effect.auditEvent.adminAuditEventId,effect.auditEvent);
       return effect.asset;
     },
     async deleteApplicationAsset(applicationAssetId) {
-      return state.applicationAssets.delete(applicationAssetId);
+      const removed=state.applicationAssets.delete(applicationAssetId);if(removed)state.originalApplicationAssets.delete(applicationAssetId);return removed;
     },
     async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
       return Array.from(state.attachmentFiles.values()).filter(
@@ -836,7 +855,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     ) {
       const privateLogins = prepareOriginalOperationalLogins(candidates, nativeLogins);
       if(privateLogins.length && !Array.from(state.workspacesByScope.values()).some(w=>w.tenantId===tenantId&&w.workspaceId===workspaceId))throw new Error('Native operational workspace no longer exists.');
-      for (const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Array.from(state.applicationAssets.values()));
+      for (const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Array.from(state.applicationAssets.values()),candidate.originalAssetAssignmentLayers);
       const modes=projectOriginalOperationalModes({tenantId,workspaceId},privateLogins,Array.from(state.participantSessions.values()),Array.from(state.testRuns.values()));
       state.operationalLoginMigrationCandidates.set(
         `${tenantId}::${workspaceId}`,
@@ -863,7 +882,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       );
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
-      validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Array.from(state.applicationAssets.values()));
+      validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Array.from(state.applicationAssets.values()),participantRosterEntry.originalAssetAssignmentLayers);
       const modes=projectOriginalLoginMode(participantRosterEntry,Array.from(state.participantSessions.values()),Array.from(state.testRuns.values()));
       for(const person of modes.participantSessions)state.participantSessions.set(person.participantSessionId,person);
       for(const run of modes.testRuns)state.testRuns.set(run.testRunId,run);

@@ -73,7 +73,7 @@ for (const kind of kinds) test(`${kind}: actual native monitor materialization a
     baseScope = {tenantId: tenant.tenantId, workspaceId: workspace.workspaceId};
     const scope = {tenantKey: tenant.tenantKey, workspaceKey: workspace.workspaceKey};
     const upload = (fileName, sourceDocument, mediaType = 'application/xml') => services.contentIntake.uploadWorkspaceFile({...scope, fileName, sourceDocument, mediaType});
-    await upload('player.html', '<html><script type="application/ld+json">' + JSON.stringify({id: 'owned-monitor-player', version: '1.2.3', specVersion: '6.0', metadataVersion: '2.0', type: 'player', name: [{lang: 'en', value: 'Owned monitor Player'}]}) + '</script><main>Owned</main></html>', 'text/html');
+    await upload('player.html', '<html><script type="application/ld+json">' + JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id: 'owned-monitor-player', version: '1.2.3', specVersion: '6.0', metadataVersion: '2.0', type: 'player', name: [{lang: 'en', value: 'Owned monitor Player'}]}) + '</script><main>Owned</main></html>', 'text/html');
     await upload('unit.xml', xml('Unit', '<Metadata><Id>' + unitName + '</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-monitor-player@1.2.3">Owned definition</Definition>'));
     await upload('booklet.xml', xml('Booklet', '<Metadata><Id>ORACLE.POW.BOOK</Id><Label>  Current Booklet Ω\n  </Label></Metadata><Units><Unit id="' + unitName + '" label="Owned Unit"/></Units>'));
     const importRoster = (mode, groupLabel) => services.workspaceAdminRead.importParticipantRoster({...scope, rosterText: document(mode, groupLabel)});

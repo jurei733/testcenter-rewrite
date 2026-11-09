@@ -1,3 +1,6 @@
+import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
+import {readOriginalAssetAssignmentLayers} from '@testcenter-rewrite-app/application';
+import {originalApplicationAssets} from './original-application-asset.js';
 import {deleteWorkspaceAggregateRows} from './workspace-aggregate-deletion.js';
 import {readOriginalWorkspaceReportSnapshot} from './original-workspace-reports.js';
 import {deleteOriginalSelectedTests} from './original-test-deletion.js';
@@ -611,6 +614,7 @@ const mapParticipantRosterEntry = (
           ...(Object.keys(assetAssignments).length > 0
             ? { assetAssignments }
             : {}),
+          ...(row.original_asset_assignment_layers_json?{originalAssetAssignmentLayers:readOriginalAssetAssignmentLayers(JSON.parse(String(row.original_asset_assignment_layers_json)))}:{}),
           importedAt: String(row.imported_at)
         };
       })()
@@ -1835,6 +1839,12 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
 ,{version:81,name:'original_native_admin_numbers',sql:`CREATE TABLE original_admin_number_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number TEXT NOT NULL);
  INSERT INTO original_admin_number_counter(singleton,last_number) VALUES(1,'0');
  CREATE TABLE original_admin_numbers(admin_number TEXT PRIMARY KEY,admin_user_id TEXT NOT NULL UNIQUE REFERENCES admin_users(admin_user_id) ON DELETE CASCADE);`}
+,{version:82,name:'original_application_asset_identities',sql:`
+ ALTER TABLE participant_roster_entries ADD COLUMN original_asset_assignment_layers_json TEXT;
+ CREATE TABLE original_application_asset_counter(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_number INTEGER NOT NULL CHECK(last_number BETWEEN 0 AND 2147483647));
+ INSERT INTO original_application_asset_counter(singleton,last_number) VALUES(1,0);
+ CREATE TABLE original_application_assets(application_asset_id TEXT PRIMARY KEY REFERENCES application_assets(application_asset_id) ON DELETE CASCADE,
+ asset_number INTEGER NOT NULL UNIQUE CHECK(asset_number BETWEEN 1 AND 2147483647),stored_name TEXT NOT NULL UNIQUE);`}
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -2249,10 +2259,10 @@ export const createSqliteFirstSliceStorage = (
     async saveApplicationSettings(settings) {
       return withAssetWrite(()=>{validateApplicationAssetReferences(settings.assetAssignments,assetNames());writeSettings(settings);});
     },
-    async mutateApplicationSettings(transform) {
+    async mutateApplicationSettings(transform, originalAssets) {
       return withAssetWrite(()=>{
         const previous=mapApplicationSettings(database.prepare("SELECT * FROM application_settings WHERE settings_key='global'").get() as Record<string,unknown>|undefined);
-        const effect=transform(structuredClone(previous));
+        const effect=transform(structuredClone(previous),originalAssets?originalApplicationAssets(database):undefined);
         validateApplicationAssetReferences(effect.settings.assetAssignments,assetNames());
         writeSettings(effect.settings);
         const audit=effect.auditEvent;
@@ -2297,6 +2307,15 @@ export const createSqliteFirstSliceStorage = (
           .get(originalName) as Record<string, unknown> | undefined
       );
     },
+    async getOriginalApplicationAssets(context){return withAssetWrite(()=>{
+      const participant=context?.kind==='participant'?mapParticipantRosterEntry(database.prepare('SELECT * FROM participant_roster_entries WHERE tenant_id=? AND workspace_id=? AND login_key=?').get(context.tenantId,context.workspaceId,context.loginKey) as Record<string,unknown>|undefined):null;
+      const operational=context?.kind==='operational'?database.prepare('SELECT candidates_json,native_logins_json FROM operational_login_migration_candidates WHERE tenant_id=? AND workspace_id=?').get(context.tenantId,context.workspaceId):undefined;
+      return {assets:originalApplicationAssets(database),settings:mapApplicationSettings(database.prepare("SELECT * FROM application_settings WHERE settings_key='global'").get() as Record<string,unknown>|undefined),
+        scopedAssignments:originalApplicationAssetScope(context,participant,JSON.parse(String(operational?.candidates_json??'[]')),JSON.parse(String(operational?.native_logins_json??'[]')))};
+    });},
+    async getOriginalApplicationAssetByStoredName(storedName){
+      return mapApplicationAsset(database.prepare('SELECT a.* FROM application_assets a JOIN original_application_assets n ON n.application_asset_id=a.application_asset_id WHERE n.stored_name=?').get(storedName) as Record<string,unknown>|undefined);
+    },
     async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
       return withAssetWrite(()=>{
         const existing=replaceByOriginalName?mapApplicationAsset(database.prepare("SELECT * FROM application_assets WHERE original_name=?").get(applicationAsset.originalName) as Record<string,unknown>|undefined):null;
@@ -2324,7 +2343,8 @@ export const createSqliteFirstSliceStorage = (
           applicationAsset.createdAt,
           applicationAsset.updatedAt
         );
-        return { applicationAsset, replaced: Boolean(existing) };
+        const original=originalApplicationAssets(database,applicationAsset.applicationAssetId);
+        return { applicationAsset, replaced: Boolean(existing), originalAsset: original.find(row=>row.applicationAssetId===applicationAsset.applicationAssetId)! };
       });
     },
     async mutateApplicationAssetDeletion(input) {
@@ -2336,7 +2356,7 @@ export const createSqliteFirstSliceStorage = (
         const scopes=(database.prepare("SELECT w.tenant_id,w.workspace_id,w.workspace_key,t.tenant_key FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id").all() as Array<{tenant_id:string;workspace_id:string;workspace_key:string;tenant_key:string}>).map(row=>({tenantId:row.tenant_id,workspaceId:row.workspace_id,workspaceKey:row.workspace_key,tenantKey:row.tenant_key}));
         const effect=prepareApplicationAssetDeletion(input,{asset,settings,roster,operational,scopes});if(!effect)return null;
         if(effect.settings)database.prepare("UPDATE application_settings SET asset_assignments_json=?,updated_at=?,updated_by_admin_user_id=? WHERE settings_key='global'").run(JSON.stringify(effect.settings.assetAssignments),effect.settings.updatedAt,effect.settings.updatedByAdminUserId);
-        for(const row of effect.roster)database.prepare("UPDATE participant_roster_entries SET asset_assignments_json=? WHERE participant_roster_entry_id=?").run(JSON.stringify(row.assetAssignments),row.participantRosterEntryId);
+        for(const row of effect.roster)database.prepare("UPDATE participant_roster_entries SET asset_assignments_json=?,original_asset_assignment_layers_json=? WHERE participant_roster_entry_id=?").run(JSON.stringify(row.assetAssignments),row.originalAssetAssignmentLayers?JSON.stringify(row.originalAssetAssignmentLayers):null,row.participantRosterEntryId);
         for(const group of effect.operational)database.prepare("UPDATE operational_login_migration_candidates SET candidates_json=? WHERE tenant_id=? AND workspace_id=?").run(JSON.stringify(group.candidates),group.tenantId,group.workspaceId);
         database.prepare("DELETE FROM application_assets WHERE application_asset_id=?").run(effect.asset.applicationAssetId);
         const audit=effect.auditEvent;
@@ -3577,7 +3597,7 @@ export const createSqliteFirstSliceStorage = (
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
+          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, original_asset_assignment_layers_json, imported_at, original_login_identity
            FROM participant_roster_entries
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -3621,7 +3641,7 @@ export const createSqliteFirstSliceStorage = (
       return withAssetWrite(()=>{
         if(privateLogins.length && !database.prepare('SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(tenantId,workspaceId))throw new Error('Native operational workspace no longer exists.');
         const assets=assetNames();
-        for(const candidate of candidates)validateApplicationAssetReferences(candidate.assetAssignments,assets);
+        for(const candidate of candidates)validateApplicationAssetReferences(candidate.assetAssignments,assets,candidate.originalAssetAssignmentLayers);
       database
         .prepare(
           `INSERT INTO operational_login_migration_candidates (
@@ -3658,13 +3678,13 @@ export const createSqliteFirstSliceStorage = (
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       return withAssetWrite(()=>{
-        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,assetNames());
+        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,assetNames(),participantRosterEntry.originalAssetAssignmentLayers);
         if(participantRosterEntry.originalLoginIdentity&&!database.prepare('SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?').get(participantRosterEntry.tenantId,participantRosterEntry.workspaceId))throw new Error('Native roster workspace no longer exists.');
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
-            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at, original_login_identity
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, original_asset_assignment_layers_json, imported_at, original_login_identity
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
             participant_roster_entry_id = excluded.participant_roster_entry_id,
             execution_mode = excluded.execution_mode,
@@ -3682,6 +3702,7 @@ export const createSqliteFirstSliceStorage = (
             custom_texts_json = excluded.custom_texts_json,
             view_settings_json = excluded.view_settings_json,
             asset_assignments_json = excluded.asset_assignments_json,
+            original_asset_assignment_layers_json = excluded.original_asset_assignment_layers_json,
             imported_at = excluded.imported_at,
             original_login_identity = excluded.original_login_identity`
         )
@@ -3711,6 +3732,7 @@ export const createSqliteFirstSliceStorage = (
           JSON.stringify(participantRosterEntry.customTexts ?? {}),
           JSON.stringify(participantRosterEntry.viewSettings ?? {}),
           JSON.stringify(participantRosterEntry.assetAssignments ?? {}),
+          participantRosterEntry.originalAssetAssignmentLayers?JSON.stringify(participantRosterEntry.originalAssetAssignmentLayers):null,
           participantRosterEntry.importedAt,
           participantRosterEntry.originalLoginIdentity ? 1 : null
         );

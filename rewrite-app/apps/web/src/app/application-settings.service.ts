@@ -33,6 +33,10 @@ export class ApplicationSettingsService {
   private warningExpirationTimer: ReturnType<typeof setTimeout> | null = null;
   private participantThemeOverride: ApplicationSettings["themeName"] | null = null;
   private participantAssetOverrides: Record<string, string> = {};
+  private readonly nativeAssetUrls = signal<Record<string,string>|null>(null);
+
+  setNativeAssetUrls(urls:Record<string,string>):void { this.nativeAssetUrls.set({...urls}); }
+  clearNativeAssetUrls():void { this.nativeAssetUrls.set(null); }
 
   readonly settings = signal<ApplicationSettings>({
     ...defaultApplicationSettings
@@ -97,9 +101,11 @@ export class ApplicationSettingsService {
     slot: ApplicationAssetSlotName,
     fallback = ""
   ): string {
-    const originalName =
+    const nativeUrls=this.nativeAssetUrls();
+    if(nativeUrls?.[slot])return nativeUrls[slot];
+    const originalName = nativeUrls===null ? (
       this.participantAssetOverrides[slot] ??
-      this.settings().assetAssignments[slot];
+      this.settings().assetAssignments[slot]) : undefined;
     if (originalName) {
       return `${productionApiRoutes.system.getApplicationAsset}?originalName=${encodeURIComponent(originalName)}`;
     }

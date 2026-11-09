@@ -7,6 +7,8 @@ import test from 'node:test';
 import {DatabaseSync} from 'node:sqlite';
 import {Pool} from 'pg';
 import {defaultApplicationSettings} from '@testcenter-rewrite-app/domain';
+import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
+import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceRepository} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
@@ -124,6 +126,36 @@ for(const kind of kinds)test(kind+': asset deletion owns catalog, global/scoped 
    try{await assert.rejects(repository.mutateApplicationAssetDeletion(input()));assert.deepEqual(await snapshot(),before);}
    finally{await rm(file,{recursive:true,force:true});await rename(file+'.backup',file);}
    const reopened=await create();assert.deepEqual(await reopened.getApplicationSettings(),before.settings);
+  });
+  await t.test('native upload replies retain their own committed URL after a concurrent replacement or deletion',async()=>{
+   let held;
+   const services=createFirstSliceServices({repository:{...repository,async saveAdminAuditEvent(event){
+    await repository.saveAdminAuditEvent(event);
+    if(held&&event.eventType==='application_asset_uploaded'){
+     const gate=held;held=undefined;gate.entered.resolve();await gate.release.promise;
+    }
+   }}});
+   const credentials={username:'owned-asset-admin',password:'Owned asset concurrency password'};
+   await services.adminAuth.bootstrapAdminUser(credentials);
+   const {adminSession}=await services.adminAuth.signIn(credentials),token=adminSession.token;
+   const dataBase64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=';
+   for(const action of ['replace','delete']){
+    const request={token,originalName:'owned-concurrent-'+action+'.png',mediaType:'image/png',dataBase64};
+    const gate={entered:Promise.withResolvers(),release:Promise.withResolvers()};held=gate;
+    const pending=services.originalAssets.upload(request).then(value=>({value}),error=>({error}));
+    try{
+     await raceWithSmokeDeadline(Promise.race([gate.entered.promise,pending.then(reply=>{throw reply.error??Error('The upload returned before the committed audit boundary.');})]),5000,()=>{throw Error('The first upload did not reach its committed audit boundary.');});
+     const first=(await repository.getOriginalApplicationAssets()).assets.find(row=>row.asset.originalName===request.originalName);assert.ok(first);
+     if(action==='delete')await services.originalAssets.delete({token,reference:String(first.assetNumber)});
+     const next=await services.originalAssets.upload({...request,dataBase64:Buffer.concat([Buffer.from(dataBase64,'base64'),Buffer.from('next')]).toString('base64')});
+     assert.notEqual(next.storedName,first.storedName);
+     if(action==='replace')assert.equal(next.id,first.assetNumber);else assert.ok(next.id>first.assetNumber);
+     gate.release.resolve();const reply=await pending;if(reply.error)throw reply.error;
+     assert.deepEqual(reply.value,{id:first.assetNumber,originalName:request.originalName,storedName:first.storedName,url:'public/uploaded_assets/'+first.storedName});
+     assert.equal(await services.originalAssets.file({storedName:first.storedName}),null);
+     assert.equal((await services.originalAssets.file({storedName:next.storedName})).dataBase64,Buffer.concat([Buffer.from(dataBase64,'base64'),Buffer.from('next')]).toString('base64'));
+    }finally{gate.release.resolve();await pending;held=undefined;}
+   }
   });
  }finally{
   for(const storage of storages)await storage.shutdown();if(control){if(kind==='sqlite')control.close();else await control.end();}

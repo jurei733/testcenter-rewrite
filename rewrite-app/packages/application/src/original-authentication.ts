@@ -23,6 +23,7 @@ export type OriginalAuthenticationPort = {
   login(input: {name: string; password: string}): Promise<OriginalAuthenticationState>;
   person(input: {loginToken: string; code: string}): Promise<OriginalAuthenticationState>;
   read(input: {token: string}): Promise<OriginalAuthenticationState>;
+  assetContext(input:{token:string}):Promise<import("./original-application-asset.js").OriginalApplicationAssetContext>;
   logout(input: {token: string}): Promise<void>;
 };
 
@@ -103,6 +104,11 @@ export function createOriginalAuthentication(input: {
       if (stored) throw wrongType();
       const {person, principal} = await personFromToken(token);
       return {kind: 'person', token, groupToken: await capability(principal, 'group'), participantSession: person, requestedCode: person.participantCode ?? ''};
+    },
+    async assetContext({token}) {
+      const stored=await input.repository.findOriginalSessionTokenByHash(digest(token));
+      const principal=stored?.kind==='login'?await principalFromLogin(token):(await personFromToken(token)).principal;
+      return {tenantId:principal.workspace.tenantId,workspaceId:principal.workspace.workspaceId,loginKey:principal.rosterEntry.loginKey,kind:principal.rosterEntry.originalOperationalMode?'operational':'participant'};
     },
     async logout({token}) {
       const stored = await input.repository.findOriginalSessionTokenByHash(digest(token));

@@ -1,3 +1,4 @@
+import {NativeAssetContext} from '../native-asset-context.service';
 import {NgTemplateOutlet} from '@angular/common';
 import {MatTooltip} from '@angular/material/tooltip';
 import {type AfterViewInit,Component,ViewChild,ViewContainerRef,inject,signal,effect,untracked} from '@angular/core';
@@ -26,13 +27,14 @@ import {NativeBackgroundService} from './native-background.service';
 export class NativeRunHostComponent implements AfterViewInit {
  @ViewChild('controller',{read:ViewContainerRef,static:true}) private slot!:ViewContainerRef;
  readonly runtime=inject(NativeRunRuntime);readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
+ readonly assets=inject(NativeAssetContext);private readonly view=new AbortController();
  readonly problem=signal('');private readonly ready=signal(false);private readonly testId=signal('');
  ownedContext:NativeRunContext|undefined;
  private readonly route=inject(ActivatedRoute);private readonly children=inject(ChildrenOutletContexts);private readonly router=inject(Router);
  constructor(){
-  inject(NativeBackgroundService);
+  this.assets.activate(this.view.signal);inject(NativeBackgroundService);
   inject(InterfaceModeService).select('original');this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(p=>this.testId.set(p.get('t')??''));
-  effect(()=>{if(!this.ready()||this.session.restoring()||this.session.busy())return;const access=this.session.access(),id=this.testId();untracked(()=>{
+  effect(()=>{if(!this.ready()||!this.assets.ready()||this.session.restoring()||this.session.busy())return;const access=this.session.access(),id=this.testId();untracked(()=>{
    if(!access){this.ownedContext?.destroy();return;}
    const ctx=this.ownedContext;if(ctx?.current&&ctx.testId===id)return;
    this.problem.set('');try{this.ownedContext=this.runtime.mount(id,this.slot,this.route,this.children);}catch(error){this.problem.set(error instanceof Error?error.message:'Der Test konnte nicht geöffnet werden.');}
@@ -40,6 +42,6 @@ export class NativeRunHostComponent implements AfterViewInit {
  }
  get header(){const ctx=this.runtime.active();return ctx?.current?ctx.injector.get(HeaderService):null;}
  ngAfterViewInit(){this.ready.set(true);}
- ngOnDestroy(){this.ownedContext?.destroy();}
+ ngOnDestroy(){this.view.abort();this.ownedContext?.destroy();}
  back(){void this.router.navigate(['/native-start']);}
 }

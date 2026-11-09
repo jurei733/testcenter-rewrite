@@ -163,6 +163,9 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     return element;
   };
   const drag=async(element,before)=>{
+    // This is a real foreground pointer interaction; background rAF throttling
+    // must not turn its rendered drag steps into seconds-long idle waits.
+    await page.bringToFront();assert.equal(await page.evaluate(()=>document.visibilityState),'visible');
     const view=JSON.parse(before.view),canvas=before.canvases.find(row=>row.width>200&&row.height>200),frame=await page.locator('iframe').boundingBox();
     assert.ok(canvas&&frame);const relativeX=(before.x-view.xMin)/view.invXscale;
     const relativeY=view.height-(before.y-view.yMin)/view.invYscale;
