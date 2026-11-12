@@ -27,6 +27,41 @@ test('a malformed installation response cannot silently select anonymous or dire
  try{await assert.rejects(installation.ready(new AbortController().signal),/Ungültiger Systemcheck-Modus/);assert.equal(installation.loginRequired(),null);}
  finally{installation.ngOnDestroy();globalThis.fetch=previous;}
 });
+test('a late startup response cannot rewind a newer administrative upload refresh or its waiting view',async()=>{
+ const previous=globalThis.fetch,first=deferred(),second=deferred();let reads=0;
+ globalThis.fetch=async()=>++reads===1?first.promise:second.promise;
+ const installation=new NativeSystemCheckInstallationService();
+ try{
+  const waiting=installation.ready(new AbortController().signal),refreshed=installation.refresh();
+  second.resolve(new Response('true'));assert.equal(await refreshed,true);
+  first.resolve(new Response('false'));assert.equal(await waiting,true);assert.equal(installation.loginRequired(),true);assert.equal(installation.problem(),null);assert.equal(reads,2);
+ }finally{installation.ngOnDestroy();globalThis.fetch=previous;}
+});
+test('a stale failed read cannot replace a successful current mode or open an obsolete application error',async()=>{
+ const previous=globalThis.fetch,first=deferred();let reads=0;
+ globalThis.fetch=async()=>++reads===1?first.promise:new Response('false');
+ const installation=new NativeSystemCheckInstallationService();
+ try{
+  const waiting=installation.ready(new AbortController().signal);assert.equal(await installation.refresh(),false);
+  first.resolve(new Response('old backend failure',{status:503}));assert.equal(await waiting,false);assert.equal(installation.problem(),null);assert.equal(installation.loginRequired(),false);
+ }finally{installation.ngOnDestroy();globalThis.fetch=previous;}
+});
+test('an explicit upload refresh recovers a failed startup without permanently poisoning new view readiness',async()=>{
+ const previous=globalThis.fetch;let reads=0;globalThis.fetch=async()=>++reads===1?new Response('owned failure',{status:503}):new Response('true');
+ const installation=new NativeSystemCheckInstallationService();
+ try{
+  await assert.rejects(installation.ready(new AbortController().signal),error=>error.status===503);assert.equal(installation.loginRequired(),null);assert.equal(installation.problem().status,503);
+  assert.equal(await installation.refresh(),true);assert.equal(await installation.ready(new AbortController().signal),true);assert.equal(installation.problem(),null);
+ }finally{installation.ngOnDestroy();globalThis.fetch=previous;}
+});
+test('failed refreshes retain the last valid Source mode while exposing the application error',async()=>{
+ const previous=globalThis.fetch;let reads=0;globalThis.fetch=async()=>++reads===1?new Response('false'):new Response('owned failure',{status:503});
+ const installation=new NativeSystemCheckInstallationService();
+ try{
+  assert.equal(await installation.ready(new AbortController().signal),false);await assert.rejects(installation.refresh(),error=>error.status===503);
+  assert.equal(await installation.ready(new AbortController().signal),false);assert.equal(installation.loginRequired(),false);assert.equal(installation.problem().status,503);
+ }finally{installation.ngOnDestroy();globalThis.fetch=previous;}
+});
 test('native directory keeps exact int64 identity, ordered duplicates and arbitrary display text',()=>{
  assert.deepEqual(parseNativeSystemCheckDirectory(''),[]);
  const text='[{"workspaceId":9007199254740993,"name":"OWNED.CHECK","label":"Owned < Ω","description":"  Owned  "},{"workspaceId":9223372036854775807,"name":"OWNED.CHECK","label":"Other","description":""}]';

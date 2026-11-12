@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "cachedBuildProducer": "9f96b4cca45eeca887bd59399ff1db11af3fdc51",
+  "actualSourceBackend": true,
+  "actualSourceFrontend": true,
+  "xmlSchemaValidation": true,
+  "allowTestMode": false,
+  "browser": "156.0.8078.80",
+  "scope": "Actual Source administrator uploads and mode read responses in one document; actual TCP mode failures and global error UI. No report after retained-admin login is claimed.",
+  "files": {
+    "own-replacement-public.png": "769b550a8443443ac9da949df5483e8a11f042949a58515620f29db7cf6d8995",
+    "own-upload-mode-transport-failure.png": "7a371ee730bcdabf024fc5c0507453f4ec8f84adbb5a4f9de0c5d110cf8c9483",
+    "invalid-upload-refreshes-public-mode.png": "6ce84ddc8c00516e70fd883a18701cf1f9ebf92b7e24b56063992eb7e8b56021",
+    "source-global-error-after-browser-history.png": "c3c53d21ad8e9d67010cc67fca1ade48726180e51ce9669ef4597de740f9aaef",
+    "capture.mjs": "bba6a5c562a41c7aaedd1b6a9357b74afec52a467ed254c67ae03a1e15f40725",
+    "history-capture.mjs": "1810e373f82adb54a115e9857e17ae67d29615a39e7fd6e8ea8c02594d07aa24",
+    "own-upload-private.png": "644c3977e6886e3fe913214a02885f3f615467b713d9262eea1a75b3c66a2b6c",
+    "observations.json": "d25b8108b603f60e2bc753564c4c439be1fc6ce07acc3af655c65c161483bc58",
+    "history-observations.json": "95b4af0ba31050277949411d5ee5fd46304c4eaa214e1f20b18dcc64c610c8bd"
+  },
+  "browserHistoryCloseQualified": true
+}

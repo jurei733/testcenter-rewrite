@@ -31,6 +31,7 @@ import {OriginalWorkspaceFileNoticeComponent} from './original-workspace-file-no
 import {OriginalParticipantConfirmationDialogComponent} from './original-participant-confirmation-dialog.component';
 import {ApplicationSettingsService} from './application-settings.service';
 import {RewriteAppUiStateService} from './rewrite-app-ui-state.service';
+import {NativeSystemCheckInstallationService} from './native-system-check/native-system-check-installation.service';
 
 @Component({selector:'app-original-workspace-files',standalone:true,
  imports:[RouterLink,MatTabNav,MatTabLink,MatTabNavPanel,OriginalSystemCheckReportsComponent,OriginalWorkspaceResultsComponent,MatToolbar,MatMenu,MatMenuTrigger,MatDivider,MatIconButton,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
@@ -56,12 +57,14 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  resultsRole:''|'RO'|'RW'='';
  private logout:MatDialogRef<OriginalParticipantLogoutDialogComponent>|null=null;
  private readonly snacks=inject(MatSnackBar);
+ private readonly systemCheckInstallation=inject(NativeSystemCheckInstallationService);
  private destroyed=false;
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
  readonly controller=new OriginalWorkspaceFilesController((method,path,body,token)=>
    this.request.request('Dateiverwaltung',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
    ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments}),
-   ()=>{if(!this.destroyed)this.changed.markForCheck();});
+   ()=>{if(!this.destroyed)this.changed.markForCheck();},
+   ()=>{void this.systemCheckInstallation.refresh();});
  private readonly routeChanges=this.route.queryParamMap.subscribe(params=>{
    const value=params.get('tab'),next=value==='syscheck'||value==='results'||value==='tests'?value:'files';
    if(this.tab!==next){this.tab=next;this.resultsRole='';this.deletion?.close(false);void this.controller.connect();}

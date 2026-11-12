@@ -38,7 +38,8 @@ export class OriginalWorkspaceFilesController {
   private sort={active:'name',direction:'asc'};
   private grouped=new Map<WorkspaceFileType,{source:OriginalWorkspaceFile[];rows:OriginalWorkspaceFile[]}>();
   constructor(private readonly transport:OriginalWorkspaceFilesTransport,
-    private readonly current:()=>OriginalWorkspaceFilesScope,private readonly changed:()=>void) {}
+    private readonly current:()=>OriginalWorkspaceFilesScope,private readonly changed:()=>void,
+    private readonly uploadSettled:()=>void=()=>{}) {}
   private owns(owner:Owner):boolean {
     return !this.destroyed && this.owner===owner && owner.epoch===this.epoch &&
       !!owner.token && sameScope(owner,this.current());
@@ -48,7 +49,13 @@ export class OriginalWorkspaceFilesController {
   }
   private async request<T>(owner:Owner,method:string,route:string,body?:unknown):Promise<T> {
     if(!this.owns(owner))throw Error('Die Anmeldung oder der Arbeitsbereich hat sich geändert.');
-    const result=await this.transport<T>(method,this.path(owner,route),body,owner.token);
+    let result:T;
+    try{result=await this.transport<T>(method,this.path(owner,route),body,owner.token);}
+    finally{
+      // Public installation state belongs to the application, including when
+      // an upload fails or its old workspace view retires before the response.
+      if(method==='POST'&&route===productionApiRoutes.workspace.uploadWorkspaceFile)this.uploadSettled();
+    }
     if(!this.owns(owner))throw Error('Die Anmeldung oder der Arbeitsbereich hat sich geändert.');
     return result;
   }

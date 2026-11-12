@@ -1,4 +1,4 @@
-import {Component,inject,signal} from '@angular/core';
+import {Component,Injector,effect,inject,signal} from '@angular/core';
 import {Router,RouterOutlet,NavigationEnd} from '@angular/router';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {ApplicationSettingsService} from './application-settings.service';
@@ -14,16 +14,27 @@ import {NativeSystemCheckInstallationService} from './native-system-check/native
 export class BootstrapRootComponent {
  readonly settings=inject(ApplicationSettingsService);readonly nativeView=signal(false);readonly online=signal(navigator.onLine);
  private readonly router=inject(Router);
+ private readonly installation=inject(NativeSystemCheckInstallationService);
+ private readonly injector=inject(Injector);
+ private readonly owner=new AbortController();
+ private errorRevision=0;
+ private closeInstallationError:(()=>void)|undefined;
  private loadingNativeSettings=false;
  private readonly updateOnline=()=>this.online.set(navigator.onLine);
  constructor(){
   // Capture the entry presentation before an authentication guard redirects
   // its URL and the lazy canonical shell is constructed.
   inject(InterfaceModeService);
-  inject(NativeSystemCheckInstallationService);
+  effect(()=>{const problem=this.installation.problem();if(problem)void this.showInstallationError(problem);});
   const update=()=>{const url=this.router.url.split('?',1)[0];const native=['/native-start','/native-test','/group-monitor','/check','/r/check-starter'].some(path=>url===path||url.startsWith(path+'/'));this.nativeView.set(native);if(native&&!this.settings.loaded()&&!this.loadingNativeSettings){this.loadingNativeSettings=true;void this.settings.load().catch(()=>undefined).finally(()=>this.loadingNativeSettings=false);}};
   this.router.events.pipe(takeUntilDestroyed()).subscribe(event=>{if(event instanceof NavigationEnd)update();});
   window.addEventListener('online',this.updateOnline);window.addEventListener('offline',this.updateOnline);
  }
- ngOnDestroy(){window.removeEventListener('online',this.updateOnline);window.removeEventListener('offline',this.updateOnline);}
+ private async showInstallationError(error:unknown){
+  const revision=++this.errorRevision;
+  const {openNativeSystemCheckInstallationError}=await import('./native-system-check/native-system-check-installation-error');
+  if(this.owner.signal.aborted||revision!==this.errorRevision)return;
+  this.closeInstallationError?.();this.closeInstallationError=openNativeSystemCheckInstallationError(this.injector,error,this.owner.signal);
+ }
+ ngOnDestroy(){this.owner.abort();this.closeInstallationError?.();window.removeEventListener('online',this.updateOnline);window.removeEventListener('offline',this.updateOnline);}
 }

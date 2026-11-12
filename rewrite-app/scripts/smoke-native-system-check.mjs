@@ -13,6 +13,7 @@ import {prepareNativeNetworkChecks, runNativeNetworkChecks, sourceNetwork} from 
 import {isSupervisedSmokeChild, runSupervisedSmoke, reportSmokePhase} from './supervised-smoke.mjs';
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 import {runNativeAnonymousSystemChecks} from './native-system-check-anonymous-smoke.mjs';
+import {runNativeSystemCheckUploadChecks} from './native-system-check-upload-smoke.mjs';
 import {stopNativeSmokeServer} from './native-monitor-smoke-io.mjs';
 
 const root = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR) : await mkdtemp(join(tmpdir(), 'owned-native-syscheck-ui-'));
@@ -157,9 +158,10 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     await page.reload(); await page.waitForURL(/\/R101\.SINGLE\/w$/); await page.locator('#syscheck-next-step:not([disabled])').waitFor();
     mark('native-system-check-single-claim-fresh-restoration-shortcut-without-return-loop');
     const anonymous=await runNativeAnonymousSystemChecks({browser,out:join(out,'anonymous'),validator,mark});
+    const administrativeUploads=await runNativeSystemCheckUploadChecks({browser,out:join(out,'upload-mode'),mark});
     assert.deepEqual(errors, []);
     await writeFile(join(out, 'result.json'), JSON.stringify({success: true, browser: browser.version(), checks, wire, reportBodies,
-      reportsPersisted: (await reports()).length, anonymous, lifecycleReceipts, errors, actualSourceFrontendReference: false, visualParityProven: false}, null, 2) + '\n');
+      reportsPersisted: (await reports()).length, anonymous, administrativeUploads, lifecycleReceipts, errors, actualSourceFrontendReference: false, visualParityProven: false}, null, 2) + '\n');
   } catch (error) {
     errors.push(String(error));
     if (page) await page.screenshot({path: join(out, 'failure.png')}).catch(() => {});

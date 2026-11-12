@@ -6,9 +6,10 @@ import {bindNativeSmokeServerOwner} from './native-monitor-smoke-io.mjs';
 const backend = await createProductionApiServer();
 await new Promise(resolve => backend.listen(0, '127.0.0.1', resolve));
 let fault = '';
+let modeFault=false;
 const proxy = createServer((incoming, outgoing) => {
   const path = new URL(incoming.url, 'http://localhost').pathname;
-  if ((fault === 'download' && path.startsWith('/speed-test/random-package/')) ||
+  if ((modeFault&&path==='/sys-check-mode') || (fault === 'download' && path.startsWith('/speed-test/random-package/')) ||
       (fault === 'upload' && incoming.method === 'POST' && path === '/speed-test/random-package')) {
     incoming.socket.destroy(); return;
   }
@@ -23,6 +24,10 @@ const proxy = createServer((incoming, outgoing) => {
 });
 bindNativeSmokeServerOwner(proxy, {extraServers: [backend]});
 process.on('message', message => {
+  if(message?.nativeModeFault!==undefined){
+    if(typeof message.nativeModeFault!=='boolean')throw Error('Unknown owned installation-mode fault.');
+    modeFault=message.nativeModeFault;process.send?.({configured:true,modeFault,id:message.id});
+  }
   if (message?.nativeNetworkFault !== undefined) {
     if (!['', 'download', 'upload'].includes(message.nativeNetworkFault)) throw Error('Unknown owned network fault.');
     fault = message.nativeNetworkFault; process.send?.({configured: true, fault, id: message.id});

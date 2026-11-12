@@ -15,12 +15,34 @@ const overview=(key='a')=>({workspaceOverview:{tenant:{tenantId:'tenant-'+key,te
 const role=(key='a',accessMode='read_write')=>({role:'workspace_admin',tenantId:'tenant-'+key,workspaceId:'workspace-'+key,accessMode});
 const scope=(key='a',token='owned-token',roles=[role(key)])=>({tenantKey:key,workspaceKey:key,token,roles});
 const emptyReport=()=>({requestedCount:0,deleted:[],didNotExist:[],notAllowed:[],wasUsed:[],errors:[]});
-const fixture=(handler,initial=scope())=>{
+const fixture=(handler,initial=scope(),uploadSettled=()=>{})=>{
  let current=initial;const calls=[],changes=[];
- const controller=new Controller(async(method,path,body,token)=>{const call={method,path,body,token};calls.push(call);return handler(call);},()=>current,()=>changes.push(true));
+ const controller=new Controller(async(method,path,body,token)=>{const call={method,path,body,token};calls.push(call);return handler(call);},()=>current,()=>changes.push(true),uploadSettled);
  return {controller,calls,changes,setScope:value=>{current=value;}};
 };
 const normal=(call,rows=[file()])=>call.path.endsWith('/files')?{items:rows,totalCount:rows.length,dependencySizesCalculated:true}:overview();
+test('application mode refresh follows actual upload responses, including errors, but not failed local file reads',async()=>{
+ let refreshes=0,posted=0;
+ const f=fixture(call=>{if(call.method==='POST'){if(++posted===1)throw Error('Owned rejected XML');return{sourcePackage:file()};}return normal(call);},scope(),()=>refreshes++);
+ await f.controller.connect();await f.controller.upload([
+  {name:'unreadable.xml',type:'application/xml',read:async()=>{throw Error('Owned reader failure');}},
+  {name:'invalid.xml',type:'application/xml',read:async()=>'<SysCheck/>'},
+  {name:'accepted.xml',type:'application/xml',read:async()=>'<Owned/>'}
+ ]);
+ assert.equal(posted,2);assert.equal(refreshes,2);assert.deepEqual(f.controller.uploads.map(row=>row.status),['error','error','completed']);
+ await f.controller.refresh();assert.equal(refreshes,2);
+});
+test('a completed old upload still refreshes public application mode after its private view is destroyed',async()=>{
+ const held=pending(),entered=pending();let refreshes=0;
+ const f=fixture(call=>{if(call.method==='POST'){entered.resolve();return held.promise;}return normal(call);},scope(),()=>refreshes++);
+ await f.controller.connect();const uploading=f.controller.upload([{name:'owned.xml',type:'application/xml',read:async()=>'<Owned/>'}]);await entered.promise;
+ f.controller.destroy();held.resolve({sourcePackage:file()});await uploading;
+ assert.equal(refreshes,1);assert.deepEqual(f.controller.files,[]);assert.deepEqual(f.controller.uploads,[]);assert.equal(f.controller.busy,false);
+});
+test('the separate deletion POST does not replace the Source upload-only mode refresh boundary',async()=>{
+ let refreshes=0;const f=fixture(call=>call.method==='POST'?{report:emptyReport()}:normal(call),scope(),()=>refreshes++);
+ await f.controller.connect();f.controller.checkAll('Unit',true);assert.equal(await f.controller.captureDeletion().confirm(),true);assert.equal(refreshes,0);
+});
 test('dependency phase is owned by the current catalog and resets on logout/destruction',async()=>{
  let calculated=true;
  const f=fixture(call=>call.path.endsWith('/files')?{items:[file()],totalCount:1,dependencySizesCalculated:calculated}:overview());

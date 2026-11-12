@@ -90,16 +90,31 @@ mode omits key/title, including for anonymous requests, whose real missing-key
 error is shown without saving a report. Wrong keys retain the Source error
 dialog. The existing dedicated-account save gate remains separate.
 
-The native browser suite includes27 cases per browser, including9 anonymous
-selection/mode/error cases and10 real persisted reports. Fresh1280x850 selection
+The same application also refreshes that shared mode after each settled upload
+HTTP result, including rejection and a response arriving after its old file view
+retires. Failed local file reads and the separate deletion POST do not trigger
+this upload boundary. Late older reads cannot overwrite a newer result or open
+an obsolete failure. Failed refreshes retain the last validated flag and expose
+the Source error dialog; browser-history navigation dismisses that dialog, as
+the actual Source reference does. A reload fetches a fresh mode.
+
+The native browser suite includes34 cases per browser, including9 anonymous
+selection/mode/error cases,7 actual administrative-upload/isolation/error cases
+and10 real persisted reports. The additional cases establish administrator
+credentials through the real UI, retain them through same-document navigation,
+and prove that native reads/saves omit that bearer and inherit no operator
+permission. Real mode-endpoint TCP failures match the Source dialog's collapsed
+visible text and exercise reload recovery. Fresh1280x850 selection
 views in the captured Primar theme are exact full-frame matches for all three
 directory states in Chrome156 and Chromium147, with independent PNG decoding,
 self comparisons and actual white repaint controls. This proves that specific
 desktop cohort; it does not complete a broad visual acceptance row.
 
-Same-application administrative-upload mode refresh, startup-mode failure/retry,
-nonfresh header/navigation state, retained canonical-session isolation and late
-report/dialog/actor retirement boundaries remain open. Historical schema-valid
+Initialization of a native wizard after an initial failed mode read and error
+dismissal without reloading still needs its own Source qualification. It remains
+blocked when no validated mode has ever arrived. Nonfresh header/navigation,
+expanded error details, delayed error-chunk loading, offline behavior and late
+report/dialog/actor retirement boundaries also remain open. Historical schema-valid
 but rejected roster-only file recovery, directory lexical/large-ID boundaries,
 additional network timeout/maximum-packet boundaries and all Systemcheck
 themes/mobile layouts also need qualification. Initial exploratory Source dialog
@@ -1349,7 +1364,7 @@ all selected records. Lists remain paged. `npm run test:system-check-reports`
 builds the core and runs the focused store/HTTP regression suite.
 
 - destructive Angular actions no longer depend on browser-native `confirm` or `prompt` UI. Workspace/content/result/system-check exact-value gates and ordinary monitor/admin confirmations share a labelled in-app alert dialog with safe initial focus, focus trapping/restoration, Escape cancellation, preserved multiline/custom monitor copy, and a disabled destructive action until the exact workspace/group/file value is entered. Participant review deletion reuses the Player confirmation surface. Production SQLite/Chromium gates prove wrong-text rejection, cancellation without a request, focus restoration, exact acceptance, and the representative content, monitor, system-check, review, and admin paths
-- every Angular feature route (Start, Workspace, Content, Runtime, Participant, System Check, and Ops) is emitted as an independent production chunk. The root shell now hydrates only shared browser/session state; feature refresh, monitor streaming, and Workspace/Content/Runtime/Ops services are resolved on demand instead of forming one shared eager feature chunk. Global error capture and confirmation state remain immediately available, while their standalone dialog surfaces load only on first use. The current production initial bundle is 448.35 kB raw and 114.33 kB estimated transfer, down from the 563.85-kB eager-feature baseline, with tightened 450-kB warning and 470-kB error budgets guarding regressions. Direct links and guarded navigation still load each complete flow. Browser smoke executes the booklet-requested fullscreen enter/exit path, verifies the configured header, and crosses the lazy start, workspace, content, runtime, participant, system-check, and admin surfaces
+- every Angular feature route (Start, Workspace, Content, Runtime, Participant, System Check, and Ops) is emitted as an independent production chunk. The root shell now hydrates only shared browser/session state; feature refresh, monitor streaming, and Workspace/Content/Runtime/Ops services are resolved on demand instead of forming one shared eager feature chunk. Global error capture and confirmation state remain immediately available, while their standalone dialog surfaces load only on first use. The current production initial bundle is 437.47 kB raw and 120.34 kB estimated transfer, down from the 563.85-kB eager-feature baseline, with tightened 450-kB warning and 470-kB error budgets guarding regressions. Direct links and guarded navigation still load each complete flow. Browser smoke executes the booklet-requested fullscreen enter/exit path, verifies the configured header, and crosses the lazy start, workspace, content, runtime, participant, system-check, and admin surfaces
 - the production Angular shell now ships an installable same-origin web manifest and a scope-limited Service Worker. After one successful online visit, `/app/participant` can be opened or reloaded with the network disabled from versioned cached HTML, hashed bundles, lazy Participant chunks, styles, manifest, and icon; an accessible banner makes clear that sign-in and content loading still require connectivity. API routes, Participant current-state, Player definitions, and resources are never cached. Pending Player responses are instead copied into a bounded IndexedDB queue only after a failed save or when the Participant view closes; the Service Worker delivers them through the normal idempotent API immediately or with Background Sync, then the next Participant load reconciles and clears the local draft. Authored response-buffer timings therefore remain intact while closing the app no longer strands the newest response in page-only storage. The server keeps HTML and the Service Worker revalidating while serving content-hashed JavaScript/CSS as immutable, and dedicated Chromium smoke coverage proves both an offline navigation response and closed-view response delivery
 - the pinned current Original Testcenter 18.0 supported-browser policy at upstream commit `90ec5884` now parses the current user agent, accepts explicitly supported and newer versions, and warns for outdated or unknown browser families in a dismissible, accessible global banner. Its exact generated Chrome 150/151, Edge 150/151, Firefox 140/152/153, iOS Safari 26.3/26.4, and Safari 26.3/26.4 list is contract-gated. The warning uses the original `%s` browser/version placeholders and switches to imported per-login custom text after participant sign-in; unit tests and an outdated-Chrome browser smoke gate the policy, dismissal, reload, and custom copy
 - byte-preserving XML intake recognizes UTF-8, UTF-16, UTF-32, ISO-8859, Windows, CJK, and other legacy declarations across direct uploads, Data URLs, loose dependency assembly, and ZIP entries. XML-standard `ISO-10646-UCS-2` and `ISO-10646-UCS-4` aliases map onto the signature-aware UTF-16/32 decoders instead of being rejected as unknown; generic aliases accept either byte order only when the BOM or leading XML signature agrees. A production `iconv-lite` fallback extends Node's narrower WHATWG decoder set with allowlisted `ISO-8859-16`/Latin-10 and DOS `CP437`/`CP775`/`CP850`/`CP852`/`CP858` IANA aliases without admitting transport codecs such as base64, hex, or UTF-7 as XML encodings. Supported multibyte encodings are decoded strictly: incomplete UTF-8, UTF-16, UTF-32, Shift_JIS, and other WHATWG sequences fail with `source_document_xml_encoding_invalid_bytes` instead of entering normalization as replacement characters. Data-URL charset metadata remains authoritative when an XML declaration is absent. Original-corpus API gates preserve representative Romanian, German, Baltic, Czech, Cyrillic, Japanese, simplified/traditional Chinese, Korean, and Euro labels through the complete release projection across memory, file, and SQLite alongside a big-endian UCS-2 Booklet, a little-endian UCS-4 Booklet, a UCS-4 IMS manifest inside ZIP, and malformed multibyte rejection
