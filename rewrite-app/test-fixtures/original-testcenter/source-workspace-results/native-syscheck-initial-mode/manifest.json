@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "cachedBuildProducer": "9f96b4cca45eeca887bd59399ff1db11af3fdc51",
+  "actualSourceBackend": true,
+  "actualSourceFrontend": true,
+  "xmlSchemaValidation": true,
+  "allowTestMode": false,
+  "scope": "Initial mode TCP failure; no successful browser mode read; actual public config and wizard, browser-history dismissal, private-default report400 and zero saved reports in one document.",
+  "files": {
+    "welcome-without-validated-mode.png": "bd12a17d98fd05a2949b7cfa6303bb3d50387777411154d2f97272de50515d16",
+    "missing-key-default-error.png": "5cc783cbd1b03ec81fc9ec3b4a723114c7a8bab1cee3ef9f0c95f17d13d72c92",
+    "selection-after-error-dismissal.png": "041f92f8506d6d5efff8468946a0de3caf338f565e1eba1273511eef915d313a",
+    "capture.mjs": "3a0679cec8132370d22438c6995e308f97d22e61c15f16b6cab0edd4e4889f34",
+    "report-without-validated-mode.png": "7973bbb494b90ebb1c212709387a2d9eb2633da3a63bdb25d4bf60dc92d131f7",
+    "observations.json": "80ed42e07c066092bc6f0af45ed19adaf71716694660f48bf67afcc574577ccd",
+    "initial-mode-error.png": "31c984f8aa79e77b8626cd06c9f05700facd4999513519c1bfa6c15e814d72a6"
+  }
+}

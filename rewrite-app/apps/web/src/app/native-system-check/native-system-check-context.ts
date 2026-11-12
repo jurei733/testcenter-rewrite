@@ -104,7 +104,9 @@ export class NativeSystemCheckContext {
     return this.read(binding, method, this.path(binding) + suffix, body);
   }
   async load(binding: NativeSystemCheckBinding): Promise<WorkspaceSystemCheck> {
-    await this.installation.ready(binding.owner.signal);
+    // Source loads public configuration independently from the application-mode
+    // lookup. An unknown mode keeps its private report default; the server
+    // still checks every save against the current actor and configuration.
     const config = JSON.parse(await this.request(binding, 'GET', '')) as Configuration;
     const unit = config.hasUnit ? JSON.parse(await this.request(binding, 'GET', '/unit-and-player')) as Unit : null;
     this.networkConfigs.set(binding, config);

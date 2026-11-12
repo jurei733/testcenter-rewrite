@@ -18,17 +18,25 @@ export class BootstrapRootComponent {
  private readonly injector=inject(Injector);
  private readonly owner=new AbortController();
  private errorRevision=0;
+ private dismissedInstallationProblem:unknown;
  private closeInstallationError:(()=>void)|undefined;
  private loadingNativeSettings=false;
  private readonly updateOnline=()=>this.online.set(navigator.onLine);
+ private readonly dismissInstallationError=()=>{
+  this.dismissedInstallationProblem=this.installation.problem();this.errorRevision++;
+ };
  constructor(){
   // Capture the entry presentation before an authentication guard redirects
   // its URL and the lazy canonical shell is constructed.
   inject(InterfaceModeService);
-  effect(()=>{const problem=this.installation.problem();if(problem)void this.showInstallationError(problem);});
+  effect(()=>{const problem=this.installation.problem();if(problem&&problem!==this.dismissedInstallationProblem)void this.showInstallationError(problem);});
   const update=()=>{const url=this.router.url.split('?',1)[0];const native=['/native-start','/native-test','/group-monitor','/check','/r/check-starter'].some(path=>url===path||url.startsWith(path+'/'));this.nativeView.set(native);if(native&&!this.settings.loaded()&&!this.loadingNativeSettings){this.loadingNativeSettings=true;void this.settings.load().catch(()=>undefined).finally(()=>this.loadingNativeSettings=false);}};
   this.router.events.pipe(takeUntilDestroyed()).subscribe(event=>{if(event instanceof NavigationEnd)update();});
   window.addEventListener('online',this.updateOnline);window.addEventListener('offline',this.updateOnline);
+  // Source closes an error on browser-history navigation. Also retire a
+  // presentation whose lazy module has not arrived yet, without suppressing
+  // a genuinely new request failure occurring after that navigation.
+  window.addEventListener('popstate',this.dismissInstallationError);window.addEventListener('hashchange',this.dismissInstallationError);
  }
  private async showInstallationError(error:unknown){
   const revision=++this.errorRevision;
@@ -36,5 +44,5 @@ export class BootstrapRootComponent {
   if(this.owner.signal.aborted||revision!==this.errorRevision)return;
   this.closeInstallationError?.();this.closeInstallationError=openNativeSystemCheckInstallationError(this.injector,error,this.owner.signal);
  }
- ngOnDestroy(){this.owner.abort();this.closeInstallationError?.();window.removeEventListener('online',this.updateOnline);window.removeEventListener('offline',this.updateOnline);}
+ ngOnDestroy(){this.owner.abort();this.closeInstallationError?.();window.removeEventListener('online',this.updateOnline);window.removeEventListener('offline',this.updateOnline);window.removeEventListener('popstate',this.dismissInstallationError);window.removeEventListener('hashchange',this.dismissInstallationError);}
 }

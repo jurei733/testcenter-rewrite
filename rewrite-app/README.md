@@ -98,8 +98,8 @@ an obsolete failure. Failed refreshes retain the last validated flag and expose
 the Source error dialog; browser-history navigation dismisses that dialog, as
 the actual Source reference does. A reload fetches a fresh mode.
 
-The native browser suite includes34 cases per browser, including9 anonymous
-selection/mode/error cases,7 actual administrative-upload/isolation/error cases
+The native browser suite includes38 cases per browser, including9 anonymous
+selection/mode/error cases,11 actual administrative-upload/isolation/error cases
 and10 real persisted reports. The additional cases establish administrator
 credentials through the real UI, retain them through same-document navigation,
 and prove that native reads/saves omit that bearer and inherit no operator
@@ -110,11 +110,16 @@ directory states in Chrome156 and Chromium147, with independent PNG decoding,
 self comparisons and actual white repaint controls. This proves that specific
 desktop cohort; it does not complete a broad visual acceptance row.
 
-Initialization of a native wizard after an initial failed mode read and error
-dismissal without reloading still needs its own Source qualification. It remains
-blocked when no validated mode has ever arrived. Nonfresh header/navigation,
-expanded error details, delayed error-chunk loading, offline behavior and late
-report/dialog/actor retirement boundaries also remain open. Historical schema-valid
+The public wizard now loads independently while the initial mode request is
+pending or failed, matching an actual Source capture with no successful mode
+response. An unknown flag keeps the private report default: an anonymous save
+omits key/title and receives the real missing-key400 without persisting a report.
+Browser-history navigation also retires a pending lazy error presentation before
+its actual module arrives; a genuinely new failure after navigation still opens
+its error dialog. Both prior mismatches have preserved failing reproductions.
+Nonfresh header/navigation, expanded error details, fully offline error-module
+availability and late report/dialog/actor retirement boundaries remain open.
+Historical schema-valid
 but rejected roster-only file recovery, directory lexical/large-ID boundaries,
 additional network timeout/maximum-packet boundaries and all Systemcheck
 themes/mobile layouts also need qualification. Initial exploratory Source dialog
