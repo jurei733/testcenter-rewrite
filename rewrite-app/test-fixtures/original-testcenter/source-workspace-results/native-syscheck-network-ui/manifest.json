@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "actualSourceBackend": true,
+  "actualSourceFrontend": true,
+  "apiMocks": false,
+  "transportFaultInjection": "owned proxy destroys speed-test sockets; no fake API response bodies",
+  "sourceBrowserVersion": "156.0.8078.80",
+  "files": {
+    "capture.mjs": "a401e560aeaf18e94158f249064069798e3f7b4fb777dccf407000ace9d6d058",
+    "observations.json": "b2aa6850b6dc09c24d876745a826fb897dda5100f2878611c2f38bce8d2a6355"
+  }
+}

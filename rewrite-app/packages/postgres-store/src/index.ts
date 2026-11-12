@@ -1,3 +1,5 @@
+import {refreshOriginalWorkspaceContentType,readOriginalSystemCheckDirectory} from './original-workspace-content-type.js';
+import {transactOriginalSystemCheck} from './original-system-check.js';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {readOriginalAssetAssignmentLayers} from '@testcenter-rewrite-app/application';
 import {originalApplicationAssets} from './original-application-asset.js';
@@ -1777,6 +1779,8 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
  INSERT INTO original_application_asset_counter(singleton,last_number) VALUES(1,0);
  CREATE TABLE original_application_assets(application_asset_id TEXT PRIMARY KEY REFERENCES application_assets(application_asset_id) ON DELETE CASCADE,
  asset_number INTEGER NOT NULL UNIQUE CHECK(asset_number BETWEEN 1 AND 2147483647),stored_name TEXT NOT NULL UNIQUE);`}
+,{version:77,name:'original_workspace_content_type',sql:`ALTER TABLE workspaces ADD COLUMN original_content_type TEXT NOT NULL DEFAULT 'mixed' CHECK(original_content_type IN ('mixed','test','sysCheck')); CREATE INDEX original_workspace_content_type ON workspaces(original_content_type,status);`}
+
 ];
 
 export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
@@ -1801,6 +1805,10 @@ const applyMigrations = async (pool: Pool): Promise<void> => {
     try {
       await client.query("BEGIN");
       await client.query(migration.sql);
+        if(migration.version===77){
+          const rows=(await client.query("SELECT tenant_id,workspace_id FROM workspaces ORDER BY workspace_id FOR UPDATE")).rows;
+          for(const row of rows)await refreshOriginalWorkspaceContentType(client,{source:mapSourcePackage,event:mapWorkspaceActivityEvent},String(row.tenant_id),String(row.workspace_id));
+        }
       await client.query(
         `INSERT INTO schema_migrations (version, name, applied_at) VALUES ($1, $2, $3)`,
         [migration.version, migration.name, new Date().toISOString()]
@@ -2154,7 +2162,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           JSON.stringify(assemblyActivityEvent.details)
         ]
       );
-      await client.query("COMMIT");
+      await refreshOriginalWorkspaceContentType(client, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId);
+        await client.query("COMMIT");
       return true;
     } catch (error) {
       await client.query("ROLLBACK");
@@ -2181,6 +2190,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapApplicationSettings
       );
     },
+    async readOriginalSystemCheckMode(){return Boolean((await pool.query("SELECT 1 FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active' AND w.original_content_type='sysCheck' LIMIT 1")).rows.length);},
+    async readOriginalSystemCheckDirectory(){return readOriginalSystemCheckDirectory(pool, {source:mapSourcePackage,event:mapWorkspaceActivityEvent});},
+    async transactOriginalSystemCheck(selector,transform){return transactOriginalSystemCheck(pool,{person:mapParticipantSession,binding:mapOriginalLoginBinding,source:mapSourcePackage,event:mapWorkspaceActivityEvent},selector,transform);},
     async saveApplicationSettings(settings) {
       return withAssetWrite(async client=>{validateApplicationAssetReferences(settings.assetAssignments,await assetNames(client));await writeSettings(client,settings);});
     },
@@ -2229,7 +2241,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       const participant=context?.kind==='participant'?mapParticipantRosterEntry((await client.query('SELECT * FROM participant_roster_entries WHERE tenant_id=$1 AND workspace_id=$2 AND login_key=$3',[context.tenantId,context.workspaceId,context.loginKey])).rows[0]):null;
       const operational=context?.kind==='operational'?(await client.query('SELECT candidates_json,native_logins_json FROM operational_login_migration_candidates WHERE tenant_id=$1 AND workspace_id=$2',[context.tenantId,context.workspaceId])).rows[0]:undefined;
       return {assets:await originalApplicationAssets(client),settings:mapApplicationSettings((await client.query("SELECT * FROM application_settings WHERE settings_key='global'")).rows[0]),
-        scopedAssignments:originalApplicationAssetScope(context,participant,JSON.parse(String(operational?.candidates_json??'[]')),JSON.parse(String(operational?.native_logins_json??'[]')))};
+        scopedAssignments:originalApplicationAssetScope(context,participant,
+          typeof operational?.candidates_json==='string'?JSON.parse(operational.candidates_json):operational?.candidates_json??[],
+          typeof operational?.native_logins_json==='string'?JSON.parse(operational.native_logins_json):operational?.native_logins_json??[])};
     });},
     async getOriginalApplicationAssetByStoredName(storedName){
       return one('SELECT a.* FROM application_assets a JOIN original_application_assets n ON n.application_asset_id=a.application_asset_id WHERE n.stored_name=$1',[storedName],mapApplicationAsset);
@@ -2764,7 +2778,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         activityEvent.workspaceId,
         async client => {
           await guardResultArtifactParent(client, activityResultParent(activityEvent));
-          return client.query(
+          await client.query(
             `INSERT INTO workspace_activity_events (
               activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -2791,6 +2805,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
               JSON.stringify(activityEvent.details)
             ]
           );
+          if(['source_package_created','source_package_replaced'].includes(activityEvent.eventType))await refreshOriginalWorkspaceContentType(client,{source:mapSourcePackage,event:mapWorkspaceActivityEvent},activityEvent.tenantId,activityEvent.workspaceId);
         }
       );
     },
@@ -2826,8 +2841,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       await withWorkspaceMutationLock(
         sourcePackage.tenantId,
         sourcePackage.workspaceId,
-        client =>
-          client.query(
+        async client => {
+          await client.query(
             `INSERT INTO source_packages (
               source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -2853,7 +2868,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
               sourcePackage.status,
               sourcePackage.uploadedAt
             ]
-          )
+          );
+          await refreshOriginalWorkspaceContentType(client, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, sourcePackage.tenantId, sourcePackage.workspaceId);
+        }
       );
     },
     reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
@@ -2987,6 +3004,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
             JSON.stringify(replacementActivityEvent.details)
           ]
         );
+        await refreshOriginalWorkspaceContentType(client, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, replacementSourcePackage.tenantId, replacementSourcePackage.workspaceId);
         await client.query("COMMIT");
         return true;
       } catch (error) {
@@ -3115,6 +3133,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
            WHERE source_package_id = $1 AND tenant_id = $2 AND workspace_id = $3`,
           [input.sourcePackageId, input.tenantId, input.workspaceId]
         );
+        await refreshOriginalWorkspaceContentType(client, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, input.tenantId, input.workspaceId);
         await client.query("COMMIT");
         return deletion.rowCount === 1;
       } catch (error) {

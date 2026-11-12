@@ -1,6 +1,6 @@
 import { resolveSystemCheckCustomText, type SystemCheckPresentationTextKey } from "@testcenter-rewrite-app/contracts/system-check-custom-texts";
 import { CommonModule } from "@angular/common";
-import { ChangeDetectorRef, Component, inject } from "@angular/core";
+import { ChangeDetectorRef, Component, ElementRef, effect, inject, signal, untracked } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -47,6 +47,9 @@ import {
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalSystemCheckStarterComponent } from "./original-system-check-starter.component";
+import { OriginalSystemCheckContentComponent } from "./original-system-check-content.component";
+import { NativeSystemCheckContext, type NativeSystemCheckBinding } from "./native-system-check/native-system-check-context";
+import { runNativeNetwork } from "./native-system-check/native-system-check-network";
 
 type SystemCheckStep =
   | "welcome"
@@ -119,12 +122,16 @@ const readSystemCheckUnitResponse = (
     FormsModule,
     SystemCheckSaveReportDialogComponent,
     VeronaPlayerHostComponent,
-    OriginalSystemCheckStarterComponent
+    OriginalSystemCheckStarterComponent,
+    OriginalSystemCheckContentComponent
   ],
   template: `
     <div class="stack system-check-shell" [class.original-system-check-shell]="interfaceMode.mode() === 'original'">
-      @defer (when interfaceMode.mode() === 'original' && canUseSystemChecks) {
-        @if (interfaceMode.mode() === 'original' && canUseSystemChecks) {
+      @if (native) {
+        <app-original-system-check-content [view]="this" />
+      }
+      @defer (when !native && interfaceMode.mode() === 'original' && canUseSystemChecks) {
+        @if (!native && interfaceMode.mode() === 'original' && canUseSystemChecks) {
           <app-original-system-check-starter [view]="this" [choices]="systemCheckChoices"
             [loading]="busy || !systemCheckChoicesLoaded" [error]="errorMessage"
             (select)="selectOriginalSystemCheck($event)" (retry)="loadSystemCheckChoices()" />
@@ -139,7 +146,7 @@ const readSystemCheckUnitResponse = (
         <strong id="systemCheckStepStatus">{{ stepNumber }} / {{ steps.length }} · {{ stepLabel }}</strong>
       </article>
 
-      <article class="card system-check-login" *ngIf="interfaceMode.mode() !== 'original' || isSystemCheckSession || systemCheckLoginRequired">
+      <article class="card system-check-login" *ngIf="!native && (interfaceMode.mode() !== 'original' || isSystemCheckSession || systemCheckLoginRequired)">
         <ng-container *ngIf="isSystemCheckSession; else systemCheckSignIn">
           <span class="eyebrow">Protected system check</span>
           <h2 id="systemCheckSignedInUser">Signed in as {{ signedInUsername }}</h2>
@@ -443,7 +450,7 @@ const readSystemCheckUnitResponse = (
         (save)="submitAnonymousReport($event)"
       ></app-system-check-save-report-dialog>
 
-      <section class="status-banner is-error" *ngIf="errorMessage && (interfaceMode.mode() !== 'original' || systemCheck || !canUseSystemChecks)" role="alert">
+      <section class="status-banner is-error" *ngIf="errorMessage && (native || interfaceMode.mode() !== 'original' || systemCheck || !canUseSystemChecks)" role="alert">
         <strong>System Check</strong><span>{{ errorMessage }}</span>
       </section>
     </div>
@@ -490,6 +497,49 @@ const readSystemCheckUnitResponse = (
 })
 export class SystemCheckViewComponent implements OnInit, OnDestroy {
   readonly interfaceMode = inject(InterfaceModeService);
+  readonly native = inject(NativeSystemCheckContext, {optional: true});
+  private readonly nativeBinding = this.native?.bindings()[0];
+  private readonly nativeLoaded = signal(false);
+  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
+  private environmentReady = false;
+  private nativeQuestionnaireVisited = false;
+  private readonly retireNative = () => {
+    this.destroyed = true; this.cancelNetworkCheck(); this.reportSaveDialogOpen = false;
+    this.systemCheck = null; this.answers = {}; this.environmentEntries = []; this.unitResponse = "";
+    this.element.nativeElement.replaceChildren();
+  };
+  get nativeOwner(): AbortSignal | undefined { return this.nativeBinding?.owner.signal; }
+  constructor() {
+    effect(() => {
+      const routeStep = this.native?.requestedStep(), loaded = this.nativeLoaded();
+      if (this.native && loaded && routeStep) untracked(() => this.applyNativeStep(routeStep));
+    });
+  }
+  private applyNativeStep(routeStep: string): void {
+    const steps: Record<string, SystemCheckStep> = {w: "welcome", n: "network", u: "unit", q: "questionnaire", r: "report"};
+    const step = steps[routeStep];
+    if (!step || !this.steps.includes(step)) { void this.native?.exit(); return; }
+    if (this.step === step) return;
+    if (step !== "network") this.cancelNetworkCheck();
+    this.step = step;
+    if (step === "questionnaire") this.nativeQuestionnaireVisited = true;
+    if (step === "welcome") void this.captureEnvironment();
+    this.refreshView();
+  }
+  private async loadNativeSystemCheck(binding: NativeSystemCheckBinding): Promise<void> {
+    binding.owner.signal.addEventListener("abort", this.retireNative, {once: true});
+    if (binding.owner.signal.aborted) { this.retireNative(); return; }
+    await this.run(async () => {
+      const check = await this.native!.load(binding);
+      if (!this.native!.current(binding)) return;
+      this.systemCheck = check;
+      this.reportTitle = `${check.displayLabel} Report`;
+      this.answers = Object.fromEntries(check.questions.filter(question => question.type !== "header").map(question => [question.id, ""]));
+      this.step = "welcome";
+      this.nativeLoaded.set(true);
+      await this.captureEnvironment();
+    });
+  }
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
@@ -540,6 +590,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   errorMessage = "";
 
   async ngOnInit(): Promise<void> {
+    if (this.native && this.nativeBinding) { await this.loadNativeSystemCheck(this.nativeBinding); return; }
     this.viewState.setActiveView("system-check");
     this.tenantKey =
       this.route.snapshot.queryParamMap.get("tenantKey")?.trim() || this.tenantKey;
@@ -557,6 +608,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.nativeBinding?.owner.signal.removeEventListener("abort", this.retireNative);
     this.destroyed = true;
     this.cancelNetworkCheck();
   }
@@ -574,7 +626,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   get canUseSystemChecks(): boolean {
-    return !this.systemCheckLoginRequired || this.isSystemCheckSession;
+    return this.native ? !!this.nativeBinding && this.native.current(this.nativeBinding) : !this.systemCheckLoginRequired || this.isSystemCheckSession;
   }
 
   get steps(): SystemCheckStep[] {
@@ -615,7 +667,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   get nextButtonDisabled(): boolean {
-    if (this.busy) return true;
+    if (this.busy || (this.native && !this.environmentReady)) return true;
     if (this.stepIndex >= this.steps.length - 1) return true;
     return this.step === "network" &&
       (this.networkEntries.length === 0 || this.networkBusy);
@@ -626,6 +678,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   get unansweredRequiredQuestions() {
+    if (this.native && !this.nativeQuestionnaireVisited) return [];
     return (this.systemCheck?.questions ?? []).filter(question => {
       if (!question.required || question.type === "header") return false;
       const value = this.answers[question.id];
@@ -642,6 +695,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   get questionnaireEntries(): SystemCheckReportEntry[] {
+    if (this.native && !this.nativeQuestionnaireVisited) return [];
     return (this.systemCheck?.questions ?? []).flatMap(question => {
       if (question.type === "header") {
         return [];
@@ -661,15 +715,15 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   get hasAdminSession(): boolean {
-    return Boolean(this.uiState.ops.adminSessionToken.trim());
+    return !this.native && Boolean(this.uiState.ops.adminSessionToken.trim());
   }
 
   get isSystemCheckSession(): boolean {
-    return this.operatorAccess.isSystemCheckOnly;
+    return this.native ? this.native.directReports : this.operatorAccess.isSystemCheckOnly;
   }
 
   get signedInUsername(): string {
-    return this.uiState.ops.adminUsername.trim();
+    return this.native ? this.native.session.access()?.loginName ?? "" : this.uiState.ops.adminUsername.trim();
   }
 
   get canSignInSystemCheck(): boolean {
@@ -842,6 +896,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   chooseAnother(): void {
+    if (this.native) { void this.native.exit(); return; }
     this.cancelNetworkCheck();
     this.systemCheck = null;
     this.step = "welcome";
@@ -853,6 +908,10 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
 
   setStep(step: SystemCheckStep): void {
     if (!this.steps.includes(step)) return;
+    if (this.native && this.nativeBinding) {
+      const routes: Record<SystemCheckStep, string> = {welcome: "w", network: "n", unit: "u", questionnaire: "q", report: "r"};
+      this.native.navigate(this.nativeBinding, routes[step]); return;
+    }
     if (step !== "network") this.cancelNetworkCheck();
     this.step = step;
   }
@@ -863,7 +922,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   nextStep(): void {
-    if (!this.canContinue) return;
+    if (!this.canContinue || (this.native && this.nextButtonDisabled)) return;
     const next = this.steps[this.stepIndex + 1];
     if (next) this.setStep(next);
   }
@@ -871,6 +930,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   async captureEnvironment(): Promise<void> {
     const check = this.systemCheck;
     const generation = ++this.environmentCaptureGeneration;
+    this.environmentReady = false;
     const userAgent = navigator.userAgent;
     const { default: UAParser } = await import("ua-parser-js");
     if (this.destroyed || this.systemCheck !== check || this.environmentCaptureGeneration !== generation) return;
@@ -974,10 +1034,10 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
       );
     }
     try {
-      const { payload } = await this.api.send<GetSystemTimeResponse>(
-        "GET",
-        productionApiRoutes.system.getTime
-      );
+      const payload = this.native && this.nativeBinding
+        ? await this.native.serverTime(this.nativeBinding)
+        : (await this.api.send<GetSystemTimeResponse>("GET", productionApiRoutes.system.getTime)).payload;
+      this.environmentReady = true;
       const timeDifferenceSeconds = Math.round(
         (clientTime - payload.timestamp) / 1000
       );
@@ -1022,12 +1082,61 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
     this.refreshView();
   }
 
+  networkSizes(direction: "download" | "upload"): readonly (number | string)[] {
+    if (this.native && this.nativeBinding && this.native.current(this.nativeBinding)) {
+      const config = this.native.network(this.nativeBinding);
+      const sizes = direction === "download" ? config.downloadSpeed.sequenceSizes : config.uploadSpeed.sequenceSizes;
+      return Array.isArray(sizes) ? sizes : [];
+    }
+    return (direction === "download" ? this.systemCheck?.downloadSpeed : this.systemCheck?.uploadSpeed)?.sequenceSizes ?? [];
+  }
+
+  private async runNativeNetworkCheck(): Promise<void> {
+    const check = this.systemCheck, binding = this.nativeBinding;
+    if (!check || !binding || !this.native || check.skipNetwork || this.networkBusy || this.destroyed) return;
+    const controller = new AbortController(); this.networkController = controller;
+    const signal = AbortSignal.any([controller.signal, binding.owner.signal]);
+    const current = () => !signal.aborted && this.networkController === controller && this.systemCheck === check && !this.destroyed;
+    this.resetNetworkMeasurements(); this.networkEntries = []; this.networkBusy = true;
+    this.networkRating = "not measured"; this.networkStatusMessage = "Netzwerk-Analyse wird gestartet"; this.errorMessage = "";
+    let configurationFailed = false;
+    this.refreshView();
+    try {
+      const navigatorWithConnection = navigator as Navigator & {connection?: BrowserConnection; mozConnection?: BrowserConnection; webkitConnection?: BrowserConnection};
+      const connection = navigatorWithConnection.connection || navigatorWithConnection.mozConnection || navigatorWithConnection.webkitConnection;
+      const result = await runNativeNetwork(this.native.network(binding), signal, progress => {
+        if (!current()) return;
+        if (progress.message) this.networkStatusMessage = progress.message;
+        if (progress.direction === "download") {
+          this.networkDownloadBytesPerSecond = progress.average!;
+          this.networkDownloadPoints = [...this.networkDownloadPoints, progress.points!];
+        } else if (progress.direction === "upload") {
+          this.networkUploadBytesPerSecond = progress.average!;
+          this.networkUploadPoints = [...this.networkUploadPoints, progress.points!];
+        }
+        this.refreshView();
+      }, connection);
+      if (!current()) return;
+      this.networkEntries = result.entries; this.networkRating = result.rating;
+      this.networkStatusMessage = "Die folgenden Netzwerkeigenschaften wurden festgestellt:";
+    } catch (error) {
+      if (!current()) return;
+      configurationFailed = true;
+      await this.native.networkError(binding, error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      if (current() && !configurationFailed) {this.networkController = null; this.networkBusy = false;}
+      this.refreshView();
+    }
+  }
+
   async runNetworkCheck(): Promise<void> {
+    if (this.native) {await this.runNativeNetworkCheck(); return;}
     const check = this.systemCheck;
     if (!check || check.skipNetwork || this.networkBusy || this.destroyed) return;
     const controller = new AbortController();
     this.networkController = controller;
-    const signal = controller.signal;
+    const signal = this.nativeBinding
+      ? AbortSignal.any([controller.signal, this.nativeBinding.owner.signal]) : controller.signal;
     this.resetNetworkMeasurements();
     this.networkEntries = [];
     this.networkRating = "not measured";
@@ -1038,7 +1147,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
     this.refreshView();
     try {
       const measurements: number[] = [];
-      for (let index = 0; index < 3; index += 1) {
+      for (let index = 0; index < (this.native ? 0 : 3); index += 1) {
         const startedAt = performance.now();
         const timeout = window.setTimeout(() => controller.abort(), 10_000);
         try {
@@ -1053,7 +1162,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
         }
       }
       const average = measurements.reduce((sum, value) => sum + value, 0) /
-        measurements.length;
+        (measurements.length || 1);
       const download = await this.measureThroughput("download", check.downloadSpeed, signal);
       const upload = await this.measureThroughput("upload", check.uploadSpeed, signal);
       signal.throwIfAborted();
@@ -1143,7 +1252,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
           )
         );
       }
-      this.networkEntries = networkEntries;
+      this.networkEntries = this.native ? networkEntries.filter(entry => entry.id !== "latency") : networkEntries;
       this.networkStatusMessage = this.interfaceMode.mode() === "original"
         ? "Die folgenden Netzwerkeigenschaften wurden festgestellt:"
         : `Measurement complete after ${download.repetitions} download and ${upload.repetitions} upload sequence(s).`;
@@ -1175,6 +1284,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   onUnitResponse(response: string): void {
+    if (this.destroyed || (this.nativeBinding && !this.native?.current(this.nativeBinding))) return;
     this.unitResponse = response;
   }
 
@@ -1205,7 +1315,8 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
       return;
     }
     this.reportSaveDialogOpen = false;
-    await this.router.navigate(["/home"]);
+    if (this.native) await this.native.exit();
+    else await this.router.navigate(["/home"]);
   }
 
   closeReportSaveDialog(): void {
@@ -1227,6 +1338,15 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   async saveReport(): Promise<void> {
     const check = this.systemCheck;
     if (!check) return;
+    if (this.native && this.nativeBinding) {
+      const binding = this.nativeBinding;
+      await this.run(async () => {
+        const payload = this.reportPayload(!this.native!.directReports);
+        if (this.native!.directReports) delete payload.title;
+        await this.native!.save(binding, payload);
+      });
+      return;
+    }
     await this.run(async () => {
       await this.api.send<SaveSystemCheckReportResponse>(
         "POST",
@@ -1421,7 +1541,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
 
     const maxRepetitions = Math.max(
       1,
-      Math.min(parameters.maxSequenceRepetitions || 1, 15)
+      Math.min(this.native ? parameters.maxSequenceRepetitions + 1 : parameters.maxSequenceRepetitions || 1, 15)
     );
     const sequenceAverages: number[] = [];
     let unstable = false;
@@ -1510,8 +1630,8 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
           { size: String(size) }
         );
         const response = await fetch(
-          `${path}?round=${repetition}&uid=${Date.now()}`,
-          { cache: "no-store", signal: controller.signal }
+          this.native ? `${path}&uid=${Date.now()}` : `${path}?round=${repetition}&uid=${Date.now()}`,
+          { cache: "no-store", credentials: "omit", redirect: "error", signal: controller.signal }
         );
         if (!response.ok) {
           throw new Error(`Download speed test returned HTTP ${response.status}.`);
@@ -1527,6 +1647,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
             method: "POST",
             headers: { "content-type": "text/plain" },
             body: "a".repeat(size),
+            credentials: "omit", redirect: "error",
             cache: "no-store",
             signal: controller.signal
           }
@@ -1676,6 +1797,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
     try {
       await action();
     } catch (error) {
+      if (this.destroyed || (this.nativeBinding && !this.native?.current(this.nativeBinding))) return;
       this.errorMessage = this.api.isApiError(error)
         ? error.message
         : error instanceof Error

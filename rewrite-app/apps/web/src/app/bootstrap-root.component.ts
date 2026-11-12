@@ -3,6 +3,7 @@ import {Router,RouterOutlet,NavigationEnd} from '@angular/router';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {ApplicationSettingsService} from './application-settings.service';
 import {InterfaceModeService} from './interface-mode.service';
+import {NativeSystemCheckInstallationService} from './native-system-check/native-system-check-installation.service';
 
 /** The native UI and canonical UI each own their routed shell and private DOM. */
 @Component({selector:'app-root',standalone:true,imports:[RouterOutlet],
@@ -19,7 +20,8 @@ export class BootstrapRootComponent {
   // Capture the entry presentation before an authentication guard redirects
   // its URL and the lazy canonical shell is constructed.
   inject(InterfaceModeService);
-  const update=()=>{const native=['/native-start','/native-test','/group-monitor'].some(path=>this.router.url.split('?',1)[0].startsWith(path));this.nativeView.set(native);if(native&&!this.settings.loaded()&&!this.loadingNativeSettings){this.loadingNativeSettings=true;void this.settings.load().catch(()=>undefined).finally(()=>this.loadingNativeSettings=false);}};
+  inject(NativeSystemCheckInstallationService);
+  const update=()=>{const url=this.router.url.split('?',1)[0];const native=['/native-start','/native-test','/group-monitor','/check','/r/check-starter'].some(path=>url===path||url.startsWith(path+'/'));this.nativeView.set(native);if(native&&!this.settings.loaded()&&!this.loadingNativeSettings){this.loadingNativeSettings=true;void this.settings.load().catch(()=>undefined).finally(()=>this.loadingNativeSettings=false);}};
   this.router.events.pipe(takeUntilDestroyed()).subscribe(event=>{if(event instanceof NavigationEnd)update();});
   window.addEventListener('online',this.updateOnline);window.addEventListener('offline',this.updateOnline);
  }

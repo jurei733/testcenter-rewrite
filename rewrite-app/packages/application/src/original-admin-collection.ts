@@ -17,7 +17,7 @@ const remove = <T>(rows: Rows<T>, key: string) => {if(rows instanceof Map)rows.d
 export type OriginalAdminCollections = {
   adminUsersByUsername?:Rows<AdminUser>;
   adminUsers: Rows<AdminUser>; adminLoginAttempts: Rows<AdminLoginAttempt>; adminRoleAssignments: Rows<AdminRoleAssignment>;
-  adminAuditEvents: Rows<AdminAuditEvent>; tenants: Rows<Tenant>; workspacesByScope: Rows<Workspace>;
+  adminAuditEvents: Rows<AdminAuditEvent>; tenants: Rows<Tenant>; workspacesByScope: Rows<Workspace>; originalWorkspaceContentTypes?:Rows<'mixed'|'test'|'sysCheck'>;
   workspacesByKey?:Rows<Workspace>;
   originalAdminNumbers?: Rows<OriginalAdminNumber>; originalAdminNumberCounter?: string;
   originalWorkspaceNumbers?: Rows<OriginalWorkspaceNumberRecord>; originalWorkspaceNumberCounter?: string;
@@ -105,6 +105,7 @@ export function mutateOriginalAdminCollections(state: OriginalAdminCollections, 
     const w=change.workspace,t=change.tenant;
     if(change.createTenant)set(state.tenants,t.tenantKey,t);
     set(state.workspacesByScope,t.tenantKey+'::'+w.workspaceKey,w);
+    if(change.kind==='create'){const types=state.originalWorkspaceContentTypes??(state.originalWorkspaceContentTypes={});set(types,w.workspaceId,'mixed');}
     // Canonical workspaces may share a key across tenants. Preserve a foreign
     // short-key alias rather than repointing it while renaming this scope.
     const alias=get(state.workspacesByKey!,w.workspaceKey);

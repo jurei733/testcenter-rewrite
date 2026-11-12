@@ -1,3 +1,4 @@
+import type {OriginalAccessSet} from '@testcenter-rewrite-app/contracts/original-session';
 import {NativeThemeContext} from '../native-theme-context.service';
 import {NativeAssetContext} from '../native-asset-context.service';
 import {Component,effect,inject,signal,untracked} from '@angular/core';
@@ -44,6 +45,8 @@ export class NativeParticipantEntryComponent {
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
  private readonly cts=inject(CustomtextService);private readonly router=inject(Router);private readonly dialog=inject(MatDialog);
+ private readonly initialNavigation=this.router.getCurrentNavigation()?.previousNavigation===null;
+ private singleActor:string|undefined;
  private readonly view=new AbortController();private logoutCleanup:(()=>void)|undefined;
  private readonly completions=inject(NativeTerminalCompletionService);
  readonly refreshing=signal(false);
@@ -55,7 +58,7 @@ export class NativeParticipantEntryComponent {
  readonly loginProblem=signal('');readonly loginProblemCode=signal(0);readonly loginProblemLevel=signal<'error'|'warning'>('error');
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
- constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(NativeBackgroundService);inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access();untracked(()=>this.bindTexts(access?.customTexts??{}));});
+ constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(NativeBackgroundService);inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access(),pending=this.session.restoring()||this.session.busy();untracked(()=>{this.bindTexts(access?.customTexts??{});if(access&&!pending&&this.initialNavigation)void this.startSingleCheck(access);});});
   if(this.session.access()&&!this.codeRequired)void this.refreshStarter();
  }
  async refreshStarter(){
@@ -65,6 +68,10 @@ export class NativeParticipantEntryComponent {
   try{await this.completions.whenSettled(scope);if(current())await this.session.refresh(this.view.signal);}
   catch(error){if(current()){this.refreshFailed.set(true);this.problem.set(error instanceof Error?error.message:'Die Übersicht konnte nicht aktualisiert werden.');}}
   finally{if(!this.view.signal.aborted)this.refreshing.set(false);}
+ }
+ private async startSingleCheck(access:OriginalAccessSet){
+  if(this.view.signal.aborted||this.session.access()!==access||this.singleActor===access.token||access.flags.includes('codeRequired')||access.claims.sysCheck?.length!==1||Object.keys(access.claims).length!==1)return;
+  this.singleActor=access.token;const check=access.claims.sysCheck[0]!;await this.router.navigate(['/check',check.workspaceId,check.id,'w']);
  }
  private bindTexts(texts:Record<string,string>){
   const scope=this.session.accessSignal;if(this.textScope===scope)return;
@@ -78,6 +85,7 @@ export class NativeParticipantEntryComponent {
  get codeLength(){const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.length:undefined;}
  async submit(){if(this.session.busy()||this.name.trim().length<3)return;this.problem.set('');const passwordStep=this.passwordStep();if(passwordStep)this.clearLoginWarning();else this.loginProblemCode.set(0);try{
   const access=await this.session.loginParticipant(this.name.trim(),passwordStep?this.password:'',this.view.signal);if(this.view.signal.aborted||this.session.access()!==access)return;this.bindTexts(access.customTexts);this.password='';this.passwordStep.set(false);
+  await this.startSingleCheck(access);
  }catch(error){if(this.view.signal.aborted||(error instanceof Error&&error.name==='AbortError'))return;if(error instanceof NativeMonitorHttpError){
    this.loginProblemCode.set(error.status);
    if(!passwordStep){this.passwordStep.set(true);this.session.problem.set('');return;}

@@ -41,6 +41,7 @@ export function createOriginalSessionPort(input: {
   operational: (scope:{tenantId:string;workspaceId:string},loginKey:string)=>Promise<OriginalOperationalDefinition|null>;
   monitorAssignments: (entry:OriginalOperationalDefinition)=>Promise<ParticipantBookletAssignment[]>;
   monitorGroups: (entry:OriginalOperationalDefinition)=>Promise<import('@testcenter-rewrite-app/contracts/original-session').OriginalTestGroupMonitorAccess[]>;
+  systemChecks: (entry:OriginalOperationalDefinition)=>Promise<import('@testcenter-rewrite-app/contracts/original-session').OriginalSystemCheckAccess[]>;
   bookletLabels: (scope: {tenantId: string; workspaceId: string}) => Promise<Map<string, string>>;
 }): OriginalSessionPort {
   const format = async (state: OriginalAuthenticationState, immediate: boolean): Promise<OriginalAccessSet> => {
@@ -73,6 +74,11 @@ export function createOriginalSessionPort(input: {
       flags: state.kind === 'login' && state.codeRequired ? ['codeRequired'] : [], claims: {}, groupToken: state.groupToken,
       viewSettings: Object.keys(login.viewSettings ?? {}).length ? structuredClone(login.viewSettings!) : [], access: {}};
     if (state.kind === 'login') return result;
+    if (isOriginalOperationalLogin(entry!) && entry!.originalOperationalMode === 'sys-check-login') {
+      const checks = await input.systemChecks(entry!);
+      if (checks.length) { result.claims.sysCheck = checks; result.access.sysCheck = checks.map(check => check.id); }
+      return result;
+    }
     const assignments = isOriginalOperationalLogin(entry!) ? await input.monitorAssignments(entry!) : input.assignments(entry!, state.requestedCode);
     if (assignments.length) {
       const [labels, runs] = await Promise.all([input.bookletLabels(person!), input.repository.listOriginalSessionTestFlags(person!.participantSessionId)]);

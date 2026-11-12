@@ -1,3 +1,5 @@
+import {refreshOriginalWorkspaceContentCollection,readOriginalSystemCheckModeCollection,readOriginalSystemCheckDirectoryCollection,projectOriginalWorkspaceFile,type OriginalWorkspaceContentType} from '@testcenter-rewrite-app/application';
+import {transactOriginalSystemCheckCollections} from '@testcenter-rewrite-app/application';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {prepareOriginalApplicationAssets,type OriginalApplicationAssetIdentity} from '@testcenter-rewrite-app/application';
 import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
@@ -138,6 +140,7 @@ type InMemoryFirstSliceState = {
   originalTestRunsByNumber: Map<string,string>;
   originalWorkspaceNumbers: Map<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
+  originalWorkspaceContentTypes: Map<string,OriginalWorkspaceContentType>;
   originalAdminNumbers: Map<string,OriginalAdminNumber>;
   originalAdminNumberCounter: string;
   originalNativeCommands: Map<string,OriginalCommandDelivery>;
@@ -191,6 +194,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   originalAdminNumbers: new Map(),
   originalAdminNumberCounter: '0',
   originalWorkspaceNumbers: new Map(),
+  originalWorkspaceContentTypes: new Map(),
   originalWorkspaceNumberCounter: "0",
   originalNativeCommands: new Map(),
   originalNativeCommandCounter: '0',
@@ -253,7 +257,8 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       assemblyActivityEvent.activityEventId,
       assemblyActivityEvent
     );
-    return true;
+    refreshOriginalWorkspaceContentCollection(state,assembledSourcePackage,projectOriginalWorkspaceFile);
+      return true;
   };
 
   return {
@@ -491,6 +496,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         scope.workspace
       );
       state.workspacesByKey.set(scope.workspace.workspaceKey, scope.workspace);
+      if(!state.originalWorkspaceContentTypes.has(scope.workspace.workspaceId))state.originalWorkspaceContentTypes.set(scope.workspace.workspaceId,'mixed');
     },
     async deleteWorkspaceAggregate(input) {
       const counts=deleteWorkspaceCollections(state,input);
@@ -511,7 +517,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         activityEvent.activityEventId,
         activityEvent
       );
+      if(['source_package_created','source_package_replaced'].includes(activityEvent.eventType))refreshOriginalWorkspaceContentCollection(state,activityEvent,projectOriginalWorkspaceFile);
     },
+    async readOriginalSystemCheckMode(){return readOriginalSystemCheckModeCollection(state);},
+    async readOriginalSystemCheckDirectory(){return readOriginalSystemCheckDirectoryCollection(state);},
+    async transactOriginalSystemCheck(selector,transform){return transactOriginalSystemCheckCollections(state,selector,transform);},
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
       let deletedCount = 0;
       for (const activityEventId of activityEventIds) {
@@ -533,6 +543,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveSourcePackage(sourcePackage) {
       state.sourcePackages.set(sourcePackage.sourcePackageId, sourcePackage);
+      refreshOriginalWorkspaceContentCollection(state,sourcePackage,projectOriginalWorkspaceFile);
     },
     reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
     async publishWorkspaceFiles(input) {
@@ -603,6 +614,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         replacementActivityEvent.activityEventId,
         replacementActivityEvent
       );
+      refreshOriginalWorkspaceContentCollection(state,replacementSourcePackage,projectOriginalWorkspaceFile);
       return true;
     },
     async deleteSourcePackageAggregate(input) {
@@ -673,6 +685,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         state.importJobs.delete(importJobId);
       }
       state.sourcePackages.delete(input.sourcePackageId);
+      refreshOriginalWorkspaceContentCollection(state,input,projectOriginalWorkspaceFile);
       return true;
     },
     async getImportJobById(importJobId) {

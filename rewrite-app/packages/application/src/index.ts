@@ -1,5 +1,10 @@
+import {selectOriginalPhysicalWorkspaceFiles,readOriginalPhysicalLoginMode} from './original-workspace-content-type.js';
+export * from './original-workspace-content-type.js';
 import {decodeSourceBase64} from './source-base64.js';
 import {createOriginalAssetPort} from './original-asset.js';
+import {createOriginalSystemCheckPort} from './original-system-check.js';
+export {readOriginalSystemCheckCollections,prepareOriginalSystemCheckEffect,transactOriginalSystemCheckCollections} from './original-system-check.js';
+export type {OriginalSystemCheckSelector,OriginalSystemCheckSnapshot,OriginalSystemCheckEffect,OriginalSystemCheckRepository} from './original-system-check.js';
 export type {OriginalAssetPort} from './original-asset.js';
 import {applicationAssetImageType} from './application-asset-image.js';
 export {prepareOriginalApplicationAssets,originalApplicationAssetScope} from './original-application-asset.js';
@@ -1377,6 +1382,7 @@ export type FirstSlicePorts = {
   originalReview:import('./original-review.js').OriginalReviewPort;
   originalSession: import('./original-session.js').OriginalSessionPort;
   originalAssets:import('./original-asset.js').OriginalAssetPort;
+  originalSystemCheck:import('./original-system-check.js').OriginalSystemCheckPort;
   originalAdminSession: import('./original-admin-session.js').OriginalAdminSessionPort;
   originalAdminDirectory: import('./original-admin-directory.js').OriginalAdminDirectoryPort;
   originalAdminPermissions: import('./original-admin-permissions.js').OriginalAdminPermissionsPort;
@@ -1517,7 +1523,7 @@ export type FirstSliceServices = FirstSlicePorts & {
   }): Promise<CreateImportJobResult>;
 };
 
-export type FirstSliceRepository = import('./original-admin-session.js').OriginalAdminSessionRepository & import('./original-monitor-store.js').OriginalMonitorRepository & import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
+export type FirstSliceRepository = import('./original-system-check.js').OriginalSystemCheckRepository & import('./original-admin-session.js').OriginalAdminSessionRepository & import('./original-monitor-store.js').OriginalMonitorRepository & import('./original-command-queue.js').OriginalCommandRepository & ParticipantAccessRepository & import('./original-session-token.js').OriginalSessionTokenRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
@@ -2747,6 +2753,20 @@ const decodePersistedSourceDocument = (
   const bytes = decodePercentEncodedDataUrlPayload(payload);
   return bytes ? { mediaType, bytes } : null;
 };
+
+export function projectOriginalWorkspaceFile(source: SourcePackage) {
+    const decoded = decodePersistedSourceDocument(source);
+    // Catalogs never inspect ZIP bytes as text. Decoding a large ITCR archive
+    // into a throwaway UTF-8 string on every dependency pass is expensive.
+    const sourceText=decoded&&!/\.zip$/i.test(source.fileName)?readPersistedSourceText(source,decoded):null;
+    return {sourcePackageId:source.sourcePackageId, fileName:source.fileName,
+      fileType:/\.xml$/i.test(source.fileName) ? classifyWorkspaceSourcePackage(
+        {...source, mediaType:'application/xml', contentStructure:null}, decoded ? {...decoded,mediaType:'application/xml'} : null)
+        : /\.zip$/i.test(source.fileName) && !/\.itcr\.zip$/i.test(source.fileName) && !source.fileName.startsWith('Resource/') ? 'Package' as const : 'Resource' as const,
+      status:source.status, uploadedAt:source.uploadedAt, fileSizeBytes:decoded?.bytes.byteLength ?? null,
+      sourceText,...(decoded&&/\.html$/i.test(source.fileName)?{sourceBytes:decoded.bytes}:{}),
+      resourceIdentifier:null};
+  }
 
 const stripTextByteOrderMark = (value: string): string =>
   value.startsWith("\uFEFF") ? value.slice(1) : value;
@@ -12926,9 +12946,9 @@ const validateTestcenterXmlSourceDocument = (
             const value = speed.getAttribute(attributeName);
             if (
               (attributeName === "min" && value === null) ||
-              (value !== null &&
-                (!isTestcenterXmlInteger(value) ||
-                  !Number.isSafeInteger(Number(value))))
+              // The XSD declares xs:integer, not a JavaScript safe integer.
+              // Native Syscheck JSON preserves Source's PHP int64 conversion.
+              (value !== null && !isTestcenterXmlInteger(value))
             ) {
               diagnostics.push(
                 createImportDiagnostic(
@@ -25333,7 +25353,7 @@ export const createFirstSliceServices = (
       participantSessionId
     );
     if (participantSession.originalOperationalMode !== undefined ||
-      (participantSession.originalLoginKey !== undefined && (await repository.listOriginalOperationalLoginsByWorkspace(participantSession.tenantId,participantSession.workspaceId)).some(login=>login.loginKey===participantSession.loginKey))) {
+      (participantSession.originalLoginKey !== undefined && (await repository.listOperationalLoginMigrationCandidatesByWorkspace(participantSession.tenantId,participantSession.workspaceId)).some(login=>login.loginKey===participantSession.loginKey))) {
       throw new FirstSliceError(403,'participant_operational_identity_forbidden','An operational native identity cannot use canonical participant access.');
     }
     const rosterEntry = await findParticipantRosterEntryByLoginKey(
@@ -27401,19 +27421,7 @@ export const createFirstSliceServices = (
 
   // Source loose files are typed by extension/root, never by a caller's MIME
   // hint or a supplied runtime structure. The decoded bytes remain unchanged.
-  const projectWorkspaceFile = (source: SourcePackage) => {
-    const decoded = decodePersistedSourceDocument(source);
-    // Catalogs never inspect ZIP bytes as text. Decoding a large ITCR archive
-    // into a throwaway UTF-8 string on every dependency pass is expensive.
-    const sourceText=decoded&&!/\.zip$/i.test(source.fileName)?readPersistedSourceText(source,decoded):null;
-    return {sourcePackageId:source.sourcePackageId, fileName:source.fileName,
-      fileType:/\.xml$/i.test(source.fileName) ? classifyWorkspaceSourcePackage(
-        {...source, mediaType:'application/xml', contentStructure:null}, decoded ? {...decoded,mediaType:'application/xml'} : null)
-        : /\.zip$/i.test(source.fileName) && !/\.itcr\.zip$/i.test(source.fileName) && !source.fileName.startsWith('Resource/') ? 'Package' as const : 'Resource' as const,
-      status:source.status, uploadedAt:source.uploadedAt, fileSizeBytes:decoded?.bytes.byteLength ?? null,
-      sourceText,...(decoded&&/\.html$/i.test(source.fileName)?{sourceBytes:decoded.bytes}:{}),
-      resourceIdentifier:null};
-  };
+  const projectWorkspaceFile = projectOriginalWorkspaceFile;
   const originalResourcePackages=createOriginalResourcePackages({decode:decodePersistedSourceDocument,
     entries:readZipEntries,read:readZipEntryBuffer,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath,
     comment:bytes=>{
@@ -27422,6 +27430,21 @@ export const createFirstSliceServices = (
     }});
   const originalTestFiles=createOriginalTestFiles({repository,project:projectWorkspaceFile,decode:decodePersistedSourceDocument,
     readPackage:(source,path)=>originalResourcePackages.read(source,path)});
+  const isRosterOnlyWorkspaceFile = (source:SourcePackage):boolean => {
+    const file=projectWorkspaceFile(source);if(file.fileType!=='Testtakers'||file.sourceText===null)return false;
+    const root=new DOMParser({onError(){}}).parseFromString(file.sourceText,'application/xml').documentElement;
+    return Boolean(root&&collectTesttakersBookletReferences(root).length===0);
+  };
+  const importRosterOnlyWorkspaceFile = async (source:SourcePackage,scope:{tenantKey:string;workspaceKey:string}):Promise<ParticipantRosterImportSummary> => {
+    const workspace=await requireWorkspace(repository,scope.tenantKey,scope.workspaceKey);
+    const [sourcePackages,activityEvents]=await Promise.all([repository.listSourcePackagesByWorkspace(workspace.tenantId,workspace.workspaceId),repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId,workspace.workspaceId)]);
+    const rosterDocuments=selectOriginalPhysicalWorkspaceFiles({sourcePackages,activityEvents}).map(projectWorkspaceFile)
+      .filter(file=>file.fileType==='Testtakers'&&file.sourceText!==null).map(file=>({sourceFileName:file.fileName,rosterText:file.sourceText!}));
+    if(!rosterDocuments.length){await repository.replaceOperationalLoginMigrationCandidatesByWorkspace(workspace.tenantId,workspace.workspaceId,[],[]);return{sourceFileNames:[],importedCount:0,updatedCount:0,operationalLoginCandidateCount:0};}
+    const imported=await importParticipantRosterDocumentsForWorkspace({...scope,sourcePackageId:source.sourcePackageId,rosterDocuments});
+    return{sourceFileNames:rosterDocuments.map(row=>row.sourceFileName),importedCount:imported.importedCount,updatedCount:imported.updatedCount,
+      operationalLoginCandidateCount:imported.operationalLoginCandidates.length};
+  };
   const validateWorkspaceFile = (source: SourcePackage) => {
     const decoded = decodePersistedSourceDocument(source);
     if (source.sourceDocument === null || !decoded) throw new FirstSliceError(400,
@@ -27558,7 +27581,8 @@ export const createFirstSliceServices = (
     assertWorkspaceFileIdentity(sourcePackage,sourcePackages,activityEvents);
     assertWorkspaceFileDependencies(sourcePackage,sourcePackages,activityEvents);
     if (file.fileType==='Testtakers') await assertTenantTesttakersIdentitiesAvailable({workspace,sourcePackage});
-    const independent = file.fileType==='Unit' || file.fileType==='Resource';
+    const rosterOnly=isRosterOnlyWorkspaceFile(sourcePackage);
+    const independent = file.fileType==='Unit' || file.fileType==='Resource' || rosterOnly;
     sourcePackage.status='accepted';
     const createdActivityEvent: WorkspaceActivityEvent = {activityEventId:idGenerator(),tenantId:workspace.tenantId,
       workspaceId:workspace.workspaceId,eventType:'source_package_created',actorId:null,subjectType:'source_package',
@@ -27568,7 +27592,8 @@ export const createFirstSliceServices = (
       expectedWorkspaceSourcePackageReferenceRevision:createWorkspaceSourcePackageReferenceRevision({sourcePackages,activityEvents})})) {
       throw new FirstSliceError(409,'workspace_file_upload_conflict','Workspace files changed during upload. Refresh and retry.');
     }
-    if (independent) return {sourcePackage,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null, ...(archiveOrigin?{}:{workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)})};
+    const rosterImport=rosterOnly?await importRosterOnlyWorkspaceFile(sourcePackage,input):null;
+    if (independent) return {sourcePackage,replacedSourcePackageId:null,importJob:null,stagedContentRelease:null,...(rosterImport?{participantRosterImport:rosterImport}:{}), ...(archiveOrigin?{}:{workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)})};
     const result = await createImportJobWithRelease({tenantKey:input.tenantKey,workspaceKey:input.workspaceKey,
       sourcePackageId:sourcePackage.sourcePackageId},{currentWorkspaceFilesOnly:true});
     return {...result,sourcePackage:(await repository.getSourcePackageById(sourcePackage.sourcePackageId)) ?? sourcePackage,
@@ -27643,7 +27668,7 @@ export const createFirstSliceServices = (
         `Source package '${replacedSourcePackage.fileName}' already has a replacement. Replace the latest version to preserve a linear history.`
       );
     }
-    let independentWorkspaceFile = false;
+    let independentWorkspaceFile = false,rosterOnlyWorkspaceFile=false;
     if (workspaceFile) {
       if (replacementSourcePackage.sourceDocument === null) throw new FirstSliceError(400,
         'workspace_file_document_required', 'A workspace file replacement requires an actual source document or encoded bytes.');
@@ -27659,7 +27684,8 @@ export const createFirstSliceServices = (
       if (/\.xml$/i.test(replacementSourcePackage.fileName)) replacementSourcePackage.mediaType='application/xml';
       const conflict = workspaceFileReplacementConflict(oldFile, newFile);
       if (conflict) throw new FirstSliceError(409, conflict.code, conflict.message);
-      independentWorkspaceFile = newFile.fileType === 'Unit' || newFile.fileType === 'Resource';
+      rosterOnlyWorkspaceFile=isRosterOnlyWorkspaceFile(replacementSourcePackage);
+      independentWorkspaceFile = newFile.fileType === 'Unit' || newFile.fileType === 'Resource' || rosterOnlyWorkspaceFile;
       if (newFile.fileType==='Unit') assertWorkspaceFileDependencies(replacementSourcePackage,sourcePackages,activityEvents,
         replacedSourcePackage.sourcePackageId);
       // A valid loose file is accepted in the same reservation as its lineage.
@@ -27715,8 +27741,9 @@ export const createFirstSliceServices = (
         "Source package lineage changed while the replacement was being prepared. Refresh the source packages and retry against the latest version."
       );
     }
+    const rosterImport=rosterOnlyWorkspaceFile?await importRosterOnlyWorkspaceFile(replacementSourcePackage,input):null;
     if (independentWorkspaceFile) return {replacedSourcePackage, replacementSourcePackage,
-      importJob:null, stagedContentRelease:null,...(archiveOrigin?{}:{workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)})};
+      importJob:null, stagedContentRelease:null,...(rosterImport?{participantRosterImport:rosterImport}:{}),...(archiveOrigin?{}:{workspaceAvailability:await workspaceFiles.ensureAvailable(workspace)})};
     const result = await createImportJobWithRelease({
       tenantKey: input.tenantKey,
       workspaceKey: input.workspaceKey,
@@ -27884,7 +27911,9 @@ export const createFirstSliceServices = (
       );
     }
 
-    if ((await repository.listOriginalOperationalLoginsByWorkspace(workspace.tenantId,workspace.workspaceId)).some(login=>login.loginKey===loginKey)) {
+    // An unqualified operational import is not permission to reuse an older
+    // ordinary roster entry through the canonical sign-in either.
+    if ((await repository.listOperationalLoginMigrationCandidatesByWorkspace(workspace.tenantId,workspace.workspaceId)).some(login=>login.loginKey===loginKey)) {
       throw new FirstSliceError(403,'participant_operational_identity_forbidden','An operational native identity cannot sign in as a canonical participant.');
     }
     const activeRelease = nativePrincipal ? null : await getActiveWorkspaceRelease(
@@ -28083,8 +28112,14 @@ export const createFirstSliceServices = (
     invalidAccess: () => new FirstSliceError(401, 'participant_session_invalid', 'Participant access is invalid or has expired.'),
     now, allowLegacySessionIds: true
   });
-  const operationalDefinition = (scope:{tenantId:string;workspaceId:string},loginKey:string) =>
-    findOriginalOperationalDefinition(repository,scope,loginKey,value=>normalizeParticipantAccessBoundary(value,participantAccessTimeZone));
+  const operationalDefinition = async (scope:{tenantId:string;workspaceId:string},loginKey:string) => {
+    const [sourcePackages,activityEvents]=await Promise.all([repository.listSourcePackagesByWorkspace(scope.tenantId,scope.workspaceId),repository.listWorkspaceActivityEventsByWorkspace(scope.tenantId,scope.workspaceId)]);
+    const physical=readOriginalPhysicalLoginMode({sourcePackages,activityEvents},loginKey,projectWorkspaceFile);
+    if(physical.managed&&physical.mode===null)throw new FirstSliceError(410,'original_login_gone','The Original login is no longer available.');
+    const operational=await findOriginalOperationalDefinition(repository,scope,loginKey,value=>normalizeParticipantAccessBoundary(value,participantAccessTimeZone));
+    if(physical.managed&&(operational?physical.mode!==operational.definition.originalOperationalMode:['monitor-group','monitor-study','sys-check-login'].includes(physical.mode!)))throw new FirstSliceError(410,'original_login_gone','The Original login mode is no longer available.');
+    return operational;
+  };
   const activeNativeWorkspace = async (scope:{tenantId:string;workspaceId:string}) => {
     const tenant=(await repository.listTenants()).find(row=>row.tenantId===scope.tenantId&&row.status==='active');
     return tenant?(await repository.listWorkspacesByTenantId(tenant.tenantId)).find(row=>row.workspaceId===scope.workspaceId&&row.status==='active'):undefined;
@@ -28113,7 +28148,7 @@ export const createFirstSliceServices = (
     const timestamp=now(),entry=principal.rosterEntry;
     const candidate:ParticipantSession={participantSessionId:idGenerator(),tenantId:principal.workspace.tenantId,workspaceId:principal.workspace.workspaceId,
       contentReleaseId:null,loginKey:entry.loginKey,groupKey:principal.binding.groupKey,originalLoginKey:entry.loginKey,
-      originalNameSuffix:'',originalOperationalMode:entry.originalOperationalMode,participantCode:'',status:'signed_in',createdAt:timestamp,
+      originalNameSuffix:createOriginalPersonNameSuffix('',entry.originalOperationalMode==='sys-check-login'),originalOperationalMode:entry.originalOperationalMode,participantCode:'',status:'signed_in',createdAt:timestamp,
       validUntil:resolveParticipantSessionValidUntil(entry,timestamp)};
     assertParticipantAccessWindow(entry,timestamp,candidate.validUntil);
     const result=await repository.resolveOriginalParticipantSession(candidate,person=>assertParticipantAccessWindow(entry,timestamp,person.validUntil));
@@ -28137,7 +28172,7 @@ export const createFirstSliceServices = (
     // A reimport can retain an older ordinary roster entry for a current
     // operational Login. Never materialize it as a dependent and demote its
     // authenticated monitor person (including a different study monitor).
-    const operationalKeys=new Set((await repository.listOriginalOperationalLoginsByWorkspace(actor.tenantId,actor.workspaceId)).map(login=>login.loginKey));
+    const operationalKeys=new Set((await repository.listOperationalLoginMigrationCandidatesByWorkspace(actor.tenantId,actor.workspaceId)).map(login=>login.loginKey));
     const members=(await repository.listParticipantRosterEntriesByWorkspace(actor.tenantId,actor.workspaceId)).filter(member=>
       !operationalKeys.has(member.loginKey)&&originalMonitorable(member)&&!participantExecutionModeDefinitions[member.executionMode!].alwaysNewSession&&
       (actor.originalOperationalMode==='monitor-study'||sameOriginalTestName(member.groupKey,actor.groupKey)));
@@ -28183,7 +28218,14 @@ export const createFirstSliceServices = (
         if (tenant.status !== 'active') continue;
         for (const workspace of await repository.listWorkspacesByTenantId(tenant.tenantId)) {
           if (workspace.status !== 'active') continue;
-          const operational = await operationalDefinition(workspace,name);
+          let operational:Awaited<ReturnType<typeof operationalDefinition>>;
+          try{operational=await operationalDefinition(workspace,name);}
+          catch(error){
+            // Unqualified public operational imports are not credentials and
+            // must not resurrect a retained participant row during first factor.
+            if(error instanceof FirstSliceError&&error.errorCode==='original_login_gone')continue;
+            throw error;
+          }
           if(operational){candidates.push({workspace,rosterEntry:operational.definition,nativeCredential:{passwordHash:operational.passwordHash}});continue;}
           const rosterEntry = (await repository.listParticipantRosterEntriesByWorkspace(workspace.tenantId, workspace.workspaceId))
             .find(entry => entry.originalLoginIdentity === true && entry.loginKey === name);
@@ -32763,6 +32805,7 @@ export const createFirstSliceServices = (
             deletedContentReleaseCount: deletion.deletedContentReleaseCount
           }
         });
+        if(sourcePackage.fileName.startsWith('Testtakers/')&&selectOriginalPhysicalWorkspaceFiles({sourcePackages,activityEvents}).some(row=>row.sourcePackageId===sourcePackage.sourcePackageId))await importRosterOnlyWorkspaceFile(sourcePackage,input);
         return deletion;
       },
       async activateContentRelease(input) {
@@ -32867,6 +32910,13 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantAccess,
     originalAuthentication,
+    originalSystemCheck:createOriginalSystemCheckPort({repository,auth:originalAuthentication,now,id:idGenerator,date:formatLegacySystemCheckDate,
+      files:{project:projectWorkspaceFile,decode:decodePersistedSourceDocument},
+      accessWindow(candidate,person,timestamp){
+        const validFrom=normalizeParticipantAccessBoundary(candidate.validFrom,participantAccessTimeZone),validTo=normalizeParticipantAccessBoundary(candidate.validTo,participantAccessTimeZone);
+        if(candidate.validFrom&&!validFrom||candidate.validTo&&!validTo||validFrom&&validTo&&validFrom>validTo)throw new FirstSliceError(410,'original_login_gone','The Original login validity is unavailable.');
+        assertParticipantAccessWindow({validFrom,validTo},timestamp,person.validUntil);
+      }}),
     originalAssets:createOriginalAssetPort({repository,settings:applicationSettings,upload:async request=>(await uploadApplicationAsset(request)).originalAsset,auth:originalAuthentication,now,id:idGenerator,
       admin:async(token,root)=>{const session=await requireActiveAdminSession(repository,token,now(),{enforceAccessWindow:true});if(root)requireAdminRole(session.roleAssignments,['platform_admin']);return session.adminUser;}}),
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
@@ -32895,7 +32945,7 @@ export const createFirstSliceServices = (
     originalSession: createOriginalSessionPort({auth: originalAuthentication, repository, registerDependants:materializeOriginalMonitor,
       operational: async (scope,loginKey)=>(await operationalDefinition(scope,loginKey))?.definition??null,
       async monitorAssignments(entry){
-        if(entry.originalOperationalMode==='monitor-study')return[];
+        if(entry.originalOperationalMode!=='monitor-group')return[];
         const entries=await repository.listParticipantRosterEntriesByWorkspace(entry.tenantId,entry.workspaceId);
         const assignments=new Map<string,import('@testcenter-rewrite-app/domain').ParticipantBookletAssignment>();
         for(const member of entries)if(member.originalLoginIdentity&&sameOriginalTestName(member.groupKey,entry.groupKey))for(const assignment of getOriginalParticipantBookletAssignments(member)){
@@ -32904,6 +32954,7 @@ export const createFirstSliceServices = (
         return [...assignments.values()];
       },
       async monitorGroups(entry){
+        if(entry.originalOperationalMode==='sys-check-login')return[];
         const groups:Array<{groupKey:string;groupLabel:string;validFrom?:string|null;validTo?:string|null}>=entry.originalOperationalMode==='monitor-group'?
           [{groupKey:entry.groupKey,groupLabel:entry.groupLabel??entry.groupKey}]:
           (await repository.listParticipantRosterEntriesByWorkspace(entry.tenantId,entry.workspaceId)).filter(originalMonitorable)
@@ -32920,6 +32971,14 @@ export const createFirstSliceServices = (
           return profiles.length?profiles.map(profile=>({...base,flags:{...flags,profile:profile.profileId,subLabel:profile.label}})):
             [{...base,flags:Object.keys(flags).length?flags:[] as []}];
         });
+      },
+      async systemChecks(entry){
+        if(entry.originalOperationalMode!=='sys-check-login')return[];
+        const [sources,events]=await Promise.all([repository.listSourcePackagesByWorkspace(entry.tenantId,entry.workspaceId),repository.listWorkspaceActivityEventsByWorkspace(entry.tenantId,entry.workspaceId)]);
+        const files=currentSystemCheckFiles(sources,events);
+        if(!files.length)return[];
+        const workspaceId=await repository.getOrCreateOriginalWorkspaceNumber(entry);
+        return files.map(({metadata})=>({id:metadata.identifier,type:'sysCheck' as const,label:metadata.label,flags:[] as [],workspaceId,description:metadata.description}));
       },
       assignments: (entry, code) => selectOriginalParticipantAssignments(getOriginalParticipantBookletAssignments(entry), code),
       async bookletLabels(scope) {

@@ -12,7 +12,8 @@ import type { AfterViewInit, OnChanges } from "@angular/core";
   styles: [":host { display: block; min-width: 0; }"]
 })
 export class OriginalSystemCheckSpeedChartComponent implements AfterViewInit, OnChanges {
-  @Input({ required: true }) sizes: number[] = [];
+  @Input({ required: true }) sizes: readonly (number | string)[] = [];
+  @Input() native = false;
   @Input({ required: true }) sequences: [number, number][][] = [];
   @Input() download = false;
   @Input({ required: true }) label = "";
@@ -26,9 +27,10 @@ export class OriginalSystemCheckSpeedChartComponent implements AfterViewInit, On
   private draw(): void {
     const canvas = this.canvas.nativeElement;
     const context = canvas.getContext("2d");
-    if (!context || !this.sizes.length) return;
-    const minX = Math.min(...this.sizes);
-    const maxX = Math.max(...this.sizes) + 16;
+    if (!context || (!this.native && !this.sizes.length)) return;
+    const numericSizes = this.sizes.map(Number);
+    const minX = Math.min(...numericSizes);
+    const maxX = Math.max(...numericSizes) + 16;
     const minY = this.download ? 20 : 0;
     const maxY = this.download ? 1200 : 5000;
     const yStep = this.download ? 50 : 100;
@@ -44,13 +46,17 @@ export class OriginalSystemCheckSpeedChartComponent implements AfterViewInit, On
     context.fillStyle = "black";
     context.strokeStyle = "black";
     context.font = "10px sans-serif";
-    for (const size of [...new Set(this.sizes)]) {
+    for (const size of [...new Set(numericSizes)]) {
       if (size % 4 !== 0) continue;
+      // Source uses strict indexOf against the raw XML strings. Its numeric
+      // tick lookup therefore does not label those native packet strings.
+      if (this.native && !this.sizes.includes(size)) continue;
       const index = Math.floor(Math.log(size) / Math.log(1024));
       context.fillText(`${(size / 1024 ** index).toFixed(2)} ${["B", "KiB", "MiB", "GiB"][index]}`, x(size), canvas.height - 4);
       context.beginPath(); context.moveTo(x(size), 0); context.lineTo(x(size), canvas.height); context.stroke();
     }
     for (let value = 0, index = 1; value < maxY; value += yStep, index += 1) {
+      context.strokeStyle = this.native ? value === 0 ? "red" : "silver" : "black";
       context.fillText(index < 10 ? `${value / 1000} sec` : " ", 4, y(value));
       context.beginPath(); context.moveTo(0, y(value)); context.lineTo(canvas.width, y(value)); context.stroke();
     }

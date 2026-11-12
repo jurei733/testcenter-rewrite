@@ -2,7 +2,7 @@ import {readOriginalReviewReports} from './original-review-report.js';
 import type {OriginalReportFormat} from '@testcenter-rewrite-app/contracts';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
-import {readOriginalPerson,resolveOriginalOwnedTestScope} from './original-test-access.js';
+import {readOriginalPerson,readOriginalTestPerson,resolveOriginalOwnedTestScope} from './original-test-access.js';
 import {formatOriginalReviewListJson,requireOriginalReviewMode,originalReviewNumber,
   type OriginalReviewScope} from './original-review-record.js';
 import {formatOriginalReviewReport} from './original-workspace-report-wire.js';
@@ -29,7 +29,7 @@ export function createOriginalReviewPort(input:{repository:FirstSliceRepository;
     async update(request){const scope=await authorize({...request,write:true});await input.repository.mutateOriginalReview(scope,{action:'update',reviewNumber:originalReviewNumber(request.reviewNumber),body:request.body,at:input.now()});},
     async delete(request){const scope=await authorize({...request,write:true});await input.repository.mutateOriginalReview(scope,{action:'delete',reviewNumber:originalReviewNumber(request.reviewNumber)});},
     async export(request){
-      const person=await readOriginalPerson(input.auth,request.token),reports=await readOriginalReviewReports(input,person);
+      const person=await readOriginalTestPerson(input.auth,request.token),reports=await readOriginalReviewReports(input,person);
       if(!reports.length)return{status:request.format==='csv'?204:200,body:request.format==='csv'?'':'[]'};
       const labels=new Map(reports.map(row=>[JSON.stringify([row.record.bookletname,row.record.unitname]),row.labels]));
       const body=formatOriginalReviewReport({rows:reports.map(row=>row.record),format:request.format,useNewVersion:true,

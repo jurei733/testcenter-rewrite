@@ -111,6 +111,9 @@ const canonicalRoutes: Routes = [
 ];
 
 export const appRoutes: Routes = [
+  {path:'r/check-starter',pathMatch:'full',loadComponent:()=>import('./native-system-check/native-system-check-starter.component').then(module=>module.NativeSystemCheckStarterComponent)},
+  {path:'check/:workspaceId/:checkName/:step',loadComponent:()=>import('./native-system-check/native-system-check-entry.component').then(module=>module.NativeSystemCheckEntryComponent)},
+  {path:'check/:workspaceId/:checkName',pathMatch:'full',redirectTo:'check/:workspaceId/:checkName/w'},
   {path:'native-start',loadComponent:()=>import('./native-participant/native-participant-entry.component').then(module=>module.NativeParticipantEntryComponent)},
   {path:'native-test',loadChildren:()=>import('./native-participant/native-routes').then(module=>module.nativeParticipantRoutes)},
   {path:'group-monitor',loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),children:[

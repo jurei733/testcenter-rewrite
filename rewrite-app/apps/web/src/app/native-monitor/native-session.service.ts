@@ -1,6 +1,7 @@
 import {Injectable,signal} from '@angular/core';
 import type {OriginalAccessSet,OriginalWorkChallenge} from '@testcenter-rewrite-app/contracts/original-session';
-export class NativeMonitorHttpError extends Error {constructor(readonly status:number,message:string,readonly response?:{url:string;statusText:string;errorId?:string|null;testMode?:string|null}){super(message);}}
+import {NativeMonitorHttpError} from './native-http-error';
+export {NativeMonitorHttpError} from './native-http-error';
 const key='testcenter-native-monitor-session';
 const finishKey=key+'-unfinished-finish';
 const purposeKey=key+'-purpose';

@@ -33,13 +33,13 @@ import { OriginalSystemCheckSpeedChartComponent } from "./original-system-check-
             <div class="speed-chart">
               <span style="font-weight:normal">Geschwindigkeit Download: </span>
               <span id="originalSystemCheckDownload">{{ speed(view.networkDownloadBytesPerSecond) }}</span>
-              <app-original-system-check-speed-chart [download]="true" [sizes]="check.downloadSpeed.sequenceSizes"
+              <app-original-system-check-speed-chart [download]="true" [native]="!!view.native" [sizes]="view.networkSizes('download')"
                 [sequences]="view.networkDownloadPoints" label="Download: Paketgröße und Antwortzeit" />
             </div>
             <div class="speed-chart">
               <span style="font-weight:normal">Geschwindigkeit Upload: </span>
               <span id="originalSystemCheckUpload">{{ speed(view.networkUploadBytesPerSecond) }}</span>
-              <app-original-system-check-speed-chart [sizes]="check.uploadSpeed.sequenceSizes"
+              <app-original-system-check-speed-chart [native]="!!view.native" [sizes]="view.networkSizes('upload')"
                 [sequences]="view.networkUploadPoints" label="Upload: Paketgröße und Antwortzeit" />
             </div>
           </div>
@@ -71,6 +71,7 @@ export class OriginalSystemCheckNetworkComponent implements AfterViewInit, OnDes
   }
   ngOnDestroy(): void { cancelAnimationFrame(this.startFrame); }
   speed(bytesPerSecond: number): string {
+    if (this.view.native && Number.isNaN(bytesPerSecond)) return "";
     if (bytesPerSecond < 0) return "Test noch nicht gestartet";
     if (!bytesPerSecond) return "⌀ 0/s";
     const bits = bytesPerSecond * 8;

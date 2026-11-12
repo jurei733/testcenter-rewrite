@@ -5,6 +5,7 @@ import {redactBugReportText} from '@testcenter-rewrite-app/contracts';
 import {NativeMonitorHttpError,NativeMonitorSessionService} from './native-monitor/native-session.service';
 import {nativeRequestError} from './native-participant/native-http-policy';
 import type {NativeLoginErrorDialogComponent} from './native-login-error-dialog.component';
+import {AppError} from './native-participant/app.interfaces';
 
 /** Source's global error dialog, owned by this unauthenticated entry view. */
 @Injectable()
@@ -13,7 +14,7 @@ export class NativeLoginFailureService implements OnDestroy {
  private readonly session=inject(NativeMonitorSessionService);
  private destroyed=false;
  private close:(()=>void)|undefined;
- async show(error:NativeMonitorHttpError,view:AbortSignal):Promise<void>{
+ async show(error:NativeMonitorHttpError,view:AbortSignal,copy?:{label:string;description:string}):Promise<void>{
   if(this.destroyed)return;this.close?.();
   const scope=this.session.accessSignal;
   if(view.aborted||scope.aborted)return;
@@ -30,8 +31,9 @@ export class NativeLoginFailureService implements OnDestroy {
    const {NativeLoginErrorDialogComponent}=await import('./native-login-error-dialog.component');
    if(!current())return;
    let payload:unknown=error.message;try{payload=JSON.parse(error.message);}catch{}
-   const mapped=nativeRequestError(new HttpErrorResponse({status:error.status,error:payload,
+   let mapped=nativeRequestError(new HttpErrorResponse({status:error.status,error:payload,
     statusText:error.response?.statusText,url:error.response?.url,headers:new HttpHeaders({...error.response?.errorId?{'error-id':error.response.errorId}:{},...error.response?.testMode?{'test-mode':error.response.testMode}:{}})}));
+   if(copy)mapped=new AppError(copy);
    mapped.description=redactBugReportText(mapped.description);mapped.details=redactBugReportText(mapped.details??'');
    ref=this.dialogs.open(NativeLoginErrorDialogComponent,{panelClass:'original-native-login-error-dialog',disableClose:true,autoFocus:'dialog',
     data:{error:mapped,url:redactBugReportText(window.location.href),timestamp:Date.now(),reload:()=>{

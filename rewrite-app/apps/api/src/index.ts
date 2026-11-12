@@ -1,4 +1,5 @@
 import {handleOriginalAssetHttp,originalAssetRouteLabel} from './original-asset-http.js';
+import {handleOriginalSystemCheckHttp,originalSystemCheckRouteLabel} from './original-system-check-http.js';
 import {handleOriginalAdminHttp,originalAdminRouteLabel} from './original-admin-http.js';
 import {handleOriginalWorkspaceHttp,originalWorkspaceRouteLabel} from './original-workspace-http.js';
 import {formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/application';
@@ -3195,10 +3196,11 @@ const serveFrontendRequest = async (
       ? ""
       : pathname.replace(/^\/app\/?/, "");
 
-  // Native group/profile IDs are path data and can contain dots. Recognize
-  // exactly this client route before applying the static-asset extension rule.
+  // Native group/profile and Systemcheck IDs are path data and can contain dots.
+  // Recognize the exact client routes before applying the asset extension rule.
   const nativeMonitorRoute = /^group-monitor(?:\/[^/]+){0,2}\/?$/.test(relativePath);
-  if (relativePath === "" || nativeMonitorRoute || !relativePath.includes(".")) {
+  const nativeSystemCheckRoute = /^check\/[^/]+\/[^/]+(?:\/[wnuqr])?\/?$/.test(relativePath);
+  if (relativePath === "" || nativeMonitorRoute || nativeSystemCheckRoute || !relativePath.includes(".")) {
     const html = await readFile(frontendIndexPath, "utf8");
     sendHtml(response, 200, html);
     return true;
@@ -3343,6 +3345,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
   }
 
   const assetLabel=originalAssetRouteLabel(method,pathname);if(assetLabel)return assetLabel;
+  const systemCheckLabel=originalSystemCheckRouteLabel(method,pathname);if(systemCheckLabel)return systemCheckLabel;
   const adminLabel=originalAdminRouteLabel(method,pathname);if(adminLabel)return adminLabel;
   const workspaceLabel=originalWorkspaceRouteLabel(method,pathname);if(workspaceLabel)return workspaceLabel;
   const monitorLabel=originalMonitorRouteLabel(method,pathname);if(monitorLabel)return monitorLabel;
@@ -3381,7 +3384,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `POST ${productionApiRoutes.system.createProofOfWorkChallenge}`;
   }
 
-  if (method === "GET" && pathname === productionApiRoutes.system.getTime) {
+  if ((method === "GET" || method === "HEAD") && (pathname === productionApiRoutes.system.getTime || pathname === "/system/time")) {
     return `GET ${productionApiRoutes.system.getTime}`;
   }
 
@@ -3421,7 +3424,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `GET ${pathname}`;
   }
 
-  if (method === "GET" && systemCheckSpeedTestDownloadPattern.test(pathname)) {
+  if ((method === "GET" || method === "HEAD") && systemCheckSpeedTestDownloadPattern.test(pathname)) {
     return `GET ${productionApiRoutes.system.downloadSpeedTestPackage}`;
   }
 
@@ -4779,8 +4782,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       if (
-        request.method === "GET" &&
-        pathname === productionApiRoutes.system.getTime
+        (request.method === "GET" || request.method === "HEAD") &&
+        (pathname === productionApiRoutes.system.getTime || pathname === "/system/time")
       ) {
         response.setHeader("cache-control", "no-store");
         sendJson<GetSystemTimeResponse>(response, 200, {
@@ -4793,14 +4796,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const systemCheckSpeedTestDownloadMatch =
         systemCheckSpeedTestDownloadPattern.exec(pathname);
       if (
-        request.method === "GET" &&
+        (request.method === "GET" || request.method === "HEAD") &&
         systemCheckSpeedTestDownloadMatch?.groups
       ) {
         const sizeValue = decodeRouteGroup(
           systemCheckSpeedTestDownloadMatch.groups.size
         ) ?? "";
-        const size = /^\d+$/.test(sizeValue)
-          ? Number.parseInt(sizeValue, 10)
+        const packageSize = sizeValue.replace(/&uid=\d+$/, "");
+        const size = /^\d+$/.test(packageSize)
+          ? Number.parseInt(packageSize, 10)
           : Number.NaN;
         if (
           !Number.isSafeInteger(size) ||
@@ -5014,6 +5018,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         logStructured(receipt.statusCode>=500?'error':'info','native_administration_error',{requestId,route:originalAdminRouteLabel(request.method??'',pathname),...receipt});
       },readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,true,decode),
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
+        header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
+      if(await handleOriginalSystemCheckHttp({request,pathname,services,readBody:()=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,false),
+        propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
+        reportError:receipt=>{if(receipt.errorCode==='internal_error')metrics.errorCounts.internal+=1;else metrics.errorCounts.firstSlice+=1;
+          logStructured(receipt.statusCode>=500?'error':'info','native_system_check_error',{requestId,route:originalSystemCheckRouteLabel(request.method??'',pathname),...receipt});},
         header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
       if(await handleOriginalWorkspaceHttp({request,pathname,searchParams:url.searchParams,services,readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,false,decode),
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,

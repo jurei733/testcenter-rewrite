@@ -20,7 +20,7 @@ export function originalApplicationAssetScope(context:OriginalApplicationAssetCo
     participant.workspaceId===context.workspaceId&&participant.loginKey===context.loginKey)return {...participant.assetAssignments};
   if(context.kind==='operational'){
     const rows=candidates.filter(row=>row.loginKey===context.loginKey),native=privateLogins.filter(row=>row.loginKey===context.loginKey);
-    if(rows.length===1&&native.length===1&&rows[0]!.loginMode===native[0]!.loginMode&&['monitor-group','monitor-study'].includes(native[0]!.loginMode))return {...rows[0]!.assetAssignments};
+    if(rows.length===1&&native.length===1&&rows[0]!.loginMode===native[0]!.loginMode&&['monitor-group','monitor-study','sys-check-login'].includes(native[0]!.loginMode))return {...rows[0]!.assetAssignments};
   }
   throw new FirstSliceError(410,'original_login_gone','The Original login is no longer available.');
 }

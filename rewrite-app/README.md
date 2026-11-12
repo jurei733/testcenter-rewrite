@@ -20,11 +20,91 @@ entry. Logout dialogs use the matching Original overlay theme and button order;
 monitor confirmations retain the Original adult behavior.
 `npm run smoke:ui:native-assets:built` includes the global/login theme matrix
 at 390/1280px with reload, real code login and logout. The pinned Source
-reference also records `sys-check-login`; that native login mode remains an
-open parity gap. Screenshots and functional theme checks alone do not establish
+reference also records `sys-check-login`. Its native session and backend wire
+endpoints are implemented. Native Starter choices and the actor-owned
+`/app/check/:workspaceId/:checkName/:step` flow are wired for welcome, network,
+opaque Verona Player, questionnaire and report steps.
+Screenshots and functional theme checks alone do not establish
 full visual parity. Use `UI_SMOKE_BROWSER_CHANNEL=chrome` or `chromium`
 explicitly for complete local native qualification, and verify the reported
 browser version in every suite.
+
+Validated Original-19 `sys-check-login` XML creates a fresh native person with
+workspace-scoped `sysCheck` claims. Native `GET`/`HEAD`
+`/workspace/:workspaceId/sys-check/:checkName` and `/unit-and-player` read current
+physical XML/resources. Configuration retains the Original text, lexical boolean,
+packet-size and exact PHP integer behavior. `PUT` on `/report` returns an empty
+201 response and stores report evidence in the workspace activity inventory.
+The native person receives no administrator or participant-Test authority.
+
+Report saves recheck current credentials, private XML provenance, role, active
+parents, access windows and the physical report configuration inside the store's
+writer. Logout, role/config replacement or expiry during upload cannot retain an
+earlier permission. Anonymous saves require the exact case-insensitive key and
+remain disabled while dedicated system-check account mode is active. The existing
+`canSave` and workspace fences also apply to native people; the pinned Source
+monitor/no-save-key write weaknesses are retained as counter-evidence. These
+controls are included in `npm run test:participant-auth` and the mandatory
+PostgreSQL runner. Native UI checks run with
+`npm run smoke:ui:native-system-check:built`, also required by the existing native
+browser cohort. They exercise real protected login, multiple-check selection,
+single-check login/restore shortcuts, native time and speed requests, the opaque
+Player response, all questionnaire control types, report persistence, delayed
+configuration cancellation, logout and actual person expiry. Native requests and
+dialogs remain owned by their route and person scope; no canonical administrator
+credential is used. `/system/time` and the Source download `&uid=` cache-buster
+are accepted without widening the existing packet limits.
+
+The native network controller replays seven actual Source frontend cases with
+real report persistence and TCP connection faults: absent packet definitions,
+scalar-zero definitions, invalid/small downloads, broken download/upload
+connections and zero-byte uploads. Empty-sequence averages retain Source's
+`0/s` reports and ratings. Failed sequences retain measured/default durations
+and all report fields. Scalar-zero definitions retain the Source program-error
+boundary in an owned reload dialog. Source chart packet labels use raw strings;
+empty plots and native grid colors follow that same reference. The existing
+64MiB allocation bound,15-round budget,45s/10s request timeouts, no-cookie and
+no-redirect transport, and cancellation scope are retained.
+
+Native `GET`/`HEAD` `/sys-check-mode` and `/sys-checks` now expose the persisted
+installation mode and public physical-check directory. Empty directories return
+204. SQLite migration83 and PostgreSQL migration77 backfill the mode from current
+physical Testtakers files; Memory/File retain the corresponding workspace state.
+A valid roster containing `sys-check-login` selects `sysCheck`, other valid
+rosters select `test`, and no valid roster selects `mixed`. Imported Login rows
+alone do not set the global mode. Upload/replacement/deletion update the physical
+catalog and mode in the same storage mutation; SQL fault controls verify rollback.
+The captured Original reference includes61 actual HTTP requests and13 lifecycle
+states. Valid roster-only files no longer fail a synthetic Test runtime import;
+their operational Logins remain usable, and deleted physical Logins cannot
+resurrect through retained ordinary roster rows.
+
+Native anonymous selection at `/app/r/check-starter` now preserves the Source
+empty/one/many states, including an explicit click when only one check exists.
+Report UI uses the public installation mode cached at application startup,
+independently from actor authentication. An external roster upload does not
+change that same-document cache; a reload picks up the new mode. Public mode
+uses the Source key/title dialog, retaining raw form values such as `  A`;
+authenticated reports still receive the server-enforced Login title. Private
+mode omits key/title, including for anonymous requests, whose real missing-key
+error is shown without saving a report. Wrong keys retain the Source error
+dialog. The existing dedicated-account save gate remains separate.
+
+The native browser suite includes27 cases per browser, including9 anonymous
+selection/mode/error cases and10 real persisted reports. Fresh1280x850 selection
+views in the captured Primar theme are exact full-frame matches for all three
+directory states in Chrome156 and Chromium147, with independent PNG decoding,
+self comparisons and actual white repaint controls. This proves that specific
+desktop cohort; it does not complete a broad visual acceptance row.
+
+Same-application administrative-upload mode refresh, startup-mode failure/retry,
+nonfresh header/navigation state, retained canonical-session isolation and late
+report/dialog/actor retirement boundaries remain open. Historical schema-valid
+but rejected roster-only file recovery, directory lexical/large-ID boundaries,
+additional network timeout/maximum-packet boundaries and all Systemcheck
+themes/mobile layouts also need qualification. Initial exploratory Source dialog
+captures contain opening animations and are not visual references. The complete
+49-functional/8-visual Original-parity goal remains open.
 
 The Original workspace now exposes the implemented **Dateien** and
 **Systemcheck Berichte** tabs. Reports show complete counts and OS/browser
@@ -537,9 +617,11 @@ the source password. The
 migration preview includes original view, column, auto-next, and filter settings
 and flags missing profile definitions. Mixed rosters import their participant
 rows and show the candidates in a dedicated Runtime card. Operational-only
-rosters are accepted as an explicit account-migration input: they make zero
-participant changes, retain only password-redacted candidates, and record the
-classification in workspace activity. The candidates persist as a workspace
+rosters make zero participant-row changes and record their classification in
+workspace activity. Validated Original-19 XML also retains private salted native
+credentials; JSON migration candidates cannot establish those native identities
+or reactivate an older participant role. Public candidate responses remain
+password-redacted. The candidates persist as a workspace
 read model in memory, file, SQLite, and PostgreSQL stores; Angular reloads them
 with the saved roster during runtime refresh, including in a different browser
 or device. A later roster import replaces that handoff, while raw roster drafts

@@ -44,6 +44,8 @@ import { OriginalSystemCheckSaveReportComponent } from "./original-system-check-
     @defer (when view.reportSaveDialogOpen) {
       @if (view.reportSaveDialogOpen) {
         <app-original-system-check-save-report
+          [owner]="view.nativeOwner"
+          [sourceValues]="!!view.nativeOwner"
           [aboutPassword]="view.customText('syscheck_report_aboutPassword', 'Nur berechtigten Personen ist das Speichern erlaubt. Bitte geben Sie unten das Systemcheck-Kennwort ein, das Sie von der Projektleitung erhalten haben!')"
           [aboutReportId]="view.customText('syscheck_report_aboutReportId', 'Die ermittelten bzw. eingegebenen Informationen werden in der Datenbank so gespeichert, dass eine zusammenfassende Auswertung für eine bestimmte Studie möglich ist. Um den Bericht einem bestimmten Projekt oder einer Studie zuordnen zu können, geben Sie bitte einen kurzen Text ein, der dann als Titel für den Bericht verwendet wird!')"
           [reportIdLabel]="view.customText('syscheck_report_id', 'Schul-ID')"

@@ -7,8 +7,14 @@ export function parseOriginalNativeTestNumber(raw:string):string{
 export async function readOriginalPerson(auth:OriginalAuthenticationPort,token:string){
  const state=await auth.read({token});if(state.kind!=='person')throw new FirstSliceError(403,'original_token_type_forbidden','The supplied token cannot perform that operation.');return state.participantSession;
 }
+/** A current Systemcheck role cannot recover former participant/monitor Tests. */
+export async function readOriginalTestPerson(auth:OriginalAuthenticationPort,token:string){
+ const person=await readOriginalPerson(auth,token);
+ if(person.originalOperationalMode==='sys-check-login')throw new FirstSliceError(403,'original_test_forbidden','The Systemcheck login cannot access Tests.');
+ return person;
+}
 export async function resolveOriginalOwnedTestScope(input:{auth:OriginalAuthenticationPort;repository:FirstSliceRepository},token:string,raw:string){
- const person=await readOriginalPerson(input.auth,token),testNumber=parseOriginalNativeTestNumber(raw),mapping=await input.repository.findOriginalTestNumber({...person,testNumber});
+ const person=await readOriginalTestPerson(input.auth,token),testNumber=parseOriginalNativeTestNumber(raw),mapping=await input.repository.findOriginalTestNumber({...person,testNumber});
  if(!mapping)throw new FirstSliceError(403,'original_test_forbidden',`Access to test ${raw} is not provided.`);return{person,scope:mapping,testNumber};
 }
 export async function resolveOriginalOwnedTest(input:{auth:OriginalAuthenticationPort;repository:FirstSliceRepository},token:string,raw:string){

@@ -24,10 +24,12 @@ import {NativeMonitorIconComponent as MatIcon} from '../../native-monitor/native
  @if(claims?.testGroupMonitor;as groups){<h3>Testgruppen-Überwachung</h3>@for(group of groups;track $index;let i=$index){<tc-test-card [name]="group.label" [subLabel]="groupLabel(group)" buttonLabel="Gruppen-Monitor Starten" [disabled]="groupDisabled(group)" [attr.data-cy]="'gm-card-'+i" (select)="monitor(group)" />}
  @if(claims?.test&&visibility!=='hidden'){<mat-accordion><mat-expansion-panel [expanded]="visibility!=='collapsed'"><mat-expansion-panel-header><mat-panel-title>{{'Testhefte anzeigen'|customtext:'gm_show_test'|async}}</mat-panel-title></mat-expansion-panel-header><ng-container [ngTemplateOutlet]="testCardList" /></mat-expansion-panel></mat-accordion>}}
  @if(claims?.test&&!claims?.testGroupMonitor){<ng-container [ngTemplateOutlet]="testCardList" />}
+ @if(claims?.sysCheck;as checks){<h4>Systemcheck</h4>@for(check of checks;track check.workspaceId+':'+check.id){<button mat-raised-button class="starter" [attr.data-cy]="'syscheck-'+check.id" (click)="systemCheck(check.workspaceId,check.id)"><div>{{check.label}}</div><div>{{check.description}}</div></button>}}
  </div>
- @if(!booklets.length&&!claims?.testGroupMonitor?.length){<p role="status">{{'Für diese Anmeldung wurde kein Test gefunden.'|customtext:'login_noBookletsAvailable'|async}}</p>}
+ @if((claims?.test&&!booklets.length)||!claims||!ObjectKeys(claims).length){<p role="status">{{'Für diese Anmeldung wurde kein Test gefunden.'|customtext:'login_noBookletsAvailable'|async}}</p>}
  <div #bottomSentinel class="sentinel"></div>@if(showScrollButton()){<button class="scroll-button" (click)="scrollDown()">Unten geht es weiter<mat-icon svgIcon="arrow_cool_down" /></button>}<div class="button-box">@if(claims?.review){<button matButton="tonal" data-cy="review-download" (click)="downloadReview()">Reviews downloaden</button>}</div><app-original-toast-container />`})
 export class NativeStarterComponent implements AfterViewInit {
+ readonly ObjectKeys=Object.keys;
  readonly session=inject(NativeMonitorSessionService);readonly starter=inject(NativeTestStarterService);readonly assets=inject(AssetService);
  private readonly toast=inject(OriginalToastService);
  private readonly router=inject(Router);private readonly element=inject<ElementRef<HTMLElement>>(ElementRef);
@@ -62,6 +64,7 @@ export class NativeStarterComponent implements AfterViewInit {
    else downloadTextFile({filename:'testcenter-reviews.csv',mediaType:'text/csv;charset=UTF-8',text:csv});
   }catch(error){if(this.current)this.problem.set(error instanceof Error?error.message:'Problem beim Herunterladen der Kommentare.');}
  }
+ async systemCheck(workspaceId:string,id:string){if(this.current)await this.router.navigate(['/check',workspaceId,id,'w']);}
  async monitor(group:OriginalTestGroupMonitorAccess){if(!this.current||this.groupDisabled(group))return;const profile=Array.isArray(group.flags)?'':group.flags.profile;await this.router.navigate(['/group-monitor',group.id,...(profile?[profile]:[])]);}
  ngAfterViewInit(){this.observer.observe(this.bottom.nativeElement);}
  scrollDown(){if(this.current)this.element.nativeElement.parentElement?.scrollBy({top:300,behavior:'smooth'});}

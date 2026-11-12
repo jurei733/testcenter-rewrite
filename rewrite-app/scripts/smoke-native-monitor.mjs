@@ -11,7 +11,8 @@ if(!isSupervisedSmokeChild(import.meta.url)){
  const suites=[
   {name:'monitor',entry:'run-native-monitor-ui-smoke.mjs',output:artifactRoot,supervision:'native-monitor-ui-supervision'},
   {name:'participant',entry:'run-native-participant-smoke.mjs',output:artifactRoot,supervision:'native-participant-supervision'},
-  {name:'websocket',entry:'smoke-native-websocket.mjs',output:join(artifactRoot,'native-websocket'),supervision:'native-websocket-supervision'}
+  {name:'websocket',entry:'smoke-native-websocket.mjs',output:join(artifactRoot,'native-websocket'),supervision:'native-websocket-supervision'},
+  {name:'system-check',entry:'smoke-native-system-check.mjs',output:artifactRoot,supervision:'native-system-check-supervision'}
  ];
  // Separate API stores and browser contexts; every suite remains mandatory.
  // Each watchdog catches its own stalled phase, even while siblings progress.

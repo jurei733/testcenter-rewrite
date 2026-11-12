@@ -8,7 +8,7 @@ import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 import {readOriginalTestLockFields,parseOriginalTestLockLog,parseOriginalTestLogEntries} from './original-test-log-json.js';
 import {hashOriginalSessionToken} from './original-session-token.js';
 import type {OriginalBookletFiles} from './original-test-files.js';
-import {parseOriginalNativeTestNumber,readOriginalPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
+import {parseOriginalNativeTestNumber,readOriginalTestPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
 import {defaultParticipantExecutionMode,type ParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
 import {originalTestDelivery,prepareOriginalNativeDelivery} from './original-native-delivery.js';
 import type {OriginalNativeStateWriteBase, OriginalNativeStateWriteResult} from '@testcenter-rewrite-app/domain';
@@ -97,7 +97,7 @@ export function createOriginalTestPort(input: {
   readResource:(scope:{tenantId:string;workspaceId:string},path:string)=>Promise<{bytes:Uint8Array;contentType:string}>;
   currentBooklet: (person: ParticipantSession, fileId: string) => Promise<{contentReleaseId: string; booklet: ContentReleaseBookletEntry}>;
 }): OriginalTestPort {
-  const personFor=(token:string)=>readOriginalPerson(input.auth,token);
+  const personFor=(token:string)=>readOriginalTestPerson(input.auth,token);
   const number=parseOriginalNativeTestNumber;
   const forbidden=(raw:string)=>new FirstSliceError(403,'original_test_forbidden',`Access to test ${raw} is not provided.`);
   const owned=(token:string,raw:string)=>resolveOriginalOwnedTest(input,token,raw);
@@ -176,11 +176,10 @@ export function createOriginalTestPort(input: {
       if(group?.kind!=='group'||!await input.repository.matchesOriginalWorkspaceNumber({...group,workspaceNumber:canonical}))throw new FirstSliceError(403,'original_group_token_invalid','Group-Token not valid');
       return input.readResource(group,path);
     },async requirePerson({token}) {
-    if ((await input.auth.read({token})).kind !== 'person') throw new FirstSliceError(403, 'original_token_type_forbidden', 'The supplied token cannot perform that operation.');
+    await personFor(token);
   }, async create(request) {
-    const state = await input.auth.read({token: request.token});
-    if (state.kind !== 'person') throw new FirstSliceError(403, 'original_token_type_forbidden', 'The supplied token cannot perform that operation.');
+    const person = await personFor(request.token);
     if (typeof request.bookletName !== 'string') throw new FirstSliceError(400, 'original_request_invalid', 'Required body-parameter is missing: `bookletName`');
-    return createOriginalPersonTest(input,state.participantSession,request.bookletName);
+    return createOriginalPersonTest(input,person,request.bookletName);
   }};
 }

@@ -1,0 +1,20 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "files": {
+    "admin-entry-hidden-link.png": "85bc1287b4c8b8c8cd2fff7f5bc0ec41fbe4ff369285825db3b2bf9c0c6e8399",
+    "anonymous-global-mode-error.png": "f00ed985a3da7712f6ce585efed563e135e110e1e4099ce0c46707c10d7d257f",
+    "anonymous-report.png": "06d0415faea33c25d04059d74f7fb7f6e32bcdccc7b6871316ab8f44f8d7d23f",
+    "anonymous-save-dialog.png": "a579d8bec4535c69d2c69f293a6a4a64466de30cfd457f14f4caada509f298db",
+    "anonymous-saved.png": "3557b7bd35fd98b8a2e9e83cfc5f49dc4154f704504aa3aee9a19ac4fc9fec5a",
+    "authenticated-cached-public-mode-dialog.png": "514778477c30d08d46447fd18330148188452f5715672f3edb249e662116f978",
+    "authenticated-private-mode-saved.png": "3557b7bd35fd98b8a2e9e83cfc5f49dc4154f704504aa3aee9a19ac4fc9fec5a",
+    "capture.mjs": "1a962f81841e9953fb3bb7f2f898ba7812692fafd41d0c2b0301685bff0aab91",
+    "observations.json": "2e096c6aa58a5c5e9d5d5a36c6c4d8366508c9ad1da445b42b8baabaced80d1e",
+    "selection-empty.png": "8adee065748d4d221010fcf62aa32b48b11c2d1a378f05cd81359541b394576e",
+    "selection-many.png": "2f2de2d4215c199128fc4108dbf159b804e0bcdd2f5197fe67bd5497d259f2c8",
+    "selection-one.png": "2f493ce3324058359e0854b70ae6eb7d17d5656189c88618b25022412958a69a",
+    "wrong-key-capture.mjs": "e638af0ff135ce16772a9111fcdf18af80d2b073f2840224fb3a257fbbe721e6",
+    "wrong-key-error.png": "ab3559020fde7fbba39cd6bd2f15c5b406860f27bcf40f2dc78f7e14bd4ef603",
+    "wrong-key-observations.json": "010d744cac57f0f4d561d75ad2fb8f54c3b35946f5b50fea28229990733578db"
+  }
+}

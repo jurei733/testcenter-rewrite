@@ -9,7 +9,7 @@ import type { Subscription } from "rxjs";
 import { OriginalOverlayStylesComponent } from "./original-overlay-styles.component";
 import type { SystemCheckSaveReportDialogResult } from "./system-check-save-report-dialog.component";
 
-type ReportDialogCopy = { aboutPassword: string; aboutReportId: string; reportIdLabel: string };
+type ReportDialogCopy = { aboutPassword: string; aboutReportId: string; reportIdLabel: string;sourceValues?:boolean };
 
 // Adapted from IQB Testcenter 19 sys-check/report/save-report (MIT).
 // See assets/ORIGINAL-UI-LICENSE.txt. Closing returns only form values to the
@@ -52,9 +52,9 @@ export class OriginalSystemCheckSaveReportDialogComponent {
     title: new FormControl("", { nonNullable: true, validators: [Validators.required, Validators.minLength(3)] }),
     key: new FormControl("", { nonNullable: true, validators: [Validators.required, Validators.minLength(3)] })
   });
-  get canSave(): boolean { return this.form.valid && this.form.controls.key.value.trim().length >= 3 && this.form.controls.title.value.trim().length >= 3; }
+  get canSave(): boolean { return this.form.valid && (this.data.sourceValues===true || this.form.controls.key.value.trim().length >= 3 && this.form.controls.title.value.trim().length >= 3); }
   submit(): void {
-    if (this.canSave) this.dialog.close({ key: this.form.controls.key.value, title: this.form.controls.title.value.trim() });
+    if (this.canSave) this.dialog.close({ key: this.form.controls.key.value, title:this.data.sourceValues===true?this.form.controls.title.value:this.form.controls.title.value.trim() });
   }
 }
 
@@ -63,6 +63,8 @@ export class OriginalSystemCheckSaveReportDialogComponent {
   imports: [OriginalOverlayStylesComponent], template: `<app-original-overlay-styles />`
 })
 export class OriginalSystemCheckSaveReportComponent implements OnInit, OnDestroy {
+  @Input() owner?: AbortSignal;
+  @Input() sourceValues=false;
   @Input() aboutPassword = "";
   @Input() aboutReportId = "";
   @Input() reportIdLabel = "Schul-ID";
@@ -71,18 +73,23 @@ export class OriginalSystemCheckSaveReportComponent implements OnInit, OnDestroy
   private readonly dialogs = inject(MatDialog);
   private dialog?: MatDialogRef<OriginalSystemCheckSaveReportDialogComponent, SystemCheckSaveReportDialogResult>;
   private closed?: Subscription;
+  private readonly retire = () => {
+    this.closed?.unsubscribe(); this.dialog?.componentRef?.location.nativeElement.remove(); this.dialog?.close();
+  };
   ngOnInit(): void {
+    if (this.owner?.aborted) return;
     this.dialog = this.dialogs.open(OriginalSystemCheckSaveReportDialogComponent, {
       width: "500px", height: "600px", maxHeight: "calc(100dvh - 32px)",
       panelClass: "original-system-check-save-report-dialog",
-      data: { aboutPassword: this.aboutPassword, aboutReportId: this.aboutReportId, reportIdLabel: this.reportIdLabel },
+      data: { aboutPassword: this.aboutPassword, aboutReportId: this.aboutReportId, reportIdLabel: this.reportIdLabel,sourceValues:this.sourceValues },
       ariaLabelledBy: "systemCheckSaveReportTitle", ariaDescribedBy: "systemCheckSaveReportDescription",
       autoFocus: "#systemCheckSaveReportKey"
     });
+    this.owner?.addEventListener("abort", this.retire, {once: true});
     this.closed = this.dialog.afterClosed().subscribe(result => {
       if (result) this.save.emit(result);
       else this.cancel.emit();
     });
   }
-  ngOnDestroy(): void { this.closed?.unsubscribe(); this.dialog?.close(); }
+  ngOnDestroy(): void { this.owner?.removeEventListener("abort", this.retire); this.retire(); }
 }

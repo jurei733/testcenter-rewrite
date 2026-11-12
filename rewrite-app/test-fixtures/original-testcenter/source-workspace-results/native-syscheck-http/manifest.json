@@ -1,0 +1,22 @@
+{
+  "capturedAt": "2026-11-09T14:10:11.942361+00:00",
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "actualSourceBackend": true,
+  "actualSourceFrontend": false,
+  "backendImage": "sha256:d7045f22e834e2907ed39b5f8c99eed3d81f37643c50c3f66746e3f654381328",
+  "sourceFilesVerifiedBeforeAndAfter": 137,
+  "configuration": {
+    "xmlSchemaValidation": true,
+    "allowTestMode": false,
+    "bruteForceProtection": "login person"
+  },
+  "sqlSeedsOrDaoStubs": false,
+  "requestRows": 62,
+  "persistedReports": 4,
+  "sourceUnsafeCounterexample": "Source accepts report writes by a monitor person and even when no report save key is configured. Preserve Rewrite dedicated actor/workspace/canSave guards.",
+  "wholeOriginalParityProven": false,
+  "files": {
+    "capture.mjs": "32a6c2c81c56712ad60fe38b957c3adbcfafdf68e920bc9ee20b85d42c02a7f6",
+    "observations.json": "30e3fc20da7d919b0789fc1b17e198719a206582970b5786c9874c109ca25da0"
+  }
+}

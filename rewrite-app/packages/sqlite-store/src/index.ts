@@ -1,3 +1,5 @@
+import {refreshOriginalWorkspaceContentType,readOriginalSystemCheckDirectory} from './original-workspace-content-type.js';
+import {transactOriginalSystemCheck} from './original-system-check.js';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {readOriginalAssetAssignmentLayers} from '@testcenter-rewrite-app/application';
 import {originalApplicationAssets} from './original-application-asset.js';
@@ -1845,6 +1847,8 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
  INSERT INTO original_application_asset_counter(singleton,last_number) VALUES(1,0);
  CREATE TABLE original_application_assets(application_asset_id TEXT PRIMARY KEY REFERENCES application_assets(application_asset_id) ON DELETE CASCADE,
  asset_number INTEGER NOT NULL UNIQUE CHECK(asset_number BETWEEN 1 AND 2147483647),stored_name TEXT NOT NULL UNIQUE);`}
+,{version:83,name:'original_workspace_content_type',sql:`ALTER TABLE workspaces ADD COLUMN original_content_type TEXT NOT NULL DEFAULT 'mixed' CHECK(original_content_type IN ('mixed','test','sysCheck')); CREATE INDEX original_workspace_content_type ON workspaces(original_content_type,status);`}
+
 ];
 
 export const SQLITE_FIRST_SLICE_SCHEMA_VERSION =
@@ -1887,6 +1891,10 @@ const applyMigrations = (database: DatabaseSync): void => {
       database.exec(migration.rebuildNativePerson ? 'BEGIN IMMEDIATE' : 'BEGIN');
       try {
         if (typeof migration.sql === 'string') database.exec(migration.sql); else migration.sql(database);
+        if(migration.version===83){
+          const rows=database.prepare("SELECT tenant_id,workspace_id FROM workspaces").all();
+          for(const row of rows)refreshOriginalWorkspaceContentType(database,{source:mapSourcePackage,event:mapWorkspaceActivityEvent},String(row.tenant_id),String(row.workspace_id));
+        }
         if (migration.rebuildNativePerson && database.prepare('PRAGMA foreign_key_check').all().length) {
           throw new Error('Native person migration violates a foreign-key relationship.');
         }
@@ -2222,7 +2230,8 @@ export const createSqliteFirstSliceStorage = (
           assemblyActivityEvent.summary,
           JSON.stringify(assemblyActivityEvent.details)
         );
-      database.exec("COMMIT");
+      refreshOriginalWorkspaceContentType(database, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId);
+        database.exec("COMMIT");
       return true;
     } catch (error) {
       rollbackAfterFailure(database, error);
@@ -2256,6 +2265,9 @@ export const createSqliteFirstSliceStorage = (
         .get() as Record<string, unknown> | undefined;
       return mapApplicationSettings(row);
     },
+    async readOriginalSystemCheckMode(){return Boolean(database.prepare("SELECT 1 FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id WHERE w.status='active' AND t.status='active' AND w.original_content_type='sysCheck' LIMIT 1").get());},
+    async readOriginalSystemCheckDirectory(){return readOriginalSystemCheckDirectory(database, {source:mapSourcePackage,event:mapWorkspaceActivityEvent});},
+    async transactOriginalSystemCheck(selector,transform){return transactOriginalSystemCheck(database,{person:mapParticipantSession,binding:mapOriginalLoginBinding,source:mapSourcePackage,event:mapWorkspaceActivityEvent},selector,transform);},
     async saveApplicationSettings(settings) {
       return withAssetWrite(()=>{validateApplicationAssetReferences(settings.assetAssignments,assetNames());writeSettings(settings);});
     },
@@ -2941,6 +2953,7 @@ export const createSqliteFirstSliceStorage = (
             activityEvent.summary,
             JSON.stringify(activityEvent.details)
           );
+        if(['source_package_created','source_package_replaced'].includes(activityEvent.eventType))refreshOriginalWorkspaceContentType(database,{source:mapSourcePackage,event:mapWorkspaceActivityEvent},activityEvent.tenantId,activityEvent.workspaceId);
       });
     },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
@@ -2976,6 +2989,7 @@ export const createSqliteFirstSliceStorage = (
       return rows.map(row => mapSourcePackage(row)).filter(Boolean) as SourcePackage[];
     },
     async saveSourcePackage(sourcePackage) {
+      database.exec("BEGIN IMMEDIATE");try{
       database
         .prepare(
           `INSERT INTO source_packages (
@@ -3004,6 +3018,8 @@ export const createSqliteFirstSliceStorage = (
           sourcePackage.status,
           sourcePackage.uploadedAt
         );
+      refreshOriginalWorkspaceContentType(database, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, sourcePackage.tenantId, sourcePackage.workspaceId);
+      database.exec("COMMIT");}catch(error){rollbackAfterFailure(database,error);}
     },
     reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
     async publishWorkspaceFiles(input) {
@@ -3136,6 +3152,7 @@ export const createSqliteFirstSliceStorage = (
             replacementActivityEvent.summary,
             JSON.stringify(replacementActivityEvent.details)
           );
+        refreshOriginalWorkspaceContentType(database, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, replacementSourcePackage.tenantId, replacementSourcePackage.workspaceId);
         database.exec("COMMIT");
         return true;
       } catch (error) {
@@ -3272,6 +3289,7 @@ export const createSqliteFirstSliceStorage = (
              WHERE source_package_id = ? AND tenant_id = ? AND workspace_id = ?`
           )
           .run(input.sourcePackageId, input.tenantId, input.workspaceId);
+        refreshOriginalWorkspaceContentType(database, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, input.tenantId, input.workspaceId);
         database.exec("COMMIT");
         return Number(deletion.changes) === 1;
       } catch (error) {

@@ -1,3 +1,5 @@
+import {refreshOriginalWorkspaceContentCollection,readOriginalSystemCheckModeCollection,readOriginalSystemCheckDirectoryCollection,projectOriginalWorkspaceFile,type OriginalWorkspaceContentType} from '@testcenter-rewrite-app/application';
+import {transactOriginalSystemCheckCollections} from '@testcenter-rewrite-app/application';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {prepareOriginalApplicationAssets,type OriginalApplicationAssetIdentity} from '@testcenter-rewrite-app/application';
 import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
@@ -156,6 +158,7 @@ type PersistedFirstSliceState = {
   originalTestRunsByNumber: Record<string,string>;
   originalWorkspaceNumbers: Record<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
+  originalWorkspaceContentTypes: Record<string,OriginalWorkspaceContentType>;
   originalAdminNumbers: Record<string,OriginalAdminNumber>;
   originalAdminNumberCounter: string;
   originalNativeCommands: Record<string,OriginalCommandDelivery>;
@@ -231,6 +234,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   originalAdminNumbers: {},
   originalAdminNumberCounter: '0',
   originalWorkspaceNumbers: {},
+  originalWorkspaceContentTypes: {},
   originalWorkspaceNumberCounter: "0",
   originalNativeCommands: {},
   originalNativeCommandCounter: '0',
@@ -800,6 +804,8 @@ const createFileRepository = (
 
       validateOriginalPersonNumbers(loaded.state.originalPersonNumbers,loaded.state.originalPersonNumberCounter,loaded.state.participantSessions);
       validateOriginalReviewCollections(loaded.state);
+      if(!Object.hasOwn(loaded.state, 'originalWorkspaceContentTypes'))loaded.state.originalWorkspaceContentTypes={};
+      for(const workspace of Object.values(loaded.state.workspacesByScope))if(!Object.hasOwn(loaded.state.originalWorkspaceContentTypes,workspace.workspaceId))refreshOriginalWorkspaceContentCollection(loaded.state,workspace,projectOriginalWorkspaceFile);
       return loaded.state;
     });
     return cachePromise;
@@ -827,7 +833,8 @@ const createFileRepository = (
   };
 
   const mutate = <Result>(
-    updater: (state: PersistedFirstSliceState) => Result
+    updater: (state: PersistedFirstSliceState) => Result,
+    shouldPersist?: (result:Result)=>boolean
   ): Promise<Result> => {
     return enqueueMutation(async () => {
       const current = await getState();
@@ -838,8 +845,10 @@ const createFileRepository = (
       const sourceDirtyBefore = new Set(dirtySourcePackageIds), releaseDirtyBefore = new Set(dirtyContentReleaseIds);
       try {
         const result = updater(next);
-        await persistState(next);
-        cachePromise = Promise.resolve(next);
+        if(!shouldPersist||shouldPersist(result)){
+          await persistState(next);
+          cachePromise = Promise.resolve(next);
+        }
         return result;
       } catch (error) {
         dirtySourcePackageIds.clear(); dirtyContentReleaseIds.clear();
@@ -938,6 +947,7 @@ const createFileRepository = (
         assembledSourcePackage;
       state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] =
         assemblyActivityEvent;
+      refreshOriginalWorkspaceContentCollection(state,assembledSourcePackage,projectOriginalWorkspaceFile);
       return true;
     });
   };
@@ -946,6 +956,18 @@ const createFileRepository = (
     async getApplicationSettings() {
       const state = await getState();
       return state.applicationSettings;
+    },
+    async readOriginalSystemCheckMode(){return readOriginalSystemCheckModeCollection(await getState());},
+    async readOriginalSystemCheckDirectory(){return readOriginalSystemCheckDirectoryCollection(await getState());},
+    async transactOriginalSystemCheck(selector,transform){
+      // Config/Unit reads and report preflight still observe the current writer
+      // queue, but never rewrite the complete manifest without a report effect.
+      const result=await mutate(state=>{
+        let changed=false;
+        const value=transactOriginalSystemCheckCollections(state,selector,snapshot=>{const effect=transform(snapshot);changed=effect.event!==undefined;return effect;});
+        return{value,changed};
+      },effect=>effect.changed);
+      return result.value;
     },
     async saveApplicationSettings(settings) {
       await mutate(state => {
@@ -1247,6 +1269,7 @@ const createFileRepository = (
           workspaceScopeKey(scope.tenantKey, scope.workspaceKey)
         ] = scope.workspace;
         state.workspacesByKey[scope.workspace.workspaceKey] = scope.workspace;
+      state.originalWorkspaceContentTypes[scope.workspace.workspaceId]??='mixed';
       });
     },
     async deleteWorkspaceAggregate(input) {
@@ -1269,6 +1292,7 @@ const createFileRepository = (
       await mutate(state => {
         guardResultArtifactCollections(state, activityResultParent(activityEvent));
         state.workspaceActivityEvents[activityEvent.activityEventId] = activityEvent;
+        if(['source_package_created','source_package_replaced'].includes(activityEvent.eventType))refreshOriginalWorkspaceContentCollection(state,activityEvent,projectOriginalWorkspaceFile);
       });
     },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
@@ -1299,6 +1323,7 @@ const createFileRepository = (
       await mutate(state => {
         dirtySourcePackageIds.add(sourcePackage.sourcePackageId);
         state.sourcePackages[sourcePackage.sourcePackageId] = sourcePackage;
+        refreshOriginalWorkspaceContentCollection(state,sourcePackage,projectOriginalWorkspaceFile);
       });
     },
     reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
@@ -1376,7 +1401,8 @@ const createFileRepository = (
           replacementSourcePackage;
         state.workspaceActivityEvents[replacementActivityEvent.activityEventId] =
           replacementActivityEvent;
-        return true;
+        refreshOriginalWorkspaceContentCollection(state,replacementSourcePackage,projectOriginalWorkspaceFile);
+      return true;
       });
     },
     async deleteSourcePackageAggregate(input) {
@@ -1450,7 +1476,8 @@ const createFileRepository = (
         }
         dirtySourcePackageIds.add(input.sourcePackageId);
         delete state.sourcePackages[input.sourcePackageId];
-        return true;
+        refreshOriginalWorkspaceContentCollection(state,input,projectOriginalWorkspaceFile);
+      return true;
       });
     },
     async getImportJobById(importJobId) {
