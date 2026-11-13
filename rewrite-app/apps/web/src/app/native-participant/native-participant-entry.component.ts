@@ -28,11 +28,12 @@ import {AssetService} from './shared/services/asset.service';
 import {NativeTerminalCompletionService} from './native-terminal-completion.service';
 import {NativeBackgroundService} from './native-background.service';
 import {CustomtextService} from './shared/services/customtext/customtext.service';
+import {NativePublicHeaderService} from '../native-public-header.service';
 import type {CodeInputType} from './app.interfaces';
 @Component({selector:'app-native-participant-entry',standalone:true,
  imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent],
  providers:[NativeLoginFailureService,AssetService,CustomtextService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
- template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(session.access()&&!session.busy()&&!codeRequired){<button matIconButton class="account-button" [matMenuTriggerFor]="accountMenu" aria-label="Nutzerinformationen"><mat-icon svgIcon="person" /></button><mat-menu #accountMenu="matMenu"><div class="account-heading">Nutzerinformationen</div><dl><dt>Anmeldename:</dt><dd>{{session.access()?.loginName}}</dd><dt>Gruppe:</dt><dd>{{session.access()?.groupLabel}}</dd></dl><button mat-menu-item (click)="logout()" data-cy="logout-button">Abmelden</button></mat-menu>}</div><div class="center">@if(!session.access()||!codeRequired){<h1>{{!session.access()?'Anmelden':'Übersicht'}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
+ template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(session.access()&&!session.busy()&&!codeRequired){<button matIconButton class="account-button" [matMenuTriggerFor]="accountMenu" aria-label="Nutzerinformationen"><mat-icon svgIcon="person" /></button><mat-menu #accountMenu="matMenu"><div class="account-heading">Nutzerinformationen</div><dl><dt>Anmeldename:</dt><dd>{{session.access()?.loginName}}</dd><dt>Gruppe:</dt><dd>{{session.access()?.groupLabel}}</dd></dl><button mat-menu-item (click)="logout()" data-cy="logout-button">Abmelden</button></mat-menu>}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
  @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
  @if(session.restoring()||refreshing()){<p role="status">Sitzung wird geprüft …</p>}
  @else if(!session.access()){
@@ -42,6 +43,8 @@ import type {CodeInputType} from './app.interfaces';
  @else if(refreshFailed()){<button matButton="filled" (click)="refreshStarter()">Übersicht erneut laden</button>}
  @else{<div class="native-login-outlet">@for(scope of ownerKeys;track scope){<app-native-starter />}</div>}@if(!session.access()){<app-original-footer />}`})
 export class NativeParticipantEntryComponent {
+ readonly publicHeader=inject(NativePublicHeaderService);
+ private clearStarterHeader:(()=>void)|undefined;
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
  private readonly cts=inject(CustomtextService);private readonly router=inject(Router);private readonly dialog=inject(MatDialog);
@@ -58,8 +61,14 @@ export class NativeParticipantEntryComponent {
  readonly loginProblem=signal('');readonly loginProblemCode=signal(0);readonly loginProblemLevel=signal<'error'|'warning'>('error');
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
- constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(NativeBackgroundService);inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access(),pending=this.session.restoring()||this.session.busy();untracked(()=>{this.bindTexts(access?.customTexts??{});if(access&&!pending&&this.initialNavigation)void this.startSingleCheck(access);});});
+ constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(NativeBackgroundService);inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access(),restoring=this.session.restoring(),pending=restoring||this.session.busy();untracked(()=>{this.bindTexts(access?.customTexts??{});if(!restoring)this.updatePublicHeader(access);if(access&&!pending&&this.initialNavigation)void this.startSingleCheck(access);});});
   if(this.session.access()&&!this.codeRequired)void this.refreshStarter();
+ }
+ private updatePublicHeader(access:OriginalAccessSet|null){
+  if(this.view.signal.aborted)return;
+  if(!access){this.clearStarterHeader=undefined;this.publicHeader.setTitle('Anmelden');}
+  else if(!access.flags.includes('codeRequired'))this.clearStarterHeader=this.publicHeader.setTitle('Übersicht');
+  else{this.clearStarterHeader?.();this.clearStarterHeader=undefined;}
  }
  async refreshStarter(){
   if(this.refreshing()||this.view.signal.aborted)return;
@@ -99,5 +108,5 @@ export class NativeParticipantEntryComponent {
   const retire=()=>{subscriptions.unsubscribe();ref.componentRef?.location.nativeElement.remove();ref.close();if(this.logoutCleanup===retire)this.logoutCleanup=undefined;};this.logoutCleanup=retire;subscriptions.add(fromEvent(scope,'abort').subscribe(retire));
   subscriptions.add(ref.afterClosed().pipe(take(1)).subscribe(result=>{retire();if(result&&!this.view.signal.aborted&&scope===this.session.accessSignal&&!scope.aborted){void this.session.logout().catch(error=>{if(!this.view.signal.aborted&&!this.session.access())this.problem.set(String(error));});}}));
  }
- ngOnDestroy(){this.view.abort();this.logoutCleanup?.();this.textScope?.removeEventListener('abort',this.clearTexts);this.clearTexts();}
+ ngOnDestroy(){this.view.abort();this.clearStarterHeader?.();this.logoutCleanup?.();this.textScope?.removeEventListener('abort',this.clearTexts);this.clearTexts();}
 }

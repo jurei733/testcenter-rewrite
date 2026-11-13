@@ -4,7 +4,7 @@ import {filter,fromEvent,Subscription,take,takeUntil} from 'rxjs';
 import {BookletService} from './group-monitor/booklet/booklet.service';
 import {TestSessionManager} from './group-monitor/test-session-manager/test-session-manager.service';
 import {GROUP_MONITOR_CONFIG} from './group-monitor/group-monitor.config';
-import {ChangeDetectorRef,Component,inject,signal,type OnDestroy} from '@angular/core';
+import {ChangeDetectorRef,Component,effect,inject,signal,type OnDestroy} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {Router,RouterOutlet,RouterLink,ActivatedRoute,NavigationEnd} from '@angular/router';
 import {MatButton,MatIconButton} from '@angular/material/button';
@@ -29,11 +29,14 @@ import {MainDataService} from './shared/shared.module';
 import {HeaderService} from './shared/services/header.service';
 import {BackendService} from './group-monitor/backend.service';
 import {NativeStarterComponent} from '../native-participant/starter/native-starter.component';
+import {NativePublicHeaderService} from '../native-public-header.service';
 @Component({selector:'app-native-monitor-entry',standalone:true,
  imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,NativeStarterComponent],
  providers:[NativeLoginFailureService,BackendService,BookletService,TestSessionManager,{provide:MAT_MENU_DEFAULT_OPTIONS,useFactory:()=>({...inject(MAT_MENU_DEFAULT_OPTIONS,{skipSelf:true}),overlayPanelClass:'original-native-monitor-menu'})},{provide:GROUP_MONITOR_CONFIG,useValue:{checkForIdleInterval:180000}}],
  templateUrl:'./native-monitor-entry.component.html',styleUrls:['./native-monitor-entry.component.css','../original-login-theme.scss']})
 export class NativeMonitorEntryComponent implements OnDestroy {
+ private readonly publicHeader=inject(NativePublicHeaderService);
+ private clearStarterHeader:(()=>void)|undefined;
  readonly backendProblem=signal('');
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
@@ -41,7 +44,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  private readonly backendSubscription=this.backend.problem$.subscribe(problem=>this.backendProblem.set(problem));
  private readonly view=new AbortController();
  private retireLogout:(()=>void)|undefined;
- ngOnDestroy(){this.view.abort();this.retireLogout?.();this.backendSubscription.unsubscribe();}
+ ngOnDestroy(){this.view.abort();this.clearStarterHeader?.();this.retireLogout?.();this.backendSubscription.unsubscribe();}
  readonly ready=signal(false);readonly problem=signal('');readonly passwordStep=signal(false);
  readonly starterRefreshing=signal(false);readonly starterRefreshFailed=signal(false);
  private starterRefresh:{scope:AbortSignal}|undefined;
@@ -53,11 +56,19 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  private readonly router=inject(Router);private readonly route=inject(ActivatedRoute);private readonly dialog=inject(MatDialog);
  constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
   const detector=inject(ChangeDetectorRef);
+  effect(()=>{if(!this.session.restoring())this.updatePublicHeader();});
   this.router.events.pipe(filter(event=>event instanceof NavigationEnd),takeUntil(fromEvent(this.view.signal,'abort'))).subscribe(()=>{
+   this.updatePublicHeader();
    detector.markForCheck();
    if(this.session.access()&&!(this.hasChild&&this.allowedChild))void this.refreshStarter();
   });
   this.ready.set(true);
+ }
+ private updatePublicHeader(){
+  if(this.view.signal.aborted||this.session.restoring())return;
+  if(!this.session.access()){this.clearStarterHeader=undefined;this.publicHeader.setTitle('Anmelden');}
+  else if(!this.hasChild)this.clearStarterHeader=this.publicHeader.setTitle('Übersicht');
+  else{this.clearStarterHeader?.();this.clearStarterHeader=undefined;}
  }
  get hasChild(){return !!this.route.firstChild;}
  get headerTitle(){if(!this.session.access())return 'Anmelden';return this.hasChild&&this.allowedChild?this.header.title||this.settings.settings().appTitle:this.session.access()&&!this.hasChild?'Übersicht':this.settings.settings().appTitle;}

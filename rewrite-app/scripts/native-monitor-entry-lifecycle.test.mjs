@@ -7,21 +7,23 @@ import * as core from '@angular/core';
 import * as rx from 'rxjs';
 const tokens=new Map(),names=new Map();let bindings;
 const imports=new Proxy({}, {get:(_,name)=>{if(!tokens.has(name)){const value=class{};tokens.set(name,value);names.set(value,name);}return tokens.get(name);}});
-function load(relative){
- const source=process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV?execFileSync('git',['show',process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV+':rewrite-app/apps/web/src/app/native-monitor/'+relative],{encoding:'utf8'}):readFileSync(new URL('../apps/web/src/app/native-monitor/'+relative,import.meta.url),'utf8');
+function load(relative,current=false){
+ const source=process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV&&!current?execFileSync('git',['show',process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV+':rewrite-app/apps/web/src/app/native-monitor/'+relative],{encoding:'utf8'}):readFileSync(new URL('../apps/web/src/app/native-monitor/'+relative,import.meta.url),'utf8');
  const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
- const exports={};new Function('exports','require',code)(exports,spec=>spec==='@angular/core'?{...core,Component:()=>value=>value,Injectable:()=>value=>value,inject:key=>{const name=names.get(key)??key.name;assert.ok(bindings.has(name),'Missing dependency '+name);return bindings.get(name);}}:spec==='rxjs'?rx:imports);return exports;
+ const exports={};new Function('exports','require',code)(exports,spec=>spec==='@angular/core'?{...core,Component:()=>value=>value,Injectable:()=>value=>value,effect:callback=>callback(),inject:key=>{const name=names.get(key)??key.name;assert.ok(bindings.has(name),'Missing dependency '+name);return bindings.get(name);}}:spec==='rxjs'?rx:imports);return exports;
 }
 const {NativeMonitorEntryComponent}=load('native-monitor-entry.component.ts');
 const {HeaderService}=load('shared/services/header.service.ts');
+const {NativePublicHeaderService}=load('../native-public-header.service.ts',true);
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const settle=()=>new Promise(done=>setImmediate(done));
 const access=token=>({token,claims:{testGroupMonitor:[{id:'owned',flags:[]}]}});
 function fixture(){
  const route={firstChild:null},nav=[],events=new rx.Subject(),closed=new rx.Subject(),problem$=new rx.BehaviorSubject(''),calls=[];let scope=new AbortController(),closes=0,marks=0;
- const session={access:core.signal(access('original')),busy:core.signal(false),problem:core.signal(''),get accessSignal(){return scope.signal;},login:async()=>session.access(),refresh:async()=>{},logout:()=>{calls.push('logout');replace(null);return Promise.resolve();}};
+ const session={access:core.signal(access('original')),busy:core.signal(false),restoring:core.signal(false),problem:core.signal(''),get accessSignal(){return scope.signal;},login:async()=>session.access(),refresh:async()=>{},logout:()=>{calls.push('logout');replace(null);return Promise.resolve();}};
  const replace=value=>{const old=scope;scope=new AbortController();session.access.set(value);old.abort();};
  bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},ChangeDetectorRef:{markForCheck(){marks++;}},Router:{events,navigate:async path=>{nav.push(path);return true;}},ActivatedRoute:route,MatDialog:{open:()=>({afterClosed:()=>closed,close:()=>{closes++;}})},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},NativeLoginFailureService:{show:async()=>{}}}));
+ bindings.set('NativePublicHeaderService',new NativePublicHeaderService());
  const header=new HeaderService();bindings.set('HeaderService',header);
  const component=new NativeMonitorEntryComponent();component.name='owned';return {component,header,route,session,nav,events,closed,calls,replace,problem$,get marks(){return marks;},get closes(){return closes;}};
 }

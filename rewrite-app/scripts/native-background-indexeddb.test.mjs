@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
 import {chromium} from 'playwright';
+import {readCurrentNativeUnitMirror} from './native-journal-mirror-observation.mjs';
 const require=createRequire(import.meta.url),ts=require('typescript');
 const inputs={
  'apps/web/src/native-save-runtime/runtime.js':new URL('../apps/web/src/native-save-runtime/runtime.js',import.meta.url),
@@ -13,6 +14,7 @@ const inputs={
 };
 const hashInputs=async()=>Object.fromEntries(await Promise.all(Object.entries(inputs).map(async([path,url])=>[path,createHash('sha256').update(await readFile(url)).digest('hex')])));
 inputs['apps/web/src/app/native-participant/native-unit-journal.ts']=new URL('../apps/web/src/app/native-participant/native-unit-journal.ts',import.meta.url);
+inputs['scripts/native-journal-mirror-observation.mjs']=new URL('./native-journal-mirror-observation.mjs',import.meta.url);
 const inputHashes=await hashInputs();
 const source=await readFile(new URL('../apps/web/src/native-save-runtime/runtime.js',import.meta.url),'utf8');
 const bridge=ts.transpileModule(await readFile(new URL('../apps/web/src/app/native-participant/native-background.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
@@ -53,6 +55,36 @@ async function pageFixture(t){
  });page.ownedToken=await page.evaluate(()=>token);return page;
 }
 const ownRequests=page=>requests.filter(request=>request.headers.authtoken===page.ownedToken);
+test('a coalesced staged ID is observed by its exact current mirrored bytes rather than its obsolete first payload',async t=>{
+ const page=await pageFixture(t);
+ const witness=await page.evaluate(async()=>{
+  const owner=new AbortController(),context=NativeBridge.nativeBackground(token,owner.signal);await context.ready;
+  const journal=await NativeUnitJournal.open({token,testId:'9007199254740993',storage:localStorage,locks:navigator.locks,crypto,
+   mirror:context.mirror,seal:context.seal});
+  journal.captureResponse('A','ORIGINAL',{owned:'The same construction'},'owned/type',1);await context.settled();
+  const bucket=Object.keys(localStorage).find(key=>key.startsWith('testcenter-native-unit-journal:v1:'));
+  const first=JSON.parse(localStorage.getItem(bucket));
+  journal.captureResponse('A','ORIGINAL',{owned:'The same construction'},'owned/type',2);await context.settled();
+  const current=JSON.parse(localStorage.getItem(bucket)),stored=await rt.readRecord(bucket);
+  window.ownedMirrorObservation={owner,journal};
+  return{bucket,actor:first.actor,testId:first.testId,first:first.entries[0],current:current.entries[0],
+   revision:current.revision,stored:stored.document.entries[0],sealed:stored.sealed};
+ });
+ assert.equal(witness.first.id,witness.current.id);
+ assert.notEqual(witness.first.payload,witness.current.payload,'The legitimate staged timestamp coalesces without changing its ID.');
+ assert.notEqual(witness.stored.payload,witness.first.payload,'The former fixed-snapshot predicate rejects this valid mirror.');
+ assert.equal(witness.stored.payload,witness.current.payload);assert.equal(witness.sealed,false);
+ const identity={bucket:witness.bucket,actor:witness.actor,testId:witness.testId,id:witness.first.id,
+  unitAlias:witness.first.unitAlias,originalUnitId:witness.first.originalUnitId,queuedAt:witness.first.queuedAt};
+ const observed=await readCurrentNativeUnitMirror(page,identity);
+ assert.equal(observed.entry.payload,witness.current.payload);
+ assert.equal(observed.entry.id,witness.first.id);assert.equal(observed.localRevision,witness.revision);
+ assert.equal(observed.mirrorRevision,witness.revision);
+ assert.equal(await readCurrentNativeUnitMirror(page,{...identity,actor:'a-different-actor'}),false);
+ assert.equal(await readCurrentNativeUnitMirror(page,{...identity,unitAlias:'a-different-unit'}),false);
+ assert.deepEqual(ownRequests(page),[],'Observing the current draft must not seal, drain or send it.');
+ await page.evaluate(()=>{ownedMirrorObservation.owner.abort();ownedMirrorObservation.journal.close();});
+});
 test('a real durable mirror registers sync while its window exists and keeps the unsealed Source window intact',async t=>{
  const page=await pageFixture(t);
  const before=await page.evaluate(async()=>{

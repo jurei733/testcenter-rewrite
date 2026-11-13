@@ -98,9 +98,9 @@ an obsolete failure. Failed refreshes retain the last validated flag and expose
 the Source error dialog; browser-history navigation dismisses that dialog, as
 the actual Source reference does. A reload fetches a fresh mode.
 
-The native browser suite includes38 cases per browser, including9 anonymous
+The native browser suite includes62 cases per browser, including9 anonymous
 selection/mode/error cases,11 actual administrative-upload/isolation/error cases
-and10 real persisted reports. The additional cases establish administrator
+and24 public-header lifecycle cases, with10 real persisted reports. The additional cases establish administrator
 credentials through the real UI, retain them through same-document navigation,
 and prove that native reads/saves omit that bearer and inherit no operator
 permission. Real mode-endpoint TCP failures match the Source dialog's collapsed
@@ -117,14 +117,37 @@ omits key/title and receives the real missing-key400 without persisting a report
 Browser-history navigation also retires a pending lazy error presentation before
 its actual module arrives; a genuinely new failure after navigation still opens
 its error dialog. Both prior mismatches have preserved failing reproductions.
-Nonfresh header/navigation, expanded error details, fully offline error-module
-availability and late report/dialog/actor retirement boundaries remain open.
+Public selection now retains the document's last public title: blank on a fresh
+entry, `Anmelden` after login, and `Systemcheck` after the wizard. Full reload
+resets it. The public Starter's retirement clears only its own title revision;
+private group/workspace/Booklet titles retain their existing access owners.
+The pinned Source login corpus also distinguishes the first code-entry header
+(`Anmelden`) from its blank full-reload restoration. The native participant gate
+now checks that pair through real login, reload and subsequent code entry.
+
+The new Source capture contains36 selection scenes over all three themes,
+1280x850 and390x850, with explicit Chrome156/Chromium147, self comparisons and
+108 actual white frames. The integrated header cohort exercises fresh/login/
+wizard/reload transitions with one configured check. Independent full-frame
+pixel comparisons qualify that cohort separately from functional CI checks.
+Generic-info/private/admin header and account-panel navigation, expanded error
+details, fully offline error-module availability and late report/dialog/actor
+retirement boundaries remain open.
 Historical schema-valid
 but rejected roster-only file recovery, directory lexical/large-ID boundaries,
-additional network timeout/maximum-packet boundaries and all Systemcheck
-themes/mobile layouts also need qualification. Initial exploratory Source dialog
+additional network timeout/maximum-packet boundaries, empty/many selection in
+other theme/viewport combinations and the remaining welcome/network/Unit/
+questionnaire/report/dialog theme/mobile layouts also need qualification. Initial exploratory Source dialog
 captures contain opening animations and are not visual references. The complete
 49-functional/8-visual Original-parity goal remains open.
+
+The native background-browser gate includes14 actual IndexedDB controls. Its
+GeoGebra check compares the current unsealed local draft with the exact current
+IndexedDB bytes: another Player notification may coalesce a staged delivery ID
+before sealing. Actor, Test, Unit, original queue time and final construction
+must still match, and capture/page closure must finish within five seconds.
+After closure, delivery must match the immutable sealed bytes with no open actor
+pages or manual worker wake. Observing the draft never seals or sends it.
 
 The Original workspace now exposes the implemented **Dateien** and
 **Systemcheck Berichte** tabs. Reports show complete counts and OS/browser

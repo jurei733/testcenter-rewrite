@@ -7,6 +7,7 @@ import {runNativeResourceUploadSmoke} from './native-resource-upload-smoke.mjs';
 import {runNativeWorkspaceZipSmoke} from './native-workspace-zip-smoke.mjs';
 import {workspaceZip} from './workspace-zip-fixture.mjs';
 import {runNativeWorkerRestartSmoke} from './native-worker-restart-smoke.mjs';
+import {readCurrentNativeUnitMirror} from './native-journal-mirror-observation.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
@@ -251,17 +252,22 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
 
     await configure('native-geogebra-large-pending',0,'stars-offline',undefined,{testIds:[testId]});
     const gestureAt=Date.now(),pendingPoint=await drag(largeRestoredElement,largeRestored);
-    const pending=await wait(async()=>{
+    const firstStaged=await wait(async()=>{
       const documents=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('testcenter-native-unit-journal:v1:')).map(key=>({key,...JSON.parse(localStorage.getItem(key))})));
       for(const document of documents)for(const entry of document.entries){
         if(document.testId===testId&&entry.kind==='response'&&entry.unitAlias==='2'&&emittedPoint(JSON.parse(entry.payload).dataParts)===pendingPoint.pointCoordinates)return{key:document.key,actor:document.actor,entry};
       }
     },'the exact real large construction is captured in its production local journal');
+    assert.ok(Buffer.byteLength(firstStaged.entry.payload)>1024*1024);
+    // Another real Player notification may replace this staged ID before the
+    // asynchronous mirror is observed. Require exact current bytes, identity,
+    // revision and the actual final pointer construction, not an obsolete sample.
+    const pending=await wait(async()=>{
+      const current=await readCurrentNativeUnitMirror(page,{bucket:firstStaged.key,actor:firstStaged.actor,testId,
+        id:firstStaged.entry.id,unitAlias:firstStaged.entry.unitAlias,originalUnitId:firstStaged.entry.originalUnitId,queuedAt:firstStaged.entry.queuedAt});
+      return current&&emittedPoint(JSON.parse(current.entry.payload).dataParts)===pendingPoint.pointCoordinates?current:false;
+    },'production IndexedDB mirror of the actual current large draft');
     const pendingBytes=Buffer.byteLength(pending.entry.payload);assert.ok(pendingBytes>1024*1024);
-    await wait(()=>page.evaluate(async({key,id,payload})=>{
-      const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('testcenter-native-save-v1',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
-      try{return await new Promise((resolve,reject)=>{const request=db.transaction('documents').objectStore('documents').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.bucket===key&&row.document.entries.some(entry=>entry.id===id&&entry.payload===payload)));request.onerror=()=>reject(request.error);});}finally{db.close();}
-    },{key:pending.key,id:pending.entry.id,payload:pending.entry.payload}),'production IndexedDB mirror of the actual large draft');
     const captureElapsedMs=Date.now()-gestureAt;assert.ok(captureElapsedMs<5000,'Close the durable draft before the Source response window expires');
     mark('native-real-large-GeoGebra-draft-enters-production-IndexedDB-before-the-five-second-response-window');
     await configure('native-geogebra-large-closed',0,'stars-closure',undefined,{testIds:[testId],closureIds:[pending.entry.id]});
@@ -280,7 +286,10 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     assert.equal(sealed?.sealed,true);assert.ok(sealed.entry);assert.equal(sealed.entry.id,pending.entry.id);
     assert.equal(emittedPoint(JSON.parse(sealed.entry.payload).dataParts),pendingPoint.pointCoordinates);
     await writeFile(join(out,'native-geogebra-large-sealed.json'),JSON.stringify({deliveryId:pending.entry.id,zeroActorPages:context.pages().length===0,closedElapsedMs,captureElapsedMs,
-      draftPayloadSha256:hash(pending.entry.payload),sealedPayloadSha256:hash(sealed.entry.payload),revision:sealed.revision,stagedDraftCoalescedBeforeSeal:pending.entry.payload!==sealed.entry.payload},null,2));
+      initialDraftPayloadSha256:hash(firstStaged.entry.payload),draftPayloadSha256:hash(pending.entry.payload),
+      stagedDraftCoalescedBeforeMirror:firstStaged.entry.payload!==pending.entry.payload,
+      mirroredLocalRevision:pending.localRevision,mirroredIndexedDbRevision:pending.mirrorRevision,
+      sealedPayloadSha256:hash(sealed.entry.payload),revision:sealed.revision,stagedDraftCoalescedBeforeSeal:pending.entry.payload!==sealed.entry.payload},null,2));
     assert.equal(writes.filter(row=>row.deliveryId===pending.entry.id).length,0);
     if(workerRestart)await runNativeWorkerRestartSmoke({browser,context,worker,configure,release,testId,entry:sealed.entry,revision:sealed.revision,out,wait,serverMessages,responseReceipts,writes,mark});
     else {

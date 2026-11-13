@@ -10,6 +10,7 @@ import { InterfaceModeService } from '../interface-mode.service';
 import { SystemCheckViewComponent } from '../system-check-view.component';
 import { OriginalOverlayStylesComponent } from '../original-overlay-styles.component';
 import { NativeLoginFailureService } from '../native-login-failure.service';
+import { NativePublicHeaderService } from '../native-public-header.service';
 
 @Component({
   selector: 'app-native-system-check-entry', standalone: true,
@@ -31,6 +32,7 @@ export class NativeSystemCheckEntryComponent {
   private readonly params = toSignal(this.route.paramMap, {initialValue: this.route.snapshot.paramMap});
   private readonly owner = new AbortController();
   constructor() {
+    inject(NativePublicHeaderService).setTitle('Systemcheck');
     inject(NativeAssetContext).activate(this.owner.signal);
     inject(NativeThemeContext).activate(this.owner.signal);
     inject(InterfaceModeService).select('original');
