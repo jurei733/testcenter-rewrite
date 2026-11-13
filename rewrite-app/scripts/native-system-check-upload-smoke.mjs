@@ -97,20 +97,25 @@ export async function runNativeSystemCheckUploadChecks({browser,out,mark}){
   await configureFault(false);
   await otherContext.close();
   const frontend=resolve('dist/apps/web/browser'),presenters=[];
-  for(const name of await readdir(frontend))if(/^chunk-[A-Z0-9]+\.js$/.test(name)&&/openNativeSystemCheckInstallationError/.test(await readFile(join(frontend,name),'utf8')))presenters.push(name);
+  for(const name of await readdir(frontend))if(/^chunk-[A-Z0-9]+\.js$/.test(name)&&/export\{[^}]*\bas openNativeSystemCheckInstallationError\b/.test(await readFile(join(frontend,name),'utf8')))presenters.push(name);
   assert.equal(presenters.length,1,'Resolve the actual exported lazy presenter from the current build, not a fabricated module.');const presenterPath='/app/'+presenters[0];
   const dialogChunks=[];for(const name of await readdir(frontend))if(/^chunk-[A-Z0-9]+\.js$/.test(name)&&/app-native-login-error/.test(await readFile(join(frontend,name),'utf8')))dialogChunks.push(name);assert.equal(dialogChunks.length,1);const dialogPath='/app/'+dialogChunks[0];
   // Hold the real shared dialog code, required by both the routed shell and
   // early fallback. This makes the pending-load boundary deterministic.
   await configure({nativeModeFault:true,nativeHeldAssetPath:dialogPath});otherContext=await browser.newContext({viewport:{width:1280,height:850}});page=await otherContext.newPage();observe(page);
   let assetListener;const assetHeld=new Promise(done=>{assetListener=message=>{if(message?.heldAssetRequest&&message.path===dialogPath){server.off('message',assetListener);done();}};server.on('message',assetListener);});
-  const pendingErrorRequest=page.waitForRequest(request=>new URL(request.url()).pathname===presenterPath,{timeout:5000});
-  await page.goto(base+'/app/r/check-starter');await raceWithSmokeDeadline(assetHeld,5000,()=>{throw Error('The actual dialog code request was not held.');});await pendingErrorRequest;const pendingTime=await page.evaluate(()=>performance.timeOrigin);
-  // Real same-document browser navigation retires even an early fallback whose
-  // wrapper is still in flight; a routed shell may already have supplied its UI.
-  await page.goto(base+'/app/r/check-starter#owned-history-dismissal');assert.equal(await page.evaluate(()=>performance.timeOrigin),pendingTime);
+  const beforeCodeWire=wire.length,presenterLoadRequest=page.waitForRequest(request=>new URL(request.url()).pathname===presenterPath,{timeout:5000});
+  await page.goto(base+'/app/r/check-starter');await raceWithSmokeDeadline(assetHeld,5000,()=>{throw Error('The actual dialog code request was not held.');});await presenterLoadRequest;const pendingTime=await page.evaluate(()=>performance.timeOrigin);
+  assert.equal(wire.slice(beforeCodeWire).filter(row=>row.path==='/sys-check-mode').length,0,'Public mode must not be requested before its error code is available.');
+  await page.goto(base+'/app/r/check-starter#owned-history-before-readiness');assert.equal(await page.evaluate(()=>performance.timeOrigin),pendingTime);
   const actualPresenterReply=page.waitForResponse(response=>new URL(response.url()).pathname===dialogPath);await configure({nativeHeldAssetPath:''});assert.equal((await actualPresenterReply).status(),200);
-  assert.equal(await page.evaluate(async path=>typeof(await import(path)).openNativeSystemCheckInstallationError,presenterPath),'function');await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));await page.getByRole('button',{name:'Owned upload check',exact:true}).waitFor();assert.equal(await page.locator('.original-native-login-error-dialog').count(),0,'A Source-dismissed error must not appear later when its real module finishes loading.');passed('browser-history-dismissal-retires-a-pending-real-lazy-error-presentation');await configureFault(false);
+  assert.equal(await page.evaluate(async path=>typeof(await import(path)).openNativeSystemCheckInstallationError,presenterPath),'function');
+  const initializedError=page.locator('.original-native-login-error-dialog');await initializedError.getByRole('heading',{name:'Netzwerkfehler',exact:true}).waitFor();
+  assert.ok(wire.slice(beforeCodeWire).some(row=>row.path==='/sys-check-mode'));assert.equal(await page.evaluate(()=>performance.timeOrigin),pendingTime);
+  // This failure genuinely occurs after the first history event. It must open,
+  // then a later real navigation must retire it without resurrection.
+  await page.goto(base+'/app/r/check-starter#owned-history-after-error');await initializedError.waitFor({state:'hidden'});await page.getByRole('button',{name:'Owned upload check',exact:true}).waitFor();assert.equal(await initializedError.count(),0);
+  passed('code-readiness-retains-a-new-failure-after-history-and-later-navigation-retires-it');await configureFault(false);
   await otherContext.close();await configure({nativeModeHold:true,nativeModeFault:true});otherContext=await browser.newContext({viewport:{width:1280,height:850}});page=await otherContext.newPage();observe(page);
   await page.goto(base+'/app/r/check-starter');await page.getByRole('button',{name:'Owned upload check',exact:true}).click();await page.locator('#syscheck-next-step:enabled').waitFor();await page.goBack();await page.waitForURL(url=>url.pathname==='/app/r/check-starter');await page.getByRole('button',{name:'Owned upload check',exact:true}).waitFor();assert.equal(await page.locator('.original-native-login-error-dialog').count(),0);
   await configure({nativeModeHold:false});await page.locator('.original-native-login-error-dialog').getByRole('heading',{name:'Netzwerkfehler',exact:true}).waitFor();passed('a-new-actual-request-failure-after-history-navigation-still-opens-its-error');await configureFault(false);

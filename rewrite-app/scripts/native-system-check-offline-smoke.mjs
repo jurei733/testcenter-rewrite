@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
+import {mkdir,mkdtemp,readFile,readdir,writeFile} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {systemCheckXml} from './native-system-check-fixture.mjs';
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
@@ -21,6 +21,22 @@ assert.equal(source.controls.length,12);assert.equal(source.selfControls.length,
 for(const row of source.controls){
  assert.equal(row.offline,true);assert.deepEqual(row.scriptsAfter,[]);
  assert.equal(row.survivesEscape,1);assert.equal(row.offlineBannerCount,0);
+ assert.equal(row.recovery.newDocument,true);assert.equal(row.recovery.loginVisible,true);
+ assert.equal(row.recovery.path,'#/r/login/');
+}
+const earlyFixture=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-syscheck-early-offline/',import.meta.url);
+const earlyManifest=JSON.parse(await readFile(new URL('manifest.json',earlyFixture)));
+for(const[path,sha]of Object.entries(earlyManifest.files)){
+ assert.match(path,/^[A-Za-z0-9.-]+$/);
+ assert.equal(createHash('sha256').update(await readFile(new URL(path,earlyFixture))).digest('hex'),sha);
+}
+const earlySource=JSON.parse(await readFile(new URL('observations.json',earlyFixture)));
+assert.equal(earlySource.actualSourceBackend,true);assert.equal(earlySource.actualSourceFrontend,true);
+assert.equal(earlySource.apiMocks,false);assert.equal(earlySource.sqlSeedsOrDaoStubs,false);
+assert.equal(earlySource.controls.length,12);assert.equal(earlySource.visualParityProven,false);
+for(const row of earlySource.controls){
+ assert.equal(row.wizardCodeNeverServed,true);assert.equal(row.wizardVisible,false);
+ assert.equal(row.offline,true);assert.deepEqual(row.scriptsAfter,[]);
  assert.equal(row.recovery.newDocument,true);assert.equal(row.recovery.loginVisible,true);
  assert.equal(row.recovery.path,'#/r/login/');
 }
@@ -53,18 +69,30 @@ export async function runNativeSystemCheckOfflineChecks({browser,out,mark}){
   await api('/api/v1/tenants/owned-offline/workspaces',{workspaceKey:'offline',displayName:'Owned offline'},'POST',201);
   const scope='/api/v1/tenants/owned-offline/workspaces/offline';
   await api(scope+'/files',{fileName:'check.xml',mediaType:'application/xml',sourceDocument:systemCheckXml('SysCheck','<Metadata><Id>R108.CHECK</Id><Label>Owned offline error check</Label></Metadata><Config skipnetwork="true" savekey="owned-key"/>')},'POST',201);
-  for(const theme of ['Primar','Sekundar','Erwachsene']){
+  const wizardFiles=[];
+  for(const name of await readdir(resolve('dist/apps/web/browser')))if(/^chunk-[A-Z0-9]+\.js$/.test(name)&&/app-native-system-check-entry/.test(await readFile(resolve('dist/apps/web/browser',name),'utf8')))wizardFiles.push(name);
+  assert.equal(wizardFiles.length,1,'Hold the real lazy wizard module from this build.');const wizardPath='/app/'+wizardFiles[0];
+  for(const early of [false,true])for(const theme of ['Primar','Sekundar','Erwachsene']){
    await api('/api/v1/admin/application-settings',{themeName:theme},'PATCH');
    for(const width of [1280,390]){
-    const prefix=theme+'-'+width,reference=source.controls.find(row=>row.theme===theme&&row.width===width&&row.browser===browser.version())??source.controls.find(row=>row.theme===theme&&row.width===width);
-    assert.ok(reference);stage=prefix+'-startup';await configure({nativeModeHold:true,nativeModeFault:true});
+    const prefix=(early?'early-':'')+theme+'-'+width,reference=source.controls.find(row=>row.theme===theme&&row.width===width&&row.browser===browser.version())??source.controls.find(row=>row.theme===theme&&row.width===width);
+    assert.ok(reference);const earlyReference=earlySource.controls.find(row=>row.theme===theme&&row.width===width&&row.browser===browser.version())??earlySource.controls.find(row=>row.theme===theme&&row.width===width);assert.ok(earlyReference);
+    stage=prefix+'-startup';await configure({nativeModeHold:true,nativeModeFault:true,nativeHeldAssetPath:early?wizardPath:''});
     context=await browser.newContext({viewport:{width,height:850},serviceWorkers:'block'});page=await context.newPage();page.setDefaultTimeout(20000);
     const scripts=[],failed=[];
     page.on('pageerror',error=>errors.push(String(error)));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
     page.on('request',request=>{const path=new URL(request.url()).pathname;if(request.resourceType()==='script')scripts.push(path);if(!path.startsWith('/app/'))wire.push({theme,width,path,method:request.method(),nativeToken:!!request.headers().authtoken,canonicalToken:!!request.headers().authorization});});
     page.on('requestfailed',request=>failed.push({path:new URL(request.url()).pathname,error:request.failure()?.errorText}));
     let heldListener;const held=new Promise(done=>{heldListener=message=>{if(message?.heldModeRequest){server.off('message',heldListener);done();}};server.on('message',heldListener);});
-    await page.goto(base+'/app/r/check-starter');await page.getByRole('button',{name:'Owned offline error check',exact:true}).waitFor();
+    let assetListener;const wizardHeld=early?new Promise(done=>{assetListener=message=>{if(message?.heldAssetRequest&&message.path===wizardPath){server.off('message',assetListener);done();}};server.on('message',assetListener);}):Promise.resolve();
+    const wizardResponses=[];page.on('response',response=>{if(new URL(response.url()).pathname===wizardPath)wizardResponses.push(response.status());});
+    if(early){
+     const directory=await api('/sys-checks',undefined,'GET',200,''),workspace=directory.find(row=>row.name==='R108.CHECK')?.workspaceId;assert.ok(workspace);
+     await page.goto(base+'/app/check/'+workspace+'/R108.CHECK/w?ui=original',{waitUntil:'domcontentloaded'});
+     await raceWithSmokeDeadline(wizardHeld,5000,()=>{throw Error('The real lazy wizard script was not held.');});assert.equal(await page.locator('#syscheck-next-step').count(),0);
+    }else{
+     await page.goto(base+'/app/r/check-starter');await page.getByRole('button',{name:'Owned offline error check',exact:true}).waitFor();
+    }
     await page.waitForFunction(theme=>document.documentElement.dataset.applicationTheme===theme&&document.documentElement.dataset.interfaceMode==='original',theme);
     await raceWithSmokeDeadline(held,5000,()=>{throw Error('Actual offline mode request not held.');});
     await page.evaluate(()=>document.fonts.ready);await page.waitForFunction(()=>Array.from(document.images).every(image=>image.complete&&image.naturalWidth>0));
@@ -73,6 +101,17 @@ export async function runNativeSystemCheckOfflineChecks({browser,out,mark}){
     const dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:'Netzwerkfehler',exact:true}).waitFor({timeout:5000});await waitForFiniteDocumentAnimations(page);
     assert.equal(await page.evaluate(()=>navigator.onLine),false);assert.equal(await page.evaluate(()=>performance.timeOrigin),timeOrigin);
     assert.equal(await page.locator('.offline-shell-banner').count(),reference.offlineBannerCount);
+    const presentation=await dialog.evaluate(element=>{
+     const surface=element.querySelector('.mat-mdc-dialog-surface'),button=element.querySelector('[data-cy=close]');
+     if(!surface||!button)throw Error('Missing actual error surface or reload action.');
+     const panel=getComputedStyle(surface),action=getComputedStyle(button),title=getComputedStyle(element.querySelector('h2'));
+     return{width:surface.getBoundingClientRect().width,borderRadius:panel.borderRadius,background:panel.backgroundColor,boxSizing:panel.boxSizing,titleFont:title.fontFamily,titleSize:title.fontSize,actionColor:action.color,actionRadius:action.borderRadius};
+    });
+    // The real cold-dialog regression previously rendered with default Material
+    // formatting until a routed shell supplied Original styles. Holding wizard
+    // code must preserve the same theme/layout as the loaded-shell dialog.
+    if(early)assert.deepEqual(presentation,controls.find(row=>!row.early&&row.theme===theme&&row.width===width)?.presentation);
+    if(early){assert.equal(await page.locator('#syscheck-next-step').count(),0);assert.deepEqual(wizardResponses,[]);}
     await page.screenshot({path:join(out,prefix+'-collapsed.png')});passed(prefix+'-cold-offline-error-renders-without-another-script');
     await dialog.locator('mat-expansion-panel-header').click();await dialog.getByText('Browser:',{exact:true}).waitFor();await waitForFiniteDocumentAnimations(page);
     const paragraphs=await dialog.locator('mat-expansion-panel p').allInnerTexts();
@@ -81,22 +120,27 @@ export async function runNativeSystemCheckOfflineChecks({browser,out,mark}){
     for(const field of [...(sourceEnvironmentMatched?['Browser:','Betriebssystem:','Gerät:']:[]),'Booklet:','Login:','Mode:']){
      assert.equal(normalize(paragraphs.find(text=>text.startsWith(field))??''),normalize(reference.expanded.paragraphs.find(text=>text.startsWith(field))??''),field);
     }
+    if(early)for(const field of ['Booklet:','Login:','Mode:']){
+     const sourceField=earlyReference.expanded.split(/\n/u).map(text=>text.trim()).find(text=>text.startsWith(field))??'';
+     assert.equal(normalize(paragraphs.find(text=>text.startsWith(field))??''),normalize(sourceField),field+' before wizard code');
+    }
     const timestamp=paragraphs.find(text=>text.startsWith('Zeitpunkt: '))?.slice('Zeitpunkt: '.length);assert.match(timestamp,/^[A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2}:\d{2} (AM|PM)$/);
     const parsed=await page.evaluate(text=>Date.parse(text),timestamp),now=await page.evaluate(()=>Date.now());assert.ok(parsed+1000>=before&&parsed<=now);
-    assert.equal(paragraphs.find(text=>text.startsWith('Url: '))?.slice('Url: '.length),page.url());
+    const expectedErrorUrl=new URL(page.url());expectedErrorUrl.search='';expectedErrorUrl.hash='';
+    assert.equal(paragraphs.find(text=>text.startsWith('Url: '))?.slice('Url: '.length),expectedErrorUrl.href);
     await page.screenshot({path:join(out,prefix+'-expanded.png')});await page.keyboard.press('Escape');assert.equal(await dialog.count(),reference.survivesEscape);
     const scriptsAfter=scripts.slice(scriptsBefore.length);assert.deepEqual(scriptsAfter,[]);assert.ok(failed.some(row=>row.path==='/sys-check-mode'));
     passed(prefix+'-Source-anonymous-details-and-Escape-retain-the-offline-dialog');
     stage=prefix+'-recover';await context.setOffline(false);await configure({nativeModeFault:false});await dialog.locator('[data-cy=close]').click();
     await page.waitForURL(url=>url.pathname==='/app/native-start');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).waitFor();
     assert.notEqual(await page.evaluate(()=>performance.timeOrigin),timeOrigin);assert.equal(await page.getByRole('dialog').count(),0);
-    controls.push({theme,width,browser:browser.version(),platform,sourceEnvironmentMatched,scriptsBefore,scriptsAfter,failed,timestamp,paragraphs,recovery:{newDocument:true,loginVisible:true,path:new URL(page.url()).pathname},sourceResourceFailureDialogs:reference.dialogCount});
+    controls.push({early,presentation,wizardPath,...early?{wizardCodeNeverServed:wizardResponses.length===0,wizardVisible:false}:{},theme,width,browser:browser.version(),platform,sourceEnvironmentMatched,scriptsBefore,scriptsAfter,failed,timestamp,paragraphs,recovery:{newDocument:true,loginVisible:true,path:new URL(page.url()).pathname},sourceResourceFailureDialogs:early?earlyReference.dialogCount:reference.dialogCount});
     passed(prefix+'-Source-reload-enters-a-new-login-document');await context.close();context=undefined;page=undefined;
    }
   }
   assert.deepEqual(errors,[]);assert.deepEqual(consoleErrors.filter(text=>/TypeError|ReferenceError|SyntaxError|NG\d{4}/u.test(text)),[]);
   assert.ok(wire.every(row=>!row.nativeToken&&!row.canonicalToken));assert.equal((await api(scope+'/system-check-reports?checkId=R108.CHECK')).items.length,0);
-  await writeFile(join(out,'result.json'),JSON.stringify({success:true,browser:browser.version(),checks,controls,errors,consoleErrors,wire,reportsPersisted:0,actualSourceFrontendReference:true,sourceFixture:manifest.sourceCommit,sourceResourceFailureCascadeRetainedAsCounterEvidence:true,visualParityProven:false},null,2)+'\n');return checks;
+  await writeFile(join(out,'result.json'),JSON.stringify({success:true,browser:browser.version(),checks,controls,errors,consoleErrors,wire,reportsPersisted:0,actualSourceFrontendReference:true,sourceFixture:manifest.sourceCommit,earlySourceFixture:earlyManifest.sourceCommit,earlyWizardContexts:controls.filter(row=>row.early).length,sourceResourceFailureCascadeRetainedAsCounterEvidence:true,visualParityProven:false},null,2)+'\n');return checks;
  }catch(error){
   await page?.screenshot({path:join(out,'failure.png')}).catch(()=>{});
   await writeFile(join(out,'failure.json'),JSON.stringify({stage,error:String(error),stack:error.stack,text:await page?.locator('body').innerText().catch(()=>''),checks,controls,errors,consoleErrors,wire},null,2)+'\n');throw error;

@@ -30,6 +30,11 @@ export class BootstrapRootComponent {
   this.dismissedInstallationProblem=this.installation.problem();this.errorRevision++;
  };
  constructor(){
+  // Source loads public settings independently from its lazy routed modules.
+  if(!this.settings.loaded()){
+   this.loadingNativeSettings=true;
+   void this.settings.load().catch(()=>undefined).finally(()=>this.loadingNativeSettings=false);
+  }
   // Capture the entry presentation before an authentication guard redirects
   // its URL and the lazy canonical shell is constructed.
   effect(()=>{const problem=this.installation.problem(),presenter=this.errors.presenter();if(problem&&problem!==this.dismissedInstallationProblem&&problem!==this.presentedInstallationProblem)untracked(()=>{void this.showInstallationError(problem,presenter);});});

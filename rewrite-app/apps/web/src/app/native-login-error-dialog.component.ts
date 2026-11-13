@@ -7,11 +7,12 @@ import type {AppError} from './native-participant/app.interfaces';
 import {NativeMonitorIconComponent as MatIcon} from './native-monitor/native-monitor-icon.component';
 import {TestModeData} from './native-monitor/common/test-mode-data.class';
 import {originalErrorTimestamp} from './original-error-timestamp';
+import {OriginalOverlayStylesComponent} from './original-overlay-styles.component';
 
 // Pinned Original shared/error-dialog, before any authenticated Test exists.
 @Component({selector:'app-native-login-error',standalone:true,
- imports:[MatButton,MatDialogActions,MatDialogContent,MatDialogTitle,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatIcon],
- template:`<h2 mat-dialog-title><mat-icon svgIcon="error" />{{data.error.label}}</h2>
+ imports:[MatButton,MatDialogActions,MatDialogContent,MatDialogTitle,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatIcon,OriginalOverlayStylesComponent],
+ template:`<app-original-overlay-styles /><h2 mat-dialog-title><mat-icon svgIcon="error" />{{data.error.label}}</h2>
  <mat-dialog-content>
   @if(data.error.errorId){<p><b>Error-Id:</b> {{data.error.errorId}} {{data.error.testMode ? '(test-mode: ' + data.error.testMode + ')' : ''}}</p>}
   @switch(data.error.type){

@@ -1,5 +1,6 @@
 import {Injectable,signal} from '@angular/core';
 import {NativeMonitorHttpError} from '../native-monitor/native-http-error';
+import {NativeErrorPresenterService} from '../native-error-presenter.service';
 
 /** Public application state. Source reads it at startup and after its own
  * administrative uploads; external changes retain the same-document cache. */
@@ -10,7 +11,7 @@ export class NativeSystemCheckInstallationService {
  private readonly owner=new AbortController();
  private revision=0;
  private pending:Promise<boolean>;
- constructor(){this.pending=this.refresh();}
+ constructor(private readonly errors:NativeErrorPresenterService){this.pending=this.refresh();}
  refresh():Promise<boolean>{
   const pending=this.read(++this.revision);this.pending=pending;
   // The root presents failures. View-specific waiters may also retire without
@@ -19,6 +20,9 @@ export class NativeSystemCheckInstallationService {
  }
  private async read(revision:number):Promise<boolean>{
   try{
+  // Source already has its global dialog code when this startup request begins.
+  // This dependency is document-owned and independent from any routed wizard.
+  await this.errors.ready();this.owner.signal.throwIfAborted();
   const response=await fetch('/sys-check-mode',{headers:{Accept:'application/json'},cache:'no-store',credentials:'omit',redirect:'error',
    signal:AbortSignal.any([this.owner.signal,AbortSignal.timeout(20000)])});
   const text=await response.text();this.owner.signal.throwIfAborted();

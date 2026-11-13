@@ -1,0 +1,44 @@
+{
+  "visualParityProven": false,
+  "thresholdChanged": false,
+  "requiredDifferingPixels": 0,
+  "failures": [
+    {
+      "run": "round109-source-early-error",
+      "error": "AssertionError [ERR_ASSERTION]: chrome-Primar-1280-early-offline-collapsed Source repaint control\n\n30 !== 0\n",
+      "main": "failed--chrome-Primar-1280-first.png",
+      "self": "failed--chrome-Primar-1280-self.png",
+      "width": 1280,
+      "height": 850,
+      "differingPixels": 30,
+      "bounds": {
+        "left": 284,
+        "top": 510,
+        "right": 995,
+        "bottom": 555
+      },
+      "sourcePixelSha256": "8e9bcfc4b45e311b2e27c2e7dc74180d6796bb9c56d4a9882c59c7c93d8c795f",
+      "rewritePixelSha256": "de54699234eefde9e13067b855faccf2720fa247e2bc99374f8b5b474ae3e193",
+      "acceptedAsPixelGolden": false
+    },
+    {
+      "run": "round109-source-early-error-final",
+      "error": "AssertionError [ERR_ASSERTION]: chromium-Sekundar-1280-early-offline-collapsed Source repaint control\n\n30 !== 0\n",
+      "main": "failed-final-chromium-Sekundar-1280-first.png",
+      "self": "failed-final-chromium-Sekundar-1280-self.png",
+      "width": 1280,
+      "height": 850,
+      "differingPixels": 30,
+      "bounds": {
+        "left": 284,
+        "top": 510,
+        "right": 995,
+        "bottom": 555
+      },
+      "sourcePixelSha256": "319df430a0536120f768227b2860b1aee32e99d44786dab929a2ac861d5db070",
+      "rewritePixelSha256": "bd326b5d9614d97fbe6e0f73e51e32a66a282c18de16e37f60b2a499b9eb7430",
+      "acceptedAsPixelGolden": false
+    }
+  ],
+  "interpretation": "Actual Source functional behavior is recorded independently. Failed strict Source repaint controls remain failed; these images are not pixel goldens."
+}
