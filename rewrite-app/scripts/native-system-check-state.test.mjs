@@ -69,3 +69,51 @@ test('native directory keeps exact int64 identity, ordered duplicates and arbitr
  assert.equal(parseNativeSystemCheckDirectory('[{"workspaceId":1,"name":"A","label":"A","description":""},{"workspaceId":1,"name":"A","label":"A","description":""}]').length,2);
  for(const text of ['{}','null','[{"workspaceId":9223372036854775808,"name":"A","label":"A","description":""}]','[{"workspaceId":1,"name":"../A","label":"A","description":""}]','[{"workspaceId":0,"name":"A","label":"A","description":""}]'])assert.throws(()=>parseNativeSystemCheckDirectory(text));
 });
+
+// Drive Root's actual compiled lifecycle through the two legitimate code-load
+// orders. The opener is a code capability; all requests/dialog ownership stays
+// with the document, including an early fallback and later routed registration.
+const rootCore=await import('@angular/core');
+const rootSource=await readFile(new URL('../apps/web/src/app/bootstrap-root.component.ts',import.meta.url),'utf8');
+const rootCode=ts.transpileModule(rootSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
+function rootFixture(t){
+ const previousWindow=globalThis.window,previousNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ globalThis.window=new EventTarget();Object.defineProperty(globalThis,'navigator',{configurable:true,value:{onLine:true}});
+ const effects=[],opens=[],closed=[],fallback=deferred();let problem=null,presenter;
+ const bindings={settings:{loaded:()=>true},mode:{mode:()=> 'original'},errors:{presenter:()=>presenter},installation:{problem:()=>problem},router:{url:'/r/check-starter',events:{pipe:()=>({subscribe(){}})}},injector:{}};
+ const exports={};new Function('exports','require',rootCode)(exports,spec=>{
+  if(spec==='@angular/core')return {...rootCore,Component:()=>value=>value,Injector:'injector',inject:key=>bindings[key],effect:callback=>{effects.push(callback);callback();}};
+  if(spec==='@angular/router')return {Router:'router',RouterOutlet:class{},NavigationEnd:class{}};
+  if(spec==='@angular/core/rxjs-interop')return {takeUntilDestroyed:()=>{}};
+  if(spec.endsWith('application-settings.service'))return {ApplicationSettingsService:'settings'};
+  if(spec.endsWith('interface-mode.service'))return {InterfaceModeService:'mode'};
+  if(spec.endsWith('native-system-check-installation.service'))return {NativeSystemCheckInstallationService:'installation'};
+  if(spec.endsWith('native-error-presenter.service'))return {NativeErrorPresenterService:'errors'};
+  if(spec.endsWith('native-system-check-installation-error'))return fallback.promise;
+  throw Error('Unexpected Root dependency '+spec);
+ });
+ const component=new exports.BootstrapRootComponent();
+ const open=(_injector,error,owner)=>{opens.push({error,owner});return()=>closed.push(error);};
+ t.after(()=>{component.ngOnDestroy();if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;if(previousNavigator)Object.defineProperty(globalThis,'navigator',previousNavigator);else delete globalThis.navigator;});
+ return {component,opens,closed,open,fallback,problem(value){problem=value;effects[0]();},register(value=open){presenter=value;effects[0]();},navigate(){window.dispatchEvent(new Event('popstate'));}};
+}
+const settleRoot=()=>new Promise(done=>setImmediate(done));
+test('a routed presenter arriving after the early fallback must not reopen the same visible failure',async t=>{
+ const f=rootFixture(t),error=Error('same public mode failure');f.problem(error);f.fallback.resolve({openNativeSystemCheckInstallationError:f.open});await settleRoot();assert.equal(f.opens.length,1);
+ f.register();await settleRoot();assert.equal(f.opens.length,1);assert.equal(f.closed.length,0);
+});
+test('a routed presenter can replace a pending fallback and its later module cannot open a duplicate',async t=>{
+ const f=rootFixture(t),error=Error('pending public mode failure');f.problem(error);f.register();assert.equal(f.opens.length,1);
+ f.fallback.resolve({openNativeSystemCheckInstallationError:f.open});await settleRoot();assert.equal(f.opens.length,1);assert.equal(f.closed.length,0);
+});
+test('history dismissal while code is pending also survives later registration, while a new failure remains visible',async t=>{
+ const f=rootFixture(t);f.problem(Error('retired failure'));f.navigate();f.register();f.fallback.resolve({openNativeSystemCheckInstallationError:f.open});await settleRoot();assert.equal(f.opens.length,0);
+ const later=Error('new failure after history');f.problem(later);assert.equal(f.opens.length,1);assert.equal(f.opens[0].error,later);
+});
+test('a destroyed document cannot display a pending fallback or a subsequently registered presenter',async t=>{
+ const f=rootFixture(t);f.problem(Error('retired document'));f.component.ngOnDestroy();f.register();f.fallback.resolve({openNativeSystemCheckInstallationError:f.open});await settleRoot();assert.equal(f.opens.length,0);
+});
+test('a genuinely new mode failure replaces the old dialog once under the same document owner',t=>{
+ const f=rootFixture(t),first=Error('first failure'),second=Error('second failure');f.register();f.problem(first);f.problem(second);
+ assert.equal(f.opens.length,2);assert.deepEqual(f.closed,[first]);assert.equal(f.opens[0].owner,f.opens[1].owner);assert.equal(f.opens[1].error,second);
+});

@@ -80,9 +80,9 @@ for(const [entry,Entry]of entries){
 const {NativeLoginFailureService}=load('native-login-failure.service.ts');
 function dialogFixture(t){
  let scope=new AbortController();const view=new AbortController(),opens=[],closed=new rx.Subject();let removed=0,closes=0,reloads=0,clears=0;
- const previousWindow=globalThis.window;globalThis.window={location:{href:'http://owned.invalid/app/native-start',reload(){reloads++;}}};t.after(()=>{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;});
+ const previousWindow=globalThis.window,previousDocument=globalThis.document;let location='http://owned.invalid/app/native-start';globalThis.window={location:{get href(){return location;},set href(value){location=value;reloads++;}}};globalThis.document={baseURI:'http://owned.invalid/app/'};t.after(()=>{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;});
  const session={get accessSignal(){return scope.signal;},clear(){clears++;}},dialogs={open(component,config){const ref={componentRef:{location:{nativeElement:{remove(){removed++;}}}},close(){closes++;closed.next();closed.complete();},afterClosed:()=>closed};opens.push({component,config,ref});return ref;}};
- bindings=new Map(Object.entries({MatDialog:dialogs,NativeMonitorSessionService:session}));const service=new NativeLoginFailureService();
+ bindings=new Map(Object.entries({MatDialog:dialogs,NativeMonitorSessionService:session,NativeErrorPresenterService:{register(){}}}));const service=new NativeLoginFailureService();
  return {service,view,opens,replace(){const old=scope;scope=new AbortController();old.abort();},get removed(){return removed;},get closes(){return closes;},get reloads(){return reloads;},get clears(){return clears;}};
 }
 test('unexpected login dialog uses the Source status mapping and only a live owner can reload',async t=>{
@@ -90,7 +90,7 @@ test('unexpected login dialog uses the Source status mapping and only a live own
  const {config}=f.opens[0];assert.equal(config.disableClose,true);assert.equal(config.autoFocus,'dialog');assert.equal(config.data.error.label,'Allgemeines Server-Problem.');assert.equal(config.data.error.type,'backend');
  config.data.reload();config.data.reload();assert.equal(f.reloads,1);assert.equal(f.clears,0);assert.equal(f.closes,1);assert.equal(f.removed,1);f.service.ngOnDestroy();
 });
-for(const retirement of ['view','session','service'])test('a pending login error import cannot open after '+retirement+' retirement',async t=>{
+for(const retirement of ['view','session','service'])test('a pending login error presentation cannot open after '+retirement+' retirement',async t=>{
  const f=dialogFixture(t),pending=f.service.show(new HttpError(500),f.view.signal);
  if(retirement==='view')f.view.abort();else if(retirement==='session')f.replace();else f.service.ngOnDestroy();
  await pending;assert.deepEqual(f.opens,[]);assert.equal(f.reloads,0);f.service.ngOnDestroy();
@@ -103,7 +103,7 @@ for(const retirement of ['view','session','service'])test('a visible login error
 test('Source session-type error resets the native access only on an authorized reload action',async t=>{
  const f=dialogFixture(t);await f.service.show(new HttpError(403),f.view.signal);assert.equal(f.clears,0);assert.equal(f.opens[0].config.data.error.type,'session');f.opens[0].config.data.reload();assert.equal(f.clears,1);assert.equal(f.reloads,1);f.service.ngOnDestroy();
 });
-test('a newer pending login failure supersedes the retired lazy import without opening two dialogs',async t=>{
+test('a newer pending login failure supersedes the retired presentation without opening two dialogs',async t=>{
  const f=dialogFixture(t),old=f.service.show(new HttpError(500),f.view.signal),current=f.service.show(new HttpError(503),f.view.signal);await Promise.all([old,current]);assert.equal(f.opens.length,1);assert.equal(f.opens[0].config.data.error.label,'Der Server ist augenblicklich nicht erreichbar');assert.equal(f.opens[0].config.data.error.type,'network_temporally');f.service.ngOnDestroy();
 });
 

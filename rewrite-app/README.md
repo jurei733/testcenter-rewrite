@@ -98,9 +98,10 @@ an obsolete failure. Failed refreshes retain the last validated flag and expose
 the Source error dialog; browser-history navigation dismisses that dialog, as
 the actual Source reference does. A reload fetches a fresh mode.
 
-The native browser suite includes62 cases per browser, including9 anonymous
+The native browser suite includes80 cases per browser, including9 anonymous
 selection/mode/error cases,11 actual administrative-upload/isolation/error cases
-and24 public-header lifecycle cases, with10 real persisted reports. The additional cases establish administrator
+and24 public-header lifecycle cases plus18 cold-offline/error/recovery cases,
+with10 real persisted reports. The additional cases establish administrator
 credentials through the real UI, retain them through same-document navigation,
 and prove that native reads/saves omit that bearer and inherit no operator
 permission. Real mode-endpoint TCP failures match the Source dialog's collapsed
@@ -130,8 +131,28 @@ The new Source capture contains36 selection scenes over all three themes,
 108 actual white frames. The integrated header cohort exercises fresh/login/
 wizard/reload transitions with one configured check. Independent full-frame
 pixel comparisons qualify that cohort separately from functional CI checks.
-Generic-info/private/admin header and account-panel navigation, expanded error
-details, fully offline error-module availability and late report/dialog/actor
+Routed native entries and the canonical shell make their error presenter available
+before displaying the UI. A document-wide code reference lets public mode errors
+use that loaded presenter without a new script request after connectivity is lost;
+it stores no actor data or view-owned callback. Earlier fallback imports retain
+the history/revision guard. Error presentation runs outside reactive dependency
+tracking, so dialog internals cannot trigger another presentation of the same
+failure. Original mode also retains the Source layout without an extra offline
+banner. Anonymous details use the Source default `Nur Ansicht (Demo)` and its
+existing exact timestamp formatter; closing and reloading enters a fresh native
+login document, matching Source's root-page action.
+
+The pinned cold Source reference contains24 collapsed/expanded scenes over both
+browsers, all themes and both widths, with real offline transitions,72 white
+frames, and successful root-login recovery. Source itself opens three program
+error dialogs after its uncached icon/font resources fail. These captures retain
+that counter-evidence; full cold-dialog pixel parity remains unproven. The native
+gate requires a usable error without further JavaScript, anonymous metadata,
+Escape retention, zero reports and a real new login document. Environment-specific
+metadata is compared only with a matching Source browser/platform.
+
+Generic-info/private/admin header and account-panel navigation, remaining expanded
+error details, cold failure before any routed shell arrives and late report/dialog/actor
 retirement boundaries remain open.
 Historical schema-valid
 but rejected roster-only file recovery, directory lexical/large-ID boundaries,

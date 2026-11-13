@@ -32,6 +32,8 @@ import { OriginalApplicationLogoComponent } from "./original-application-logo.co
 import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
+import { NativeErrorPresenterService } from "./native-error-presenter.service";
+import { openNativeSystemCheckInstallationError } from "./native-system-check/native-system-check-installation-error";
 
 const routeViews: AppView[] = [
   "home",
@@ -66,6 +68,7 @@ const routeViews: AppView[] = [
   styleUrl: "./app.component.css"
 })
 export class AppComponent implements OnInit, OnDestroy {
+  constructor() { inject(NativeErrorPresenterService).register(openNativeSystemCheckInstallationError); }
   readonly interfaceMode = inject(InterfaceModeService);
   readonly app = inject(AppShellFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
