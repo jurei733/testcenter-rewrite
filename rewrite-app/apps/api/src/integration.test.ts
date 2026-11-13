@@ -16657,8 +16657,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
       }
     }
   );
-  assert.equal(operationalLogin.status, 401);
-  assert.equal(operationalLogin.body.error, "participant_login_invalid");
+  // An imported operational identity is explicitly forbidden from canonical
+  // participant access; it is not an unknown participant credential.
+  assert.equal(operationalLogin.status, 403);
+  assert.equal(operationalLogin.body.error, "participant_operational_identity_forbidden");
 
   const participantLogin = await requestJson<{
     participantSession: {

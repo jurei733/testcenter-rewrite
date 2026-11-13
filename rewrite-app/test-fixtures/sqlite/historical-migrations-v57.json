@@ -1,0 +1,294 @@
+{
+  "sourceCommit": "fae90ea5b12161aa0da9267144faf21ee344e5c8",
+  "sourcePath": "rewrite-app/packages/sqlite-store/src/index.ts",
+  "sourceBlob": "8108ede0c079f07732220e7ab60e3972e07c030d",
+  "sourceSha256": "2da46f9fdc399877beec3c940598345101e346738a3def6bebfc30da41c84ded",
+  "maximumVersion": 57,
+  "migrations": [
+    {
+      "version": 1,
+      "name": "initial_first_slice_schema",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS schema_migrations (\n        version INTEGER PRIMARY KEY,\n        name TEXT NOT NULL,\n        applied_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS tenants (\n        tenant_id TEXT PRIMARY KEY,\n        tenant_key TEXT NOT NULL UNIQUE,\n        display_name TEXT NOT NULL,\n        status TEXT NOT NULL,\n        created_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS workspaces (\n        workspace_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        tenant_key TEXT NOT NULL,\n        workspace_key TEXT NOT NULL,\n        display_name TEXT NOT NULL,\n        status TEXT NOT NULL,\n        created_at TEXT NOT NULL,\n        UNIQUE (tenant_key, workspace_key)\n      );\n\n      CREATE TABLE IF NOT EXISTS source_packages (\n        source_package_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        file_name TEXT NOT NULL,\n        media_type TEXT NOT NULL,\n        status TEXT NOT NULL,\n        uploaded_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS import_jobs (\n        import_job_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        source_package_id TEXT NOT NULL,\n        status TEXT NOT NULL,\n        created_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS content_releases (\n        content_release_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        import_job_id TEXT NOT NULL,\n        release_label TEXT NOT NULL,\n        status TEXT NOT NULL,\n        created_at TEXT NOT NULL,\n        activated_at TEXT\n      );\n\n      CREATE TABLE IF NOT EXISTS participant_sessions (\n        participant_session_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        content_release_id TEXT NOT NULL,\n        login_key TEXT NOT NULL,\n        group_key TEXT NOT NULL,\n        status TEXT NOT NULL,\n        created_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS test_runs (\n        test_run_id TEXT PRIMARY KEY,\n        participant_session_id TEXT NOT NULL,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        content_release_id TEXT NOT NULL,\n        booklet_key TEXT NOT NULL,\n        status TEXT NOT NULL,\n        current_unit_key TEXT,\n        created_at TEXT NOT NULL,\n        updated_at TEXT NOT NULL\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_workspaces_workspace_key\n        ON workspaces (workspace_key);\n      CREATE INDEX IF NOT EXISTS idx_source_packages_workspace\n        ON source_packages (tenant_id, workspace_id);\n      CREATE INDEX IF NOT EXISTS idx_import_jobs_workspace\n        ON import_jobs (tenant_id, workspace_id);\n      CREATE INDEX IF NOT EXISTS idx_content_releases_workspace\n        ON content_releases (tenant_id, workspace_id);\n      CREATE INDEX IF NOT EXISTS idx_participant_sessions_workspace\n        ON participant_sessions (tenant_id, workspace_id);\n      CREATE INDEX IF NOT EXISTS idx_test_runs_workspace\n        ON test_runs (tenant_id, workspace_id);\n      CREATE INDEX IF NOT EXISTS idx_test_runs_participant_session\n        ON test_runs (participant_session_id);\n    "
+    },
+    {
+      "version": 2,
+      "name": "add_test_run_completed_at",
+      "sql": "\n      ALTER TABLE test_runs\n      ADD COLUMN completed_at TEXT;\n    "
+    },
+    {
+      "version": 3,
+      "name": "add_content_release_runtime_snapshot",
+      "sql": "\n      ALTER TABLE content_releases\n      ADD COLUMN runtime_snapshot_json TEXT NOT NULL DEFAULT '{\"bookletEntries\":[]}';\n    "
+    },
+    {
+      "version": 4,
+      "name": "add_source_package_content_structure",
+      "sql": "\n      ALTER TABLE source_packages\n      ADD COLUMN content_structure_json TEXT;\n    "
+    },
+    {
+      "version": 5,
+      "name": "add_source_package_source_document",
+      "sql": "\n      ALTER TABLE source_packages\n      ADD COLUMN source_document_text TEXT;\n    "
+    },
+    {
+      "version": 6,
+      "name": "add_import_job_diagnostics",
+      "sql": "\n      ALTER TABLE import_jobs\n      ADD COLUMN finished_at TEXT;\n\n      ALTER TABLE import_jobs\n      ADD COLUMN diagnostics_json TEXT NOT NULL DEFAULT '[]';\n    "
+    },
+    {
+      "version": 7,
+      "name": "add_workspace_activity_events",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS workspace_activity_events (\n        activity_event_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        event_type TEXT NOT NULL,\n        actor_id TEXT,\n        subject_type TEXT NOT NULL,\n        subject_id TEXT NOT NULL,\n        occurred_at TEXT NOT NULL,\n        summary TEXT NOT NULL,\n        details_json TEXT NOT NULL DEFAULT '{}'\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_workspace_activity_events_workspace\n        ON workspace_activity_events (tenant_id, workspace_id, occurred_at);\n    "
+    },
+    {
+      "version": 8,
+      "name": "add_admin_auth",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS admin_users (\n        admin_user_id TEXT PRIMARY KEY,\n        username TEXT NOT NULL UNIQUE,\n        display_name TEXT NOT NULL,\n        password_hash TEXT NOT NULL,\n        status TEXT NOT NULL,\n        created_at TEXT NOT NULL\n      );\n\n      CREATE TABLE IF NOT EXISTS admin_sessions (\n        admin_session_id TEXT PRIMARY KEY,\n        admin_user_id TEXT NOT NULL,\n        session_token TEXT NOT NULL UNIQUE,\n        created_at TEXT NOT NULL,\n        expires_at TEXT NOT NULL,\n        revoked_at TEXT\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_admin_sessions_user\n        ON admin_sessions (admin_user_id);\n    "
+    },
+    {
+      "version": 9,
+      "name": "add_admin_role_assignments",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS admin_role_assignments (\n        role_assignment_id TEXT PRIMARY KEY,\n        admin_user_id TEXT NOT NULL,\n        role TEXT NOT NULL,\n        tenant_id TEXT,\n        workspace_id TEXT,\n        created_at TEXT NOT NULL\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_admin_role_assignments_user\n        ON admin_role_assignments (admin_user_id);\n    "
+    },
+    {
+      "version": 10,
+      "name": "add_admin_audit_events",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS admin_audit_events (\n        admin_audit_event_id TEXT PRIMARY KEY,\n        event_type TEXT NOT NULL,\n        actor_admin_user_id TEXT,\n        subject_admin_user_id TEXT,\n        occurred_at TEXT NOT NULL,\n        summary TEXT NOT NULL,\n        details_json TEXT NOT NULL DEFAULT '{}'\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_occurred_at\n        ON admin_audit_events (occurred_at);\n      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_subject\n        ON admin_audit_events (subject_admin_user_id, occurred_at);\n      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_actor\n        ON admin_audit_events (actor_admin_user_id, occurred_at);\n    "
+    },
+    {
+      "version": 11,
+      "name": "add_test_run_unit_responses",
+      "sql": "\n      ALTER TABLE test_runs\n      ADD COLUMN unit_responses_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 12,
+      "name": "add_workspace_reviews",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS workspace_reviews (\n        review_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        participant_session_id TEXT NOT NULL,\n        test_run_id TEXT NOT NULL,\n        unit_key TEXT,\n        reviewer_id TEXT NOT NULL,\n        category TEXT NOT NULL,\n        comment_text TEXT NOT NULL,\n        created_at TEXT NOT NULL,\n        updated_at TEXT NOT NULL\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_workspace_reviews_workspace\n        ON workspace_reviews (tenant_id, workspace_id, updated_at);\n      CREATE INDEX IF NOT EXISTS idx_workspace_reviews_test_run\n        ON workspace_reviews (test_run_id);\n    "
+    },
+    {
+      "version": 13,
+      "name": "add_participant_roster_entries",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS participant_roster_entries (\n        participant_roster_entry_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        login_key TEXT NOT NULL,\n        group_key TEXT NOT NULL,\n        booklet_key TEXT,\n        display_name TEXT,\n        imported_at TEXT NOT NULL,\n        UNIQUE (tenant_id, workspace_id, login_key)\n      );\n\n      CREATE INDEX IF NOT EXISTS idx_participant_roster_entries_workspace\n        ON participant_roster_entries (tenant_id, workspace_id, login_key);\n    "
+    },
+    {
+      "version": 14,
+      "name": "add_participant_roster_password_hash",
+      "sql": "\n      ALTER TABLE participant_roster_entries\n        ADD COLUMN password_hash TEXT;\n    "
+    },
+    {
+      "version": 15,
+      "name": "add_participant_roster_booklet_keys",
+      "sql": "\n      ALTER TABLE participant_roster_entries\n        ADD COLUMN booklet_keys_json TEXT;\n    "
+    },
+    {
+      "version": 16,
+      "name": "add_test_run_unlocked_testlets",
+      "sql": "\n      ALTER TABLE test_runs\n        ADD COLUMN unlocked_testlet_keys_json TEXT NOT NULL DEFAULT '[]';\n    "
+    },
+    {
+      "version": 17,
+      "name": "add_test_run_testlet_timers",
+      "sql": "\n      ALTER TABLE test_runs\n        ADD COLUMN testlet_timers_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 18,
+      "name": "add_test_run_leave_locks",
+      "sql": "\n      ALTER TABLE test_runs\n        ADD COLUMN locked_testlet_keys_json TEXT NOT NULL DEFAULT '[]';\n      ALTER TABLE test_runs\n        ADD COLUMN locked_unit_keys_json TEXT NOT NULL DEFAULT '[]';\n    "
+    },
+    {
+      "version": 19,
+      "name": "add_test_run_monitor_navigation_unlock",
+      "sql": "\n      ALTER TABLE test_runs\n        ADD COLUMN monitor_navigation_unlocked INTEGER NOT NULL DEFAULT 0;\n    "
+    },
+    {
+      "version": 20,
+      "name": "add_participant_booklet_state_presets",
+      "sql": "\n      ALTER TABLE participant_roster_entries\n        ADD COLUMN booklet_state_presets_json TEXT;\n      ALTER TABLE test_runs\n        ADD COLUMN preset_booklet_states_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 21,
+      "name": "add_participant_booklet_assignment_variants",
+      "sql": "\n      ALTER TABLE participant_roster_entries\n        ADD COLUMN booklet_assignments_json TEXT;\n      ALTER TABLE test_runs\n        ADD COLUMN booklet_assignment_key TEXT;\n    "
+    },
+    {
+      "version": 22,
+      "name": "persist_booklet_states_snapshot",
+      "sql": "\n      ALTER TABLE test_runs\n        ADD COLUMN booklet_states_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 23,
+      "name": "add_participant_access_windows",
+      "sql": "\n      ALTER TABLE participant_roster_entries ADD COLUMN valid_from TEXT;\n      ALTER TABLE participant_roster_entries ADD COLUMN valid_to TEXT;\n      ALTER TABLE participant_roster_entries ADD COLUMN valid_for_minutes INTEGER;\n      ALTER TABLE participant_sessions ADD COLUMN valid_until TEXT;\n    "
+    },
+    {
+      "version": 24,
+      "name": "add_participant_login_attempts",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS participant_login_attempts (\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        login_key TEXT NOT NULL,\n        failed_attempts INTEGER NOT NULL,\n        expires_at TEXT NOT NULL,\n        updated_at TEXT NOT NULL,\n        PRIMARY KEY (tenant_id, workspace_id, login_key)\n      );\n      CREATE INDEX IF NOT EXISTS idx_participant_login_attempts_expiry\n        ON participant_login_attempts (expires_at);\n    "
+    },
+    {
+      "version": 25,
+      "name": "add_participant_code",
+      "sql": "\n      ALTER TABLE participant_sessions ADD COLUMN participant_code TEXT;\n    "
+    },
+    {
+      "version": 26,
+      "name": "add_participant_test_logs",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS participant_test_logs (\n        participant_test_log_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        participant_session_id TEXT NOT NULL,\n        test_run_id TEXT NOT NULL,\n        unit_key TEXT,\n        original_unit_id TEXT,\n        log_key TEXT NOT NULL,\n        log_content TEXT NOT NULL,\n        timestamp INTEGER NOT NULL,\n        recorded_at TEXT NOT NULL\n      );\n      CREATE INDEX IF NOT EXISTS idx_participant_test_logs_workspace\n        ON participant_test_logs (tenant_id, workspace_id, timestamp);\n      CREATE INDEX IF NOT EXISTS idx_participant_test_logs_test_run\n        ON participant_test_logs (test_run_id, timestamp);\n    "
+    },
+    {
+      "version": 27,
+      "name": "add_participant_execution_modes",
+      "sql": "\n      ALTER TABLE participant_roster_entries ADD COLUMN execution_mode TEXT;\n      ALTER TABLE participant_sessions ADD COLUMN execution_mode TEXT;\n      ALTER TABLE test_runs ADD COLUMN execution_mode TEXT;\n    "
+    },
+    {
+      "version": 28,
+      "name": "persist_booklet_state_overrides",
+      "sql": "\n      ALTER TABLE test_runs\n        ADD COLUMN booklet_state_overrides_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 29,
+      "name": "add_review_priorities",
+      "sql": "\n      ALTER TABLE workspace_reviews\n        ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;\n    "
+    },
+    {
+      "version": 30,
+      "name": "add_review_task_pages",
+      "sql": "\n      ALTER TABLE workspace_reviews ADD COLUMN page INTEGER;\n      ALTER TABLE workspace_reviews ADD COLUMN page_label TEXT;\n    "
+    },
+    {
+      "version": 31,
+      "name": "add_review_provenance",
+      "sql": "\n      ALTER TABLE workspace_reviews ADD COLUMN original_unit_id TEXT;\n      ALTER TABLE workspace_reviews ADD COLUMN user_agent TEXT;\n    "
+    },
+    {
+      "version": 32,
+      "name": "add_admin_role_group_scope",
+      "sql": "\n      ALTER TABLE admin_role_assignments ADD COLUMN group_key TEXT;\n    "
+    },
+    {
+      "version": 33,
+      "name": "add_admin_access_windows",
+      "sql": "\n      ALTER TABLE admin_users ADD COLUMN valid_from TEXT;\n      ALTER TABLE admin_users ADD COLUMN valid_to TEXT;\n      ALTER TABLE admin_users ADD COLUMN valid_for_minutes INTEGER;\n      ALTER TABLE admin_users ADD COLUMN first_signed_in_at TEXT;\n    "
+    },
+    {
+      "version": 34,
+      "name": "add_admin_role_monitor_profiles",
+      "sql": "\n      ALTER TABLE admin_role_assignments ADD COLUMN monitor_profiles_json TEXT NOT NULL DEFAULT '[]';\n    "
+    },
+    {
+      "version": 35,
+      "name": "add_participant_custom_texts",
+      "sql": "\n      ALTER TABLE participant_roster_entries ADD COLUMN custom_texts_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 36,
+      "name": "add_test_run_lock",
+      "sql": "\n      ALTER TABLE test_runs ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;\n    "
+    },
+    {
+      "version": 37,
+      "name": "add_admin_role_access_mode",
+      "sql": "\n      ALTER TABLE admin_role_assignments ADD COLUMN access_mode TEXT NOT NULL DEFAULT 'read_write';\n    "
+    },
+    {
+      "version": 38,
+      "name": "add_application_settings",
+      "sql": "\n      CREATE TABLE application_settings (\n        settings_key TEXT PRIMARY KEY,\n        app_title TEXT NOT NULL,\n        global_warning_text TEXT,\n        global_warning_expires_at TEXT,\n        updated_at TEXT,\n        updated_by_admin_user_id TEXT\n      );\n    "
+    },
+    {
+      "version": 39,
+      "name": "add_attachment_files",
+      "sql": "\n      CREATE TABLE attachment_files (\n        attachment_file_id TEXT PRIMARY KEY,\n        attachment_id TEXT NOT NULL,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        file_name TEXT NOT NULL,\n        media_type TEXT NOT NULL,\n        data_base64 TEXT NOT NULL,\n        created_at TEXT NOT NULL\n      );\n      CREATE INDEX attachment_files_workspace_attachment_idx\n        ON attachment_files (tenant_id, workspace_id, attachment_id, created_at);\n    "
+    },
+    {
+      "version": 40,
+      "name": "add_application_branding",
+      "sql": "\n      ALTER TABLE application_settings ADD COLUMN main_logo TEXT NOT NULL DEFAULT 'app-icon.svg';\n      ALTER TABLE application_settings ADD COLUMN theme_name TEXT NOT NULL DEFAULT 'Primar';\n    "
+    },
+    {
+      "version": 41,
+      "name": "add_application_custom_texts",
+      "sql": "\n      ALTER TABLE application_settings ADD COLUMN custom_texts_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 42,
+      "name": "add_admin_custom_texts",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS admin_users (\n        admin_user_id TEXT PRIMARY KEY,\n        username TEXT NOT NULL UNIQUE,\n        display_name TEXT NOT NULL,\n        password_hash TEXT NOT NULL,\n        status TEXT NOT NULL,\n        valid_from TEXT,\n        valid_to TEXT,\n        valid_for_minutes INTEGER,\n        first_signed_in_at TEXT,\n        created_at TEXT NOT NULL\n      );\n      ALTER TABLE admin_users ADD COLUMN custom_texts_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 43,
+      "name": "add_application_content",
+      "sql": "\n      ALTER TABLE application_settings ADD COLUMN intro_html TEXT NOT NULL DEFAULT '';\n      ALTER TABLE application_settings ADD COLUMN legal_notice_html TEXT NOT NULL DEFAULT '';\n    "
+    },
+    {
+      "version": 44,
+      "name": "add_operational_login_migration_candidates",
+      "sql": "\n      CREATE TABLE operational_login_migration_candidates (\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        candidates_json TEXT NOT NULL DEFAULT '[]',\n        updated_at TEXT NOT NULL,\n        PRIMARY KEY (tenant_id, workspace_id)\n      );\n    "
+    },
+    {
+      "version": 45,
+      "name": "add_admin_login_attempts",
+      "sql": "\n      CREATE TABLE admin_login_attempts (\n        username TEXT PRIMARY KEY,\n        failed_attempts INTEGER NOT NULL,\n        expires_at TEXT NOT NULL,\n        updated_at TEXT NOT NULL\n      );\n      CREATE INDEX idx_admin_login_attempts_expiry\n        ON admin_login_attempts (expires_at);\n    "
+    },
+    {
+      "version": 46,
+      "name": "add_admin_password_change_required",
+      "sql": "\n      ALTER TABLE admin_users\n        ADD COLUMN password_change_required INTEGER NOT NULL DEFAULT 0;\n    "
+    },
+    {
+      "version": 47,
+      "name": "index_participant_test_state_monitor_reads",
+      "sql": "\n      CREATE TABLE IF NOT EXISTS participant_test_logs (\n        participant_test_log_id TEXT PRIMARY KEY,\n        tenant_id TEXT NOT NULL,\n        workspace_id TEXT NOT NULL,\n        participant_session_id TEXT NOT NULL,\n        test_run_id TEXT NOT NULL,\n        unit_key TEXT,\n        original_unit_id TEXT,\n        log_key TEXT NOT NULL,\n        log_content TEXT NOT NULL,\n        timestamp INTEGER NOT NULL,\n        recorded_at TEXT NOT NULL\n      );\n      CREATE INDEX idx_participant_test_logs_monitor_state\n        ON participant_test_logs (\n          tenant_id,\n          workspace_id,\n          log_key,\n          test_run_id,\n          timestamp DESC,\n          recorded_at DESC\n        )\n        WHERE unit_key IS NULL;\n    "
+    },
+    {
+      "version": 48,
+      "name": "add_test_run_pause_source",
+      "sql": "\n      ALTER TABLE test_runs ADD COLUMN pause_source TEXT;\n    "
+    },
+    {
+      "version": 49,
+      "name": "add_participant_view_settings",
+      "sql": "\n      ALTER TABLE participant_roster_entries\n        ADD COLUMN view_settings_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 50,
+      "name": "add_participant_asset_assignments",
+      "sql": "\n      ALTER TABLE participant_roster_entries\n        ADD COLUMN asset_assignments_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 51,
+      "name": "add_application_assets",
+      "sql": "\n      CREATE TABLE application_assets (\n        application_asset_id TEXT PRIMARY KEY,\n        original_name TEXT NOT NULL UNIQUE,\n        media_type TEXT NOT NULL,\n        data_base64 TEXT NOT NULL,\n        byte_length INTEGER NOT NULL,\n        created_at TEXT NOT NULL,\n        updated_at TEXT NOT NULL\n      );\n    "
+    },
+    {
+      "version": 52,
+      "name": "add_application_asset_assignments",
+      "sql": "\n      ALTER TABLE application_settings\n        ADD COLUMN asset_assignments_json TEXT NOT NULL DEFAULT '{}';\n    "
+    },
+    {
+      "version": 53,
+      "name": "add_participant_group_labels",
+      "sql": "\n      ALTER TABLE participant_roster_entries ADD COLUMN group_label TEXT;\n    "
+    },
+    {
+      "version": 54,
+      "name": "add_separate_public_notices",
+      "sql": "\n      ALTER TABLE application_settings\n        ADD COLUMN privacy_notice TEXT NOT NULL DEFAULT '';\n      ALTER TABLE application_settings\n        ADD COLUMN accessibility_notice TEXT NOT NULL DEFAULT '';\n    "
+    },
+    {
+      "version": 55,
+      "name": "persist_test_run_shared_parameters",
+      "sql": "\n      ALTER TABLE test_runs\n        ADD COLUMN shared_parameters_json TEXT NOT NULL DEFAULT '[]';\n    "
+    },
+    {
+      "version": 56,
+      "name": "add_consumed_proof_of_work_challenges",
+      "sql": "\n      CREATE TABLE consumed_proof_of_work_challenges (\n        challenge_id TEXT PRIMARY KEY,\n        consumed_at TEXT NOT NULL,\n        expires_at TEXT NOT NULL\n      );\n      CREATE INDEX idx_consumed_proof_of_work_challenges_expiry\n        ON consumed_proof_of_work_challenges (expires_at);\n    "
+    },
+    {
+      "version": 57,
+      "name": "add_participant_access_credentials",
+      "sql": "\n      CREATE TABLE participant_access_credentials (\n        participant_session_id TEXT PRIMARY KEY REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE,\n        token_hash TEXT,\n        updated_at TEXT NOT NULL\n      );\n    "
+    }
+  ]
+}

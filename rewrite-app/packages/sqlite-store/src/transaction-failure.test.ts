@@ -9,6 +9,7 @@ import test from "node:test";
 
 import type { ParticipantTestLog } from "@testcenter-rewrite-app/domain";
 import { createSqliteFirstSliceRepository, migrateSqliteFirstSliceStorage, SQLITE_BUSY_TIMEOUT_MS, SQLITE_FIRST_SLICE_SCHEMA_VERSION } from "./index.js";
+import { createHistoricalSqliteDatabase } from "./historical-migration.fixture.js";
 
 const log = (id: string, content: string): ParticipantTestLog => ({
   participantTestLogId: id, tenantId: "own-tenant", workspaceId: "own-workspace",
@@ -182,8 +183,8 @@ test("SQLite rolls back a test-log batch after a busy COMMIT and accepts a later
 test("SQLite migration automatic rollback preserves its cause and leaves schema changes retryable", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sqlite-migration-failure-"));
   const databasePath = join(directory, "own.sqlite");
-  const repository = createSqliteFirstSliceRepository(databasePath);
-  const control = new DatabaseSync(databasePath);
+  const repository = createSqliteFirstSliceRepository(":memory:");
+  const control = createHistoricalSqliteDatabase(databasePath, 57);
   try {
     const run = { tenantId: "own", workspaceId: "own", participantSessionId: "own", testRunId: "own",
       contentReleaseId: "own", bookletKey: "own", status: "running" as const, currentUnitKey: "unit",
@@ -192,23 +193,17 @@ test("SQLite migration automatic rollback preserves its cause and leaves schema 
     await repository.saveParticipantSession({tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,contentReleaseId:run.contentReleaseId,loginKey:'own',groupKey:'own',status:'launched',createdAt:run.createdAt});
     await repository.saveTestRun(run);
     const storedRun = await repository.getTestRunById(run.testRunId);
-    control.exec(`DELETE FROM schema_migrations WHERE version >= 58;
-      DROP TABLE original_application_assets; DROP TABLE original_application_asset_counter; ALTER TABLE participant_roster_entries DROP COLUMN original_asset_assignment_layers_json;
-      DROP TABLE IF EXISTS original_admin_numbers; DROP TABLE IF EXISTS original_admin_number_counter; DROP TABLE IF EXISTS original_native_reviews; DROP TABLE IF EXISTS original_native_review_counters; DROP TABLE IF EXISTS original_person_numbers; DROP TABLE IF EXISTS original_person_number_counter; DROP INDEX IF EXISTS original_person_number_parent_scope; DROP TABLE IF EXISTS original_native_commands; DROP TABLE IF EXISTS original_native_command_counter; ALTER TABLE participant_sessions DROP COLUMN original_operational_mode; ALTER TABLE operational_login_migration_candidates DROP COLUMN native_logins_json; DROP TABLE IF EXISTS original_native_units; DROP TABLE original_workspace_numbers; DROP TABLE original_workspace_number_counter; ALTER TABLE test_runs DROP COLUMN original_test_state_json; DROP TABLE original_test_numbers; DROP TABLE original_test_number_counter; ALTER TABLE test_runs DROP COLUMN response_part_types_json; DROP TABLE original_session_tokens; DROP INDEX participant_access_credentials_token_hash;
-      DROP TABLE original_login_bindings; DROP TABLE original_participant_groups;
-      DROP INDEX participant_sessions_original_login;
-      ALTER TABLE participant_sessions DROP COLUMN original_name_suffix; ALTER TABLE participant_sessions DROP COLUMN original_login_key;
-      ALTER TABLE participant_roster_entries DROP COLUMN original_login_identity;
-      ALTER TABLE test_runs DROP COLUMN original_result_state_json; ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json;
-      DROP TABLE participant_progress_deliveries;
-      ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
-      ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json;
-      DROP TABLE participant_run_commands;
-      DROP TABLE participant_connection_presence;
-      ALTER TABLE participant_test_logs DROP COLUMN original_timestamp;
-      CREATE TRIGGER own_migration_failure BEFORE INSERT ON schema_migrations
+    control.prepare(`INSERT INTO participant_sessions (participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(run.participantSessionId, run.tenantId, run.workspaceId, run.contentReleaseId, 'own', 'own', 'launched', run.createdAt);
+    control.prepare(`INSERT INTO test_runs (test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, unit_responses_json, testlet_timers_json, created_at, updated_at, completed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(run.testRunId, run.participantSessionId, run.tenantId, run.workspaceId, run.contentReleaseId, run.bookletKey, run.status, run.currentUnitKey, JSON.stringify(run.unitResponses), JSON.stringify(run.testletTimers), run.createdAt, run.updatedAt, run.completedAt);
+    control.exec(`CREATE TRIGGER own_migration_failure BEFORE INSERT ON schema_migrations
       WHEN NEW.version = 58 BEGIN SELECT RAISE(ROLLBACK, 'own migration failure'); END`);
+    const schema = () => control.prepare("SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY type, name").all();
+    const beforeFailure = schema();
     await assert.rejects(migrateSqliteFirstSliceStorage(databasePath), /own migration failure/);
+    assert.deepEqual(schema(), beforeFailure);
+    assert.equal(control.prepare("SELECT unit_responses_json FROM test_runs WHERE test_run_id = 'own'").get()?.unit_responses_json, JSON.stringify(run.unitResponses));
     assert.equal(control.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()?.version, 57);
     assert.equal(control.prepare("SELECT name FROM sqlite_master WHERE name = 'participant_connection_presence'").get(), undefined);
     assert.equal(control.prepare("SELECT name FROM sqlite_master WHERE name = 'participant_run_commands'").get(), undefined);

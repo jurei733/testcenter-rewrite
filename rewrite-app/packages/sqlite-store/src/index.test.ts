@@ -22,6 +22,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 import { createSqliteFirstSliceRepository, SQLITE_BUSY_TIMEOUT_MS } from "./index.js";
+import { createHistoricalSqliteDatabase } from "./historical-migration.fixture.js";
 
 const startExternalSqliteLock = (databasePath: string, lock: "reader" | "writer", durationMs: number) => {
   const worker = new Worker(`
@@ -706,29 +707,9 @@ test("SQLite preserves login-specific admin custom texts", async () => {
 test("SQLite adds current defaults to legacy application settings", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-branding-"));
   const databasePath = join(tempDirectory, "legacy.sqlite");
-  const database = new DatabaseSync(databasePath);
+  const database = createHistoricalSqliteDatabase(databasePath, 39);
   try {
     database.exec(`
-      CREATE TABLE schema_migrations (
-        version INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        applied_at TEXT NOT NULL
-      );
-      INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (39, 'add_attachment_files', '2026-08-08T20:00:00.000Z');
-      CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
-      CREATE TABLE participant_sessions (participant_session_id TEXT PRIMARY KEY, tenant_id TEXT, workspace_id TEXT, content_release_id TEXT NOT NULL);
-      CREATE TABLE participant_roster_entries (
-        participant_roster_entry_id TEXT PRIMARY KEY
-      );
-      CREATE TABLE application_settings (
-        settings_key TEXT PRIMARY KEY,
-        app_title TEXT NOT NULL,
-        global_warning_text TEXT,
-        global_warning_expires_at TEXT,
-        updated_at TEXT,
-        updated_by_admin_user_id TEXT
-      );
       INSERT INTO application_settings (
         settings_key, app_title, global_warning_text,
         global_warning_expires_at, updated_at, updated_by_admin_user_id
@@ -796,31 +777,9 @@ test("SQLite preserves and deletes attachment images", async () => {
 test("SQLite upgrades legacy admin roles to read-write access", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-admin-mode-"));
   const databasePath = join(tempDirectory, "legacy.sqlite");
-  const database = new DatabaseSync(databasePath);
+  const database = createHistoricalSqliteDatabase(databasePath, 36);
   try {
     database.exec(`
-      CREATE TABLE schema_migrations (
-        version INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        applied_at TEXT NOT NULL
-      );
-      INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (36, 'add_test_run_lock', '2026-08-03T00:00:00.000Z');
-      CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
-      CREATE TABLE participant_sessions (participant_session_id TEXT PRIMARY KEY, tenant_id TEXT, workspace_id TEXT, content_release_id TEXT NOT NULL);
-      CREATE TABLE participant_roster_entries (
-        participant_roster_entry_id TEXT PRIMARY KEY
-      );
-      CREATE TABLE admin_role_assignments (
-        role_assignment_id TEXT PRIMARY KEY,
-        admin_user_id TEXT NOT NULL,
-        role TEXT NOT NULL,
-        tenant_id TEXT,
-        workspace_id TEXT,
-        group_key TEXT,
-        monitor_profiles_json TEXT NOT NULL DEFAULT '[]',
-        created_at TEXT NOT NULL
-      );
       INSERT INTO admin_role_assignments (
         role_assignment_id, admin_user_id, role, tenant_id, workspace_id,
         group_key, monitor_profiles_json, created_at
