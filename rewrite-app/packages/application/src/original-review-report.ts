@@ -7,8 +7,7 @@ export type OriginalReviewReportProjection={reviewId:string;record:OriginalRevie
 export type OriginalReviewReportReader={repository:FirstSliceRepository;timeZone:string;
  labels:(scope:{tenantId:string;workspaceId:string},bookletName:string)=>Promise<{bookletLabel:string;unitLabels:Record<string,string>}>};
 
-/** Shared native report data for participant exports and the operator archive.
- * Safe canonical mirrors cannot recover raw nullable fields or numeric pages. */
+/** Participant Review reports preserve raw nullable fields and numeric pages. */
 export async function readOriginalReviewReports(input:OriginalReviewReportReader,person:ParticipantSession):Promise<OriginalReviewReportProjection[]>{
   const reviews=await input.repository.listOriginalReviewsByPerson(person);
   if(!reviews.length)return [];

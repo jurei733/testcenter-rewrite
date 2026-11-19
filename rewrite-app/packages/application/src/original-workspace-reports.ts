@@ -10,7 +10,7 @@ import {assertOriginalUnitRecord,originalUnitParentMatches,type OriginalUnitScop
 import {assertOriginalNativeReview,originalReviewNumber,type OriginalNativeReview} from './original-review-record.js';
 import {formatOriginalParticipantLogEntry} from './original-report-csv.js';
 import {formatOriginalResponseReport,formatOriginalLogReport,formatOriginalReviewReport,formatOriginalUnitStateReport,formatOriginalReviewTimestamp,
-  type OriginalResponseReportRecord,type OriginalLogReportRecord,type OriginalReviewReportRecord} from './original-workspace-report-wire.js';
+  type OriginalResponseReportRecord,type OriginalLogReportRecord,type OriginalReviewReportRecord,type OriginalReportLabels} from './original-workspace-report-wire.js';
 import {FirstSliceError} from './first-slice-error.js';
 
 type Scope={tenantId:string;workspaceId:string};
@@ -19,7 +19,12 @@ type Binding=Pick<OriginalLoginBinding,'tenantId'|'workspaceId'|'loginKey'|'grou
 export type OriginalReportRun=OriginalUnitScope&{bookletName?:string};
 export type OriginalReportMetadata={people:Person[];bindings:Binding[];runs:OriginalReportRun[]};
 export type OriginalReportParent={run:OriginalReportRun;person:Person;bindings:Binding[]};
-export type OriginalReportRequest=Scope&{type:'response'|'log'|'review';groups:string[]|null};
+export type OriginalReportRequest=Scope&{
+  type:'response'|'log'|'review';
+  groups:string[]|null;
+  /** The aggregate ZIP shares exact stored group keys with the canonical exports. */
+  exactSessionGroups?:true;
+};
 type UnitIdentity=OriginalUnitScope&Pick<OriginalNativeUnit,'unitName'|'originalUnitId'>;
 export type OriginalReportStoredUnit=OriginalUnitScope&{unitName:string;unit:UnitIdentity|OriginalNativeUnit};
 export type OriginalReportStoredReview=OriginalUnitScope&{kind:string;reviewNumber:string;reviewId:string;review:OriginalNativeReview};
@@ -27,6 +32,11 @@ type LegacyUnit={testRunId:string;unitName:string};
 export type OriginalReportFamily={units:OriginalReportStoredUnit[];legacyUnits:LegacyUnit[];logs:ParticipantTestLog[];reviews:OriginalReportStoredReview[];
   legacyReviews:Array<{testRunId:string;reviewId:string}>;testNumbers:OriginalTestNumberRecord[];personNumbers:OriginalPersonNumberRecord[]};
 type ReviewData=Omit<OriginalReviewReportRecord,'page'|'reviewtime'>&{page:string|null;updatedAt:string};
+type ReviewLabelReader=(scope:Scope,name:string)=>Promise<{bookletLabel:string;unitLabels:Record<string,string>}>;
+export type PreparedOriginalWorkspaceReviews={
+  rows:OriginalReviewReportRecord[];
+  labels:(booklet:string,unit:string)=>OriginalReportLabels;
+};
 export type OriginalWorkspaceReportSnapshot={type:'response';rows:OriginalResponseReportRecord[]}|{type:'log';rows:OriginalLogReportRecord[]}|{type:'review';rows:ReviewData[]};
 const unavailable=()=>new FirstSliceError(409,'original_report_history_unknown','The selected native report history is unavailable or ambiguous.');
 export function assertOriginalReportRowCount(count:number):void {
@@ -35,13 +45,19 @@ export function assertOriginalReportRowCount(count:number):void {
 const inScope=(a:Scope,b:Scope)=>a.tenantId===b.tenantId&&a.workspaceId===b.workspaceId;
 /** Group selection precedes family validation. No answer, state or credential is read. */
 export function selectOriginalReportParents(metadata:OriginalReportMetadata,input:OriginalReportRequest):OriginalReportParent[]{
-  if(input.groups!==null&&new Set(input.groups).size>100)throw new FirstSliceError(400,'result_archive_group_limit_exceeded','At most 100 result groups can be exported at once.');
+  const selectedGroups=input.groups===null?null:new Set(input.groups);
+  if(selectedGroups&&selectedGroups.size>100)throw new FirstSliceError(400,'result_archive_group_limit_exceeded','At most 100 result groups can be exported at once.');
   const people=new Map(metadata.people.filter(p=>inScope(p,input)&&typeof p.originalLoginKey==='string').map(p=>[p.participantSessionId,p]));
   const byLogin=new Map<string,Binding[]>();for(const binding of metadata.bindings.filter(b=>inScope(b,input))){const rows=byLogin.get(binding.loginKey)??[];rows.push(binding);byLogin.set(binding.loginKey,rows);}
   return metadata.runs.filter(r=>inScope(r,input)&&people.has(r.participantSessionId)).flatMap(run=>{
     const person=people.get(run.participantSessionId)!,bindings=byLogin.get(person.originalLoginKey!)??[];
-    const group=bindings[0]?.groupKey??person.groupKey;
-    return input.groups!==null&&!input.groups.some(value=>originalParticipantGroupKeysEqual(value,group))?[]:[{run,person,bindings}];
+    if(selectedGroups){
+      const group=bindings[0]?.groupKey??person.groupKey;
+      const selected=input.exactSessionGroups ? selectedGroups.has(person.groupKey) :
+        input.groups!.some(value=>originalParticipantGroupKeysEqual(value,group));
+      if(!selected)return [];
+    }
+    return [{run,person,bindings}];
   });
 }
 function identity(parent:OriginalReportParent){
@@ -158,8 +174,26 @@ export function originalReportFormat(accept:string):'csv'|'json'{
 export function originalReportQuery(params:URLSearchParams,key:string):string|null{
   let value:string|null='';for(const [name,text]of params){if(name===key)value=text;else if(name.startsWith(key+'['))value=null;}return value;
 }
+export async function prepareOriginalWorkspaceReviewRows(input:{
+  scope:Scope; rows:ReviewData[]; timeZone:string; readLabels?:ReviewLabelReader;
+}):Promise<PreparedOriginalWorkspaceReviews>{
+  const labels=new Map<string,Awaited<ReturnType<ReviewLabelReader>>>();
+  if(input.readLabels)for(const {bookletname} of input.rows){
+    if(bookletname&&bookletname!=='0'&&!labels.has(bookletname))labels.set(bookletname,await input.readLabels(input.scope,bookletname));
+  }
+  return {
+    rows:input.rows.map(({updatedAt,page,...row})=>({...row,
+      page:page===null?null:(JSON as unknown as {rawJSON:(text:string)=>{readonly rawJSON:string}}).rawJSON(page),
+      reviewtime:formatOriginalReviewTimestamp(updatedAt,input.timeZone)})),
+    labels(booklet,unit){
+      const current=labels.get(booklet);
+      return {bookletlabel:current?.bookletLabel??'',
+        unitlabel:current&&Object.hasOwn(current.unitLabels,unit)?current.unitLabels[unit]??'':''};
+    }
+  };
+}
 export function createOriginalWorkspaceReportPort(input:{repository:FirstSliceRepository;workspace:(tenantKey:string,workspaceKey:string)=>Promise<Scope>;timeZone:string;
-  labels:(scope:Scope,name:string)=>Promise<{bookletLabel:string;unitLabels:Record<string,string>}>}){
+  labels:ReviewLabelReader}){
   return {async read(request:{tenantKey:string;workspaceKey:string;type:'response'|'log'|'review';dataIds:string|null;accept:string;useNewVersion:boolean}):Promise<{body:string;contentType:string}>{
     if(request.dataIds===null)throw new FirstSliceError(500,'original_report_query_invalid','Internal error.');
     const groups=request.dataIds===''?null:request.dataIds.split(','),scope=await input.workspace(request.tenantKey,request.workspaceKey),format=originalReportFormat(request.accept);
@@ -167,11 +201,9 @@ export function createOriginalWorkspaceReportPort(input:{repository:FirstSliceRe
     if(snapshot.type==='response')body=formatOriginalResponseReport(snapshot.rows,format);
     else if(snapshot.type==='log')body=formatOriginalLogReport(snapshot.rows,format);
     else{
-      const labels=new Map<string,Awaited<ReturnType<typeof input.labels>>>();
-      if(request.useNewVersion)for(const row of snapshot.rows)if(!labels.has(row.bookletname))labels.set(row.bookletname,await input.labels(scope,row.bookletname));
-      body=formatOriginalReviewReport({format,useNewVersion:request.useNewVersion,rows:snapshot.rows.map(({updatedAt,page,...row})=>({...row,
-        page:page===null?null:(JSON as unknown as {rawJSON:(text:string)=>{readonly rawJSON:string}}).rawJSON(page),reviewtime:formatOriginalReviewTimestamp(updatedAt,input.timeZone)})),
-        labels:(booklet,unit)=>({bookletlabel:labels.get(booklet)?.bookletLabel??'',unitlabel:labels.get(booklet)?.unitLabels[unit]??''})});
+      const reviews=await prepareOriginalWorkspaceReviewRows({scope,rows:snapshot.rows,timeZone:input.timeZone,
+        readLabels:request.useNewVersion?input.labels:undefined});
+      body=formatOriginalReviewReport({format,useNewVersion:request.useNewVersion,...reviews});
     }
     return {body,contentType:format==='csv'?'text/csv;charset=UTF-8':'application/json'};
   }};

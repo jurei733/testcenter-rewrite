@@ -15,8 +15,7 @@ import {originalResourceMediaType} from './original-resource-media-type.js';
 import type {WorkspaceArchiveUploadReport} from '@testcenter-rewrite-app/domain';
 import {createOriginalResourcePackages} from './original-resource-package.js';
 import {createOriginalReportTextComparator} from './original-report-collation.js';
-import {readOriginalReviewReports,type OriginalReviewReportProjection} from './original-review-report.js';
-import {originalReviewReportCategoryKeys,encodeOriginalReportJson,formatOriginalResponseReport,formatOriginalUnitStateReport} from './original-workspace-report-wire.js';
+import {originalReviewReportCategoryKeys,projectOriginalReviewReportRows,encodeOriginalReportJson,formatOriginalResponseReport,formatOriginalUnitStateReport} from './original-workspace-report-wire.js';
 import {originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix} from '@testcenter-rewrite-app/domain';
 import {originalReviewHistoryUnavailable} from './original-review-record.js';
 import {createOriginalReviewPort} from './original-review.js';
@@ -89,7 +88,7 @@ export type {OriginalResultTest} from './original-group-results.js';
 import {createOriginalGroupResultsPort, projectOriginalStartedTests, type OriginalGroupResultInventory} from './original-group-results.js';
 export {prepareOriginalTestSelection,prepareOriginalTestDeletionInput,selectOriginalTestDeletion,deleteOriginalSelectedTestsFromCollections} from './original-test-deletion.js';
 export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletionResult} from './original-test-deletion.js';
-import {createOriginalWorkspaceReportPort} from './original-workspace-reports.js';
+import {createOriginalWorkspaceReportPort,prepareOriginalWorkspaceReviewRows,type PreparedOriginalWorkspaceReviews} from './original-workspace-reports.js';
 export {selectOriginalReportParents,projectOriginalWorkspaceReport,assertOriginalReportRowCount,readOriginalWorkspaceReportCollections,originalReportUnitIdentity,originalReportFormat,originalReportQuery} from './original-workspace-reports.js';
 export type {OriginalReportMetadata,OriginalReportParent,OriginalReportRun,OriginalReportFamily,OriginalReportRequest,OriginalWorkspaceReportSnapshot,OriginalReportStoredUnit,OriginalReportStoredReview} from './original-workspace-reports.js';
 export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,originalWorkspaceWriteSqlSnapshot} from './original-workspace-write.js';
@@ -16379,7 +16378,7 @@ const buildOriginalReviewReportRows = (input: {
   reviews: WorkspaceReview[];
   contentReleases: ContentRelease[];
   groupKeys: string[];
-  nativeReviews?:OriginalReviewReportProjection[];
+  nativeReviewReport?:PreparedOriginalWorkspaceReviews;
 }): { rows: OriginalReviewReportRow[]; categoryColumns: string[] } => {
   const contentReleasesById = new Map(
     input.contentReleases.map(release => [release.contentReleaseId, release])
@@ -16393,23 +16392,16 @@ const buildOriginalReviewReportRows = (input: {
     limit: 50_001,
     limitMaximum: 50_001
   });
-  const nativeById=new Map((input.nativeReviews??[]).map(row=>[row.reviewId,row]));
-  // Source AdminDAO emits the Unit branch then the Booklet branch. Native
-  // collection order must not inherit the canonical UI's latest-edit sort.
-  // Source has no within-branch ORDER BY; retain the supplied native order.
-  const nativeOrder=[...(input.nativeReviews??[]).filter(row=>row.record.unitname!==''),...(input.nativeReviews??[]).filter(row=>row.record.unitname==='')];
-  const nativeRank=new Map(nativeOrder.map((row,index)=>[row.reviewId,index]));
-  if(nativeRank.size)items.sort((left,right)=>{
-    const a=nativeRank.get(left.review.reviewId),b=nativeRank.get(right.review.reviewId);
-    return a===undefined?(b===undefined?0:1):b===undefined?-1:a-b;
-  });
-  const categories = items.some(item=>nativeById.has(item.review.reviewId)) ? originalReviewReportCategoryKeys(items.map(item=>({categories:nativeById.get(item.review.reviewId)?.record.categories??item.review.categories.join(' ')}))) : Array.from(
-    new Set(items.flatMap(item => item.review.categories))
-  ).sort();
+  const native = input.nativeReviewReport;
+  const categories = native?.rows.length ? originalReviewReportCategoryKeys([
+    ...native.rows,
+    ...items.map(item => ({categories:item.review.categories.join(' ')}))
+  ]) : Array.from(new Set(items.flatMap(item => item.review.categories))).sort();
   const categoryColumns = categories.map(category => `category_${category}`);
-  const rows = items.map(item => {
-    const native=nativeById.get(item.review.reviewId);
-    const selectedCategories=native?native.record.categories.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g,'').split(' '):item.review.categories;
+  const nativeRows = native ? projectOriginalReviewReportRows({
+    ...native, format: "json", useNewVersion: true
+  }, categories) : [];
+  const legacyRows = items.map(item => {
     const testRun = item.testRun ? normalizeTestRun(item.testRun) : null;
     const unit = testRun
       ? resolveOriginalReportUnit({
@@ -16431,12 +16423,9 @@ const buildOriginalReviewReportRows = (input: {
         : "",
       unitname: item.review.unitKey ?? "",
       priority: String(item.review.priority),
-      ...Object.fromEntries(
-        categories.map(category => [
-          `category_${category}`,
-          selectedCategories.includes(category)
-        ])
-      ),
+      ...Object.fromEntries(categories.map(category => [
+        `category_${category}`, item.review.categories.includes(category)
+      ])),
       reviewtime: toOriginalReportDateTime(item.review.createdAt),
       page: item.review.page,
       pagelabel: item.review.pageLabel,
@@ -16445,12 +16434,10 @@ const buildOriginalReviewReportRows = (input: {
       reviewer: item.review.reviewerId,
       entry: item.review.comment,
       unitlabel: unit.unitLabel,
-      bookletlabel: unit.bookletLabel,
-      ...(native?Object.fromEntries(Object.entries(native.record).filter(([key])=>key!=='categories')):{}),
-      ...(native?native.labels:{})
+      bookletlabel: unit.bookletLabel
     } satisfies OriginalReviewReportRow;
   });
-  return { rows, categoryColumns };
+  return { rows:[...nativeRows, ...legacyRows], categoryColumns };
 };
 
 const formatParticipantReviewReport = (input: {
@@ -16521,12 +16508,16 @@ const createOriginalResultArchive = (input: {
   testLogs: ParticipantTestLog[];
   activityEvents: WorkspaceActivityEvent[];
   contentReleases: ContentRelease[];
-  nativeReviews:OriginalReviewReportProjection[];
+  nativeReviewReport?:PreparedOriginalWorkspaceReviews;
+  nativeReviewPersonIds: ReadonlySet<string>;
   nativeUnits: import("@testcenter-rewrite-app/domain").OriginalNativeUnit[];
 }): WorkspaceOriginalResultArchive => {
   const responseRows = input.groupKeys.length ? buildOriginalResponseReportRows(input) : [];
   const logRows = input.groupKeys.length ? buildOriginalLogReportRows(input) : [];
-  const reviewReport = input.groupKeys.length ? buildOriginalReviewReportRows(input) : { rows: [], categoryColumns: [] };
+  const reviewReport = input.groupKeys.length ? buildOriginalReviewReportRows({
+    ...input,
+    reviews: input.reviews.filter(review => !input.nativeReviewPersonIds.has(review.participantSessionId))
+  }) : { rows: [], categoryColumns: [] };
   const counts = {
     responses: responseRows.length,
     logs: logRows.length,
@@ -16615,7 +16606,7 @@ const createOriginalResultArchive = (input: {
     ["responses.csv", input.nativeUnits.length&&responseRows.length ? formatOriginalResponseReport(responseRows,"csv") : formatOriginalReportCsv(responseColumns, responsesCsvRows)],
     ["logs.json", logRows.some(row=>typeof row.timestamp==='object') ? encodeOriginalReportJson(logRows) : JSON.stringify(logRows)],
     ["logs.csv", formatOriginalLogReportCsv(logColumns, logRows)],
-    ["reviews.json", input.nativeReviews.length ? encodeOriginalReportJson(reviewReport.rows) : JSON.stringify(reviewReport.rows)],
+    ["reviews.json", input.nativeReviewReport?.rows.length ? encodeOriginalReportJson(reviewReport.rows) : JSON.stringify(reviewReport.rows)],
     ["reviews.csv", formatOriginalReviewReportCsv(reviewColumns, reviewCsvRows)]
   ] as const;
   return {
@@ -31581,19 +31572,41 @@ export const createFirstSliceServices = (
         const groupKeys = selectedGroupKeys ?? Array.from(
           new Set(participantSessions.map(session => session.groupKey))
         ).sort();
-        const nativeUnits = await readOriginalArchiveNativeUnits(repository, {
-          tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,testRuns,participantSessions,groupKeys
-        });
-        const nativeReviews:OriginalReviewReportProjection[]=[];
-        for(const person of participantSessions){
-          if(person.tenantId!==workspace.tenantId||person.workspaceId!==workspace.workspaceId||typeof person.originalLoginKey!=='string'||!groupKeys.includes(person.groupKey))continue;
-          const reports=await readOriginalReviewReports({repository,timeZone:participantAccessTimeZone,
-            labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)},person);
-          if(reports.some(row=>!groupKeys.some(key=>archiveUnitNamesEqual(key,row.record.groupname))))throw originalReviewHistoryUnavailable();
-          nativeReviews.push(...reports);
+        const nativePeople = participantSessions.filter(person =>
+          person.tenantId === workspace.tenantId && person.workspaceId === workspace.workspaceId &&
+          typeof person.originalLoginKey === "string"
+        );
+        const selectedKeys = new Set(groupKeys);
+        const [nativeUnits, nativeSnapshot] = await Promise.all([
+          readOriginalArchiveNativeUnits(repository, {
+            tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,testRuns,participantSessions,groupKeys
+          }),
+          nativePeople.some(person => selectedKeys.has(person.groupKey))
+            ? repository.getOriginalWorkspaceReportSnapshot({
+                tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,
+                type:"review",groups:selectedGroupKeys ?? null,exactSessionGroups:true
+              }).catch(error => {
+                if (error instanceof FirstSliceError && error.errorCode === "original_report_history_unknown") {
+                  throw originalReviewHistoryUnavailable();
+                }
+                throw error;
+              })
+            : undefined
+        ]);
+        let nativeReviewReport:PreparedOriginalWorkspaceReviews | undefined;
+        if (nativeSnapshot) {
+          if (nativeSnapshot.type !== "review") throw originalReviewHistoryUnavailable();
+          nativeReviewReport = await prepareOriginalWorkspaceReviewRows({
+            scope:workspace, rows:nativeSnapshot.rows, timeZone:participantAccessTimeZone,
+            readLabels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)
+          });
         }
+        // Native rows are authoritative from one workspace snapshot. A concurrent
+        // mirror write must never be exported as a second, legacy Review.
+        const nativePersonIds = new Set(nativePeople.map(person => person.participantSessionId));
         return createOriginalResultArchive({
-          nativeReviews,
+          nativeReviewReport,
+          nativeReviewPersonIds: nativePersonIds,
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           groupKeys,

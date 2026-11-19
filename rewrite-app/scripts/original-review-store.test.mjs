@@ -221,10 +221,63 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
    const known=(await repository.listWorkspaceReviewsByWorkspace(storeScope.tenantId,storeScope.workspaceId)).find(row=>row.participantSessionId===peer.participantSession.participantSessionId);assert.ok(known);
    const legacy={...known,reviewId:randomUUID(),comment:'Owned legacy canonical Review'};await repository.saveWorkspaceReview(legacy);
    assert.equal((await repository.getWorkspaceReviewById(legacy.reviewId)).comment,legacy.comment);
-   await assert.rejects(()=>services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.GROUP']}),error=>error.statusCode===409);
+   await assert.rejects(()=>services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.GROUP']}),error=>error.statusCode===409&&error.errorCode==='original_review_history_unknown');
    assert.ok((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:[]})).body.length>0);
    assert.ok((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.UNKNOWN']})).body.length>0);
    await repository.deleteWorkspaceReview(legacy.reviewId);
+  });
+  await t.test('operator ZIP shares workspace-wide native review order and current labels across interleaved people', async () => {
+   const peerUnit = {token: peer.token, testNumber: peerNumber, unitName: 'OWNED.UNIT'};
+   for (const [target, entry, categories] of [
+    [peerUnit, 'Interleaved peer first', '001 tech'],
+    [request, 'Interleaved owner', '01 tech'],
+    [peerUnit, 'Interleaved peer second', '1 tech'],
+    [{...peerUnit, unitName: null}, 'Interleaved peer booklet', 'booklet']
+   ]) await services.originalReview.create({...target, body: {...body, entry, categories}});
+   await upload('booklet.xml', xml('Booklet', '<Metadata><Id>OWNED.REVIEW</Id><Label>Current booklet Ω</Label></Metadata><Units><Unit id="OWNED.UNIT" label="Current unit β"/></Units>'));
+   await reopen();
+   const readArchive = async groupKeys => {
+    const {body: zip} = await services.workspaceAdminRead.exportOriginalResultArchive({...scope, groupKeys});
+    const files = new Map();
+    for (let offset = 0; zip.readUInt32LE(offset) === 0x04034b50;) {
+     const length = zip.readUInt32LE(offset + 18), nameLength = zip.readUInt16LE(offset + 26);
+     const start = offset + 30 + nameLength + zip.readUInt16LE(offset + 28);
+     files.set(zip.toString('utf8', offset + 30, offset + 30 + nameLength), zip.toString('utf8', start, start + length));
+     offset = start + length;
+    }
+    return files;
+   };
+   const files = await readArchive(['OWNED.GROUP']);
+   for (const [format, accept] of [['json', 'application/json'], ['csv', 'text/csv']]) {
+    const report = await services.originalWorkspaceReport.read({...scope, type: 'review', dataIds: 'OWNED.GROUP', accept, useNewVersion: true});
+    if (format === 'json') {
+     const rows = JSON.parse(report.body);
+     assert.equal(rows.filter(row => row.entry.startsWith('Interleaved')).length, 4);
+     assert.ok(rows.every(row => row.bookletlabel === 'Current booklet Ω'));
+     assert.ok(rows.every(row => row.unitlabel === (row.unitname ? 'Current unit β' : '')));
+    }
+    assert.equal(files.get('reviews.' + format), report.body, 'ZIP must preserve the workspace report bytes for ' + format);
+   }
+   const {tenantId, workspaceId, contentReleaseId} = storeScope;
+   for (const groupKey of ['OWNED.GROUP', 'owned.group']) {
+    const participantSessionId = randomUUID(), testRunId = randomUUID();
+    await repository.saveParticipantSession({tenantId, workspaceId, contentReleaseId, participantSessionId,
+     loginKey: 'legacy-' + groupKey, groupKey, executionMode: 'run-trial', status: 'launched', createdAt: at});
+    await repository.saveTestRun({tenantId, workspaceId, contentReleaseId, participantSessionId, testRunId,
+     bookletKey: 'OWNED.REVIEW', executionMode: 'run-trial', status: 'running', currentUnitKey: null,
+     unitResponses: {}, createdAt: at, updatedAt: at, completedAt: null});
+    await services.workspaceReview.createReview({...scope, participantSessionId, testRunId,
+     category: 'legacy', reviewerId: 'owned', comment: 'Legacy ' + groupKey});
+   }
+   await reopen();
+   const before = JSON.parse(files.get('reviews.json'));
+   const mixed = JSON.parse((await readArchive(['OWNED.GROUP'])).get('reviews.json'));
+   assert.deepEqual(mixed.map(row => row.entry), [...before.map(row => row.entry), 'Legacy OWNED.GROUP']);
+   assert.ok(mixed.slice(0, -1).every(row => row.category_legacy === false));
+   assert.equal(mixed.at(-1).category_legacy, true);
+   assert.equal(typeof mixed.at(-1).priority, 'string');
+   const lowerCase = JSON.parse((await readArchive(['owned.group'])).get('reviews.json'));
+   assert.deepEqual(lowerCase.map(row => row.entry), ['Legacy owned.group']);
   });
   await t.test('Source57 native response and log report bytes survive durable reopen',async()=>{
    const previous=at;try{await assertNativeResultReportWitness({services:()=>services,tenantKey:tenant.tenantKey,setNow:value=>{at=value;},reopen});}finally{at=previous;}

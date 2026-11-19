@@ -118,17 +118,21 @@ export const originalReviewReportCategoryKeys = (rows:ReadonlyArray<Pick<Origina
   return keys.sort(compareCategory);
 };
 
-export function formatOriginalReviewReport(input:{rows:OriginalReviewReportRecord[]; format:OriginalReportFormat;
-  useNewVersion:boolean; labels?:(bookletName:string,unitName:string)=>OriginalReportLabels}):string {
-  const keys=originalReviewReportCategoryKeys(input.rows);
-  const rows=input.rows.map(row => {
+type OriginalReviewReportInput={
+  rows:OriginalReviewReportRecord[];
+  format:OriginalReportFormat;
+  useNewVersion:boolean;
+  labels?:(bookletName:string,unitName:string)=>OriginalReportLabels;
+};
+export function projectOriginalReviewReportRows(input:OriginalReviewReportInput,keys=originalReviewReportCategoryKeys(input.rows)){
+  return input.rows.map(row => {
     const values=trim(row.categories).split(' ');
     const categories=Object.fromEntries(keys.map(key => {
       const selected=values.includes(key);
       return input.useNewVersion ? ['category_'+key,input.format==='csv'?(selected?'TRUE':'FALSE'):selected]
         : ['category: '+key,selected?'X':null];
     }));
-    const record:Record<string,unknown>={...identity(row),priority:row.priority,...categories,
+    const record:Record<string,string|number|boolean|null|{readonly rawJSON:string}>={...identity(row),priority:row.priority,...categories,
       reviewtime:row.reviewtime,...(input.useNewVersion?{}:{entry:row.entry}),page:row.page&&typeof row.page==='object'&&input.format==='csv'?row.page.rawJSON:row.page,pagelabel:row.pagelabel,
       originalUnitId:row.originalUnitId,userAgent:row.userAgent};
     if (input.useNewVersion) {
@@ -138,7 +142,9 @@ export function formatOriginalReviewReport(input:{rows:OriginalReviewReportRecor
     }
     return record;
   });
-  return render(input.format,rows);
+}
+export function formatOriginalReviewReport(input:OriginalReviewReportInput):string {
+  return render(input.format,projectOriginalReviewReportRows(input));
 }
 
 /** Source TimeStamp::toDisplayFormat: seconds, configured system timezone,
