@@ -164,6 +164,7 @@ export class RewriteAppOpsService {
 
     this.applyAdminAuthPayload(payload);
     this.uiState.setAdminSessionToken(payload.sessionToken);
+    this.uiState.publishOriginalAccountRights();
     this.opsState.adminPassword = "";
     this.feedback.rememberActivity(
       "Admin Signed In",
@@ -218,8 +219,9 @@ export class RewriteAppOpsService {
     return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : value;
   }
 
-  async refreshAdminSession(): Promise<void> {
-    if (!this.hasAdminSession()) {
+  async refreshAdminSession({publishOriginalRights = false} = {}): Promise<void> {
+    const token = this.opsState.adminSessionToken.trim();
+    if (!token) {
       return;
     }
     const payload = await this.requestState.request<GetAdminCurrentSessionResponse>(
@@ -227,14 +229,21 @@ export class RewriteAppOpsService {
       "GET",
       productionApiRoutes.admin.currentSession,
       undefined,
-      { headers: this.createAdminHeaders() }
+      { headers: { authorization: `Bearer ${token}` }, quiet: publishOriginalRights }
     );
 
+    if (token !== this.opsState.adminSessionToken.trim()) {
+      return;
+    }
     this.applyAdminAuthPayload(payload);
-    this.feedback.rememberActivity(
-      "Admin Session Refreshed",
-      `${payload.adminUser.username} is authenticated.`
-    );
+    if (publishOriginalRights) {
+      this.uiState.publishOriginalAccountRights();
+    } else {
+      this.feedback.rememberActivity(
+        "Admin Session Refreshed",
+        `${payload.adminUser.username} is authenticated.`
+      );
+    }
     this.persistence.persistShellState();
   }
 

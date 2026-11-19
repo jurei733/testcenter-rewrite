@@ -134,6 +134,9 @@ export class AppShellFacade {
   }
 
   get originalOperatorRights(): readonly string[] {
+    if (!this.uiState.showOriginalAccountRights()) {
+      return [];
+    }
     // The native admin access set includes workspaceAdmin even without workspace grants.
     const rights = ["Verwaltung von Testinhalten"];
     if (this.isPlatformAdmin) {

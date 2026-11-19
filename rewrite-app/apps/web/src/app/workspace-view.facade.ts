@@ -44,6 +44,8 @@ import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
+import { InterfaceModeService } from "./interface-mode.service";
+import { RewriteAppOpsService } from "./rewrite-app-ops.service";
 
 type WorkspaceDirectorySortBy = "displayName" | "latestFileModificationAt";
 type WorkspaceDirectorySortDirection = "asc" | "desc";
@@ -59,6 +61,8 @@ export class WorkspaceViewFacade {
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly requestState = inject(RewriteAppShellRequestService);
+  private readonly interfaceMode = inject(InterfaceModeService);
+  private readonly opsService = inject(RewriteAppOpsService);
 
   readonly workspace = this.uiState.workspace;
   workspaceDisplayNameDraft = "";
@@ -2404,6 +2408,13 @@ export class WorkspaceViewFacade {
 
   init(): void {
     this.viewState.setActiveView("workspace");
+    // Original's workspace selection publishes the session it reads. A direct
+    // visit to a protected content or administration view only restores it.
+    if (this.interfaceMode.mode() === "original" && this.uiState.adminSessionActive()) {
+      void this.opsService.refreshAdminSession({publishOriginalRights: true}).catch(() => {
+        // Invalid active sessions are cleared by the shared request service.
+      });
+    }
   }
 
   get canUseTenantScope(): boolean {

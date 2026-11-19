@@ -40,7 +40,9 @@ async function signIn(context,key,username='demo-admin',password='demo-admin-pas
  await page.locator('#adminUsername').fill(username);await page.locator('#adminPassword').fill(password);await page.locator('#adminSignInButton').click();
  if(username==='demo-admin')await page.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
  else await page.locator('#adminSignOutButton').waitFor();
+ const workspaceSession=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/auth/current-session');
  await page.goto(base+'/app/workspace?ui=original',{waitUntil:'domcontentloaded'});
+ assert.equal((await workspaceSession).status(),200);
  await page.locator('#tenantKey').fill('demo-tenant');await page.locator('#tenantKey').dispatchEvent('change');
  await page.locator('#workspaceKey').fill(key);await page.locator('#workspaceKey').dispatchEvent('change');
  await page.locator('[data-view-nav="content"]').click();if(waitFiles)await page.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();return page;
@@ -157,6 +159,27 @@ try {
     console.log('native_workspace_files_account='+theme+'-'+width+':passed');
     await checkOriginalAccountKeyboardFocus(readPage,accountTrigger);
     console.log('native_workspace_files_keyboard_account='+theme+'-'+width+':passed');
+    if(theme==='Primar' && width===1280) {
+      await readPage.reload({waitUntil:'domcontentloaded'});
+      await readPage.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
+      assert.equal(await readPage.locator('[data-cy="upload-files"]').isDisabled(),true);
+      await accountTrigger.click();await account.waitFor();
+      const restoredDetails=await account.locator('dd').allTextContents();
+      assert.equal(restoredDetails.length,3);
+      assert.deepEqual(restoredDetails.slice(0,2),[username,'']);
+      await account.getByRole('button',{name:'Nutzerinformationen schließen'}).click();
+      await account.waitFor({state:'detached'});
+      const workspaceRefresh=readPage.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/auth/current-session');
+      await readPage.locator('#originalWorkspaceFileHeader [data-cy="logo"]').click();
+      assert.equal((await workspaceRefresh).status(),200);
+      await readPage.locator('[data-view-nav="content"]').click();
+      await readPage.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
+      await accountTrigger.click();await account.waitFor();
+      assert.deepEqual((await account.locator('dd').allTextContents()).slice(0,-1),[username,'','Verwaltung von Testinhalten']);
+      await account.getByRole('button',{name:'Nutzerinformationen schließen'}).click();
+      await account.waitFor({state:'detached'});
+      console.log('native_workspace_files_account_restored_session=passed');
+    }
     await readPage.locator('[data-cy="files-checkAll-Unit"] input').check();
     assert.equal(await readPage.locator('[data-cy="delete-files"]').isDisabled(),true);
     const readRow=readPage.locator('mat-row').filter({has:readPage.locator('[data-cy="files-checkbox-NATIVE.UNIT"]')});

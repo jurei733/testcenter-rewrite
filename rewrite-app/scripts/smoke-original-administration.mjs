@@ -70,6 +70,23 @@ try{
   await page.locator("#adminSignInButton").click();let browserToken=(await(await browserSignedIn).json()).sessionToken;
   assert.notEqual(browserToken,token,"The browser must own its actual sign-in session, separate from setup.");
   const surface=page.locator('#originalSystemAdministration[aria-busy="false"]');await surface.waitFor();
+  const accountTrigger=page.locator("#originalAdministrationAccountButton");
+  const account=page.locator(".original-native-account-menu");
+  const systemRights=[
+    "Verwaltung von Testinhalten",
+    "Verwaltung von Nutzerrechten und von grundsätzlichen Systemeinstellungen"
+  ];
+  const checkAccountDetails=async expectedRights=>{
+    await accountTrigger.click();await account.waitFor();
+    const [name,group,...rightsAndVersion]=await account.locator("dd").allTextContents();
+    assert.deepEqual([name,group],["demo-admin",""]);
+    assert.deepEqual(rightsAndVersion.slice(0,-1),expectedRights);
+    assert.match(rightsAndVersion.at(-1),/^Rewrite(?: \([a-f0-9]{12}\))?$/);
+    await account.getByRole("button",{name:"Nutzerinformationen schließen"}).click();
+    await account.waitFor({state:"detached"});
+    assert.equal(await accountTrigger.evaluate(element=>document.activeElement===element),true);
+  };
+  await checkAccountDetails(systemRights);
   assert.equal(await page.locator("#originalAdministrationHeader h1").textContent(),"Systemverwaltung");
   assert.equal(await page.locator(".hero:visible,.view-nav:visible,.app-layout:visible").count(),0);
   assert.equal(await page.locator("#adminSessionToken").count(),0);
@@ -265,7 +282,6 @@ try{
   assert.equal(await page.locator("#requiredAdminPasswordChangeDialog").count(),0);
   assert.equal(await page.evaluate(secret=>JSON.stringify({...localStorage,...sessionStorage}).includes(secret),"Own-root-updated-password-9!"),false);
   console.log("original_administration=own-existing-password-reset-and-secret-not-persisted:passed");
-  const accountTrigger=page.locator("#originalAdministrationAccountButton");
   for(const theme of ["Primar","Sekundar","Erwachsene"]){
     await api("/api/v1/admin/application-settings",{themeName:theme},"PATCH");
     await page.reload({waitUntil:"domcontentloaded"});await surface.waitFor();
@@ -283,19 +299,17 @@ try{
     }
   }
   await page.setViewportSize({width:1280,height:844});
-  await accountTrigger.click();
-  const account=page.locator(".original-native-account-menu");await account.waitFor();
-  const [name,group,...rightsAndVersion]=await account.locator("dd").allTextContents();
-  assert.equal(name,"demo-admin");
-  assert.equal(group,"");
-  assert.deepEqual(rightsAndVersion.slice(0,-1),[
-    "Verwaltung von Testinhalten",
-    "Verwaltung von Nutzerrechten und von grundsätzlichen Systemeinstellungen"
-  ]);
-  assert.match(rightsAndVersion.at(-1),/^Rewrite(?: \([a-f0-9]{12}\))?$/);
-  await account.getByRole("button",{name:"Nutzerinformationen schließen"}).click();
-  await account.waitFor({state:"detached"});
-  assert.equal(await accountTrigger.evaluate(element=>document.activeElement===element),true);
+  await checkAccountDetails([]);
+  const currentSessionPath="/api/v1/admin/auth/current-session";
+  const restoredSession=await fetch(base+currentSessionPath,{headers:{authorization:`Bearer ${browserToken}`}});
+  assert.equal(restoredSession.status,200);
+  assert.ok((await restoredSession.json()).roleAssignments.some(({role})=>role==="platform_admin"));
+  const workspaceRefresh=page.waitForResponse(response=>new URL(response.url()).pathname===currentSessionPath);
+  await page.locator('#originalAdministrationHeader [data-cy="logo"]').click();
+  assert.equal((await workspaceRefresh).status(),200);
+  await page.locator("#administrationUsersTab").click();await surface.waitFor();
+  await checkAccountDetails(systemRights);
+  console.log("original_administration_account=restored-session-and-workspace-publication:passed");
   console.log("original_administration_account=source-rights-and-focus:passed");
   await accountTrigger.click();
   await page.locator("#globalAdminSignOutButton").click();await waitForMaterialDialog(page);
