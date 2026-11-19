@@ -13,14 +13,16 @@ const serverTime = (value: unknown): number => {
 };
 export type OriginalResultTest = Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId'> & {
   savedUnitKeys: string[]; bookletName?: string; lastOpenedAt?: string | null; lastTestModifiedAt?: string | null;
+  responseCount?: number; updatedAt?: string;
 };
-export function projectOriginalResultTest(run: Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId' | 'originalResultState'> & {unitResponses?: TestRun['unitResponses']},
+export function projectOriginalResultTest(run: Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId' | 'originalResultState'> & Partial<Pick<TestRun,'unitResponses' | 'updatedAt'>>,
   savedUnitKeys: readonly string[] = Object.keys(run.unitResponses ?? {}),nativeUnitKeys:readonly string[]=[]): OriginalResultTest {
   if (!Array.isArray(savedUnitKeys) || savedUnitKeys.some(key => typeof key !== 'string')) throw unavailable();
   const state = run.originalResultState,units=[...savedUnitKeys];
   for(const key of nativeUnitKeys)if(!units.some(existing=>originalParticipantGroupKeysEqual(existing,key)))units.push(key);
   return {testRunId: run.testRunId, participantSessionId: run.participantSessionId, tenantId: run.tenantId, workspaceId: run.workspaceId,
     contentReleaseId: run.contentReleaseId, savedUnitKeys: units,
+    ...(run.updatedAt === undefined ? {} : {updatedAt: run.updatedAt, responseCount: savedUnitKeys.length}),
     ...(state?.bookletName === undefined ? {} : {bookletName: state.bookletName}),
     ...(state?.lastOpenedAt === undefined ? {} : {lastOpenedAt: state.lastOpenedAt}),
     ...(state?.lastTestModifiedAt === undefined ? {} : {lastTestModifiedAt: state.lastTestModifiedAt})};
@@ -50,10 +52,8 @@ export function projectOriginalGroupResultInventory(input: OriginalGroupResultIn
 type Scope = {tenantId: string; workspaceId: string};
 const inScope = (row: Scope, scope: Scope): boolean => row.tenantId === scope.tenantId && row.workspaceId === scope.workspaceId;
 
-/** Reproduce Source grouping from credential-stage snapshots, mutable Login
- * bindings, actual opening history and distinct persisted Units. Current roster
- * labels, Run.updatedAt and arbitrary Unit logs do not establish that history. */
-export function projectOriginalGroupResults(input: Scope & OriginalGroupResultInventory & {selectedGroups?: string[]}): OriginalGroupResult[] {
+/** Both summaries use the same opening, Unit and clock evidence for native Tests. */
+export function* projectOriginalStartedTests(input: Scope & OriginalGroupResultInventory & {selectedGroups?: string[]}) {
   const people = new Map(input.people.filter(person => inScope(person, input) && typeof person.originalLoginKey === 'string')
     .map(person => [person.participantSessionId, person]));
   const bindingsByLogin = new Map<string, OriginalGroupResultInventory['bindings']>();
@@ -68,7 +68,6 @@ export function projectOriginalGroupResults(input: Scope & OriginalGroupResultIn
   }
   const runs = input.runs.filter(run => inScope(run, input) && people.has(run.participantSessionId));
   const savedUnits = selectOriginalSavedUnitKeys({testRuns: runs, persistedUnitKeys: new Map(runs.map(run => [run.testRunId, run.savedUnitKeys])), reviews: input.reviews, activityEvents: input.events});
-  const rows = new Map<string, {group: OriginalGroupResultInventory['groups'][number]; name: string; started: number; minimum: number; maximum: number; total: number; modified: number}>();
   const identities = new Set<string>();
   for (const run of runs) {
     if (run.lastOpenedAt === null) continue;
@@ -87,16 +86,24 @@ export function projectOriginalGroupResults(input: Scope & OriginalGroupResultIn
     const identity = JSON.stringify([person.participantSessionId, run.bookletName]);
     if (identities.has(identity)) throw unavailable();
     identities.add(identity);
-    const modified = Math.max(serverTime(group.lastModifiedAt), serverTime(run.lastTestModifiedAt));
-    const count = savedUnits.get(run.testRunId)?.size ?? 0;
-    const row = rows.get(group.groupKey) ?? {group, name: binding.groupKey, started: 0, minimum: count, maximum: count, total: 0, modified};
+    yield {run, group, name: binding.groupKey, unitCount: savedUnits.get(run.testRunId)?.size ?? 0,
+      lastChange: Math.floor(Math.max(serverTime(group.lastModifiedAt), serverTime(run.lastTestModifiedAt)) / 1000)};
+  }
+}
+
+/** Reproduce Source grouping from credential-stage snapshots, mutable Login
+ * bindings, actual opening history and distinct persisted Units. */
+export function projectOriginalGroupResults(input: Scope & OriginalGroupResultInventory & {selectedGroups?: string[]}): OriginalGroupResult[] {
+  const rows = new Map<string, {group: OriginalGroupResultInventory['groups'][number]; name: string; started: number; minimum: number; maximum: number; total: number; modified: number}>();
+  for (const {group, name, unitCount: count, lastChange: modified} of projectOriginalStartedTests(input)) {
+    const row = rows.get(group.groupKey) ?? {group, name, started: 0, minimum: count, maximum: count, total: 0, modified};
     row.started++; row.total += count; row.minimum = Math.min(row.minimum, count); row.maximum = Math.max(row.maximum, count);
     row.modified = Math.max(row.modified, modified);
     rows.set(group.groupKey, row);
   }
   return [...rows.values()].map(row => ({groupName: row.name, groupLabel: row.group.groupLabel, bookletsStarted: row.started,
     numUnitsMin: row.minimum, numUnitsMax: row.maximum, numUnitsTotal: row.total,
-    numUnitsAvg: row.total / row.started, lastChange: Math.floor(row.modified / 1000)}))
+    numUnitsAvg: row.total / row.started, lastChange: row.modified}))
     .sort((left, right) => left.groupName.localeCompare(right.groupName));
 }
 

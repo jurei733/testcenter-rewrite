@@ -86,7 +86,7 @@ export {projectOriginalGroupResultInventory} from './original-group-results.js';
 export type {OriginalGroupResultInventory} from './original-group-results.js';
 export {projectOriginalResultTest} from './original-group-results.js';
 export type {OriginalResultTest} from './original-group-results.js';
-import {createOriginalGroupResultsPort} from './original-group-results.js';
+import {createOriginalGroupResultsPort, projectOriginalStartedTests, type OriginalGroupResultInventory} from './original-group-results.js';
 export {prepareOriginalTestSelection,prepareOriginalTestDeletionInput,selectOriginalTestDeletion,deleteOriginalSelectedTestsFromCollections} from './original-test-deletion.js';
 export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletionResult} from './original-test-deletion.js';
 import {createOriginalWorkspaceReportPort} from './original-workspace-reports.js';
@@ -7564,14 +7564,15 @@ const listDetailedResponsesForWorkspace = (input: {
 const listGroupResultsForWorkspace = (input: {
   tenantKey: string;
   workspaceKey: string;
-  participantSessions: ParticipantSession[];
+  tenantId: string;
+  workspaceId: string;
+  inventory: OriginalGroupResultInventory;
   participantRosterEntries: ParticipantRosterEntry[];
-  testRuns: TestRun[];
-  reviews: WorkspaceReview[];
   testLogs: ParticipantTestLog[];
 }): WorkspaceGroupResultSummary[] => {
+  const {inventory} = input;
   const participantSessionsById = new Map(
-    input.participantSessions.map(participantSession => [
+    inventory.people.map(participantSession => [
       participantSession.participantSessionId,
       participantSession
     ])
@@ -7580,7 +7581,7 @@ const listGroupResultsForWorkspace = (input: {
     input.participantRosterEntries
   );
   const reviewsByTestRunId = new Map<string, number>();
-  for (const review of input.reviews) {
+  for (const review of inventory.reviews) {
     reviewsByTestRunId.set(
       review.testRunId,
       (reviewsByTestRunId.get(review.testRunId) ?? 0) + 1
@@ -7594,61 +7595,55 @@ const listGroupResultsForWorkspace = (input: {
     );
   }
 
-  const groupRuns = new Map<
-    string,
-    Array<{
-      testRun: TestRun;
-      responseCount: number;
-      reviewCount: number;
-      testLogCount: number;
-    }>
-  >();
-  for (const rawTestRun of input.testRuns) {
-    const testRun = normalizeTestRun(rawTestRun);
-    const participantSession = participantSessionsById.get(
-      testRun.participantSessionId
-    );
-    if (!participantSession?.groupKey) {
-      continue;
-    }
-    const rows = groupRuns.get(participantSession.groupKey) ?? [];
-    rows.push({
-      testRun,
-      responseCount: Object.keys(testRun.unitResponses).length,
-      reviewCount: reviewsByTestRunId.get(testRun.testRunId) ?? 0,
-      testLogCount: testLogsByTestRunId.get(testRun.testRunId) ?? 0
-    });
-    groupRuns.set(participantSession.groupKey, rows);
-  }
-
-  return [...groupRuns.entries()]
-    .map(([groupKey, rows]) => {
-      const responseCounts = rows.map(row => row.responseCount);
-      const responseCount = responseCounts.reduce((total, count) => total + count, 0);
-      const lastChangeAt = rows.reduce(
-        (latest, row) =>
-          row.testRun.updatedAt.localeCompare(latest) > 0
-            ? row.testRun.updatedAt
-            : latest,
-        rows[0]?.testRun.updatedAt ?? ""
-      );
-
-      return {
+  // Old runs without an opening marker remain accessible through the legacy
+  // summary. The strict Original endpoint still requires complete history.
+  const started = projectOriginalStartedTests({
+    ...inventory, tenantId: input.tenantId, workspaceId: input.workspaceId,
+    runs: inventory.runs.filter(run => run.lastOpenedAt !== undefined)
+  });
+  const nativeByRun = new Map(Array.from(started, result => [result.run.testRunId, result]));
+  const summaries = new Map<string, WorkspaceGroupResultSummary>();
+  for (const run of inventory.runs) {
+    const person = participantSessionsById.get(run.participantSessionId);
+    if (!person?.groupKey) continue;
+    const native = nativeByRun.get(run.testRunId);
+    if (person.originalLoginKey !== undefined && run.lastOpenedAt === null) continue;
+    const groupKey = person.groupKey;
+    const responseCount = run.responseCount ?? 0;
+    const unitCount = native?.unitCount ?? responseCount;
+    const lastChangeAt = native ? new Date(native.lastChange * 1000).toISOString() : run.updatedAt ?? "";
+    let summary = summaries.get(groupKey);
+    if (!summary) {
+      summary = {
         tenantKey: input.tenantKey,
         workspaceKey: input.workspaceKey,
         groupKey,
         groupLabel: groupLabels.get(groupKey) ?? groupKey,
-        bookletsStarted: rows.length,
-        numUnitsMin: Math.min(...responseCounts),
-        numUnitsMax: Math.max(...responseCounts),
-        numUnitsTotal: responseCount,
-        numUnitsAvg: responseCount / rows.length,
-        responseCount,
-        reviewCount: rows.reduce((total, row) => total + row.reviewCount, 0),
-        testLogCount: rows.reduce((total, row) => total + row.testLogCount, 0),
+        bookletsStarted: 0,
+        numUnitsMin: unitCount,
+        numUnitsMax: unitCount,
+        numUnitsTotal: 0,
+        numUnitsAvg: 0,
+        responseCount: 0,
+        reviewCount: 0,
+        testLogCount: 0,
         lastChangeAt
       };
-    })
+      summaries.set(groupKey, summary);
+    }
+    if (native) summary.groupLabel = native.group.groupLabel;
+    summary.bookletsStarted += 1;
+    summary.numUnitsMin = Math.min(summary.numUnitsMin, unitCount);
+    summary.numUnitsMax = Math.max(summary.numUnitsMax, unitCount);
+    summary.numUnitsTotal += unitCount;
+    summary.numUnitsAvg = summary.numUnitsTotal / summary.bookletsStarted;
+    summary.responseCount += responseCount;
+    summary.reviewCount += reviewsByTestRunId.get(run.testRunId) ?? 0;
+    summary.testLogCount += testLogsByTestRunId.get(run.testRunId) ?? 0;
+    if (lastChangeAt > summary.lastChangeAt) summary.lastChangeAt = lastChangeAt;
+  }
+
+  return [...summaries.values()]
     .sort(
       (left, right) =>
         right.lastChangeAt.localeCompare(left.lastChangeAt) ||
@@ -31463,25 +31458,15 @@ export const createFirstSliceServices = (
           input.workspaceKey
         );
         const [
-          participantSessions,
+          inventory,
           participantRosterEntries,
-          testRuns,
-          reviews,
           testLogs
         ] = await Promise.all([
-          repository.listParticipantSessionsByWorkspace(
+          repository.getOriginalGroupResultInventory(
             workspace.tenantId,
             workspace.workspaceId
           ),
           repository.listParticipantRosterEntriesByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listTestRunsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listWorkspaceReviewsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
           ),
@@ -31494,10 +31479,10 @@ export const createFirstSliceServices = (
         return listGroupResultsForWorkspace({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
-          participantSessions,
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          inventory,
           participantRosterEntries,
-          testRuns,
-          reviews,
           testLogs
         });
       },

@@ -80,6 +80,8 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
     const upload = (group, label) => services.workspaceAdminRead.importParticipantRoster({...scope, rosterText: roster(group, label)});
     const login = () => services.originalAuthentication.login({name: 'owned-results-person', password: 'Owned-results-secret'});
     const read = groups => services.originalGroupResults.list({...scope, ...(groups === undefined ? {} : {groups})});
+    const readOverview = () => services.workspaceAdminRead.listGroupResults(scope);
+    const overviewMetrics = row => [row.bookletsStarted, row.numUnitsMin, row.numUnitsMax, row.numUnitsTotal, row.numUnitsAvg];
     await upload(); clock = 1;
     const credential = await login();
     await t.test('credential-only and person-only groups have no started result row', async () => {
@@ -95,6 +97,9 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
       await repository.saveTestRun(second);
       const [row] = await read(); assert.equal(row.bookletsStarted, 1); assert.equal(row.numUnitsTotal, 0); assert.equal(row.lastChange, seconds(3));
       assert.deepEqual(Object.keys(row).sort(), Object.keys(nativeCase.result).sort());
+      const [overview] = await readOverview();
+      assert.deepEqual(overviewMetrics(overview), [1, 0, 0, 0, 0]);
+      assert.equal(Date.parse(overview.lastChangeAt), seconds(3) * 1000);
     });
     await t.test('saved state/review Units count without answers, including a deleted review, and Unit writes do not advance Test time', async () => {
       clock = 4; await services.participantRuntime.saveProgress({testRunId: first.testRunId, status: 'running', responseOnly: true, responseUnitKey: 'A1', unitResponse: privateResponse});
@@ -109,10 +114,16 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
       await repository.saveParticipantTestLogs([{...ids, participantSessionId: person.participantSessionId, testRunId: first.testRunId, participantTestLogId: randomUUID(),
         unitKey: 'uninitialized-arbitrary-log', originalUnitId: null, logKey: 'OWNED', logContent: 'does not create a Unit', timestamp: Date.parse(stamp(99)), recordedAt: stamp(99)}]);
       assert.deepEqual(await read(), [row]);
+      const [overview] = await readOverview();
+      assert.deepEqual(overviewMetrics(overview), overviewMetrics(row));
+      assert.equal(Date.parse(overview.lastChangeAt), seconds(5) * 1000);
+      assert.equal(overview.responseCount, 2);
+      assert.ok(overview.testLogCount > 0);
     });
     await t.test('current raw group spelling uses the binding while first label and the Test-only clock remain frozen', async () => {
       clock = 10; await upload(frozen.groupName, frozen.reimportedLabel); await login();
       assert.equal((await read())[0].groupLabel, frozen.groupLabel); assert.equal((await read())[0].lastChange, seconds(5));
+      assert.equal((await readOverview())[0].groupLabel, frozen.groupLabel);
       clock = 11; const lower = frozen.groupName.toLowerCase(); await upload(lower, frozen.reimportedLabel); await login();
       const [row] = await read(); assert.equal(row.groupName, lower); assert.equal(row.groupLabel, frozen.groupLabel);
       assert.deepEqual(await read([]), [row]); assert.deepEqual(await read([frozen.groupName]), [row]); assert.deepEqual(await read([' ' + lower]), []); assert.deepEqual(await read(['missing']), []);
@@ -228,7 +239,9 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
       await repository.saveTestRun({...ids, contentReleaseId: release, participantSessionId: id, testRunId: id, bookletKey: 'ORACLE.BOOK.A',
         executionMode: 'run-hot-return', status: 'running', currentUnitKey: 'A1', unitResponses: {A1: privateResponse}, createdAt: stamp(90), updatedAt: stamp(99), completedAt: null});
       assert.deepEqual(await read(), before);
-      assert.ok((await services.workspaceAdminRead.listGroupResults(scope)).some(row => row.groupKey === 'Canonical.Extension'));
+      const extension = (await readOverview()).find(row => row.groupKey === 'Canonical.Extension');
+      assert.deepEqual(overviewMetrics(extension), [1,1,1,1,1]);
+      assert.equal(extension.lastChangeAt, stamp(99));
       const guarded = new Proxy(repository, {get(target, key) {
         if (key === 'getOriginalGroupResultInventory') return async (...args) => {
           const inventory = await target[key](...args), alien = {...ids, workspaceId: 'foreign-owned-workspace'};

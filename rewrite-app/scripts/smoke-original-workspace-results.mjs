@@ -143,8 +143,33 @@ try{
  // the native A,B creation order and proving post-delete sort reapplication.
  const extra=await native('/test',ownedPersonToken,'PUT',{bookletName:'OWNED.RESULT.C'});assert.equal(extra.status,201);
  const extraId=extra.bytes.toString();assert.match(extraId,/^[1-9][0-9]*$/);
+ const readGroupSummaries=async()=>{
+  const response=await fetch(base+`/api/v1/tenants/${scope.tenantKey}/workspaces/${scope.workspaceKey}/results/groups`,{
+   headers:{Authorization:'Bearer '+readerToken},signal:AbortSignal.timeout(15000)
+  });
+  assert.equal(response.status,200);
+  return (await response.json()).items;
+ };
+ const compareGroupA=async expected=>{
+  const response=await native('/workspace/'+workspaceId+'/results',readerToken);
+  assert.equal(response.status,200);
+  const original=JSON.parse(response.bytes).find(row=>row.groupName==='OWNED.RESULT.A');
+  assert.equal(original.bookletsStarted,expected);
+  const summary=(await readGroupSummaries()).find(row=>row.groupKey===original.groupName);
+  for(const field of ['bookletsStarted','numUnitsMin','numUnitsMax','numUnitsTotal','numUnitsAvg']){
+   assert.equal(summary[field],original[field],field+' must follow Original Test and Unit history');
+  }
+  assert.equal(Date.parse(summary.lastChangeAt),original.lastChange*1000);
+ };
+ await compareGroupA(2);
  assert.equal((await native('/test/'+extraId,ownedPersonToken)).status,200);
  assert.equal((await native('/test/'+extraId+'/state',ownedPersonToken,'PATCH',[{key:'CONTROLLER',content:'RUNNING',timeStamp:++clock}])).status,200);
+ const extraUnit=await native('/test/'+extraId+'/unit/OWNED.RESULT.UNIT/state',ownedPersonToken,'PATCH',{
+  newState:[{key:'PRESENTATION_PROGRESS',content:'some',timeStamp:++clock}]
+ });
+ assert.equal(extraUnit.status,200);
+ await compareGroupA(3);
+ mark('workspace-group-summary-uses-started-tests-and-saved-units');
  const write=await browser.newContext({viewport:{width:1280,height:844}});
  try{
   await open(write,'owned-results-writer','tests');const before=JSON.parse((await native('/workspace/'+workspaceId+'/responses/detailed')).bytes);

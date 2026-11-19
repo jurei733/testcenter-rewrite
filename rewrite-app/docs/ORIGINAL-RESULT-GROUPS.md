@@ -1,5 +1,19 @@
 # Original participant group snapshots
 
+## Group statistics in both result views (2026-11-19)
+
+For native Tests with recorded opening history, the workspace group overview
+and the Original Results table share the opening, saved Unit, group label and
+Test clock calculation. Reserving a Test leaves the started count unchanged.
+A saved Unit contributes to the Unit count even when it has no response,
+and Unit-only writes leave the Test clock unchanged.
+
+The workspace overview keeps the stored group keys used by its exports and
+deletion actions, along with its response, review and log counters. Canonical
+sessions and older runs with no recorded opening history keep their existing
+summary rules. The Original endpoint continues to require enough history to
+validate its statistics.
+
 
 ## Current native deletion authorization (2026-11-02)
 
