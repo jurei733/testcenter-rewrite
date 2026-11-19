@@ -114,6 +114,23 @@ export async function runNativeSystemCheckOfflineChecks({browser,out,mark}){
     if(early){assert.equal(await page.locator('#syscheck-next-step').count(),0);assert.deepEqual(wizardResponses,[]);}
     await page.screenshot({path:join(out,prefix+'-collapsed.png')});passed(prefix+'-cold-offline-error-renders-without-another-script');
     await dialog.locator('mat-expansion-panel-header').click();await dialog.getByText('Browser:',{exact:true}).waitFor();await waitForFiniteDocumentAnimations(page);
+    const fontSession=await context.newCDPSession(page);
+    let paintedDetailFont;
+    try{
+     await fontSession.send('DOM.enable');await fontSession.send('CSS.enable');
+     const {root:{nodeId}}=await fontSession.send('DOM.getDocument');
+     const detail=await fontSession.send('DOM.querySelector',{nodeId,selector:'[role="dialog"] mat-expansion-panel p b'});
+     assert.ok(detail.nodeId,'Find an actual bold diagnostics label.');
+     const {fonts}=await fontSession.send('CSS.getPlatformFontsForNode',detail);
+     paintedDetailFont=fonts;
+     const style=await dialog.locator('mat-expansion-panel p b').first().evaluate(element=>{
+      const font=getComputedStyle(element);
+      return {family:font.fontFamily,weight:font.fontWeight,
+       faces:[...document.fonts].map(face=>[face.family,face.weight,face.status])};
+     });
+     assert.ok(fonts.length&&fonts.every(font=>font.isCustomFont&&font.postScriptName==='NunitoSans12ptExtraLight12pt-Bold'),
+      prefix+' must paint bold Original text offline: '+JSON.stringify({fonts,style,failed}));
+    }finally{await fontSession.detach();}
     const paragraphs=await dialog.locator('mat-expansion-panel p').allInnerTexts();
     const sourceEnvironmentMatched=platform==='MacIntel'&&reference.browser===browser.version();
     for(const field of ['Browser:','Betriebssystem:','Gerät:'])assert.ok(paragraphs.some(text=>text.startsWith(field)),JSON.stringify({field,paragraphs}));
@@ -134,7 +151,7 @@ export async function runNativeSystemCheckOfflineChecks({browser,out,mark}){
     stage=prefix+'-recover';await context.setOffline(false);await configure({nativeModeFault:false});await dialog.locator('[data-cy=close]').click();
     await page.waitForURL(url=>url.pathname==='/app/native-start');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).waitFor();
     assert.notEqual(await page.evaluate(()=>performance.timeOrigin),timeOrigin);assert.equal(await page.getByRole('dialog').count(),0);
-    controls.push({early,presentation,wizardPath,...early?{wizardCodeNeverServed:wizardResponses.length===0,wizardVisible:false}:{},theme,width,browser:browser.version(),platform,sourceEnvironmentMatched,scriptsBefore,scriptsAfter,failed,timestamp,paragraphs,recovery:{newDocument:true,loginVisible:true,path:new URL(page.url()).pathname},sourceResourceFailureDialogs:early?earlyReference.dialogCount:reference.dialogCount});
+    controls.push({early,presentation,paintedDetailFont,wizardPath,...early?{wizardCodeNeverServed:wizardResponses.length===0,wizardVisible:false}:{},theme,width,browser:browser.version(),platform,sourceEnvironmentMatched,scriptsBefore,scriptsAfter,failed,timestamp,paragraphs,recovery:{newDocument:true,loginVisible:true,path:new URL(page.url()).pathname},sourceResourceFailureDialogs:early?earlyReference.dialogCount:reference.dialogCount});
     passed(prefix+'-Source-reload-enters-a-new-login-document');await context.close();context=undefined;page=undefined;
    }
   }
