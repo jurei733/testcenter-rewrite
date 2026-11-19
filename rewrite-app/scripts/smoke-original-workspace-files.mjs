@@ -6,6 +6,7 @@ import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
+import {checkOriginalAccountKeyboardFocus} from './original-account-keyboard-focus.mjs';
 const scratch=await mkdtemp(join(tmpdir(),'owned-original-files-'));
 const artifacts=process.env.UI_SMOKE_ARTIFACT_DIR?resolve(process.env.UI_SMOKE_ARTIFACT_DIR,'original-workspace-files'):scratch;
 await mkdir(artifacts,{recursive:true});console.log('owned_artifacts='+artifacts);
@@ -154,23 +155,7 @@ try {
     await account.waitFor({state:'detached'});
     assert.equal(await accountTrigger.evaluate(element=>document.activeElement===element),true);
     console.log('native_workspace_files_account='+theme+'-'+width+':passed');
-    await readPage.keyboard.press('Tab');
-    await accountTrigger.focus();
-    await accountTrigger.press('Enter');
-    await account.waitFor();
-    const focusRing=await accountTrigger.evaluate(element=>{
-      const layer=element.querySelector('.mat-mdc-button-persistent-ripple');
-      return {
-        focused:element.matches(':focus-visible'),
-        buttonRadius:getComputedStyle(element).borderRadius,
-        rippleRadius:getComputedStyle(layer).borderRadius,
-        opacity:getComputedStyle(layer,'::before').opacity
-      };
-    });
-    assert.deepEqual(focusRing,{focused:true,buttonRadius:'12px',rippleRadius:'12px',opacity:'0.12'});
-    await account.getByRole('button',{name:'Nutzerinformationen schließen'}).press('Enter');
-    await account.waitFor({state:'detached'});
-    assert.equal(await accountTrigger.evaluate(element=>document.activeElement===element),true);
+    await checkOriginalAccountKeyboardFocus(readPage,accountTrigger);
     console.log('native_workspace_files_keyboard_account='+theme+'-'+width+':passed');
     await readPage.locator('[data-cy="files-checkAll-Unit"] input').check();
     assert.equal(await readPage.locator('[data-cy="delete-files"]').isDisabled(),true);

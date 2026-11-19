@@ -51,6 +51,11 @@
   }
 }
 
+:root[data-interface-mode='original'] :is(#originalAdministrationHeader, #originalWorkspaceFileHeader)
+  .account-button .mat-mdc-button-persistent-ripple {
+  border-radius: inherit;
+}
+
 // Rewrite's general button hover lifts by one pixel; the pinned Material
 // dialogs do not. Keep the correction local to these Original renderers.
 :root[data-interface-mode='original'] .original-password-confirmation-dialog button.mat-mdc-button-base:hover,

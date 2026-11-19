@@ -9,6 +9,7 @@ import { chromium } from "playwright";
 import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { runOriginalApplicationSettingsSmoke } from "./original-application-settings-smoke.mjs";
 import { waitForMaterialDialog } from "./material-dialog-ready.mjs";
+import { checkOriginalAccountKeyboardFocus } from "./original-account-keyboard-focus.mjs";
 import {checkNativeNameInputBoundary,checkNativePasswordInputBoundary,selectAfterNativeMatrixFailure} from './original-administration-boundary-smoke.mjs';
 
 // Real protected API, native Original controls and an owned SQLite database.
@@ -264,6 +265,7 @@ try{
   assert.equal(await page.locator("#requiredAdminPasswordChangeDialog").count(),0);
   assert.equal(await page.evaluate(secret=>JSON.stringify({...localStorage,...sessionStorage}).includes(secret),"Own-root-updated-password-9!"),false);
   console.log("original_administration=own-existing-password-reset-and-secret-not-persisted:passed");
+  const accountTrigger=page.locator("#originalAdministrationAccountButton");
   for(const theme of ["Primar","Sekundar","Erwachsene"]){
     await api("/api/v1/admin/application-settings",{themeName:theme},"PATCH");
     await page.reload({waitUntil:"domcontentloaded"});await surface.waitFor();
@@ -276,10 +278,11 @@ try{
       await page.locator(`[data-workspace-id="${alphaNativeId}"]`).click();
       await page.screenshot({path:join(artifacts,`${theme}-${label}-workspaces.png`),fullPage:false});
       await page.locator('[data-cy="superadmin-tabs:users"]').click();
+      await checkOriginalAccountKeyboardFocus(page,accountTrigger);
+      console.log(`original_administration_keyboard_account=${theme}-${label}:passed`);
     }
   }
   await page.setViewportSize({width:1280,height:844});
-  const accountTrigger=page.locator("#originalAdministrationAccountButton");
   await accountTrigger.click();
   const account=page.locator(".original-native-account-menu");await account.waitFor();
   const [name,group,...rightsAndVersion]=await account.locator("dd").allTextContents();

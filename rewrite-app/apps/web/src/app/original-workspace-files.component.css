@@ -129,5 +129,4 @@ mat-toolbar .center { position:absolute; left:50%; transform:translateX(-50%); p
 mat-toolbar h1 { margin:0; font:400 22px/28px 'Nunito Sans'; letter-spacing:normal; white-space:nowrap; }
 .logo a,.logo img { height:100%; } .logo img { width:auto; display:block; }
 .account-button { background:white; color:var(--secondary); border-radius:12px; font-family:revert; font-weight:revert; }
-:host ::ng-deep .account-button .mat-mdc-button-persistent-ripple { border-radius: inherit; }
 
