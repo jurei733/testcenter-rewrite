@@ -48,6 +48,12 @@ async function open(context,username='owned-results-writer',view='results'){
  await tab(view==='tests'?'Tests löschen':'Ergebnisse/Antworten');return page;
 }
 const selectGroup=async(label)=>{await page.locator('#originalWorkspaceResults mat-row').filter({hasText:label}).locator('input[type=checkbox]').check();await page.locator('[data-cy="download-responses"]:enabled').waitFor();};
+async function assertResultsIconSpacing(target,expectedMargin){
+ const icons=target.locator('#originalWorkspaceResults button[data-cy] mat-icon');
+ await icons.first().waitFor();
+ const margins=await icons.evaluateAll(elements=>elements.map(icon=>getComputedStyle(icon).marginRight));
+ assert.deepEqual(margins,Array(5).fill(expectedMargin));
+}
 try{
  await services.platform.createTenant({tenantKey:scope.tenantKey,displayName:'Owned results'});
  const workspace=await services.platform.createWorkspace({...scope,displayName:'Eigene Ergebnisse Ω'});
@@ -102,6 +108,21 @@ try{
   const context=await browser.newContext({viewport:{width,height:844},locale:'de-DE',timezoneId:'Europe/Berlin'});
   try{
    await open(context,role==='RW'?'owned-results-writer':'owned-results-reader');const visualInput={page,theme,width,role,workspaceId,groups:JSON.parse((await native('/workspace/'+workspaceId+'/results')).bytes),tests:JSON.parse((await native('/workspace/'+workspaceId+'/responses/detailed')).bytes)};
+   await assertResultsIconSpacing(page,'5px');
+   if(theme==='Primar'&&width===1280&&role==='RW'){
+    const reopened=await context.newPage();
+    try{
+     await reopened.goto(page.url(),{waitUntil:'domcontentloaded'});
+     await assertResultsIconSpacing(reopened,'8px');
+     const files=reopened.locator('[data-cy="Dateien"]');
+     await files.focus();await files.press('Enter');
+     await reopened.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
+     const results=reopened.locator('[data-cy="Ergebnisse/Antworten"]');
+     await results.focus();await results.press('Enter');
+     await assertResultsIconSpacing(reopened,'5px');
+    }finally{await reopened.close();await page.bringToFront();}
+    mark('results-toolbar-navigation-and-direct-entry-spacing');
+   }
    if(visual)await visual.compare({...visualInput,view:'results',selected:false});
    assert.equal(await page.locator('#originalWorkspaceResults mat-row').count(),2);
    await page.locator('#originalWorkspaceFileHeader h1').getByText('Verwaltung "Eigene Ergebnisse Ω" ('+role+')',{exact:true}).waitFor();

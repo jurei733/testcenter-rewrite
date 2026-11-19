@@ -92,7 +92,7 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
     if(kind==='source')first=result;
     else{
      const self=await compareScreenshots(original,first.bytes,result.bytes),comparison=await compareScreenshots(original,first.bytes,candidate.bytes);
-     const receipt={key,candidate:manifest.appCommit,sourceCommit:manifest.source.commit,inputSequence:'Fresh document in authenticated context; fonts ready; focus Files; focus target tab; Enter; select row when requested; blur via heading',sourceSelfControl:self,comparison,sourceGeometry:first.geometry,rewriteGeometry:candidate.geometry};results.push(receipt);
+     const receipt={key,candidate:manifest.appCommit,sourceCommit:manifest.source.commit,inputSequence:'Fresh document in authenticated context; fonts ready; focus Files; focus target tab; Enter; select row when requested; blur via toolbar center',sourceSelfControl:self,comparison,sourceGeometry:first.geometry,rewriteGeometry:candidate.geometry};results.push(receipt);
      await writeFile(join(artifacts,key+'.json'),JSON.stringify(receipt,null,2));
      assert.equal(self.differingPixels,0,'Original self-control: '+key);assert.equal(comparison.differingPixels,0,'Actual Original-to-Rewrite whole viewport: '+key);
     }

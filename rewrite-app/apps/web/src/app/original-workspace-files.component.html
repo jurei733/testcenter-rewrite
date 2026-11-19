@@ -44,7 +44,7 @@
     @if (tab === 'results' || tab === 'tests') {
       @defer (when true) {
         <app-original-workspace-results [sessionToken]="sessionToken" [tenantKey]="tenantKey" [workspaceKey]="workspaceKey"
-          [view]="tab" (roleChange)="resultsRole=$event" />
+          [view]="tab" [class.compact-results-toolbar]="compactResultsToolbar" (roleChange)="resultsRole=$event" />
       } @placeholder { <p role="status">Ergebnisse werden geladen…</p> }
       @error {
         <p role="alert">Die Ergebnisverwaltung konnte nicht geladen werden.</p>

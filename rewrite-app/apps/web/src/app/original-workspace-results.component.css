@@ -2,6 +2,9 @@
   min-width: 100px;
   margin: 2px;
 }
+
+:host(.compact-results-toolbar) .results-view .mat-icon { margin-right: 5px; }
+
 :host { min-width:0; }
 .results-view .flex-column { display:flex; flex-direction:column; }
 .results-view .flex-row { display:flex; flex-direction:row; }

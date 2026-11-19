@@ -54,6 +54,9 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  private readonly router=inject(Router);
  private readonly route=inject(ActivatedRoute);
  tab:'files'|'syscheck'|'results'|'tests'='files';
+ // Original uses Material's default spacing when Results is the document's first view.
+ compactResultsToolbar=this.route.snapshot.queryParamMap.get('tab')!=='results' ||
+   !!(this.router.currentNavigation()??this.router.lastSuccessfulNavigation())?.previousNavigation;
  resultsRole:''|'RO'|'RW'='';
  private logout:MatDialogRef<OriginalParticipantLogoutDialogComponent>|null=null;
  private readonly snacks=inject(MatSnackBar);
@@ -67,6 +70,7 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    ()=>{void this.systemCheckInstallation.refresh();});
  private readonly routeChanges=this.route.queryParamMap.subscribe(params=>{
    const value=params.get('tab'),next=value==='syscheck'||value==='results'||value==='tests'?value:'files';
+   if(next!=='results')this.compactResultsToolbar=true;
    if(this.tab!==next){this.tab=next;this.resultsRole='';this.deletion?.close(false);void this.controller.connect();}
  });
  readonly fileTypes:WorkspaceFileType[]=['Testtakers','Booklet','SysCheck','Unit','Resource','Package'];
