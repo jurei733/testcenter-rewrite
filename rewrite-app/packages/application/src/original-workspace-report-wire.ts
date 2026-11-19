@@ -63,12 +63,15 @@ export function formatOriginalResponseReport(rows:OriginalResponseReportRecord[]
     ['groupname','loginname','code','bookletname','unitname','originalUnitId','responses','laststate']);
 }
 
-export function formatOriginalLogReport(rows:OriginalLogReportRecord[], format:OriginalReportFormat):string {
+export const originalLogReportColumns=['groupname','loginname','code','bookletname','unitname','originalUnitId','timestamp','logentry'];
+export function projectOriginalLogReportRows(rows:OriginalLogReportRecord[],format:OriginalReportFormat){
   // AdminDAO uses UNION ALL, without an ORDER BY: retain the supplied sequence.
-  return render(format, rows.map(row => ({...identity(row), originalUnitId:row.originalUnitId,
+  return rows.map(row => ({...identity(row), originalUnitId:row.originalUnitId,
     timestamp:row.originalClientTimestamp === undefined ? row.timestamp : format === 'csv' ? exactParticipantTestLogTimestamp(row) :
-      (JSON as unknown as {rawJSON:(value:string)=>unknown}).rawJSON(exactParticipantTestLogTimestamp(row)), logentry:row.logentry})),
-  ['groupname','loginname','code','bookletname','unitname','originalUnitId','timestamp','logentry']);
+      (JSON as unknown as {rawJSON:(value:string)=>{readonly rawJSON:string}}).rawJSON(exactParticipantTestLogTimestamp(row)), logentry:row.logentry}));
+}
+export function formatOriginalLogReport(rows:OriginalLogReportRecord[], format:OriginalReportFormat):string {
+  return render(format,projectOriginalLogReportRows(rows,format),originalLogReportColumns);
 }
 
 const trim = (text:string):string => text.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g,'');

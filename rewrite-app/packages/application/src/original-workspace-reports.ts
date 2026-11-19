@@ -22,8 +22,8 @@ export type OriginalReportParent={run:OriginalReportRun;person:Person;bindings:B
 export type OriginalReportRequest=Scope&{
   type:'response'|'log'|'review';
   groups:string[]|null;
-  /** The aggregate ZIP shares exact stored group keys with the canonical exports. */
-  exactSessionGroups?:true;
+  /** The ZIP selects exact stored group keys and renders legacy logs separately. */
+  archive?:true;
 };
 type UnitIdentity=OriginalUnitScope&Pick<OriginalNativeUnit,'unitName'|'originalUnitId'>;
 export type OriginalReportStoredUnit=OriginalUnitScope&{unitName:string;unit:UnitIdentity|OriginalNativeUnit};
@@ -53,12 +53,16 @@ export function selectOriginalReportParents(metadata:OriginalReportMetadata,inpu
     const person=people.get(run.participantSessionId)!,bindings=byLogin.get(person.originalLoginKey!)??[];
     if(selectedGroups){
       const group=bindings[0]?.groupKey??person.groupKey;
-      const selected=input.exactSessionGroups ? selectedGroups.has(person.groupKey) :
+      const selected=input.archive ? selectedGroups.has(person.groupKey) :
         input.groups!.some(value=>originalParticipantGroupKeysEqual(value,group));
       if(!selected)return [];
     }
     return [{run,person,bindings}];
   });
+}
+export function isOriginalReportLog(log:ParticipantTestLog):boolean{
+  return [originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix]
+    .some(prefix=>log.participantTestLogId.startsWith(prefix));
 }
 function identity(parent:OriginalReportParent){
   const {run,person,bindings}=parent,binding=bindings[0];
@@ -105,9 +109,10 @@ export function projectOriginalWorkspaceReport(input:OriginalReportRequest,paren
   };
   if(input.type==='log'){
     assertOriginalReportRowCount(family.logs.length);
-    const rows=[...family.logs.filter(l=>l.unitKey!==null),...family.logs.filter(l=>l.unitKey===null)].map(log=>{
+    const logs=input.archive?family.logs.filter(isOriginalReportLog):family.logs;
+    const rows=[...logs.filter(l=>l.unitKey!==null),...logs.filter(l=>l.unitKey===null)].map(log=>{
       const parent=byRun.get(log.testRunId);if(!parent||!inScope(parent.run,log)||log.participantSessionId!==parent.run.participantSessionId||
-        ![originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix].some(prefix=>log.participantTestLogId.startsWith(prefix))||
+        !isOriginalReportLog(log)||
         !Number.isInteger(log.timestamp)||!Number.isSafeInteger(log.timestamp)&&log.originalClientTimestamp===undefined)throw unavailable();
       exactParticipantTestLogTimestamp(log);
       const unit=log.unitKey===null?null:unitsFor(parent,log.unitKey);

@@ -15,8 +15,8 @@ import {originalResourceMediaType} from './original-resource-media-type.js';
 import type {WorkspaceArchiveUploadReport} from '@testcenter-rewrite-app/domain';
 import {createOriginalResourcePackages} from './original-resource-package.js';
 import {createOriginalReportTextComparator} from './original-report-collation.js';
-import {originalReviewReportCategoryKeys,projectOriginalReviewReportRows,encodeOriginalReportJson,formatOriginalResponseReport,formatOriginalUnitStateReport} from './original-workspace-report-wire.js';
-import {originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix} from '@testcenter-rewrite-app/domain';
+import {originalReviewReportCategoryKeys,projectOriginalReviewReportRows,encodeOriginalReportJson,formatOriginalResponseReport,formatOriginalUnitStateReport,
+  originalLogReportColumns,projectOriginalLogReportRows,type OriginalLogReportRecord} from './original-workspace-report-wire.js';
 import {originalReviewHistoryUnavailable} from './original-review-record.js';
 import {createOriginalReviewPort} from './original-review.js';
 export * from './original-review.js';
@@ -88,7 +88,7 @@ export type {OriginalResultTest} from './original-group-results.js';
 import {createOriginalGroupResultsPort, projectOriginalStartedTests, type OriginalGroupResultInventory} from './original-group-results.js';
 export {prepareOriginalTestSelection,prepareOriginalTestDeletionInput,selectOriginalTestDeletion,deleteOriginalSelectedTestsFromCollections} from './original-test-deletion.js';
 export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletionResult} from './original-test-deletion.js';
-import {createOriginalWorkspaceReportPort,prepareOriginalWorkspaceReviewRows,type PreparedOriginalWorkspaceReviews} from './original-workspace-reports.js';
+import {createOriginalWorkspaceReportPort,isOriginalReportLog,prepareOriginalWorkspaceReviewRows,type PreparedOriginalWorkspaceReviews} from './original-workspace-reports.js';
 export {selectOriginalReportParents,projectOriginalWorkspaceReport,assertOriginalReportRowCount,readOriginalWorkspaceReportCollections,originalReportUnitIdentity,originalReportFormat,originalReportQuery} from './original-workspace-reports.js';
 export type {OriginalReportMetadata,OriginalReportParent,OriginalReportRun,OriginalReportFamily,OriginalReportRequest,OriginalWorkspaceReportSnapshot,OriginalReportStoredUnit,OriginalReportStoredReview} from './original-workspace-reports.js';
 export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,originalWorkspaceWriteSqlSnapshot} from './original-workspace-write.js';
@@ -16176,17 +16176,11 @@ type OriginalLogReportRow = {
   bookletname: string;
   unitname: string;
   originalUnitId: string;
-  timestamp: string | {readonly rawJSON:string};
+  timestamp: string;
   logentry: string;
 };
 
 type OriginalReviewReportRow = Record<string, string | number | boolean | null | {readonly rawJSON:string}>;
-
-const formatOriginalLogReportCsv = (
-  columns: string[],
-  rows: OriginalLogReportRow[]
-): string =>
-  formatOriginalReportCsv(columns, rows.map(row=>({...row,timestamp:typeof row.timestamp==='object'?row.timestamp.rawJSON:row.timestamp})));
 
 const formatOriginalReviewReportCsv = (
   columns: string[],
@@ -16334,41 +16328,25 @@ const buildOriginalResponseReportRows = (input: {
     );
 };
 
-const buildOriginalLogReportRows = (input: {
+const buildLegacyArchiveLogRows = (input: {
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
   testLogs: ParticipantTestLog[];
   groupKeys: string[];
 }): OriginalLogReportRow[] => {
-  const people=new Map(input.participantSessions.map(person=>[person.participantSessionId,person]));
-  const runs=new Map(input.testRuns.map(run=>[run.testRunId,run]));
-  const native=(log:ParticipantTestLog)=>typeof people.get(log.participantSessionId)?.originalLoginKey==='string'&&
-    [originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix].some(prefix=>log.participantTestLogId.startsWith(prefix));
-  // AdminDAO UNION ALL emits Unit logs then Test logs, without a branch ORDER BY.
-  // Keep the supplied raw collection rank; do not inherit UI timestamp/UUID order.
-  const raw=input.testLogs.filter(native);
-  const ranks=new Map([...raw.filter(log=>log.unitKey!==null),...raw.filter(log=>log.unitKey===null)].map((log,i)=>[log.participantTestLogId,i]));
   const items=listParticipantTestLogsForWorkspace({tenantKey:'',workspaceKey:'',...input,limit:50_001});
-  items.sort((left,right)=>{
-    const a=ranks.get(left.testLog.participantTestLogId),b=ranks.get(right.testLog.participantTestLogId);
-    if(a!==undefined||b!==undefined)return a===undefined?1:b===undefined?-1:a-b;
-    return compareParticipantTestLogTimestamps(left.testLog,right.testLog)||
-      left.groupKey.localeCompare(right.groupKey)||left.loginKey.localeCompare(right.loginKey);
-  });
-  return items.map(item=>{
-    const person=people.get(item.testLog.participantSessionId)!,run=runs.get(item.testLog.testRunId)!,isNative=ranks.has(item.testLog.participantTestLogId);
-    if(isNative&&(typeof person.originalNameSuffix!=='string'||typeof run.originalResultState?.bookletName!=='string'))throw new FirstSliceError(409,'original_log_history_unknown','The historical native log identity is unavailable.');
-    return {
-      groupname:item.groupKey,
-      loginname:isNative?person.originalLoginKey!:item.loginKey,
-      code:isNative?person.originalNameSuffix??'':item.participantCode,
-      bookletname:isNative?run.originalResultState?.bookletName??item.bookletAssignmentKey:item.bookletAssignmentKey,
-      unitname:item.testLog.unitKey??'',originalUnitId:item.testLog.originalUnitId??'',
-      timestamp:isNative?(JSON as unknown as {rawJSON:(value:string)=>{readonly rawJSON:string}}).rawJSON(exactParticipantTestLogTimestamp(item.testLog)):
-        String(item.testLog.originalTimestamp??exactParticipantTestLogTimestamp(item.testLog)),
-      logentry:formatOriginalParticipantLogEntry(item.testLog)
-    };
-  });
+  items.sort((left,right)=>compareParticipantTestLogTimestamps(left.testLog,right.testLog)||
+    left.groupKey.localeCompare(right.groupKey)||left.loginKey.localeCompare(right.loginKey));
+  return items.map(item=>({
+    groupname:item.groupKey,
+    loginname:item.loginKey,
+    code:item.participantCode,
+    bookletname:item.bookletAssignmentKey,
+    unitname:item.testLog.unitKey??'',
+    originalUnitId:item.testLog.originalUnitId??'',
+    timestamp:String(item.testLog.originalTimestamp??exactParticipantTestLogTimestamp(item.testLog)),
+    logentry:formatOriginalParticipantLogEntry(item.testLog)
+  }));
 };
 
 const buildOriginalReviewReportRows = (input: {
@@ -16509,18 +16487,22 @@ const createOriginalResultArchive = (input: {
   activityEvents: WorkspaceActivityEvent[];
   contentReleases: ContentRelease[];
   nativeReviewReport?:PreparedOriginalWorkspaceReviews;
-  nativeReviewPersonIds: ReadonlySet<string>;
+  nativePersonIds: ReadonlySet<string>;
+  nativeLogs: OriginalLogReportRecord[];
   nativeUnits: import("@testcenter-rewrite-app/domain").OriginalNativeUnit[];
 }): WorkspaceOriginalResultArchive => {
   const responseRows = input.groupKeys.length ? buildOriginalResponseReportRows(input) : [];
-  const logRows = input.groupKeys.length ? buildOriginalLogReportRows(input) : [];
+  const legacyLogs = input.groupKeys.length ? buildLegacyArchiveLogRows({
+    ...input,
+    testLogs: input.testLogs.filter(log=>!input.nativePersonIds.has(log.participantSessionId)||!isOriginalReportLog(log))
+  }) : [];
   const reviewReport = input.groupKeys.length ? buildOriginalReviewReportRows({
     ...input,
-    reviews: input.reviews.filter(review => !input.nativeReviewPersonIds.has(review.participantSessionId))
+    reviews: input.reviews.filter(review => !input.nativePersonIds.has(review.participantSessionId))
   }) : { rows: [], categoryColumns: [] };
   const counts = {
     responses: responseRows.length,
-    logs: logRows.length,
+    logs: input.nativeLogs.length + legacyLogs.length,
     reviews: reviewReport.rows.length
   };
   if (Object.values(counts).some(count => count > 50_000)) {
@@ -16540,16 +16522,6 @@ const createOriginalResultArchive = (input: {
     "originalUnitId",
     "responses",
     "laststate"
-  ];
-  const logColumns = [
-    "groupname",
-    "loginname",
-    "code",
-    "bookletname",
-    "unitname",
-    "originalUnitId",
-    "timestamp",
-    "logentry"
   ];
   const reviewColumns = [
     "groupname",
@@ -16604,8 +16576,8 @@ const createOriginalResultArchive = (input: {
     ["manifest.json", `${JSON.stringify(manifest, null, 2)}\n`],
     ["responses.json", input.nativeUnits.length&&responseRows.length ? formatOriginalResponseReport(responseRows,"json") : JSON.stringify(responseRows)],
     ["responses.csv", input.nativeUnits.length&&responseRows.length ? formatOriginalResponseReport(responseRows,"csv") : formatOriginalReportCsv(responseColumns, responsesCsvRows)],
-    ["logs.json", logRows.some(row=>typeof row.timestamp==='object') ? encodeOriginalReportJson(logRows) : JSON.stringify(logRows)],
-    ["logs.csv", formatOriginalLogReportCsv(logColumns, logRows)],
+    ["logs.json", input.nativeLogs.length ? encodeOriginalReportJson([...projectOriginalLogReportRows(input.nativeLogs,"json"), ...legacyLogs]) : JSON.stringify(legacyLogs)],
+    ["logs.csv", formatOriginalReportCsv(originalLogReportColumns, [...projectOriginalLogReportRows(input.nativeLogs,"csv"), ...legacyLogs])],
     ["reviews.json", input.nativeReviewReport?.rows.length ? encodeOriginalReportJson(reviewReport.rows) : JSON.stringify(reviewReport.rows)],
     ["reviews.csv", formatOriginalReviewReportCsv(reviewColumns, reviewCsvRows)]
   ] as const;
@@ -31560,8 +31532,7 @@ export const createFirstSliceServices = (
           ),
           repository.listParticipantTestLogsByWorkspace(
             workspace.tenantId,
-            workspace.workspaceId,
-            {order:"collection"}
+            workspace.workspaceId
           ),
           repository.listContentReleasesByWorkspace(
             workspace.tenantId,
@@ -31577,27 +31548,42 @@ export const createFirstSliceServices = (
           typeof person.originalLoginKey === "string"
         );
         const selectedKeys = new Set(groupKeys);
-        const [nativeUnits, nativeSnapshot] = await Promise.all([
+        const hasSelectedNativePeople = nativePeople.some(person => selectedKeys.has(person.groupKey));
+        const nativeScope = {
+          tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+          groups: selectedGroupKeys ?? null, archive: true as const
+        };
+        const [nativeUnits, nativeReviews, nativeLogs] = await Promise.all([
           readOriginalArchiveNativeUnits(repository, {
             tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,testRuns,participantSessions,groupKeys
           }),
-          nativePeople.some(person => selectedKeys.has(person.groupKey))
+          hasSelectedNativePeople
             ? repository.getOriginalWorkspaceReportSnapshot({
-                tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,
-                type:"review",groups:selectedGroupKeys ?? null,exactSessionGroups:true
+                ...nativeScope, type:"review"
               }).catch(error => {
                 if (error instanceof FirstSliceError && error.errorCode === "original_report_history_unknown") {
                   throw originalReviewHistoryUnavailable();
                 }
                 throw error;
               })
+            : undefined,
+          hasSelectedNativePeople
+            ? repository.getOriginalWorkspaceReportSnapshot({...nativeScope, type:"log"}).catch(error => {
+                if (error instanceof FirstSliceError && error.errorCode === "original_report_history_unknown") {
+                  throw new FirstSliceError(409,"original_log_history_unknown","The historical native log identity is unavailable.");
+                }
+                throw error;
+              })
             : undefined
         ]);
+        if (nativeReviews && nativeReviews.type !== "review") throw originalReviewHistoryUnavailable();
+        if (nativeLogs && nativeLogs.type !== "log") {
+          throw new FirstSliceError(409,"original_log_history_unknown","The historical native log identity is unavailable.");
+        }
         let nativeReviewReport:PreparedOriginalWorkspaceReviews | undefined;
-        if (nativeSnapshot) {
-          if (nativeSnapshot.type !== "review") throw originalReviewHistoryUnavailable();
+        if (nativeReviews) {
           nativeReviewReport = await prepareOriginalWorkspaceReviewRows({
-            scope:workspace, rows:nativeSnapshot.rows, timeZone:participantAccessTimeZone,
+            scope:workspace, rows:nativeReviews.rows, timeZone:participantAccessTimeZone,
             readLabels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)
           });
         }
@@ -31606,7 +31592,8 @@ export const createFirstSliceServices = (
         const nativePersonIds = new Set(nativePeople.map(person => person.participantSessionId));
         return createOriginalResultArchive({
           nativeReviewReport,
-          nativeReviewPersonIds: nativePersonIds,
+          nativeLogs: nativeLogs?.rows ?? [],
+          nativePersonIds,
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           groupKeys,

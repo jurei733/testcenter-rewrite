@@ -121,6 +121,58 @@ for(const kind of process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:['memo
    assert.deepEqual(ack,{reason:'OK',nativeStateBase:{version:1,revision:guard.revision,controlEpoch:guard.controlEpoch}});
    assert.equal((await services.originalCommand.acknowledge({...target,commandNumber:command.id,nativeStateProtocol:'1'})).reason,'OK, was already marked as executed');
   });
+  await t.test('mixed navigation, Unit, lock and buffered logs share exact workspace and ZIP exports after reopen', async () => {
+   const first = {token: owner.token, testNumber: firstId};
+   const next = {token: second.token, testNumber: secondId};
+   const unitName = 'ORACLE.POW.UNIT';
+   await services.originalUnit.patchState({...next, unitName, body: {originalUnitId: 'FIRST.NATIVE', newState: [
+    {key: 'PRESENTATION_PROGRESS', content: 'some', timeStamp: 800}
+   ]}});
+   await services.originalTest.patchState({...first, patch: [{key: 'CURRENT_UNIT_ID', content: unitName, timeStamp: 700}]});
+   await change([Number(secondId)]);
+   await services.originalUnit.putLog({...first, unitName, body: [{key: 'EXPORT_UNIT_FIRST', content: 'Ω', timeStamp: 900}]});
+   await services.originalTest.putLog({...next, body: decodeOriginalTestLogJson(
+    '[{"key":"EXPORT_BUFFER","content":"first Ω","timeStamp":9007199254740993},{"key":"EXPORT_BUFFER","content":"second β","timeStamp":9007199254740992}]'
+   )});
+   await services.originalUnit.putLog({...next, unitName, body: [{key: 'EXPORT_UNIT_SECOND', content: 'β', timeStamp: 600}]});
+   await change([Number(secondId)], false);
+   if (kind !== 'memory') { await storage.shutdown(); await open(); }
+   const archive = async () => {
+    const {body: zip} = await services.workspaceAdminRead.exportOriginalResultArchive({...scope, groupKeys: [group]});
+    const files = new Map();
+    for (let offset = 0; zip.readUInt32LE(offset) === 0x04034b50;) {
+     const length = zip.readUInt32LE(offset + 18), nameLength = zip.readUInt16LE(offset + 26);
+     const start = offset + 30 + nameLength + zip.readUInt16LE(offset + 28);
+     files.set(zip.toString('utf8', offset + 30, offset + 30 + nameLength), zip.toString('utf8', start, start + length));
+     offset = start + length;
+    }
+    return files;
+   };
+   const files = await archive();
+   const report = (accept) => services.originalWorkspaceReport.read({...scope, type: 'log', dataIds: group, accept, useNewVersion: false});
+   const json = (await report('application/json')).body;
+   assert.match(json, /"timestamp":9007199254740993/);
+   assert.match(json, /"timestamp":9007199254740992/);
+   const rows = JSON.parse(json);
+   assert.ok(rows.some(row => row.logentry.startsWith('locked by monitor : ') && row.timestamp === 0));
+   assert.ok(rows.some(row => row.logentry.startsWith('CURRENT_UNIT_ID : ')));
+   const markerEntries = text => JSON.parse(text).filter(row => row.logentry.startsWith('EXPORT_')).map(row => row.logentry);
+   assert.deepEqual(markerEntries(files.get('logs.json')), markerEntries(json));
+   assert.equal(files.get('logs.json'), json);
+   const csv = (await report('text/csv')).body;
+   assert.equal(files.get('logs.csv'), csv);
+   await repository.saveParticipantTestLogs([{
+    ...scopeMap, participantTestLogId: randomUUID(), unitKey: null, originalUnitId: null,
+    logKey: 'LEGACY_EXPORT', logContent: '', timestamp: 17, recordedAt: new Date(time).toISOString()
+   }]);
+   await assert.rejects(report('application/json'), error => error.errorCode === 'original_report_history_unknown');
+   const mixed = await archive();
+   assert.ok(mixed.get('logs.json').startsWith(json.slice(0, -1) + ','));
+   assert.equal(JSON.parse(mixed.get('logs.json')).length, rows.length + 1);
+   assert.equal(JSON.parse(mixed.get('logs.json')).at(-1).timestamp, '17');
+   assert.ok(mixed.get('logs.csv').startsWith(csv + '\n'));
+   assert.ok(mixed.get('logs.csv').endsWith(';"17";"LEGACY_EXPORT"'));
+  });
   if(kind==='sqlite'||kind==='postgres')await t.test('real protected HTTP uses literal empty success, strict raw types and authorization before path/body decoding',async()=>{
    const env={FIRST_SLICE_STORE:kind,FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',REQUIRE_LOGIN_PASSWORD:'false',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'participant,second_code',FIRST_SLICE_PROOF_OF_WORK_SECRET:'owned-lock-http-challenge-secret-not-production',FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET:'',FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER:'12',...(url?{FIRST_SLICE_POSTGRES_URL:url.toString()}:{})};const previous=new Map(Object.keys(env).map(key=>[key,process.env[key]]));try{Object.assign(process.env,env);server=await createProductionApiServer();}finally{for(const[key,value]of previous)if(value===undefined)delete process.env[key];else process.env[key]=value;}
    await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port,path='/monitor/group/'+group+'/tests/lock';
