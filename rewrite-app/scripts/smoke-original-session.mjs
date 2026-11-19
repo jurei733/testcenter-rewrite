@@ -57,9 +57,11 @@ try {
     setPhase('owned-fixture-upload-' + fileName);
     return operatorApi(workspace + '/files', {fileName, sourceDocument, mediaType}, operator, 201);
   };
-  const metadata = {id: 'owned-native-browser-player', version: '6.0.4', specVersion: '6.0', metadataVersion: '2.0', type: 'player',
+  const metadata = {$schema: 'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',
+    id: 'owned-native-browser-player', version: '6.0.4', specVersion: '6.0', metadataVersion: '2.0', type: 'player',
     name: [{lang: 'de', value: 'Owned native browser Player'}], description: [{lang: 'de', value: 'Owned fixture'}]};
-  await upload('player.html', '<html><script type="application/ld+json">' + JSON.stringify(metadata) + '</script><main>Owned fixture</main><script>addEventListener("message",event=>{if(event.data?.type==="vopStartCommand")document.querySelector("main").dataset.started="true";});parent.postMessage({type:"vopReadyNotification",metadata:{specVersion:"6.0"}},"*");</script></html>', 'text/html');
+  const playerFileName = 'owned-native-browser-player-6.0.html';
+  await upload(playerFileName, '<html><script type="application/ld+json">' + JSON.stringify(metadata) + '</script><main>Owned fixture</main><script>addEventListener("message",event=>{if(event.data?.type==="vopStartCommand")document.querySelector("main").dataset.started="true";});parent.postMessage({type:"vopReadyNotification",metadata:{specVersion:"6.0"}},"*");</script></html>', 'text/html');
   await upload('unit.xml', '<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/unit-xml/17.6"><Metadata><Id>OWNED.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="owned-native-browser-player@6.0.4">Owned definition</Definition></Unit>');
   await upload('booklet.xml', '<Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0"><Metadata><Id>OWNED.BROWSER</Id><Label>Owned native Booklet</Label></Metadata><Units><Unit id="OWNED.UNIT" label="Owned unit"/></Units></Booklet>');
   setPhase('owned-roster-fixture');
@@ -154,7 +156,7 @@ try {
   await request('GET','/test/'+peerTest.rawText,undefined,person.token,403);
   const opened=(await request('GET','/test/'+peerTest.rawText,undefined,peerPerson.token)).value;
   assert.deepEqual(Object.keys(opened),['mode','laststate','xml','resources','firstStart','workspaceId','presetBookletStates']);
-  assert.equal(opened.firstStart,true);assert.deepEqual(opened.laststate,[]);assert.deepEqual(opened.resources,{'OWNED.UNIT':{usesPlayer:['Resource/player.html']}});
+  assert.equal(opened.firstStart,true);assert.deepEqual(opened.laststate,[]);assert.deepEqual(opened.resources,{'OWNED.UNIT':{usesPlayer:['Resource/'+playerFileName]}});
   assert.equal((await request('GET','/test/'+peerTest.rawText,undefined,peerPerson.token)).value.firstStart,false);
   await request('PATCH','/test/'+peerTest.rawText+'/state',[{key:'browserChoice',content:false,timeStamp:9},{key:'browserObject',content:{b:'Ω/x',a:1},timeStamp:1}],peerPerson.token);
   await request('PATCH','/test/'+peerTest.rawText+'/state',[{key:'browserChoice',content:'later packet',timeStamp:1}],peerPerson.token);
@@ -162,10 +164,10 @@ try {
   assert.deepEqual(state,{browserChoice:'later packet',browserObject:'{"b":"\\u03a9\\/x","a":1}'});
   mark('browser-native-test-read-opens-once-and-preserves-source-typed-packet-state');
   setPhase('browser-native-group-resource');
-  const resource=await page.evaluate(async({token,workspaceId})=>{
-    const response=await fetch('/file/'+token+'/ws_'+workspaceId+'/Resource/player.html');
+  const resource=await page.evaluate(async({token,workspaceId,fileName})=>{
+    const response=await fetch('/file/'+token+'/ws_'+workspaceId+'/Resource/'+fileName);
     return{status:response.status,cache:response.headers.get('cache-control'),type:response.headers.get('content-type'),source:response.headers.get('x-source'),text:await response.text()};
-  },{token:peerPerson.groupToken,workspaceId:opened.workspaceId});
+  },{token:peerPerson.groupToken,workspaceId:opened.workspaceId,fileName:playerFileName});
   assert.equal(resource.status,200);assert.equal(resource.cache,'private');assert.equal(resource.type,'text/html;charset=UTF-8');assert.equal(resource.source,'backend');assert.ok(resource.text.includes('<main>Owned fixture</main>'));
   mark('browser-native-group-resource-preserves-current-player-headers-and-bytes');
   const unitPath='/test/'+peerTest.rawText+'/unit/OWNED.BROWSER.ALIAS',unitRead='/test/'+peerTest.rawText+'/unit/OWNED.UNIT/alias/OWNED.BROWSER.ALIAS';

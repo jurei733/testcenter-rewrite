@@ -56,11 +56,14 @@ try {
  const port=await raceWithSmokeDeadline(new Promise((done,reject)=>{server.once('message',message=>done(message.port));server.once('error',reject);
   server.once('exit',()=>reject(Error('Owned native-files API exited before readiness.')));}),20000,()=>{throw Error('Owned native-files API did not start.');});
  base='http://127.0.0.1:'+port;token=(await api('/api/v1/admin/auth/sign-in',{username:'demo-admin',password:'demo-admin-password'})).sessionToken;
- browser=await chromium.launch({headless:process.env.CI==='true' && process.env.UI_SMOKE_HEADFUL!=='true'});
+ browser=await chromium.launch({
+  headless:process.env.CI==='true' && process.env.UI_SMOKE_HEADFUL!=='true',
+  ...(process.env.UI_SMOKE_BROWSER_CHANNEL?{channel:process.env.UI_SMOKE_BROWSER_CHANNEL}:{})
+ });
  for(const theme of ['Primar','Sekundar','Erwachsene'])for(const width of [1280,390]) {
   const key='native-files-'+theme.toLowerCase()+'-'+width,scope='/api/v1/tenants/demo-tenant/workspaces/'+key;
   await api('/api/v1/admin/original-interface/application-settings',{themeName:theme},'PATCH');
-  await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey:key,displayName:'Eigene Dateien '+width},'POST',201);
+  await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey:key,displayName:'Eigener Arbeitsbereich '+width},'POST',201);
   const context=await browser.newContext({viewport:{width,height:844},locale:'de-DE',timezoneId:'Europe/Berlin'}),errors=[];
   try {
    page=await signIn(context,key);page.on('pageerror',error=>errors.push(String(error)));
@@ -140,6 +143,17 @@ try {
     const readPage=await signIn(readContext,key,username,password);
     assert.equal(await readPage.locator('[data-cy="upload-files"]').isDisabled(),true);
     assert.equal(await readPage.locator('[data-cy="upload-file-select"]').isDisabled(),true);
+    const accountTrigger=readPage.locator('[data-cy="account-button"]');
+    await accountTrigger.click();
+    const account=readPage.locator('.original-native-account-menu');await account.waitFor();
+    const [loginName,group,right,version]=await account.locator('dd').allTextContents();
+    assert.equal(await account.locator('dd').count(),4);
+    assert.deepEqual([loginName,group,right],[username,'','Verwaltung von Testinhalten']);
+    assert.match(version,/^Rewrite(?: \([a-f0-9]{12}\))?$/);
+    await account.getByRole('button',{name:'Nutzerinformationen schließen'}).click();
+    await account.waitFor({state:'detached'});
+    assert.equal(await accountTrigger.evaluate(element=>document.activeElement===element),true);
+    console.log('native_workspace_files_account='+theme+'-'+width+':passed');
     await readPage.locator('[data-cy="files-checkAll-Unit"] input').check();
     assert.equal(await readPage.locator('[data-cy="delete-files"]').isDisabled(),true);
     const readRow=readPage.locator('mat-row').filter({has:readPage.locator('[data-cy="files-checkbox-NATIVE.UNIT"]')});
@@ -156,8 +170,8 @@ try {
       await readContext.route(route,async request=>{requestStarted();await held;await request.continue();});
       await readRow.locator('button').click();
       await raceWithSmokeDeadline(started,10000,()=>{throw Error('Owned held download did not start.');});
-      await readPage.locator('[data-cy="account-button"]').click();
-      await readPage.locator('#globalAdminSignOutButton').click();
+      await accountTrigger.click();
+      await account.locator('#globalAdminSignOutButton.mat-tonal-button').click();
       await readPage.locator('#originalParticipantLogoutConfirmButton').click();
       await readPage.locator('#originalWorkspaceFiles').waitFor({state:'detached'});
       const rejected=readPage.waitForResponse(response=>response.url()===route);

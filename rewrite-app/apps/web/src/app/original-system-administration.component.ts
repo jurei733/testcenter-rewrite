@@ -34,7 +34,6 @@ import { OriginalAdministrationEditorComponent, type OriginalAdministrationEdito
 import { OriginalParticipantLogoutDialogComponent } from "./original-participant-logout-dialog.component";
 import { OriginalToastService } from "./original-toast.service";
 import { OriginalToastContainerComponent } from "./original-toast-container.component";
-import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers";
 
 // IQB Testcenter 19 Superadmin tables and header (MIT), using the Rewrite's
 // native authorization, directories, complete matrices and aggregate APIs.
@@ -134,10 +133,6 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
       const payload=await this.request.requestJson("Aktuelle Anmeldung",productionApiRoutes.admin.currentSession,true,{authorization:`Bearer ${token}`});
       if(!this.destroyed&&this.state.ops.adminSessionToken.trim()===token){this.state.ops.adminSessionView=JSON.stringify(payload,null,2);try{this.persistence.persistShellState();}catch{}this.changed.markForCheck();}
     }catch{/* The request service retires an actually invalid current canonical session. */}
-  }
-  get version(): string {
-    const commit=readStringValue(parseJsonDocument(this.app.ops.runtimeHealthView),["manifest","build","commitSha"]);
-    return commit?`Rewrite (${commit.slice(0,12)})`:"Rewrite";
   }
   get showDirectoryProblem(): boolean { return !!this.directory.problem && !this.editor && this.confirmationId===null; }
   private consumeDialogProblem(): string {

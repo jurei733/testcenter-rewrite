@@ -3,21 +3,23 @@
 <div id="originalWorkspaceFileFrame">
   <mat-toolbar data-cy="header" id="originalWorkspaceFileHeader">
     <div class="side">
-      <button mat-icon-button class="account-button" aria-label="Nutzerinformationen"
+      <button matIconButton class="account-button" aria-label="Nutzerinformationen"
         data-cy="account-button" [matMenuTriggerFor]="accountMenu" #account="matMenuTrigger">
         <mat-icon originalWorkspaceFileIcon name="person" />
       </button>
-      <mat-menu #accountMenu="matMenu" class="original-workspace-account-menu">
+      <mat-menu #accountMenu="matMenu" class="original-native-account-menu">
         <div class="heading"><div>Nutzerinformationen</div>
-          <button mat-icon-button aria-label="Nutzerinformationen schließen"
+          <button matIconButton aria-label="Nutzerinformationen schließen"
             (click)="account.closeMenu()"><mat-icon originalWorkspaceFileIcon name="close" /></button>
         </div>
         <dl><dt>Anmeldename:</dt><dd>{{app.operatorAccountUsername}}</dd>
           <dt>Gruppe:</dt><dd></dd><dt>Berechtigung:</dt>
-          <dd>Verwaltung des Arbeitsbereichs</dd>
-          <dt>Version:</dt><dd>{{app.ops.buildRef}}</dd>
+          @for (right of app.originalOperatorRights; track right) {
+            <dd>{{ right }}</dd>
+          }
+          <dt>Version:</dt><dd>{{app.originalOperatorVersion}}</dd>
         </dl><mat-divider />
-        <button mat-button id="globalAdminSignOutButton" class="logout-button"
+        <button matButton="tonal" id="globalAdminSignOutButton" class="logout-button"
           data-cy="logout-button" (click)="$event.stopPropagation(); confirmLogout(account)">Abmelden</button>
       </mat-menu>
     </div>

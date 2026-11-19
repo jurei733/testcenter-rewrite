@@ -125,7 +125,7 @@ app-original-overlay-styles,app-original-workspace-file-surface-styles { display
 mat-tab-nav-panel { display:block; box-sizing:content-box; overflow-y:auto; padding:5px; }
 mat-toolbar { display:flex; justify-content:space-between; position:relative; flex:0 0 auto; padding:8px 24px; background:var(--secondary); color:white; }
 mat-toolbar .side { height:100%; display:flex; align-items:center; }
-mat-toolbar .center { position:absolute; left:50%; transform:translateX(-50%); }
+mat-toolbar .center { position:absolute; left:50%; transform:translateX(-50%); pointer-events:none; }
 mat-toolbar h1 { margin:0; font:400 22px/28px 'Nunito Sans'; letter-spacing:normal; white-space:nowrap; }
 .logo a,.logo img { height:100%; } .logo img { width:auto; display:block; }
 .account-button { background:white; color:var(--secondary); border-radius:12px; font-family:revert; font-weight:revert; }

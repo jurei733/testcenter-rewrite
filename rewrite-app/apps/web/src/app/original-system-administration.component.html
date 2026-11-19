@@ -6,15 +6,18 @@
       aria-label="Nutzerinformationen" [matMenuTriggerFor]="accountMenu" #account="matMenuTrigger" data-cy="account-button">
       <mat-icon originalAdministrationIcon name="person" />
     </button>
-    <mat-menu #accountMenu="matMenu" class="original-administration-account-menu">
+    <mat-menu #accountMenu="matMenu" class="original-native-account-menu">
       <div class="heading"><div>Nutzerinformationen</div>
         <button matIconButton aria-label="Nutzerinformationen schließen" (click)="account.closeMenu()"><mat-icon originalAdministrationIcon name="close" /></button>
       </div>
       <dl>
         <dt>Anmeldename:</dt><dd>{{ app.operatorAccountUsername }}</dd>
         <dt>Gruppe:</dt><dd></dd>
-        <dt>Berechtigung:</dt><dd>Verwaltung von Nutzerrechten und von grundsätzlichen Systemeinstellungen</dd>
-        <dt>Version:</dt><dd>{{ version }}</dd>
+        <dt>Berechtigung:</dt>
+        @for (right of app.originalOperatorRights; track right) {
+          <dd>{{ right }}</dd>
+        }
+        <dt>Version:</dt><dd>{{ app.originalOperatorVersion }}</dd>
       </dl>
       <mat-divider />
       <button matButton="tonal" id="globalAdminSignOutButton" class="logout-button" data-cy="logout-button"

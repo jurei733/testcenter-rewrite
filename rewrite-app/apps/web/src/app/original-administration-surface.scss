@@ -24,13 +24,3 @@
     box-sizing:content-box;
   }
 }
-:root[data-interface-mode='original'] .original-administration-account-menu {
-  width:330px; padding:12px;
-  font:16px 'Nunito Sans',sans-serif;
-  .heading { display:flex; align-items:center; font-size:22px; }
-  .heading button { margin-left:auto; border-radius:12px; border:1px solid; }
-  .heading button .mat-mdc-button-persistent-ripple { border-radius:inherit; }
-  dt { margin-top:12px; font-weight:700; }
-  dd { margin-top:4px; margin-inline-start:0; }
-  .logout-button { margin-top:12px; border:1px solid var(--secondary); }
-}

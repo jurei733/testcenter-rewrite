@@ -10,7 +10,7 @@ import {
 
 import type { AppView } from "./rewrite-app-shell.types";
 import { buildParticipantEntryUrl } from "./participant-session-links";
-import { parseJsonDocument } from "./rewrite-app-shell.readers";
+import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { AdminPasswordChangeService } from "./admin-password-change.service";
@@ -131,6 +131,20 @@ export class AppShellFacade {
 
   get operatorAccountUsername(): string {
     return this.operatorAccess.username;
+  }
+
+  get originalOperatorRights(): readonly string[] {
+    // The native admin access set includes workspaceAdmin even without workspace grants.
+    const rights = ["Verwaltung von Testinhalten"];
+    if (this.isPlatformAdmin) {
+      rights.push("Verwaltung von Nutzerrechten und von grundsätzlichen Systemeinstellungen");
+    }
+    return rights;
+  }
+
+  get originalOperatorVersion(): string {
+    const commit = readStringValue(parseJsonDocument(this.ops.runtimeHealthView), ["manifest", "build", "commitSha"]);
+    return commit ? `Rewrite (${commit.slice(0, 12)})` : "Rewrite";
   }
 
   get operatorAccountDisplayName(): string {

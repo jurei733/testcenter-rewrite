@@ -279,11 +279,22 @@ try{
     }
   }
   await page.setViewportSize({width:1280,height:844});
-  await page.locator("#originalAdministrationAccountButton").click();
-  const account=page.locator(".original-administration-account-menu");await account.waitFor();
-  assert.match(await account.innerText(),/demo-admin/);
-  assert.match(await account.innerText(),/Verwaltung von Nutzerrechten und von grundsätzlichen Systemeinstellungen/);
-  assert.match(await account.innerText(),/Rewrite/);
+  const accountTrigger=page.locator("#originalAdministrationAccountButton");
+  await accountTrigger.click();
+  const account=page.locator(".original-native-account-menu");await account.waitFor();
+  const [name,group,...rightsAndVersion]=await account.locator("dd").allTextContents();
+  assert.equal(name,"demo-admin");
+  assert.equal(group,"");
+  assert.deepEqual(rightsAndVersion.slice(0,-1),[
+    "Verwaltung von Testinhalten",
+    "Verwaltung von Nutzerrechten und von grundsätzlichen Systemeinstellungen"
+  ]);
+  assert.match(rightsAndVersion.at(-1),/^Rewrite(?: \([a-f0-9]{12}\))?$/);
+  await account.getByRole("button",{name:"Nutzerinformationen schließen"}).click();
+  await account.waitFor({state:"detached"});
+  assert.equal(await accountTrigger.evaluate(element=>document.activeElement===element),true);
+  console.log("original_administration_account=source-rights-and-focus:passed");
+  await accountTrigger.click();
   await page.locator("#globalAdminSignOutButton").click();await waitForMaterialDialog(page);
   await page.locator("#originalParticipantLogoutCancelButton").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
   assert.equal((await fetch(base+"/api/v1/admin/auth/current-session",{headers:{authorization:`Bearer ${browserToken}`}})).status,200);

@@ -22,7 +22,9 @@ export async function createOriginalResultsVisualReference({browser,root,sourceR
  await new Promise(done=>server.listen(0,'127.0.0.1',done));const base='http://127.0.0.1:'+server.address().port,results=[];
  async function capture(page,path){
   await page.bringToFront();await page.evaluate(()=>document.fonts.ready);
-  await page.locator('[data-cy="header"] h1').click();await page.mouse.move(0,0);await waitForFiniteDocumentAnimations(page);
+  const toolbar=await page.locator('[data-cy="header"]').boundingBox();assert.ok(toolbar);
+  await page.mouse.click(toolbar.x+toolbar.width/2,toolbar.y+toolbar.height/2);
+  await page.mouse.move(0,0);await waitForFiniteDocumentAnimations(page);
   const measure=()=>page.evaluate(()=>{
    const box=node=>{const r=node.getBoundingClientRect(),s=getComputedStyle(node);return {x:r.x,y:r.y,width:r.width,height:r.height,font:s.font,padding:s.padding,opacity:s.opacity,color:s.color,background:s.backgroundColor,text:node.textContent.trim()};};
    return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},scroll:[scrollX,scrollY],
