@@ -110,15 +110,23 @@ export function projectOriginalWorkspaceReport(input:OriginalReportRequest,paren
   if(input.type==='log'){
     assertOriginalReportRowCount(family.logs.length);
     const logs=input.archive?family.logs.filter(isOriginalReportLog):family.logs;
-    const rows=[...logs.filter(l=>l.unitKey!==null),...logs.filter(l=>l.unitKey===null)].map(log=>{
+    const rows:OriginalLogReportRecord[]=[];
+    for(const log of [...logs.filter(l=>l.unitKey!==null),...logs.filter(l=>l.unitKey===null)]){
       const parent=byRun.get(log.testRunId);if(!parent||!inScope(parent.run,log)||log.participantSessionId!==parent.run.participantSessionId||
         !isOriginalReportLog(log)||
         !Number.isInteger(log.timestamp)||!Number.isSafeInteger(log.timestamp)&&log.originalClientTimestamp===undefined)throw unavailable();
       exactParticipantTestLogTimestamp(log);
-      const unit=log.unitKey===null?null:unitsFor(parent,log.unitKey);
-      return {...identity(parent),unitname:unit?.unitName??'',originalUnitId:unit?.originalUnitId??'',timestamp:log.timestamp,
-        ...(log.originalClientTimestamp===undefined?{}:{originalClientTimestamp:log.originalClientTimestamp}),logentry:formatOriginalParticipantLogEntry(log)};
-    });
+      const stored=log.unitKey===null?undefined:findUnit(parent.run,log.unitKey);
+      if(log.unitKey!==null&&!stored){
+        // Older rewrites could save a Unit log before the Unit existed. Such
+        // rows carry an empty originalUnitId and fall outside Source's join.
+        if(log.originalUnitId===''&&log.participantTestLogId.startsWith(originalUnitLogIdPrefix))continue;
+        throw unavailable();
+      }
+      const unit=stored&&ownedUnit(parent,stored);
+      rows.push({...identity(parent),unitname:unit?.unitName??'',originalUnitId:unit?.originalUnitId??'',timestamp:log.timestamp,
+        ...(log.originalClientTimestamp===undefined?{}:{originalClientTimestamp:log.originalClientTimestamp}),logentry:formatOriginalParticipantLogEntry(log)});
+    }
     return {type:'log',rows};
   }
   assertOriginalReportRowCount(family.reviews.length);

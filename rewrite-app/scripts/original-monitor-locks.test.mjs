@@ -136,6 +136,10 @@ for(const kind of process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:['memo
    )});
    await services.originalUnit.putLog({...next, unitName, body: [{key: 'EXPORT_UNIT_SECOND', content: 'β', timeStamp: 600}]});
    await change([Number(secondId)], false);
+   await repository.saveParticipantTestLogs([{
+    ...scopeMap, participantTestLogId: 'original-unit-log:' + randomUUID(), unitKey: 'OWNED.ORPHAN',
+    originalUnitId: '', logKey: 'OLD_ORPHAN', logContent: '', timestamp: 11, recordedAt: new Date(time).toISOString()
+   }]);
    if (kind !== 'memory') { await storage.shutdown(); await open(); }
    const archive = async () => {
     const {body: zip} = await services.workspaceAdminRead.exportOriginalResultArchive({...scope, groupKeys: [group]});
@@ -154,6 +158,7 @@ for(const kind of process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:['memo
    assert.match(json, /"timestamp":9007199254740993/);
    assert.match(json, /"timestamp":9007199254740992/);
    const rows = JSON.parse(json);
+   assert.ok(!rows.some(row => row.unitname === 'OWNED.ORPHAN'));
    assert.ok(rows.some(row => row.logentry.startsWith('locked by monitor : ') && row.timestamp === 0));
    assert.ok(rows.some(row => row.logentry.startsWith('CURRENT_UNIT_ID : ')));
    const markerEntries = text => JSON.parse(text).filter(row => row.logentry.startsWith('EXPORT_')).map(row => row.logentry);

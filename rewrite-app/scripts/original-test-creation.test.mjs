@@ -384,9 +384,18 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       assert.deepEqual((await repository.getTestRunById(testRun.testRunId)).originalResultState.lastTestStateAt,opened.originalResultState.lastTestStateAt);
       const zero=JSON.parse(formatOriginalUnitReadJson(await services.originalUnit.read({...base,unitName:'OWNED.NATIVE.UNIT',alias:'0'})));assert.deepEqual(zero.state,{});assert.deepEqual(zero.dataParts,{});
       const count=(await services.originalGroupResults.list(scope))[0].numUnitsTotal;
-      await services.originalUnit.putLog({...base,unitName:'OWNED.LOG.ONLY',body:{logEntries:[{key:'raw',content:{b:'Ω/x',a:1},timeStamp:0}]}});
+      const rawLog={logEntries:[{key:'raw',content:{b:'Ω/x',a:1},timeStamp:0}]};
+      const missing={...base,unitName:'OWNED.LOG.ONLY',deliveryId:randomUUID()};
+      const beforeMissingLog=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId);
+      await services.originalUnit.putLog({...base,unitName:missing.unitName,body:[]});
+      await assert.rejects(services.originalUnit.putLog({...missing,body:rawLog}),denied(500,'original_unit_log_target_missing'));
       assert.equal(await repository.getOriginalUnit({...testRun,unitName:'OWNED.LOG.ONLY'}),null);assert.equal((await services.originalGroupResults.list(scope))[0].numUnitsTotal,count);
+      assert.deepEqual(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),beforeMissingLog);
+      await services.originalUnit.patchState({...base,unitName:missing.unitName,body:{originalUnitId:'OWNED.LATE',newState:[]}});
+      await services.originalUnit.putLog({...missing,body:rawLog});
+      await services.originalUnit.putLog({...missing,body:rawLog});
       const logs=await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId),ownLogs=logs.filter(row=>row.testRunId===testRun.testRunId);assert.equal(ownLogs.filter(row=>row.logKey==='choice').length,5);assert.ok(ownLogs.some(row=>row.logKey==='choice'&&row.logContent==='stale across packets'));assert.ok(ownLogs.some(row=>row.logKey==='raw'&&row.logContent==='{"b":"\\u03a9\\/x","a":1}'));
+      assert.equal(ownLogs.filter(row=>row.logKey==='raw').length,1);
     });
     await t.test('late native Unit state failure rolls back the row and logs, including durable reopening',async()=>{
       const session=await auth('owned-unit-peer'),id=await request(session,native.bookletName),[testRun]=await owned(session.person),unitName='OWNED.ATOMIC.ALIAS',target={token:session.person.token,testNumber:id,unitName};

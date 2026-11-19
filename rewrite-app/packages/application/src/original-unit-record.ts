@@ -48,6 +48,8 @@ export function prepareOriginalUnitMutation(input:OriginalUnitInput,previous:Ori
  const effect=structuredClone(transform(structuredClone(previous)));
  if(effect.unit){const unit=effect.unit;assertOriginalUnitRecord(unit);if(!originalUnitParentMatches(input,unit)||!originalParticipantGroupKeysEqual(unit.unitName,input.unitName)||previous&&(unit.unitName!==previous.unitName||unit.originalUnitId!==previous.originalUnitId))throw invalid();}
  if(!Array.isArray(effect.logs)||effect.logs.some(log=>!keys.filter(key=>key!=='contentReleaseId').every(key=>log[key]===input[key])||typeof log.unitKey!=='string'||!originalParticipantGroupKeysEqual(log.unitKey,input.unitName)))throw invalid();
+ // Source's Unit log foreign key requires a saved Unit for nonempty batches.
+ if(effect.logs.length&&!previous&&!effect.unit)throw new FirstSliceError(500,'original_unit_log_target_missing','Internal error.');
  if(new Set(effect.logs.map(log=>log.participantTestLogId)).size!==effect.logs.length)throw Error('Native Unit log identity collision.');return effect;
 }
 export function createOriginalUnitRecord(input:OriginalUnitInput,originalUnitId:string):OriginalNativeUnit{
