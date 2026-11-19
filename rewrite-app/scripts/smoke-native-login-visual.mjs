@@ -11,7 +11,7 @@ import {resolve,join,extname,relative} from 'node:path';
 import {pathToFileURL} from 'node:url';
 const app=process.cwd(),selfControl=process.argv[2]==='source-self-control',entry=process.env.NATIVE_LOGIN_ENTRY??'monitor';assert.ok(['monitor','participant'].includes(entry));
 assert.ok(process.argv[2]===undefined||selfControl||process.argv[2]==='rewrite','Expected source-self-control or rewrite');
-const loginState=process.env.NATIVE_LOGIN_SCENE??'empty';assert.ok(['empty','name-filled','password','password-filled','password-visible','password-back','password-error','password-rate-limit','password-expired','password-scheduled','password-server-error'].includes(loginState));const rejectionStatus=({'password-error':400,'password-rate-limit':429,'password-expired':410,'password-scheduled':401,'password-server-error':500})[loginState];const scene='native-login-'+entry+'-'+loginState;assert.ok(process.argv.length<=3,'Unexpected native login visual arguments');
+const loginState=process.env.NATIVE_LOGIN_SCENE??'empty';assert.ok(['empty','name-filled','password','password-filled','password-visible','password-back','password-error','password-rate-limit','password-expired','password-scheduled','password-server-error','account'].includes(loginState));const rejectionStatus=({'password-error':400,'password-rate-limit':429,'password-expired':410,'password-scheduled':401,'password-server-error':500})[loginState];const scene='native-login-'+entry+'-'+loginState;assert.ok(process.argv.length<=3,'Unexpected native login visual arguments');
 assert.ok(process.env.UI_SMOKE_ARTIFACT_DIR&&process.env.ORIGINAL_BROWSER_REFERENCE_ROOT);
 const out=resolve(process.env.UI_SMOKE_ARTIFACT_DIR),root=await realpath(process.env.ORIGINAL_BROWSER_REFERENCE_ROOT);
 assert.ok(relative(app,out).startsWith('..'),'Visual evidence must stay outside the source checkout');
@@ -50,6 +50,7 @@ const storeRoot=await mkdtemp(join(tmpdir(),'owned-native-monitor-visual-'));
 try{
 const file=join(storeRoot,'store.sqlite'),storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(process.env.FIRST_SLICE_XML_SCHEMA_CACHE??join(app,'.data/original-xml-schemas'),false),services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
 const group='OWNED.PARITY',name='owned-parity-monitor',password='Owned parity password';
+const accountName='owned-parity-participant';
 // Each rejected final-password flow gets its own real actor; the production retry limiter stays enabled.
 const errorActors=['desktop-source','desktop-rewrite','mobile-source','mobile-rewrite'].map(id=>'owned-error-'+id);
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
@@ -58,7 +59,8 @@ const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.con
 await upload('owned-player-1.2.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned Player'}],description:[{lang:'de',value:'Owned visual fixture'}]})+'</script><main>Owned</main></html>','text/html');
 await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-player@1.2.3">Owned</Definition>'));
 await upload('booklet.xml',xml('Booklet','<Metadata><Id>OWNED.BOOK</Id><Label>Owned Monitor Booklet</Label></Metadata><Units><Testlet id="B1" label="Owned Block"><Restrictions><TimeMax minutes="10"/></Restrictions><Unit id="OWNED.UNIT" label="Owned Unit"/></Testlet></Units>'));
-await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="'+group+'" label="Owned Monitor Group"><Login name="'+name+'" pw="'+password+'" mode="monitor-group"/><Login name="owned-alpha" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login><Login name="owned-beta" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login></Group><Group id="OWNED.FAILURE" label="'+(loginState==='password-server-error'?'':'Owned rejected login')+'"'+(loginState==='password-expired'?' validTo="1/1/2000 12:00"':loginState==='password-scheduled'?' validFrom="1/1/2099 12:00"':'')+'>'+errorActors.map(actor=>'<Login name="'+actor+'" pw="'+password+'" mode="monitor-group"/>').join('')+'</Group>')});
+const accountLogin=loginState==='account'?'<Login name="'+accountName+'" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login>':'';
+await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="'+group+'" label="Owned Monitor Group"><Login name="'+name+'" pw="'+password+'" mode="monitor-group"/><Login name="owned-alpha" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login><Login name="owned-beta" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login>'+accountLogin+'</Group><Group id="OWNED.FAILURE" label="'+(loginState==='password-server-error'?'':'Owned rejected login')+'"'+(loginState==='password-expired'?' validTo="1/1/2000 12:00"':loginState==='password-scheduled'?' validFrom="1/1/2099 12:00"':'')+'>'+errorActors.map(actor=>'<Login name="'+actor+'" pw="'+password+'" mode="monitor-group"/>').join('')+'</Group>')});
 for(const person of ['owned-alpha','owned-beta']){const a=await services.originalSession.login({name:person,password:''}),id=await services.originalTest.create({token:a.token,bookletName:'OWNED.BOOK'});await services.originalTest.read({token:a.token,testNumber:id});await services.originalTest.patchState({token:a.token,testNumber:id,patch:[{key:'CURRENT_UNIT_ID',content:'OWNED.UNIT',timeStamp:100},{key:'CONTROLLER',content:'RUNNING',timeStamp:101},{key:'CONNECTION',content:'POLLING',timeStamp:102}]});await services.originalUnit.patchState({token:a.token,testNumber:id,unitName:'OWNED.UNIT',body:{newState:[{key:'PRESENTATION_PROGRESS',content:'some',timeStamp:103}]}});}
 await storage.shutdown();
 let server,browser,sourceServer;const pages=[],surfaces=[],errors=[],unknown=[],requests=[],captureFailures=[];let base;
@@ -98,7 +100,25 @@ const settings=(await native('GET',productionApiRoutes.system.getApplicationSett
    assert.equal(navigation.status(),200);const documentBytes=await navigation.body();await writeFile(join(out,screen+'-'+side+'-document.html'),documentBytes);
    surfaces.push({side,screen,origin:new URL(page.url()).origin,path:new URL(page.url()).pathname,documentSha256:createHash('sha256').update(documentBytes).digest('hex')});
    await page.locator('.login-section form input').first().waitFor();await page.evaluate(()=>document.fonts.ready);
-   if(loginState!=='empty'){
+   if(loginState==='account'){
+    const actor=entry==='participant'?accountName:name;
+    await page.locator('.login-section form input').first().fill(actor);
+    await page.locator('[data-cy=login-user]').click();
+    if(entry==='monitor'){
+     await page.locator('.login-section input[type=password]').fill(password);
+     await page.locator('[data-cy=login-user]').click();
+    }
+    const account=page.locator('[data-cy=header] button.account-button'),menu=page.getByRole('menu');
+    await account.waitFor();
+    await page.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();
+    await account.click();await menu.waitFor();
+    assert.deepEqual(await menu.locator('dt').allTextContents(),['Anmeldename:','Gruppe:','Berechtigung:','Version:']);
+    assert.deepEqual(await menu.locator('dd').allTextContents(),[actor,'Owned Monitor Group',
+     entry==='participant'?'Ausführung/Ansicht einer Befragung oder eines Testheftes':'Beobachtung/Prüfung einer Testgruppe','Rewrite']);
+    await menu.locator('.heading button').click();await menu.waitFor({state:'hidden'});
+    await page.waitForFunction(()=>document.activeElement?.matches('[data-cy=header] button.account-button'));
+    await account.click();await menu.waitFor();
+   }else if(loginState!=='empty'){
     await page.locator('.login-section form input').first().fill(['password-error','password-rate-limit','password-expired','password-scheduled','password-server-error'].includes(loginState)?'owned-error-'+screen+'-'+side:name);
     if(loginState.startsWith('password')){
      await page.locator('[data-cy=login-user]').click();await page.locator('.login-section input[type=password]').waitFor();
@@ -110,7 +130,7 @@ const settings=(await native('GET',productionApiRoutes.system.getApplicationSett
    if(loginState==='password-server-error'){await page.getByRole('dialog').waitFor();assert.ok((await page.locator('body').innerText()).includes(nativeErrorInput.errorId),'The actual HTTP Error-ID must be rendered by both real error dialogs');await page.keyboard.press('Escape');await page.mouse.click(2,2);assert.equal(await page.getByRole('dialog').count(),1);}
    await page.mouse.move(1,1);
    await page.waitForFunction(()=>document.getAnimations().every(a=>!Number.isFinite(a.effect?.getTiming().iterations)||a.playState==='finished'),{},{timeout:2000});
-   await writeFile(join(out,screen+'-'+side+'-scene.json'),JSON.stringify({scene,authenticated:false,entryState:await page.evaluate(()=>{const field=document.querySelector('.login-section form input'),eye=document.querySelector('.mat-mdc-form-field-icon-suffix button');return {focusedInput:document.activeElement===field,inputType:field?.type,inputValueLength:field?.value.length,autofocus:field?.hasAttribute('autofocus'),visibilityPressed:eye?.getAttribute('aria-pressed')??null};}),text:await page.locator('body').innerText()},null,2));
+   await writeFile(join(out,screen+'-'+side+'-scene.json'),JSON.stringify({scene,authenticated:loginState==='account',entryState:await page.evaluate(()=>{const field=document.querySelector('.login-section form input'),eye=document.querySelector('.mat-mdc-form-field-icon-suffix button');return {focusedInput:document.activeElement===field,inputType:field?.type,inputValueLength:field?.value.length,autofocus:field?.hasAttribute('autofocus'),visibilityPressed:eye?.getAttribute('aria-pressed')??null};}),text:await page.locator('body').innerText()},null,2));
    const inspectLayout=()=>page.evaluate(()=>{
     const box=e=>{const b=e?.getBoundingClientRect();return b?{x:b.x,y:b.y,width:b.width,height:b.height}:null;};
     const selectors=['.help-box','.help-box mat-icon','.help-box mat-card-content','app-root','tc-root','app-native-monitor-entry','app-native-participant-entry','.button-section button','.mdc-notched-outline__leading','.mdc-notched-outline__notch','.mdc-notched-outline__trailing','.mdc-floating-label','.mat-mdc-text-field-wrapper','.mdc-button__ripple','.login-page','.welcome-section','.login-section','.login-section form','.login-section h2','.button-section','.login-section form button','.login-section input','tc-footer','footer','.cdk-overlay-pane','.mat-mdc-dialog-container','.mat-mdc-dialog-title','.mat-mdc-dialog-content','.mat-mdc-dialog-actions','input','#setTimer','h2[mat-dialog-title]','[data-cy=dialog-confirm]','[data-cy=dialog-cancel]','.mat-mdc-menu-panel','.mat-mdc-menu-item','.mat-mdc-menu-submenu-icon','[data-cy=GM_forward_button]','[data-cy=GM_pause_button]','[data-cy=GM_end_button]','[data-cy=account-button]','html','body','[data-cy=header] h1','.mat-drawer-container','.mat-drawer-content','tc-test-session:first-of-type td','tc-test-session:first-of-type h1','tc-test-session:first-of-type .units','tc-test-session:first-of-type .testlet','tc-test-session:first-of-type .unit','tc-test-session:first-of-type mat-icon'];
@@ -126,6 +146,18 @@ const settings=(await native('GET',productionApiRoutes.system.getApplicationSett
 
     await writeFile(join(out,screen+'-'+side+'-'+phase+'.json'),JSON.stringify({geometry:capture.geometry,diagnostics:(await inspectLayout()).diagnostics,paint:capture.paintDiagnostics,animationSpec,phase},null,2));console.log('captured='+screen+'-'+side+'-'+phase);
     if(side==='rewrite'&&captures.source[phase])comparisons[screen][phase]=await compareScreenshots(page,captures.source[phase],capture.bytes);
+   }
+   if(loginState==='account'){
+    await page.locator('[data-cy=logout-button]').click();
+    const dialog=page.getByRole('dialog');
+    await dialog.getByRole('heading',{name:'Sicher, dass du dich abmelden möchtest?'}).waitFor();
+    await dialog.getByRole('button',{name:'Hier bleiben',exact:true}).click();
+    await dialog.waitFor({state:'hidden'});
+    await page.locator('[data-cy=header] button.account-button').click();
+    await page.locator('[data-cy=logout-button]').click();
+    await dialog.getByRole('button',{name:'Abmelden',exact:true}).click();
+    await page.locator('.login-section form input').first().waitFor();
+    assert.equal(await page.locator('[data-cy=header] button.account-button').count(),0);
    }
    if(loginState==='password-server-error'){
     await page.getByRole('button',{name:'Fehlerdetails',exact:true}).click();
