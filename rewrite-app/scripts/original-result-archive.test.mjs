@@ -143,6 +143,27 @@ for (const kind of kinds) test(`${kind}: Original archive distinguishes omitted 
       const all = await report(); assert.equal(all.manifest.groupKeys.length, 103); assert.equal(all.rows.responses.length, 2);
       await assert.rejects(() => report(all.manifest.groupKeys), error => error.errorCode === 'result_archive_group_limit_exceeded');
     });
+    await t.test('legacy log chronology retains exact stored clocks that round to the same number', async () => {
+      const people = await repository.listParticipantSessionsByWorkspace(workspace.tenantId, workspace.workspaceId);
+      const exactClocks = [['alpha', '9007199254740993'], ['beta', '9007199254740992']];
+      for (const [groupKey, originalClientTimestamp] of exactClocks) {
+        const { participantSessionId } = people.find(person => person.groupKey === groupKey);
+        const [{ testRunId }] = await repository.listTestRunsByParticipantSessionId(participantSessionId);
+        await repository.saveParticipantTestLogs([{
+          ...workspace, participantSessionId, testRunId, participantTestLogId: randomUUID(),
+          unitKey: null, originalUnitId: null, logKey: 'EXACT_CLOCK', logContent: '',
+          timestamp: Number(originalClientTimestamp), originalClientTimestamp, recordedAt: timestamp
+        }]);
+      }
+      if (kind !== 'memory') { await storage.shutdown(); await open(); }
+      const archive = await report(['alpha', 'beta']);
+      const clocks = archive.rows.logs.filter(row => row.logentry === 'EXACT_CLOCK');
+      assert.deepEqual(clocks.map(row => [row.groupname, row.timestamp]), exactClocks.toReversed());
+      const csvClocks = archive.entries.get('logs.csv').split('\n').filter(row => row.endsWith(';"EXACT_CLOCK"'));
+      assert.equal(csvClocks.length, 2);
+      assert.ok(csvClocks[0].endsWith(';"9007199254740992";"EXACT_CLOCK"'));
+      assert.ok(csvClocks[1].endsWith(';"9007199254740993";"EXACT_CLOCK"'));
+    });
     await t.test('saved state-only Units export empty response arrays instead of opaque packets', async () => {
       const session=(await repository.listParticipantSessionsByWorkspace(workspace.tenantId,workspace.workspaceId)).find(row=>row.loginKey==='alpha');
       const run=(await repository.listTestRunsByParticipantSessionId(session.participantSessionId))[0];
@@ -308,6 +329,17 @@ test('protected HTTP exports retain unanswered Units for read-only users after c
    return result.rows.responses;
   };
   const rows=await check();
+  const all=readArchive({body:await request(archive,{token:ro})});
+  assert.deepEqual(all.rows.responses,rows);
+  assert.equal(all.manifest.counts.reviews,1);
+  for(const query of ['?groupKey','?groupKey=&groupKey=%20%09','?groupKey=absent']){
+   const empty=readArchive({body:await request(archive+query,{token:ro})});
+   assert.deepEqual(empty.manifest.counts,{responses:0,logs:0,reviews:0},query);
+   assert.deepEqual(empty.rows,{responses:[],logs:[],reviews:[]},query);
+  }
+  const mixed=readArchive({body:await request(selected+'&groupKey=%20&groupKey=group%3Astudent-demo',{token:ro})});
+  assert.deepEqual(mixed.manifest.groupKeys,['group:student-demo']);
+  assert.deepEqual(mixed.rows,all.rows);
   await request(archive,{token:'',status:401});
   await request(scope+'/reviews/'+created.item.review.reviewId,{method:'DELETE',token:ro,status:403});
   assert.deepEqual(await check(),rows);

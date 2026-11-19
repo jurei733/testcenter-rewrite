@@ -8162,13 +8162,13 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         if (!groupFilter.ok) {
           return;
         }
+        const groupKeys =
+          groupFilter.groupKeys ?? (groupFilter.groupKey ? [groupFilter.groupKey] : []);
         const archive =
           await services.workspaceAdminRead.exportOriginalResultArchive({
             tenantKey,
             workspaceKey,
-            groupKeys:
-              groupFilter.groupKeys ??
-              (groupFilter.groupKey ? [groupFilter.groupKey] : undefined)
+            groupKeys: url.searchParams.has("groupKey") ? groupKeys : undefined
           });
         sendAsset(response, 200, archive.mediaType, archive.body, {
           "cache-control": "private, no-store",

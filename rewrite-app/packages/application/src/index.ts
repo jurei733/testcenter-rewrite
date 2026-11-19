@@ -16353,7 +16353,7 @@ const buildOriginalLogReportRows = (input: {
   items.sort((left,right)=>{
     const a=ranks.get(left.testLog.participantTestLogId),b=ranks.get(right.testLog.participantTestLogId);
     if(a!==undefined||b!==undefined)return a===undefined?1:b===undefined?-1:a-b;
-    return Number(exactParticipantTestLogTimestamp(left.testLog))-Number(exactParticipantTestLogTimestamp(right.testLog))||
+    return compareParticipantTestLogTimestamps(left.testLog,right.testLog)||
       left.groupKey.localeCompare(right.groupKey)||left.loginKey.localeCompare(right.loginKey);
   });
   return items.map(item=>{
