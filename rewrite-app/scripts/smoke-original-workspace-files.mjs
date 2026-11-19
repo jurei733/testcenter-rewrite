@@ -154,6 +154,24 @@ try {
     await account.waitFor({state:'detached'});
     assert.equal(await accountTrigger.evaluate(element=>document.activeElement===element),true);
     console.log('native_workspace_files_account='+theme+'-'+width+':passed');
+    await readPage.keyboard.press('Tab');
+    await accountTrigger.focus();
+    await accountTrigger.press('Enter');
+    await account.waitFor();
+    const focusRing=await accountTrigger.evaluate(element=>{
+      const layer=element.querySelector('.mat-mdc-button-persistent-ripple');
+      return {
+        focused:element.matches(':focus-visible'),
+        buttonRadius:getComputedStyle(element).borderRadius,
+        rippleRadius:getComputedStyle(layer).borderRadius,
+        opacity:getComputedStyle(layer,'::before').opacity
+      };
+    });
+    assert.deepEqual(focusRing,{focused:true,buttonRadius:'12px',rippleRadius:'12px',opacity:'0.12'});
+    await account.getByRole('button',{name:'Nutzerinformationen schließen'}).press('Enter');
+    await account.waitFor({state:'detached'});
+    assert.equal(await accountTrigger.evaluate(element=>document.activeElement===element),true);
+    console.log('native_workspace_files_keyboard_account='+theme+'-'+width+':passed');
     await readPage.locator('[data-cy="files-checkAll-Unit"] input').check();
     assert.equal(await readPage.locator('[data-cy="delete-files"]').isDisabled(),true);
     const readRow=readPage.locator('mat-row').filter({has:readPage.locator('[data-cy="files-checkbox-NATIVE.UNIT"]')});
