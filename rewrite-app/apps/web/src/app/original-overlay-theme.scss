@@ -28,7 +28,7 @@
 :root[data-interface-mode='original'] .original-native-account-menu {
   width: 330px;
   padding: 12px;
-  box-sizing: content-box;
+  color: var(--mat-sys-on-surface);
 
   .heading {
     display: flex;
@@ -46,7 +46,10 @@
   .heading .mat-mdc-button-persistent-ripple { border-radius: inherit; }
   dt { margin-top: 12px; font-weight: 700; }
   dd { margin-top: 4px; margin-inline-start: 0; }
-  .logout-button { margin-top: 12px; }
+  .logout-button {
+    margin-top: 12px;
+    border: 1px solid var(--mat-sys-outline-variant);
+  }
 }
 
 // Rewrite's general button hover lifts by one pixel; the pinned Material

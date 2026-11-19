@@ -57,9 +57,14 @@ import { CustomtextPipe } from '../shared/pipes/customtext/customtext.pipe';
       padding: 16px 24px;
       border-radius: 4px;
       border: 1px solid var(--mat-sys-primary);
+      background-color: var(--mat-sys-surface);
       flex-direction: row;
       align-items: center;
       gap: 24px;
+    }
+    .flex-column {
+      display: flex;
+      flex-direction: column;
     }
     .number {
       font-size: 57px;

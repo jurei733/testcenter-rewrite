@@ -4,6 +4,12 @@
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
+  color: var(--mat-sys-on-surface);
+}
+
+.intro .flex-column {
+  display: flex;
+  flex-direction: column;
 }
 
 .intro {
