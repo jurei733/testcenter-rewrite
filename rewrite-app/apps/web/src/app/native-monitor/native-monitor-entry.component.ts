@@ -11,7 +11,8 @@ import {MatButton,MatIconButton} from '@angular/material/button';
 import {MatInput} from '@angular/material/input';
 import {MatFormField,MatLabel,MatSuffix} from '@angular/material/form-field';
 import {MatToolbar} from '@angular/material/toolbar';
-import {MatMenu,MatMenuItem,MatMenuTrigger,MAT_MENU_DEFAULT_OPTIONS} from '@angular/material/menu';
+import {MAT_MENU_DEFAULT_OPTIONS} from '@angular/material/menu';
+import {NativeAccountMenuComponent} from '../native-account-menu.component';
 import {NativeMonitorIconComponent as MatIcon} from './native-monitor-icon.component';
 import {MatDialog} from '@angular/material/dialog';
 import type {OriginalTestGroupMonitorAccess} from '@testcenter-rewrite-app/contracts/original-session';
@@ -31,7 +32,7 @@ import {BackendService} from './group-monitor/backend.service';
 import {NativeStarterComponent} from '../native-participant/starter/native-starter.component';
 import {NativePublicHeaderService} from '../native-public-header.service';
 @Component({selector:'app-native-monitor-entry',standalone:true,
- imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,NativeStarterComponent],
+ imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,NativeStarterComponent],
  providers:[NativeLoginFailureService,BackendService,BookletService,TestSessionManager,{provide:MAT_MENU_DEFAULT_OPTIONS,useFactory:()=>({...inject(MAT_MENU_DEFAULT_OPTIONS,{skipSelf:true}),overlayPanelClass:'original-native-monitor-menu'})},{provide:GROUP_MONITOR_CONFIG,useValue:{checkForIdleInterval:180000}}],
  templateUrl:'./native-monitor-entry.component.html',styleUrls:['./native-monitor-entry.component.css','../original-login-theme.scss']})
 export class NativeMonitorEntryComponent implements OnDestroy {
@@ -93,7 +94,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  }
  async open(claim:OriginalTestGroupMonitorAccess){if(this.view.signal.aborted)return;const flags=Array.isArray(claim.flags)?{}:claim.flags;const target=['/group-monitor',claim.id,...(flags.profile?[flags.profile]:[])];await this.router.navigate(target);}
  claimLabel(claim:OriginalTestGroupMonitorAccess){return Array.isArray(claim.flags)?'':claim.flags.subLabel??'';}
- async selection(){if(!this.view.signal.aborted)await this.router.navigate(['/group-monitor']);}
+ private async selection(){if(!this.view.signal.aborted)await this.router.navigate(['/group-monitor']);}
  async refreshStarter(){
   if(this.view.signal.aborted||!this.session.access())return;
   const scope=this.session.accessSignal;

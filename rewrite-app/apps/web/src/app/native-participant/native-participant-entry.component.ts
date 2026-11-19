@@ -8,7 +8,7 @@ import {MatToolbar} from '@angular/material/toolbar';
 import {MatInput} from '@angular/material/input';
 import {MatFormField,MatLabel,MatSuffix} from '@angular/material/form-field';
 import {MatButton,MatIconButton} from '@angular/material/button';
-import {MatMenu,MatMenuItem,MatMenuTrigger} from '@angular/material/menu';
+import {NativeAccountMenuComponent} from '../native-account-menu.component';
 import {MatDialog} from '@angular/material/dialog';
 import {Subscription,fromEvent,take} from 'rxjs';
 import {NativeMonitorSessionService,NativeMonitorHttpError} from '../native-monitor/native-session.service';
@@ -31,9 +31,9 @@ import {CustomtextService} from './shared/services/customtext/customtext.service
 import {NativePublicHeaderService} from '../native-public-header.service';
 import type {CodeInputType} from './app.interfaces';
 @Component({selector:'app-native-participant-entry',standalone:true,
- imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,MatMenu,MatMenuItem,MatMenuTrigger,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent],
+ imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent],
  providers:[NativeLoginFailureService,AssetService,CustomtextService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
- template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(session.access()&&!session.busy()&&!codeRequired){<button matIconButton class="account-button" [matMenuTriggerFor]="accountMenu" aria-label="Nutzerinformationen"><mat-icon svgIcon="person" /></button><mat-menu #accountMenu="matMenu"><div class="account-heading">Nutzerinformationen</div><dl><dt>Anmeldename:</dt><dd>{{session.access()?.loginName}}</dd><dt>Gruppe:</dt><dd>{{session.access()?.groupLabel}}</dd></dl><button mat-menu-item (click)="logout()" data-cy="logout-button">Abmelden</button></mat-menu>}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
+ template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(!session.busy()&&!codeRequired){@if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
  @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
  @if(session.restoring()||refreshing()){<p role="status">Sitzung wird geprüft …</p>}
  @else if(!session.access()){

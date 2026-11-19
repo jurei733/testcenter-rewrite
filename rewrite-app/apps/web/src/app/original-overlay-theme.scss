@@ -4,6 +4,7 @@
 // CDK overlays live under body, outside the component's themed host.
 // Scope their theme explicitly; never affect a Rewrite menu or dialog.
 :root[data-interface-mode='original'] .original-participant-account-menu,
+:root[data-interface-mode='original'] .original-native-account-menu,
 :root[data-interface-mode='original'] .original-administration-account-menu,
 :root[data-interface-mode='original'] .original-administration-settings-overlay,
 :root[data-interface-mode='original'] .original-administration-editor-dialog,
@@ -22,6 +23,30 @@
 :root[data-interface-mode='original'] .original-participant-error-dialog,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog {
   @include theme.apply();
+}
+
+:root[data-interface-mode='original'] .original-native-account-menu {
+  width: 330px;
+  padding: 12px;
+  box-sizing: content-box;
+
+  .heading {
+    display: flex;
+    align-items: center;
+    font-size: 22px;
+
+    button {
+      margin-left: auto;
+      border-radius: 12px;
+      border: 1px solid;
+    }
+  }
+
+  button:hover { transform: none; }
+  .heading .mat-mdc-button-persistent-ripple { border-radius: inherit; }
+  dt { margin-top: 12px; font-weight: 700; }
+  dd { margin-top: 4px; margin-inline-start: 0; }
+  .logout-button { margin-top: 12px; }
 }
 
 // Rewrite's general button hover lifts by one pixel; the pinned Material
