@@ -46,6 +46,8 @@
 }
 
 .scroll-button {
+  // The Source uses a plain browser button, even inside the themed Starter.
+  all: revert;
   position: sticky;
   bottom: 24px;
   right: 24px;
