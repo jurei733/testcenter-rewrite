@@ -14992,217 +14992,199 @@ try {
   }, "testcenter-rewrite:participant-save-outbox:v1");
   stopAfter("participant-official-stars-player-family");
 
-  logStep("participant-official-stars-current-release-player-family");
-  const currentStarsPlayerPackage =
-    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
-      playerPackage =>
-        playerPackage.family === "STARS current-release choice interaction"
+  for (const { version, step } of [
+    { version: "0.6.19", step: "participant-official-stars-historical-release-player-family" },
+    { version: "0.7.2", step: "participant-official-stars-current-release-player-family" }
+  ]) {
+    logStep(step);
+    const starsRelease = officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      candidate => candidate.playerModuleId === "iqb-player-stars" && candidate.playerModuleVersion === version
     );
-  assert.ok(
-    currentStarsPlayerPackage,
-    "The current official STARS release should be pinned."
-  );
-  const currentStarsTenantKey = `${tenantKey}-verona-stars-current`;
-  const currentStarsWorkspaceKey = `${workspaceKey}-verona-stars-current`;
-  const currentStarsBookletKey = "BOOKLET.OFFICIAL.STARS-0.7.2";
-  const currentStarsUnitKey = "UNIT.OFFICIAL.STARS-0.7.2";
-  const currentStarsLoginKey = "student-official-stars-current";
-  const [currentStarsPlayerDocument, currentStarsDefinitionDocument] =
-    await Promise.all([
-      readBrotliBase64Text(
-        resolve(
-          "test-fixtures/original-testcenter",
-          currentStarsPlayerPackage.playerFixture
-        )
-      ),
-      readFile(
-        resolve(
-          "test-fixtures/original-testcenter",
-          currentStarsPlayerPackage.definitionFixture
+    assert.ok(starsRelease, `Official STARS ${version} should be pinned.`);
+    const releaseTenantKey = `${tenantKey}-verona-stars-${version.replaceAll(".", "-")}`;
+    const releaseWorkspaceKey = `${workspaceKey}-verona-stars-${version.replaceAll(".", "-")}`;
+    const bookletKey = `BOOKLET.OFFICIAL.STARS-${version}`;
+    const unitKey = `UNIT.OFFICIAL.STARS-${version}`;
+    const loginKey = "student-official-stars";
+    const displayName = `Official STARS ${version} Player`;
+    const [playerDocument, definitionDocument] =
+      await Promise.all([
+        readBrotliBase64Text(
+          resolve(
+            "test-fixtures/original-testcenter",
+            starsRelease.playerFixture
+          )
         ),
-        "utf8"
-      ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+        readFile(
+          resolve(
+            "test-fixtures/original-testcenter",
+            starsRelease.definitionFixture
+          ),
+          "utf8"
+        ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+      ]);
+    assert.equal(createHash("sha256").update(playerDocument).digest("hex"), starsRelease.playerSha256);
+    assert.equal(createHash("sha256").update(definitionDocument).digest("hex"), starsRelease.definitionSha256);
+    const packageZip = createStoredZipBuffer([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>
+              <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+              <resource identifier="${unitKey}" href="units/Unit.xml" />
+              <resource identifier="${starsRelease.playerKey}" href="players/Player.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: `
+          <Booklet>
+            <Metadata>
+              <Id>${bookletKey}</Id>
+              <Label>${displayName}</Label>
+            </Metadata>
+            <Units>
+              <Unit id="${unitKey}" label="STARS choice" />
+            </Units>
+          </Booklet>
+        `
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata>
+              <Id>${unitKey}</Id>
+              <Label>STARS choice</Label>
+            </Metadata>
+            <Definition player="${starsRelease.playerKey}" type="${starsRelease.unitDefinitionType}"><![CDATA[${definitionDocument}]]></Definition>
+          </Unit>
+        `
+      },
+      {
+        fileName: "export/players/Player.html",
+        content: playerDocument
+      }
     ]);
-  const currentStarsPlayerZip = createStoredZipBuffer([
-    {
-      fileName: "export/imsmanifest.xml",
-      content: `
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
-          <resources>
-            <resource identifier="${currentStarsBookletKey}" href="booklets/Booklet.xml" />
-            <resource identifier="${currentStarsUnitKey}" href="units/Unit.xml" />
-            <resource identifier="${currentStarsPlayerPackage.playerKey}" href="players/Player.html" />
-          </resources>
-        </manifest>
-      `
-    },
-    {
-      fileName: "export/booklets/Booklet.xml",
-      content: `
-        <Booklet>
-          <Metadata>
-            <Id>${currentStarsBookletKey}</Id>
-            <Label>Official STARS 0.7.2 Player</Label>
-          </Metadata>
-          <Units>
-            <Unit id="${currentStarsUnitKey}" label="Current STARS choice" />
-          </Units>
-        </Booklet>
-      `
-    },
-    {
-      fileName: "export/units/Unit.xml",
-      content: `
-        <Unit>
-          <Metadata>
-            <Id>${currentStarsUnitKey}</Id>
-            <Label>Current STARS choice</Label>
-          </Metadata>
-          <Definition player="${currentStarsPlayerPackage.playerKey}" type="${currentStarsPlayerPackage.unitDefinitionType}"><![CDATA[${currentStarsDefinitionDocument}]]></Definition>
-        </Unit>
-      `
-    },
-    {
-      fileName: "export/players/Player.html",
-      content: currentStarsPlayerDocument
-    }
-  ]);
-  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
-    body: {
-      tenantKey: currentStarsTenantKey,
-      displayName: "Official STARS 0.7.2 Player"
-    }
-  });
-  await sendSmokeJsonAndDrain(
-    `${baseUrl}/api/v1/tenants/${currentStarsTenantKey}/workspaces`,
-    {
+    await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
       body: {
-        workspaceKey: currentStarsWorkspaceKey,
-        displayName: "Official STARS 0.7.2 Player"
+        tenantKey: releaseTenantKey,
+        displayName
       }
-    }
-  );
-  const currentStarsWorkspaceApiUrl =
-    `${baseUrl}/api/v1/tenants/${currentStarsTenantKey}` +
-    `/workspaces/${currentStarsWorkspaceKey}`;
-  const currentStarsSourceResponse = await sendSmokeJson(
-    `${currentStarsWorkspaceApiUrl}/source-packages`,
-    {
-      body: {
-        fileName: "official-stars-0.7.2-browser-smoke.zip",
-        mediaType: "application/zip",
-        sourceDocument: `data:application/zip;base64,${currentStarsPlayerZip.toString("base64")}`
-      }
-    }
-  );
-  const currentStarsSourcePayload = await currentStarsSourceResponse.json();
-  const currentStarsImportResponse = await sendSmokeJson(
-    `${currentStarsWorkspaceApiUrl}/import-jobs`,
-    {
-      body: {
-        sourcePackageId:
-          currentStarsSourcePayload.sourcePackage.sourcePackageId
-      }
-    }
-  );
-  const currentStarsImportPayload = await currentStarsImportResponse.json();
-  assert.equal(
-    currentStarsImportPayload.importJob.status,
-    "completed",
-    JSON.stringify(currentStarsImportPayload.importJob.diagnostics)
-  );
-  const currentStarsReleaseId =
-    currentStarsImportPayload.stagedContentRelease?.contentReleaseId;
-  assert.ok(currentStarsReleaseId, "Official STARS 0.7.2 should stage a release.");
-  await sendSmokeJsonAndDrain(
-    `${currentStarsWorkspaceApiUrl}/content-releases/${currentStarsReleaseId}/activate`,
-    { body: {} }
-  );
-  await sendSmokeJsonAndDrain(`${currentStarsWorkspaceApiUrl}/participant-roster`, {
-    body: {
-      rosterText: [
-        {
-          loginKey: currentStarsLoginKey,
-          groupKey: "group:official-stars-current",
-          bookletKey: currentStarsBookletKey,
-          displayName: "Official STARS 0.7.2 Participant",
-          executionMode: "run-hot-return"
+    });
+    await sendSmokeJsonAndDrain(
+      `${baseUrl}/api/v1/tenants/${releaseTenantKey}/workspaces`,
+      {
+        body: {
+          workspaceKey: releaseWorkspaceKey,
+          displayName
         }
-      ]
-    }
-  });
-  await page.goto(
-    `${baseUrl}/participant?${new URLSearchParams({
-      tenantKey: currentStarsTenantKey,
-      workspaceKey: currentStarsWorkspaceKey,
-      loginKey: currentStarsLoginKey,
-      bookletKey: currentStarsBookletKey
-    }).toString()}`,
-    { waitUntil: "domcontentloaded" }
-  );
-  await page
-    .locator("#participantVeronaPlayerVersion")
-    .filter({ hasText: `API ${currentStarsPlayerPackage.playerApiVersion}` })
-    .waitFor({ timeout: 30_000 });
-  const currentStarsParticipantSessionId = await page
-    .locator("#participantRouteSessionId")
-    .inputValue();
-  assert.ok(currentStarsParticipantSessionId);
-  const currentStarsFrame = page.frameLocator("#participantVeronaPlayerFrame");
-  const currentStarsChoice = currentStarsFrame.locator(
-    '[data-cy="button-2"] input'
-  );
-  await currentStarsChoice.waitFor({ state: "attached", timeout: 30_000 });
-  await currentStarsChoice.dispatchEvent("click");
-  await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/participant/sessions/${currentStarsParticipantSessionId}/current-state`,
-    payload => {
-      const response =
-        payload?.currentRunState?.testRun?.unitResponses?.[
-          currentStarsUnitKey
-        ];
-      if (typeof response !== "string") return false;
-      try {
-        const unitState = JSON.parse(response).unitState;
-        if (
-          unitState?.unitStateDataType !==
-          currentStarsPlayerPackage.unitStateType
-        ) return false;
-        const responses = unitState?.dataParts?.responses;
-        if (typeof responses !== "string") return false;
-        return JSON.parse(responses)?.some(
-          value =>
-            value?.id === "BUTTONS" &&
-            value?.status === "VALUE_CHANGED" &&
-            String(value?.value) === "3"
-        );
-      } catch {
-        return false;
       }
-    },
-    30_000
-  );
-  await participantHttpActor.goto(page,
-    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
-      currentStarsParticipantSessionId
-    )}`,
-    { waitUntil: "domcontentloaded" }
-  );
-  await page
-    .locator("#participantVeronaPlayerVersion")
-    .filter({ hasText: `API ${currentStarsPlayerPackage.playerApiVersion}` })
-    .waitFor({ timeout: 30_000 });
-  const restoredCurrentStarsChoice = page
-    .frameLocator("#participantVeronaPlayerFrame")
-    .locator('[data-cy="button-2"] input');
-  await restoredCurrentStarsChoice.waitFor({
-    state: "attached",
-    timeout: 30_000
-  });
-  assert.equal(
-    await restoredCurrentStarsChoice.getAttribute("data-selected"),
-    "true"
-  );
+    );
+    const workspaceApiUrl =
+      `${baseUrl}/api/v1/tenants/${releaseTenantKey}` +
+      `/workspaces/${releaseWorkspaceKey}`;
+    const sourceResponse = await sendSmokeJson(
+      `${workspaceApiUrl}/source-packages`,
+      {
+        body: {
+          fileName: `official-stars-${version}-browser-smoke.zip`,
+          mediaType: "application/zip",
+          sourceDocument: `data:application/zip;base64,${packageZip.toString("base64")}`
+        }
+      }
+    );
+    const sourcePayload = await sourceResponse.json();
+    const importResponse = await sendSmokeJson(
+      `${workspaceApiUrl}/import-jobs`,
+      {
+        body: {
+          sourcePackageId: sourcePayload.sourcePackage.sourcePackageId
+        }
+      }
+    );
+    const importPayload = await importResponse.json();
+    assert.equal(
+      importPayload.importJob.status,
+      "completed",
+      JSON.stringify(importPayload.importJob.diagnostics)
+    );
+    const releaseId = importPayload.stagedContentRelease?.contentReleaseId;
+    assert.ok(releaseId, `${displayName} should stage a release.`);
+    await sendSmokeJsonAndDrain(
+      `${workspaceApiUrl}/content-releases/${releaseId}/activate`,
+      { body: {} }
+    );
+    await sendSmokeJsonAndDrain(`${workspaceApiUrl}/participant-roster`, {
+      body: {
+        rosterText: [
+          {
+            loginKey,
+            groupKey: "group:official-stars",
+            bookletKey,
+            displayName: `${displayName} Participant`,
+            executionMode: "run-hot-return"
+          }
+        ]
+      }
+    });
+    await page.goto(
+      `${baseUrl}/participant?${new URLSearchParams({
+        tenantKey: releaseTenantKey,
+        workspaceKey: releaseWorkspaceKey,
+        loginKey,
+        bookletKey
+      }).toString()}`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: `API ${starsRelease.playerApiVersion}` })
+      .waitFor({ timeout: 30_000 });
+    const sessionId = await page.locator("#participantRouteSessionId").inputValue();
+    assert.ok(sessionId);
+    const playerFrame = page.frameLocator("#participantVeronaPlayerFrame");
+    const choice = playerFrame.locator('[data-cy="button-2"]');
+    await choice.locator('input[data-selected="false"]').waitFor({ state: "attached", timeout: 30_000 });
+    await choice.locator("input").press("Space", { timeout: 30_000 });
+    const stateUrl = `${baseUrl}/api/v1/participant/sessions/${sessionId}/current-state`;
+    const saved = (await pollJsonWithPredicate(stateUrl, payload => {
+      const response = payload.currentRunState?.testRun?.unitResponses?.[unitKey];
+      const unitState = parseVeronaUnitResponse(response)?.unitState;
+      const responses = unitState?.dataParts?.responses;
+      return unitState?.unitStateDataType === starsRelease.unitStateType &&
+        typeof responses === "string" &&
+        JSON.parse(responses).some(value =>
+          value.id === "BUTTONS" && value.status === "VALUE_CHANGED" && String(value.value) === "3"
+        );
+    }, 30_000)).currentRunState.testRun;
+
+    await participantHttpActor.goto(page,
+      `${baseUrl}/participant?participantSessionId=${encodeURIComponent(sessionId)}`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await page.locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: `API ${starsRelease.playerApiVersion}` })
+      .waitFor({ timeout: 30_000 });
+    await choice.locator('input[data-selected="true"]').waitFor({ state: "attached", timeout: 30_000 });
+    assert.equal(await choice.locator("input").isChecked(), true);
+    const restored = (await pollJsonWithPredicate(stateUrl, payload =>
+      Boolean(payload.currentRunState?.testRun?.unitResponses?.[unitKey])
+    )).currentRunState.testRun;
+    assert.equal(restored.testRunId, saved.testRunId);
+    const savedState = parseVeronaUnitResponse(saved.unitResponses[unitKey]).unitState;
+    const restoredState = parseVeronaUnitResponse(restored.unitResponses[unitKey]).unitState;
+    assert.equal(restoredState.unitStateDataType, savedState.unitStateDataType);
+    assert.equal(typeof restoredState.dataParts.responses, "string");
+    // Audio may continue reporting its own progress after the answer is saved.
+    const answer = state => JSON.parse(state.dataParts.responses).find(value => value.id === "BUTTONS");
+    assert.deepEqual(answer(restoredState), answer(savedState));
+    logStep(`${step}-restored`);
+    stopAfter(step);
+  }
 
   logStep("participant-official-speedtest-player-family");
   const speedtestPlayerPackage =
