@@ -1232,7 +1232,8 @@ export type OriginalTestResultState = {
   nativeTimerControl?: {
     commandId: string;
     paused: boolean;
-    reopen?: { unitAlias: string; minutes: number };
+    reopen?: { unitAlias: string; minutes: number; timerKey?: string } |
+      { unitAlias: string; minutes: null; timerKey: string };
   };
 };
 

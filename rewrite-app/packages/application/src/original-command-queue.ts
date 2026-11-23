@@ -1,4 +1,4 @@
-import type {ParticipantSession,TestRun,OriginalLoginBinding,Tenant,Workspace} from '@testcenter-rewrite-app/domain';
+import type {ParticipantSession,TestRun,OriginalLoginBinding,OriginalTestResultState,Tenant,Workspace} from '@testcenter-rewrite-app/domain';
 import type {OriginalOperationalLogin} from './original-operational-login.js';
 import type {OriginalTestNumberRecord} from './original-test-number.js';
 import type {OriginalCommandPacket} from './original-command-codec.js';
@@ -14,7 +14,8 @@ import type {OriginalNativeStateWriteBase} from '@testcenter-rewrite-app/domain'
 
 export type OriginalCommandActor=Pick<ParticipantSession,'tenantId'|'workspaceId'|'participantSessionId'|'groupKey'> & {originalLoginKey:string};
 export type OriginalCommandDelivery=OriginalTestNumberRecord & OriginalCommandPacket & {commanderParticipantSessionId:string|null;executed:boolean};
-export type OriginalTimerTransition={timestamp:string;gotoBlock?:string|null};
+export type OriginalTimerDestination={timerKey:string|null;inheritsTimer:boolean};
+export type OriginalTimerTransition={timestamp:string;destination?:OriginalTimerDestination};
 export type OriginalCommandRepository={
   reserveOriginalCommandNumber():Promise<string>;
   findOriginalCommandTarget(actor:OriginalCommandActor,testNumber:string):Promise<OriginalTestNumberRecord|null>;
@@ -88,22 +89,35 @@ export function listOriginalCommandsCollection(state:OriginalCommandCollections,
 }
 export function prepareOriginalNativeTimerControl(
   before:TestRun['originalResultState'], command:Pick<OriginalCommandPacket,'id'|'keyword'|'arguments'>,
-  {timestamp,gotoBlock}:OriginalTimerTransition
+  {timestamp,destination}:OriginalTimerTransition
 ):TestRun['originalResultState']{
   const keyword=command.keyword.toLowerCase();
   if(!before||!['pause','resume','goto','terminate'].includes(keyword)||
     (before.nativeTimerControl&&BigInt(before.nativeTimerControl.commandId)>=BigInt(command.id)))return undefined;
   const now=Date.parse(timestamp),paused=keyword==='pause';
-  const reopen=keyword==='goto'&&command.arguments[0]==='id'&&command.arguments[1]&&
-    /^\| closed timeblock reopened - new remaining time (\d+)$/.exec(command.arguments[2]??'');
-  const minutes=reopen?Number(reopen[1]):0;
-  if(!before.nativeTestletTimers&&!before.nativeTimerControl&&!(minutes>0&&Number.isSafeInteger(minutes)))return undefined;
-  const control={commandId:command.id,paused,
-    ...(minutes>0&&Number.isSafeInteger(minutes)?{reopen:{unitAlias:command.arguments[1]!,minutes}}:{})};
+  const [address,unitAlias,description]=command.arguments;
+  const reopenMessage=/^\| closed timeblock reopened - new remaining time (\d+)(?:\.\d+)?$/.exec(description??'');
+  const minutes=reopenMessage?Number(reopenMessage[1]):0;
+  const timerKey=destination?.timerKey;
+  const targetClock=timerKey?before.nativeTestletTimers?.[timerKey]:undefined;
+  const hasRemainingTime=targetClock?.status==='running'&&Date.parse(targetClock.expiresAt??'')>now||
+    targetClock?.status==='paused'&&targetClock.remainingSeconds>0;
+  let reopen:NonNullable<OriginalTestResultState['nativeTimerControl']>['reopen'];
+  if(keyword==='goto'&&address==='id'&&unitAlias&&timerKey&&!hasRemainingTime){
+    if(destination.inheritsTimer&&(description===''||reopenMessage)){
+      // Source restores minutes on the immediate parent. An inherited timer
+      // instead starts with its own authored duration once its balance is zero.
+      reopen={unitAlias,timerKey,minutes:null};
+    }else if(minutes>0&&Number.isSafeInteger(minutes)){
+      reopen={unitAlias,timerKey,minutes};
+    }
+  }
+  if(!before.nativeTestletTimers&&!before.nativeTimerControl&&!reopen)return undefined;
+  const control={commandId:command.id,paused,...(reopen?{reopen}:{})};
   const timers=before.nativeTestletTimers;
-  if(!timers||(keyword!=='pause'&&keyword!=='terminate'&&(keyword!=='goto'||gotoBlock===undefined)))return {...before,nativeTimerControl:control};
+  if(!timers||(keyword!=='pause'&&keyword!=='terminate'&&(keyword!=='goto'||!destination)))return {...before,nativeTimerControl:control};
   const stopped=Object.fromEntries(Object.entries(timers).map(([id,timer])=>{
-    if(keyword==='goto'&&id===gotoBlock)return [id,timer];
+    if(keyword==='goto'&&id===destination?.timerKey)return [id,timer];
     if(timer.status!=='running'&&(timer.status!=='paused'||paused))return [id,timer];
     const remaining=timer.expiresAt?Math.max(0,(Date.parse(timer.expiresAt)-now)/1000):timer.remainingSeconds;
     if(remaining<=0)return [id,{...timer,status:'expired' as const,remainingSeconds:0,updatedAt:timestamp,endedAt:timer.expiresAt??timestamp}];

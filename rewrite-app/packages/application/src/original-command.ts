@@ -1,7 +1,7 @@
 import {originalTestLogIdPrefix} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
-import type {OriginalCommandActor,OriginalTimerTransition} from './original-command-queue.js';
+import type {OriginalCommandActor,OriginalTimerDestination,OriginalTimerTransition} from './original-command-queue.js';
 import type {ParticipantSession,TestRun} from '@testcenter-rewrite-app/domain';
 import {parseOriginalCommandFields,prepareOriginalCommandInsert,readOriginalLastCommandId,formatOriginalCommandsJson,originalCommandInteger} from './original-command-codec.js';
 import {resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
@@ -18,7 +18,7 @@ export type OriginalCommandPort={
  acknowledge(input:{token:string;testNumber:string;commandNumber:string;nativeStateProtocol?:unknown}):Promise<AcknowledgementReason|{reason:AcknowledgementReason;nativeStateBase:OriginalNativeStateWriteBase}>;
 };
 export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort;repository:FirstSliceRepository;now:()=>string;id:()=>string;
- resolveTimerDestination?:(person:ParticipantSession,run:TestRun,unitAlias:string)=>Promise<string|null|undefined>
+ resolveTimerDestination?:(person:ParticipantSession,run:TestRun,unitAlias:string)=>Promise<OriginalTimerDestination|undefined>
 }):OriginalCommandPort{
  const monitor=async(token:string):Promise<OriginalCommandActor>=>{const state=await input.auth.read({token});if(state.kind!=='person'||state.participantSession.originalOperationalMode!=='monitor-group'||state.participantSession.originalLoginKey===undefined)throw new FirstSliceError(403,'original_monitor_forbidden','A current native group monitor is required.');const person=state.participantSession;return{tenantId:person.tenantId,workspaceId:person.workspaceId,participantSessionId:person.participantSessionId,originalLoginKey:person.originalLoginKey!,groupKey:person.groupKey};};
  return{
@@ -71,14 +71,15 @@ export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort
    let transition:OriginalTimerTransition|undefined;
    if(native){
     const run=await input.repository.getTestRunById(scope.testRunId);
-    let gotoBlock:string|null|undefined;
-    if(run?.originalResultState?.nativeTestletTimers&&input.resolveTimerDestination){
+    let destination:OriginalTimerDestination|undefined;
+    const timerKnown=run?.originalResultState?.nativeTestletTimers||run?.originalTestState?.TESTLETS_TIMELEFT;
+    if(run&&timerKnown&&input.resolveTimerDestination){
      const command=(await input.repository.listOriginalCommands(scope,null)).find(row=>row.id===number);
      if(command?.keyword.toLowerCase()==='goto'&&command.arguments[0]==='id'&&command.arguments[1]){
-      gotoBlock=await input.resolveTimerDestination(person,run,command.arguments[1]);
+      destination=await input.resolveTimerDestination(person,run,command.arguments[1]);
      }
     }
-    transition={timestamp:input.now(),...(gotoBlock===undefined?{}:{gotoBlock})};
+    transition={timestamp:input.now(),destination};
    }
    const result=await input.repository.acknowledgeOriginalCommand(scope,number,native,transition);
    const outcome=typeof result==='object'&&result?result.outcome:result;

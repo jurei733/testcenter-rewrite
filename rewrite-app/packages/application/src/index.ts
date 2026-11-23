@@ -32915,7 +32915,10 @@ export const createFirstSliceServices = (
         try{({booklet}=await currentOriginalBooklet(person,parseOriginalTestName(name).fileId));}
         catch(error){if(error instanceof FirstSliceError&&error.statusCode===404)return undefined;throw error;}
         const unit=booklet.unitEntries.find(entry=>sameOriginalTestName(entry.unitKey,alias));
-        return unit?resolveTimedTestletForUnit(booklet,unit.unitKey)?.testletKey??null:undefined;
+        if(!unit)return undefined;
+        const timerKey=resolveTimedTestletForUnit(booklet,unit.unitKey)?.testletKey??null;
+        const immediateParent=unit.testletPath?.at(-1)??originalBookletRootTestletKey;
+        return {timerKey,inheritsTimer:timerKey!==null&&timerKey!==immediateParent};
       }
     }),
     originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository,now,id:idGenerator,

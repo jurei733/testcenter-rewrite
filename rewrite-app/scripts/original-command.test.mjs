@@ -237,6 +237,61 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    assert.equal(cancelled.status,'cancelled');
    assert.equal(cancelled.remainingMilliseconds,0);
   });
+  await t.test('a monitor can reopen an inherited deadline only at the commanded destination',async()=>{
+   const unit=alias=>`<Unit id="ORACLE.POW.UNIT" alias="${alias}" label="${alias}"/>`;
+   await upload('nested-timer.xml',xml('Booklet',
+    '<Metadata><Id>ORACLE.POW.NESTED</Id><Label>Nested timing</Label></Metadata><Units>'+
+    '<Testlet id="outer" label="Outer"><Restrictions><TimeMax minutes="2" leave="forbidden"/></Restrictions>'+
+    '<Testlet id="inner-a" label="A"><Restrictions><TimeMax minutes="0.5"/></Restrictions>'+unit('A')+'</Testlet>'+
+    '<Testlet id="inner-b" label="B">'+unit('B')+'</Testlet></Testlet>'+unit('OUTSIDE')+'</Units>'));
+   const {person}=await authenticate('owned-command-canonical');
+   const testNumber=await services.originalTest.create({token:person.token,bookletName:'ORACLE.POW.NESTED'});
+   const read={token:person.token,testNumber,nativeStateProtocol:'1'},scope=await current(testNumber,person);
+   let now=Date.now();
+   const clockService=()=>createFirstSliceServices({
+    repository,now:()=>new Date(now).toISOString(),originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'
+   });
+   let timed=clockService();
+   const enter=(unitAlias,action='enter')=>timed.originalTest.enterTimer({...read,body:{unitAlias,action}});
+   const goto=async(alias,description)=>{
+    await send({keyword:'goto',arguments:['id',alias,description],timestamp:Math.floor(now/1000),testIds:[Number(testNumber)]});
+    const [pending]=await repository.listOriginalCommands(scope,null);
+    assert.equal(pending.keyword,'goto');
+    const result=await timed.originalCommand.acknowledge({...read,commandNumber:pending.id});
+    assert.equal(result.reason,'OK');
+    return pending.id;
+   };
+   await timed.originalTest.read(read);
+   const first=await enter('A');
+   assert.equal(first.testletKey,'outer');
+   assert.equal(first.remainingMilliseconds,120000);
+   now=Date.parse(first.startedAt)+5000;
+   await goto('B','| closed timeblock reopened - new remaining time 1');
+   assert.equal((await enter('B')).expiresAt,first.expiresAt,'A running inherited clock keeps its deadline');
+   now=Date.parse(first.expiresAt)+1;
+   assert.equal((await enter('B')).status,'expired','A jump issued while the clock was running cannot reopen it later');
+
+   const reopenId=await goto('B','');
+   assert.equal((await enter('A')).status,'expired','Only the selected alias can consume the monitor command');
+   await close();await open();timed=clockService();
+   const reopened=await enter('B');
+   assert.equal(reopened.remainingMilliseconds,120000);
+   assert.notEqual(reopened.startedAt,first.startedAt);
+   assert.equal((await enter('A')).expiresAt,reopened.expiresAt);
+   now=Date.parse(reopened.expiresAt)+1;
+   assert.equal((await enter('B','expire')).status,'expired');
+   const duplicate=await timed.originalCommand.acknowledge({...read,commandNumber:reopenId});
+   assert.equal(duplicate.reason,'OK, was already marked as executed');
+   assert.equal((await enter('B')).status,'expired','A consumed monitor command cannot start another clock');
+   const secondId=await goto('A','| closed timeblock reopened - new remaining time 1.5');
+   assert.notEqual(secondId,reopenId);
+   const restarted=await enter('A');
+   assert.equal(restarted.testletKey,'outer');
+   assert.equal(restarted.remainingMilliseconds,120000);
+   now+=5000;
+   await goto('OUTSIDE','');
+   assert.equal((await enter('B')).status,'cancelled');
+  });
   await t.test('deleting only the commander retains recipient commands and clears its private creator reference',async()=>{
    const group='ORACLE.RETIRED.COMMANDER',now=new Date().toISOString();await repository.getOrCreateOriginalParticipantGroup({...ids,groupKey:group,groupLabel:'Retired commander',createdAt:now});
    await repository.bindOriginalLoginGroup({...ids,loginKey:monitorName,groupKey:group,groupSnapshotKey:group,authenticatedAt:now});

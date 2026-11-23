@@ -142,8 +142,13 @@ export function createOriginalTestPort(input: {
         if(mode.forceTimeRestrictions&&(action==='interrupt'||action==='reenter'||action==='cancel'&&block.leave==='forbidden')){
           throw new FirstSliceError(409,'native_timer_exit_forbidden','The authored timer cannot be interrupted by the participant.');
         }
-        const reopen=action==='enter'&&current?.status!=='running'&&control?.reopen&&current?.reopenCommandId!==control.commandId&&
-          originalParticipantGroupKeysEqual(control.reopen.unitAlias,unitAlias)?control.reopen:undefined;
+        const closed=!current||current.status==='cancelled'||current.status==='expired'||
+          current.status==='running'&&current.expiresAt!==null&&Date.parse(current.expiresAt)<=now;
+        const grant=control?.reopen;
+        const reopen=action==='enter'&&closed&&grant&&current?.reopenCommandId!==control?.commandId&&
+          (grant.timerKey===undefined||grant.timerKey===block.key)&&
+          originalParticipantGroupKeysEqual(grant.unitAlias,unitAlias)?grant:undefined;
+        const grantedMilliseconds=reopen?.minutes!=null?Math.min(durationMilliseconds,reopen.minutes*60000):durationMilliseconds;
         let timer:TestletTimerState & {reopenCommandId?:string};
         if(action!=='enter'&&!current){
           throw new FirstSliceError(409,'native_timer_unavailable','The Unit has no active server timer.');
@@ -173,11 +178,11 @@ export function createOriginalTestPort(input: {
             timer={...current,status:'running',durationSeconds:remainingMilliseconds/1000,remainingSeconds:remainingMilliseconds/1000,
               startedAt:timestamp,expiresAt:expires.toISOString(),updatedAt:timestamp,endedAt:null};
           }else if(action==='enter'&&(reopen||current.status==='paused'&&!control?.paused)){
-            if(reopen)remainingMilliseconds=Math.min(durationMilliseconds,reopen.minutes*60000);
+            if(reopen)remainingMilliseconds=grantedMilliseconds;
             timer={...current,status:remainingMilliseconds===0?'expired':'running',remainingSeconds:remainingMilliseconds/1000,
               expiresAt:remainingMilliseconds===0?null:new Date(now+remainingMilliseconds).toISOString(),
               updatedAt:timestamp,endedAt:remainingMilliseconds===0?timestamp:null,
-              ...(reopen?{reopenCommandId:control!.commandId}:{})};
+              ...(reopen?{startedAt:timestamp,reopenCommandId:control!.commandId}:{})};
           }else return null;
         }else{
           remainingMilliseconds=durationMilliseconds;
@@ -189,7 +194,7 @@ export function createOriginalTestPort(input: {
               remainingMilliseconds=Math.min(durationMilliseconds,Math.round(old*60000));
             }
           }
-          if(reopen)remainingMilliseconds=Math.min(durationMilliseconds,reopen.minutes*60000);
+          if(reopen&&remainingMilliseconds===0)remainingMilliseconds=grantedMilliseconds;
           if(!Number.isFinite(new Date(now+remainingMilliseconds).getTime())){
             throw new FirstSliceError(409,'native_timer_unavailable','The authored time limit is outside the supported clock range.');
           }
