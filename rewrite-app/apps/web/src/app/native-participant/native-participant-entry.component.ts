@@ -8,6 +8,7 @@ import {MatToolbar} from '@angular/material/toolbar';
 import {MatInput} from '@angular/material/input';
 import {MatFormField,MatLabel,MatSuffix} from '@angular/material/form-field';
 import {MatButton,MatIconButton} from '@angular/material/button';
+import {MatCard,MatCardActions,MatCardContent,MatCardHeader,MatCardTitle} from '@angular/material/card';
 import {NativeAccountMenuComponent} from '../native-account-menu.component';
 import {MatDialog} from '@angular/material/dialog';
 import {Subscription,fromEvent,take} from 'rxjs';
@@ -33,11 +34,25 @@ import {NativePublicHeaderService} from '../native-public-header.service';
 import type {CodeInputType} from './app.interfaces';
 import {originalParticipantReturnPath} from './original-participant-bookmark';
 @Component({selector:'app-native-participant-entry',standalone:true,
- imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent],
+ imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent,MatCard,MatCardActions,MatCardContent,MatCardHeader,MatCardTitle],
  providers:[NativeLoginFailureService,AssetService,CustomtextService,NativeTestStarterService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
+ styles:`
+  .missing-route { display: flex; justify-content: center; color: var(--mat-sys-on-surface); }
+  .missing-route mat-card { width: 400px; max-width: 100%; margin-top: 80px; }
+  .missing-route mat-card-content { overflow-wrap: anywhere; }
+ `,
  template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(!session.busy()&&!codeRequired){@if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
  @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
- @if(session.restoring()||refreshing()||(directLoginName&&session.busy())){<p role="status">Sitzung wird geprüft …</p>}
+ @if(missingRoute!==null){
+  <main class="missing-route">
+   <mat-card appearance="outlined">
+    <mat-card-header><mat-card-title>Diese Seite wurde nicht gefunden.</mat-card-title></mat-card-header>
+    <mat-card-content>{{missingRoute}}</mat-card-content>
+    <mat-card-actions><button matButton="elevated" type="button" routerLink="/native-start">Zur Startseite</button></mat-card-actions>
+   </mat-card>
+  </main>
+ }
+ @else if(session.restoring()||refreshing()||(directLoginName&&session.busy())){<p role="status">Sitzung wird geprüft …</p>}
  @else if(startingTest()){<p role="status">Test wird geöffnet …</p>}
  @else if(directLoginName){}
  @else if(explicitLogin||!session.access()){
@@ -45,7 +60,7 @@ import {originalParticipantReturnPath} from './original-participant-bookmark';
  <div class="login-section">@if(!passwordStep()){<form (ngSubmit)="submit()"><h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" required minlength="3" autocomplete="username" autocapitalize="off" /></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>@if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}@else{<form (ngSubmit)="submit()"><div class="password-headline"><button matIconButton type="button" (click)="passwordStep.set(false);password=''" aria-label="Zurück"><mat-icon svgIcon="chevron_left" /></button><h2>Kennwort eingeben</h2></div><mat-form-field appearance="outline"><mat-label>Kennwort</mat-label><input matInput name="password" autofocus (keyup)="passwordKeyUp($event)" [(ngModel)]="password" [type]="showPassword?'text':'password'" autocomplete="current-password"/><button mat-icon-button matSuffix type="button" aria-label="Kennwort anzeigen" [attr.aria-pressed]="showPassword" (click)="showPassword=!showPassword"><mat-icon svgIcon="visibility" /></button></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>@if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}<app-native-login-browser-notice /><div class="button-section"><button matButton="tonal" type="button" routerLink="/ops" data-cy="login-admin-form">Adminbereich</button></div></div></div></div></div>
  }@else if(codeRequired){<div class="native-login-outlet"><app-native-code-login [inputType]="codeInputType" [length]="codeLength" [disabled]="session.busy()" [problemText]="problem()" (submitCode)="code($event)" /></div>}
  @else if(refreshFailed()){<button matButton="filled" (click)="refreshStarter()">Übersicht erneut laden</button>}
- @else{<div class="native-login-outlet">@for(scope of ownerKeys;track scope){<app-native-starter />}</div>}@if(!session.access()){<app-original-footer />}`})
+ @else{<div class="native-login-outlet">@for(scope of ownerKeys;track scope){<app-native-starter />}</div>}@if(missingRoute===null&&!session.access()){<app-original-footer />}`})
 export class NativeParticipantEntryComponent {
  readonly publicHeader=inject(NativePublicHeaderService);
  private clearStarterHeader:(()=>void)|undefined;
@@ -55,6 +70,7 @@ export class NativeParticipantEntryComponent {
  private readonly route=inject(ActivatedRoute).snapshot;
  readonly directLoginName=this.route?.data.directLogin===true?this.route.queryParamMap.get('name'):null;
  readonly explicitLogin=this.route?.data.explicitLogin===true;
+ readonly missingRoute=this.route?.data.notFound===true?this.route.queryParamMap.get('path')??'':null;
  private readonly initialNavigation=this.router.getCurrentNavigation()?.previousNavigation===null;
  private singleActor:string|undefined;
  private readonly view=new AbortController();private logoutCleanup:(()=>void)|undefined;
@@ -76,6 +92,7 @@ export class NativeParticipantEntryComponent {
   inject(NativeBackgroundService);
   inject(InterfaceModeService).select('original');
   effect(()=>{
+   if(this.missingRoute!==null)return;
    const access=this.session.access(),restoring=this.session.restoring(),pending=restoring||this.session.busy();
    untracked(()=>{
     this.bindTexts(access?.customTexts??{});
@@ -84,7 +101,7 @@ export class NativeParticipantEntryComponent {
    });
   });
   if(this.directLoginName)void this.openDirectLogin(this.directLoginName);
-  else if(!this.explicitLogin&&this.session.access()&&!this.codeRequired)void this.refreshStarter();
+  else if(this.missingRoute===null&&!this.explicitLogin&&this.session.access()&&!this.codeRequired)void this.refreshStarter();
  }
  private updatePublicHeader(access:OriginalAccessSet|null){
   if(this.view.signal.aborted)return;
@@ -179,7 +196,7 @@ export class NativeParticipantEntryComponent {
    if(!this.view.signal.aborted)this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');
   }
  }
- logoClick(){if(!this.codeRequired||this.view.signal.aborted)return;const pending=this.session.logout(),scope=this.session.accessSignal;void pending.catch(error=>{if(!this.view.signal.aborted&&scope===this.session.accessSignal&&!this.session.access())this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.');});}
+ logoClick(){if(this.missingRoute!==null||!this.codeRequired||this.view.signal.aborted)return;const pending=this.session.logout(),scope=this.session.accessSignal;void pending.catch(error=>{if(!this.view.signal.aborted&&scope===this.session.accessSignal&&!this.session.access())this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.');});}
  logout(){if(this.logoutCleanup||this.view.signal.aborted)return;const claims=this.session.access()?.claims,isOperator=['superAdmin','workspaceAdmin','testGroupMonitor'].some(key=>!!claims&&Object.hasOwn(claims,key));const scope=this.session.accessSignal,ref=this.dialog.open(OriginalParticipantLogoutDialogComponent,{panelClass:'original-participant-logout-dialog',data:{safeMode:!isOperator&&this.settings.effectiveThemeName()==='Primar'},autoFocus:'dialog'}),subscriptions=new Subscription();
   const retire=()=>{subscriptions.unsubscribe();ref.componentRef?.location.nativeElement.remove();ref.close();if(this.logoutCleanup===retire)this.logoutCleanup=undefined;};this.logoutCleanup=retire;subscriptions.add(fromEvent(scope,'abort').subscribe(retire));
   subscriptions.add(ref.afterClosed().pipe(take(1)).subscribe(result=>{retire();if(result&&!this.view.signal.aborted&&scope===this.session.accessSignal&&!scope.aborted){void this.session.logout().catch(error=>{if(!this.view.signal.aborted&&!this.session.access())this.problem.set(String(error));});}}));

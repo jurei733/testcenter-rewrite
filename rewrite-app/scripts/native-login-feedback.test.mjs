@@ -25,7 +25,7 @@ function load(relative){
  });return exports;
 }
 const {NativePublicHeaderService}=load('native-public-header.service.ts');
-const {originalParticipantBookmark,originalParticipantReturnPath}=load('native-participant/original-participant-bookmark.ts');
+const {originalMissingRouteBookmark,originalParticipantBookmark,originalParticipantReturnPath}=load('native-participant/original-participant-bookmark.ts');
 test('Original participant bookmarks distinguish direct logins, explicit returns and reserved routes',()=>{
  assert.equal(originalParticipantBookmark('#/r/login'),'/native-start');
  assert.equal(originalParticipantBookmark('#/r/login/%2Fr%2Fstarter'),'/native-start/login?returnTo=%2Fr%2Fstarter');
@@ -45,17 +45,38 @@ test('Original return destinations stay inside the existing guarded application 
   assert.equal(originalParticipantReturnPath(destination),'/native-start',destination);
  }
 });
+test('Unknown nested Original bookmarks display their full path without turning it into credentials',()=>{
+ const hash='#/archiv/fehlt?seite=1', destination=originalMissingRouteBookmark(hash);
+ assert.equal(originalParticipantBookmark(hash),null);
+ assert.equal(destination,'/native-start/not-found?path=%2Farchiv%2Ffehlt%3Fseite%3D1');
+ assert.equal(originalMissingRouteBookmark('#/r/fehlt'),'/native-start/not-found?path=%2Fr%2Ffehlt');
+ for(const known of ['#/owned-user','#/r/login','#/r/check-starter','#/admin/2/files','#/t/2/u/1','#/gm/group/one','#/check/1/check/w','#/sm/study','#/am/section','#/bad/%FF']){
+  assert.equal(originalMissingRouteBookmark(known),null,known);
+ }
+});
 const entries=[['monitor',load('native-monitor/native-monitor-entry.component.ts').NativeMonitorEntryComponent],['participant',load('native-participant/native-participant-entry.component.ts').NativeParticipantEntryComponent]];
-function fixture(Entry){
+function fixture(Entry,snapshot){
  const scope=new AbortController(),problem$=new rx.BehaviorSubject('');
  const failures=[];
  const session={access:core.signal(null),busy:core.signal(false),restoring:core.signal(false),problem:core.signal(''),accessSignal:scope.signal};
- bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},ChangeDetectorRef:{markForCheck(){}},Router:{events:new rx.Subject(),getCurrentNavigation:()=>null,navigate:async()=>true},ActivatedRoute:{firstChild:null},MatDialog:{},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},CustomtextService:{restoreDefault(){},addCustomTexts(){}},NativeTerminalCompletionService:{},NativeLoginFailureService:{show:async(error,owner)=>failures.push({error,owner})}}));
+ bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},ChangeDetectorRef:{markForCheck(){}},Router:{events:new rx.Subject(),getCurrentNavigation:()=>null,navigate:async()=>true},ActivatedRoute:{firstChild:null,snapshot},MatDialog:{},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},CustomtextService:{restoreDefault(){},addCustomTexts(){}},NativeTerminalCompletionService:{},NativeLoginFailureService:{show:async(error,owner)=>failures.push({error,owner})}}));
  bindings.set('NativePublicHeaderService',new NativePublicHeaderService());
  bindings.set('NativeBackgroundService',{});
  bindings.set('NativeTestStarterService',{});
  const component=new Entry();component.name='owned-login';return {component,session,failures};
 }
+test('Going home from an unknown Original bookmark preserves the awaiting person-code session',()=>{
+ const Entry=entries.find(([kind])=>kind==='participant')[1];
+ const snapshot={data:{notFound:true},queryParamMap:{get:()=>'/archiv/fehlt'}};
+ const {component,session}=fixture(Entry,snapshot);
+ let logoutCalls=0;
+ session.access.set({flags:['codeRequired']});
+ session.logout=async()=>{logoutCalls++;};
+ component.logoClick();
+ assert.equal(component.missingRoute,'/archiv/fehlt');
+ assert.equal(logoutCalls,0);
+ component.ngOnDestroy();
+});
 for(const [entry,Entry]of entries){
  for(const [status,message]of [[400,'Anmeldedaten sind nicht gültig. Bitte noch einmal versuchen!'],[401,'Anmeldung abgelehnt. Anmeldedaten sind noch nicht freigeben.'],[204,'Anmeldedaten sind gültig, aber es sind keine Arbeitsbereiche oder Tests freigegeben.'],[410,'Anmeldedaten sind abgelaufen'],[429,'Zu viele Fehlversuche! Probieren Sie es zu einem späteren Zeitpunkt noch einmal.']])test(entry+': final credential rejection '+status+' resets both fields and reports only the Original inline message',async()=>{
   const {component:c,session:s}=fixture(Entry);c.passwordStep.set(true);c.password='owned bad password';let credentials;

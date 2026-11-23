@@ -4,6 +4,7 @@ const reservedEntryNames = new Set([
   'native-start', 'native-test', 'group-monitor', 'system-check', 'attachment-capture',
   'ops', 'legal-notice', 'privacy', 'accessibility'
 ]);
+const originalRootRoutes = new Set(['login', 'admin-login', 'check-starter', 'route-dispatcher', 'code-input', 'starter']);
 const invalidSegment = (value: string) =>
   value === '.' || value === '..' || /[\/\\?#();\x00-\x1f\x7f]/.test(value);
 
@@ -20,6 +21,19 @@ export function originalParticipantBookmark(hash: string): string | null {
     const name = decodeURIComponent(direct[1]);
     if (reservedEntryNames.has(name) || invalidSegment(name)) return null;
     return '/native-start/direct?' + new URLSearchParams({name});
+  } catch {
+    return null;
+  }
+}
+
+export function originalMissingRouteBookmark(hash: string): string | null {
+  const nested = /^#\/([^/?#]+)\/([^/?#]+)/.exec(hash);
+  if (!nested) return null;
+  try {
+    const first = decodeURIComponent(nested[1]!);
+    const second = decodeURIComponent(nested[2]!);
+    if (reservedEntryNames.has(first) && (first !== 'r' || originalRootRoutes.has(second))) return null;
+    return '/native-start/not-found?' + new URLSearchParams({path: hash.slice(1)});
   } catch {
     return null;
   }

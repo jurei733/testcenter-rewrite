@@ -135,6 +135,7 @@ export const appRoutes: Routes = [
   {path:'check/:workspaceId/:checkName',pathMatch:'full',redirectTo:'check/:workspaceId/:checkName/w'},
   {path:'native-start/direct',loadComponent:participantEntry,data:{directLogin:true}},
   {path:'native-start/login',loadComponent:participantEntry,data:{explicitLogin:true}},
+  {path:'native-start/not-found',loadComponent:participantEntry,data:{notFound:true}},
   {path:'native-start',loadComponent:participantEntry},
   {path:'native-test',loadChildren:()=>import('./native-participant/native-routes').then(module=>module.nativeParticipantRoutes)},
   {path:'group-monitor',loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),children:[
