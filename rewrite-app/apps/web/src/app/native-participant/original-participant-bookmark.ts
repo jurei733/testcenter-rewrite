@@ -17,6 +17,17 @@ const originalRootDestinations = new Map([
 ]);
 const invalidSegment = (value: string) =>
   value === '.' || value === '..' || /[\/\\?#();\x00-\x1f\x7f]/.test(value);
+export const legacyBookmarkQueryKey = 'legacyBookmark';
+
+function protectedDestination(path: string): string | null {
+  if (/^\/t\/[1-9]\d*(?:\/(?:status|u\/[1-9]\d*))?$/.test(path)) {
+    return path.replace(/^\/t\//, '/native-test/');
+  }
+  if (/^\/gm\/[^/]+(?:\/[^/]+)?$/.test(path)) {
+    return path.replace(/^\/gm\//, '/group-monitor/');
+  }
+  return null;
+}
 
 export function originalParticipantBookmark(hash: string): string | null {
   const path = hash.split('?', 1)[0];
@@ -28,6 +39,8 @@ export function originalParticipantBookmark(hash: string): string | null {
       if (segments.every(segment => !invalidSegment(segment))) {
         const destination = originalRootDestinations.get(segments.join('/'));
         if (destination) return destination;
+        const protectedPath = protectedDestination('/' + segments.map(encodeURIComponent).join('/'));
+        if (protectedPath) return protectedPath + '?' + new URLSearchParams({[legacyBookmarkQueryKey]: '1'});
       }
     }
     if (login) {
@@ -67,14 +80,11 @@ export function originalParticipantReturnPath(target: string): string {
   }
   const root = originalRootDestinations.get(path.slice(1).replace(/([^/])\/$/, '$1'));
   if (root && root !== '/r/check-starter') return root;
-  let destination = path;
-  if (/^\/t\/[1-9]\d*(?:\/(?:status|u\/[1-9]\d*))?$/.test(path)) {
-    destination = path.replace(/^\/t\//, '/native-test/');
-  } else if (/^\/gm\/[^/]+(?:\/[^/]+)?$/.test(path)) {
-    destination = path.replace(/^\/gm\//, '/group-monitor/');
-  } else if (!/^\/(?:legal-notice|privacy|accessibility|r\/check-starter|check\/[^/]+\/[^/]+(?:\/[wnuqr])?)$/.test(path)) {
+  const protectedPath = protectedDestination(path);
+  if (!protectedPath && !/^\/(?:legal-notice|privacy|accessibility|r\/check-starter|check\/[^/]+\/[^/]+(?:\/[wnuqr])?)$/.test(path)) {
     return '/native-start';
   }
+  const destination = protectedPath ?? path;
   return queryParts.length ? destination + '?' + queryParts.join('?') : destination;
 }
 

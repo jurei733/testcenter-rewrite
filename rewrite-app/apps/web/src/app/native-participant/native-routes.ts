@@ -1,8 +1,9 @@
 import {inject} from '@angular/core';
 import {Router,type Routes,type CanActivateFn,type CanDeactivateFn} from '@angular/router';
-import {toObservable} from '@angular/core/rxjs-interop';
-import {filter,take,timeout,map,firstValueFrom,isObservable} from 'rxjs';
+import {firstValueFrom,isObservable} from 'rxjs';
+import {afterNativeSessionRestore} from '../native-monitor/native-session-route.guard';
 import {NativeMonitorSessionService} from '../native-monitor/native-session.service';
+import {legacyBookmarkQueryKey} from './original-participant-bookmark';
 import {NativeRunRuntime,validNativeTestId} from './native-run-runtime.service';
 import type {NativeRunContext} from './native-run-context';
 import {NativeRunHostComponent} from './native-run-host.component';
@@ -23,8 +24,11 @@ function ownedGuard(ctx:NativeRunContext,run:()=>unknown,retiredResult:boolean):
 }
 const access:CanActivateFn=route=>{
  const session=inject(NativeMonitorSessionService),router=inject(Router);
- const decide=()=>validNativeTestId(route.paramMap.get('t')??'')&&!!session.access()?.claims.test?.length&&!session.access()?.flags.includes('codeRequired')?true:router.parseUrl('/native-start');
- return session.restoring()?toObservable(session.restoring).pipe(filter(value=>!value),take(1),timeout(20000),map(decide)):decide();
+ return afterNativeSessionRestore(session,()=>{
+  const current=session.access();
+  if(validNativeTestId(route.paramMap.get('t')??'')&&current?.claims.test?.length&&!current.flags.includes('codeRequired'))return true;
+  return router.parseUrl(route.queryParamMap.get(legacyBookmarkQueryKey)==='1'?'/native-start/dispatch':'/native-start');
+ });
 };
 const unitAccess:CanActivateFn=(route,state)=>{
  const ctx=inject(NativeRunRuntime).active(),router=inject(Router),id=route.parent?.paramMap.get('t')??'';
