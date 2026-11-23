@@ -616,6 +616,32 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       await reopen();
       assert.deepEqual(await clockService().enterTimer(input),expired);
       assert.equal((await clockService().read(read)).laststate.TESTLETS_TIMELEFT,'{"timed":1000}');
+      await assert.rejects(clockService().enterTimer({...input,body:{...input.body,action:'reenter',previousStartedAt:expired.startedAt}}),denied(409));
+    });
+    await t.test('an advisory Unit re-entry can renew an expired occurrence just once',async()=>{
+      const {person}=await auth('owned-review');
+      const testNumber=await services.originalTest.create({token:person.token,bookletName:'OWNED.ASSIGNED#advisory:timer'});
+      let clock=Date.now();
+      const timed=createFirstSliceServices({repository,now:()=>new Date(clock).toISOString(),
+        originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'}).originalTest;
+      const read={token:person.token,testNumber};
+      const unitAlias='OWNED.NATIVE.UNIT';
+      const observe=()=>timed.enterTimer({...read,body:{unitAlias}});
+      await timed.read(read);
+      const first=await observe();
+      clock=Date.parse(first.expiresAt)+1;
+      const expired=await observe();
+      assert.equal(expired.status,'expired');
+      assert.deepEqual(await observe(),expired);
+      const reenter=()=>timed.enterTimer({...read,body:{unitAlias,action:'reenter',previousStartedAt:expired.startedAt}});
+      const next=await reenter();
+      assert.equal(next.status,'running');
+      assert.equal(next.remainingMilliseconds,60000);
+      assert.notEqual(next.startedAt,expired.startedAt);
+      assert.equal((await reenter()).expiresAt,next.expiresAt);
+      clock=Date.parse(next.expiresAt)+1;
+      const nextExpired=await observe();
+      assert.deepEqual(await reenter(),nextExpired);
     });
     await t.test('concurrent same-name requests reserve one Test and one stable number',async()=>{
       const simultaneous=await auth('owned-atomic');const values=await Promise.all(Array.from({length:12},(_,index)=>request(simultaneous,index%2?native.bookletName:native.bookletName.toLowerCase())));

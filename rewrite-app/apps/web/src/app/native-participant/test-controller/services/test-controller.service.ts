@@ -545,9 +545,15 @@ export class TestControllerService {
     this.updateSingleLock(testlet, 'time', false);
   }
 
-  async startTimer(testlet: Testlet, unit: Unit): Promise<boolean> {
-    const clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter'),{defaultValue:null});
-    if(!this.nativeCurrent||this.currentUnit!==unit||!clock)return false;
+  async startTimer(testlet: Testlet, unit: Unit, changedUnit: boolean, ownsEntry: () => boolean): Promise<boolean> {
+    const current=()=>this.nativeCurrent&&this.currentUnit===unit&&ownsEntry();
+    let clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter'),{defaultValue:null});
+    if(!current()||!clock)return false;
+    if(clock.testletKey===testlet.id&&changedUnit&&!this.testMode.forceTimeRestrictions&&
+      (clock.status==='expired'||clock.status==='cancelled')){
+      clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'reenter',clock.startedAt),{defaultValue:null});
+      if(!current()||!clock)return false;
+    }
     if(clock.testletKey!==testlet.id||!Number.isSafeInteger(clock.remainingMilliseconds)||clock.remainingMilliseconds<0){
       throw new Error('Ungültige serverseitige Testzeit.');
     }
@@ -561,7 +567,8 @@ export class TestControllerService {
       this.timers$.next(new TimerData(0,testlet.id,MaxTimerEvent.ENDED));
       return false;
     }
-    const deadline=performance.now()+clock.remainingMilliseconds;
+    const timeBudget=clock.remainingMilliseconds;
+    const deadline=performance.now()+timeBudget;
     const remainingSeconds=()=>Math.max(0,Math.ceil((deadline-performance.now())/1000));
     this.currentTimerId = testlet.id;
     this.timerUnitAlias=unit.alias;
@@ -570,7 +577,7 @@ export class TestControllerService {
     const timeTicker$ = createTicker();
     this.timerIntervalSubscription = this.owned(() => timeTicker$
       .pipe(
-        takeUntil(timer(clock.remainingMilliseconds)),
+        takeUntil(timer(timeBudget)),
         map(remainingSeconds)
       ).subscribe({
         next: val => {

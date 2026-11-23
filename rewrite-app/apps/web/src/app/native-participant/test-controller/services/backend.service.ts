@@ -14,6 +14,7 @@ export interface NativeTimerClock {
   testletKey: string;
   status: 'running'|'paused'|'expired'|'cancelled';
   remainingMilliseconds: number;
+  startedAt: string;
 }
 
 @Injectable({
@@ -73,8 +74,9 @@ export class BackendService {
     return this.http.get<TestData>(`${this.backendUrl}test/${testId}`,{nativeStateProtocol:true});
   }
 
-  timer(testId: string, unitAlias: string, action: 'enter'|'cancel'|'interrupt'|'expire'): Observable<NativeTimerClock> {
-    return this.http.patch<NativeTimerClock>(`${this.backendUrl}test/${testId}/timer`, {unitAlias, action});
+  timer(testId: string, unitAlias: string, action: 'enter'|'cancel'|'interrupt'|'expire'|'reenter',
+    previousStartedAt?: string): Observable<NativeTimerClock> {
+    return this.http.patch<NativeTimerClock>(`${this.backendUrl}test/${testId}/timer`, {unitAlias, action, previousStartedAt});
   }
 
   prepareUnitJournal(saving:boolean):Promise<void>{return this.http.prepareUnitJournal(saving);}

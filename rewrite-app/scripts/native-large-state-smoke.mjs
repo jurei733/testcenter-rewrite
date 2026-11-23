@@ -24,11 +24,15 @@ export async function runNativeLargeStateSmoke({browser,base,out,password,mark,c
   await wait(()=>responseReceipts.some(row=>row.phase==='native-six-MiB-state'&&row.path===responsePath&&row.status===201),'six-MiB answer exceeds the former aggregate limit');
   await page.reload();await wait(async()=>await answer().isEnabled(),'six-MiB Player restore');assert.equal(hash(await answer().inputValue()),hash(larger));mark('native-six-MiB-Verona-answer-saves-and-reloads-without-the-former-five-MiB-aggregate-limit');
   await page.evaluate(()=>{window.__largePlayer=document.querySelector('iframe');});
-  const secured=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('testcenter-native-unit-journal:v1:')).map(key=>[key,localStorage.getItem(key)]));
+  const durableResponses=()=>page.evaluate(()=>Object.keys(localStorage)
+    .filter(key=>key.startsWith('testcenter-native-unit-journal:v1:'))
+    .flatMap(key=>JSON.parse(localStorage.getItem(key)).entries)
+    .filter(entry=>entry.kind==='response'&&entry.phase==='ready'));
   await configure('native-large-state-offline',0,'stars-offline',undefined,{testIds:[testId]});
   const older='P'.repeat(3*1024*1024);await type(older);
   await wait(()=>responseReceipts.some(row=>row.phase==='native-large-state-offline'&&row.path===responsePath&&row.status===503),'three-MiB prior packet reaches Source buffer flush');
   const oldId=responseReceipts.find(row=>row.phase==='native-large-state-offline'&&row.path===responsePath&&row.status===503).deliveryId;
+  const secured=await durableResponses();
   await type(large);await page.getByRole('button',{name:'Erneut speichern',exact:true}).waitFor();
   await wait(()=>new Set(responseReceipts.filter(row=>row.phase==='native-large-state-offline'&&row.path===responsePath&&row.status===503).map(row=>row.deliveryId)).size===2,'large current packet coexists with the pending older packet');
   const packets=()=>responseReceipts.filter(row=>row.phase==='native-large-state-offline'&&row.path===responsePath&&row.status===503);
@@ -37,14 +41,22 @@ export async function runNativeLargeStateSmoke({browser,base,out,password,mark,c
   assert.match(await page.locator('[data-cy="toast-container"]').innerText(),/nicht lokal gesichert/);
   assert.equal(await page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}),true);
   for(const id of new Set(packets().map(row=>row.deliveryId)))assert.equal(new Set(packets().filter(row=>row.deliveryId===id).map(row=>row.bodySha256)).size,1);
-  for(const[key,text]of secured)assert.equal(await page.evaluate(key=>localStorage.getItem(key),key),text);
+  const pending=await durableResponses();
+  for(const entry of secured)assert.deepEqual(pending.find(row=>row.id===entry.id),entry);
+  const token=await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session'));
+  const readSaved=async()=>{
+   const reply=await context.request.get(base+`/test/${testId}/unit/OWNED.UNIT/alias/OWNED.UNIT`,{headers:{AuthToken:token}});
+   assert.equal(reply.status(),200);
+   return (await reply.json()).dataParts.owned;
+  };
+  assert.equal(hash(await readSaved()),hash(larger),'Rejected saves leave the previous six-MiB answer intact');
   await page.screenshot({path:join(out,'native-large-state-pending.png')});mark('native-two-MiB-current-answer-retains-three-MiB-prior-packet-and-live-Player-through-ten-failures');
   await configure('native-large-state-retry',0);await page.getByRole('button',{name:'Erneut speichern',exact:true}).click();
   await wait(()=>new Set(responseReceipts.filter(row=>row.phase==='native-large-state-retry'&&row.path===responsePath&&row.status===201).map(row=>row.deliveryId)).size===2,'both original packets accepted');
   await page.getByRole('button',{name:'Erneut speichern',exact:true}).waitFor({state:'hidden'});
   const accepted=responseReceipts.filter(row=>row.phase==='native-large-state-retry'&&row.path===responsePath&&row.status===201);assert.equal(accepted.length,2);assert.ok(accepted.some(row=>row.deliveryId===oldId));
   for(const row of accepted)assert.equal(row.bodySha256,packets().find(old=>old.deliveryId===row.deliveryId).bodySha256);
-  const token=await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session')),reply=await context.request.get(base+`/test/${testId}/unit/OWNED.UNIT/alias/OWNED.UNIT`,{headers:{AuthToken:token}});assert.equal(reply.status(),200);assert.equal(hash((await reply.json()).dataParts.owned),hash(large));
+  assert.equal(hash(await readSaved()),hash(large));
   await page.reload();await wait(async()=>await answer().isEnabled(),'second reload restores latest large state');assert.equal(hash(await answer().inputValue()),hash(large));assert.deepEqual(errors,[]);mark('native-large-state-explicit-retry-keeps-frozen-identities-and-restores-latest-two-MiB-answer');
   await writeFile(join(out,'native-large-state-recovered.json'),JSON.stringify({testId,opaqueVeronaFixture:true,geoGebraApplicationExecuted:false,currentBytes:Buffer.byteLength(large),currentSha256:hash(large),sixMiBBytes:Buffer.byteLength(larger),sixMiBSha256:hash(larger),sixMiBReloadExact:true,priorBytes:Buffer.byteLength(older),priorMayBeViewMemory:true,failedAttempts:packets().length,accepted:accepted.map(({deliveryId,bodySha256,bodyBytes})=>({deliveryId,bodySha256,bodyBytes})),playerPreserved:true,unsafeDepartureProtected:true,reloadExact:true,errors},null,2));
  }catch(error){await page.screenshot({path:join(out,'native-large-state-failure.png')}).catch(()=>{});await writeFile(join(out,'native-large-state-failure.json'),JSON.stringify({error:String(error),testId,url:page.url(),errors,body:await page.locator('body').innerText().catch(()=>''),receipts:responseReceipts.filter(row=>row.phase.startsWith('native-large-state')||row.phase==='native-six-MiB-state')},null,2));throw error;}

@@ -49,6 +49,8 @@ export class UnithostComponent implements OnInit, OnDestroy {
   private iFrameItemplayer: HTMLIFrameElement | null = null;
   private subscriptions: { [tag: string ]: Subscription } = {};
   private destroyed=false;
+  private unitEntry=0;
+  private changedUnit=false;
   private playerLease:NativePlayerLease|undefined;
   private initialization:ReturnType<typeof setTimeout>|undefined;
   clearCode: string = '';
@@ -307,6 +309,9 @@ export class UnithostComponent implements OnInit, OnDestroy {
     }
 
     this.pageService.updateValidPages([]);
+    const previous=this.tcs.currentUnit;
+    this.changedUnit=!!previous&&previous.sequenceId!==unitSequenceId;
+    this.unitEntry+=1;
     this.tcs.currentUnitSequenceId = unitSequenceId;
 
     if (!this.tcs.currentUnit) {
@@ -381,16 +386,18 @@ export class UnithostComponent implements OnInit, OnDestroy {
 
     const unit=this.tcs.currentUnit;
     const timerId=unit?.parent.timerId;
+    const entry=this.unitEntry;
+    const ownsEntry=()=>!this.destroyed&&this.unitEntry===entry&&this.mds.http.isCurrent&&this.tcs.currentUnit===unit;
     try{
       if(unit&&timerId&&timerId!==this.tcs.currentTimerId&&
-        !await this.tcs.startTimer(this.tcs.testlets[timerId],unit))return;
+        !await this.tcs.startTimer(this.tcs.testlets[timerId],unit,this.changedUnit,ownsEntry))return;
     }catch(error){
-      if(!this.destroyed&&this.mds.http.isCurrent&&this.tcs.currentUnit===unit){
+      if(ownsEntry()){
         this.mds.appError=new AppError({label:'Die Testzeit konnte nicht geladen werden.',description:String(error),type:'network'});
       }
       return;
     }
-    if(this.destroyed||!this.mds.http.isCurrent||this.tcs.currentUnit!==unit)return;
+    if(!ownsEntry())return;
     this.prepareIframe();
     this.tcs.updateNavigationState();
   }

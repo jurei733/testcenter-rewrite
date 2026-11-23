@@ -110,12 +110,14 @@ export function createOriginalTestPort(input: {
   return {
     async enterTimer({token,testNumber:raw,body}){
       const{person,run,testNumber}=await owned(token,raw);
-      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>key!=='unitAlias'&&key!=='action')||
+      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['unitAlias','action','previousStartedAt'].includes(key))||
         !('unitAlias' in body)||typeof body.unitAlias!=='string'||!body.unitAlias||body.unitAlias.length>255){
         throw new FirstSliceError(400,'native_timer_entry_invalid','A native timer entry requires a Unit alias.');
       }
       const action='action' in body?body.action:'enter';
-      if(action!=='enter'&&action!=='cancel'&&action!=='interrupt'&&action!=='expire'){
+      const previousStartedAt='previousStartedAt' in body?body.previousStartedAt:undefined;
+      if(typeof action!=='string'||!['enter','cancel','interrupt','expire','reenter'].includes(action)||
+        (action==='reenter'?typeof previousStartedAt!=='string'||previousStartedAt.length>32:previousStartedAt!==undefined)){
         throw new FirstSliceError(400,'native_timer_entry_invalid','Invalid native timer action.');
       }
       const unitAlias=body.unitAlias;
@@ -137,7 +139,7 @@ export function createOriginalTestPort(input: {
         const control=testRun.originalResultState?.nativeTimerControl;
         const mode=participantExecutionModeDefinitions[testRun.executionMode??defaultParticipantExecutionMode]
           ??participantExecutionModeDefinitions[defaultParticipantExecutionMode];
-        if(mode.forceTimeRestrictions&&(action==='interrupt'||action==='cancel'&&block.leave==='forbidden')){
+        if(mode.forceTimeRestrictions&&(action==='interrupt'||action==='reenter'||action==='cancel'&&block.leave==='forbidden')){
           throw new FirstSliceError(409,'native_timer_exit_forbidden','The authored timer cannot be interrupted by the participant.');
         }
         const reopen=action==='enter'&&current?.status!=='running'&&control?.reopen&&current?.reopenCommandId!==control.commandId&&
@@ -161,6 +163,15 @@ export function createOriginalTestPort(input: {
             if(action==='cancel')remainingMilliseconds=0;
             timer={...current,status:action==='cancel'?'cancelled':'paused',remainingSeconds:remainingMilliseconds/1000,
               expiresAt:null,updatedAt:timestamp,endedAt:action==='cancel'?timestamp:null};
+          }else if(action==='reenter'&&!control?.paused&&current.startedAt===previousStartedAt&&
+            (current.status==='expired'||current.status==='cancelled')){
+            remainingMilliseconds=durationMilliseconds;
+            const expires=new Date(now+remainingMilliseconds);
+            if(!Number.isFinite(expires.getTime())){
+              throw new FirstSliceError(409,'native_timer_unavailable','The authored time limit is outside the supported clock range.');
+            }
+            timer={...current,status:'running',durationSeconds:remainingMilliseconds/1000,remainingSeconds:remainingMilliseconds/1000,
+              startedAt:timestamp,expiresAt:expires.toISOString(),updatedAt:timestamp,endedAt:null};
           }else if(action==='enter'&&(reopen||current.status==='paused'&&!control?.paused)){
             if(reopen)remainingMilliseconds=Math.min(durationMilliseconds,reopen.minutes*60000);
             timer={...current,status:remainingMilliseconds===0?'expired':'running',remainingSeconds:remainingMilliseconds/1000,
