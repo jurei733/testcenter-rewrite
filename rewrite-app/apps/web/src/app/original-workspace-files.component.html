@@ -95,6 +95,8 @@
                 <mat-header-cell *matHeaderCellDef class="namecell"
                   mat-sort-header>Dateiname</mat-header-cell>
                 <mat-cell *matCellDef="let file" class="namecell">
+                  @let standalone = file.fileType === 'Testtakers' || file.fileType === 'SysCheck';
+                  @let noDependants = standalone || !controller.usedBy(file).length;
                   <div class="file-report">
                     <button mat-button [attr.data-cy]="file.name"
                       (click)="download(file)">{{file.name}}</button>
@@ -102,7 +104,7 @@
                       @if (rowErrors(file).length) {
                         <mat-icon originalWorkspaceFileIcon class="report-error"
                           name="error" />
-                      } @else if (warnings(file).length || neverUsed(file)) {
+                      } @else if (warnings(file).length || noDependants) {
                         <mat-icon originalWorkspaceFileIcon class="report-warning"
                           name="warning" />
                       }
@@ -121,7 +123,7 @@
                           <app-original-workspace-file-notice level="info"
                             [text]="file.metadata.participantCount+' Teilnehmer definiert'" />
                         }
-                        @if (neverUsed(file)) {
+                        @if (noDependants && !standalone) {
                           <app-original-workspace-file-notice level="warning"
                             [text]="file.fileType+' is never used.'" />
                         }

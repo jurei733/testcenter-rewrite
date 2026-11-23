@@ -142,7 +142,6 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  information(file:OriginalWorkspaceFile):string[] {
    return (file.validationDiagnostics??[]).filter(row=>row.severity==='info').map(row=>row.message);
  }
- neverUsed(file:OriginalWorkspaceFile):boolean {return file.fileType!=='Testtakers' && file.fileType!=='SysCheck' && !this.controller.usedBy(file).length;}
  invalid(type?:WorkspaceFileType):number {return this.controller.files.filter(file=>(!type || file.fileType===type) && this.errors(file).length).length;}
  get participants():number {return this.controller.files.reduce((sum,file)=>sum+(file.metadata.participantCount??0),0);}
  sort(value:Sort):void {this.controller.setSort(value.active,value.direction);}

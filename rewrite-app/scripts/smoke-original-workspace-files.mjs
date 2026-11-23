@@ -99,7 +99,16 @@ try {
    await api('/api/v1/participant/sessions/'+sessionId+'/resources/Testtakers/people.xml',undefined,'GET',404,participantToken);
    assert.equal(await page.locator('#originalWorkspaceFiles mat-row').count(),6);
    for(const label of ['Teilnehmerlisten','Testhefte','Systemcheck-Definitionen','Units','Ressourcen'])await page.locator('mat-panel-title').getByText(label,{exact:true}).waitFor();
+   for(const [category,fileName] of [['SysCheck','check.xml'],['Testtakers','people.xml']]){
+    const row=page.locator('mat-row').filter({has:page.locator('[data-cy="'+fileName+'"]')});
+    await row.locator('mat-icon.report-warning').waitFor();
+    assert.equal(await row.getByText(category+' is never used.',{exact:true}).count(),0);
+   }
+   const unusedRow=page.locator('mat-row').filter({has:page.locator('[data-cy="empty.bin"]')});
+   await unusedRow.locator('mat-icon.report-warning').waitFor();
+   assert.equal(await unusedRow.getByText('Resource is never used.',{exact:true}).count(),1);
    const unitRow=page.locator('mat-row').filter({has:page.locator('[data-cy="files-checkbox-NATIVE.UNIT"]')});
+   assert.equal(await unitRow.locator('mat-icon.report-warning').count(),0);
    await unitRow.locator('mat-cell').last().click();
    await page.locator('mat-row.selected-row').filter({has:page.locator('[data-cy="files-checkbox-NATIVE.UNIT"]')}).waitFor();
    assert.ok((await unitRow.getAttribute('class')).includes('selected-row'));
