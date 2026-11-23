@@ -50,18 +50,30 @@ export async function runNativeSystemCheckUploadChecks({browser,out,mark}){
  try{
   server=spawn(process.execPath,[resolve('scripts/native-system-check-server.mjs')],{stdio:['ignore','ignore','inherit','ipc'],env:{...process.env,FIRST_SLICE_STORE:'sqlite',FIRST_SLICE_SQLITE_FILE:join(runtime,'owned.sqlite'),FIRST_SLICE_BOOTSTRAP_DEMO:'true',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',REQUIRE_LOGIN_PASSWORD:'false'}});
   const port=await raceWithSmokeDeadline(new Promise((done,reject)=>{server.once('message',message=>done(message.port));server.once('error',reject);server.once('exit',()=>reject(Error('Owned upload API exited.')));}),20000,()=>{throw Error('Owned upload API startup timed out.');});base='http://127.0.0.1:'+port;
-  token=(await api('/api/v1/admin/auth/sign-in',{username:'demo-admin',password:'demo-admin-password'},'POST',200,'')).sessionToken;
+  const admin=await api('/api/v1/admin/auth/sign-in',{username:'demo-admin',password:'demo-admin-password'},'POST',200,'');
+  token=admin.sessionToken;
   await api('/api/v1/platform/tenants',{tenantKey:'owned-mode',displayName:'Owned mode'},'POST',201);await api('/api/v1/tenants/owned-mode/workspaces',{workspaceKey:'upload',displayName:'Owned mode'},'POST',201);
+  await api('/api/v1/admin/users/'+encodeURIComponent(admin.adminUser.adminUserId)+'/role-assignments',{
+   role:'workspace_admin',tenantKey:'owned-mode',workspaceKey:'upload',accessMode:'read_write'
+  });
   const scope='/api/v1/tenants/owned-mode/workspaces/upload';
   await api(scope+'/files',{fileName:'check.xml',mediaType:'application/xml',sourceDocument:systemCheckXml('SysCheck','<Metadata><Id>R105.CHECK</Id><Label>Owned upload check</Label></Metadata><Config skipnetwork="true" savekey="owned-key"/>')},'POST',201);
   const directory=await api('/sys-checks',undefined,'GET',200,''),number=String(directory.find(row=>row.name==='R105.CHECK').workspaceId);
+  const {originalWorkspaceChoices}=await api('/api/v1/admin/auth/current-session?view=original-workspace-starter');
+  assert.ok(originalWorkspaceChoices.some(choice=>String(choice.workspaceNumber)===number&&choice.mode==='RW'));
   const roster=mode=>systemCheckXml('Testtakers','<Metadata/><Group id="R105.REWRITE" label="Owned"><Login name="r105-owned-login" pw="owned-password" mode="'+mode+'"/></Group>');
   context=await browser.newContext({viewport:{width:1280,height:850}});page=await context.newPage();observe(page);
   await page.goto(base+'/app/r/check-starter?ui=original');await page.getByRole('button',{name:'Owned upload check',exact:true}).waitFor();const documentTime=await page.evaluate(()=>performance.timeOrigin);
   const navigation=await context.newCDPSession(page),initialHistory=await navigation.send('Page.getNavigationHistory'),selectionEntry=initialHistory.entries[initialHistory.currentIndex].id;
   await page.getByRole('button',{name:/zurück zur Startseite/}).click();await page.locator('[data-cy=login-admin-form]').click();await page.locator('#adminUsername').fill('demo-admin');await page.locator('#adminPassword').fill('demo-admin-password');
   const signedIn=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/auth/sign-in'&&response.request().method()==='POST');await page.locator('#adminSignInButton').click();const browserToken=(await(await signedIn).json()).sessionToken,browserDigest=digest('Bearer '+browserToken);
-  await page.locator('#originalSystemAdministration[aria-busy=false]').waitFor();await page.getByRole('link',{name:'Gehe zur Startseite',exact:true}).click();await page.locator('#tenantKey').fill('owned-mode');await page.locator('#tenantKey').dispatchEvent('change');await page.locator('#workspaceKey').fill('upload');await page.locator('#workspaceKey').dispatchEvent('change');await page.locator('[data-view-nav=content]').click();await page.locator('#originalWorkspaceFiles[aria-busy=false]').waitFor();
+  const chooseWorkspaceFiles=async()=>{
+   await page.waitForURL(url=>url.pathname==='/app/operator-start');
+   await page.locator('[data-cy="workspace-card-Owned mode"]').getByRole('button').click();
+   await page.waitForURL(url=>url.pathname==='/app/admin/'+number+'/files');
+   await page.locator('#originalWorkspaceFiles[aria-busy=false]').waitFor();
+  };
+  await chooseWorkspaceFiles();
   assert.equal(await page.evaluate(()=>performance.timeOrigin),documentTime);assert.equal(modes.at(-1),false);
   const contentPath=new URL(page.url()).pathname;
   const upload=async(text,label,expected,status=201)=>{
@@ -74,7 +86,16 @@ export async function runNativeSystemCheckUploadChecks({browser,out,mark}){
    // calls can outrun same-document router events and cross the initial page.
    await navigation.send('Page.navigateToHistoryEntry',{entryId:selectionEntry});await page.waitForURL(url=>url.pathname==='/app/r/check-starter');await page.getByRole('button',{name:'Owned upload check',exact:true}).waitFor();assert.equal(await page.evaluate(()=>performance.timeOrigin),documentTime);
   };
-  const returnToFiles=async()=>{await backToNative();await page.getByRole('button',{name:/zurück zur Startseite/}).click();await page.locator('[data-cy=login-admin-form]').click();await page.locator('#originalSystemAdministration[aria-busy=false]').waitFor();await page.getByRole('link',{name:'Gehe zur Startseite',exact:true}).click();await page.locator('#tenantKey').fill('owned-mode');await page.locator('#tenantKey').dispatchEvent('change');await page.locator('#workspaceKey').fill('upload');await page.locator('#workspaceKey').dispatchEvent('change');await page.locator('[data-view-nav=content]').click();assert.equal(new URL(page.url()).pathname,contentPath);await page.locator('#originalWorkspaceFiles[aria-busy=false]').waitFor();assert.equal(await page.evaluate(()=>performance.timeOrigin),documentTime);};
+  const returnToFiles=async()=>{
+   await backToNative();
+   await page.getByRole('button',{name:/zurück zur Startseite/}).click();
+   await page.locator('[data-cy=login-admin-form]').click();
+   await page.locator('#originalSystemAdministration[aria-busy=false]').waitFor();
+   await page.getByRole('link',{name:'Gehe zur Startseite',exact:true}).click();
+   await chooseWorkspaceFiles();
+   assert.equal(new URL(page.url()).pathname,contentPath);
+   assert.equal(await page.evaluate(()=>performance.timeOrigin),documentTime);
+  };
   const openReport=async()=>{await page.getByRole('button',{name:'Owned upload check',exact:true}).click();await page.locator('#syscheck-next-step:enabled').waitFor();await page.locator('#syscheck-next-step').click();await page.locator('#originalSystemCheckReport').waitFor();};
   await upload(roster('sys-check-login'),'own-upload-private',true);passed('same-document-real-admin-upload-refreshes-private-mode');
   await backToNative();await openReport();const denied=page.waitForResponse(response=>response.request().method()==='PUT'&&new URL(response.url()).pathname==='/workspace/'+number+'/sys-check/R105.CHECK/report');await page.locator('#saveSystemCheckReportButton').click();assert.equal((await denied).status(),400);await page.getByRole('dialog').waitFor();assert.equal(await page.locator('#systemCheckSaveReportKey').count(),0);assert.equal('keyPhrase' in bodies.at(-1),false);assert.equal('title' in bodies.at(-1),false);await capture('retained-canonical-native-private-error');passed('retained-canonical-administrator-is-not-promoted-to-native-person');
