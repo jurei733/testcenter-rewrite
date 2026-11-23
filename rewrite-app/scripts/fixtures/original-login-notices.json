@@ -1,6 +1,14 @@
 {
   "referenceCommit": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
   "scope": "Unmodified Source frontend; notice-local coordinates in three themes and four viewports; owned login fixtures, no Source backend proof",
+  "macArm64HeadlessHttpsAdmin": {
+    "referenceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+    "browserVersions": ["147.0.7727.15", "157.0.8103.80"],
+    "measurements": {
+      "host": { "height": 66 },
+      "icon": { "y": 21 }
+    }
+  },
   "measurements": {
     "Primar-desktop": {
       "capsLock": {

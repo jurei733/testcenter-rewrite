@@ -53,7 +53,7 @@ const browserBase = insecureReference ? base.replace("127.0.0.1", "testcenter-pr
 const states = {}, errors = [], unknown = [];
 let browser;
 try {
-  browser = await chromium.launch({ headless: false,
+  browser = await chromium.launch({ headless: process.env.ORIGINAL_LOGIN_REFERENCE_HEADLESS === "true",
     ...(process.env.UI_SMOKE_BROWSER_CHANNEL ? { channel: process.env.UI_SMOKE_BROWSER_CHANNEL } : {}),
     args: ["--host-resolver-rules=MAP testcenter-proof.insecure 127.0.0.1"] });
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {

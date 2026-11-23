@@ -1,4 +1,5 @@
-import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
+import { loadOriginalVisualReference, assertOriginalVisualBrowser, overlayOriginalVisuals } from "./qualified-original-visuals.mjs";
+import { originalBrowserSource } from "./original-browser-reference.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -72,10 +73,17 @@ try {
   }
   token = (await api("/api/v1/admin/auth/sign-in", credentials)).sessionToken;
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
-  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
+  const headless = process.env.CI === "true" && !headful;
+  browser = await chromium.launch({ headless,
     ...(process.env.UI_SMOKE_BROWSER_CHANNEL ? { channel: process.env.UI_SMOKE_BROWSER_CHANNEL } : {}),
     args: ["--host-resolver-rules=MAP testcenter-proof.insecure 127.0.0.1"] });
   assertOriginalVisualBrowser(browser, noticeReference);
+  // The pinned Original rounds its normal line height differently in the
+  // measured macOS headless renderers. Keep the headed and Linux references.
+  const macHeadless = noticeReference.macArm64HeadlessHttpsAdmin;
+  const useMacHeadless = headless && process.platform === "darwin" && process.arch === "arm64" &&
+    macHeadless.browserVersions.includes(browser.version());
+  if (useMacHeadless) assert.equal(macHeadless.referenceCommit, originalBrowserSource.commit);
   let browserChallenges = 0;
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
@@ -96,7 +104,10 @@ try {
         if (proof) {
           await notice.waitFor(); assert.equal(await notice.innerText(), "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.");
           if (mode === "original") {
-            assert.deepEqual(await notice.evaluate(readNotice), noticeReference.measurements[`${theme}-${screen}`].httpsAdmin);
+            const expected = noticeReference.measurements[`${theme}-${screen}`].httpsAdmin;
+            await page.evaluate(() => document.fonts.ready);
+            assert.deepEqual(await notice.evaluate(readNotice),
+              useMacHeadless ? overlayOriginalVisuals(expected, macHeadless.measurements) : expected);
           }
           assert.equal(await submit.isDisabled(), true);
           await page.locator("#adminPassword").press("Enter");
