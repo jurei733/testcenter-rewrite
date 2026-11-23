@@ -273,6 +273,7 @@ import { OriginalSystemAdministrationComponent } from "./original-system-adminis
       @defer (when true) {
         <app-original-system-administration [sessionToken]="view.ops.adminSessionToken"
           [section]="activeAdminSection"
+          [highlightSection]="highlightAdminSection"
           (sectionSelected)="selectAdminSection($event)" />
       } @error {
         <p role="alert">Die Systemverwaltung konnte nicht geladen werden.</p>
@@ -1252,6 +1253,9 @@ export class OpsViewComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   activeAdminSection: AdministrationSection = "users";
+  get highlightAdminSection(): boolean {
+    return this.route.snapshot.queryParamMap.get("adminSection") !== "default";
+  }
   get explicitOriginalLogin(): boolean {
     return isExplicitOriginalAdminLogin(this.router.url);
   }

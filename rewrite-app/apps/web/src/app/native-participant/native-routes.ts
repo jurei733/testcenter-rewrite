@@ -26,7 +26,8 @@ const access:CanActivateFn=route=>{
  const session=inject(NativeMonitorSessionService),router=inject(Router);
  return afterNativeSessionRestore(session,()=>{
   const current=session.access();
-  if(validNativeTestId(route.paramMap.get('t')??'')&&current?.claims.test?.length&&!current.flags.includes('codeRequired'))return true;
+  const testId=route.paramMap.get('t');
+  if((testId===null||validNativeTestId(testId))&&current?.claims.test?.length&&!current.flags.includes('codeRequired'))return true;
   return router.parseUrl(route.queryParamMap.get(legacyBookmarkQueryKey)==='1'?'/native-start/dispatch':'/native-start');
  });
 };
@@ -42,8 +43,10 @@ const runExit:CanDeactivateFn<NativeRunHostComponent>=(component,route,state,nex
  const ctx=component.ownedContext;if(!ctx)return true;
  return ownedGuard(ctx,()=>ctx.injector.get(TestControllerDeactivateGuard).canDeactivate(ctx.view?.instance as any,route,state,next),true);
 };
-export const nativeParticipantRoutes:Routes=[{path:':t',component:NativeRunHostComponent,canActivate:[access],canDeactivate:[runExit],children:[
+export const nativeParticipantRoutes:Routes=[
+ {path:'status',pathMatch:'full',canActivate:[access],loadComponent:()=>import('./native-standalone-test-status.component').then(module=>module.NativeStandaloneTestStatusComponent)},
+ {path:':t',component:NativeRunHostComponent,canActivate:[access],canDeactivate:[runExit],children:[
  {path:'',pathMatch:'full',children:[]},
  {path:'status',component:TestStatusComponent},
  {path:'u/:u',component:UnithostComponent,canActivate:[unitAccess],canDeactivate:[unitExit]}
-]}];
+ ]}];

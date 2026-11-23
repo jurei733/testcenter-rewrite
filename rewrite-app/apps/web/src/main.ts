@@ -24,9 +24,8 @@ const registerAppShellServiceWorker = async (): Promise<void> => {
 
 const normalizeOriginalEntry = (): void => {
   const url = new URL(window.location.href);
-  const originalBookmark = /^#(\/admin\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*\/?)$/i.exec(url.hash);
   if (/^\/(?:app\/?)?$/.test(url.pathname)) {
-    const destination = originalBookmark?.[1] ?? originalParticipantBookmark(url.hash) ?? originalMissingRouteBookmark(url.hash);
+    const destination = originalParticipantBookmark(url.hash) ?? originalMissingRouteBookmark(url.hash);
     if (destination) {
       const bookmark = new URL("/app" + destination, url.origin);
       url.pathname = bookmark.pathname;
@@ -36,7 +35,8 @@ const normalizeOriginalEntry = (): void => {
       url.hash = "";
     }
   }
-  if (url.pathname.startsWith("/app/admin/") && url.searchParams.get("ui") !== "original") {
+  if ((url.pathname.startsWith("/app/admin/") || /^\/app\/superadmin(?:\/|$)/.test(url.pathname)) &&
+      url.searchParams.get("ui") !== "original") {
     url.searchParams.set("ui", "original");
   }
   if (url.href !== window.location.href) {

@@ -23,6 +23,7 @@ const invalidSegment = (value: string) =>
 export const legacyBookmarkQueryKey = 'legacyBookmark';
 
 function protectedDestination(path: string): string | null {
+  if (path === '/t/status') return '/native-test/status';
   if (/^\/t\/[1-9]\d*(?:\/(?:status|u\/[1-9]\d*))?$/.test(path)) {
     return path.replace(/^\/t\//, '/native-test/');
   }
@@ -53,7 +54,8 @@ export function originalParticipantBookmark(hash: string): string | null {
         const encodedPath = '/' + segments.map(encodeURIComponent).join('/');
         const check = originalSystemCheckBookmark(encodedPath);
         if (check) return check;
-        const protectedPath = protectedDestination(encodedPath);
+        const operatorBookmark = /^\/(?:admin\/[^/]+|superadmin)(?:\/[^/]+)*$/.test(encodedPath);
+        const protectedPath = operatorBookmark ? encodedPath : protectedDestination(encodedPath);
         if (protectedPath) return protectedPath + '?' + new URLSearchParams({[legacyBookmarkQueryKey]: '1'});
       }
     }

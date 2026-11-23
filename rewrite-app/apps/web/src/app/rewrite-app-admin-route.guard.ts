@@ -3,6 +3,7 @@ import { Router, type CanActivateFn, type UrlTree } from "@angular/router";
 
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { legacyBookmarkQueryKey } from "./native-participant/original-participant-bookmark";
 
 const redirectSignedOutOperator = async (
   requestedUrl: string
@@ -77,3 +78,33 @@ export const requireOriginalWorkspaceSession: CanActivateFn = (_route, state) =>
   inject(Router).createUrlTree(["/ops"], {
     queryParams: { ui: "original", returnUrl: state.url }
   });
+
+export const requireOriginalNumericWorkspaceActor: CanActivateFn = (route, state) => {
+  if (route.queryParamMap.get(legacyBookmarkQueryKey) === "1" &&
+      !inject(RewriteAppUiStateService).ops.adminSessionToken.trim()) {
+    return inject(Router).parseUrl("/native-start/dispatch");
+  }
+  return requireAdministrativeOperator(route, state);
+};
+
+export const resolveLegacySuperadminBookmark: CanActivateFn = async route => {
+  const router = inject(Router);
+  const injector = inject(Injector);
+  const dispatch = router.parseUrl("/native-start/dispatch");
+  if (!inject(RewriteAppUiStateService).ops.adminSessionToken.trim()) return dispatch;
+  try {
+    const { RewriteAppOpsService } = await import("./rewrite-app-ops.service");
+    const session = await injector.get(RewriteAppOpsService).refreshAdminSession({publishOriginalRights: true});
+    if (!session) return dispatch;
+    if (!session.roleAssignments.some(assignment => assignment.role === "platform_admin")) {
+      return router.createUrlTree(["/operator-start"], {queryParams: {ui: "original"}});
+    }
+    const requested = route.paramMap.get("section");
+    const adminSection = requested === "workspaces" || requested === "settings" || requested === "users"
+      ? requested
+      : requested || route.data["fallbackSection"] ? "default" : "users";
+    return router.createUrlTree(["/ops"], {queryParams: {ui: "original", adminSection}});
+  } catch {
+    return dispatch;
+  }
+};

@@ -5,7 +5,9 @@ import {
   rejectSystemCheckOperator,
   requireAuthenticatedOperator,
   requireAdministrativeOperator,
-  requireOriginalWorkspaceSession
+  requireOriginalWorkspaceSession,
+  requireOriginalNumericWorkspaceActor,
+  resolveLegacySuperadminBookmark
 } from "./rewrite-app-admin-route.guard";
 import { matchOriginalNumericWorkspace, resolveOriginalNumericWorkspace } from "./original-workspace-browser-route";
 import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
@@ -37,9 +39,14 @@ const canonicalRoutes: Routes = [
   {
     matcher: matchOriginalNumericWorkspace,
     loadComponent: () => import("./original-numeric-workspace.component").then(module => module.OriginalNumericWorkspaceComponent),
-    canActivate: [requireAdministrativeOperator, requireOriginalWorkspaceSession],
+    canActivate: [requireOriginalNumericWorkspaceActor, requireOriginalWorkspaceSession],
     resolve: { originalWorkspace: resolveOriginalNumericWorkspace }
   },
+  {path: "superadmin", children: [
+    {path: "", pathMatch: "full", canActivate: [resolveLegacySuperadminBookmark], children: []},
+    {path: ":section", pathMatch: "full", canActivate: [resolveLegacySuperadminBookmark], children: []},
+    {path: "**", canActivate: [resolveLegacySuperadminBookmark], data: {fallbackSection: true}, children: []}
+  ]},
   {
     path: "content",
     loadComponent: () =>

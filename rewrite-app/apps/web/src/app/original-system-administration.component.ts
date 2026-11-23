@@ -49,6 +49,7 @@ import { OriginalToastContainerComponent } from "./original-toast-container.comp
 export class OriginalSystemAdministrationComponent implements OnChanges, OnDestroy {
   @Input({required:true}) sessionToken = "";
   @Input() section: AdministrationSection = "users";
+  @Input() highlightSection = true;
   @Output() sectionSelected = new EventEmitter<AdministrationSection>();
   readonly app = inject(AppShellFacade);
   readonly settings = inject(ApplicationSettingsService);
