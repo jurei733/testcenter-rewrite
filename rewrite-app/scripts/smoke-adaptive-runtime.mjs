@@ -182,7 +182,11 @@ let browser;
 
 try {
   await pollReady(`${baseUrl}/readyz`);
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({
+    headless: true,
+    channel: process.env.UI_SMOKE_BROWSER_CHANNEL || undefined
+  });
+  console.log(`adaptive_runtime_browser=${browser.version()}`);
   const page = await browser.newPage();
   participantHttpActor.observePage(page);
   const corpus = JSON.parse(
@@ -222,6 +226,12 @@ try {
     );
   assert.match(restrictedBookletDocument, /CodeToEnter code="route"/);
   assert.match(restrictedBookletDocument, /alias="finish-unit"/);
+  const expiringBookletKey = `${adaptivePackage.booklet.bookletKey}-expiry`;
+  const expiringBookletDocument = restrictedBookletDocument
+    .replace(`<Id>${adaptivePackage.booklet.bookletKey}</Id>`, `<Id>${expiringBookletKey}</Id>`)
+    .replace('TimeMax minutes="2"', 'TimeMax minutes="0.2"');
+  assert.ok(expiringBookletDocument.includes(`<Id>${expiringBookletKey}</Id>`));
+  assert.match(expiringBookletDocument, /TimeMax minutes="0\.2"/);
 
   const [originalUnitDocument, codingSchemeBase64, playerBase64] = await Promise.all([
     readFile(resolve(fixtureRoot, adaptivePackage.unit.fixture), "utf8"),
@@ -255,12 +265,13 @@ try {
   const sourcePackage = createStoredZipBuffer([
     {
       fileName: "export/imsmanifest.xml",
-      content: `<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"><resources><resource identifier="${adaptivePackage.booklet.bookletKey}" href="booklets/CY_Bklt_Adap-1.xml" /><resource identifier="${adaptivePackage.unit.unitKey}" href="units/Unit2.xml" /><resource identifier="coding-scheme.vocs.json" href="schemes/coding-scheme.vocs.json" /><resource identifier="${adaptivePackage.player.playerKey}" href="players/verona-player-simple-6.0.html" /></resources></manifest>`
+      content: `<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"><resources><resource identifier="${adaptivePackage.booklet.bookletKey}" href="booklets/CY_Bklt_Adap-1.xml" /><resource identifier="${expiringBookletKey}" href="booklets/Adaptive-Timed-Expiry.xml" /><resource identifier="${adaptivePackage.unit.unitKey}" href="units/Unit2.xml" /><resource identifier="coding-scheme.vocs.json" href="schemes/coding-scheme.vocs.json" /><resource identifier="${adaptivePackage.player.playerKey}" href="players/verona-player-simple-6.0.html" /></resources></manifest>`
     },
     {
       fileName: "export/booklets/CY_Bklt_Adap-1.xml",
       content: restrictedBookletDocument
     },
+    { fileName: "export/booklets/Adaptive-Timed-Expiry.xml", content: expiringBookletDocument },
     { fileName: "export/units/Unit2.xml", content: unitDocument },
     {
       fileName: "export/schemes/coding-scheme.vocs.json",
@@ -277,6 +288,10 @@ try {
   const workspaceKey = `adaptive-runtime-smoke-${suffix}`;
   const loginKey = "adaptive-runtime-participant";
   const bookletKey = adaptivePackage.booklet.bookletKey;
+  const expiryScenarios = [
+    { executionMode: "run-hot-return", nextUnit: "finish-unit", locked: true, resumes: true },
+    { executionMode: "run-review", nextUnit: "professional-unit", locked: false, resumes: false }
+  ];
   await sendJson(`${baseUrl}/api/v1/platform/tenants`, {
     tenantKey,
     displayName: "Adaptive runtime smoke"
@@ -315,7 +330,14 @@ try {
         bookletKey,
         displayName: "Adaptive Runtime Participant",
         executionMode: "run-hot-restart"
-      }
+      },
+      ...expiryScenarios.map(({ executionMode }) => ({
+        loginKey: `adaptive-${executionMode}`,
+        groupKey: "group:adaptive-runtime",
+        bookletKey: expiringBookletKey,
+        displayName: `Adaptive ${executionMode} Participant`,
+        executionMode
+      }))
     ]
   });
 
@@ -514,6 +536,103 @@ try {
     "TESTLETS_LOCKED_AFTER_LEAVE"
   ]) {
     assert.equal(logKeys.has(logKey), true, logKey);
+  }
+
+  for (const { executionMode, nextUnit, locked, resumes } of expiryScenarios) {
+    const context = await browser.newContext();
+    try {
+      const learner = await context.newPage();
+      participantHttpActor.observePage(learner);
+      await learner.goto(`${baseUrl}/participant?${new URLSearchParams({
+        tenantKey, workspaceKey, loginKey: `adaptive-${executionMode}`, bookletKey: expiringBookletKey
+      })}`, { waitUntil: "domcontentloaded" });
+      const frame = learner.frameLocator("#participantVeronaPlayerFrame");
+      if (executionMode === "run-review") {
+        await learner.locator("#participantRouteAdaptiveState-level").selectOption("professional");
+      } else {
+        await frame.locator("#var3").fill("3");
+        await frame.locator("#var3").press("End");
+      }
+      await learner.locator("#participantRouteTestletUnlockCode").waitFor();
+      const sessionId = await learner.locator("#participantRouteSessionId").inputValue();
+      assert.ok(sessionId);
+      const stateUrl = `${baseUrl}/api/v1/participant/sessions/${sessionId}/current-state`;
+      const before = (await pollJson(stateUrl, ({ currentRunState }) =>
+        currentRunState?.testRun?.bookletStates?.level === "professional"
+      )).currentRunState.testRun;
+      assert.equal(before.currentUnitKey, "decision-unit");
+      assert.equal(Object.keys(before.testletTimers ?? {}).length, 0);
+
+      await learner.locator("#participantRouteTestletUnlockCode").fill("route");
+      await learner.locator("#participantRouteTestletUnlockButton").click();
+      const timerKey = "stage1-professional";
+      const running = (await pollJson(stateUrl, ({ currentRunState }) =>
+        currentRunState?.testRun?.testletTimers?.[timerKey]?.status === "running"
+      )).currentRunState.testRun;
+      const start = running.testletTimers[timerKey];
+      assert.equal(running.currentUnitKey, "professional-unit");
+      assert.equal(start.durationSeconds, 12);
+      assert.equal(Date.parse(start.expiresAt) - Date.parse(start.startedAt), 12_000);
+      await frame.locator("#var1").waitFor();
+      const timer = learner.locator("#participantRouteTestletTimer");
+      await timer.waitFor();
+
+      if (resumes) {
+        await participantHttpActor.goto(learner,
+          `${baseUrl}/participant?participantSessionId=${encodeURIComponent(sessionId)}`,
+          { waitUntil: "domcontentloaded" }
+        );
+        await frame.locator("#var1").waitFor();
+        await timer.waitFor();
+        const resumed = (await pollJson(stateUrl, ({ currentRunState }) =>
+          currentRunState?.testRun?.testletTimers?.[timerKey]?.status === "running"
+        )).currentRunState.testRun;
+        assert.equal(resumed.testRunId, running.testRunId);
+        assert.equal(resumed.testletTimers[timerKey].startedAt, start.startedAt);
+        assert.equal(resumed.testletTimers[timerKey].expiresAt, start.expiresAt);
+        assert.equal(resumed.bookletStates.level, "professional");
+      }
+
+      // Observe the actual browser handle expiry before asking the API for the final state.
+      await timer.waitFor({ state: "hidden", timeout: 22_000 });
+      await learner.locator("#participantRouteUnitKey").filter({ hasText: nextUnit }).waitFor();
+      const expiredState = (await pollJson(stateUrl, ({ currentRunState }) =>
+        currentRunState?.testRun?.testletTimers?.[timerKey]?.status === "expired"
+      )).currentRunState;
+      const expired = expiredState.testRun;
+      assert.equal(expired.testRunId, running.testRunId);
+      assert.equal(expired.currentUnitKey, nextUnit);
+      assert.equal(expired.testletTimers[timerKey].remainingSeconds, 0);
+      assert.equal(expired.bookletStates.level, "professional");
+      assert.equal(expiredState.bookletUnits.find(unit => unit.unitKey === "professional-unit")?.isLocked, locked);
+      for (const other of ["stage1-beginner", "stage1-advanced", "optional-block"]) {
+        assert.ok(!Object.hasOwn(expired.testletTimers, other));
+      }
+      const branch = learner.locator('#participantRouteUnitRail [data-unit-key="professional-unit"]');
+      assert.match(await branch.getAttribute("aria-label"), locked ? /, locked$/ : /, available$/);
+      if (locked) {
+        assert.equal(await branch.isDisabled(), true);
+        const reopen = await fetch(`${baseUrl}/api/v1/participant/test-runs/${expired.testRunId}/save-progress`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ currentUnitKey: "professional-unit", status: "running" })
+        });
+        assert.equal(reopen.status, 409);
+        const denial = await reopen.json();
+        assert.equal(denial.error, "booklet_navigation_denied");
+        assert.ok(denial.details.deniedReasons.includes("testlet_time_closed"));
+        const audit = await fetch(`${workspaceUrl}/test-logs?testRunId=${encodeURIComponent(expired.testRunId)}&limit=100`);
+        assert.equal(audit.status, 200);
+        const snapshots = (await audit.json()).items.map(item => item.testLog)
+          .filter(log => log.logKey === "TESTLETS_TIMELEFT")
+          .map(log => JSON.parse(log.logContent));
+        assert.ok(snapshots.some(snapshot => snapshot[timerKey] === 0.2), "The log must record the authored 12-second budget in minutes.");
+        assert.ok(snapshots.some(snapshot => snapshot[timerKey] === 0), "The log must record the exhausted budget.");
+      }
+      console.log(`adaptive_timer_expiry=${executionMode}:${nextUnit}:${locked ? "locked" : "advisory"}:passed`);
+    } finally {
+      await context.close();
+    }
   }
 
   process.stdout.write(

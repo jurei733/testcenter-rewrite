@@ -21787,12 +21787,11 @@ const reconcileExpiredTestletTimers = (
 const findClosedTimedTestlet = (
   booklet: ContentReleaseBookletEntry | undefined,
   testRun: TestRun,
-  unitKey: string | null
+  unit: SourcePackageUnitEntry | undefined
 ): SourcePackageTestletEntry | null => {
-  if (!booklet || !unitKey) {
+  if (!booklet || !unit) {
     return null;
   }
-  const unit = booklet.unitEntries.find(candidate => candidate.unitKey === unitKey);
   const rootTimer = testRun.testletTimers?.[originalBookletRootTestletKey];
   if (
     booklet.rootRestrictions?.timeMax &&
@@ -21800,7 +21799,7 @@ const findClosedTimedTestlet = (
   ) {
     return resolveBookletRootTestlet(booklet);
   }
-  for (const testletKey of unit?.testletPath ?? []) {
+  for (const testletKey of unit.testletPath ?? []) {
     const timer = testRun.testletTimers?.[testletKey];
     if (timer?.status === "expired" || timer?.status === "cancelled") {
       return (
@@ -22490,13 +22489,13 @@ const resolveBookletNavigationState = (
       reasons.push(reason);
     }
   };
-  const isUnitInaccessible = (unitKey: string | null): boolean =>
+  const isUnitInaccessible = (unit: SourcePackageUnitEntry): boolean =>
     executionMode.forceNaviRestrictions &&
-    (isUnitLeaveLocked(booklet, testRun, unitKey) ||
-      Boolean(findClosedTimedTestlet(booklet, testRun, unitKey)));
+    (isUnitLeaveLocked(booklet, testRun, unit.unitKey) ||
+      Boolean(findClosedTimedTestlet(booklet, testRun, unit)));
   let previousUnitIndex = -1;
   for (let index = currentIndex - 1; index >= 0; index -= 1) {
-    if (!isUnitInaccessible(units[index]?.unitKey ?? null)) {
+    if (!isUnitInaccessible(units[index])) {
       previousUnitIndex = index;
       break;
     }
@@ -22507,7 +22506,7 @@ const resolveBookletNavigationState = (
     index < units.length;
     index += 1
   ) {
-    if (!isUnitInaccessible(units[index]?.unitKey ?? null)) {
+    if (!isUnitInaccessible(units[index])) {
       nextUnitIndex = index;
       break;
     }
@@ -22672,7 +22671,7 @@ const requireBookletNavigationAllowed = (input: {
   const closedTimedTestlet = findClosedTimedTestlet(
     booklet,
     input.testRun,
-    input.targetUnitKey
+    units[targetIndex]
   );
   if (
     closedTimedTestlet &&
@@ -22835,6 +22834,7 @@ const resolveRuntimeBookletUnits = (
     contentRelease.runtimeSnapshot.bookletEntries.find(
       candidate => candidate.bookletKey === bookletKey
     ) ?? contentRelease.runtimeSnapshot.bookletEntries[0];
+  const { forceNaviRestrictions } = resolveParticipantExecutionMode(testRun.executionMode);
 
   return (
     resolveVisibleBookletUnits(bookletEntry, testRun).map(unitEntry => ({
@@ -22842,7 +22842,8 @@ const resolveRuntimeBookletUnits = (
       displayLabel: unitEntry.displayLabel,
       ...(unitEntry.shortLabel ? { shortLabel: unitEntry.shortLabel } : {}),
       testletPath: unitEntry.testletPath ?? [],
-      isLocked: isUnitLeaveLocked(bookletEntry, testRun, unitEntry.unitKey),
+      isLocked: isUnitLeaveLocked(bookletEntry, testRun, unitEntry.unitKey) ||
+        (forceNaviRestrictions && Boolean(findClosedTimedTestlet(bookletEntry, testRun, unitEntry))),
       ...(unitEntry.description ? { description: unitEntry.description } : {}),
       ...(unitEntry.content ? { content: unitEntry.content } : {})
     })) ?? []
