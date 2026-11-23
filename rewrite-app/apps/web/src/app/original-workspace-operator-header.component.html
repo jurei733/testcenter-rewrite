@@ -1,0 +1,28 @@
+<mat-toolbar data-cy="header" [id]="headerId()">
+  <div class="side">
+    <button matIconButton class="account-button" aria-label="Nutzerinformationen"
+      data-cy="account-button" [matMenuTriggerFor]="accountMenu" #account="matMenuTrigger">
+      <mat-icon originalWorkspaceFileIcon name="person" />
+    </button>
+    <mat-menu #accountMenu="matMenu" class="original-native-account-menu">
+      <div class="heading"><div>Nutzerinformationen</div>
+        <button matIconButton aria-label="Nutzerinformationen schließen"
+          (click)="account.closeMenu()"><mat-icon originalWorkspaceFileIcon name="close" /></button>
+      </div>
+      <dl><dt>Anmeldename:</dt><dd>{{app.operatorAccountUsername}}</dd>
+        <dt>Gruppe:</dt><dd></dd><dt>Berechtigung:</dt>
+        @for (right of app.originalOperatorRights; track right) {
+          <dd>{{ right }}</dd>
+        }
+        <dt>Version:</dt><dd>{{app.originalOperatorVersion}}</dd>
+      </dl><mat-divider />
+      <button matButton="tonal" id="globalAdminSignOutButton" class="logout-button"
+        data-cy="logout-button" (click)="$event.stopPropagation(); confirmLogout(account)">Abmelden</button>
+    </mat-menu>
+  </div>
+  <div class="center"><h1>{{title()}}</h1></div>
+  <div class="side logo"><a routerLink="/operator-start" [queryParams]="{ui:'original'}" aria-label="Gehe zur Startseite">
+    <img id="applicationLogo" data-cy="logo" alt="Logo der Anwendung"
+      matTooltip="Zur Startseite" [src]="settings.assetUrl('logo',settings.settings().mainLogo)" />
+  </a></div>
+</mat-toolbar>

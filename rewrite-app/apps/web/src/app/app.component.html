@@ -2,6 +2,7 @@
   class="page"
   [class.is-busy]="app.activeRequestLabel() !== null"
   [class.is-native-monitor-page]="isNativeMonitorView"
+  [class.original-operator-starter-page]="isOriginalOperatorStarter"
   [class.is-participant-page]="isParticipantView || isOriginalAdminLogin"
 >
   <span hidden>{{ app.renderVersion() }}</span>
@@ -277,6 +278,10 @@
             {{ view.label }}
           </a>
         }
+        @if (interfaceMode.mode() === 'original' && app.hasAdminSession) {
+          <a class="nav-link" routerLink="/operator-start" [queryParams]="{ui:'original'}"
+             data-cy="goto-original-operator-start">Arbeitsbereiche auswählen</a>
+        }
         @if (app.hasAdminSession) {
           <details
             id="operatorAccountMenu"
@@ -312,6 +317,13 @@
     }
     @if (isFocusedEntryView || isOriginalNativeOperator) {
       <main class="home-stage" [class.participant-stage]="isOriginalAdminLogin">
+        @defer (when isOriginalOperatorStarter || isOriginalWorkspaceFiles) {
+          @if (isOriginalOperatorStarter || isOriginalWorkspaceFiles) {
+            <app-original-workspace-operator-header
+              [headerId]="isOriginalOperatorStarter ? 'originalOperatorStarterHeader' : 'originalWorkspaceFileHeader'"
+              [title]="isOriginalOperatorStarter ? 'Übersicht' : originalWorkspaceHeader.title()" />
+          }
+        }
         <router-outlet></router-outlet>
       </main>
     } @else {

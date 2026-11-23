@@ -71,3 +71,9 @@ export const rejectSystemCheckOperator: CanActivateFn = () => {
     ? inject(Router).createUrlTree(["/system-check"])
     : true;
 };
+
+export const requireSignedInWorkspaceStarter: CanActivateFn = (_route, state) =>
+  !!inject(RewriteAppUiStateService).ops.adminSessionToken ||
+  inject(Router).createUrlTree(["/ops"], {
+    queryParams: { ui: "original", returnUrl: state.url }
+  });

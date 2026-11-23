@@ -25,7 +25,7 @@
     </mat-menu>
   </div>
   <div class="center"><h1>Systemverwaltung</h1></div>
-  <div class="side logo"><a routerLink="/workspace" aria-label="Gehe zur Startseite">
+  <div class="side logo"><a routerLink="/operator-start" [queryParams]="{ui:'original'}" aria-label="Gehe zur Startseite">
     <img id="applicationLogo" data-cy="logo" [src]="settings.assetUrl('logo', settings.settings().mainLogo)"
       alt="Logo der Anwendung" matTooltip="Zur Startseite" />
   </a></div>

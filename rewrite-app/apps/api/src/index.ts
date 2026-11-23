@@ -5399,10 +5399,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
         const { adminUser, adminSession, roleAssignments } =
           await services.adminAuth.getCurrentSession({ sessionToken });
+        const originalWorkspaceChoices = url.searchParams.get("view") === "original-workspace-starter"
+          ? await services.originalAdminSession.workspaceChoices({token:sessionToken})
+          : undefined;
         sendJson<GetAdminCurrentSessionResponse>(response, 200, {
           adminUser: toPublicAdminUser(adminUser),
           adminSession: toPublicAdminSession(adminSession),
-          roleAssignments
+          roleAssignments,
+          ...(originalWorkspaceChoices === undefined ? {} : {originalWorkspaceChoices})
         });
         return;
       }

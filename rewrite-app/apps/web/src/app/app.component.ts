@@ -28,6 +28,7 @@ import { LiveContextComponent } from "./live-context.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalFooterComponent } from "./original-footer.component";
 import { OriginalParticipantAccountComponent } from "./original-participant-account.component";
+import { OriginalWorkspaceOperatorHeaderComponent, OriginalWorkspaceOperatorHeaderState } from "./original-workspace-operator-header.component";
 import { OriginalApplicationLogoComponent } from "./original-application-logo.component";
 import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { AppView } from "./rewrite-app-shell.types";
@@ -62,8 +63,10 @@ const routeViews: AppView[] = [
     LiveContextComponent,
     OriginalFooterComponent,
     OriginalParticipantAccountComponent,
-    OriginalApplicationLogoComponent
+    OriginalApplicationLogoComponent,
+    OriginalWorkspaceOperatorHeaderComponent
   ],
+  providers: [OriginalWorkspaceOperatorHeaderState],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css"
 })
@@ -71,6 +74,7 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor() { inject(NativeErrorPresenterService).register(openNativeSystemCheckInstallationError); }
   readonly interfaceMode = inject(InterfaceModeService);
   readonly app = inject(AppShellFacade);
+  readonly originalWorkspaceHeader = inject(OriginalWorkspaceOperatorHeaderState);
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly bugReports = inject(BugReportService);
   readonly confirmation = inject(ConfirmationDialogService);
@@ -151,7 +155,15 @@ export class AppComponent implements OnInit, OnDestroy {
 
   get isNativeMonitorView(): boolean { return ['/group-monitor','/native-test','/native-start'].some(path=>this.router.url.split('?',1)[0].startsWith(path)); }
 
-  get isOriginalNativeOperator(): boolean { return this.isOriginalAdministration || this.isOriginalWorkspaceFiles || this.isNativeMonitorView; }
+  get isOriginalOperatorStarter(): boolean {
+    this.routeVersion();
+    return this.router.url.split("?", 1)[0] === "/operator-start";
+  }
+
+  get isOriginalNativeOperator(): boolean {
+    return this.isOriginalAdministration || this.isOriginalWorkspaceFiles ||
+      this.isOriginalOperatorStarter || this.isNativeMonitorView;
+  }
 
   get activeRouteView(): AppView {
     this.routeVersion();

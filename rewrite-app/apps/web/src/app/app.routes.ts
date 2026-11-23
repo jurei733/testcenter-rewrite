@@ -4,7 +4,8 @@ import {Injector,inject} from '@angular/core';
 import {
   rejectSystemCheckOperator,
   requireAuthenticatedOperator,
-  requireAdministrativeOperator
+  requireAdministrativeOperator,
+  requireSignedInWorkspaceStarter
 } from "./rewrite-app-admin-route.guard";
 import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
 
@@ -22,6 +23,14 @@ const canonicalRoutes: Routes = [
         module => module.WorkspaceViewComponent
       ),
     canActivate: [requireAdministrativeOperator]
+  },
+  {
+    path: "operator-start",
+    loadComponent: () =>
+      import("./original-operator-starter.component").then(
+        module => module.OriginalOperatorStarterComponent
+      ),
+    canActivate: [requireAdministrativeOperator, requireSignedInWorkspaceStarter]
   },
   {
     path: "content",

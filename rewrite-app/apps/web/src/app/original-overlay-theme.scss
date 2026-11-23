@@ -51,7 +51,7 @@
   }
 }
 
-:root[data-interface-mode='original'] :is(#originalAdministrationHeader, #originalWorkspaceFileHeader)
+:root[data-interface-mode='original'] :is(#originalAdministrationHeader, #originalWorkspaceFileHeader, #originalOperatorStarterHeader)
   .account-button .mat-mdc-button-persistent-ripple {
   border-radius: inherit;
 }

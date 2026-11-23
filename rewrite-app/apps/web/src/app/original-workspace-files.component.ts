@@ -1,15 +1,10 @@
 import {ChangeDetectorRef,Component,Input,inject,type OnChanges,type OnDestroy} from '@angular/core';
-import {MatButton,MatIconButton} from '@angular/material/button';
-import {MatDivider} from '@angular/material/divider';
-import {MatMenu,MatMenuTrigger} from '@angular/material/menu';
-import {MatToolbar} from '@angular/material/toolbar';
+import {MatButton} from '@angular/material/button';
 import {Router,RouterLink,RouterLinkActive,ActivatedRoute} from '@angular/router';
 import {MatTabNav,MatTabLink,MatTabNavPanel} from '@angular/material/tabs';
 import {OriginalSystemCheckReportsComponent} from './original-system-check-reports.component';
 import {OriginalWorkspaceResultsComponent} from './original-workspace-results.component';
-import {AppShellFacade} from './app-shell.facade';
 import {OriginalOverlayStylesComponent} from './original-overlay-styles.component';
-import {OriginalParticipantLogoutDialogComponent} from './original-participant-logout-dialog.component';
 import {OriginalWorkspaceFileSurfaceStylesComponent} from './original-workspace-file-surface-styles.component';
 import {MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions} from '@angular/material/card';
 import {MatCheckbox} from '@angular/material/checkbox';
@@ -26,15 +21,15 @@ import {OriginalWorkspaceFilesController,type OriginalWorkspaceFile} from './ori
 import {RewriteAppShellRequestService} from './rewrite-app-shell-request.service';
 import {RewriteAppApiService} from './rewrite-app-api.service';
 import {RewriteAppOperatorAccessService} from './rewrite-app-operator-access.service';
+import {OriginalWorkspaceOperatorHeaderState} from './original-workspace-operator-header.component';
 import {OriginalWorkspaceFileIconComponent} from './original-workspace-file-icon.component';
 import {OriginalWorkspaceFileNoticeComponent} from './original-workspace-file-notice.component';
 import {OriginalParticipantConfirmationDialogComponent} from './original-participant-confirmation-dialog.component';
-import {ApplicationSettingsService} from './application-settings.service';
 import {RewriteAppUiStateService} from './rewrite-app-ui-state.service';
 import {NativeSystemCheckInstallationService} from './native-system-check/native-system-check-installation.service';
 
 @Component({selector:'app-original-workspace-files',standalone:true,
- imports:[RouterLink,RouterLinkActive,MatTabNav,MatTabLink,MatTabNavPanel,OriginalSystemCheckReportsComponent,OriginalWorkspaceResultsComponent,MatToolbar,MatMenu,MatMenuTrigger,MatDivider,MatIconButton,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
+ imports:[RouterLink,RouterLinkActive,MatTabNav,MatTabLink,MatTabNavPanel,OriginalSystemCheckReportsComponent,OriginalWorkspaceResultsComponent,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
    MatCheckbox,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatExpansionPanelDescription,
    MatProgressBar,MatProgressSpinner,MatSort,MatSortHeader,MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,MatCellDef,MatCell,
    MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow,MatTooltip,OriginalWorkspaceFileIconComponent,OriginalWorkspaceFileNoticeComponent],
@@ -48,9 +43,8 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  private readonly api=inject(RewriteAppApiService);
  private readonly access=inject(RewriteAppOperatorAccessService);
  private readonly changed=inject(ChangeDetectorRef);
+ private readonly header=inject(OriginalWorkspaceOperatorHeaderState);
  private readonly dialogs=inject(MatDialog);
- readonly settings=inject(ApplicationSettingsService);
- readonly app=inject(AppShellFacade);
  private readonly router=inject(Router);
  private readonly route=inject(ActivatedRoute);
  tab:'files'|'syscheck'|'results'|'tests'='files';
@@ -67,7 +61,6 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  compactResultsToolbar=this.route.snapshot.queryParamMap.get('tab')!=='results' ||
    !!(this.router.currentNavigation()??this.router.lastSuccessfulNavigation())?.previousNavigation;
  resultsRole:''|'RO'|'RW'='';
- private logout:MatDialogRef<OriginalParticipantLogoutDialogComponent>|null=null;
  private readonly snacks=inject(MatSnackBar);
  private readonly systemCheckInstallation=inject(NativeSystemCheckInstallationService);
  private destroyed=false;
@@ -75,7 +68,7 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  readonly controller=new OriginalWorkspaceFilesController((method,path,body,token)=>
    this.request.request('Dateiverwaltung',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
    ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments}),
-   ()=>{if(!this.destroyed)this.changed.markForCheck();},
+   ()=>{if(!this.destroyed){this.header.title.set(this.title);this.changed.markForCheck();}},
    ()=>{void this.systemCheckInstallation.refresh();});
  private readonly routeChanges=this.route.queryParamMap.subscribe(params=>{
    const value=params.get('tab'),next=value==='syscheck'||value==='results'||value==='tests'?value:'files';
@@ -96,24 +89,16 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    {label:'Systemcheck-Definitionen',versions:'18'},{label:'Units',versions:'17'},{label:'Verona-Player',versions:'2–6'}];
  readonly trackFile=(_index:number,file:OriginalWorkspaceFile)=>file.sourcePackageId;
  reloadReports():void {globalThis.location.reload();}
- ngOnChanges():void {this.deletion?.close(false);this.logout?.close(false);void this.controller.connect();}
- ngOnDestroy():void {this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.logout?.close(false);this.controller.destroy();}
+ ngOnChanges():void {this.deletion?.close(false);void this.controller.connect();}
+ ngOnDestroy():void {this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.controller.destroy();this.header.title.set('Verwaltung');}
+ setResultsRole(role: ''|'RO'|'RW'):void {
+   this.resultsRole=role;
+   this.header.title.set(this.title);
+ }
  get title():string {
    const workspace=this.controller.overview?.workspace;
    const role=(this.tab==='results'||this.tab==='tests')&&this.resultsRole?this.resultsRole:this.controller.canWrite?'RW':'RO';
    return workspace ? `Verwaltung "${workspace.displayName}" (${role})` : 'Verwaltung';
- }
- confirmLogout(trigger:MatMenuTrigger):void {
-   if(this.destroyed || this.logout)return;const token=this.state.ops.adminSessionToken;trigger.closeMenu();
-   this.logout=this.dialogs.open(OriginalParticipantLogoutDialogComponent,{panelClass:'original-participant-logout-dialog',
-     data:{safeMode:this.settings.settings().themeName==='Primar'},autoFocus:'dialog',restoreFocus:true,
-     ariaLabelledBy:'originalParticipantLogoutTitle',ariaDescribedBy:'originalParticipantLogoutMessage'});
-   this.logout.afterClosed().subscribe(accepted=>{
-     this.logout=null;if(!accepted || this.destroyed || this.state.ops.adminSessionToken!==token)return;
-     void this.app.signOutAdmin().finally(()=>{
-       if(!this.state.ops.adminSessionToken || this.state.ops.adminSessionToken===token)void this.router.navigateByUrl('/ops');
-     });
-   });
  }
  size(bytes:number|null):string {
    if(bytes===null || !Number.isFinite(bytes))return 'nicht berechnet';

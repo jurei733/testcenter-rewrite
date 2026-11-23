@@ -1,3 +1,4 @@
+import type {OriginalOperatorWorkspaceChoice} from '@testcenter-rewrite-app/contracts';
 import type {AdminUser, AdminSession, AdminRoleAssignment, AdminLoginAttempt, AdminAuditEvent, Workspace, Tenant} from '@testcenter-rewrite-app/domain';
 import type {OriginalAdminAccessSet} from '@testcenter-rewrite-app/contracts/original-session';
 import {FirstSliceError} from './first-slice-error.js';
@@ -21,6 +22,7 @@ export type OriginalAdminSessionSnapshot = {
 };
 export type OriginalAdminSessionEffect = {
   value?: OriginalAdminAccessSet; error?: FirstSliceError;
+  workspaceChoices?: OriginalOperatorWorkspaceChoice[];
   user?: AdminUser; sessions?: AdminSession[];
   createdUser?:AdminUser; adminNumbers?:OriginalAdminNumber[]; directoryJson?:string;
   targetUser?:AdminUser; targetSessions?:AdminSession[]; attempt?: AdminLoginAttempt; audit?: AdminAuditEvent;
@@ -42,6 +44,7 @@ export type OriginalAdminSessionRepository = {
 export type OriginalAdminSessionPort = {
   login(input: {name: string; password: string}): Promise<OriginalAdminAccessSet>;
   read(input: {token: string}): Promise<OriginalAdminAccessSet>;
+  workspaceChoices(input: {token: string}): Promise<OriginalOperatorWorkspaceChoice[]>;
   logout(input: {token: string}): Promise<void>;
   recognizes(token: string): Promise<boolean>;
   authorize(input:{token:string;superAdmin?:boolean;adminNumber?:string}):Promise<void>;
@@ -119,23 +122,33 @@ export function createOriginalAdminSessionPort(input: {
   const expires = (user: AdminUser, timestamp: string): string => new Date(Math.min(
     Date.parse(timestamp) + Math.min(input.sessionTtlMs, 600 * 60_000),
     input.accessUntil(user) ? Date.parse(input.accessUntil(user)!) : Infinity)).toISOString();
+  const workspaceMemberships = (s: OriginalAdminSessionSnapshot, user: AdminUser) => {
+    const choices: Array<{workspace:Workspace; tenant:Tenant; mode:string}> = [];
+    const seen = new Set<string>();
+    for (const role of s.roles) {
+      if (role.adminUserId !== user.adminUserId || !isOriginalWorkspaceMembership(role) ||
+          !role.tenantId || !role.workspaceId || seen.has(role.workspaceId)) continue;
+      const workspace = s.workspaces.find(w => w.workspaceId === role.workspaceId && w.tenantId === role.tenantId && w.status === 'active');
+      const tenant = s.tenants.find(t => t.tenantId === role.tenantId && t.status === 'active');
+      if (!workspace || !tenant) continue;
+      seen.add(workspace.workspaceId);
+      const write = s.roles.some(r => r.adminUserId === user.adminUserId && r.role === 'workspace_admin' &&
+        r.workspaceId === workspace.workspaceId && r.tenantId === workspace.tenantId &&
+        (r.accessMode === undefined || r.accessMode === 'read_write'));
+      choices.push({workspace, tenant, mode:role.role==='native_workspace_opaque'?originalWorkspaceRoleValue(role):write?'RW':'RO'});
+    }
+    return choices;
+  };
   const accessSet = (s: OriginalAdminSessionSnapshot, user: AdminUser, token: string): Pick<OriginalAdminSessionEffect, 'value' | 'number' | 'counter' | 'workspaceNumbers' | 'workspaceCounter'> => {
     const identity = prepareOriginalAdminNumber(user, s.number, s.counter);
     const workspaces: OriginalAdminAccessSet['claims']['workspaceAdmin'] = [];
     const numbers: OriginalWorkspaceNumberRecord[] = [];
     let workspaceCounter = s.workspaceCounter;
-    const seen = new Set<string>();
-    for (const role of s.roles) {
-      if (role.adminUserId !== user.adminUserId || !isOriginalWorkspaceMembership(role) || !role.tenantId || !role.workspaceId || seen.has(role.workspaceId)) continue;
-      const workspace = s.workspaces.find(w => w.workspaceId === role.workspaceId && w.tenantId === role.tenantId && w.status === 'active');
-      if (!workspace || !s.tenants.some(t => t.tenantId === workspace.tenantId && t.status === 'active')) continue;
-      seen.add(workspace.workspaceId);
+    for (const {workspace, mode} of workspaceMemberships(s, user)) {
       const prepared = prepareOriginalWorkspaceNumber(workspace, workspace, s.workspaceNumbers.find(row => row.workspaceId === workspace.workspaceId), workspaceCounter);
       workspaceCounter = prepared.counter;
       if (prepared.changed) numbers.push(prepared.record);
-      const rw = s.roles.some(r => r.adminUserId === user.adminUserId && r.role === 'workspace_admin' && r.workspaceId === workspace.workspaceId &&
-        r.tenantId === workspace.tenantId && (r.accessMode === undefined || r.accessMode === 'read_write'));
-      workspaces.push({id: prepared.record.workspaceNumber, type: 'workspaceAdmin', label: workspace.displayName, flags: {mode: role.role==='native_workspace_opaque'?originalWorkspaceRoleValue(role):rw?'RW':'RO'}});
+      workspaces.push({id: prepared.record.workspaceNumber, type: 'workspaceAdmin', label: workspace.displayName, flags: {mode}});
     }
     const claims: OriginalAdminAccessSet['claims'] = {workspaceAdmin: workspaces};
     const access: OriginalAdminAccessSet['access'] = {workspaceAdmin: workspaces.map(w => w.id)};
@@ -203,6 +216,19 @@ export function createOriginalAdminSessionPort(input: {
         const timestamp = input.now(), session = active(s, token, timestamp), user = s.user!;
         return {...accessSet(s, user, token), sessions: s.sessions.map(row => row.adminSessionId === session.adminSessionId ? {...row, expiresAt: expires(user, timestamp)} : row)};
       }))!;
+    },
+    async workspaceChoices({token}) {
+      const timestamp = input.now();
+      const effect = await input.repository.mutateOriginalAdminSession({token, at:timestamp}, s => {
+        active(s, token, timestamp);
+        if (s.user!.passwordChangeRequired && !superAdmin(s)) return {workspaceChoices:[]};
+        return {workspaceChoices:workspaceMemberships(s, s.user!).map(({workspace,tenant,mode})=>({
+          workspaceId:workspace.workspaceId, tenantKey:tenant.tenantKey, workspaceKey:workspace.workspaceKey,
+          label:workspace.displayName, mode
+        }))};
+      });
+      if (effect.error) throw effect.error;
+      return effect.workspaceChoices!;
     },
     async logout({token}) {
       await mutate({token}, s => {

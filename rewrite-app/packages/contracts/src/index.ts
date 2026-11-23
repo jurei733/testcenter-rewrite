@@ -1128,10 +1128,19 @@ export type AdminSignInResponse = {
   sessionToken: string;
 };
 
+export type OriginalOperatorWorkspaceChoice = {
+  workspaceId: string;
+  tenantKey: string;
+  workspaceKey: string;
+  label: string;
+  mode: string;
+};
+
 export type GetAdminCurrentSessionResponse = {
   adminUser: PublicAdminUser;
   adminSession: PublicAdminSession;
   roleAssignments: PublicAdminRoleAssignment[];
+  originalWorkspaceChoices?: OriginalOperatorWorkspaceChoice[];
 };
 
 export type AdminSignOutResponse = {

@@ -64,6 +64,16 @@ try {
   headless:process.env.CI==='true' && process.env.UI_SMOKE_HEADFUL!=='true',
   ...(process.env.UI_SMOKE_BROWSER_CHANNEL?{channel:process.env.UI_SMOKE_BROWSER_CHANNEL}:{})
  });
+ const unauthenticated=await browser.newContext();
+ try {
+   const directStarter=await unauthenticated.newPage();
+   await directStarter.goto(base+'/app/operator-start?ui=original');
+   await directStarter.locator('#adminSignInButton').waitFor();
+   assert.equal(new URL(directStarter.url()).searchParams.get('returnUrl'),'/operator-start?ui=original');
+   assert.equal(await directStarter.locator('[data-cy^="workspace-card-"]').count(),0);
+   const response=await unauthenticated.request.get(base+'/api/v1/admin/auth/current-session?view=original-workspace-starter');
+   assert.equal(response.status(),401);
+ } finally {await unauthenticated.close();}
  for(const theme of ['Primar','Sekundar','Erwachsene'])for(const width of [1280,390]) {
   const key='native-files-'+theme.toLowerCase()+'-'+width,scope='/api/v1/tenants/demo-tenant/workspaces/'+key;
   await api('/api/v1/admin/original-interface/application-settings',{themeName:theme},'PATCH');
@@ -188,10 +198,21 @@ try {
       assert.deepEqual(restoredDetails.slice(0,2),[username,'']);
       await account.getByRole('button',{name:'Nutzerinformationen schließen'}).click();
       await account.waitFor({state:'detached'});
-      const workspaceRefresh=readPage.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/auth/current-session');
-      await readPage.locator('#originalWorkspaceFileHeader [data-cy="logo"]').click();
-      assert.equal((await workspaceRefresh).status(),200);
-      await readPage.locator('[data-view-nav="content"]').click();
+      const workspaceRefresh=readPage.waitForResponse(response=>{
+        const url=new URL(response.url());
+        return url.pathname==='/api/v1/admin/auth/current-session' && url.searchParams.get('view')==='original-workspace-starter';
+      });
+      await readPage.locator('#originalWorkspaceFileHeader a:has([data-cy="logo"])').press('Enter');
+      const starterSession=await workspaceRefresh;
+      assert.equal(starterSession.status(),200);
+      const {originalWorkspaceChoices}=await starterSession.json();
+      assert.deepEqual(originalWorkspaceChoices.map(({tenantKey,workspaceKey,label,mode})=>({tenantKey,workspaceKey,label,mode})),
+        [{tenantKey:'demo-tenant',workspaceKey:key,label:'Eigener Arbeitsbereich '+width,mode:'RO'}]);
+      await readPage.locator('[data-cy=change-password]').press('Enter');
+      await readPage.locator('#ownAdminPasswordChangeDialog').waitFor();
+      await readPage.locator('#ownAdminPasswordCancelButton').click();
+      await readPage.locator('#ownAdminPasswordChangeDialog').waitFor({state:'detached'});
+      await readPage.locator('[data-cy="workspace-card-Eigener Arbeitsbereich '+width+'"] button').press('Enter');
       await readPage.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
       await accountTrigger.click();await account.waitFor();
       assert.deepEqual((await account.locator('dd').allTextContents()).slice(0,-1),[username,'','Verwaltung von Testinhalten']);

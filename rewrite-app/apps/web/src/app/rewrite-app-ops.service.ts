@@ -219,7 +219,8 @@ export class RewriteAppOpsService {
     return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : value;
   }
 
-  async refreshAdminSession({publishOriginalRights = false} = {}): Promise<void> {
+  async refreshAdminSession({publishOriginalRights = false, includeOriginalWorkspaceChoices = false} = {}):
+      Promise<GetAdminCurrentSessionResponse | undefined> {
     const token = this.opsState.adminSessionToken.trim();
     if (!token) {
       return;
@@ -227,7 +228,8 @@ export class RewriteAppOpsService {
     const payload = await this.requestState.request<GetAdminCurrentSessionResponse>(
       "Admin Current Session",
       "GET",
-      productionApiRoutes.admin.currentSession,
+      productionApiRoutes.admin.currentSession +
+        (includeOriginalWorkspaceChoices ? "?view=original-workspace-starter" : ""),
       undefined,
       { headers: { authorization: `Bearer ${token}` }, quiet: publishOriginalRights }
     );
@@ -245,6 +247,7 @@ export class RewriteAppOpsService {
       );
     }
     this.persistence.persistShellState();
+    return payload;
   }
 
   async refreshAdminSessions(): Promise<void> {

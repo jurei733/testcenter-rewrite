@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, inject } from "@angular/core";
 import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { ActivatedRoute } from "@angular/router";
 
 import { InterfaceModeService } from './interface-mode.service';
 import { RewriteAppUiStateService } from './rewrite-app-ui-state.service';
@@ -27,7 +28,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
     @if (interfaceMode.mode() === 'original' && state.ops.adminSessionToken) {
       @defer (when true) {
         <app-original-workspace-files [sessionToken]="state.ops.adminSessionToken"
-          [tenantKey]="state.workspace.tenantKey" [workspaceKey]="state.workspace.workspaceKey" />
+          [tenantKey]="originalTenantKey" [workspaceKey]="originalWorkspaceKey" />
       } @placeholder {
         <p role="status">Dateien werden geladen…</p>
       } @error {
@@ -545,7 +546,16 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 export class ContentViewComponent implements OnInit {
   readonly view = inject(ContentViewFacade);
   readonly interfaceMode=inject(InterfaceModeService);
-  readonly state=inject(RewriteAppUiStateService);
+  readonly state = inject(RewriteAppUiStateService);
+  private readonly route = inject(ActivatedRoute);
+
+  get originalTenantKey(): string {
+    return this.route.snapshot.queryParamMap.get("tenant") ?? this.state.workspace.tenantKey;
+  }
+
+  get originalWorkspaceKey(): string {
+    return this.route.snapshot.queryParamMap.get("workspace") ?? this.state.workspace.workspaceKey;
+  }
 
   reloadFilesView():void {globalThis.location.reload();}
 

@@ -292,3 +292,18 @@
     flex-direction: column;
   }
 }
+
+.page.original-operator-starter-page {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  max-width: none;
+  min-height: 100dvh;
+  padding: 0;
+}
+
+.original-operator-starter-page > .home-stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}

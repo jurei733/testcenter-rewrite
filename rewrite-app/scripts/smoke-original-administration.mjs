@@ -304,10 +304,16 @@ try{
   const restoredSession=await fetch(base+currentSessionPath,{headers:{authorization:`Bearer ${browserToken}`}});
   assert.equal(restoredSession.status,200);
   assert.ok((await restoredSession.json()).roleAssignments.some(({role})=>role==="platform_admin"));
-  const workspaceRefresh=page.waitForResponse(response=>new URL(response.url()).pathname===currentSessionPath);
+  const workspaceRefresh=page.waitForResponse(response=>{
+    const url=new URL(response.url());
+    return url.pathname===currentSessionPath && url.searchParams.get('view')==='original-workspace-starter';
+  });
   await page.locator('#originalAdministrationHeader [data-cy="logo"]').click();
-  assert.equal((await workspaceRefresh).status(),200);
-  await page.locator("#administrationUsersTab").click();await surface.waitFor();
+  const starterSession=await workspaceRefresh;
+  assert.equal(starterSession.status(),200);
+  assert.deepEqual((await starterSession.json()).originalWorkspaceChoices,[]);
+  await page.locator('[data-cy=goto-superadmin-settings]').click();
+  await page.locator('[data-cy="superadmin-tabs:users"]').click();await surface.waitFor();
   await checkAccountDetails(systemRights);
   console.log("original_administration_account=restored-session-and-workspace-publication:passed");
   console.log("original_administration_account=source-rights-and-focus:passed");
