@@ -129,8 +129,10 @@ const canonicalRoutes: Routes = [
 
 const participantEntry = () => import('./native-participant/native-participant-entry.component')
   .then(module => module.NativeParticipantEntryComponent);
+const nativeInfoPage = () => import('./native-public-info-page.component').then(module => module.NativePublicInfoPageComponent);
 
 export const appRoutes: Routes = [
+  ...['legal-notice','privacy','accessibility'].map(notice=>({path:'native-info/'+notice,loadComponent:nativeInfoPage,data:{notice}})),
   {path:'r/check-starter',pathMatch:'full',loadComponent:()=>import('./native-system-check/native-system-check-starter.component').then(module=>module.NativeSystemCheckStarterComponent)},
   {path:'check/:workspaceId/:checkName/:step',loadComponent:()=>import('./native-system-check/native-system-check-entry.component').then(module=>module.NativeSystemCheckEntryComponent)},
   {path:'check/:workspaceId/:checkName',pathMatch:'full',redirectTo:'check/:workspaceId/:checkName/w'},

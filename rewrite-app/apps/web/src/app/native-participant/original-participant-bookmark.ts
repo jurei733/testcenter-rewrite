@@ -1,7 +1,7 @@
 const reservedEntryNames = new Set([
   'r', 't', 'gm', 'sm', 'am', 'admin', 'superadmin', 'check',
   'home', 'workspace', 'operator-start', 'content', 'runtime', 'participant',
-  'native-start', 'native-test', 'group-monitor', 'system-check', 'attachment-capture',
+  'native-start', 'native-test', 'native-info', 'group-monitor', 'system-check', 'attachment-capture',
   'ops', 'legal-notice', 'privacy', 'accessibility'
 ]);
 const originalAdminLoginPath = '/ops?ui=original&legacyLogin=1';
@@ -14,6 +14,9 @@ const originalRootDestinations = new Map([
   ['r/login', '/native-start/login'],
   ['r/admin-login', originalAdminLoginPath],
   ['r/check-starter', '/r/check-starter'],
+  ['legal-notice', '/native-info/legal-notice'],
+  ['privacy', '/native-info/privacy'],
+  ['accessibility', '/native-info/accessibility'],
 ]);
 const invalidSegment = (value: string) =>
   value === '.' || value === '..' || /[\/\\?#();\x00-\x1f\x7f]/.test(value);
@@ -29,6 +32,14 @@ function protectedDestination(path: string): string | null {
   return null;
 }
 
+function originalSystemCheckBookmark(path: string): string | null {
+  const match = /^\/check\/0*([1-9]\d*)\/([^/]+)(?:\/([wnuqr]))?$/.exec(path);
+  if (!match) return null;
+  const [, workspace, check, step = 'w'] = match;
+  // The Original guards later steps until the current document has loaded a check.
+  return step === 'w' ? `/check/${workspace}/${check}/w` : '/native-start/dispatch';
+}
+
 export function originalParticipantBookmark(hash: string): string | null {
   const path = hash.split('?', 1)[0];
   const login = /^#\/r\/login(?:\/([^/?#]+))?\/?$/.exec(hash);
@@ -39,7 +50,10 @@ export function originalParticipantBookmark(hash: string): string | null {
       if (segments.every(segment => !invalidSegment(segment))) {
         const destination = originalRootDestinations.get(segments.join('/'));
         if (destination) return destination;
-        const protectedPath = protectedDestination('/' + segments.map(encodeURIComponent).join('/'));
+        const encodedPath = '/' + segments.map(encodeURIComponent).join('/');
+        const check = originalSystemCheckBookmark(encodedPath);
+        if (check) return check;
+        const protectedPath = protectedDestination(encodedPath);
         if (protectedPath) return protectedPath + '?' + new URLSearchParams({[legacyBookmarkQueryKey]: '1'});
       }
     }
@@ -81,7 +95,7 @@ export function originalParticipantReturnPath(target: string): string {
   const root = originalRootDestinations.get(path.slice(1).replace(/([^/])\/$/, '$1'));
   if (root && root !== '/r/check-starter') return root;
   const protectedPath = protectedDestination(path);
-  if (!protectedPath && !/^\/(?:legal-notice|privacy|accessibility|r\/check-starter|check\/[^/]+\/[^/]+(?:\/[wnuqr])?)$/.test(path)) {
+  if (!protectedPath && !/^\/(?:r\/check-starter|check\/[^/]+\/[^/]+(?:\/[wnuqr])?)$/.test(path)) {
     return '/native-start';
   }
   const destination = protectedPath ?? path;

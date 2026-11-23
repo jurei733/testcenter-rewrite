@@ -30,7 +30,7 @@ test('Original participant bookmarks distinguish direct logins, explicit returns
  assert.equal(originalParticipantBookmark('#/r/login'),'/native-start/login');
  assert.equal(originalParticipantBookmark('#/r/login/%2Fr%2Fstarter'),'/native-start/login?returnTo=%2Fr%2Fstarter');
  assert.equal(originalParticipantBookmark('#/Owned.Name'),'/native-start/direct?name=Owned.Name');
- for(const bookmark of ['#/privacy','#/admin','#/person/child','#/a%2Fb','#/a%5Cb','#/a%3Bb','#/%2e%2e','#/%FF']){
+ for(const bookmark of ['#/admin','#/person/child','#/a%2Fb','#/a%5Cb','#/a%3Bb','#/%2e%2e','#/%FF']){
   assert.equal(originalParticipantBookmark(bookmark),null,bookmark);
  }
 });
@@ -39,7 +39,7 @@ test('Original return destinations stay inside the existing guarded application 
   ['/r/starter','/native-start/starter'],['/r/code-input','/native-start/dispatch'],['/r/login','/native-start/login'],
   ['/t/9/u/2?ui=original','/native-test/9/u/2?ui=original'],
   ['/gm/group.one/full','/group-monitor/group.one/full'],['/check/1/hardware','/check/1/hardware'],
-  ['/privacy','/privacy']
+  ['/privacy','/native-info/privacy']
  ])assert.equal(originalParticipantReturnPath(source),destination);
  for(const destination of ['https://owned.invalid','//owned.invalid','/gm/../login','/api/session','/t/123/(aux:other)','/gm/a\\b']){
   assert.equal(originalParticipantReturnPath(destination),'/native-start',destination);
@@ -51,6 +51,20 @@ test('Direct Original test and monitor bookmarks select guarded destinations',()
   ['gm/group.one','/group-monitor/group.one'],['gm/group%20one/full','/group-monitor/group%20one/full']
  ])assert.equal(originalParticipantBookmark('#/'+source),destination+'?legacyBookmark=1',source);
  for(const source of ['t/0','t/9/u/0','t/9/unknown','gm/a//b','gm/a%2Fb/full','gm/group/%2e%2e','gm/group/%5Cfull']){
+  assert.equal(originalParticipantBookmark('#/'+source),null,source);
+ }
+});
+test('Original public and Systemcheck bookmarks select their cold entry screens',()=>{
+ for(const notice of ['legal-notice','privacy','accessibility']){
+  assert.equal(originalParticipantBookmark('#/'+notice+'/?name=unrelated'),'/native-info/'+notice);
+ }
+ for(const source of ['check/2/Check.A','check/02/Check.A/w/','check/%32/Check.A?irrelevant=1']){
+  assert.equal(originalParticipantBookmark('#/'+source),'/check/2/Check.A/w',source);
+ }
+ for(const step of ['n','u','q','r']){
+  assert.equal(originalParticipantBookmark('#/check/2/Check.A/'+step),'/native-start/dispatch');
+ }
+ for(const source of ['check/0/Check.A','check/2x/Check.A','check/2/Check%2FA','check/2/%2e%2e','check/2/Check.A/invalid']){
   assert.equal(originalParticipantBookmark('#/'+source),null,source);
  }
 });

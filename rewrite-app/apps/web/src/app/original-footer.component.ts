@@ -1,4 +1,4 @@
-import { Component, inject } from "@angular/core";
+import { Component, inject, input } from "@angular/core";
 import { MatButton } from "@angular/material/button";
 import { RouterLink } from "@angular/router";
 import { AppShellFacade } from "./app-shell.facade";
@@ -13,9 +13,9 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
     <footer id="originalApplicationFooter">
       <div class="version-label">Version {{ version }}</div>
       <nav aria-label="Öffentliche Informationen" class="all-buttons">
-        <a matButton id="applicationAccessibilityNoticeLink" routerLink="/accessibility">Barrierefreiheit</a>
-        <a matButton id="applicationPrivacyNoticeLink" routerLink="/privacy">Datenschutz</a>
-        <a matButton id="applicationLegalNoticeLink" routerLink="/legal-notice">Impressum</a>
+        <a matButton id="applicationAccessibilityNoticeLink" [routerLink]="noticePrefix() + '/accessibility'">Barrierefreiheit</a>
+        <a matButton id="applicationPrivacyNoticeLink" [routerLink]="noticePrefix() + '/privacy'">Datenschutz</a>
+        <a matButton id="applicationLegalNoticeLink" [routerLink]="noticePrefix() + '/legal-notice'">Impressum</a>
       </nav>
     </footer>
   `,
@@ -31,6 +31,7 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
 })
 export class OriginalFooterComponent {
   readonly app = inject(AppShellFacade);
+  readonly noticePrefix = input<'' | '/native-info'>('');
 
   get version(): string {
     const build = readStringValue(parseJsonDocument(this.app.ops.runtimeHealthView),
