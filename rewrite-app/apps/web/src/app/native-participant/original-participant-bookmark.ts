@@ -11,7 +11,7 @@ const originalRootDestinations = new Map([
   ['r/route-dispatcher', '/native-start/dispatch'],
   ['r/code-input', '/native-start/dispatch'],
   ['r/starter', '/native-start/starter'],
-  ['r/login', '/native-start'],
+  ['r/login', '/native-start/login'],
   ['r/admin-login', originalAdminLoginPath],
   ['r/check-starter', '/r/check-starter'],
 ]);
@@ -33,7 +33,7 @@ export function originalParticipantBookmark(hash: string): string | null {
     if (login) {
       return login[1]
         ? '/native-start/login?' + new URLSearchParams({returnTo: decodeURIComponent(login[1])})
-        : '/native-start';
+        : '/native-start/login';
     }
     if (!direct?.[1]) return null;
     const name = decodeURIComponent(direct[1]);
@@ -65,10 +65,8 @@ export function originalParticipantReturnPath(target: string): string {
   } catch {
     return '/native-start';
   }
-  if (/^\/r\/admin-login\/?$/.test(path)) return originalAdminLoginPath;
-  if (/^\/r\/(?:starter|code-input|route-dispatcher)\/?$/.test(path) || /^\/r\/?$/.test(path)) {
-    return '/native-start';
-  }
+  const root = originalRootDestinations.get(path.slice(1).replace(/([^/])\/$/, '$1'));
+  if (root && root !== '/r/check-starter') return root;
   let destination = path;
   if (/^\/t\/[1-9]\d*(?:\/(?:status|u\/[1-9]\d*))?$/.test(path)) {
     destination = path.replace(/^\/t\//, '/native-test/');

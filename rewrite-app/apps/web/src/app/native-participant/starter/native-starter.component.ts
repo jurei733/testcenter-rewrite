@@ -14,8 +14,9 @@ import {AssetService} from '../shared/services/asset.service';
 import {CustomtextService} from '../shared/services/customtext/customtext.service';
 import {CustomtextPipe} from '../shared/pipes/customtext/customtext.pipe';
 import {NativeMonitorIconComponent as MatIcon} from '../../native-monitor/native-monitor-icon.component';
+import {AlertComponent} from '../../native-monitor/shared/components/alert/alert.component';
 @Component({selector:'app-native-starter',standalone:true,
- imports:[MatButton,OriginalToastContainerComponent,TestCardComponent,AsyncPipe,NgTemplateOutlet,CustomtextPipe,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatIcon],
+ imports:[MatButton,OriginalToastContainerComponent,TestCardComponent,AsyncPipe,NgTemplateOutlet,CustomtextPipe,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatIcon,AlertComponent],
  providers:[NativeTestStarterService,AssetService,CustomtextService,OriginalToastService],styleUrls:['./starter.component.scss'],
  template:`<div class="intro"><img class="companion-image" [src]="assets.getAssetSrc('starterCompanion')" alt="companion-image"/><div class="flex-column"><p class="intro-heading">Schön, dass du da bist!</p><p>Komm, wir legen los. Wähle einen Teil aus.</p></div></div>
  @if(problem()){<p role="alert">{{problem()}}</p>}
@@ -26,7 +27,7 @@ import {NativeMonitorIconComponent as MatIcon} from '../../native-monitor/native
  @if(claims?.test&&!claims?.testGroupMonitor){<ng-container [ngTemplateOutlet]="testCardList" />}
  @if(claims?.sysCheck;as checks){<h4>Systemcheck</h4>@for(check of checks;track check.workspaceId+':'+check.id){<button mat-raised-button class="starter" [attr.data-cy]="'syscheck-'+check.id" (click)="systemCheck(check.workspaceId,check.id)"><div>{{check.label}}</div><div>{{check.description}}</div></button>}}
  </div>
- @if((claims?.test&&!booklets.length)||!claims||!ObjectKeys(claims).length){<p role="status">{{'Für diese Anmeldung wurde kein Test gefunden.'|customtext:'login_noBookletsAvailable'|async}}</p>}
+ @if((claims?.test&&!booklets.length)||!claims||!ObjectKeys(claims).length){<tc-alert level="info" role="status" customtext="login_noBookletsAvailable" text="Für diese Anmeldung wurde kein Test gefunden." />}
  <div #bottomSentinel class="sentinel"></div>@if(showScrollButton()){<button class="scroll-button" (click)="scrollDown()">Unten geht es weiter<mat-icon svgIcon="arrow_cool_down" /></button>}<div class="button-box">@if(claims?.review){<button matButton="tonal" data-cy="review-download" (click)="downloadReview()">Reviews downloaden</button>}</div><app-original-toast-container />`})
 export class NativeStarterComponent implements AfterViewInit {
  readonly ObjectKeys=Object.keys;
@@ -48,7 +49,10 @@ export class NativeStarterComponent implements AfterViewInit {
    this.scheduleAccessCheck();
   },5000);
  }
- get claims(){return this.current?this.session.access()?.claims:undefined;}
+ get claims(){
+  const access=this.current?this.session.access():null;
+  return access?.flags.includes('codeRequired')?{}:access?.claims;
+ }
  get current(){return !this.owner.signal.aborted&&!this.scope.aborted&&this.scope===this.session.accessSignal;}
  get booklets(){return this.claims?.test?.map(claim=>({id:claim.id,name:claim.label,mode:(claim.flags.locked?'locked':claim.flags.running?'continue':this.claims?.testGroupMonitor?'view':'start') as 'locked'|'continue'|'view'|'start'}))??[];}
  get visibility(){const settings=this.session.access()?.viewSettings;if(settings&&!Array.isArray(settings)&&'monitorBookletVisibility'in settings){const v=settings.monitorBookletVisibility;if(v==='collapsed'||v==='hidden')return v;}return 'visible';}

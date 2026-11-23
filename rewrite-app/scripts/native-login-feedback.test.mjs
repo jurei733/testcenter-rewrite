@@ -27,7 +27,7 @@ function load(relative){
 const {NativePublicHeaderService}=load('native-public-header.service.ts');
 const {isExplicitOriginalAdminLogin,originalMissingRouteBookmark,originalParticipantBookmark,originalParticipantReturnPath}=load('native-participant/original-participant-bookmark.ts');
 test('Original participant bookmarks distinguish direct logins, explicit returns and reserved routes',()=>{
- assert.equal(originalParticipantBookmark('#/r/login'),'/native-start');
+ assert.equal(originalParticipantBookmark('#/r/login'),'/native-start/login');
  assert.equal(originalParticipantBookmark('#/r/login/%2Fr%2Fstarter'),'/native-start/login?returnTo=%2Fr%2Fstarter');
  assert.equal(originalParticipantBookmark('#/Owned.Name'),'/native-start/direct?name=Owned.Name');
  for(const bookmark of ['#/privacy','#/admin','#/person/child','#/a%2Fb','#/a%5Cb','#/a%3Bb','#/%2e%2e','#/%FF']){
@@ -36,7 +36,7 @@ test('Original participant bookmarks distinguish direct logins, explicit returns
 });
 test('Original return destinations stay inside the existing guarded application routes',()=>{
  for(const [source,destination]of [
-  ['/r/starter','/native-start'],['/r/code-input','/native-start'],
+  ['/r/starter','/native-start/starter'],['/r/code-input','/native-start/dispatch'],['/r/login','/native-start/login'],
   ['/t/9/u/2?ui=original','/native-test/9/u/2?ui=original'],
   ['/gm/group.one/full','/group-monitor/group.one/full'],['/check/1/hardware','/check/1/hardware'],
   ['/privacy','/privacy']
@@ -95,6 +95,35 @@ test('Going home from an unknown Original bookmark preserves the awaiting person
  component.logoClick();
  assert.equal(component.missingRoute,'/archiv/fehlt');
  assert.equal(logoutCalls,0);
+ component.ngOnDestroy();
+});
+test('An explicit Original participant login can replace a restored session and continue to the code step',async()=>{
+ const Entry=entries.find(([kind])=>kind==='participant')[1];
+ const snapshot={data:{explicitLogin:true},queryParamMap:{get:()=>null}};
+ const {component,session}=fixture(Entry,snapshot);
+ session.access.set({token:'restored',claims:{test:[]},flags:[]});
+ const fresh={token:'fresh',claims:{},flags:['codeRequired'],customTexts:{}};
+ session.loginParticipant=async()=>{session.access.set(fresh);return fresh;};
+ const navigations=[];
+ bindings.get('Router').navigate=async(commands,extras)=>{navigations.push({commands,extras});return true;};
+ await component.submit();
+ assert.equal(component.explicitLogin,true);
+ assert.equal(session.access(),fresh);
+ assert.deepEqual(navigations,[{commands:['/native-start'],extras:{replaceUrl:true}}]);
+ component.ngOnDestroy();
+});
+test('The logo on an explicit Original Starter preserves the pending-code session',()=>{
+ const Entry=entries.find(([kind])=>kind==='participant')[1];
+ const {component,session}=fixture(Entry,{data:{legacyEntry:'starter'}});
+ const pending={token:'pending',flags:['codeRequired']};
+ session.access.set(pending);
+ let calls=0;
+ session.logout=async()=>{calls++;};
+ component.logoClick();
+ assert.equal(component.showCode,false);
+ assert.equal(component.logoDestination,'/native-start/starter');
+ assert.equal(session.access(),pending);
+ assert.equal(calls,0);
  component.ngOnDestroy();
 });
 for(const [entry,Entry]of entries){

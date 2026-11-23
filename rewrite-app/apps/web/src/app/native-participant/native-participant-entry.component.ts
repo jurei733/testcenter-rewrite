@@ -41,7 +41,7 @@ import {originalParticipantReturnPath} from './original-participant-bookmark';
   .missing-route mat-card { width: 400px; max-width: 100%; margin-top: 80px; }
   .missing-route mat-card-content { overflow-wrap: anywhere; }
  `,
- template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(!session.busy()&&!codeRequired){@if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
+ template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(!session.busy()&&!explicitLogin&&!showCode){@if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a [routerLink]="logoDestination" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
  @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
  @if(missingRoute!==null){
   <main class="missing-route">
@@ -58,20 +58,22 @@ import {originalParticipantReturnPath} from './original-participant-bookmark';
  @else if(explicitLogin||!session.access()){
  <div class="native-login-outlet"><div class="native-login-host"><div class="login-page"><div class="welcome-section"><img [src]="settings.assetUrl('loginIllustration')" alt=""/><div><p class="heading">Willkommen im IQB‑Testcenter</p><p>Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.</p></div></div>
  <div class="login-section">@if(!passwordStep()){<form (ngSubmit)="submit()"><h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" required minlength="3" autocomplete="username" autocapitalize="off" /></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>@if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}@else{<form (ngSubmit)="submit()"><div class="password-headline"><button matIconButton type="button" (click)="passwordStep.set(false);password=''" aria-label="Zurück"><mat-icon svgIcon="chevron_left" /></button><h2>Kennwort eingeben</h2></div><mat-form-field appearance="outline"><mat-label>Kennwort</mat-label><input matInput name="password" autofocus (keyup)="passwordKeyUp($event)" [(ngModel)]="password" [type]="showPassword?'text':'password'" autocomplete="current-password"/><button mat-icon-button matSuffix type="button" aria-label="Kennwort anzeigen" [attr.aria-pressed]="showPassword" (click)="showPassword=!showPassword"><mat-icon svgIcon="visibility" /></button></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>@if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}<app-native-login-browser-notice /><div class="button-section"><button matButton="tonal" type="button" routerLink="/ops" data-cy="login-admin-form">Adminbereich</button></div></div></div></div></div>
- }@else if(codeRequired){<div class="native-login-outlet"><app-native-code-login [inputType]="codeInputType" [length]="codeLength" [disabled]="session.busy()" [problemText]="problem()" (submitCode)="code($event)" /></div>}
+ }@else if(showCode){<div class="native-login-outlet"><app-native-code-login [inputType]="codeInputType" [length]="codeLength" [disabled]="session.busy()" [problemText]="problem()" (submitCode)="code($event)" /></div>}
  @else if(refreshFailed()){<button matButton="filled" (click)="refreshStarter()">Übersicht erneut laden</button>}
- @else{<div class="native-login-outlet">@for(scope of ownerKeys;track scope){<app-native-starter />}</div>}@if(missingRoute===null&&!session.access()){<app-original-footer />}`})
+ @else{<div class="native-login-outlet">@for(scope of ownerKeys;track scope){<app-native-starter />}</div>}@if(missingRoute===null&&(explicitLogin||!session.access())){<app-original-footer />}`})
 export class NativeParticipantEntryComponent {
  readonly publicHeader=inject(NativePublicHeaderService);
  private clearStarterHeader:(()=>void)|undefined;
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
  private readonly cts=inject(CustomtextService);private readonly router=inject(Router);private readonly dialog=inject(MatDialog);
- private readonly route=inject(ActivatedRoute).snapshot;
+ private readonly activeRoute=inject(ActivatedRoute);
+ private readonly route=this.activeRoute.snapshot;
  readonly directLoginName=this.route?.data.directLogin===true?this.route.queryParamMap.get('name'):null;
  readonly explicitLogin=this.route?.data.explicitLogin===true;
  readonly missingRoute=this.route?.data.notFound===true?this.route.queryParamMap.get('path')??'':null;
  private readonly legacyEntry=this.route?.data.legacyEntry;
+ readonly logoDestination=this.explicitLogin?'/native-start/login':this.legacyEntry==='starter'?'/native-start/starter':'/native-start';
  private readonly initialNavigation=this.router.getCurrentNavigation()?.previousNavigation===null;
  private singleActor:string|undefined;
  private readonly view=new AbortController();private logoutCleanup:(()=>void)|undefined;
@@ -105,12 +107,12 @@ export class NativeParticipantEntryComponent {
    });
   });
   if(this.directLoginName)void this.openDirectLogin(this.directLoginName);
-  else if(this.missingRoute===null&&!this.explicitLogin&&this.session.access()&&!this.codeRequired)void this.refreshStarter();
+  else if(this.missingRoute===null&&!this.explicitLogin&&this.session.access()&&!this.showCode)void this.refreshStarter();
  }
  private updatePublicHeader(access:OriginalAccessSet|null){
   if(this.view.signal.aborted)return;
   if(!access){this.clearStarterHeader=undefined;this.publicHeader.setTitle('Anmelden');}
-  else if(!access.flags.includes('codeRequired'))this.clearStarterHeader=this.publicHeader.setTitle('Übersicht');
+  else if(!this.showCode)this.clearStarterHeader=this.publicHeader.setTitle('Übersicht');
   else{this.clearStarterHeader?.();this.clearStarterHeader=undefined;}
  }
  async refreshStarter(){
@@ -165,8 +167,11 @@ export class NativeParticipantEntryComponent {
   }
  }
  private async navigateAfterLogin(access:OriginalAccessSet):Promise<void>{
-  if(this.explicitLogin){
-   const route=originalParticipantReturnPath(this.route.queryParamMap.get('returnTo')??'');
+  const returnTo=this.explicitLogin?this.activeRoute.snapshot.queryParamMap.get('returnTo'):null;
+  if(returnTo){
+   const destination=originalParticipantReturnPath(returnTo);
+   const route=destination==='/native-start/dispatch'&&!access.flags.includes('codeRequired')
+    ?'/native-start/starter':destination;
    if(!await this.router.navigateByUrl(route,{replaceUrl:true})&&!this.view.signal.aborted&&this.session.access()===access){
     await this.router.navigate(['/native-start'],{replaceUrl:true});
    }
@@ -174,8 +179,11 @@ export class NativeParticipantEntryComponent {
   }
   await this.startSingleTest(access);
   await this.startSingleCheck(access);
+  if(this.explicitLogin&&!this.view.signal.aborted&&this.session.access()===access){
+   await this.router.navigate(['/native-start'],{replaceUrl:true});
+  }
  }
- get codeRequired(){return this.session.access()?.flags.includes('codeRequired')??false;}
+ get showCode(){return this.legacyEntry!=='starter'&&(this.session.access()?.flags.includes('codeRequired')??false);}
  get ownerKeys(){this.session.access();this.session.busy();return [this.session.accessSignal];}
  get codeInputType():CodeInputType{const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.type??'text-field':'text-field';}
  get codeLength(){const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.length:undefined;}
@@ -201,7 +209,7 @@ export class NativeParticipantEntryComponent {
    if(!this.view.signal.aborted)this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');
   }
  }
- logoClick(){if(this.missingRoute!==null||!this.codeRequired||this.view.signal.aborted)return;const pending=this.session.logout(),scope=this.session.accessSignal;void pending.catch(error=>{if(!this.view.signal.aborted&&scope===this.session.accessSignal&&!this.session.access())this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.');});}
+ logoClick(){if(this.missingRoute!==null||(!this.showCode&&!this.explicitLogin)||!this.session.access()||this.view.signal.aborted)return;const pending=this.session.logout(),scope=this.session.accessSignal;void pending.catch(error=>{if(!this.view.signal.aborted&&scope===this.session.accessSignal&&!this.session.access())this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.');});}
  logout(){if(this.logoutCleanup||this.view.signal.aborted)return;const claims=this.session.access()?.claims,isOperator=['superAdmin','workspaceAdmin','testGroupMonitor'].some(key=>!!claims&&Object.hasOwn(claims,key));const scope=this.session.accessSignal,ref=this.dialog.open(OriginalParticipantLogoutDialogComponent,{panelClass:'original-participant-logout-dialog',data:{safeMode:!isOperator&&this.settings.effectiveThemeName()==='Primar'},autoFocus:'dialog'}),subscriptions=new Subscription();
   const retire=()=>{subscriptions.unsubscribe();ref.componentRef?.location.nativeElement.remove();ref.close();if(this.logoutCleanup===retire)this.logoutCleanup=undefined;};this.logoutCleanup=retire;subscriptions.add(fromEvent(scope,'abort').subscribe(retire));
   subscriptions.add(ref.afterClosed().pipe(take(1)).subscribe(result=>{retire();if(result&&!this.view.signal.aborted&&scope===this.session.accessSignal&&!scope.aborted){void this.session.logout().catch(error=>{if(!this.view.signal.aborted&&!this.session.access())this.problem.set(String(error));});}}));
