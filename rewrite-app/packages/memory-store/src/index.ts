@@ -619,6 +619,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return true;
     },
     async deleteSourcePackageAggregate(input) {
+      guardOriginalWorkspaceWriteCollections(state, state.adminSessionsByToken, input);
       const sourcePackage = state.sourcePackages.get(input.sourcePackageId);
       if (
         !sourcePackage ||
@@ -686,6 +687,8 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         state.importJobs.delete(importJobId);
       }
       state.sourcePackages.delete(input.sourcePackageId);
+      const activity = input.deletionActivityEvent;
+      if (activity) state.workspaceActivityEvents.set(activity.activityEventId, activity);
       refreshOriginalWorkspaceContentCollection(state,input,projectOriginalWorkspaceFile);
       return true;
     },

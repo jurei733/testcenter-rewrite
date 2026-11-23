@@ -28,7 +28,7 @@ export class OriginalWorkspaceFilesController {
   overview:WorkspaceOverview|null=null;
   busy=false;
   problem='';
-  notice='';
+  notice:{message:string;action:string}|null=null;
   uploads:OriginalWorkspaceUploadResult[]=[];
   selectedRowId='';
   deletionReport:DeleteSourcePackagesResponse['report']|null=null;
@@ -124,7 +124,7 @@ export class OriginalWorkspaceFilesController {
   async connect():Promise<void> {
     const scope=this.current();this.epoch++;
     const owner={epoch:this.epoch,token:scope.token,tenantKey:scope.tenantKey,workspaceKey:scope.workspaceKey};this.owner=owner;
-    this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.problem='';this.notice='';this.selectedRowId='';
+    this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.problem='';this.notice=null;this.selectedRowId='';
     this.busy=!!owner.token && !!owner.tenantKey && !!owner.workspaceKey;this.changed();
     if(!this.busy)return;
     try { await this.load(owner); }
@@ -139,7 +139,7 @@ export class OriginalWorkspaceFilesController {
   }
   async upload(files:OriginalWorkspaceUpload[]):Promise<void> {
     const owner=this.owner;if(!owner || !this.owns(owner) || !this.canWrite || this.busy || !files.length)return;
-    this.busy=true;this.problem='';this.notice='';this.uploads=files.map(file=>({name:file.name,status:'queued',message:''}));this.changed();
+    this.busy=true;this.problem='';this.notice=null;this.uploads=files.map(file=>({name:file.name,status:'queued',message:''}));this.changed();
     try {
       for(let index=0;index<files.length;index++) {
         if(!this.owns(owner))return;
@@ -189,7 +189,7 @@ export class OriginalWorkspaceFilesController {
     let used=false;
     return {count:selected.length,confirm:async()=>{
       if(used || !this.owns(owner) || !this.canWrite || this.busy)return false;
-      used=true;this.busy=true;this.problem='';this.notice='';this.changed();
+      used=true;this.busy=true;this.problem='';this.notice=null;this.changed();
       try {
         const result=await this.request<DeleteSourcePackagesResponse>(owner,'POST',productionApiRoutes.workspace.deleteSourcePackages,{items:selected});
         this.deletionReport=result.report;
@@ -199,7 +199,8 @@ export class OriginalWorkspaceFilesController {
         if(report.wasUsed.length)messages.push(`${report.wasUsed.length} Dateien werden von anderen verwendet und wurden nicht gelöscht.`);
         if(report.didNotExist.length)messages.push(`${report.didNotExist.length} Dateien existieren nicht mehr.`);
         if(report.errors.length)messages.push(`${report.errors.length} Dateien konnten wegen eines Fehlers nicht gelöscht werden.`);
-        this.notice=messages.join('\n');await this.load(owner);return true;
+        if(messages.length)this.notice={message:messages.join('<br>'),action:messages.length>1?'Achtung':''};
+        await this.load(owner);return true;
       } catch(error){if(this.owns(owner))this.problem=problemText(error,'Löschen fehlgeschlagen.');return false;}
       finally{if(this.owns(owner)){this.busy=false;this.changed();}}
     }};
@@ -209,5 +210,5 @@ export class OriginalWorkspaceFilesController {
     return {path:this.path(owner,productionApiRoutes.workspace.downloadWorkspaceFile,file.sourcePackageId),name:file.name,token:owner.token,
       current:()=>this.owns(owner)};
   }
-  destroy():void {this.destroyed=true;this.epoch++;this.owner=null;this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.selectedRowId='';this.busy=false;this.problem='';this.notice='';this.changed();}
+  destroy():void {this.destroyed=true;this.epoch++;this.owner=null;this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.selectedRowId='';this.busy=false;this.problem='';this.notice=null;this.changed();}
 }

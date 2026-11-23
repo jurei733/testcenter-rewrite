@@ -99,6 +99,8 @@ export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,orig
 export type {OriginalWorkspaceWriteAuthority,OriginalWorkspaceWriteSnapshot} from './original-workspace-write.js';
 import {createOriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
 export {findOriginalWorkspaceFile, projectOriginalWorkspaceFileDigests, readOriginalWorkspaceFileSelection} from './original-workspace-files.js';
+export {deleteOriginalWorkspaceFiles, readOriginalWorkspaceFileDeletion} from './original-workspace-file-deletion.js';
+import type {OriginalWorkspaceWriteAuthority} from './original-workspace-write.js';
 export {readOriginalWorkspaceAdministrationCollection,parseOriginalWorkspaceNumber,originalExplicitWorkspaceAccess,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection} from './original-workspace-administration.js';
 export type {OriginalWorkspaceAdministrationScope,OriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
 import {createOriginalTestAdministrationPort} from './original-test-administration.js';
@@ -478,6 +480,7 @@ export type ContentIntakePort = {
     workspaceKey: string;
     sourcePackageId: string;
     confirmation: string;
+    authority?: OriginalWorkspaceWriteAuthority;
   }): Promise<WorkspaceSourcePackageDeletion>;
   activateContentRelease(input: {
     tenantKey: string;
@@ -1644,6 +1647,8 @@ export type FirstSliceRepository = import('./original-system-check.js').Original
     expectedImportJobIds: string[];
     expectedContentReleaseIds: string[];
     expectedWorkspaceSourcePackageReferenceRevision: string;
+    authority?: OriginalWorkspaceWriteAuthority;
+    deletionActivityEvent?: WorkspaceActivityEvent;
   }): Promise<boolean>;
   getImportJobById(importJobId: string): Promise<ImportJob | null>;
   listImportJobsByWorkspace(
@@ -32772,6 +32777,10 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        if (input.authority && !selectCurrentWorkspaceFiles(sourcePackages, activityEvents)
+          .some(source => source.sourcePackageId === sourcePackage.sourcePackageId)) {
+          throw new FirstSliceError(404, "source_package_not_found", "File not found.");
+        }
         const readiness = buildSourcePackageDeletionReadiness({
           sourcePackage,
           importJobs,
@@ -32793,6 +32802,26 @@ export const createFirstSliceServices = (
           );
         }
 
+        const deletion: WorkspaceSourcePackageDeletion = {
+          sourcePackageId: sourcePackage.sourcePackageId,
+          fileName: sourcePackage.fileName,
+          deletedImportJobCount: readiness.importJobs.length,
+          deletedContentReleaseCount: readiness.contentReleases.length
+        };
+        const deletionActivity = {
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "source_package_deleted",
+          subjectType: "source_package",
+          subjectId: sourcePackage.sourcePackageId,
+          summary: `Source package '${sourcePackage.fileName}' deleted.`,
+          details: {
+            fileName: sourcePackage.fileName,
+            mediaType: sourcePackage.mediaType,
+            deletedImportJobCount: deletion.deletedImportJobCount,
+            deletedContentReleaseCount: deletion.deletedContentReleaseCount
+          }
+        } satisfies Parameters<typeof buildWorkspaceActivity>[0];
         const deleted = await repository.deleteSourcePackageAggregate({
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
@@ -32807,7 +32836,11 @@ export const createFirstSliceServices = (
             createWorkspaceSourcePackageReferenceRevision({
               sourcePackages,
               activityEvents
-            })
+            }),
+          ...(input.authority ? {
+            authority: input.authority,
+            deletionActivityEvent: buildWorkspaceActivity(deletionActivity)
+          } : {})
         });
         if (!deleted) {
           throw new FirstSliceError(
@@ -32817,26 +32850,7 @@ export const createFirstSliceServices = (
           );
         }
 
-        const deletion: WorkspaceSourcePackageDeletion = {
-          sourcePackageId: sourcePackage.sourcePackageId,
-          fileName: sourcePackage.fileName,
-          deletedImportJobCount: readiness.importJobs.length,
-          deletedContentReleaseCount: readiness.contentReleases.length
-        };
-        await recordWorkspaceActivity({
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "source_package_deleted",
-          subjectType: "source_package",
-          subjectId: sourcePackage.sourcePackageId,
-          summary: `Source package '${sourcePackage.fileName}' deleted.`,
-          details: {
-            fileName: sourcePackage.fileName,
-            mediaType: sourcePackage.mediaType,
-            deletedImportJobCount: deletion.deletedImportJobCount,
-            deletedContentReleaseCount: deletion.deletedContentReleaseCount
-          }
-        });
+        if (!input.authority) await recordWorkspaceActivity(deletionActivity);
         if(sourcePackage.fileName.startsWith('Testtakers/')&&selectOriginalPhysicalWorkspaceFiles({sourcePackages,activityEvents}).some(row=>row.sourcePackageId===sourcePackage.sourcePackageId))await importRosterOnlyWorkspaceFile(sourcePackage,input);
         return deletion;
       },

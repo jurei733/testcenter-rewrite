@@ -6,9 +6,16 @@ import {FirstSliceError} from './first-slice-error.js';
 import {originalCommandInteger,originalCommandFloatString} from './original-command-codec.js';
 import {OriginalPhpNumber,OriginalPhpObject} from './original-test-log-json.js';
 import {originalOpaqueWorkspaceRole} from './original-workspace-role.js';
+import type {OriginalWorkspaceWriteAuthority} from './original-workspace-write.js';
 
 export type OriginalWorkspaceAdministrationScope={tenantId:string;workspaceId:string;tenantKey:string;workspaceKey:string};
-export type OriginalWorkspaceAdministrationPort={context(input:{token:string;tenantKey:string;workspaceKey:string}):Promise<{workspaceId:string;role:'RO'|'RW'}>;resolve(input:{token:string;workspacePathSegment:string;write:boolean}):Promise<OriginalWorkspaceAdministrationScope>;delete(input:{token:string;workspacePathSegment:string;kind:'groups'|'tests';body:unknown}):Promise<void>};
+type WorkspaceLocator={token:string;workspacePathSegment:string};
+export type OriginalWorkspaceAdministrationPort={
+  context(input:{token:string;tenantKey:string;workspaceKey:string}):Promise<{workspaceId:string;role:'RO'|'RW'}>;
+  resolve(input:WorkspaceLocator&{write:boolean}):Promise<OriginalWorkspaceAdministrationScope>;
+  authorizeWrite(input:WorkspaceLocator):Promise<OriginalWorkspaceAdministrationScope&{authority:OriginalWorkspaceWriteAuthority}>;
+  delete(input:WorkspaceLocator&{kind:'groups'|'tests';body:unknown}):Promise<void>;
+};
 type Collection<T>=Map<string,T>|Record<string,T>;
 const values=<T>(rows:Collection<T>):T[]=>rows instanceof Map?[...rows.values()]:Object.values(rows);
 const internal=()=>new FirstSliceError(500,'original_workspace_request_invalid','Internal error.');
@@ -68,10 +75,13 @@ export function createOriginalWorkspaceAdministrationPort(input:{repository:Firs
     if(!scope||!role)throw new FirstSliceError(404,'original_workspace_not_found','Workspace `'+reference+'` not found.');
     if(request.write&&role!=='RW')throw new FirstSliceError(403,'original_workspace_read_only','Access Denied: Role `RW` on workspace `ws_'+reference+'`, needed. Only `RO` provided.');
     return scope;
+  },async authorizeWrite(request){
+    const scope=await port.resolve({...request,write:true});
+    return {...scope,authority:{token:request.token,tenantId:scope.tenantId,workspaceId:scope.workspaceId,now:input.now}};
   },async delete(request){
-    const scope=await port.resolve({...request,write:true}),authority={token:request.token,tenantId:scope.tenantId,workspaceId:scope.workspaceId,now:input.now};
-    const result=request.kind==='groups'?await input.repository.deleteOriginalGroupResults({...scope,groups:prepareOriginalNativeGroupSelection(request.body),authority})
-      :await input.repository.deleteOriginalSelectedTests({...scope,personSessions:prepareOriginalNativeTestSelection(request.body),authority});
+    const scope=await port.authorizeWrite(request);
+    const result=request.kind==='groups'?await input.repository.deleteOriginalGroupResults({...scope,groups:prepareOriginalNativeGroupSelection(request.body)})
+      :await input.repository.deleteOriginalSelectedTests({...scope,personSessions:prepareOriginalNativeTestSelection(request.body)});
     if(!result)throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
   }};
   return port;

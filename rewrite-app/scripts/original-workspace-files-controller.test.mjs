@@ -156,7 +156,8 @@ test('confirmation captures exact original IDs/filenames, retains partial outcom
  f.controller.checkAll('Unit',false);f.controller.checkAll('Resource',true);
  assert.equal(await captured.confirm(),true);assert.deepEqual(posted,{items:[{sourcePackageId:'UNIT',confirmation:'Unit/owned.xml'}]});
  assert.equal(await captured.confirm(),false);assert.equal(f.calls.filter(call=>call.method==='POST').length,1);
- assert.deepEqual(f.controller.deletionReport,report);assert.match(f.controller.notice,/werden von anderen verwendet/);
+ assert.deepEqual(f.controller.deletionReport,report);
+ assert.deepEqual(f.controller.notice,{message:'1 Dateien werden von anderen verwendet und wurden nicht gelöscht.',action:''});
 });
 test('old confirmation and download ownership are invalid after workspace change, logout or destruction',async()=>{
  for(const transition of ['scope','logout','destroy']){

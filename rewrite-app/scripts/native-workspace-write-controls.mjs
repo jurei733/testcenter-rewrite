@@ -12,10 +12,16 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
  const originalRun=await repository.findOriginalTestNumber({...ids,participantSessionId:person.participantSession.participantSessionId,testNumber});
  assert.ok(originalRun);
  await repository.getOrCreateOriginalParticipantGroup({...ids,groupKey,groupLabel:'Owned revocation control',createdAt:new Date().toISOString()});
+ const fileName='owned-delete-control.txt';
+ const {sourcePackage}=await services.contentIntake.uploadWorkspaceFile({...scope,fileName,mediaType:'text/plain',sourceDocument:'Owned deletion control'});
+ const filePath='Resource/'+fileName;
  const restore=async()=>{await repository.saveAdminUser(user);await repository.saveAdminRoleAssignment(role);await repository.saveTenant(tenant);await repository.saveWorkspace({...scope,workspace});};
  const preserved=async()=>{
   assert.ok(await repository.getTestRunById(originalRun.testRunId),'An unauthorized request must retain its actual selected Test.');
   assert.ok((await repository.listOriginalParticipantGroupsByWorkspace(ids.tenantId,ids.workspaceId)).some(g=>g.groupKey===groupKey),'An unauthorized request must retain its actual selected group.');
+  assert.deepEqual(await repository.getSourcePackageById(sourcePackage.sourcePackageId),sourcePackage);
+  const events=await repository.listWorkspaceActivityEventsByWorkspace(ids.tenantId,ids.workspaceId);
+  assert.ok(!events.some(event=>event.eventType==='source_package_deleted'&&event.subjectId===sourcePackage.sourcePackageId));
  };
  const cases=[
   ['logout',403,async token=>services.adminAuth.signOut({sessionToken:token})],
@@ -28,12 +34,16 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
   ['suspended Tenant',404,async()=>repository.saveTenant({...tenant,status:'suspended'})],
   ['archived Workspace',404,async()=>repository.saveWorkspace({...scope,workspace:{...workspace,status:'archived'}})]
  ];
- for(const boundary of ['body','durable-writer'])for(const kind of ['groups','tests'])for(const[label,status,invalidate]of cases){
+ const repositories={groups:'deleteOriginalGroupResults',tests:'deleteOriginalSelectedTests',files:'deleteSourcePackageAggregate'};
+ const selections={groups:{groups:[groupKey]},tests:{personSessions:[{loginName,bookletName:'OWNED.ADM.B'}]},files:{f:[filePath]}};
+ const basePath='/workspace/'+workspaceNumber;
+ const paths={groups:basePath+'/responses',tests:basePath+'/responses/detailed',files:basePath+'/files'};
+ for(const boundary of ['body','durable-writer'])for(const kind of ['groups','tests','files'])for(const[label,status,invalidate]of cases){
   await t.test(`native ${kind} DELETE rejects ${label} after ${boundary} wait`,{timeout:20000},async()=>{
    await restore();const token=(await services.adminAuth.signIn({username:user.username,password:'Owned-test-admin-reader-secret'})).adminSession.token;
    const entered=Promise.withResolvers(),release=Promise.withResolvers();let failure;
    const delayed=new Proxy(repository,{get(target,key){
-    if(boundary==='durable-writer'&&key===(kind==='groups'?'deleteOriginalGroupResults':'deleteOriginalSelectedTests'))return async(...args)=>{entered.resolve();await release.promise;return target[key](...args);};
+    if(boundary==='durable-writer'&&key===repositories[kind])return async(...args)=>{entered.resolve();await release.promise;return target[key](...args);};
     const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;
    }});
    const runtime=boundary==='durable-writer'?createFirstSliceServices({repository:delayed}):services;
@@ -43,8 +53,8 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
    }).catch(error=>{failure=error;res.writeHead(500);res.end();}));
    await new Promise(done=>server.listen(0,'127.0.0.1',done));let req;
    try{
-    const payload=JSON.stringify(kind==='groups'?{groups:[groupKey]}:{personSessions:[{loginName,bookletName:'OWNED.ADM.B'}]}),response=Promise.withResolvers();
-    req=request({hostname:'127.0.0.1',port:server.address().port,path:'/workspace/'+workspaceNumber+'/responses'+(kind==='tests'?'/detailed':''),method:'DELETE',headers:{AuthToken:token,'Content-Type':'application/json','Content-Length':Buffer.byteLength(payload)}},res=>{const chunks=[];res.on('data',b=>chunks.push(b));res.on('end',()=>response.resolve({status:res.statusCode,headers:res.headers,body:Buffer.concat(chunks).toString()}));});
+    const payload=JSON.stringify(selections[kind]),response=Promise.withResolvers();
+    req=request({hostname:'127.0.0.1',port:server.address().port,path:paths[kind],method:'DELETE',headers:{AuthToken:token,'Content-Type':'application/json','Content-Length':Buffer.byteLength(payload)}},res=>{const chunks=[];res.on('data',b=>chunks.push(b));res.on('end',()=>response.resolve({status:res.statusCode,headers:res.headers,body:Buffer.concat(chunks).toString()}));});
     req.on('error',response.reject);
     if(boundary==='body')req.write(payload.slice(0,1));else req.end(payload);
     await Promise.race([entered.promise,response.promise.then(r=>{throw Error('Request did not reach held boundary: '+r.status);})]);
@@ -55,7 +65,7 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
   });
  }
  if(connectionString){
-  await verifyNativeWorkspaceWritePostgres(t,{repository,services,ids,role,workspaceNumber,groupKey,connectionString});
+  await verifyNativeWorkspaceWritePostgres(t,{repository,services,ids,role,workspaceNumber,groupKey,sourcePackage,connectionString});
   await repository.getOrCreateOriginalParticipantGroup({...ids,groupKey,groupLabel:'Owned revocation control',createdAt:new Date().toISOString()});
  }
  await t.test('a still-authorized native transaction deletes the actual selected Test and group only',async()=>{

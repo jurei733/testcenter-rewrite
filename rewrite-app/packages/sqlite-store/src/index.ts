@@ -2,6 +2,7 @@ import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalAttachmentHistoryProjector} from '@testcenter-rewrite-app/application';
 import {readOriginalAttachmentMetadata, readOriginalAttachmentTestNumbers} from './original-attachment-files.js';
 import {refreshOriginalWorkspaceContentType,readOriginalSystemCheckDirectory} from './original-workspace-content-type.js';
+import {guardOriginalWorkspaceWrite} from './original-workspace-write.js';
 import {transactOriginalSystemCheck} from './original-system-check.js';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {readOriginalAssetAssignmentLayers} from '@testcenter-rewrite-app/application';
@@ -3140,6 +3141,7 @@ export const createSqliteFirstSliceStorage = (
     async deleteSourcePackageAggregate(input) {
       database.exec("BEGIN IMMEDIATE");
       try {
+        guardOriginalWorkspaceWrite(database, input);
         const sourcePackage = database
           .prepare(
             `SELECT source_package_id
@@ -3267,6 +3269,16 @@ export const createSqliteFirstSliceStorage = (
              WHERE source_package_id = ? AND tenant_id = ? AND workspace_id = ?`
           )
           .run(input.sourcePackageId, input.tenantId, input.workspaceId);
+        const activity = input.deletionActivityEvent;
+        if (activity) {
+          database.prepare(`INSERT INTO workspace_activity_events (
+            activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+            subject_type, subject_id, occurred_at, summary, details_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(activity.activityEventId, activity.tenantId, activity.workspaceId, activity.eventType,
+              activity.actorId, activity.subjectType, activity.subjectId, activity.occurredAt,
+              activity.summary, JSON.stringify(activity.details));
+        }
         refreshOriginalWorkspaceContentType(database, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, input.tenantId, input.workspaceId);
         database.exec("COMMIT");
         return Number(deletion.changes) === 1;

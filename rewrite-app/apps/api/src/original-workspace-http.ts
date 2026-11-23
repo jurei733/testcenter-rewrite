@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import type {IncomingMessage} from 'node:http';
 import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,findOriginalWorkspaceFile,projectOriginalWorkspaceFileDigests,readOriginalWorkspaceFileSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
+import {deleteOriginalWorkspaceFiles,readOriginalWorkspaceFileDeletion} from '@testcenter-rewrite-app/application';
 
 const route=/^\/workspace\/([^/]+)\/(files(?:-dependencies)?|results|responses(?:\/detailed)?|report\/([^/]+)|file\/([^/]+)\/([^/]+))$/;
 const contextRoute=/^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/original-administration$/;
@@ -38,7 +39,12 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
   input.header('cache-control','private, no-store');
   const operation=match[2], download=!!match[4];
   const methods=operation==='files-dependencies'?['POST']
-    :download||operation==='files'||operation==='results'||match[3]?['GET']:operation==='responses'?['DELETE']:['GET','DELETE'];
+    :download||operation==='results'||match[3]?['GET']:operation==='responses'?['DELETE']:['GET','DELETE'];
+  const readJson=async(decode:(payload:Uint8Array)=>unknown)=>{
+    try{return await input.readBody(decode);}
+    catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_workspace_json_invalid','Internal error.');throw error;}
+  };
+  const decodeJson=(bytes:Uint8Array):unknown=>JSON.parse(Buffer.from(bytes).toString('utf8'));
   try {
     if(!methods.includes(input.request.method??'')){input.header('allow',methods.join(', '));throw new FirstSliceError(405,'original_method_not_allowed','Method not allowed. Must be one of: '+methods.join(', '));}
     const token=input.request.headers.authtoken;
@@ -72,14 +78,21 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
       input.download(Buffer.from(result.dataBase64,'base64'),fileName,fileType==='Resource'?'application/octet-stream':'text/xml');
       return true;
     }
-    if(operation==='files'||operation==='files-dependencies'){
-      let selection:Set<string>|undefined;
-      if(operation==='files-dependencies'){
-        let body:unknown;
-        try {body=await input.readBody(bytes=>JSON.parse(Buffer.from(bytes).toString('utf8')));}
-        catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_workspace_json_invalid','Internal error.');throw error;}
-        selection=readOriginalWorkspaceFileSelection(body);
+    if(operation==='files'&&input.request.method==='DELETE'){
+      const body=await readJson(decodeJson);
+      const writable=await administration.authorizeWrite(access);
+      if(writable.tenantId!==scope.tenantId||writable.workspaceId!==scope.workspaceId){
+        throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
       }
+      const paths=readOriginalWorkspaceFileDeletion(body);
+      const catalog=await input.services.workspaceAdminRead.getWorkspaceFileCatalog(scope);
+      await confirmScope();
+      const report=await deleteOriginalWorkspaceFiles(writable,catalog,paths,input.services.contentIntake.deleteSourcePackage);
+      input.raw(207,encodeOriginalReportJson(report),'application/json');
+      return true;
+    }
+    if(operation==='files'||operation==='files-dependencies'){
+      const selection=operation==='files-dependencies'?readOriginalWorkspaceFileSelection(await readJson(decodeJson)):undefined;
       const catalog=await input.services.workspaceAdminRead.getWorkspaceFileCatalog({...scope,original:{includeDependencies:selection!==undefined}});
       await confirmScope();
       input.raw(200,encodeOriginalReportJson(projectOriginalWorkspaceFileDigests(catalog,selection)),'application/json');
@@ -94,7 +107,7 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
       const body=match[2]==='results'?encodeOriginalReportJson(await input.services.originalGroupResults.list(scope)):formatOriginalTestAdministrationJson(await input.services.originalTestAdministration.list(scope));
       input.raw(200,body,'application/json');return true;
     }
-    let body:unknown;try{body=await input.readBody(decodeOriginalTestLogJson);}catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_workspace_json_invalid','Internal error.');throw error;}
+    const body=await readJson(decodeOriginalTestLogJson);
     await input.services.originalWorkspaceAdministration.delete({token,workspacePathSegment:match[1]!,kind:match[2]==='responses'?'groups':'tests',body});
     input.raw(200,'','text/html; charset=UTF-8');
   }catch(error){

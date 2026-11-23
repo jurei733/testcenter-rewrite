@@ -196,7 +196,8 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       await original(workspace+'/files',401,{header:'Authorization'});
       await original(workspace+'/files',403,{actor:'invalid-owned-admin-token'});
       await original(workspace+'/files',404,{actor:monitor});
-      await original(workspace+'/files',405,{method:'DELETE'});
+      await original(workspace+'/files',403,{method:'DELETE',body:{f:['Unit/unit.xml']}});
+      await original(workspace+'/files',405,{method:'PUT'});
       await original(workspace+'/files-dependencies',400,{method:'POST',body:{}});
       await original(workspace+'/files-dependencies',400,{method:'POST',body:{body:'booklet.xml'}});
       await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey:'owned-empty-files',displayName:'Empty fixture'},'POST',201);
@@ -225,6 +226,56 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       await original(workspace+'/file/Unit/unit.xml%00',404);
       assert.deepEqual(await api(scope+'/source-packages?limit=500'),before);
       assert.deepEqual(await api(scope+'/activity-events?limit=500'),activity);
+    });
+    await t.test('native mixed deletion preserves dependencies and reports Original paths',async()=>{
+      const workspaceKey='owned-file-deletion';
+      await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey,displayName:'Owned deletion'},'POST',201);
+      const scoped='/api/v1/tenants/demo-tenant/workspaces/'+workspaceKey;
+      const writer=await user('owned-file-writer','workspace_admin','read_write',workspaceKey);
+      const sources=[];
+      for(const [fileName,mediaType,sourceDocument] of [
+        ['writer-player.html','text/html',player],
+        ['writer-unit.xml','application/xml',xml('Unit','WRITER-UNIT','<Definition player="catalog-player@1.2.9">owned</Definition>')],
+        ['writer-booklet.xml','application/xml',xml('Booklet','WRITER-BOOKLET','<Units><Unit id="WRITER-UNIT"/></Units>')],
+        ['writer-binary.bin','application/octet-stream','data:application/octet-stream;base64,AP/+AA==']
+      ]){
+        sources.push((await api(scoped+'/source-packages',{fileName,mediaType,sourceDocument},'POST',201)).sourcePackage);
+      }
+      const context=await fetch(base+scoped+'/original-administration',{headers:{AuthToken:writer}});
+      assert.equal(context.status,200);
+      const workspace='/workspace/'+(await context.json()).workspaceId;
+      const remove=async(body,status=207,actor=writer,header='AuthToken')=>{
+        const response=await fetch(base+workspace+'/files',{method:'DELETE',headers:{
+          'Content-Type':'application/json',
+          ...(actor?{[header]:header==='Authorization'?'Bearer '+actor:actor}:{})
+        },body:JSON.stringify(body)});
+        if(response.status!==status)assert.equal(response.status,status,await response.text());
+        assert.equal(response.headers.get('cache-control'),'private, no-store');
+        return status===207?response.json():response.text();
+      };
+      const selected=['Unit/writer-unit.xml','Resource/writer-binary.bin','not-a-path','Resource/../writer-player.html','Resource/absent'];
+      await remove({f:selected},401,null);
+      await remove({f:selected},401,writer,'Authorization');
+      await remove({f:selected},404,readOnly);
+      await remove({f:selected},404,token);
+      await remove({},400);
+      await remove({f:['Resource/writer-binary.bin',null]},400);
+      assert.equal((await api(scoped+'/files')).totalCount,4);
+      assert.deepEqual(await remove({f:selected}),{
+        deleted:['Resource/writer-binary.bin'],did_not_exist:['Resource/absent'],not_allowed:['Resource/../writer-player.html'],
+        was_used:['Unit/writer-unit.xml'],incorrect_path:['not-a-path'],error:[]
+      });
+      const chain=['Resource/writer-player.html','Unit/writer-unit.xml','Booklet/writer-booklet.xml'];
+      assert.deepEqual(await remove({f:chain}),{
+        deleted:chain,did_not_exist:[],not_allowed:[],was_used:[],incorrect_path:[],error:[]
+      });
+      assert.equal((await api(scoped+'/files')).totalCount,0);
+      assert.deepEqual((await remove({f:chain})).did_not_exist,chain);
+      const removed=await api(scoped+'/activity-events?limit=500&eventType=source_package_deleted');
+      const deletedRows=removed.items.map(item=>item.activityEvent);
+      assert.ok(deletedRows.every(row=>row.eventType==='source_package_deleted'));
+      assert.deepEqual(deletedRows.map(row=>row.subjectId).sort(),sources.map(row=>row.sourcePackageId).sort());
+      assert.equal((await api(scope+'/files')).totalCount,6);
     });
     const replacement=await api(scope+'/source-packages/'+created[1].sourcePackageId+'/replacements',{
       fileName:'booklet.xml',mediaType:'application/xml',

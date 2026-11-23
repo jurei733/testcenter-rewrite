@@ -8,24 +8,30 @@ async function lockWait(pool,pid){
  while(Date.now()<until){if((await pool.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1',[pid])).rows[0]?.wait_event_type==='Lock')return;await delay(10);}
  assert.fail('The independent owned connection did not reach an actual PostgreSQL row-lock wait.');
 }
-export async function verifyNativeWorkspaceWritePostgres(t,{repository,services,ids,role,workspaceNumber,groupKey,connectionString}){
+export async function verifyNativeWorkspaceWritePostgres(t,{repository,services,ids,role,workspaceNumber,groupKey,sourcePackage,connectionString}){
  const observer=new Pool({connectionString});
  const login=async()=>(await services.adminAuth.signIn({username:'writer',password:'Owned-test-admin-reader-secret'})).adminSession;
  try{
-  for(const change of ['logout','clock-expiry'])await t.test('PostgreSQL native DELETE rechecks '+change+' after a real Workspace lock wait',{timeout:20000},async ctx=>{
+  for(const kind of ['groups','files'])for(const change of ['logout','clock-expiry'])await t.test('PostgreSQL native '+kind+' DELETE rechecks '+change+' after a real Workspace lock wait',{timeout:20000},async ctx=>{
    const session=await login();let timestamp=new Date().toISOString();
    const runtime=createFirstSliceServices({repository,now:()=>timestamp}),blocker=await observer.connect(),entered=Promise.withResolvers();let deletionPid;
    await blocker.query('BEGIN');await blocker.query('SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE',[ids.tenantId,ids.workspaceId]);
    const query=Client.prototype.query,hook=ctx.mock.method(Client.prototype,'query',function(...args){
-    if(typeof args[0]==='string'&&args[0].startsWith('SELECT workspace_id FROM workspaces')&&args[0].includes('FOR NO KEY UPDATE')){deletionPid=this.processID;entered.resolve();}
+    const sql=typeof args[0]==='string'?args[0].replace(/\s+/g,' '):'';
+    if(sql.startsWith('SELECT workspace_id FROM workspaces')&&sql.endsWith(kind==='groups'?'FOR NO KEY UPDATE':'FOR UPDATE')){deletionPid=this.processID;entered.resolve();}
     return query.apply(this,args);
    });
-   const pending=runtime.originalWorkspaceAdministration.delete({token:session.token,workspacePathSegment:workspaceNumber,kind:'groups',body:{groups:[groupKey]}}).then(value=>({value}),error=>({error}));
+   const locator={token:session.token,workspacePathSegment:workspaceNumber};
+   const removal=kind==='groups'?runtime.originalWorkspaceAdministration.delete({...locator,kind,body:{groups:[groupKey]}})
+    :runtime.originalWorkspaceAdministration.authorizeWrite(locator).then(scope=>runtime.contentIntake.deleteSourcePackage({...scope,
+     sourcePackageId:sourcePackage.sourcePackageId,confirmation:sourcePackage.fileName}));
+   const pending=removal.then(value=>({value}),error=>({error}));
    try{
     await Promise.race([entered.promise,pending.then(v=>{throw v.error??Error('Deletion missed its row lock');})]);await lockWait(observer,deletionPid);
     if(change==='logout')await services.adminAuth.signOut({sessionToken:session.token});else timestamp=new Date(Date.parse(session.expiresAt)+1).toISOString();
     await blocker.query('COMMIT');const result=await pending;assert.equal(result.error?.statusCode,403);
     assert.ok((await repository.listOriginalParticipantGroupsByWorkspace(ids.tenantId,ids.workspaceId)).some(g=>g.groupKey===groupKey));
+    assert.deepEqual(await repository.getSourcePackageById(sourcePackage.sourcePackageId),sourcePackage);
    }finally{await blocker.query('ROLLBACK');await pending;hook.mock.restore();blocker.release();}
   });
   await t.test('PostgreSQL native DELETE holds the current session and explicit grant until its own commit',{timeout:20000},async ctx=>{

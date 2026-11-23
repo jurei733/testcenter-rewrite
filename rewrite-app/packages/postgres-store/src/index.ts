@@ -2,6 +2,7 @@ import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {originalAttachmentHistoryProjector} from '@testcenter-rewrite-app/application';
 import {readOriginalAttachmentMetadata, readOriginalAttachmentTestNumbers} from './original-attachment-files.js';
 import {refreshOriginalWorkspaceContentType,readOriginalSystemCheckDirectory} from './original-workspace-content-type.js';
+import {guardOriginalWorkspaceWrite} from './original-workspace-write.js';
 import {transactOriginalSystemCheck} from './original-system-check.js';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {readOriginalAssetAssignmentLayers} from '@testcenter-rewrite-app/application';
@@ -3008,6 +3009,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           await client.query("ROLLBACK");
           return false;
         }
+        await guardOriginalWorkspaceWrite(client, input);
         const sourcePackage = await client.query<{ source_package_id: string }>(
           `SELECT source_package_id
            FROM source_packages
@@ -3098,6 +3100,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           return false;
         }
 
+        await guardOriginalWorkspaceWrite(client, input);
         await client.query(
           `DELETE FROM content_releases
            WHERE content_release_id = ANY($1::text[])`,
@@ -3112,6 +3115,16 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
            WHERE source_package_id = $1 AND tenant_id = $2 AND workspace_id = $3`,
           [input.sourcePackageId, input.tenantId, input.workspaceId]
         );
+        const activity = input.deletionActivityEvent;
+        if (activity) {
+          await client.query(`INSERT INTO workspace_activity_events (
+            activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+            subject_type, subject_id, occurred_at, summary, details_json
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [activity.activityEventId, activity.tenantId, activity.workspaceId, activity.eventType,
+            activity.actorId, activity.subjectType, activity.subjectId, activity.occurredAt,
+            activity.summary, JSON.stringify(activity.details)]);
+        }
         await refreshOriginalWorkspaceContentType(client, {source:mapSourcePackage,event:mapWorkspaceActivityEvent}, input.tenantId, input.workspaceId);
         await client.query("COMMIT");
         return deletion.rowCount === 1;

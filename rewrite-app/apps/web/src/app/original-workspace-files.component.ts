@@ -168,7 +168,10 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
        confirmLabel:'Löschen',cancelLabel:'Abbrechen',safeMode:false}});
    this.deletion.afterClosed().subscribe(async accepted=>{
      this.deletion=null;if(!accepted || this.destroyed)return;
-     if(await captured.confirm() && !this.destroyed && this.controller.notice)this.snacks.open(this.controller.notice,'',{duration:1000});
+     if(await captured.confirm() && !this.destroyed && this.controller.notice){
+       const {message,action}=this.controller.notice;
+       this.snacks.open(message,action,{duration:1000});
+     }
    });
  }
 }

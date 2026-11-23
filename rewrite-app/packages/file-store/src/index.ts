@@ -1408,6 +1408,7 @@ const createFileRepository = (
     },
     async deleteSourcePackageAggregate(input) {
       return mutate(state => {
+        guardOriginalWorkspaceWriteCollections(state, state.adminSessions, input);
         const sourcePackage = state.sourcePackages[input.sourcePackageId];
         if (
           !sourcePackage ||
@@ -1477,6 +1478,8 @@ const createFileRepository = (
         }
         dirtySourcePackageIds.add(input.sourcePackageId);
         delete state.sourcePackages[input.sourcePackageId];
+        const activity = input.deletionActivityEvent;
+        if (activity) state.workspaceActivityEvents[activity.activityEventId] = activity;
         refreshOriginalWorkspaceContentCollection(state,input,projectOriginalWorkspaceFile);
       return true;
       });
