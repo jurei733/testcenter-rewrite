@@ -208,18 +208,6 @@ try {
     channel: process.env.UI_SMOKE_BROWSER_CHANNEL || undefined });
   process.stdout.write(`ib_browser_version=${browser.version()}, ui=${interfaceMode}, headful=${headful}\n`);
   context = await browser.newContext();
-  const startPackets = [];
-  await context.exposeBinding("__recordOwnedIbStart", (source, packet) => {
-    startPackets.push({ frame: source.frame, ...packet });
-  });
-  await context.addInitScript(() => {
-    if (window === window.top) return;
-    window.addEventListener("message", event => {
-      if (event.source !== window.parent || event.data?.type !== "vopStartCommand") return;
-      void window.__recordOwnedIbStart({ unitState: structuredClone(event.data.unitState),
-        playerSessionId: event.data.sessionId, trusted: event.isTrusted });
-    });
-  });
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   page = await context.newPage();
   page.on("request", request => {
@@ -437,6 +425,42 @@ try {
   // Old-page current-state replies may still arrive while navigation commits.
   // Bind the restoration witness to requests started by the new document and
   // consume their bodies immediately, before any later document can evict them.
+  // Chrome may handle the opaque frame's first message before the renderer's
+  // observer is installed. Hold animation callbacks after the genuine Ready
+  // until the current receiver has been armed, then let Chrome deliver Start.
+  await page.addInitScript(() => {
+    if (window !== window.top) return;
+    const request = window.requestAnimationFrame.bind(window);
+    const cancel = window.cancelAnimationFrame.bind(window);
+    const queued = new Map();
+    const gate = { ready: false, receiverArmed: false };
+    window.__ownedIbStartGate = gate;
+    window.addEventListener("message", event => {
+      const player = document.querySelector("#participantVeronaPlayerFrame");
+      if (player && event.isTrusted && event.source === player.contentWindow &&
+          event.data?.type === "vopReadyNotification") {
+        gate.ready = true;
+      }
+    }, { capture: true });
+    window.requestAnimationFrame = callback => {
+      if (!gate.ready || gate.receiverArmed) return request(callback);
+      const proceed = timestamp => {
+        if (!gate.receiverArmed) {
+          queued.set(first, request(proceed));
+          return;
+        }
+        queued.delete(first);
+        callback(timestamp);
+      };
+      const first = request(proceed);
+      queued.set(first, first);
+      return first;
+    };
+    window.cancelAnimationFrame = id => {
+      cancel(queued.get(id) ?? id);
+      queued.delete(id);
+    };
+  });
   let reEntryCommitted = false;
   const freshRequests = new WeakSet();
   const markReEntry = frame => {
@@ -474,16 +498,33 @@ try {
   assert.ok(restoredInteractions(reEntryResponseEnvelope) >= savedInteractionCount,
     "The actual re-entry read must retain the trusted interaction scores, not default state.");
   assert.deepEqual(reEntryResponseEnvelope.dataPartValueTypes, JSON.parse(savedUnitResponse).dataPartValueTypes);
+  await page.waitForFunction(() => window.__ownedIbStartGate?.ready, undefined, { polling: 50, timeout: 15_000 });
+  const receiver = await page.locator("#participantVeronaPlayerFrame").elementHandle();
+  assert.ok(receiver, "The re-entry page must mount its Player iframe.");
+  const restoredPlayerFrame = await receiver.contentFrame();
+  assert.ok(restoredPlayerFrame);
+  await restoredPlayerFrame.evaluate(() => {
+    if (location.href !== "about:srcdoc" || window.origin !== "null") {
+      throw new Error("The selected message receiver must be the opaque Player.");
+    }
+    window.__ownedIbStart = [];
+    window.addEventListener("message", event => {
+      if (event.source === window.parent && event.data?.type === "vopStartCommand") {
+        window.__ownedIbStart.push({ unitState: structuredClone(event.data.unitState), trusted: event.isTrusted });
+      }
+    }, { capture: true });
+  });
+  await page.evaluate(() => { window.__ownedIbStartGate.receiverArmed = true; });
+  await receiver.dispose();
   const reEntryResources = await withChromiumIbRuntime(context, page, participantSessionId, async runtime => {
     await runtime.waitVisible("input[type=text]");
-    const player = await page.locator("#participantVeronaPlayerFrame").elementHandle();
-    const restoredPlayerFrame = await player.contentFrame();
-    const deadline = Date.now() + 10_000;
-    let start;
-    while (!start && Date.now() < deadline) {
-      start = startPackets.find(packet => packet.frame === restoredPlayerFrame && packet.unitState?.dataParts);
-      if (!start) await delay(50);
-    }
+    const currentReceiver = await page.locator("#participantVeronaPlayerFrame").elementHandle();
+    assert.equal(await currentReceiver?.contentFrame(), restoredPlayerFrame,
+      "The recorded Start must belong to the Player that loaded the verified runtime.");
+    await currentReceiver?.dispose();
+    const start = await restoredPlayerFrame.evaluate(
+      () => window.__ownedIbStart?.find(packet => packet.unitState?.dataParts)
+    );
     assert.ok(start, "The exact restored opaque Player must receive its real parent Start command.");
     assert.equal(start.trusted, true);
     assert.deepEqual(start.unitState, reEntryResponseEnvelope.unitState,
