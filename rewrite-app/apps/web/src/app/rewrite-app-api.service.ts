@@ -4,6 +4,7 @@ import type { ApiErrorResponse } from "@testcenter-rewrite-app/contracts";
 
 export type ApiErrorLike = ApiErrorResponse & {
   statusCode?: number;
+  response?: { errorId: string | null; testMode: string | null; statusText: string };
 };
 
 export type ApiDownload = {
@@ -49,7 +50,15 @@ export class RewriteAppApiService {
     }
 
     if (!response.ok) {
-      throw this.normalizeApiError(response.status, payload);
+      const error = this.normalizeApiError(response.status, payload);
+      if (path.startsWith("/workspace/")) {
+        error.response = {
+          errorId: response.headers.get("error-id"),
+          testMode: response.headers.get("test-mode"),
+          statusText: response.statusText
+        };
+      }
+      throw error;
     }
 
     return {

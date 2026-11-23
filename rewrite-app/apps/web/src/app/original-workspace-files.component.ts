@@ -1,4 +1,5 @@
 import {ChangeDetectorRef,Component,Input,inject,type OnChanges,type OnDestroy} from '@angular/core';
+import {HttpErrorResponse,HttpHeaders} from '@angular/common/http';
 import {MatButton} from '@angular/material/button';
 import {Router,RouterLink,RouterLinkActive,ActivatedRoute} from '@angular/router';
 import {MatTabNav,MatTabLink,MatTabNavPanel} from '@angular/material/tabs';
@@ -20,8 +21,11 @@ import {MatSnackBar} from '@angular/material/snack-bar';
 import type {WorkspaceFileType} from '@testcenter-rewrite-app/domain';
 import {OriginalWorkspaceFilesController,type OriginalWorkspaceFile,type OriginalWorkspaceUploadTransfer} from './original-workspace-files-controller';
 import {RewriteAppShellRequestService} from './rewrite-app-shell-request.service';
-import {RewriteAppApiService} from './rewrite-app-api.service';
+import {RewriteAppApiService,type ApiErrorLike} from './rewrite-app-api.service';
 import {RewriteAppOperatorAccessService} from './rewrite-app-operator-access.service';
+import {redactBugReportText} from '@testcenter-rewrite-app/contracts';
+import {nativeRequestError} from './native-participant/native-http-policy';
+import {NativeLoginErrorDialogComponent,type NativeErrorDialogData} from './native-login-error-dialog.component';
 import {OriginalWorkspaceOperatorHeaderState} from './original-workspace-operator-header.component';
 import {OriginalWorkspaceFileIconComponent} from './original-workspace-file-icon.component';
 import {OriginalWorkspaceFileNoticeComponent} from './original-workspace-file-notice.component';
@@ -68,6 +72,7 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  private readonly systemCheckInstallation=inject(NativeSystemCheckInstallationService);
  private destroyed=false;
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
+ private deletionError:MatDialogRef<NativeLoginErrorDialogComponent>|null=null;
  readonly controller=new OriginalWorkspaceFilesController(<T>(method:string,path:string,body:unknown,token:string,
    upload?:OriginalWorkspaceUploadTransfer)=>{
    if(upload && body instanceof FormData)return this.api.uploadMultipart<T>(path,body,{AuthToken:token},upload);
@@ -86,6 +91,7 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    this.tab=next;
    this.resultsRole='';
    this.deletion?.close(false);
+   this.deletionError?.close();
    // On a workspace switch, wait for the verified scope inputs in ngOnChanges.
    if(workspaceNumber===this.workspaceNumber)void this.controller.connect();
  });
@@ -103,8 +109,11 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    {label:'Systemcheck-Definitionen',versions:'18'},{label:'Units',versions:'17'},{label:'Verona-Player',versions:'2–6'}];
  readonly trackFile=(_index:number,file:OriginalWorkspaceFile)=>file.sourcePackageId;
  reloadReports():void {globalThis.location.reload();}
- ngOnChanges():void {this.deletion?.close(false);this.resultsRole='';void this.controller.connect();}
- ngOnDestroy():void {this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.controller.destroy();this.header.title.set('Verwaltung');}
+ ngOnChanges():void {this.deletion?.close(false);this.deletionError?.close();this.resultsRole='';void this.controller.connect();}
+ ngOnDestroy():void {
+   this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.deletionError?.close();
+   this.controller.destroy();this.header.title.set('Verwaltung');
+ }
  setResultsRole(role: ''|'RO'|'RW'):void {
    this.resultsRole=role;
    this.header.title.set(this.title);
@@ -173,10 +182,40 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
        confirmLabel:'Löschen',cancelLabel:'Abbrechen',safeMode:false}});
    this.deletion.afterClosed().subscribe(async accepted=>{
      this.deletion=null;if(!accepted || this.destroyed)return;
-     if(await captured.confirm() && !this.destroyed && this.controller.notice){
+     if(await captured.confirm((error,path,current)=>this.showDeletionConflict(error,path,current)) && !this.destroyed && this.controller.notice){
        const {message,action}=this.controller.notice;
        this.snacks.open(message,action,{duration:1000});
      }
    });
+ }
+
+ private showDeletionConflict(error:ApiErrorLike,path:string,current:()=>boolean):void {
+   if(this.destroyed || !current() || this.deletionError)return;
+   const response=error.response;
+   const mapped=nativeRequestError(new HttpErrorResponse({
+     status:409,statusText:response?.statusText||'Conflict',
+     url:new URL(path,window.location.origin).href,error:error.message,
+     headers:new HttpHeaders({
+       ...(response?.errorId?{'error-id':response.errorId}:{}),
+       ...(response?.testMode?{'test-mode':response.testMode}:{})
+     })
+   }));
+   mapped.description=redactBugReportText(mapped.description);
+   mapped.details=redactBugReportText(mapped.details??'');
+   const url=new URL(window.location.href);url.search='';url.hash='';
+   const dialog=this.dialogs.open(NativeLoginErrorDialogComponent,{
+     panelClass:'original-native-login-error-dialog',disableClose:true,autoFocus:'dialog',restoreFocus:false,
+     ariaLabel:mapped.label,
+     data:{
+       error:mapped,url:redactBugReportText(url.href),timestamp:Date.now(),login:this.access.displayName,
+       reload:()=>{
+         if(!this.destroyed && current()){
+           window.location.assign(new URL('operator-start?ui=original',document.baseURI).href);
+         }
+       }
+     } satisfies NativeErrorDialogData
+   });
+   this.deletionError=dialog;
+   dialog.afterClosed().subscribe(()=>{if(this.deletionError===dialog)this.deletionError=null;});
  }
 }

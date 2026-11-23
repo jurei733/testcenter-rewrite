@@ -213,6 +213,29 @@ test('native deletion uses the same numeric workspace and mutation protection as
  assert.deepEqual(f.controller.deletionReport,reports);
  assert.equal(f.controller.notice.message,'1 Dateien erfolgreich gelöscht.');
 });
+test('native deletion conflict reports server diagnostics only while the captured workspace owns the request',async()=>{
+ const native={...scope(),nativeRole:'RW',workspaceNumber:'17'};
+ const conflict={error:'unexpected_error',message:'Workspace blocked by another upload or deletion action.',statusCode:409,
+  response:{errorId:'owned-error',testMode:'NO',statusText:'Conflict'}};
+ const held=pending();
+ let calls=0;
+ const f=fixture(call=>{
+  if(call.method==='DELETE'){if(++calls===1)throw conflict;return held.promise;}
+  return normal(call);
+ },native);
+ await f.controller.connect();
+ f.controller.checkAll('Unit',true);
+ let current;
+ const result=await f.controller.captureDeletion().confirm((failure,path,isCurrent)=>{
+  assert.deepEqual(failure,conflict);assert.equal(path,'/workspace/17/files');current=isCurrent;
+ });
+ assert.equal(result,false);assert.equal(current(),true);
+ assert.equal(f.controller.problem,'');assert.equal(f.controller.selected.length,1);
+ const stale=f.controller.captureDeletion().confirm(()=>assert.fail('Retired workspace cannot show a dialog.'));
+ f.setScope({...native,workspaceNumber:'18'});await f.controller.connect();
+ held.reject(conflict);
+ assert.equal(await stale,false);assert.equal(current(),false);assert.equal(f.controller.problem,'');
+});
 test('old confirmation and download ownership are invalid after workspace change, logout or destruction',async()=>{
  for(const transition of ['scope','logout','destroy']){
   const f=fixture(call=>normal(call));await f.controller.connect();f.controller.checkAll('Unit',true);

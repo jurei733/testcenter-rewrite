@@ -2,6 +2,7 @@ import {productionApiRoutes, resolveRoutePath, type DeleteSourcePackagesResponse
   type GetWorkspaceFileCatalogResponse, type GetWorkspaceOverviewResponse,
   type PublicAdminRoleAssignment, type UploadWorkspaceFileResponse} from '@testcenter-rewrite-app/contracts';
 import type {OriginalWorkspaceFileDeletionReport,OriginalWorkspaceUploadReport,WorkspaceCatalogFile,WorkspaceOverview,WorkspaceFileType,WorkspaceArchiveUploadReport,WorkspaceFileValidationReport} from '@testcenter-rewrite-app/domain';
+import type {ApiErrorLike} from './rewrite-app-api.service';
 
 export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; workspaceKey:string; roles:PublicAdminRoleAssignment[];nativeRole?:'RO'|'RW';workspaceNumber?:string};
 export type OriginalWorkspaceUploadTransfer = {signal:AbortSignal;onProgress:(percent:number)=>void};
@@ -10,6 +11,7 @@ export type OriginalWorkspaceFilesTransport = <T>(method:string,path:string,body
 export type OriginalWorkspaceFile = WorkspaceCatalogFile & {name:string; isChecked:boolean};
 export type OriginalWorkspaceUpload = {name:string; type:string; read:()=>Promise<string>};
 export type OriginalWorkspaceUploadResult = {name:string; status:'queued'|'uploading'|'completed'|'error'; message:string;publicationProblem?:string;archiveEntries?:WorkspaceArchiveUploadReport['entries'];validationReport?:WorkspaceFileValidationReport};
+type NativeDeletionConflict = (error:ApiErrorLike,path:string,current:()=>boolean)=>void;
 type Owner = {epoch:number; token:string; tenantKey:string; workspaceKey:string;workspaceNumber?:string};
 const sameScope = (a:Owner,b:OriginalWorkspaceFilesScope):boolean =>
   a.token===b.token && a.tenantKey===b.tenantKey && a.workspaceKey===b.workspaceKey && a.workspaceNumber===b.workspaceNumber;
@@ -230,21 +232,21 @@ export class OriginalWorkspaceFilesController {
     }
   }
   clearUploads():void {if(!this.busy){this.uploads=[];this.changed();}}
-  captureDeletion():{confirm:()=>Promise<boolean>;count:number}|null {
+  captureDeletion():{confirm:(onConflict?:NativeDeletionConflict)=>Promise<boolean>;count:number}|null {
     const owner=this.owner,files=this.selected;
     const selected=files.map(file=>({sourcePackageId:file.sourcePackageId,confirmation:file.fileName}));
     const nativePaths=owner?.workspaceNumber&&files.every(file=>file.fileType!=='Package')
       ?files.map(file=>file.fileType+'/'+file.name):null;
     if(!owner || !this.owns(owner) || !this.canWrite || this.busy || !selected.length)return null;
+    const nativePath=nativePaths?'/workspace/'+encodeURIComponent(owner.workspaceNumber!)+'/files':null;
     let used=false;
-    return {count:selected.length,confirm:async()=>{
+    return {count:selected.length,confirm:async onConflict=>{
       if(used || !this.owns(owner) || !this.canWrite || this.busy)return false;
       used=true;this.busy=true;this.problem='';this.notice=null;this.changed();
       try {
         const messages=[];
-        if(nativePaths){
-          const path='/workspace/'+encodeURIComponent(owner.workspaceNumber!)+'/files';
-          const report=await this.transport<OriginalWorkspaceFileDeletionReport>('DELETE',path,{f:nativePaths},owner.token);
+        if(nativePath){
+          const report=await this.transport<OriginalWorkspaceFileDeletionReport>('DELETE',nativePath,{f:nativePaths},owner.token);
           if(!this.owns(owner))return false;
           this.deletionReport=report;
           if(report.deleted.length)messages.push(`${report.deleted.length} Dateien erfolgreich gelöscht.`);
@@ -261,7 +263,16 @@ export class OriginalWorkspaceFilesController {
         }
         if(messages.length)this.notice={message:messages.join('<br>'),action:messages.length>1?'Achtung':''};
         await this.load(owner);return true;
-      } catch(error){if(this.owns(owner))this.problem=problemText(error,'Löschen fehlgeschlagen.');return false;}
+      } catch(error){
+        if(!this.owns(owner))return false;
+        const failure=error as ApiErrorLike|null;
+        if(nativePath && failure?.statusCode===409 && failure.response && onConflict){
+          onConflict(failure,nativePath,()=>this.owns(owner));
+        }else{
+          this.problem=problemText(error,'Löschen fehlgeschlagen.');
+        }
+        return false;
+      }
       finally{if(this.owns(owner)){this.busy=false;this.changed();}}
     }};
   }
