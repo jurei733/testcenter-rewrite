@@ -3,7 +3,7 @@ import {MatButton,MatIconButton} from '@angular/material/button';
 import {MatDivider} from '@angular/material/divider';
 import {MatMenu,MatMenuTrigger} from '@angular/material/menu';
 import {MatToolbar} from '@angular/material/toolbar';
-import {Router,RouterLink,ActivatedRoute} from '@angular/router';
+import {Router,RouterLink,RouterLinkActive,ActivatedRoute} from '@angular/router';
 import {MatTabNav,MatTabLink,MatTabNavPanel} from '@angular/material/tabs';
 import {OriginalSystemCheckReportsComponent} from './original-system-check-reports.component';
 import {OriginalWorkspaceResultsComponent} from './original-workspace-results.component';
@@ -34,7 +34,7 @@ import {RewriteAppUiStateService} from './rewrite-app-ui-state.service';
 import {NativeSystemCheckInstallationService} from './native-system-check/native-system-check-installation.service';
 
 @Component({selector:'app-original-workspace-files',standalone:true,
- imports:[RouterLink,MatTabNav,MatTabLink,MatTabNavPanel,OriginalSystemCheckReportsComponent,OriginalWorkspaceResultsComponent,MatToolbar,MatMenu,MatMenuTrigger,MatDivider,MatIconButton,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
+ imports:[RouterLink,RouterLinkActive,MatTabNav,MatTabLink,MatTabNavPanel,OriginalSystemCheckReportsComponent,OriginalWorkspaceResultsComponent,MatToolbar,MatMenu,MatMenuTrigger,MatDivider,MatIconButton,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
    MatCheckbox,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatExpansionPanelDescription,
    MatProgressBar,MatProgressSpinner,MatSort,MatSortHeader,MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,MatCellDef,MatCell,
    MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow,MatTooltip,OriginalWorkspaceFileIconComponent,OriginalWorkspaceFileNoticeComponent],
@@ -54,6 +54,15 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  private readonly router=inject(Router);
  private readonly route=inject(ActivatedRoute);
  tab:'files'|'syscheck'|'results'|'tests'='files';
+ readonly tabs=[
+   {id:'files',label:'Dateien'},
+   {id:'syscheck',label:'Systemcheck Berichte'},
+   {id:'results',label:'Ergebnisse/Antworten'},
+   {id:'tests',label:'Tests löschen'}
+ ] as const;
+ // RouterLinkActive supplies the route's activation lifecycle. The selected
+ // view still follows the normalized query parameter, including the default.
+ readonly tabRouteMatch={paths:'exact',queryParams:'ignored',matrixParams:'ignored',fragment:'ignored'} as const;
  // Original uses Material's default spacing when Results is the document's first view.
  compactResultsToolbar=this.route.snapshot.queryParamMap.get('tab')!=='results' ||
    !!(this.router.currentNavigation()??this.router.lastSuccessfulNavigation())?.previousNavigation;

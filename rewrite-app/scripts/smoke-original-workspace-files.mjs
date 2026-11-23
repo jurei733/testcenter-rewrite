@@ -205,6 +205,24 @@ try {
       await readPage.waitForLoadState('domcontentloaded');assert.equal(afterLogoutDownloads,0);
       console.log('native_workspace_files_held_download_logout=passed');
     }
+    if(theme==='Primar' && width===390) {
+      const openContent=async query=>readPage.goto(base+'/app/content?ui=original&'+query,{waitUntil:'domcontentloaded'});
+      const selectedTab=name=>readPage.getByRole('tab',{name,selected:true,exact:true});
+      await openContent('tab=unknown');
+      await selectedTab('Dateien').waitFor();
+      await readPage.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
+      await openContent('tab=results&tab=tests');
+      await selectedTab('Ergebnisse/Antworten').waitFor();
+      await readPage.locator('#originalWorkspaceResults[aria-busy="false"]').waitFor();
+      const testsTab=readPage.getByRole('tab',{name:'Tests löschen',exact:true});
+      await testsTab.press('Enter');
+      await selectedTab('Tests löschen').waitFor();
+      await readPage.locator('#originalWorkspaceTests[aria-busy="false"]').waitFor();
+      await readPage.goBack();
+      await selectedTab('Ergebnisse/Antworten').waitFor();
+      await readPage.locator('#originalWorkspaceResults[aria-busy="false"]').waitFor();
+      console.log('native_workspace_files_direct_tabs_and_history=passed');
+    }
     console.log('native_workspace_files_readonly='+theme+'-'+width+':passed');
   }finally{releaseDownload?.();await readContext.close();}
  }

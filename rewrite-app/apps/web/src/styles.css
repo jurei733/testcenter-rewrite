@@ -12,6 +12,15 @@
   font-display: swap;
   src: url('./assets/fonts/nunitosans/nunito-sans-v19-latin-700.woff2') format('woff2');
 }
+/* The offline dialog warms its own face. Keep the regular UI on the
+   bundled URL so the early dialog request cannot change tab measurements. */
+@font-face {
+  font-family: 'Nunito Sans Diagnostics';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/app/assets/fonts/nunitosans/nunito-sans-v19-latin-700.woff2') format('woff2');
+}
 @font-face {
   font-family: 'Nunito Sans';
   font-style: italic;

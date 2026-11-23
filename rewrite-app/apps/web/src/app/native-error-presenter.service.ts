@@ -12,8 +12,7 @@ export class NativeErrorPresenterService {
  readonly presenter=this.value.asReadonly();
  constructor(){
   // The first bold diagnostics text may be painted after the connection drops.
-  // Start loading the actual face while the document is still online.
-  void globalThis.document?.fonts?.load('700 16px "Nunito Sans"').catch(()=>undefined);
+  void globalThis.document?.fonts?.load('700 16px "Nunito Sans Diagnostics"').catch(()=>undefined);
  }
  register(presenter:NativeErrorPresenter){
   this.value.set(presenter);this.resolveReady?.(presenter);this.resolveReady=undefined;

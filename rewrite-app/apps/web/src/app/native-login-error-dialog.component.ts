@@ -37,7 +37,7 @@ import {OriginalOverlayStylesComponent} from './original-overlay-styles.componen
   </mat-expansion-panel>
  </mat-dialog-content>
  <mat-dialog-actions><button mat-raised-button (click)="data.reload()" data-cy="close">Schließen und neu laden</button></mat-dialog-actions>`,
- styles:[`.mat-mdc-dialog-actions{--mat-dialog-actions-alignment:center}h2 mat-icon{margin-right:15px;color:#A92319}.mat-expansion-panel{margin-bottom:10px}`]})
+ styles:[`h3,b{font-family:"Nunito Sans Diagnostics","Nunito Sans",sans-serif}.mat-mdc-dialog-actions{--mat-dialog-actions-alignment:center}h2 mat-icon{margin-right:15px;color:#A92319}.mat-expansion-panel{margin-bottom:10px}`]})
 export class NativeLoginErrorDialogComponent {
  readonly defaultModeLabel=TestModeData.labels['RUN-DEMO'];
  readonly data=inject<{error:AppError;url:string;timestamp:number;reload:()=>void}>(MAT_DIALOG_DATA);
