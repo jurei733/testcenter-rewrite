@@ -116,6 +116,7 @@ export class TestControllerService {
   unitAliasMap: { [unitId: string] : number } = {};
 
   private _currentUnitSequenceId = -Infinity;
+  private pausedResumeUnitSequenceId?: number;
   readonly currentUnitSequenceId$ = new BehaviorSubject<number>(-Infinity);
   configChanged$ = new Subject<void>(); // merely tracked that something changed, not interested in value
   get currentUnitSequenceId(): number {
@@ -370,6 +371,7 @@ export class TestControllerService {
     this.sharedParameters = [];
 
     this.currentUnitSequenceId = -Infinity;
+    this.pausedResumeUnitSequenceId = undefined;
     this.unitContentReady$.next(false);
 
     this.booklet = null;
@@ -737,10 +739,18 @@ export class TestControllerService {
     return this.setUnitNavigationRequest(UnitNavigationTarget.PAUSE, true);
   }
 
+  restorePausedTest(unitSequenceId: number): Promise<boolean> {
+    this.pausedResumeUnitSequenceId = this.units[unitSequenceId]?.sequenceId;
+    this.state$.next('PAUSED');
+    return this.setUnitNavigationRequest(UnitNavigationTarget.PAUSE);
+  }
+
   resume(): Promise<boolean> {
-    const target = (this.currentUnitSequenceId > 0) ? String(this.currentUnitSequenceId) : UnitNavigationTarget.FIRST;
+    const target = this.currentUnit?.sequenceId ?? this.pausedResumeUnitSequenceId ??
+      this.getNavigationState(-Infinity).targets.next;
+    if (target === null) return Promise.resolve(false);
     this.state$.next('RUNNING');
-    return this.setUnitNavigationRequest(target, true);
+    return this.setUnitNavigationRequest(String(target), true);
   }
 
   updateSingleLock(testlet: Testlet, key: TestletLockType, value: boolean): void {

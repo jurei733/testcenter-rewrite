@@ -28,7 +28,7 @@ import {
   isLoadingFileLoaded,
   type LoadedFile, type LoadingProgress, type LoadingQueueEntry,
   type TestData, type TestStateKey,
-  type UnitData, UnitNavigationTarget,
+  type UnitData,
   type Booklet, type Unit, isUnit, TestletLockTypes, type Testlet, type BookletStateOption, type BookletState
 } from '../interfaces/test-controller.interfaces';
 import { EnvironmentData } from '../classes/test-controller.classes';
@@ -128,8 +128,7 @@ export class TestLoaderService extends BookletParserService<Unit, Testlet, Bookl
       (lastState.CONTROLLER === 'TERMINATED_PAUSED') ||
       (lastState.CONTROLLER === 'PAUSED')
     ) {
-      this.tcs.state$.next('PAUSED');
-      return this.tcs.setUnitNavigationRequest(UnitNavigationTarget.PAUSE);
+      return this.tcs.restorePausedTest(resumeTargetUnitSequenceId);
     }
     this.tcs.state$.next('RUNNING');
     // Wait for the starting unit's own block resources (definition/scheme) here, BEFORE

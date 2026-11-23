@@ -281,6 +281,36 @@ test('native internal navigation preserves only the immutable owned run, includi
   for(const path of ['/native-start','/native-test/9223372036854775806/u/1','/native-test/9223372036854775808/u/1','/t/9223372036854775807/u/1'])assert.equal(f.controller.willAlsoEndTest(path),true,path);
  }finally{f.finish();}
 });
+test('native resume after a paused reload returns to the stored Unit before a player is mounted',async()=>{
+ const f=nativeBuffers();
+ try{
+  const {controller}=f, paths=[];
+  const setup=()=>{
+   controller.booklet={config:{}};
+   controller.units={
+    1:{sequenceId:1,parent:{locked:null}},
+    2:{sequenceId:2,parent:{locked:null}}
+   };
+  };
+  setup();
+  controller.closeAllBuffers=async()=>controller.navigation$.getValue();
+  controller.router={navigate:async([path],options)=>{paths.push([path,options.state.force]);return true;}};
+  await controller.restorePausedTest(2);
+  assert.equal(controller.state$.getValue(),'PAUSED');
+  assert.equal(controller.currentUnitSequenceId,-Infinity);
+  assert.equal(await controller.resume(),true);
+  assert.deepEqual(paths,[['/native-test/9223372036854775807/status',false],['/native-test/9223372036854775807/u/2',true]]);
+  controller.reset();
+  setup();
+  await controller.restorePausedTest(99);
+  assert.equal(await controller.resume(),true);
+  assert.deepEqual(paths.at(-1),['/native-test/9223372036854775807/u/1',true]);
+  await controller.restorePausedTest(99);
+  controller.units={};
+  assert.equal(await controller.resume(),false);
+  assert.equal(controller.state$.getValue(),'PAUSED');
+ }finally{f.finish();}
+});
 test('native TimeMax permits movement inside its block and refuses to leave through another run',async()=>{
  const {DefaultUrlSerializer}=await import(pathToFileURL(require.resolve('@angular/router')).href);
  navigationTypes.PRIMARY_OUTLET='primary';
