@@ -5029,7 +5029,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
       if(await handleOriginalWorkspaceHttp({request,pathname,searchParams:url.searchParams,services,readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,false,decode),
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
-        header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
+        header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);},
+        download:(body,fileName,mediaType)=>sendAsset(response,200,mediaType,body,{
+          'content-disposition':buildAttachmentContentDisposition(fileName,true),'cache-control':'private, no-store',
+          'content-length':String(body.byteLength)
+        })}))return;
       if(await handleOriginalAttachmentHttp({request, pathname, searchParams: url.searchParams, services,
         readUpload: () => {
           const contentType = request.headers['content-type'] ?? '';

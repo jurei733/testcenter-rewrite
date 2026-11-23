@@ -24,6 +24,7 @@ export type WorkspaceCatalogFile = {
     label: string;
     description: string;
     participantCount: number | null;
+    veronaModuleType?: string;
     veronaVersion: string | null;
     moduleVersion: string | null;
   };

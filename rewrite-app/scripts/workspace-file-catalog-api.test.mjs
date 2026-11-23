@@ -141,9 +141,9 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
     const download=await fetch(base+scope+'/source-packages/'+created[2].sourcePackageId+'/download',{
       headers:{authorization:'Bearer '+token}});
     assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),unit);
-    const user=async(name,role,accessMode)=>{
+    const user=async(name,role,accessMode,workspaceKey='owned-files')=>{
       await api('/api/v1/admin/users',{username:name,password:'Owned-file-password-9!',roleAssignments:[{
-        role,tenantKey:'demo-tenant',workspaceKey:'owned-files',...(accessMode?{accessMode}:{})
+        role,tenantKey:'demo-tenant',workspaceKey,...(accessMode?{accessMode}:{})
       }]},'POST',201);
       let session=(await api('/api/v1/admin/auth/sign-in',{username:name,password:'Owned-file-password-9!'})).sessionToken;
       await api('/api/v1/admin/auth/password',{password:'Changed-file-password-9!'},'POST',200,session);
@@ -154,6 +154,78 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
     await api('/api/v1/tenants/demo-tenant/workspaces/demo-workspace/files',undefined,'GET',403,readOnly);
     const monitor=await user('owned-catalog-monitor','study_monitor');
     await api(scope+'/files',undefined,'GET',403,monitor);
+    await t.test('native numeric files, dependency requests and downloads stay inside the workspace grant',async()=>{
+      const requestOriginal=async(path,status,{method='GET',actor=readOnly,body,header='AuthToken'}={})=>{
+        const response=await fetch(base+path,{method,headers:{
+          ...(actor?{[header]:header==='Authorization'?'Bearer '+actor:actor}:{}),
+          ...(body===undefined?{}:{'Content-Type':'application/json'})
+        },...(body===undefined?{}:{body:JSON.stringify(body)})});
+        if(response.status!==status)assert.equal(response.status,status,method+' '+path+' '+await response.text());
+        assert.equal(response.headers.get('cache-control'),'private, no-store');
+        return response;
+      };
+      const original=async(path,status,options)=>{
+        const response=await requestOriginal(path,status,options);
+        return status===200 ? response.json() : response.text();
+      };
+      const {workspaceId} = await original(scope+'/original-administration',200);
+      const workspace='/workspace/'+workspaceId;
+      const files=await original(workspace+'/files',200);
+      assert.deepEqual(Object.values(files).flat().map(row=>row.name).sort(),fixtures.map(([name])=>name).sort());
+      assert.ok(Object.values(files).flat().every(row=>row.dependencies.length===0));
+      assert.equal(files.Testtakers[0].info.testtakers,1);
+      assert.equal(files.Unit[0].size,unit.length);
+      assert.equal(files.Unit[0].id,'UNIT');
+      assert.equal(files.Unit[0].info.label,'  Aufgabe Ω  ');
+      assert.equal(files.Unit[0].modificationTime,Math.floor(Date.parse(find('unit.xml').uploadedAt)/1000));
+      assert.ok(files.Resource.some(row=>row.info.veronaVersion==='6.0'&&row.info.veronaModuleType==='player'));
+      const graph=await original(workspace+'/files-dependencies',200,{
+        method:'POST',body:{body:['booklet.xml',null,'booklet.xml','unknown.xml']}
+      });
+      assert.deepEqual(Object.keys(graph),['Booklet']);
+      assert.deepEqual(graph.Booklet[0].dependencies,[
+        {object_name:'unit.xml',relationship_type:'containsUnit'},
+        {object_name:'custom-player.html',relationship_type:'usesPlayer'}
+      ]);
+      for(const payload of [JSON.stringify(files),JSON.stringify(graph)]){
+        for(const secret of ['private-user','private-password','private-state','private-unit-body','private-player-body','sourcePackageId','sourceDocument']){
+          assert.ok(!payload.includes(secret),secret);
+        }
+      }
+      await original(workspace+'/files',401,{actor:null});
+      await original(workspace+'/files',401,{header:'Authorization'});
+      await original(workspace+'/files',403,{actor:'invalid-owned-admin-token'});
+      await original(workspace+'/files',404,{actor:monitor});
+      await original(workspace+'/files',405,{method:'DELETE'});
+      await original(workspace+'/files-dependencies',400,{method:'POST',body:{}});
+      await original(workspace+'/files-dependencies',400,{method:'POST',body:{body:'booklet.xml'}});
+      await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey:'owned-empty-files',displayName:'Empty fixture'},'POST',201);
+      const second=await user('owned-empty-reader','workspace_admin','read_only','owned-empty-files');
+      const locator=await original('/api/v1/tenants/demo-tenant/workspaces/owned-empty-files/original-administration',200,{actor:second});
+      const empty='/workspace/'+locator.workspaceId;
+      assert.deepEqual(await original(empty+'/files',200,{actor:second}),[]);
+      assert.deepEqual(await original(empty+'/files-dependencies',200,{method:'POST',actor:second,body:{body:[null]}}),[]);
+      await original(empty+'/files',404);
+      await original(workspace+'/files-dependencies',404,{method:'POST',actor:second,body:{body:['booklet.xml']}});
+      const unitPath=workspace+'/file/Unit/unit.xml';
+      const unitDownload=await requestOriginal(unitPath,200);
+      assert.equal(unitDownload.headers.get('content-type'),'text/xml');
+      assert.equal(unitDownload.headers.get('content-length'),String(unit.length));
+      assert.match(unitDownload.headers.get('content-disposition'),/^attachment;.*filename="unit\.xml"/);
+      assert.deepEqual(Buffer.from(await unitDownload.arrayBuffer()),unit);
+      const binaryDownload=await requestOriginal(workspace+'/file/Resource/image.bin',200);
+      assert.equal(binaryDownload.headers.get('content-type'),'application/octet-stream');
+      assert.deepEqual(Buffer.from(await binaryDownload.arrayBuffer()),Buffer.from([0,255,254,0]));
+      await original(unitPath,401,{actor:null});
+      await original(unitPath,404,{actor:second});
+      await original(unitPath,405,{method:'DELETE'});
+      await original(workspace+'/file/Booklet/unit.xml',404);
+      await original(workspace+'/file/Unit/%2Funit.xml',404);
+      await original(workspace+'/file/Unit/%5Cunit.xml',404);
+      await original(workspace+'/file/Unit/unit.xml%00',404);
+      assert.deepEqual(await api(scope+'/source-packages?limit=500'),before);
+      assert.deepEqual(await api(scope+'/activity-events?limit=500'),activity);
+    });
     const replacement=await api(scope+'/source-packages/'+created[1].sourcePackageId+'/replacements',{
       fileName:'booklet.xml',mediaType:'application/xml',
       sourceDocument:xml('Booklet','BOOKLET','<Units><Unit id="UNIT"/></Units>','<Label>Geändert Ω</Label>')

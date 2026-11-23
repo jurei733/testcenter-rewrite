@@ -51,7 +51,7 @@ const first = (node: Element | undefined, name: string): Element | undefined => 
 const sourceUpper = (value: string): string => value.replace(/[a-z]/g, letter => letter.toUpperCase());
 const sourceId = (value: string): string => sourceUpper(value).replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, '');
 
-function inspect(input: WorkspaceCatalogInput): {
+function inspect(input: WorkspaceCatalogInput, includeVeronaModuleType = false): {
   metadata: WorkspaceCatalogFile['metadata']; references: WorkspaceFileReference[]; moduleId: string;
   diagnostics?: WorkspaceCatalogFile['validationDiagnostics'];
 } {
@@ -66,7 +66,8 @@ function inspect(input: WorkspaceCatalogInput): {
     if (!/\.html$/i.test(input.fileName)) return {metadata, references, moduleId};
     const parsed=inspectOriginalHtmlResource(input.fileName,input.sourceText,input.sourceBytes);
     Object.assign(metadata,{identifier:parsed.identifier,label:parsed.label,description:parsed.description,
-      moduleVersion:parsed.moduleVersion,veronaVersion:parsed.veronaVersion});
+      moduleVersion:parsed.moduleVersion,veronaVersion:parsed.veronaVersion,
+      ...(includeVeronaModuleType&&parsed.moduleType!==null?{veronaModuleType:parsed.moduleType}:{})});
     return{metadata,references,moduleId:parsed.moduleId,diagnostics:[
       ...parsed.errors.map(message=>({code:'workspace_resource_metadata_invalid',severity:'error' as const,message})),
       ...parsed.catalogWarnings.map(message=>({code:'workspace_resource_metadata_warning',severity:'warning' as const,message})),
@@ -129,8 +130,8 @@ function inspect(input: WorkspaceCatalogInput): {
 /** Lightweight complete current-file read model. Import status and validation
  * are not rewritten by this projection. Unresolved/ambiguous edges stay explicit.
  */
-export function buildWorkspaceFileCatalog(inputs: WorkspaceCatalogInput[], options: {requireDependencies?: boolean} = {}): WorkspaceFileCatalog {
-  const inspected = inputs.map(input => ({ input, ...inspect(input) }));
+export function buildWorkspaceFileCatalog(inputs: WorkspaceCatalogInput[], options: {requireDependencies?: boolean; includeVeronaModuleType?: boolean} = {}): WorkspaceFileCatalog {
+  const inspected = inputs.map(input => ({ input, ...inspect(input, options.includeVeronaModuleType) }));
   const index = new Map<string, Set<number>>();
   const key = (type: WorkspaceFileType, value: string) => JSON.stringify([type, sourceUpper(value)]);
   for (const [at, item] of inspected.entries()) {

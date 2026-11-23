@@ -167,5 +167,6 @@ export function inspectOriginalHtmlResource(fileName: string, sourceText: string
             warning(`Non-Standard-Filename: \`${recommended}\` expected.`);
     }
     return { identifier: sourceUpperCase(`${moduleId}-${parsed.major}.${parsed.minor}`), moduleId, effectiveVersion: parsed.text,
+        moduleType: isSourceTruthy(moduleType) ? moduleType : null,
         moduleVersion: isSourceTruthy(moduleType) ? parsed.text : null, veronaVersion: isSourceTruthy(moduleType) ? veronaVersion : null, label, description, warnings, catalogWarnings, info, errors };
 }

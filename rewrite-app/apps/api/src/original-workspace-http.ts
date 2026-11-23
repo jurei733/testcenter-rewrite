@@ -1,19 +1,20 @@
 import {randomUUID} from 'node:crypto';
 import type {IncomingMessage} from 'node:http';
-import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,type FirstSliceServices} from '@testcenter-rewrite-app/application';
+import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,findOriginalWorkspaceFile,projectOriginalWorkspaceFileDigests,readOriginalWorkspaceFileSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
 
-const route=/^\/workspace\/([^/]+)\/(results|responses(?:\/detailed)?|report\/([^/]+))$/;
+const route=/^\/workspace\/([^/]+)\/(files(?:-dependencies)?|results|responses(?:\/detailed)?|report\/([^/]+)|file\/([^/]+)\/([^/]+))$/;
 const contextRoute=/^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/original-administration$/;
 export function originalWorkspaceRouteLabel(method:string,pathname:string):string|null {
   if(contextRoute.test(pathname))return method+' /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/original-administration';
-  const match=route.exec(pathname);return match?method+' /workspace/:workspaceId/'+(match[3]?'report/:reportType':match[2]):null;
+  const match=route.exec(pathname);return match?method+' /workspace/:workspaceId/'+(match[3]?'report/:reportType':match[4]?'file/:fileType/:fileName':match[2]):null;
 }
 /** Native routes always require a current admin capability, independently of
  * canonical operator-demo configuration and its inherited role model. */
 export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage;pathname:string;searchParams?:URLSearchParams;services:FirstSliceServices;
   readBody:(decode:(payload:Uint8Array)=>unknown)=>Promise<unknown>;
   propagateError:(error:unknown)=>boolean;
-  header:(name:string,value:string)=>void;raw:(status:number,text:string,contentType:string)=>void}):Promise<boolean> {
+  header:(name:string,value:string)=>void;raw:(status:number,text:string,contentType:string)=>void;
+  download:(body:Buffer,fileName:string,mediaType:string)=>void}):Promise<boolean> {
   const context=contextRoute.exec(input.pathname);
   const match=route.exec(input.pathname);if(!match&&!context)return false;
   if(context){
@@ -34,12 +35,56 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
     return true;
   }
   if(!match)return false;
-  input.header('cache-control','private, no-store');const methods=match[2]==='results'||match[3]?['GET']:match[2]==='responses'?['DELETE']:['GET','DELETE'];
+  input.header('cache-control','private, no-store');
+  const operation=match[2], download=!!match[4];
+  const methods=operation==='files-dependencies'?['POST']
+    :download||operation==='files'||operation==='results'||match[3]?['GET']:operation==='responses'?['DELETE']:['GET','DELETE'];
   try {
     if(!methods.includes(input.request.method??'')){input.header('allow',methods.join(', '));throw new FirstSliceError(405,'original_method_not_allowed','Method not allowed. Must be one of: '+methods.join(', '));}
     const token=input.request.headers.authtoken;
     if(typeof token!=='string'||!token)throw new FirstSliceError(401,'original_token_missing','Auth Header not sufficient: '+(token===''?'empty':'missing'));
-    const scope=await input.services.originalWorkspaceAdministration.resolve({token,workspacePathSegment:match[1]!,write:input.request.method==='DELETE'});
+    const administration=input.services.originalWorkspaceAdministration;
+    const access={token,workspacePathSegment:match[1]!,write:input.request.method==='DELETE'};
+    const scope=await administration.resolve(access);
+    const confirmScope=async()=>{
+      const current=await administration.resolve(access);
+      if(current.tenantId!==scope.tenantId||current.workspaceId!==scope.workspaceId){
+        throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
+      }
+    };
+    if(download){
+      const missing=()=>new FirstSliceError(404,'original_workspace_file_not_found','File not found.');
+      let fileType:string,fileName:string;
+      try {
+        fileType=decodeURIComponent(match[4]!);
+        fileName=decodeURIComponent(match[5]!);
+      } catch {throw missing();}
+      if(!fileName||fileName==='.'||fileName==='..'||/[/\\\x00-\x1f\x7f]/.test(fileName+fileType))throw missing();
+      const catalog=await input.services.workspaceAdminRead.getWorkspaceFileCatalog(scope);
+      const file=findOriginalWorkspaceFile(catalog,fileType,fileName);
+      if(!file)throw missing();
+      const result=await input.services.workspaceAdminRead.downloadSourcePackage({...scope,sourcePackageId:file.sourcePackageId})
+        .catch(error=>{
+          if(error instanceof FirstSliceError&&['source_package_not_found','source_package_download_unavailable'].includes(error.errorCode))throw missing();
+          throw error;
+        });
+      await confirmScope();
+      input.download(Buffer.from(result.dataBase64,'base64'),fileName,fileType==='Resource'?'application/octet-stream':'text/xml');
+      return true;
+    }
+    if(operation==='files'||operation==='files-dependencies'){
+      let selection:Set<string>|undefined;
+      if(operation==='files-dependencies'){
+        let body:unknown;
+        try {body=await input.readBody(bytes=>JSON.parse(Buffer.from(bytes).toString('utf8')));}
+        catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_workspace_json_invalid','Internal error.');throw error;}
+        selection=readOriginalWorkspaceFileSelection(body);
+      }
+      const catalog=await input.services.workspaceAdminRead.getWorkspaceFileCatalog({...scope,original:{includeDependencies:selection!==undefined}});
+      await confirmScope();
+      input.raw(200,encodeOriginalReportJson(projectOriginalWorkspaceFileDigests(catalog,selection)),'application/json');
+      return true;
+    }
     if(input.request.method==='GET'){
       if(match[3]){
         const type=match[3];if(type!=='response'&&type!=='log'&&type!=='review')throw new FirstSliceError(404,'original_report_type_missing',"Report type '"+type+"' not found.");

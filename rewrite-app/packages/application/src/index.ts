@@ -98,6 +98,7 @@ export type {OriginalReportMetadata,OriginalReportParent,OriginalReportRun,Origi
 export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,originalWorkspaceWriteSqlSnapshot} from './original-workspace-write.js';
 export type {OriginalWorkspaceWriteAuthority,OriginalWorkspaceWriteSnapshot} from './original-workspace-write.js';
 import {createOriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
+export {findOriginalWorkspaceFile, projectOriginalWorkspaceFileDigests, readOriginalWorkspaceFileSelection} from './original-workspace-files.js';
 export {readOriginalWorkspaceAdministrationCollection,parseOriginalWorkspaceNumber,originalExplicitWorkspaceAccess,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection} from './original-workspace-administration.js';
 export type {OriginalWorkspaceAdministrationScope,OriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
 import {createOriginalTestAdministrationPort} from './original-test-administration.js';
@@ -636,7 +637,7 @@ export type WorkspaceAdminReadPort = {
     sortDirection?: "asc" | "desc";
     limit?: number;
   }): Promise<WorkspaceSourcePackageListResult>;
-  getWorkspaceFileCatalog(input: { tenantKey: string; workspaceKey: string }): Promise<WorkspaceFileCatalog>;
+  getWorkspaceFileCatalog(input: { tenantKey: string; workspaceKey: string; original?: {includeDependencies: boolean} }): Promise<WorkspaceFileCatalog>;
   exportSourcePackagesCsv(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -30736,7 +30737,7 @@ export const createFirstSliceServices = (
               sourceText: decoded ? readPersistedSourceText(source, decoded) : null,
               ...(decoded&&/\.html$/i.test(source.fileName)?{sourceBytes:decoded.bytes}:{}),
               resourceIdentifier: null};
-          }),activityEvents));
+          }),activityEvents), {requireDependencies:input.original?.includeDependencies, includeVeronaModuleType:!!input.original});
         const byId=new Map(currentFiles.map(source=>[source.sourcePackageId,source]));
         for (const file of catalog.items) {
           const source=byId.get(file.sourcePackageId);
