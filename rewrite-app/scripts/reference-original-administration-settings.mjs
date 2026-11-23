@@ -216,7 +216,8 @@ try {
     await page.locator('#adminUsername').fill('demo-admin'); await page.locator('#adminPassword').fill('demo-admin-password');
     const signedIn = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/admin/auth/sign-in' && response.ok());
     await page.locator('#adminSignInButton').click(); const browserToken = (await (await signedIn).json()).sessionToken;
-    assert.notEqual(browserToken, token); await page.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
+    assert.notEqual(browserToken, token); await page.locator('[data-cy="goto-superadmin-settings"]').click();
+    await page.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
     const storageState = await login.storageState(); await login.close();
     for (const width of [1280, 390]) {
       // Render both builds in the same native window/surface and viewport.

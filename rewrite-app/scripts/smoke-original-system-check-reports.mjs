@@ -41,7 +41,7 @@ async function chooseTab(page,label){
 async function open(context,username='owned-reports-writer',workspace=key){
  const page=await context.newPage();await page.goto(base+'/app/ops?ui=original',{waitUntil:'domcontentloaded'});
  await page.locator('#adminUsername').fill(username);await page.locator('#adminPassword').fill('Changed-native-reports-9!');await page.locator('#adminSignInButton').click();
- await page.locator('#adminSignOutButton').waitFor();
+ await page.waitForURL(url=>url.pathname==='/app/operator-start');
  return visitWorkspace(page,workspace);
 }
 async function visitWorkspace(page,workspace){
@@ -176,7 +176,7 @@ try{
   // Use the real sign-in and workspace controls, then navigate directly to the
   // selected report tab without preloading its feature code.
   page=await missing.newPage();await page.goto(base+'/app/ops?ui=original',{waitUntil:'domcontentloaded'});
-  await page.locator('#adminUsername').fill('owned-reports-writer');await page.locator('#adminPassword').fill('Changed-native-reports-9!');await page.locator('#adminSignInButton').click();await page.locator('#adminSignOutButton').waitFor();
+  await page.locator('#adminUsername').fill('owned-reports-writer');await page.locator('#adminPassword').fill('Changed-native-reports-9!');await page.locator('#adminSignInButton').click();await page.waitForURL(url=>url.pathname==='/app/operator-start');
   await page.goto(base+'/app/workspace?ui=original',{waitUntil:'domcontentloaded'});await page.locator('#workspaceKey').fill(key);await page.locator('#workspaceKey').dispatchEvent('change');
   await page.locator('[data-view-nav="content"]').click();await page.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();await page.locator('[data-cy="Systemcheck Berichte"]').click();
   await page.getByText('Die Berichtsverwaltung konnte nicht geladen werden.',{exact:true}).waitFor();assert.ok(blocked);

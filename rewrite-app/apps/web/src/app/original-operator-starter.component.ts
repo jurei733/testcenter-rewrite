@@ -1,10 +1,14 @@
-import { Component, effect, inject, signal, untracked } from "@angular/core";
+import {
+  Component, ElementRef, effect, inject, signal, untracked, viewChild,
+  type AfterViewInit, type OnDestroy
+} from "@angular/core";
 import { MatButton } from "@angular/material/button";
 import { Router, RouterLink } from "@angular/router";
 import type { OriginalOperatorWorkspaceChoice } from "@testcenter-rewrite-app/contracts";
 
 import { AppComponent } from "./app.component";
 import { ApplicationSettingsService } from "./application-settings.service";
+import { NativeMonitorIconComponent } from "./native-monitor/native-monitor-icon.component";
 import { TestCardComponent } from "./native-participant/starter/test-card.component";
 import { AssetService } from "./native-participant/shared/services/asset.service";
 import { OriginalOverlayStylesComponent } from "./original-overlay-styles.component";
@@ -17,18 +21,24 @@ import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
   selector: "app-original-operator-starter",
   imports: [
     MatButton, RouterLink, TestCardComponent, OriginalWorkspaceFileNoticeComponent,
-    OriginalOverlayStylesComponent
+    OriginalOverlayStylesComponent, NativeMonitorIconComponent
   ],
   providers: [AssetService],
   templateUrl: "./original-operator-starter.component.html",
   styleUrls: ["./original-login-theme.scss", "./original-operator-starter.component.css"]
 })
-export class OriginalOperatorStarterComponent {
+export class OriginalOperatorStarterComponent implements AfterViewInit, OnDestroy {
   readonly shell = inject(AppComponent);
   readonly settings = inject(ApplicationSettingsService);
   readonly choices = signal<OriginalOperatorWorkspaceChoice[]>([]);
   readonly loading = signal(true);
   readonly failed = signal(false);
+  readonly showScrollButton = signal(false);
+  private readonly scroller = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly sentinel = viewChild.required<ElementRef<HTMLElement>>("bottomSentinel");
+  private readonly observer = new IntersectionObserver(([entry]) => {
+    this.showScrollButton.set(!entry.isIntersecting);
+  });
   private readonly ops = inject(RewriteAppOpsService);
   private readonly state = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
@@ -50,6 +60,18 @@ export class OriginalOperatorStarterComponent {
       this.identity = { token, passwordChangeRequired };
       untracked(() => void this.loadChoices());
     });
+  }
+
+  ngAfterViewInit(): void {
+    this.observer.observe(this.sentinel().nativeElement);
+  }
+
+  ngOnDestroy(): void {
+    this.observer.disconnect();
+  }
+
+  scrollDown(): void {
+    this.scroller.scrollBy({ top: 300, behavior: "smooth" });
   }
 
   async loadChoices(): Promise<void> {

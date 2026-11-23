@@ -39,8 +39,7 @@ const check=xml('SysCheck','testcenter-syscheck-xml','18.0','<Metadata><Id>NATIV
 async function signIn(context,key,username='demo-admin',password='demo-admin-password',waitFiles=true) {
  const page=await context.newPage();await page.goto(base+'/app/ops?ui=original',{waitUntil:'domcontentloaded'});
  await page.locator('#adminUsername').fill(username);await page.locator('#adminPassword').fill(password);await page.locator('#adminSignInButton').click();
- if(username==='demo-admin')await page.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
- else await page.locator('#adminSignOutButton').waitFor();
+ await page.waitForURL(url=>url.pathname==='/app/operator-start');
  const workspaceSession=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/auth/current-session');
  await page.goto(base+'/app/workspace?ui=original',{waitUntil:'domcontentloaded'});
  assert.equal((await workspaceSession).status(),200);
@@ -208,6 +207,18 @@ try {
       const {originalWorkspaceChoices}=await starterSession.json();
       assert.deepEqual(originalWorkspaceChoices.map(({tenantKey,workspaceKey,label,mode})=>({tenantKey,workspaceKey,label,mode})),
         [{tenantKey:'demo-tenant',workspaceKey:key,label:'Eigener Arbeitsbereich '+width,mode:'RO'}]);
+      // At short heights the Original scrolls the overview beneath its fixed header.
+      await readPage.setViewportSize({width:390,height:320});
+      const card=readPage.locator('[data-cy="workspace-card-Eigener Arbeitsbereich '+width+'"] button');
+      const scrollAction=readPage.getByRole('button',{name:'Unten geht es weiter'});
+      await scrollAction.waitFor();
+      const previousTop=(await card.boundingBox()).y;
+      await scrollAction.press('Enter');
+      await scrollAction.waitFor({state:'detached'});
+      assert.ok((await card.boundingBox()).y<previousTop-30);
+      assert.equal((await readPage.locator('#originalOperatorStarterHeader').boundingBox()).y,0);
+      assert.equal(await readPage.evaluate(()=>window.scrollY),0);
+      await readPage.setViewportSize({width,height:844});
       await readPage.locator('[data-cy=change-password]').press('Enter');
       await readPage.locator('#ownAdminPasswordChangeDialog').waitFor();
       await readPage.locator('#ownAdminPasswordCancelButton').click();

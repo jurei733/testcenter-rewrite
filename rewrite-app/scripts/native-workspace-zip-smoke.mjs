@@ -22,7 +22,7 @@ export async function runNativeWorkspaceZipSmoke({browser, base, out, fixture, m
     });
     await page.goto(base+'/app/ops?ui=original');
     await page.locator('#adminUsername').fill(credentials.username); await page.locator('#adminPassword').fill(credentials.password);
-    await page.locator('#adminSignInButton').click(); await page.locator('#adminSignOutButton').waitFor();
+    await page.locator('#adminSignInButton').click(); await page.waitForURL(url=>url.pathname==='/app/operator-start');
     await page.goto(base+'/app/workspace?ui=original');
     await page.locator('#tenantKey').fill(fixture.scope.tenantKey); await page.locator('#tenantKey').dispatchEvent('change');
     await page.locator('#workspaceKey').fill(fixture.scope.workspaceKey); await page.locator('#workspaceKey').dispatchEvent('change');

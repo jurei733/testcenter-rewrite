@@ -40,7 +40,7 @@ async function open(context,username='owned-results-writer',view='results'){
  page.on('request',r=>{const path=new URL(r.url()).pathname;if(/^\/workspace\//.test(path))wire.push({path,method:r.method(),native:!!r.headers().authtoken,canonical:!!r.headers().authorization});});
  await page.goto(base+'/app/ops?ui=original',{waitUntil:'domcontentloaded'});
  await page.locator('#adminUsername').fill(username);await page.locator('#adminPassword').fill(password);await page.locator('#adminSignInButton').click();
- await page.locator('#adminSignOutButton').waitFor();
+ await page.waitForURL(url=>url.pathname==='/app/operator-start');
  await page.goto(base+'/app/workspace?ui=original',{waitUntil:'domcontentloaded'});
  await page.locator('#tenantKey').fill(scope.tenantKey);await page.locator('#tenantKey').dispatchEvent('change');
  await page.locator('#workspaceKey').fill(scope.workspaceKey);await page.locator('#workspaceKey').dispatchEvent('change');

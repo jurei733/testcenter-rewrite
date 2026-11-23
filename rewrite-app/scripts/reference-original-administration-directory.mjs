@@ -131,6 +131,7 @@ try {
     await loginPage.locator('#adminUsername').fill('demo-admin');await loginPage.locator('#adminPassword').fill('demo-admin-password');
     const signedIn=loginPage.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/auth/sign-in'&&response.ok());
     await loginPage.locator('#adminSignInButton').click();assert.notEqual((await(await signedIn).json()).sessionToken,token);
+    await loginPage.locator('[data-cy="goto-superadmin-settings"]').click();
     await loginPage.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
     const storageState=await login.storageState();await login.close();
     for(const width of [1280,390]) {

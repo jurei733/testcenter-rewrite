@@ -29,7 +29,14 @@
       }
     }
   </div>
-  <div class="sentinel"></div>
+  <div #bottomSentinel class="sentinel"></div>
+
+  @if (showScrollButton()) {
+    <button type="button" class="scroll-button" (click)="scrollDown()">
+      Unten geht es weiter
+      <mat-icon svgIcon="arrow_cool_down" />
+    </button>
+  }
 
   <div class="button-box">
     @if (shell.app.isPlatformAdmin) {

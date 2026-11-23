@@ -69,6 +69,7 @@ try{
   const browserSignedIn=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/v1/admin/auth/sign-in"&&response.ok());
   await page.locator("#adminSignInButton").click();let browserToken=(await(await browserSignedIn).json()).sessionToken;
   assert.notEqual(browserToken,token,"The browser must own its actual sign-in session, separate from setup.");
+  await page.locator('[data-cy="goto-superadmin-settings"]').click();
   const surface=page.locator('#originalSystemAdministration[aria-busy="false"]');await surface.waitFor();
   const accountTrigger=page.locator("#originalAdministrationAccountButton");
   const account=page.locator(".original-native-account-menu");
@@ -226,9 +227,18 @@ try{
   await guestPage.locator("#adminUsername").fill("owned-admin-a");await guestPage.locator("#adminPassword").fill("Reset-original-password-9!");
   const signedIn=guestPage.waitForResponse(response=>new URL(response.url()).pathname==="/api/v1/admin/auth/sign-in"&&response.ok());
   await guestPage.locator("#adminSignInButton").click();const guestToken=(await(await signedIn).json()).sessionToken;
+  await guestPage.waitForURL(url=>url.pathname==='/app/operator-start');
+  await guestPage.locator("#requiredAdminPasswordChangeDialog").waitFor();
+  assert.equal(await guestPage.locator('[data-cy^="workspace-card-"]').count(),0);
+  const lockedChoices=await fetch(base+"/api/v1/admin/auth/current-session?view=original-workspace-starter",{
+    headers:{authorization:`Bearer ${guestToken}`}
+  });
+  assert.equal(lockedChoices.status,200);
+  assert.deepEqual((await lockedChoices.json()).originalWorkspaceChoices,[]);
   await guestPage.locator("#requiredAdminPassword").fill("Own-original-password-9!");
   await guestPage.locator("#requiredAdminPasswordConfirmation").fill("Own-original-password-9!");
-  await guestPage.locator("#requiredAdminPasswordSubmitButton").click();await guestPage.locator("#requiredAdminPasswordChangeDialog").waitFor({state:"detached"});
+  await guestPage.locator("#requiredAdminPasswordSubmitButton").click();
+  await guestPage.locator("#adminSignInButton").waitFor();
   assert.equal((await fetch(base+"/api/v1/admin/auth/current-session",{headers:{authorization:`Bearer ${guestToken}`}})).status,401);
   await guest.close();await page.bringToFront();
   console.log("original_administration=reset-real-login-lazy-required-password-change-revokes-session:passed");

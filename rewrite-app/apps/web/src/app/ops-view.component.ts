@@ -1255,7 +1255,17 @@ export class OpsViewComponent implements OnInit {
   // emitted after that transition would be lost with the old lazy component.
   readonly authenticateOriginal = async (): Promise<void> => {
     await this.view.signInFromOriginalInterface();
-    await this.continueToRequestedView();
+    if (
+      await this.continueToRequestedView() ||
+      !this.view.canUseAdminSession ||
+      this.view.isMonitorOnlySession
+    ) {
+      return;
+    }
+    await this.router.navigate(["/operator-start"], {
+      queryParams: { ui: "original" },
+      replaceUrl: true
+    });
   };
 
   ngOnInit(): void {

@@ -93,6 +93,7 @@ try {
       const secretInput = page.locator("#globalConfirmationPasswordInput");
       const submit = page.locator("#globalConfirmationConfirmButton");
       if (ui === "original") {
+        await page.locator('[data-cy="goto-superadmin-settings"]').click();
         const nativeUserIds=[];
         for(const user of users)nativeUserIds.push(await nativeAdminId(user.adminUser.adminUserId));
         await runOriginalAdminDeletionSmoke({page,users,nativeUserIds,api,password,wrongPassword,screen,deletions});
@@ -259,7 +260,9 @@ try {
   await fallbackPage.route(`**/app/${originalRendererChunk}`, async route => { blockedChunks++; await route.abort("failed"); });
   await fallbackPage.goto(`${baseUrl}/app/ops?ui=original`, { waitUntil: "networkidle" });
   await fallbackPage.locator("#adminUsername").fill("demo-admin"); await fallbackPage.locator("#adminPassword").fill(password);
-  await fallbackPage.locator("#adminSignInButton").click(); await fallbackPage.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
+  await fallbackPage.locator("#adminSignInButton").click();
+  await fallbackPage.locator('[data-cy="goto-superadmin-settings"]').click();
+  await fallbackPage.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
   await fallbackPage.locator('[data-admin-id="' + await nativeAdminId(fallbackUser.adminUser.adminUserId) + '"]').click();
   await fallbackPage.locator('[data-cy="delete-user"]').click();
   await fallbackPage.waitForFunction(() => document.activeElement?.id === "globalConfirmationPasswordInput");
