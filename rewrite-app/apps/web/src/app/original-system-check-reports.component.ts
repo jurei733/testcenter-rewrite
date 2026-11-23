@@ -8,7 +8,6 @@ import {MatSort,MatSortHeader} from '@angular/material/sort';
 import {MatTableModule,MatTableDataSource} from '@angular/material/table';
 import {MatTooltip} from '@angular/material/tooltip';
 import type {SystemCheckReportStatistics,SystemCheckReportBreakdown} from '@testcenter-rewrite-app/domain';
-import {ApplicationSettingsService} from './application-settings.service';
 import {OriginalSystemCheckReportsController} from './original-system-check-reports-controller';
 import {OriginalParticipantConfirmationDialogComponent} from './original-participant-confirmation-dialog.component';
 import {OriginalWorkspaceFileIconComponent} from './original-workspace-file-icon.component';
@@ -21,8 +20,10 @@ import {RewriteAppUiStateService} from './rewrite-app-ui-state.service';
  templateUrl:'./original-system-check-reports.component.html',
  styles:[`:host { display:block; min-width:0; } .columnhost { display:flex; flex-direction:column; }
   .flex-row { display:flex; flex-direction:row; } .flex-column { display:flex; flex-direction:column; }
-  .mat-icon { margin-right:5px; } .mat-mdc-raised-button { min-width:100px; margin:2px; }
-  .table-header { font-weight:700; } [role=alert] { color:var(--mat-sys-error); }`]
+  .mat-mdc-raised-button { min-width:100px; margin:2px; }
+  button.mat-mdc-button-base:disabled { opacity:1; }
+  button:hover { transform:none; }
+  [role=alert] { color:var(--mat-sys-error); }`]
 })
 export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy {
  @Input({required:true}) sessionToken='';
@@ -34,7 +35,6 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
  private readonly changed=inject(ChangeDetectorRef);
  private readonly dialogs=inject(MatDialog);
  private readonly snacks=inject(MatSnackBar);
- private readonly settings=inject(ApplicationSettingsService);
  private destroyed=false;
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
  readonly data=new MatTableDataSource<SystemCheckReportStatistics>([]);
@@ -62,9 +62,9 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
   const captured=this.controller.captureDeletion();if(!captured || this.deletion)return;
   const prompt=captured.ids.length>1?`Es werden alle Berichte für diese ${captured.ids.length} Systemchecks `:
    `Es werden alle Berichte für diesen Systemcheck "${captured.ids[0]}" `;
-  this.deletion=this.dialogs.open(OriginalParticipantConfirmationDialogComponent,{panelClass:'original-participant-confirmation-dialog',
+  this.deletion=this.dialogs.open(OriginalParticipantConfirmationDialogComponent,{panelClass:'original-participant-confirmation-dialog',autoFocus:'dialog',
    data:{title:'Löschen von Berichten',message:prompt+'gelöscht. Fortsetzen?',confirmLabel:'Berichtsdaten löschen',cancelLabel:'Abbrechen',
-    safeMode:this.settings.settings().themeName==='Primar'}});
+    safeMode:false}});
   this.deletion.afterClosed().subscribe(async accepted=>{
    this.deletion=null;if(!accepted || this.destroyed)return;
    await captured.confirm();
