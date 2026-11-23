@@ -9,6 +9,10 @@ import {parseOriginalTestName} from './original-test.js';
 import {readOriginalPerson} from './original-test-access.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import type {OriginalMonitorRepository} from './original-monitor-store.js';
+import type {FirstSliceRepository} from './index.js';
+import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
+import {projectOriginalGroupResults} from './original-group-results.js';
+import {parseOriginalWorkspaceNumber} from './original-workspace-administration.js';
 import {formatOriginalMonitorSessionsJson, type OriginalMonitorActor} from './original-monitor-session.js';
 import {FirstSliceError} from './first-slice-error.js';
 
@@ -18,8 +22,9 @@ export type OriginalMonitorPort = {
   profile(input: {token: string; profileId: string}): Promise<OriginalMonitorProfile>;
   booklet(input: {token: string; bookletName: string}): Promise<string>;
   sessions(input: {token: string; groupKey?: string}): Promise<string>;
+  studyResults(input: {token: string; workspacePathSegment: string; groups: string}): Promise<OriginalGroupResult[]>;
 };
-export function createOriginalMonitorPort(input: {auth: OriginalAuthenticationPort; repository: OriginalMonitorRepository & Pick<import('./index.js').FirstSliceRepository,'appendOriginalTestLogs'>; now:()=>string; id:()=>string;
+export function createOriginalMonitorPort(input: {auth: OriginalAuthenticationPort; repository: OriginalMonitorRepository & Pick<FirstSliceRepository,'appendOriginalTestLogs'|'findOriginalWorkspaceAdministrationScope'|'getOriginalGroupResultInventory'>; now:()=>string; id:()=>string;
   profiles: (actor: OriginalMonitorActor) => Promise<OriginalMonitorProfile[] | undefined>;
   assignedBooklets: (person: ParticipantSession) => Promise<string[]>;
   readBooklet: (scope: {tenantId: string; workspaceId: string}, name: string) => Promise<{xml: string}>;
@@ -61,6 +66,23 @@ export function createOriginalMonitorPort(input: {auth: OriginalAuthenticationPo
       }
       return (await input.readBooklet(person, bookletName)).xml;
     },
-    async sessions({token, groupKey}) {return formatOriginalMonitorSessionsJson(await input.repository.readOriginalMonitorSessions(await actor(token), groupKey));}
+    async sessions({token, groupKey}) {return formatOriginalMonitorSessionsJson(await input.repository.readOriginalMonitorSessions(await actor(token), groupKey));},
+    async studyResults({token, workspacePathSegment, groups}) {
+      const monitor = await actor(token);
+      if (monitor.mode !== 'monitor-study') {
+        throw new FirstSliceError(403, 'original_study_monitor_forbidden', 'A current study monitor is required.');
+      }
+      let reference: string;
+      try { reference = decodeURIComponent(workspacePathSegment); }
+      catch { throw new FirstSliceError(400, 'original_study_workspace_invalid', 'Invalid workspace path.'); }
+      const number = parseOriginalWorkspaceNumber(reference);
+      const scope = number ? await input.repository.findOriginalWorkspaceAdministrationScope(number) : null;
+      if (!scope || scope.tenantId !== monitor.tenantId || scope.workspaceId !== monitor.workspaceId) {
+        throw new FirstSliceError(404, 'original_study_workspace_not_found', 'Workspace not found.');
+      }
+      const inventory = await input.repository.getOriginalGroupResultInventory(scope.tenantId, scope.workspaceId);
+      return projectOriginalGroupResults({...inventory, tenantId: scope.tenantId, workspaceId: scope.workspaceId,
+        selectedGroups: groups ? groups.split(',') : undefined});
+    }
   };
 }

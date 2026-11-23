@@ -1,6 +1,6 @@
 import {Injectable,signal} from '@angular/core';
 
-type PublicHeaderTitle=''|'Anmelden'|'Übersicht'|'Systemcheck'|'Rechtliches'|'Datenschutz'|'Barrierefreiheit';
+type PublicHeaderTitle=''|'Anmelden'|'Übersicht'|'Systemcheck'|'Rechtliches'|'Datenschutz'|'Barrierefreiheit'|'Studienmonitor';
 
 /** Source's public titles survive routed views, but not a new document.
  * Private group, workspace and Booklet titles keep their existing access owners. */

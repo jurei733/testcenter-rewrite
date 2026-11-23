@@ -6,12 +6,13 @@ export const originalSessionPaths = {
 } as const;
 export type OriginalTestAccess = {id: string; type: 'test'; label: string; flags: {locked: boolean; running: boolean}};
 export type OriginalTestGroupMonitorAccess = {id:string;type:'testGroupMonitor';label:string;flags:[]|{expired?:number;scheduled?:number;profile?:string;subLabel?:string}};
+export type OriginalStudyMonitorAccess = {id: string; type: 'studyMonitor'; label: string; flags: []};
 export type OriginalSystemCheckAccess = {id:string;type:'sysCheck';label:string;flags:[];workspaceId:string;description:string};
 export type OriginalAccessSet = {
   token: string; displayName: string; loginName: string; groupLabel: string; id: null; pwSetByAdmin: null;
   customTexts: Record<string, string>; flags: string[];
-  claims: {test?: OriginalTestAccess[]; review?: []; testGroupMonitor?:OriginalTestGroupMonitorAccess[]; sysCheck?:OriginalSystemCheckAccess[]}; groupToken: string;
-  viewSettings: ParticipantViewSettings | []; access: {test?: string[]; review?: []; testGroupMonitor?:string[]; sysCheck?:string[]};
+  claims: {test?: OriginalTestAccess[]; review?: []; studyMonitor?: OriginalStudyMonitorAccess[]; testGroupMonitor?:OriginalTestGroupMonitorAccess[]; sysCheck?:OriginalSystemCheckAccess[]}; groupToken: string;
+  viewSettings: ParticipantViewSettings | []; access: {test?: string[]; review?: []; studyMonitor?: string[]; testGroupMonitor?:string[]; sysCheck?:string[]};
 };
 export type OriginalWorkChallenge = {algorithm: 'SHA-256'; challenge: string; maxNumber: number; salt: string; signature: string};
 export type OriginalWorkSolution = Omit<OriginalWorkChallenge, 'maxNumber'> & {number: number};

@@ -5029,7 +5029,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
         header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
       const subscribe=broadcaster?async(target:Parameters<NativeBroadcaster['issue']>[0],credential:string)=>{const ticket=await broadcaster.issue(target,credential);if(ticket&&!response.destroyed&&!response.headersSent)response.setHeader('SubscribeToken',ticket);}:undefined;
-      if (await handleOriginalMonitorHttp({request,pathname,services,subscribe,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
+      if (await handleOriginalMonitorHttp({request,pathname,searchParams:url.searchParams,services,subscribe,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
         raw:(status,text,contentType)=>{response.writeHead(status,{'content-type':contentType});response.end(text);}})) return;
       if(await handleOriginalReviewHttp({request,pathname,services,
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,

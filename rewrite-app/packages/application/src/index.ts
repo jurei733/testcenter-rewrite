@@ -32977,6 +32977,12 @@ export const createFirstSliceServices = (
             [{...base,flags:Object.keys(flags).length?flags:[] as []}];
         });
       },
+      async studyWorkspace(entry) {
+        const workspace = await activeNativeWorkspace(entry);
+        if (!workspace) throw new FirstSliceError(410, 'original_login_gone', 'The Original workspace is no longer available.');
+        return {id: await repository.getOrCreateOriginalWorkspaceNumber({tenantId: workspace.tenantId, workspaceId: workspace.workspaceId}), type: 'studyMonitor',
+          label: workspace.displayName, flags: []};
+      },
       async systemChecks(entry){
         if(entry.originalOperationalMode!=='sys-check-login')return[];
         const [sources,events]=await Promise.all([repository.listSourcePackagesByWorkspace(entry.tenantId,entry.workspaceId),repository.listWorkspaceActivityEventsByWorkspace(entry.tenantId,entry.workspaceId)]);

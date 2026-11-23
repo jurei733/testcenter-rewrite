@@ -11,7 +11,7 @@ import {
 } from "./rewrite-app-admin-route.guard";
 import { matchOriginalNumericWorkspace, resolveOriginalNumericWorkspace } from "./original-workspace-browser-route";
 import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
-import { gateLegacyGroupMonitorBookmark } from "./native-monitor/native-session-route.guard";
+import { gateLegacyGroupMonitorBookmark, gateStudyMonitor } from "./native-monitor/native-session-route.guard";
 
 const canonicalRoutes: Routes = [
   { path: "", pathMatch: "full", redirectTo: "home" },
@@ -150,6 +150,8 @@ export const appRoutes: Routes = [
   {path:'native-start/dispatch',loadComponent:participantEntry,data:{legacyEntry:'dispatch'}},
   {path:'native-start',loadComponent:participantEntry},
   {path:'native-test',loadChildren:()=>import('./native-participant/native-routes').then(module=>module.nativeParticipantRoutes)},
+  {path:'study-monitor/:workspace',canActivate:[gateStudyMonitor],loadComponent:()=>
+    import('./native-monitor/native-study-monitor.component').then(module=>module.NativeStudyMonitorComponent)},
   {path:'group-monitor',canActivate:[gateLegacyGroupMonitorBookmark],loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),children:[
     {path:':group-name/:profile-id',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)},
     {path:':group-name',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)}

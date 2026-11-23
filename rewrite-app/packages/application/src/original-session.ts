@@ -8,7 +8,7 @@ import {isOriginalOperationalLogin,type OriginalOperationalDefinition} from './o
 import {originalPersonAlwaysNew} from './original-person-identity.js';
 import {hashOriginalSessionToken} from './original-session-token.js';
 
-import type {OriginalAccessSet, OriginalTestAccess} from '@testcenter-rewrite-app/contracts/original-session';
+import type {OriginalAccessSet, OriginalStudyMonitorAccess, OriginalTestAccess} from '@testcenter-rewrite-app/contracts/original-session';
 export type {OriginalAccessSet} from '@testcenter-rewrite-app/contracts/original-session';
 export type OriginalSessionTest = Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' |
   'contentReleaseId' | 'bookletKey' | 'bookletAssignmentKey' | 'locked'> & {lastOpenedAt?: string | null};
@@ -41,6 +41,7 @@ export function createOriginalSessionPort(input: {
   operational: (scope:{tenantId:string;workspaceId:string},loginKey:string)=>Promise<OriginalOperationalDefinition|null>;
   monitorAssignments: (entry:OriginalOperationalDefinition)=>Promise<ParticipantBookletAssignment[]>;
   monitorGroups: (entry:OriginalOperationalDefinition)=>Promise<import('@testcenter-rewrite-app/contracts/original-session').OriginalTestGroupMonitorAccess[]>;
+  studyWorkspace: (entry: OriginalOperationalDefinition) => Promise<OriginalStudyMonitorAccess>;
   systemChecks: (entry:OriginalOperationalDefinition)=>Promise<import('@testcenter-rewrite-app/contracts/original-session').OriginalSystemCheckAccess[]>;
   bookletLabels: (scope: {tenantId: string; workspaceId: string}) => Promise<Map<string, string>>;
 }): OriginalSessionPort {
@@ -78,6 +79,12 @@ export function createOriginalSessionPort(input: {
       const checks = await input.systemChecks(entry!);
       if (checks.length) { result.claims.sysCheck = checks; result.access.sysCheck = checks.map(check => check.id); }
       return result;
+    }
+    // The Original adds the workspace in GET /session, when the Starter refreshes.
+    if (!immediate && isOriginalOperationalLogin(entry!) && entry!.originalOperationalMode === 'monitor-study') {
+      const workspace = await input.studyWorkspace(entry!);
+      result.claims.studyMonitor = [workspace];
+      result.access.studyMonitor = [workspace.id];
     }
     const assignments = isOriginalOperationalLogin(entry!) ? await input.monitorAssignments(entry!) : input.assignments(entry!, state.requestedCode);
     if (assignments.length) {

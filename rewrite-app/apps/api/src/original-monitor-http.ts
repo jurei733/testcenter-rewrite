@@ -6,21 +6,29 @@ const profilePath = /^\/monitor\/profile\/([^/]+)$/;
 const bookletPath = /^\/booklet\/([^/]+)$/;
 const lockPath = /^\/monitor\/group\/([^/]+)\/tests\/(lock|unlock)$/;
 const groupPath = /^\/monitor\/group\/([^/]+)\/test-sessions$/;
+const studyPath = /^\/workspace\/([^/]+)\/studyresults$/;
 export function originalMonitorRouteLabel(method: string, pathname: string): string | null {
   const lock=lockPath.exec(pathname);if(lock)return method+' /monitor/group/:groupName/tests/'+lock[2];
+  if(studyPath.test(pathname))return method+' /workspace/:workspaceId/studyresults';
   return pathname === '/monitor/test-sessions' ? method + ' /monitor/test-sessions' : groupPath.test(pathname) ? method + ' /monitor/group/:groupName/test-sessions' : profilePath.test(pathname) ? method + ' /monitor/profile/:profileId' : bookletPath.test(pathname) ? method + ' /booklet/:bookletName' : null;
 }
-export async function handleOriginalMonitorHttp(input: {request: IncomingMessage; pathname: string; services: FirstSliceServices;
+export async function handleOriginalMonitorHttp(input: {request: IncomingMessage; pathname: string; searchParams: URLSearchParams; services: FirstSliceServices;
   readBody: (allowEmpty?:boolean,decode?:(payload:Uint8Array)=>unknown)=>Promise<unknown>;
   subscribe?:(target:{channel:'test-sessions';groupKey?:string},credential:string)=>Promise<void>;
   header: (name: string, value: string) => void; raw: (status: number, text: string, contentType: string) => void}): Promise<boolean> {
   if (!originalMonitorRouteLabel('', input.pathname)) return false;
   input.header('cache-control', 'private, no-store');
-  const mutation=lockPath.exec(input.pathname),method=mutation?'POST':'GET';
-  if(input.request.method!==method){input.header('allow',method);if(mutation){input.header('Test-Mode','NO');input.header('Error-ID','error-'+randomUUID());input.raw(405,'Method not allowed. Must be one of: '+method,'text/html;charset=UTF-8');}else input.raw(405,encodeOriginalReportJson('Method not allowed.'),'application/json');return true;}
+  const mutation=lockPath.exec(input.pathname),study=studyPath.exec(input.pathname),method=mutation?'POST':'GET';
+  if(input.request.method!==method&&!(study&&input.request.method==='HEAD')){input.header('allow',method);if(mutation){input.header('Test-Mode','NO');input.header('Error-ID','error-'+randomUUID());input.raw(405,'Method not allowed. Must be one of: '+method,'text/html;charset=UTF-8');}else input.raw(405,encodeOriginalReportJson('Method not allowed.'),'application/json');return true;}
   try {
     const token = input.request.headers.authtoken;
     if (typeof token !== 'string' || !token) throw new FirstSliceError(401, 'original_token_missing', 'Auth Header not sufficient: missing or empty');
+    if (study) {
+      const rows = await input.services.originalMonitor.studyResults({token, workspacePathSegment: study[1]!,
+        groups: input.searchParams.get('groups') ?? ''});
+      input.raw(200, encodeOriginalReportJson(rows), 'application/json');
+      return true;
+    }
     // Role and current private credential provenance precede group decoding.
     const booklet=bookletPath.exec(input.pathname),profile=profilePath.exec(input.pathname);
     if(booklet)await input.services.originalTest.requirePerson({token});else await input.services.originalMonitor.requireMonitor({token});
@@ -39,7 +47,7 @@ export async function handleOriginalMonitorHttp(input: {request: IncomingMessage
     input.raw(200,snapshot,'application/json');
   } catch (error) {
     if (!(error instanceof FirstSliceError)) throw error;
-    if(mutation||profilePath.test(input.pathname)||bookletPath.test(input.pathname)){
+    if(study||mutation||profilePath.test(input.pathname)||bookletPath.test(input.pathname)){
       input.header('Error-ID','error-'+randomUUID());input.header('Test-Mode','NO');
       input.raw(error.statusCode,(error.statusCode>=500?'Internal error.':error.message).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#039;'),'text/html;charset=UTF-8');
     }else input.raw(error.statusCode, encodeOriginalReportJson(error.message), 'application/json');

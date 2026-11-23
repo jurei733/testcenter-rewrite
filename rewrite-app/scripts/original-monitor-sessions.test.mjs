@@ -44,6 +44,7 @@ test('Source79 retains all Source75 controls and proves fresh dependent material
   assert.equal(fresh.rows.length, 5); assert.equal(new Set(fresh.rows.map(row => row.personId)).size, 3);
   assert.deepEqual(packetSet(first.rows), packetSet(fresh.rows)); assert.deepEqual(packetSet(repeated.rows), packetSet(fresh.rows));
   assert.equal(repeated.personBearerRetained, true); assert.equal(study.studyAccessSet.claims.test, undefined);
+  assert.equal(study.studyAccessSet.claims.studyMonitor, undefined);
   assert.equal(study.peerRows[0].personLabel, peerName); assert.equal(study.peerRows[0].testState.status, 'pending');
 });
 
@@ -53,7 +54,7 @@ for (const kind of kinds) test(`${kind}: actual native monitor materialization a
   const schema = 'owned_monitor_sessions_' + randomUUID().replaceAll('-', '');
   const url = kind === 'postgres' ? new URL(process.env.FIRST_SLICE_POSTGRES_URL) : null;
   url?.searchParams.set('options', '-c search_path=' + schema);
-  let storage, repository, services, pool, control, server, monitor, study, owner, firstRows, firstId, identity, baseScope;
+  let storage, repository, services, pool, control, server, monitor, study, owner, firstRows, firstId, identity, baseScope, nativeWorkspace;
   const open = async () => {
     storage = kind === 'memory' ? storage ?? {repository: createInMemoryFirstSliceRepository(), shutdown: async () => {}}
       : kind === 'file' ? await createFileFirstSliceStorage(file) : kind === 'sqlite' ? createSqliteFirstSliceStorage(file) : await createPostgresFirstSliceStorage(url.toString());
@@ -109,6 +110,13 @@ for (const kind of kinds) test(`${kind}: actual native monitor materialization a
     });
     await t.test('study login materializes only its workspace and returns group claims without inventing own Test claims', async () => {
       study = await services.originalSession.login({name: studyName, password});
+      nativeWorkspace = await repository.getOrCreateOriginalWorkspaceNumber(baseScope);
+      const claim = {id: nativeWorkspace, type: 'studyMonitor', label: workspace.displayName, flags: []};
+      assert.equal(study.claims.studyMonitor, undefined);
+      const restored = await services.originalSession.read({token: study.token});
+      assert.deepEqual(restored.claims.studyMonitor, [claim]);
+      assert.deepEqual(restored.access.studyMonitor, [nativeWorkspace]);
+      assert.equal(monitor.claims.studyMonitor, undefined);
       assert.equal(study.claims.test, undefined); assert.ok(study.claims.testGroupMonitor.some(row => row.id === peerGroup));
       const rows = await list(study.token, peerGroup); assert.equal(rows.length, 1); assert.equal(rows[0].personLabel, peerName);
       assert.equal(rows[0].testState.status, 'pending');
@@ -157,7 +165,8 @@ for (const kind of kinds) test(`${kind}: actual native monitor materialization a
         const response = await fetch(base + path, {method, headers: {...headers, ...(token ? {AuthToken: token} : {}), ...(body === undefined ? {} : {'content-type': 'application/json'})}, ...(body === undefined ? {} : {body: JSON.stringify(body)}), signal: AbortSignal.timeout(15000)});
         const text = await response.text(); assert.equal(response.status, status, method + ' ' + path + ': ' + text);
         assert.equal(response.headers.get('cache-control'), 'private, no-store');
-        assert.equal(response.headers.get('content-type')?.split(';')[0], path.startsWith('/session') && status >= 400 ? 'text/html' : 'application/json');
+        assert.equal(response.headers.get('content-type')?.split(';')[0],
+          status >= 400 && status !== 405 && (path.startsWith('/session') || path.includes('/studyresults')) ? 'text/html' : 'application/json');
         return {value: text ? (response.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) : text) : null, headers: response.headers, text};
       };
       const path = '/monitor/group/' + encodeURIComponent(group) + '/test-sessions';
@@ -186,6 +195,24 @@ for (const kind of kinds) test(`${kind}: actual native monitor materialization a
       assert.deepEqual((await request('GET', '/monitor/test-sessions', {token: access.token})).value, []);
       const studyRows = (await request('GET', '/monitor/test-sessions', {token: study.token})).value;
       assert.equal(studyRows.length, 6); assert.deepEqual(new Set(studyRows.map(row => row.groupName)), new Set([group, peerGroup]));
+      const studyPath = '/workspace/' + nativeWorkspace + '/studyresults';
+      const expectedStudy = await services.originalGroupResults.list(scope);
+      assert.equal(expectedStudy.length, 1);
+      const aggregate = await request('GET', studyPath, {token: study.token});
+      assert.deepEqual(aggregate.value, expectedStudy);
+      assert.deepEqual((await request('GET', studyPath + '?groups=' + group, {token: study.token})).value, expectedStudy);
+      assert.deepEqual((await request('GET', studyPath + '?groups=' + peerGroup, {token: study.token})).value, []);
+      const foreign = await services.platform.createWorkspace({...scope, workspaceKey: 'foreign', displayName: 'Foreign test workspace'});
+      const foreignNumber = await repository.getOrCreateOriginalWorkspaceNumber({tenantId: foreign.tenantId, workspaceId: foreign.workspaceId});
+      await request('GET', '/workspace/' + foreignNumber + '/studyresults', {token: study.token, status: 404});
+      for (const token of [access.token, owner.token, study.groupToken]) await request('GET', studyPath, {token, status: 403});
+      await request('GET', studyPath, {status: 401});
+      const studyHead = await request('HEAD', studyPath, {token: study.token});
+      assert.equal(studyHead.text, '');
+      const studyPost = await request('POST', studyPath, {token: study.token, status: 405});
+      assert.equal(studyPost.headers.get('allow'), 'GET');
+      await services.originalSession.logout({token: study.token});
+      await request('GET', studyPath, {token: study.token, status: 401});
       assert.equal((await request('GET', '/session', {token: owner.token})).value.token, owner.token);
       await closeServer();
     });
