@@ -40,6 +40,7 @@ export const sourcePackageStatuses = [
   "rejected"
 ] as const satisfies readonly SourcePackageStatus[];
 export type WorkspaceFileValidationReport={error?:string[];warning?:string[];info?:string[]};
+export type OriginalWorkspaceUploadReport=Record<string, WorkspaceFileValidationReport | []> | [];
 export type WorkspaceArchiveUploadReport = {
   fileName:string;
   sha256:string;

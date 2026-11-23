@@ -3,8 +3,19 @@ import type {IncomingMessage} from 'node:http';
 import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,findOriginalWorkspaceFile,projectOriginalWorkspaceFileDigests,readOriginalWorkspaceFileSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
 import {deleteOriginalWorkspaceFiles,readOriginalWorkspaceFileDeletion} from '@testcenter-rewrite-app/application';
 
-const route=/^\/workspace\/([^/]+)\/(files(?:-dependencies)?|results|responses(?:\/detailed)?|report\/([^/]+)|file\/([^/]+)\/([^/]+))$/;
+const route=/^\/workspace\/([^/]+)\/(files(?:-dependencies)?|results|responses(?:\/detailed)?|report\/([^/]+)|file(?:\/([^/]+)\/([^/]+))?)$/;
 const contextRoute=/^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/original-administration$/;
+async function readOriginalWorkspaceUpload(contentType:string,bytes:Buffer) {
+  if(!bytes.length)throw new FirstSliceError(400,'original_workspace_upload_missing','No Upload File.');
+  let form:FormData;
+  try {form=await new Response(new Uint8Array(bytes),{headers:{'content-type':contentType}}).formData();}
+  catch {throw new FirstSliceError(400,'original_workspace_multipart_invalid','Invalid multipart upload.');}
+  const array=form.getAll('fileforvo[]').filter(value=>typeof value!=='string');
+  const single=form.getAll('fileforvo').filter(value=>typeof value!=='string').at(-1);
+  const files=array.length?array:single?[single]:[];
+  if(!files.length)throw new FirstSliceError(400,'original_workspace_upload_missing','No Upload File in fileforvo');
+  return Promise.all(files.map(async file=>({fileName:file.name,bytes:new Uint8Array(await file.arrayBuffer())})));
+}
 export function originalWorkspaceRouteLabel(method:string,pathname:string):string|null {
   if(contextRoute.test(pathname))return method+' /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/original-administration';
   const match=route.exec(pathname);return match?method+' /workspace/:workspaceId/'+(match[3]?'report/:reportType':match[4]?'file/:fileType/:fileName':match[2]):null;
@@ -13,6 +24,7 @@ export function originalWorkspaceRouteLabel(method:string,pathname:string):strin
  * canonical operator-demo configuration and its inherited role model. */
 export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage;pathname:string;searchParams?:URLSearchParams;services:FirstSliceServices;
   readBody:(decode:(payload:Uint8Array)=>unknown)=>Promise<unknown>;
+  readUpload:()=>Promise<Buffer>;
   propagateError:(error:unknown)=>boolean;
   header:(name:string,value:string)=>void;raw:(status:number,text:string,contentType:string)=>void;
   download:(body:Buffer,fileName:string,mediaType:string)=>void}):Promise<boolean> {
@@ -38,7 +50,8 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
   if(!match)return false;
   input.header('cache-control','private, no-store');
   const operation=match[2], download=!!match[4];
-  const methods=operation==='files-dependencies'?['POST']
+  const upload=operation==='file';
+  const methods=operation==='files-dependencies'||upload?['POST']
     :download||operation==='results'||match[3]?['GET']:operation==='responses'?['DELETE']:['GET','DELETE'];
   const readJson=async(decode:(payload:Uint8Array)=>unknown)=>{
     try{return await input.readBody(decode);}
@@ -50,14 +63,26 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
     const token=input.request.headers.authtoken;
     if(typeof token!=='string'||!token)throw new FirstSliceError(401,'original_token_missing','Auth Header not sufficient: '+(token===''?'empty':'missing'));
     const administration=input.services.originalWorkspaceAdministration;
-    const access={token,workspacePathSegment:match[1]!,write:input.request.method==='DELETE'};
+    const access={token,workspacePathSegment:match[1]!,write:upload||input.request.method==='DELETE'};
     const scope=await administration.resolve(access);
-    const confirmScope=async()=>{
-      const current=await administration.resolve(access);
+    const confirmCurrentScope=(current:typeof scope)=>{
       if(current.tenantId!==scope.tenantId||current.workspaceId!==scope.workspaceId){
         throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
       }
     };
+    const confirmScope=async()=>confirmCurrentScope(await administration.resolve(access));
+    if(upload){
+      const contentType=input.request.headers['content-type']??'';
+      if(!/^multipart\/form-data(?:;|$)/i.test(contentType)){
+        throw new FirstSliceError(400,'original_workspace_multipart_invalid','A workspace file upload requires multipart form data.');
+      }
+      const files=await readOriginalWorkspaceUpload(contentType,await input.readUpload());
+      const writable=await administration.authorizeWrite(access);
+      confirmCurrentScope(writable);
+      const result=await input.services.contentIntake.uploadOriginalWorkspaceFiles({...writable,files});
+      input.raw(result.containsErrors?207:201,encodeOriginalReportJson(result.report),'application/json');
+      return true;
+    }
     if(download){
       const missing=()=>new FirstSliceError(404,'original_workspace_file_not_found','File not found.');
       let fileType:string,fileName:string;
@@ -81,9 +106,7 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
     if(operation==='files'&&input.request.method==='DELETE'){
       const body=await readJson(decodeJson);
       const writable=await administration.authorizeWrite(access);
-      if(writable.tenantId!==scope.tenantId||writable.workspaceId!==scope.workspaceId){
-        throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
-      }
+      confirmCurrentScope(writable);
       const paths=readOriginalWorkspaceFileDeletion(body);
       const catalog=await input.services.workspaceAdminRead.getWorkspaceFileCatalog(scope);
       await confirmScope();

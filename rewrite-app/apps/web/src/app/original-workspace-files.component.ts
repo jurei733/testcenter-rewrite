@@ -68,9 +68,10 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  private readonly systemCheckInstallation=inject(NativeSystemCheckInstallationService);
  private destroyed=false;
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
- readonly controller=new OriginalWorkspaceFilesController((method,path,body,token)=>
-   this.request.request('Dateiverwaltung',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
-   ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments,nativeRole:this.nativeRole}),
+ readonly controller=new OriginalWorkspaceFilesController(<T>(method:string,path:string,body:unknown,token:string)=>
+   path.startsWith('/workspace/') ? this.api.send<T>(method,path,body,{AuthToken:token}).then(result=>result.payload) :
+     this.request.request<T>('Dateiverwaltung',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
+   ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments,nativeRole:this.nativeRole,workspaceNumber:this.workspaceNumber}),
    ()=>{if(!this.destroyed){this.header.title.set(this.title);this.changed.markForCheck();}},
    ()=>{void this.systemCheckInstallation.refresh();});
  private readonly routeChanges=combineLatest([this.route.paramMap,this.route.queryParamMap]).subscribe(([params,query])=>{
@@ -145,6 +146,7 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  }
  async chooseFiles(event:Event):Promise<void> {
    const input=event.target as HTMLInputElement,files=Array.from(input.files??[]);input.value='';
+   if(this.workspaceNumber){await this.controller.uploadNative(files);return;}
    await this.controller.upload(files.map(file=>({name:file.name,type:file.type,read:()=>new Promise<string>((done,reject)=>{
      const reader=new FileReader();reader.onload=()=>typeof reader.result==='string'?done(reader.result):reject(Error('Datei konnte nicht gelesen werden.'));
      reader.onerror=()=>reject(Error('Datei konnte nicht gelesen werden.'));reader.onabort=()=>reject(Error('Lesen abgebrochen.'));

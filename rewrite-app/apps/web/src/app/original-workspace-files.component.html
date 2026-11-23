@@ -192,6 +192,19 @@
               @if (upload.publicationProblem) {
                 <app-original-workspace-file-notice level="error" [text]="upload.publicationProblem" />
               }
+            } @else if (upload.validationReport; as report) {
+              <div class="subheading-2" [class.error]="upload.status === 'error'" [class.success]="upload.status === 'completed'">
+                {{upload.name}} - {{upload.status === 'error' ? 'Abgelehnt' : 'Erfolgreich hochgeladen'}}
+              </div>
+              @for (message of report.error ?? []; track $index) {
+                <app-original-workspace-file-notice level="error" [text]="message" />
+              }
+              @for (message of report.info ?? []; track $index) {
+                <app-original-workspace-file-notice level="info" [text]="message" />
+              }
+              @for (message of report.warning ?? []; track $index) {
+                <app-original-workspace-file-notice level="warning" [text]="message" />
+              }
             } @else {
               <h2 class="subheading-2" [class.success]="upload.status === 'completed'"
                 [class.error]="upload.status === 'error'">{{upload.name}}</h2>

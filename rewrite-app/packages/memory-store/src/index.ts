@@ -220,8 +220,10 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
   const state = createInitialState();
 
   const reserveSourcePackageWithActivity = async (input: Parameters<FirstSliceRepository['reserveSourcePackageAssembly']>[0],
-    requiredEventType: 'source_package_assembled' | 'source_package_created'): Promise<boolean> => {
+    requiredEventType: 'source_package_assembled' | 'source_package_created',
+    authority?: Parameters<FirstSliceRepository['reserveWorkspaceFileUpload']>[0]['authority']): Promise<boolean> => {
     const { assembledSourcePackage, assemblyActivityEvent } = input;
+    guardOriginalWorkspaceWriteCollections(state, state.adminSessionsByToken, {...assembledSourcePackage, authority});
     const sourcePackages = Array.from(state.sourcePackages.values()).filter(
       candidate =>
         candidate.tenantId === assembledSourcePackage.tenantId &&
@@ -570,9 +572,10 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,
-      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),
+      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created', input.authority),
     async reserveSourcePackageReplacement(input) {
       const { replacementSourcePackage, replacementActivityEvent } = input;
+      guardOriginalWorkspaceWriteCollections(state, state.adminSessionsByToken, {...replacementSourcePackage, authority: input.authority});
       const sourcePackages = Array.from(state.sourcePackages.values()).filter(
         candidate =>
           candidate.tenantId === replacementSourcePackage.tenantId &&

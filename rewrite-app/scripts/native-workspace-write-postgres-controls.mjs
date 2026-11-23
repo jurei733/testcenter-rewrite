@@ -12,7 +12,7 @@ export async function verifyNativeWorkspaceWritePostgres(t,{repository,services,
  const observer=new Pool({connectionString});
  const login=async()=>(await services.adminAuth.signIn({username:'writer',password:'Owned-test-admin-reader-secret'})).adminSession;
  try{
-  for(const kind of ['groups','files'])for(const change of ['logout','clock-expiry'])await t.test('PostgreSQL native '+kind+' DELETE rechecks '+change+' after a real Workspace lock wait',{timeout:20000},async ctx=>{
+  for(const kind of ['groups','files','upload','replacement'])for(const change of ['logout','clock-expiry'])await t.test('PostgreSQL native '+kind+' rechecks '+change+' after a real Workspace lock wait',{timeout:20000},async ctx=>{
    const session=await login();let timestamp=new Date().toISOString();
    const runtime=createFirstSliceServices({repository,now:()=>timestamp}),blocker=await observer.connect(),entered=Promise.withResolvers();let deletionPid;
    await blocker.query('BEGIN');await blocker.query('SELECT workspace_id FROM workspaces WHERE tenant_id=$1 AND workspace_id=$2 FOR UPDATE',[ids.tenantId,ids.workspaceId]);
@@ -22,16 +22,23 @@ export async function verifyNativeWorkspaceWritePostgres(t,{repository,services,
     return query.apply(this,args);
    });
    const locator={token:session.token,workspacePathSegment:workspaceNumber};
-   const removal=kind==='groups'?runtime.originalWorkspaceAdministration.delete({...locator,kind,body:{groups:[groupKey]}})
-    :runtime.originalWorkspaceAdministration.authorizeWrite(locator).then(scope=>runtime.contentIntake.deleteSourcePackage({...scope,
-     sourcePackageId:sourcePackage.sourcePackageId,confirmation:sourcePackage.fileName}));
-   const pending=removal.then(value=>({value}),error=>({error}));
+   const uploadName='owned-lock-only.txt';
+   const fileName=kind==='replacement'?sourcePackage.fileName.split('/').at(-1):uploadName;
+   const write=async()=>{
+    if(kind==='groups')return runtime.originalWorkspaceAdministration.delete({...locator,kind,body:{groups:[groupKey]}});
+    const scope=await runtime.originalWorkspaceAdministration.authorizeWrite(locator);
+    if(kind==='files')return runtime.contentIntake.deleteSourcePackage({...scope,sourcePackageId:sourcePackage.sourcePackageId,confirmation:sourcePackage.fileName});
+    return runtime.contentIntake.uploadOriginalWorkspaceFiles({...scope,files:[{fileName,bytes:Buffer.from('Owned lock control')}]});
+   };
+   const pending=write().then(value=>({value}),error=>({error}));
    try{
-    await Promise.race([entered.promise,pending.then(v=>{throw v.error??Error('Deletion missed its row lock');})]);await lockWait(observer,deletionPid);
+    await Promise.race([entered.promise,pending.then(v=>{throw v.error??Error('Mutation missed its row lock');})]);await lockWait(observer,deletionPid);
     if(change==='logout')await services.adminAuth.signOut({sessionToken:session.token});else timestamp=new Date(Date.parse(session.expiresAt)+1).toISOString();
     await blocker.query('COMMIT');const result=await pending;assert.equal(result.error?.statusCode,403);
     assert.ok((await repository.listOriginalParticipantGroupsByWorkspace(ids.tenantId,ids.workspaceId)).some(g=>g.groupKey===groupKey));
     assert.deepEqual(await repository.getSourcePackageById(sourcePackage.sourcePackageId),sourcePackage);
+    const sources=await repository.listSourcePackagesByWorkspace(ids.tenantId,ids.workspaceId);
+    assert.deepEqual(sources.filter(row=>[sourcePackage.fileName,'Resource/'+uploadName].includes(row.fileName)),[sourcePackage]);
    }finally{await blocker.query('ROLLBACK');await pending;hook.mock.restore();blocker.release();}
   });
   await t.test('PostgreSQL native DELETE holds the current session and explicit grant until its own commit',{timeout:20000},async ctx=>{

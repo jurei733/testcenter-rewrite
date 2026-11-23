@@ -2149,10 +2149,12 @@ export const createSqliteFirstSliceStorage = (
   };
 
   const reserveSourcePackageWithActivity = async (input: Parameters<FirstSliceRepository['reserveSourcePackageAssembly']>[0],
-    requiredEventType: 'source_package_assembled' | 'source_package_created'): Promise<boolean> => {
+    requiredEventType: 'source_package_assembled' | 'source_package_created',
+    authority?: Parameters<FirstSliceRepository['reserveWorkspaceFileUpload']>[0]['authority']): Promise<boolean> => {
     const { assembledSourcePackage, assemblyActivityEvent } = input;
     database.exec("BEGIN IMMEDIATE");
     try {
+      guardOriginalWorkspaceWrite(database, {...assembledSourcePackage, authority});
       const sourcePackages = (
         database
           .prepare(
@@ -3031,11 +3033,12 @@ export const createSqliteFirstSliceStorage = (
     },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,
-      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),
+      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created', input.authority),
     async reserveSourcePackageReplacement(input) {
       const { replacementSourcePackage, replacementActivityEvent } = input;
       database.exec("BEGIN IMMEDIATE");
       try {
+        guardOriginalWorkspaceWrite(database, {...replacementSourcePackage, authority: input.authority});
         const replacedSourcePackage = database
           .prepare(
             `SELECT source_package_id

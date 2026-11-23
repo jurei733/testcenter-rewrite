@@ -13,6 +13,7 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
  assert.ok(originalRun);
  await repository.getOrCreateOriginalParticipantGroup({...ids,groupKey,groupLabel:'Owned revocation control',createdAt:new Date().toISOString()});
  const fileName='owned-delete-control.txt';
+ const newFileName='owned-upload-control.txt';
  const {sourcePackage}=await services.contentIntake.uploadWorkspaceFile({...scope,fileName,mediaType:'text/plain',sourceDocument:'Owned deletion control'});
  const filePath='Resource/'+fileName;
  const restore=async()=>{await repository.saveAdminUser(user);await repository.saveAdminRoleAssignment(role);await repository.saveTenant(tenant);await repository.saveWorkspace({...scope,workspace});};
@@ -20,6 +21,8 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
   assert.ok(await repository.getTestRunById(originalRun.testRunId),'An unauthorized request must retain its actual selected Test.');
   assert.ok((await repository.listOriginalParticipantGroupsByWorkspace(ids.tenantId,ids.workspaceId)).some(g=>g.groupKey===groupKey),'An unauthorized request must retain its actual selected group.');
   assert.deepEqual(await repository.getSourcePackageById(sourcePackage.sourcePackageId),sourcePackage);
+  const files=await repository.listSourcePackagesByWorkspace(ids.tenantId,ids.workspaceId);
+  assert.deepEqual(files.filter(file=>[filePath,'Resource/'+newFileName].includes(file.fileName)),[sourcePackage]);
   const events=await repository.listWorkspaceActivityEventsByWorkspace(ids.tenantId,ids.workspaceId);
   assert.ok(!events.some(event=>event.eventType==='source_package_deleted'&&event.subjectId===sourcePackage.sourcePackageId));
  };
@@ -34,12 +37,16 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
   ['suspended Tenant',404,async()=>repository.saveTenant({...tenant,status:'suspended'})],
   ['archived Workspace',404,async()=>repository.saveWorkspace({...scope,workspace:{...workspace,status:'archived'}})]
  ];
- const repositories={groups:'deleteOriginalGroupResults',tests:'deleteOriginalSelectedTests',files:'deleteSourcePackageAggregate'};
+ const repositories={groups:'deleteOriginalGroupResults',tests:'deleteOriginalSelectedTests',files:'deleteSourcePackageAggregate',
+  upload:'reserveWorkspaceFileUpload',replacement:'reserveSourcePackageReplacement'};
  const selections={groups:{groups:[groupKey]},tests:{personSessions:[{loginName,bookletName:'OWNED.ADM.B'}]},files:{f:[filePath]}};
  const basePath='/workspace/'+workspaceNumber;
- const paths={groups:basePath+'/responses',tests:basePath+'/responses/detailed',files:basePath+'/files'};
- for(const boundary of ['body','durable-writer'])for(const kind of ['groups','tests','files'])for(const[label,status,invalidate]of cases){
-  await t.test(`native ${kind} DELETE rejects ${label} after ${boundary} wait`,{timeout:20000},async()=>{
+ const paths={groups:basePath+'/responses',tests:basePath+'/responses/detailed',files:basePath+'/files',
+  upload:basePath+'/file',replacement:basePath+'/file'};
+ const multipartName={upload:newFileName,replacement:fileName};
+ for(const boundary of ['body','durable-writer'])for(const kind of Object.keys(paths))for(const[label,status,invalidate]of cases){
+  const method=multipartName[kind]?'POST':'DELETE';
+  await t.test(`native ${kind} ${method} rejects ${label} after ${boundary} wait`,{timeout:20000},async()=>{
    await restore();const token=(await services.adminAuth.signIn({username:user.username,password:'Owned-test-admin-reader-secret'})).adminSession.token;
    const entered=Promise.withResolvers(),release=Promise.withResolvers();let failure;
    const delayed=new Proxy(repository,{get(target,key){
@@ -47,14 +54,17 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
     const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;
    }});
    const runtime=boundary==='durable-writer'?createFirstSliceServices({repository:delayed}):services;
+   const bytes=async req=>{if(boundary==='body')entered.resolve();const chunks=[];for await(const chunk of req)chunks.push(chunk);return Buffer.concat(chunks);};
    const server=createServer((req,res)=>void handleOriginalWorkspaceHttp({request:req,pathname:new URL(req.url,'http://owned.invalid').pathname,services:runtime,
-    readBody:async decode=>{if(boundary==='body')entered.resolve();const chunks=[];for await(const chunk of req)chunks.push(chunk);return decode(Buffer.concat(chunks));},
+    readBody:async decode=>decode(await bytes(req)),readUpload:()=>bytes(req),
     propagateError:()=>false,header:(key,value)=>res.setHeader(key,value),raw:(code,text,type)=>{res.writeHead(code,{'Content-Type':type});res.end(text);}
    }).catch(error=>{failure=error;res.writeHead(500);res.end();}));
    await new Promise(done=>server.listen(0,'127.0.0.1',done));let req;
    try{
-    const payload=JSON.stringify(selections[kind]),response=Promise.withResolvers();
-    req=request({hostname:'127.0.0.1',port:server.address().port,path:paths[kind],method:'DELETE',headers:{AuthToken:token,'Content-Type':'application/json','Content-Length':Buffer.byteLength(payload)}},res=>{const chunks=[];res.on('data',b=>chunks.push(b));res.on('end',()=>response.resolve({status:res.statusCode,headers:res.headers,body:Buffer.concat(chunks).toString()}));});
+    const type=method==='POST'?'multipart/form-data; boundary=owned-test-body':'application/json';
+    const payload=method==='POST'?'--owned-test-body\r\nContent-Disposition: form-data; name="fileforvo[]"; filename="'+multipartName[kind]+'"\r\nContent-Type: text/plain\r\n\r\nUnauthorized replacement\r\n--owned-test-body--\r\n':JSON.stringify(selections[kind]);
+    const response=Promise.withResolvers();
+    req=request({hostname:'127.0.0.1',port:server.address().port,path:paths[kind],method,headers:{AuthToken:token,'Content-Type':type,'Content-Length':Buffer.byteLength(payload)}},res=>{const chunks=[];res.on('data',b=>chunks.push(b));res.on('end',()=>response.resolve({status:res.statusCode,headers:res.headers,body:Buffer.concat(chunks).toString()}));});
     req.on('error',response.reject);
     if(boundary==='body')req.write(payload.slice(0,1));else req.end(payload);
     await Promise.race([entered.promise,response.promise.then(r=>{throw Error('Request did not reach held boundary: '+r.status);})]);

@@ -277,6 +277,69 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       assert.deepEqual(deletedRows.map(row=>row.subjectId).sort(),sources.map(row=>row.sourcePackageId).sort());
       assert.equal((await api(scope+'/files')).totalCount,6);
     });
+    await t.test('native multipart uploads validate in dependency order and keep exact bytes',async()=>{
+      const workspaceKey='owned-native-upload';
+      await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey,displayName:'Owned native upload'},'POST',201);
+      const scoped='/api/v1/tenants/demo-tenant/workspaces/'+workspaceKey;
+      const writer=await user('owned-upload-writer','workspace_admin','read_write',workspaceKey);
+      const reader=await user('owned-upload-reader','workspace_admin','read_only',workspaceKey);
+      const context=await fetch(base+scoped+'/original-administration',{headers:{AuthToken:writer}});
+      assert.equal(context.status,200);
+      const workspace='/workspace/'+(await context.json()).workspaceId;
+      const send=async(rows,status,actor=writer,header='AuthToken')=>{
+        const form=new FormData();
+        for(const [fileName,bytes,alias='fileforvo[]'] of rows){
+          form.append(alias,new Blob([bytes],{type:'application/octet-stream'}),fileName);
+        }
+        form.append('ws','workspace');
+        const response=await fetch(base+workspace+'/file',{method:'POST',headers:{
+          ...(actor?{[header]:header==='Authorization'?'Bearer '+actor:actor}:{})
+        },body:form});
+        if(response.status!==status)assert.equal(response.status,status,await response.text());
+        assert.equal(response.headers.get('cache-control'),'private, no-store');
+        return status===201||status===207?response.json():response.text();
+      };
+      const raw=Buffer.from([0,255,254,0,13,10,0]);
+      const good=[['raw.bin',raw]];
+      await send(good,401,null);
+      await send(good,401,writer,'Authorization');
+      await send(good,403,reader);
+      await send(good,404,readOnly);
+      await send(good,404,token);
+      await send([['bad.bin',raw,'other']],400);
+      await send([['not-a-zip.zip',raw],...good],400);
+      assert.equal((await api(scoped+'/files')).totalCount,0);
+      const mixed=await send([
+        ['booklet.xml',fixtures[1][1]],['unit.xml',unit],['custom-player.html',player],...good,
+        ['invalid.xml','<unknown/>'],['../outside.bin',raw]
+      ],207);
+      assert.deepEqual(Object.keys(mixed),['custom-player.html','raw.bin','../outside.bin','unit.xml','booklet.xml','invalid.xml']);
+      assert.ok(mixed['invalid.xml'].error.length);
+      assert.ok(mixed['../outside.bin'].error.length);
+      for(const name of ['custom-player.html','raw.bin','unit.xml','booklet.xml'])assert.ok(!mixed[name].error,name);
+      assert.equal((await api(scoped+'/files')).totalCount,4);
+      const download=async(type,name)=>{
+        const response=await fetch(base+workspace+'/file/'+type+'/'+name,{headers:{AuthToken:writer}});
+        assert.equal(response.status,200);return Buffer.from(await response.arrayBuffer());
+      };
+      assert.deepEqual(await download('Resource','raw.bin'),raw);
+      assert.deepEqual(await download('Unit','unit.xml'),unit);
+      const releases=await api(scoped+'/content-releases?limit=500');
+      assert.ok(releases.items.length>0,'The accepted Booklet produces a runtime from the earlier batch members.');
+      const paths=await api(scoped+'/files');
+      const old=paths.items.find(row=>row.fileName==='Resource/raw.bin').sourcePackageId;
+      assert.ok((await send([['raw.bin','earlier'],['raw.bin','later']],201))['raw.bin'].warning.some(x=>x.includes('overwritten')));
+      assert.equal((await download('Resource','raw.bin')).toString(),'later');
+      const historical=await fetch(base+scoped+'/source-packages/'+old+'/download',{headers:{Authorization:'Bearer '+token}});
+      assert.equal(historical.status,200);assert.deepEqual(Buffer.from(await historical.arrayBuffer()),raw);
+      assert.deepEqual(await send([['single.bin',raw,'fileforvo']],201),{'single.bin':{warning:['Resource is never used']}});
+      const sourceFixture=resolve('test-fixtures/original-testcenter/source-workspace-results/native-resource-catalog-http');
+      const archiveInput=JSON.parse(readFileSync(join(sourceFixture,'inputs.json'))).find(row=>row.label==='current-translation');
+      const archive=Buffer.from(readFileSync(join(sourceFixture,archiveInput.label+'.zip.base64'),'utf8').trim(),'base64');
+      assert.equal(createHash('sha256').update(archive).digest('hex'),archiveInput.archiveSha256);
+      const original=JSON.parse(readFileSync(join(sourceFixture,'observations.json'))).rows.find(row=>row.label===archiveInput.label);
+      assert.deepEqual(await send([[archiveInput.name,archive]],201),original.value);
+    });
     const replacement=await api(scope+'/source-packages/'+created[1].sourcePackageId+'/replacements',{
       fileName:'booklet.xml',mediaType:'application/xml',
       sourceDocument:xml('Booklet','BOOKLET','<Units><Unit id="UNIT"/></Units>','<Label>Geändert Ω</Label>')

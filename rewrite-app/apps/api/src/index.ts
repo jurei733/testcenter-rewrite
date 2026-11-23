@@ -5028,6 +5028,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           logStructured(receipt.statusCode>=500?'error':'info','native_system_check_error',{requestId,route:originalSystemCheckRouteLabel(request.method??'',pathname),...receipt});},
         header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
       if(await handleOriginalWorkspaceHttp({request,pathname,searchParams:url.searchParams,services,readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,false,decode),
+        readUpload:()=>readRequestBuffer(request,runtime.config.maxSourcePackageJsonBodyBytes),
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
         header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);},
         download:(body,fileName,mediaType)=>sendAsset(response,200,mediaType,body,{

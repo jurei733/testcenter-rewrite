@@ -39,6 +39,34 @@ test('a completed old upload still refreshes public application mode after its p
  f.controller.destroy();held.resolve({sourcePackage:file()});await uploading;
  assert.equal(refreshes,1);assert.deepEqual(f.controller.files,[]);assert.deepEqual(f.controller.uploads,[]);assert.equal(f.controller.busy,false);
 });
+test('native upload uses one authorized multipart request and projects sorted file reports',async()=>{
+ let refreshes=0;
+ const native={...scope(),nativeRole:'RW',workspaceNumber:'17'};
+ const f=fixture(call=>call.method==='POST'?{'b.xml':{error:['Rejected']},'a.bin':[]}:normal(call),native,()=>refreshes++);
+ await f.controller.connect();
+ const selected=[new File(['bad'],'b.xml'),new File([new Uint8Array([0,255])],'a.bin')];
+ await f.controller.uploadNative(selected);
+ const [post]=f.calls.filter(call=>call.method==='POST');
+ assert.equal(post.path,'/workspace/17/file');assert.equal(post.token,native.token);
+ assert.deepEqual(post.body.getAll('fileforvo[]').map(file=>file.name),['b.xml','a.bin']);
+ assert.deepEqual(new Uint8Array(await post.body.getAll('fileforvo[]')[1].arrayBuffer()),new Uint8Array([0,255]));
+ assert.deepEqual(f.controller.uploads.map(({name,status,validationReport})=>({name,status,validationReport})),[
+  {name:'a.bin',status:'completed',validationReport:{}},{name:'b.xml',status:'error',validationReport:{error:['Rejected']}}
+ ]);
+ assert.equal(refreshes,1);
+ f.setScope({...native,nativeRole:'RO'});await f.controller.connect();await f.controller.uploadNative(selected);
+ assert.equal(f.calls.filter(call=>call.method==='POST').length,1);
+});
+test('native report for a retired numeric workspace cannot update the current view',async()=>{
+ const held=pending();let refreshes=0;
+ const native={...scope(),nativeRole:'RW',workspaceNumber:'17'};
+ const f=fixture(call=>call.method==='POST'?held.promise:normal(call),native,()=>refreshes++);
+ await f.controller.connect();
+ const uploading=f.controller.uploadNative([new File(['owned'],'old.txt')]);
+ f.setScope({...native,workspaceNumber:'18'});await f.controller.connect();
+ held.resolve({'old.txt':[]});await uploading;
+ assert.equal(refreshes,1);assert.equal(f.controller.busy,false);assert.deepEqual(f.controller.uploads,[]);
+});
 test('the separate deletion POST does not replace the Source upload-only mode refresh boundary',async()=>{
  let refreshes=0;const f=fixture(call=>call.method==='POST'?{report:emptyReport()}:normal(call),scope(),()=>refreshes++);
  await f.controller.connect();f.controller.checkAll('Unit',true);assert.equal(await f.controller.captureDeletion().confirm(),true);assert.equal(refreshes,0);

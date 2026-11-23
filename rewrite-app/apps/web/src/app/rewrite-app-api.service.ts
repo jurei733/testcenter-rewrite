@@ -30,8 +30,12 @@ export class RewriteAppApiService {
     };
 
     if (body !== undefined && method !== "GET" && method !== "HEAD") {
-      headers["Content-Type"] = "application/json";
-      init.body = JSON.stringify(body);
+      if (body instanceof FormData) {
+        init.body = body;
+      } else {
+        headers["Content-Type"] = "application/json";
+        init.body = JSON.stringify(body);
+      }
     }
 
     const response = await fetch(path, init);

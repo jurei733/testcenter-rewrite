@@ -2081,7 +2081,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   };
 
   const reserveSourcePackageWithActivity = async (input: Parameters<FirstSliceRepository['reserveSourcePackageAssembly']>[0],
-    requiredEventType: 'source_package_assembled' | 'source_package_created'): Promise<boolean> => {
+    requiredEventType: 'source_package_assembled' | 'source_package_created',
+    authority?: Parameters<FirstSliceRepository['reserveWorkspaceFileUpload']>[0]['authority']): Promise<boolean> => {
     const { assembledSourcePackage, assemblyActivityEvent } = input;
     const client = await pool.connect();
     try {
@@ -2093,6 +2094,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
          FOR UPDATE`,
         [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
       );
+      await guardOriginalWorkspaceWrite(client, {...assembledSourcePackage, authority});
       const sourcePackages = (
         await client.query(
           `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type,
@@ -2131,6 +2133,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         await client.query("ROLLBACK");
         return false;
       }
+      await guardOriginalWorkspaceWrite(client, {...assembledSourcePackage, authority});
       await client.query(
         `INSERT INTO source_packages (
           source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
@@ -2885,7 +2888,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,
-      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),
+      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created', input.authority),
     async reserveSourcePackageReplacement(input) {
       const { replacementSourcePackage, replacementActivityEvent } = input;
       const client = await pool.connect();
@@ -2898,6 +2901,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
            FOR UPDATE`,
           [replacementSourcePackage.tenantId, replacementSourcePackage.workspaceId]
         );
+        await guardOriginalWorkspaceWrite(client, {...replacementSourcePackage, authority: input.authority});
         const replacedSourcePackage = await client.query(
           `SELECT source_package_id
            FROM source_packages
@@ -2949,6 +2953,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           await client.query("ROLLBACK");
           return false;
         }
+        await guardOriginalWorkspaceWrite(client, {...replacementSourcePackage, authority: input.authority});
         await client.query(
           `INSERT INTO source_packages (
             source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at

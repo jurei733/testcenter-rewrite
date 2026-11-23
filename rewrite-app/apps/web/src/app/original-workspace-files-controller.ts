@@ -1,16 +1,16 @@
 import {productionApiRoutes, resolveRoutePath, type DeleteSourcePackagesResponse,
   type GetWorkspaceFileCatalogResponse, type GetWorkspaceOverviewResponse,
   type PublicAdminRoleAssignment, type UploadWorkspaceFileResponse} from '@testcenter-rewrite-app/contracts';
-import type {WorkspaceCatalogFile, WorkspaceOverview, WorkspaceFileType,WorkspaceArchiveUploadReport} from '@testcenter-rewrite-app/domain';
+import type {OriginalWorkspaceUploadReport,WorkspaceCatalogFile,WorkspaceOverview,WorkspaceFileType,WorkspaceArchiveUploadReport,WorkspaceFileValidationReport} from '@testcenter-rewrite-app/domain';
 
-export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; workspaceKey:string; roles:PublicAdminRoleAssignment[];nativeRole?:'RO'|'RW'};
+export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; workspaceKey:string; roles:PublicAdminRoleAssignment[];nativeRole?:'RO'|'RW';workspaceNumber?:string};
 export type OriginalWorkspaceFilesTransport = <T>(method:string,path:string,body:unknown,token:string)=>Promise<T>;
 export type OriginalWorkspaceFile = WorkspaceCatalogFile & {name:string; isChecked:boolean};
 export type OriginalWorkspaceUpload = {name:string; type:string; read:()=>Promise<string>};
-export type OriginalWorkspaceUploadResult = {name:string; status:'queued'|'uploading'|'completed'|'error'; message:string;publicationProblem?:string;archiveEntries?:WorkspaceArchiveUploadReport['entries']};
-type Owner = {epoch:number; token:string; tenantKey:string; workspaceKey:string};
+export type OriginalWorkspaceUploadResult = {name:string; status:'queued'|'uploading'|'completed'|'error'; message:string;publicationProblem?:string;archiveEntries?:WorkspaceArchiveUploadReport['entries'];validationReport?:WorkspaceFileValidationReport};
+type Owner = {epoch:number; token:string; tenantKey:string; workspaceKey:string;workspaceNumber?:string};
 const sameScope = (a:Owner,b:OriginalWorkspaceFilesScope):boolean =>
-  a.token===b.token && a.tenantKey===b.tenantKey && a.workspaceKey===b.workspaceKey;
+  a.token===b.token && a.tenantKey===b.tenantKey && a.workspaceKey===b.workspaceKey && a.workspaceNumber===b.workspaceNumber;
 const problemText = (error:unknown,fallback:string):string => {
   if (!error || typeof error!=='object')return fallback;
   const record=error as {message?:unknown;details?:{diagnostics?:Array<{severity?:unknown;message?:unknown}>}};
@@ -123,7 +123,7 @@ export class OriginalWorkspaceFilesController {
   }
   async connect():Promise<void> {
     const scope=this.current();this.epoch++;
-    const owner={epoch:this.epoch,token:scope.token,tenantKey:scope.tenantKey,workspaceKey:scope.workspaceKey};this.owner=owner;
+    const owner={epoch:this.epoch,token:scope.token,tenantKey:scope.tenantKey,workspaceKey:scope.workspaceKey,workspaceNumber:scope.workspaceNumber};this.owner=owner;
     this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.problem='';this.notice=null;this.selectedRowId='';
     this.busy=!!owner.token && !!owner.tenantKey && !!owner.workspaceKey;this.changed();
     if(!this.busy)return;
@@ -176,6 +176,34 @@ export class OriginalWorkspaceFilesController {
       if(this.owns(owner))await this.load(owner);
     } catch(error){if(this.owns(owner))this.problem=problemText(error,'Dateien konnten nicht aktualisiert werden.');}
     finally{if(this.owns(owner)){this.busy=false;this.changed();}}
+  }
+  async uploadNative(files:File[]):Promise<void> {
+    const owner=this.owner;
+    if(!owner?.workspaceNumber || !this.owns(owner) || !this.canWrite || this.busy || !files.length)return;
+    this.busy=true;this.problem='';this.notice=null;
+    this.uploads=files.map(file=>({name:file.name,status:'uploading',message:''}));
+    this.changed();
+    const form=new FormData();
+    for(const file of files)form.append('fileforvo[]',file);
+    form.append('ws','workspace');
+    try {
+      const path='/workspace/'+encodeURIComponent(owner.workspaceNumber)+'/file';
+      const report=await this.transport<OriginalWorkspaceUploadReport>('POST',path,form,owner.token);
+      if(!this.owns(owner))return;
+      this.uploads=Object.entries(report).sort(([a],[b])=>a<b?-1:a>b?1:0)
+        .map(([name,reportRow])=>{
+          const validationReport=Array.isArray(reportRow)?{}:reportRow;
+          return {name,status:validationReport.error?.length?'error':'completed',message:'',validationReport};
+        });
+      await this.load(owner);
+    } catch(error) {
+      if(this.owns(owner)){
+        this.uploads=[{name:'Upload',status:'error',message:'',validationReport:{error:[problemText(error,'Hochladen fehlgeschlagen.')]}}];
+      }
+    } finally {
+      this.uploadSettled();
+      if(this.owns(owner)){this.busy=false;this.changed();}
+    }
   }
   private cancelPendingUploads():void {
     for(const row of this.uploads)if(row.status==='queued' || row.status==='uploading'){
