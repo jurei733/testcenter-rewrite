@@ -281,6 +281,36 @@ test('native internal navigation preserves only the immutable owned run, includi
   for(const path of ['/native-start','/native-test/9223372036854775806/u/1','/native-test/9223372036854775808/u/1','/t/9223372036854775807/u/1'])assert.equal(f.controller.willAlsoEndTest(path),true,path);
  }finally{f.finish();}
 });
+test('native TimeMax permits movement inside its block and refuses to leave through another run',async()=>{
+ const {DefaultUrlSerializer}=await import(pathToFileURL(require.resolve('@angular/router')).href);
+ navigationTypes.PRIMARY_OUTLET='primary';
+ const f=nativeBuffers();
+ try{
+  const parser=new DefaultUrlSerializer(),notices=[];
+  f.controller.router={parseUrl:url=>parser.parse(url)};
+  f.controller.ms={showSnackbar:text=>notices.push(text)};
+  f.controller.testMode={saveResponses:true,forceTimeRestrictions:true};
+  const timed={id:'timed',timerId:'timed',locked:null,restrictions:{timeMax:{minutes:2,leave:'forbidden'}}};
+  const untimed={id:'untimed',timerId:null,locked:null,restrictions:{}};
+  f.controller.testlets={timed};
+  f.controller.units={
+   1:{sequenceId:1,parent:timed,state:{}},
+   2:{sequenceId:2,parent:timed,state:{}},
+   3:{sequenceId:3,parent:untimed,state:{}}
+  };
+  f.controller.currentUnitSequenceId=1;
+  f.controller.currentTimerId='timed';
+  f.controller.state$.next('RUNNING');
+  const canLeave=url=>rx.firstValueFrom(f.controller.canDeactivateUnit(url,false));
+  assert.equal(await canLeave('/native-test/9223372036854775807/u/2?reload=42'),true);
+  assert.equal(f.controller.currentTimerId,'timed');
+  assert.deepEqual(notices,[]);
+  assert.equal(await canLeave('/native-test/9223372036854775807/u/3'),false);
+  assert.equal(await canLeave('/native-test/9223372036854775806/u/2'),false);
+  assert.equal(await canLeave('/t/9223372036854775807/u/2'),false);
+  assert.equal(notices.length,3);
+ }finally{f.finish();}
+});
 test('native Source empty saved-buffer close requires all three distinct buffer kinds',async t=>{
  t.mock.timers.enable({apis:['setTimeout','setInterval']});const f=nativeBuffers();try{const nav=f.controller.navigation$.getValue(),p=f.controller.closeAllBuffers('empty','saved');t.mock.timers.tick(1);assert.equal(await p,nav);}finally{f.finish();}
 });

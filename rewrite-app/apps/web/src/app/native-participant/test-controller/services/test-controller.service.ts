@@ -1142,12 +1142,15 @@ export class TestControllerService {
       return of(true);
     }
 
-    let newUnit: Unit | null = null;
-    const match = nextStateUrl.match(/t\/(\d+)\/u\/(\d+)$/);
-    if (match) {
-      const targetUnitSequenceId = Number(match[2]);
-      newUnit = this.units[targetUnitSequenceId] || null;
-    }
+    const segments = this.router.parseUrl(nextStateUrl).root.children[PRIMARY_OUTLET]?.segments;
+    const unitSegment = segments?.[3]?.path;
+    const newUnit = segments?.length === 4 &&
+      segments[0].path === 'native-test' &&
+      segments[1].path === this.nativeTestId &&
+      segments[2].path === 'u' &&
+      unitSegment && /^\d+$/.test(unitSegment) ?
+      this.units[Number(unitSegment)] ?? null :
+      null;
 
     const forceNavigation = ignoreRouterState ?? this.router.getCurrentNavigation()?.extras?.state?.force ?? false;
     if (forceNavigation) {
