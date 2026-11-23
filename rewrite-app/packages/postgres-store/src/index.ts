@@ -17,7 +17,7 @@ import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/applicat
 import {lockOriginalTest} from './original-test-lock.js';
 import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import {appendOriginalTestLogs} from './original-test-log.js';
-import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
+import {writeAttachmentFile,readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
 import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {mutateOriginalAdminSession} from './original-admin-session.js';
@@ -2327,32 +2327,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
     },
     async saveAttachmentFile(attachmentFile) {
-      await withResultArtifactParent(pool, attachmentResultParent(attachmentFile), async client => {
-        await client.query(
-          `INSERT INTO attachment_files (
-          attachment_file_id, attachment_id, tenant_id, workspace_id,
-          file_name, media_type, data_base64, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT(attachment_file_id) DO UPDATE SET
-          attachment_id = EXCLUDED.attachment_id,
-          tenant_id = EXCLUDED.tenant_id,
-          workspace_id = EXCLUDED.workspace_id,
-          file_name = EXCLUDED.file_name,
-          media_type = EXCLUDED.media_type,
-          data_base64 = EXCLUDED.data_base64,
-          created_at = EXCLUDED.created_at`,
-          [
-            attachmentFile.attachmentFileId,
-            attachmentFile.attachmentId,
-            attachmentFile.tenantId,
-            attachmentFile.workspaceId,
-            attachmentFile.fileName,
-            attachmentFile.mediaType,
-            attachmentFile.dataBase64,
-            attachmentFile.createdAt
-          ]
-        );
-      });
+      await withResultArtifactParent(pool, attachmentResultParent(attachmentFile), client =>
+        writeAttachmentFile(client, attachmentFile, true));
     },
     async deleteAttachmentFile(attachmentFileId) {
       const result = await pool.query(
@@ -3674,9 +3650,16 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async deleteOriginalSelectedTests(input){return deleteOriginalSelectedTests(pool,input);},
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(pool, input);},
-    async listOriginalUnitsByWorkspace(tenantId,workspaceId){return (await pool.query('SELECT unit_json FROM original_native_units WHERE tenant_id=$1 AND workspace_id=$2',[tenantId,workspaceId])).rows.map(row=>JSON.parse(String(row.unit_json)));},
+    async listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds) {
+      const sql = 'SELECT unit_json FROM original_native_units WHERE tenant_id=$1 AND workspace_id=$2';
+      const {rows} = testRunIds
+        ? await pool.query(sql + ' AND test_run_id = ANY($3::text[])', [tenantId, workspaceId, testRunIds])
+        : await pool.query(sql, [tenantId, workspaceId]);
+      return rows.map(row => JSON.parse(String(row.unit_json)));
+    },
     async getOriginalUnit(input){return readOriginalNativeUnit(pool,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(pool,input,transform);},
+    async mutateOriginalAttachment(input){await mutateOriginalNativeUnit(pool,input,input);},
     async listOriginalReviews(scope){return listOriginalNativeReviews(pool,scope);},
     async mutateOriginalReview(scope,operation){return mutateOriginalNativeReview(pool,scope,operation);},
     async listOriginalReviewsByPerson(scope){return listOriginalNativeReviewsByPerson(pool,scope);},

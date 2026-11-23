@@ -1,5 +1,6 @@
 import {originalParticipantGroupKeysEqual} from '@testcenter-rewrite-app/application';
-import type {OriginalNativeUnit,ParticipantProgressDelivery,TestRun} from '@testcenter-rewrite-app/domain';
+import type {AttachmentFile,OriginalNativeUnit,ParticipantProgressDelivery,TestRun} from '@testcenter-rewrite-app/domain';
+import {prepareOriginalAttachmentResponse, type OriginalAttachmentMutation} from '@testcenter-rewrite-app/application';
 import {prepareOriginalUnitDelivery} from '@testcenter-rewrite-app/application';
 import {assertOriginalUnitInput,assertOriginalUnitRecord,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitParentMatches,resultParentUnavailable,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from '@testcenter-rewrite-app/application';
 import {withResultArtifactParent} from './result-artifact-parent.js';
@@ -22,14 +23,15 @@ export function readOriginalNativeUnitInTransaction(database:DatabaseSync,input:
 export function readOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput):OriginalNativeUnit|null{
  assertOriginalUnitInput(input);return withResultArtifactParent(database,input,()=>readOriginalNativeUnitInTransaction(database,input));
 }
-export function mutateOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput,transform:OriginalUnitTransform):OriginalNativeUnit|null{
+export function mutateOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput,mutation:OriginalUnitTransform | OriginalAttachmentMutation):OriginalNativeUnit|null{
  assertOriginalUnitInput(input);return withResultArtifactParent(database,input,()=>{
   const previous=readOriginalNativeUnitInTransaction(database,input);
   const saved=input.delivery?database.prepare('SELECT * FROM participant_progress_deliveries WHERE test_run_id=? AND delivery_id=?').get(input.testRunId,input.delivery.deliveryId):undefined;
   if(saved&&(['tenant_id','workspace_id','participant_session_id','content_release_id'] as const).some((key,index)=>saved[key]!==[input.tenantId,input.workspaceId,input.participantSessionId,input.contentReleaseId][index]))throw resultParentUnavailable();
   const receipt=input.delivery?prepareOriginalUnitDelivery(input,input.delivery,saved?JSON.parse(String(saved.delivery_json)) as ParticipantProgressDelivery:undefined):undefined;
   if(receipt===null)return previous;
-  const effect=prepareOriginalUnitMutation(input,previous,transform);
+  const effect = typeof mutation === 'function' ? prepareOriginalUnitMutation(input, previous, mutation)
+    : {unit: mutateAttachmentResponse(database, mutation, previous) ?? undefined, logs: []};
   if(effect.unit){const unit=effect.unit;database.prepare(`INSERT INTO original_native_units(test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,unit_name,unit_json) VALUES(?,?,?,?,?,?,?)
    ON CONFLICT(test_run_id,unit_name) DO UPDATE SET unit_json=excluded.unit_json`).run(unit.testRunId,unit.participantSessionId,unit.tenantId,unit.workspaceId,unit.contentReleaseId,unit.unitName,JSON.stringify(unit));}
   for(const log of effect.logs)database.prepare(`INSERT INTO participant_test_logs(participant_test_log_id,tenant_id,workspace_id,participant_session_id,test_run_id,unit_key,original_unit_id,log_key,log_content,timestamp,recorded_at,original_timestamp)
@@ -39,6 +41,31 @@ export function mutateOriginalNativeUnit(database:DatabaseSync,input:OriginalUni
   return effect.unit??previous;
  });
 }
+
+export function writeAttachmentFile(database:DatabaseSync, file:AttachmentFile, upsert = false):void {
+  database.prepare(`INSERT INTO attachment_files (
+    attachment_file_id, attachment_id, tenant_id, workspace_id, file_name, media_type, data_base64, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)` + (upsert ? `
+  ON CONFLICT(attachment_file_id) DO UPDATE SET attachment_id=excluded.attachment_id,
+    tenant_id=excluded.tenant_id, workspace_id=excluded.workspace_id, file_name=excluded.file_name,
+    media_type=excluded.media_type, data_base64=excluded.data_base64, created_at=excluded.created_at` : ''))
+    .run(file.attachmentFileId, file.attachmentId, file.tenantId, file.workspaceId,
+      file.fileName, file.mediaType, file.dataBase64, file.createdAt);
+}
+
+function mutateAttachmentResponse(database:DatabaseSync, input:OriginalAttachmentMutation,
+  previous:OriginalNativeUnit | null):OriginalNativeUnit | null {
+  const scope = [input.attachmentId, input.tenantId, input.workspaceId];
+  const files = database.prepare(
+    'SELECT attachment_file_id AS attachmentFileId, created_at AS createdAt FROM attachment_files WHERE attachment_id=? AND tenant_id=? AND workspace_id=?'
+  ).all(...scope).map(row => ({attachmentFileId:String(row.attachmentFileId),createdAt:String(row.createdAt)}));
+  const unit = prepareOriginalAttachmentResponse(input, previous, files);
+  if ('file' in input.change) writeAttachmentFile(database, input.change.file);
+  else database.prepare('DELETE FROM attachment_files WHERE attachment_id=? AND tenant_id=? AND workspace_id=? AND attachment_file_id=?')
+    .run(...scope, input.change.deleteFileId);
+  return unit;
+}
+
 export function invalidateOriginalNativeUnits(database:DatabaseSync,next:TestRun):void{
  const units=database.prepare('SELECT unit_name FROM original_native_units WHERE test_run_id=?').all(next.testRunId);if(!units.length)return;
  const changes=database.prepare(`WITH before AS (SELECT j.key,j.value FROM test_runs t,json_each(t.unit_responses_json) j WHERE t.test_run_id=?),after AS (SELECT key,value FROM json_each(?))

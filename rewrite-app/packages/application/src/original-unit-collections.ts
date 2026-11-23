@@ -1,4 +1,6 @@
-import type {OriginalNativeUnit,ParticipantSession,ParticipantTestLog,ParticipantProgressDelivery,TestRun,WorkspaceReview,WorkspaceActivityEvent} from '@testcenter-rewrite-app/domain';
+import type {AttachmentFile,OriginalNativeUnit,ParticipantSession,ParticipantTestLog,ParticipantProgressDelivery,TestRun,WorkspaceReview,WorkspaceActivityEvent} from '@testcenter-rewrite-app/domain';
+import {prepareOriginalAttachmentResponse, type OriginalAttachmentMutation} from './original-attachment-response.js';
+import {FirstSliceError} from './first-slice-error.js';
 import {prepareOriginalUnitDelivery} from './original-unit-delivery.js';
 import {assertOriginalUnitParent,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitRecordKey,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from './original-unit-record.js';
 import {selectOriginalSavedUnitKeys} from './original-saved-unit-projection.js';
@@ -26,6 +28,24 @@ export function invalidateOriginalUnitCollection(state:Pick<State,'originalNativ
   if([...aliases].some(alias=>originalParticipantGroupKeysEqual(alias,unit.unitName)&&previous.unitResponses[alias]!==next.unitResponses[alias]))set(state.originalNativeUnits,key,{...unit,unknownHistory:true});
  }
 }
+export function mutateOriginalAttachmentCollection(state:State & {attachmentFiles:Collection<AttachmentFile>},input:OriginalAttachmentMutation):void {
+  const files = values(state.attachmentFiles).filter(row => row.attachmentId === input.attachmentId &&
+    row.tenantId === input.tenantId && row.workspaceId === input.workspaceId);
+  const unit = prepareOriginalAttachmentResponse(input, readOriginalUnitCollection(state, input), files);
+  if ('file' in input.change) {
+    const file = input.change.file;
+    if (get(state.attachmentFiles, file.attachmentFileId)) {
+      throw new FirstSliceError(409, 'original_attachment_file_conflict', 'The attachment file identity conflicts with stored data.');
+    }
+    set(state.attachmentFiles, file.attachmentFileId, file);
+  } else if (state.attachmentFiles instanceof Map) {
+    state.attachmentFiles.delete(input.change.deleteFileId);
+  } else {
+    delete state.attachmentFiles[input.change.deleteFileId];
+  }
+  if (unit) set(state.originalNativeUnits, originalUnitRecordKey(unit), unit);
+}
+
 export function mutateOriginalUnitCollection(state:State,input:OriginalUnitInput,transform:OriginalUnitTransform):OriginalNativeUnit|null{
  const previous=readOriginalUnitCollection(state,input);
  const receiptKey=input.delivery?JSON.stringify([input.testRunId,input.delivery.deliveryId]):undefined;

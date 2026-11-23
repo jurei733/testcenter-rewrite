@@ -52,9 +52,11 @@ export {decodeOriginalTestLogJson,encodeOriginalTestLogContent,parseOriginalTest
 export {prepareOriginalTestLock,lockOriginalTestCollection} from './original-test-lock.js';
 export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection,formatOriginalTestLogEntry} from './original-test-log.js';
 import {createOriginalUnitPort} from './original-unit.js';
+import {attachmentStorageId, type AttachmentFileChange, type OriginalAttachmentMutation} from './original-attachment-response.js';
 export {formatOriginalUnitReadJson} from './original-unit.js';
 export type {OriginalUnitPort,OriginalUnitRead} from './original-unit.js';
-export {readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from './original-unit-collections.js';
+export {readOriginalUnitCollection,mutateOriginalUnitCollection,mutateOriginalAttachmentCollection,invalidateOriginalUnitCollection} from './original-unit-collections.js';
+export {prepareOriginalAttachmentResponse, type OriginalAttachmentMutation} from './original-attachment-response.js';
 export {originalUnitHistoryUnavailable,assertOriginalUnitParent,assertOriginalUnitInput,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitRecordKey,selectOriginalUnitName,prepareOriginalUnitMutation,patchOriginalUnitState,patchOriginalUnitParts} from './original-unit-record.js';
 export type {OriginalUnitScope,OriginalUnitInput,OriginalUnitEffect,OriginalUnitTransform} from './original-unit-record.js';
 export {originalUnitDelivery,prepareOriginalUnitDelivery} from './original-unit-delivery.js';
@@ -1724,7 +1726,8 @@ export type FirstSliceRepository = import('./original-system-check.js').Original
   /** One committed inventory snapshot; never returns response/timer values or private review text. */
   getOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   mutateOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput, transform: import('./original-unit-record.js').OriginalUnitTransform): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
-  listOriginalUnitsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalNativeUnit[]>;
+  mutateOriginalAttachment(input: OriginalAttachmentMutation): Promise<void>;
+  listOriginalUnitsByWorkspace(tenantId: string, workspaceId: string, testRunIds?: string[]): Promise<import("@testcenter-rewrite-app/domain").OriginalNativeUnit[]>;
   listOriginalReviews(scope:import('./original-review-record.js').OriginalReviewScope):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
   mutateOriginalReview(scope:import('./original-review-record.js').OriginalReviewScope,operation:import('./original-review-record.js').OriginalReviewMutation):Promise<import('./original-review-record.js').OriginalNativeReview|null>;
   listOriginalReviewsByPerson(scope:{participantSessionId:string;tenantId:string;workspaceId:string}):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
@@ -25047,14 +25050,7 @@ export const createFirstSliceServices = (
 
         return booklet.unitEntries.flatMap(unitEntry =>
           (unitEntry.requestedAttachments ?? []).map(request => {
-            const attachmentId = `att-${Buffer.from(
-              JSON.stringify([
-                testRun.testRunId,
-                unitEntry.unitKey,
-                request.variableId
-              ]),
-              "utf8"
-            ).toString("base64url")}`;
+            const attachmentId = attachmentStorageId(testRun.testRunId, unitEntry.unitKey, request.variableId);
             const files = (filesByAttachmentId.get(attachmentId) ?? []).sort(
               (left, right) =>
                 left.createdAt.localeCompare(right.createdAt) ||
@@ -28308,6 +28304,29 @@ export const createFirstSliceServices = (
       updateApplicationSettings: input => updateApplicationSettings(input),
       patchOriginalApplicationSettings: input => updateApplicationSettings(input,true)
     };
+  const mutateAttachmentFile = async (attachment: WorkspaceAttachment, change: AttachmentFileChange, occurredAt: string) => {
+    const run = (await repository.listOriginalPersonTestIdentities(attachment))
+      .find(row => row.testRunId === attachment.testRunId);
+    if (run?.originalResultState?.bookletName) {
+      const inventory = await repository.getOriginalTestAdministrationInventory(attachment.tenantId, attachment.workspaceId);
+      const number = inventory.numbers.find(row => row.testRunId === run.testRunId &&
+        row.participantSessionId === attachment.participantSessionId &&
+        row.contentReleaseId === run.contentReleaseId);
+      if (number) {
+        await repository.mutateOriginalAttachment({
+          testRunId: run.testRunId, participantSessionId: attachment.participantSessionId,
+          tenantId: attachment.tenantId, workspaceId: attachment.workspaceId, contentReleaseId: run.contentReleaseId,
+          unitName: attachment.unitKey, attachmentId: attachment.attachmentId, variableId: attachment.variableId,
+          partId: [number.testNumber, attachment.unitKey, attachment.variableId].join(':'), occurredAt, change
+        });
+        return;
+      }
+    }
+    if ('file' in change) await repository.saveAttachmentFile(change.file);
+    else if (!await repository.deleteAttachmentFile(change.deleteFileId)) {
+      throw new FirstSliceError(404, 'attachment_file_not_found', 'The requested attachment file was not found.');
+    }
+  };
   const attachmentOperations = (authorize: typeof requireAttachmentAccess): AttachmentPort => ({
     async listAttachments(input) {
       const access = await authorize({
@@ -28371,7 +28390,7 @@ export const createFirstSliceServices = (
         dataBase64: normalizedFile.dataBase64,
         createdAt: now()
       };
-      await repository.saveAttachmentFile(attachmentFile);
+      await mutateAttachmentFile(attachment, {file: attachmentFile}, attachmentFile.createdAt);
       await recordWorkspaceActivity({
         tenantId: access.workspace.tenantId,
         workspaceId: access.workspace.workspaceId,
@@ -28449,7 +28468,7 @@ export const createFirstSliceServices = (
           "The requested attachment file was not found."
         );
       }
-      await repository.deleteAttachmentFile(attachmentFile.attachmentFileId);
+      await mutateAttachmentFile(attachment, {deleteFileId: attachmentFile.attachmentFileId}, now());
       await recordWorkspaceActivity({
         tenantId: access.workspace.tenantId,
         workspaceId: access.workspace.workspaceId,
@@ -28485,6 +28504,7 @@ export const createFirstSliceServices = (
     },
     inventory: (tenantId, workspaceId) => repository.getOriginalTestAdministrationInventory(tenantId, workspaceId),
     attachments: buildWorkspaceAttachments,
+    units: (tenantId, workspaceId, testRunIds) => repository.listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds),
     scopedOperations: authorize => attachmentOperations(async request => {
       const access = await authorize(request.sessionToken);
       if (access.workspace.tenantKey !== request.tenantKey || access.workspace.workspaceKey !== request.workspaceKey) {

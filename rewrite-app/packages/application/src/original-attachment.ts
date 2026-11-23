@@ -1,15 +1,17 @@
 import type {OriginalAttachment, UploadAttachmentFileRequest} from '@testcenter-rewrite-app/contracts';
-import type {AttachmentFile, Workspace, WorkspaceAttachment} from '@testcenter-rewrite-app/domain';
+import type {AttachmentFile, OriginalNativeUnit, Workspace, WorkspaceAttachment} from '@testcenter-rewrite-app/domain';
 import {FirstSliceError} from './first-slice-error.js';
 import type {AttachmentPort} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import type {OriginalTestAdministrationInventory} from './original-test-administration.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
+import {orderedOriginalAttachmentFiles} from './original-attachment-response.js';
+import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 
 export const isOriginalAttachmentGroup = (group: string): boolean => group.startsWith('experimental');
 const missing = () => new FirstSliceError(404, 'original_attachment_not_found', 'The requested attachment was not found.');
 
-type NativeTarget = {source: OriginalAttachment; stored: WorkspaceAttachment};
+type NativeTarget = {source: OriginalAttachment; stored: WorkspaceAttachment; contentReleaseId: string};
 type AttachmentRequest = {token: string; attachmentId: string};
 type NativeAccess = {workspace: Workspace & {tenantKey: string}; actorAdminUserId: string; groupKeys: string[]};
 
@@ -17,6 +19,7 @@ export type OriginalAttachmentPort = {
   authorize(token: string): Promise<NativeAccess>;
   list(token: string): Promise<OriginalAttachment[]>;
   get(request: AttachmentRequest): Promise<OriginalAttachment>;
+  preflight(request: AttachmentRequest): Promise<void>;
   pages(token: string): Promise<WorkspaceAttachment[]>;
   page(request: AttachmentRequest): Promise<WorkspaceAttachment>;
   upload(request: AttachmentRequest, file: UploadAttachmentFileRequest): Promise<void>;
@@ -36,6 +39,7 @@ export function createOriginalAttachmentPort(input: {
   workspace: (scope: {tenantId: string; workspaceId: string}) => Promise<NativeAccess['workspace'] | undefined>;
   inventory: (tenantId: string, workspaceId: string) => Promise<OriginalTestAdministrationInventory>;
   attachments: (workspace: Workspace) => Promise<WorkspaceAttachment[]>;
+  units: (tenantId: string, workspaceId: string, testRunIds: string[]) => Promise<OriginalNativeUnit[]>;
   scopedOperations: (authorize: OriginalAttachmentPort['authorize']) => AttachmentPort;
 }): OriginalAttachmentPort {
   const authorize = async (token: string): Promise<NativeAccess> => {
@@ -90,7 +94,7 @@ export function createOriginalAttachmentPort(input: {
         variableId: stored.variableId
       };
       if (targets.has(attachmentId)) throw new FirstSliceError(409, 'original_attachment_ambiguous', 'The attachment identity is ambiguous.');
-      targets.set(attachmentId, {source, stored});
+      targets.set(attachmentId, {source, stored, contentReleaseId: run.contentReleaseId});
     }
     return {workspace, targets};
   };
@@ -103,17 +107,49 @@ export function createOriginalAttachmentPort(input: {
     }
     const target = targets.get(attachmentId);
     if (!target) throw missing();
-    return {target, sessionToken: token, workspaceKey: workspace.workspaceKey, tenantKey: workspace.tenantKey,
+    return {target, workspace, sessionToken: token, workspaceKey: workspace.workspaceKey, tenantKey: workspace.tenantKey,
       attachmentId: target.stored.attachmentId};
   };
   const page = (target: NativeTarget): WorkspaceAttachment => ({...target.stored,
     attachmentId: target.source.attachmentId, personLabel: target.source.personLabel, testLabel: target.source.testLabel,
     unitLabel: target.source.unitLabel});
 
+  const hydrateResponses = async (workspace: Workspace, targets: NativeTarget[]) => {
+    const withFiles = targets.filter(({stored}) => stored.attachmentFileIds.length);
+    if (!withFiles.length) return;
+    const runIds = [...new Set(withFiles.map(({stored}) => stored.testRunId))];
+    const units = await input.units(workspace.tenantId, workspace.workspaceId, runIds);
+    const unitsByRun = new Map<string, OriginalNativeUnit[]>();
+    for (const unit of units) {
+      const known = unitsByRun.get(unit.testRunId) ?? [];
+      known.push(unit);
+      unitsByRun.set(unit.testRunId, known);
+    }
+    for (const {stored, source, contentReleaseId} of withFiles) {
+      const unit = unitsByRun.get(stored.testRunId)?.find(row =>
+        row.participantSessionId === stored.participantSessionId && row.contentReleaseId === contentReleaseId &&
+        !row.unknownHistory && originalParticipantGroupKeysEqual(row.unitName, stored.unitKey));
+      const part = unit?.parts.find(row => row.id === source.attachmentId && row.responseType === 'iqb-standard@1.0');
+      if (!part) continue;
+      source.attachmentFileIds = orderedOriginalAttachmentFiles(stored.attachmentFileIds, part, stored.variableId);
+      source.lastModified = part.ts;
+    }
+  };
+
   return {
     authorize,
-    async list(token) {return [...(await scopedTargets(token)).targets.values()].map(row => row.source);},
-    async get(request) {return (await resolve(request)).target.source;},
+    async list(token) {
+      const {workspace, targets} = await scopedTargets(token);
+      const rows = [...targets.values()];
+      await hydrateResponses(workspace, rows);
+      return rows.map(row => row.source);
+    },
+    async get(request) {
+      const {workspace, target} = await resolve(request);
+      await hydrateResponses(workspace, [target]);
+      return target.source;
+    },
+    async preflight(request) {await resolve(request);},
     async pages(token) {return [...(await scopedTargets(token)).targets.values()].map(page);},
     async page(request) {return page((await resolve(request)).target);},
     async upload(request, file) {await operations.uploadAttachmentFile({...await resolve(request), ...file});},

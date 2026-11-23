@@ -66,7 +66,7 @@ export async function handleOriginalAttachmentHttp(input: {
   } else if (reference && operation === 'data') {
     input.json(200, formatOriginalAttachmentJson(await port.get(reference)));
   } else if (reference && request.method === 'POST') {
-    await port.get(reference);
+    await port.preflight(reference);
     await port.upload(reference, await input.readUpload());
     input.json(201, '');
   } else if (reference && fileId) {

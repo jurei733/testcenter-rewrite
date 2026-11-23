@@ -17,7 +17,7 @@ import {prepareOriginalOperationalLogins} from '@testcenter-rewrite-app/applicat
 import {lockOriginalTest} from './original-test-lock.js';
 import {readParticipantTestLogTimestamp,exactParticipantTestLogTimestamp} from '@testcenter-rewrite-app/domain';
 import {appendOriginalTestLogs} from './original-test-log.js';
-import {readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
+import {writeAttachmentFile,readOriginalNativeUnit,mutateOriginalNativeUnit,invalidateOriginalNativeUnits} from './original-native-unit.js';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
 import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {mutateOriginalAdminSession} from './original-admin-session.js';
@@ -2414,33 +2414,8 @@ export const createSqliteFirstSliceStorage = (
       return mapAttachmentFile(row);
     },
     async saveAttachmentFile(attachmentFile) {
-      withResultArtifactParent(database, attachmentResultParent(attachmentFile), () => {
-        database
-          .prepare(
-            `INSERT INTO attachment_files (
-            attachment_file_id, attachment_id, tenant_id, workspace_id,
-            file_name, media_type, data_base64, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(attachment_file_id) DO UPDATE SET
-            attachment_id = excluded.attachment_id,
-            tenant_id = excluded.tenant_id,
-            workspace_id = excluded.workspace_id,
-            file_name = excluded.file_name,
-            media_type = excluded.media_type,
-            data_base64 = excluded.data_base64,
-            created_at = excluded.created_at`
-          )
-          .run(
-            attachmentFile.attachmentFileId,
-            attachmentFile.attachmentId,
-            attachmentFile.tenantId,
-            attachmentFile.workspaceId,
-            attachmentFile.fileName,
-            attachmentFile.mediaType,
-            attachmentFile.dataBase64,
-            attachmentFile.createdAt
-          );
-      });
+      withResultArtifactParent(database, attachmentResultParent(attachmentFile), () =>
+        writeAttachmentFile(database, attachmentFile, true));
     },
     async deleteAttachmentFile(attachmentFileId) {
       return (
@@ -3844,9 +3819,16 @@ export const createSqliteFirstSliceStorage = (
     },
     async deleteOriginalSelectedTests(input){return deleteOriginalSelectedTests(database,input);},
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(database, input);},
-    async listOriginalUnitsByWorkspace(tenantId,workspaceId){return database.prepare('SELECT unit_json FROM original_native_units WHERE tenant_id=? AND workspace_id=?').all(tenantId,workspaceId).map(row=>JSON.parse(String(row.unit_json)));},
+    async listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds) {
+      const sql = 'SELECT unit_json FROM original_native_units WHERE tenant_id=? AND workspace_id=?';
+      const records = testRunIds
+        ? database.prepare(sql + ' AND test_run_id IN (SELECT value FROM json_each(?))').all(tenantId, workspaceId, JSON.stringify(testRunIds))
+        : database.prepare(sql).all(tenantId, workspaceId);
+      return records.map(row => JSON.parse(String(row.unit_json)));
+    },
     async getOriginalUnit(input){return readOriginalNativeUnit(database,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(database,input,transform);},
+    async mutateOriginalAttachment(input){await mutateOriginalNativeUnit(database,input,input);},
     async listOriginalReviews(scope){return listOriginalNativeReviews(database,scope);},
     async mutateOriginalReview(scope,operation){return mutateOriginalNativeReview(database,scope,operation);},
     async listOriginalReviewsByPerson(scope){return listOriginalNativeReviewsByPerson(database,scope);},

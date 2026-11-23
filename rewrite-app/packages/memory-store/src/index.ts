@@ -18,7 +18,7 @@ import type {OriginalCommandDelivery} from '@testcenter-rewrite-app/application'
 import {prepareOriginalOperationalLogins,projectOriginalOperationalModes} from '@testcenter-rewrite-app/application';
 import {lockOriginalTestCollection,appendOriginalTestLogCollection} from '@testcenter-rewrite-app/application';
 import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
-import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
+import {originalUnitParentMatches,readOriginalUnitCollection,mutateOriginalUnitCollection,mutateOriginalAttachmentCollection,invalidateOriginalUnitCollection} from '@testcenter-rewrite-app/application';
 import {preserveOriginalTestState} from '@testcenter-rewrite-app/application';
 import {assertOriginalAdminNameAvailable,prepareOriginalAdminNumber,mutateOriginalAdminCollections,type OriginalAdminNumber} from '@testcenter-rewrite-app/application';
 import {prepareOriginalWorkspaceNumber,selectOwnedOriginalTestNumber,type OriginalWorkspaceNumberRecord} from '@testcenter-rewrite-app/application';
@@ -983,9 +983,14 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       guardOriginalWorkspaceWriteCollections(state,state.adminSessionsByToken,input);
       return deleteOriginalGroupsFromCollections(state, input);
     },
-    async listOriginalUnitsByWorkspace(tenantId,workspaceId){return structuredClone(Array.from(state.originalNativeUnits.values()).filter(unit=>unit.tenantId===tenantId&&unit.workspaceId===workspaceId));},
+    async listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds) {
+      const selected = testRunIds && new Set(testRunIds);
+      return structuredClone([...state.originalNativeUnits.values()].filter(unit =>
+        unit.tenantId === tenantId && unit.workspaceId === workspaceId && (!selected || selected.has(unit.testRunId))));
+    },
     async getOriginalUnit(input){return readOriginalUnitCollection(state,input);},
     async mutateOriginalUnit(input,transform){return mutateOriginalUnitCollection(state,input,transform);},
+    async mutateOriginalAttachment(input){mutateOriginalAttachmentCollection(state,input);},
     async listOriginalReviews(scope){return readOriginalReviewCollection(state,scope);},
     async mutateOriginalReview(scope,operation){return mutateOriginalReviewCollection(state,scope,operation);},
     async listOriginalReviewsByPerson(scope){return readOriginalReviewPersonCollection(state,scope);},
