@@ -25,6 +25,7 @@ import {AlertComponent} from '../../native-monitor/shared/components/alert/alert
  <ng-template #testCardList>@for(booklet of booklets;track booklet.id;let i=$index){<tc-test-card [name]="booklet.name" [index]="i" [mode]="booklet.mode" [disabled]="!!starter.pendingBooklet()" [attr.data-cy]="'booklet-'+booklet.id" (select)="start(booklet.id)" />}</ng-template>
  @if(claims?.testGroupMonitor;as groups){<h3>Testgruppen-Überwachung</h3>@for(group of groups;track $index;let i=$index){<tc-test-card [name]="group.label" [subLabel]="groupLabel(group)" buttonLabel="Gruppen-Monitor Starten" [disabled]="groupDisabled(group)" [attr.data-cy]="'gm-card-'+i" (select)="monitor(group)" />}
  @if(claims?.test&&visibility!=='hidden'){<mat-accordion><mat-expansion-panel [expanded]="visibility!=='collapsed'"><mat-expansion-panel-header><mat-panel-title>{{'Testhefte anzeigen'|customtext:'gm_show_test'|async}}</mat-panel-title></mat-expansion-panel-header><ng-container [ngTemplateOutlet]="testCardList" /></mat-expansion-panel></mat-accordion>}}
+ @if(claims?.attachmentManager;as groups){<h4>Aufgaben-Anhänge Verwalten</h4>@for(group of groups;track group.id){<button mat-raised-button class="starter" (click)="attachmentManager(group.id)"><div class="starter-title">{{group.label}}</div><div>Anhänge Verwalten</div></button>}}
  @if(claims?.test&&!claims?.testGroupMonitor){<ng-container [ngTemplateOutlet]="testCardList" />}
  @if(claims?.sysCheck;as checks){<h4>Systemcheck</h4>@for(check of checks;track check.workspaceId+':'+check.id){<button mat-raised-button class="starter" [attr.data-cy]="'syscheck-'+check.id" (click)="systemCheck(check.workspaceId,check.id)"><div>{{check.label}}</div><div>{{check.description}}</div></button>}}
  </div>
@@ -71,6 +72,7 @@ export class NativeStarterComponent implements AfterViewInit {
  }
  async systemCheck(workspaceId:string,id:string){if(this.current)await this.router.navigate(['/check',workspaceId,id,'w']);}
  async studyMonitor(workspace:string){if(this.current)await this.router.navigate(['/study-monitor',workspace]);}
+ async attachmentManager(group:string){if(this.current)await this.router.navigate(['/attachment-manager',group]);}
  async monitor(group:OriginalTestGroupMonitorAccess){if(!this.current||this.groupDisabled(group))return;const profile=Array.isArray(group.flags)?'':group.flags.profile;await this.router.navigate(['/group-monitor',group.id,...(profile?[profile]:[])]);}
  ngAfterViewInit(){this.observer.observe(this.bottom.nativeElement);}
  scrollDown(){if(this.current)this.element.nativeElement.parentElement?.scrollBy({top:300,behavior:'smooth'});}

@@ -6,6 +6,7 @@ import {formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/appl
 import {handleOriginalReviewHttp,originalReviewRouteLabel} from './original-review-http.js';
 import {NativeBroadcaster} from './native-broadcaster.js';
 import {handleOriginalMonitorHttp,originalMonitorRouteLabel} from './original-monitor-http.js';
+import {handleOriginalAttachmentHttp,originalAttachmentRouteLabel} from './original-attachment-http.js';
 import {handleOriginalTestHttp, originalTestCreationPath,originalTestRouteLabel,originalResourceLogPath} from './original-test-http.js';
 import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/original-group-results';
 import {OriginalSessionProof} from './original-session-proof.js';
@@ -3347,6 +3348,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   const assetLabel=originalAssetRouteLabel(method,pathname);if(assetLabel)return assetLabel;
   const systemCheckLabel=originalSystemCheckRouteLabel(method,pathname);if(systemCheckLabel)return systemCheckLabel;
+  const attachmentLabel=originalAttachmentRouteLabel(method,pathname);if(attachmentLabel)return attachmentLabel;
   const adminLabel=originalAdminRouteLabel(method,pathname);if(adminLabel)return adminLabel;
   const workspaceLabel=originalWorkspaceRouteLabel(method,pathname);if(workspaceLabel)return workspaceLabel;
   const monitorLabel=originalMonitorRouteLabel(method,pathname);if(monitorLabel)return monitorLabel;
@@ -5028,6 +5030,22 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       if(await handleOriginalWorkspaceHttp({request,pathname,searchParams:url.searchParams,services,readBody:decode=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,false,decode),
         propagateError:error=>error instanceof ClientRequestAbortedError||error instanceof RequestBodyTooLargeError,
         header:(name,value)=>response.setHeader(name,value),raw:(status,text,contentType)=>{response.writeHead(status,{...securityHeaders,'content-type':contentType});endResponse(response,text);}}))return;
+      if(await handleOriginalAttachmentHttp({request, pathname, searchParams: url.searchParams, services,
+        readUpload: () => {
+          const contentType = request.headers['content-type'] ?? '';
+          if (!/^multipart\/form-data(?:;|$)/i.test(contentType)) {
+            throw new InvalidMultipartBodyError('An attachment upload requires multipart form data.');
+          }
+          return readMultipartAttachmentUpload(request, contentType, runtime.config.maxSourcePackageJsonBodyBytes);
+        },
+        pdf: (attachments, labelTemplate) => createAttachmentPagesPdf({attachments, labelTemplate, layout: 'original'}),
+        header: (name, value) => response.setHeader(name, value),
+        json: (status, text) => {response.writeHead(status, {...securityHeaders, 'content-type': 'application/json'}); endResponse(response, text);},
+        binary: (mediaType, body, inline, fileName) => sendAsset(response, 200, mediaType, body, {
+          'content-disposition': buildAttachmentContentDisposition(fileName).replace(/^attachment;/, inline ? 'inline;' : 'attachment;'),
+          'cache-control': 'private, no-store'
+        })
+      }))return;
       const subscribe=broadcaster?async(target:Parameters<NativeBroadcaster['issue']>[0],credential:string)=>{const ticket=await broadcaster.issue(target,credential);if(ticket&&!response.destroyed&&!response.headersSent)response.setHeader('SubscribeToken',ticket);}:undefined;
       if (await handleOriginalMonitorHttp({request,pathname,searchParams:url.searchParams,services,subscribe,readBody:(allowEmpty=false,decode)=>readJsonBody<unknown>(request,runtime.config.maxJsonBodyBytes,allowEmpty,decode),header:(name,value)=>response.setHeader(name,value),
         raw:(status,text,contentType)=>{response.writeHead(status,{'content-type':contentType});response.end(text);}})) return;

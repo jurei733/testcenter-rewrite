@@ -7,6 +7,7 @@ import {FirstSliceError} from './first-slice-error.js';
 import {isOriginalOperationalLogin,type OriginalOperationalDefinition} from './original-operational-login.js';
 import {originalPersonAlwaysNew} from './original-person-identity.js';
 import {hashOriginalSessionToken} from './original-session-token.js';
+import {isOriginalAttachmentGroup} from './original-attachment.js';
 
 import type {OriginalAccessSet, OriginalStudyMonitorAccess, OriginalTestAccess} from '@testcenter-rewrite-app/contracts/original-session';
 export type {OriginalAccessSet} from '@testcenter-rewrite-app/contracts/original-session';
@@ -109,6 +110,10 @@ export function createOriginalSessionPort(input: {
     if (isOriginalOperationalLogin(entry!)) {
       const groups=await input.monitorGroups(entry!);
       if(groups.length){result.claims.testGroupMonitor=groups;result.access.testGroupMonitor=groups.map(group=>group.id);}
+      if (entry!.originalOperationalMode === 'monitor-group' && isOriginalAttachmentGroup(entry!.groupKey)) {
+        result.claims.attachmentManager = [{id: entry!.groupKey, type: 'attachmentManager', label: entry!.groupLabel ?? '', flags: []}];
+        result.access.attachmentManager = [entry!.groupKey];
+      }
     }
     if (entry!.executionMode === 'run-review') { result.claims.review = []; result.access.review = []; }
     return result;

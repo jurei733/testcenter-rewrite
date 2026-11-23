@@ -38,7 +38,7 @@ export class BootstrapRootComponent {
   // Capture the entry presentation before an authentication guard redirects
   // its URL and the lazy canonical shell is constructed.
   effect(()=>{const problem=this.installation.problem(),presenter=this.errors.presenter();if(problem&&problem!==this.dismissedInstallationProblem&&problem!==this.presentedInstallationProblem)untracked(()=>{void this.showInstallationError(problem,presenter);});});
-  const update=()=>{const url=this.router.url.split('?',1)[0];const native=['/native-start','/native-test','/native-info','/group-monitor','/study-monitor','/check','/r/check-starter'].some(path=>url===path||url.startsWith(path+'/'));this.nativeView.set(native);if(native&&!this.settings.loaded()&&!this.loadingNativeSettings){this.loadingNativeSettings=true;void this.settings.load().catch(()=>undefined).finally(()=>this.loadingNativeSettings=false);}};
+  const update=()=>{const url=this.router.url.split('?',1)[0];const native=['/native-start','/native-test','/native-info','/group-monitor','/study-monitor','/attachment-manager','/check','/r/check-starter'].some(path=>url===path||url.startsWith(path+'/'));this.nativeView.set(native);if(native&&!this.settings.loaded()&&!this.loadingNativeSettings){this.loadingNativeSettings=true;void this.settings.load().catch(()=>undefined).finally(()=>this.loadingNativeSettings=false);}};
   this.router.events.pipe(takeUntilDestroyed()).subscribe(event=>{if(event instanceof NavigationEnd)update();});
   window.addEventListener('online',this.updateOnline);window.addEventListener('offline',this.updateOnline);
   // Source closes an error on browser-history navigation. Also retire a

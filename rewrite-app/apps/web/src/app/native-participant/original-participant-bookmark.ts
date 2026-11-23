@@ -1,7 +1,7 @@
 const reservedEntryNames = new Set([
   'r', 't', 'gm', 'sm', 'am', 'admin', 'superadmin', 'check',
   'home', 'workspace', 'operator-start', 'content', 'runtime', 'participant',
-  'native-start', 'native-test', 'native-info', 'group-monitor', 'study-monitor', 'system-check', 'attachment-capture',
+  'native-start', 'native-test', 'native-info', 'group-monitor', 'study-monitor', 'system-check', 'attachment-capture', 'attachment-manager',
   'ops', 'legal-notice', 'privacy', 'accessibility'
 ]);
 const originalAdminLoginPath = '/ops?ui=original&legacyLogin=1';
@@ -26,6 +26,9 @@ function protectedDestination(path: string): string | null {
   if (path === '/t/status') return '/native-test/status';
   const study = /^\/sm\/0*([1-9]\d*)$/.exec(path);
   if (study) return '/study-monitor/' + study[1];
+  if (/^\/am\/[^/]+(?:\/(?:attachment-overview|capture-image))?$/.test(path)) {
+    return path.replace(/^\/am\//, '/attachment-manager/');
+  }
   if (/^\/t\/[1-9]\d*(?:\/(?:status|u\/[1-9]\d*))?$/.test(path)) {
     return path.replace(/^\/t\//, '/native-test/');
   }

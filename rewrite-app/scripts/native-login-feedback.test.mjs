@@ -49,6 +49,8 @@ test('Direct Original test and monitor bookmarks select guarded destinations',()
  for(const [source,destination]of [
   ['t/status','/native-test/status'],['t/9','/native-test/9'],['t/9/u/2?other=1','/native-test/9/u/2'],['t/9/status/','/native-test/9/status'],
   ['sm/2','/study-monitor/2'],['sm/002','/study-monitor/2'],
+  ['am/experimental-one','/attachment-manager/experimental-one'],
+  ['am/experimental-one/capture-image','/attachment-manager/experimental-one/capture-image'],
   ['gm/group.one','/group-monitor/group.one'],['gm/group%20one/full','/group-monitor/group%20one/full']
  ])assert.equal(originalParticipantBookmark('#/'+source),destination+'?legacyBookmark=1',source);
  for(const source of ['t/0','t/9/u/0','t/9/unknown','gm/a//b','gm/a%2Fb/full','gm/group/%2e%2e','gm/group/%5Cfull']){

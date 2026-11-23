@@ -20,6 +20,15 @@ export const gateStudyMonitor:CanActivateFn=()=>{
  });
 };
 
+export const gateAttachmentManager:CanActivateFn=()=>{
+ const session=inject(NativeMonitorSessionService),router=inject(Router);
+ return afterNativeSessionRestore(session,()=>{
+  const access=session.access();
+  return access?.claims.attachmentManager?.length&&!access.flags.includes('codeRequired')
+   ?true:router.parseUrl('/native-start/dispatch');
+ });
+};
+
 export const gateLegacyGroupMonitorBookmark:CanActivateFn=route=>{
  if(route.queryParamMap.get(legacyBookmarkQueryKey)!=='1')return true;
  const session=inject(NativeMonitorSessionService),router=inject(Router);

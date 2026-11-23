@@ -103,6 +103,8 @@ export {projectOriginalSessionTest} from './original-session.js';
 export type {OriginalSessionTest} from './original-session.js';
 import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
 import {createOriginalSessionPort} from './original-session.js';
+import {createOriginalAttachmentPort} from './original-attachment.js';
+export {formatOriginalAttachmentJson} from './original-attachment.js';
 import {createOriginalAdminDirectoryPort} from './original-admin-directory.js';
 import {createOriginalAdminPermissionsPort} from './original-admin-permissions.js';
 export {validateOriginalAdminRoleChanges} from './original-admin-permissions.js';
@@ -1363,6 +1365,7 @@ export type ApplicationSettingsPort = {
 export type FirstSlicePorts = {
   applicationSettings: ApplicationSettingsPort;
   attachments: AttachmentPort;
+  originalAttachments: import('./original-attachment.js').OriginalAttachmentPort;
   adminAuth: AdminAuthPort;
   adminDirectory: AdminDirectoryPort;
   platform: PlatformPort;
@@ -28305,175 +28308,195 @@ export const createFirstSliceServices = (
       updateApplicationSettings: input => updateApplicationSettings(input),
       patchOriginalApplicationSettings: input => updateApplicationSettings(input,true)
     };
+  const attachmentOperations = (authorize: typeof requireAttachmentAccess): AttachmentPort => ({
+    async listAttachments(input) {
+      const access = await authorize({
+        ...input,
+        write: false
+      });
+      const requestedGroupKey = input.groupKey?.trim();
+      if (
+        requestedGroupKey &&
+        access.groupKeys &&
+        !access.groupKeys.includes(requestedGroupKey)
+      ) {
+        throw new FirstSliceError(
+          403,
+          "attachment_group_scope_forbidden",
+          "The requested group is outside the monitor's assigned groups."
+        );
+      }
+      return (await buildWorkspaceAttachments(access.workspace)).filter(
+        attachment =>
+          (!access.groupKeys || access.groupKeys.includes(attachment.groupKey)) &&
+          (!requestedGroupKey || attachment.groupKey === requestedGroupKey)
+      );
+    },
+    async getAttachment(input) {
+      const access = await authorize({
+        ...input,
+        write: false
+      });
+      return requireScopedAttachment({
+        workspace: access.workspace,
+        groupKeys: access.groupKeys,
+        attachmentId: input.attachmentId
+      });
+    },
+    async uploadAttachmentFile(input) {
+      const access = await authorize({
+        ...input,
+        write: true
+      });
+      const attachment = await requireScopedAttachment({
+        workspace: access.workspace,
+        groupKeys: access.groupKeys,
+        attachmentId: input.attachmentId
+      });
+      if (attachment.attachmentType !== "capture-image") {
+        throw new FirstSliceError(
+          409,
+          "attachment_capture_type_unsupported",
+          `Attachment type '${attachment.attachmentType || "unspecified"}' is retained for compatibility but does not support image capture.`
+        );
+      }
+      const normalizedFile = normalizeAttachmentFileInput(input);
+      const attachmentFile: AttachmentFile = {
+        attachmentFileId: `image:${idGenerator()}.${normalizedFile.extension}`,
+        attachmentId: attachment.attachmentId,
+        tenantId: access.workspace.tenantId,
+        workspaceId: access.workspace.workspaceId,
+        fileName: normalizedFile.fileName,
+        mediaType: normalizedFile.mediaType,
+        dataBase64: normalizedFile.dataBase64,
+        createdAt: now()
+      };
+      await repository.saveAttachmentFile(attachmentFile);
+      await recordWorkspaceActivity({
+        tenantId: access.workspace.tenantId,
+        workspaceId: access.workspace.workspaceId,
+        eventType: "attachment_file_uploaded",
+        actorId: access.actorAdminUserId,
+        subjectType: "test_run",
+        subjectId: attachment.testRunId,
+        summary: `Uploaded attachment image '${attachmentFile.fileName}' for '${attachment.loginKey}'.`,
+        details: {
+          attachmentId: attachment.attachmentId,
+          attachmentFileId: attachmentFile.attachmentFileId,
+          groupKey: attachment.groupKey,
+          loginKey: attachment.loginKey,
+          bookletKey: attachment.bookletKey,
+          unitKey: attachment.unitKey,
+          variableId: attachment.variableId,
+          mediaType: attachmentFile.mediaType
+        }
+      });
+      return requireScopedAttachment({
+        workspace: access.workspace,
+        groupKeys: access.groupKeys,
+        attachmentId: attachment.attachmentId
+      });
+    },
+    async getAttachmentFile(input) {
+      const access = await authorize({
+        ...input,
+        write: false
+      });
+      const attachment = await requireScopedAttachment({
+        workspace: access.workspace,
+        groupKeys: access.groupKeys,
+        attachmentId: input.attachmentId
+      });
+      const attachmentFile = await repository.getAttachmentFileById(
+        input.attachmentFileId.trim()
+      );
+      if (
+        !attachmentFile ||
+        attachmentFile.attachmentId !== attachment.attachmentId ||
+        attachmentFile.tenantId !== access.workspace.tenantId ||
+        attachmentFile.workspaceId !== access.workspace.workspaceId
+      ) {
+        throw new FirstSliceError(
+          404,
+          "attachment_file_not_found",
+          "The requested attachment file was not found."
+        );
+      }
+      return attachmentFile;
+    },
+    async deleteAttachmentFile(input) {
+      const access = await authorize({
+        ...input,
+        write: true
+      });
+      const attachment = await requireScopedAttachment({
+        workspace: access.workspace,
+        groupKeys: access.groupKeys,
+        attachmentId: input.attachmentId
+      });
+      const attachmentFile = await repository.getAttachmentFileById(
+        input.attachmentFileId.trim()
+      );
+      if (
+        !attachmentFile ||
+        attachmentFile.attachmentId !== attachment.attachmentId ||
+        attachmentFile.tenantId !== access.workspace.tenantId ||
+        attachmentFile.workspaceId !== access.workspace.workspaceId
+      ) {
+        throw new FirstSliceError(
+          404,
+          "attachment_file_not_found",
+          "The requested attachment file was not found."
+        );
+      }
+      await repository.deleteAttachmentFile(attachmentFile.attachmentFileId);
+      await recordWorkspaceActivity({
+        tenantId: access.workspace.tenantId,
+        workspaceId: access.workspace.workspaceId,
+        eventType: "attachment_file_deleted",
+        actorId: access.actorAdminUserId,
+        subjectType: "test_run",
+        subjectId: attachment.testRunId,
+        summary: `Deleted attachment image '${attachmentFile.fileName}' for '${attachment.loginKey}'.`,
+        details: {
+          attachmentId: attachment.attachmentId,
+          attachmentFileId: attachmentFile.attachmentFileId,
+          groupKey: attachment.groupKey,
+          loginKey: attachment.loginKey,
+          bookletKey: attachment.bookletKey,
+          unitKey: attachment.unitKey,
+          variableId: attachment.variableId
+        }
+      });
+      return requireScopedAttachment({
+        workspace: access.workspace,
+        groupKeys: access.groupKeys,
+        attachmentId: attachment.attachmentId
+      });
+    }
+  });
+  const attachments = attachmentOperations(requireAttachmentAccess);
+  const originalAttachments = createOriginalAttachmentPort({
+    auth: originalAuthentication,
+    workspace: async scope => {
+      const workspace = await activeNativeWorkspace(scope);
+      const tenant = workspace && (await repository.listTenants()).find(row => row.tenantId === workspace.tenantId && row.status === 'active');
+      return workspace && tenant ? {...workspace, tenantKey: tenant.tenantKey} : undefined;
+    },
+    inventory: (tenantId, workspaceId) => repository.getOriginalTestAdministrationInventory(tenantId, workspaceId),
+    attachments: buildWorkspaceAttachments,
+    scopedOperations: authorize => attachmentOperations(async request => {
+      const access = await authorize(request.sessionToken);
+      if (access.workspace.tenantKey !== request.tenantKey || access.workspace.workspaceKey !== request.workspaceKey) {
+        throw new FirstSliceError(404, 'original_attachment_not_found', 'The requested attachment was not found.');
+      }
+      return access;
+    })
+  });
   return {
     applicationSettings,
-    attachments: {
-      async listAttachments(input) {
-        const access = await requireAttachmentAccess({
-          ...input,
-          write: false
-        });
-        const requestedGroupKey = input.groupKey?.trim();
-        if (
-          requestedGroupKey &&
-          access.groupKeys &&
-          !access.groupKeys.includes(requestedGroupKey)
-        ) {
-          throw new FirstSliceError(
-            403,
-            "attachment_group_scope_forbidden",
-            "The requested group is outside the monitor's assigned groups."
-          );
-        }
-        return (await buildWorkspaceAttachments(access.workspace)).filter(
-          attachment =>
-            (!access.groupKeys || access.groupKeys.includes(attachment.groupKey)) &&
-            (!requestedGroupKey || attachment.groupKey === requestedGroupKey)
-        );
-      },
-      async getAttachment(input) {
-        const access = await requireAttachmentAccess({
-          ...input,
-          write: false
-        });
-        return requireScopedAttachment({
-          workspace: access.workspace,
-          groupKeys: access.groupKeys,
-          attachmentId: input.attachmentId
-        });
-      },
-      async uploadAttachmentFile(input) {
-        const access = await requireAttachmentAccess({
-          ...input,
-          write: true
-        });
-        const attachment = await requireScopedAttachment({
-          workspace: access.workspace,
-          groupKeys: access.groupKeys,
-          attachmentId: input.attachmentId
-        });
-        if (attachment.attachmentType !== "capture-image") {
-          throw new FirstSliceError(
-            409,
-            "attachment_capture_type_unsupported",
-            `Attachment type '${attachment.attachmentType || "unspecified"}' is retained for compatibility but does not support image capture.`
-          );
-        }
-        const normalizedFile = normalizeAttachmentFileInput(input);
-        const attachmentFile: AttachmentFile = {
-          attachmentFileId: `image:${idGenerator()}.${normalizedFile.extension}`,
-          attachmentId: attachment.attachmentId,
-          tenantId: access.workspace.tenantId,
-          workspaceId: access.workspace.workspaceId,
-          fileName: normalizedFile.fileName,
-          mediaType: normalizedFile.mediaType,
-          dataBase64: normalizedFile.dataBase64,
-          createdAt: now()
-        };
-        await repository.saveAttachmentFile(attachmentFile);
-        await recordWorkspaceActivity({
-          tenantId: access.workspace.tenantId,
-          workspaceId: access.workspace.workspaceId,
-          eventType: "attachment_file_uploaded",
-          actorId: access.actorAdminUserId,
-          subjectType: "test_run",
-          subjectId: attachment.testRunId,
-          summary: `Uploaded attachment image '${attachmentFile.fileName}' for '${attachment.loginKey}'.`,
-          details: {
-            attachmentId: attachment.attachmentId,
-            attachmentFileId: attachmentFile.attachmentFileId,
-            groupKey: attachment.groupKey,
-            loginKey: attachment.loginKey,
-            bookletKey: attachment.bookletKey,
-            unitKey: attachment.unitKey,
-            variableId: attachment.variableId,
-            mediaType: attachmentFile.mediaType
-          }
-        });
-        return requireScopedAttachment({
-          workspace: access.workspace,
-          groupKeys: access.groupKeys,
-          attachmentId: attachment.attachmentId
-        });
-      },
-      async getAttachmentFile(input) {
-        const access = await requireAttachmentAccess({
-          ...input,
-          write: false
-        });
-        const attachment = await requireScopedAttachment({
-          workspace: access.workspace,
-          groupKeys: access.groupKeys,
-          attachmentId: input.attachmentId
-        });
-        const attachmentFile = await repository.getAttachmentFileById(
-          input.attachmentFileId.trim()
-        );
-        if (
-          !attachmentFile ||
-          attachmentFile.attachmentId !== attachment.attachmentId ||
-          attachmentFile.tenantId !== access.workspace.tenantId ||
-          attachmentFile.workspaceId !== access.workspace.workspaceId
-        ) {
-          throw new FirstSliceError(
-            404,
-            "attachment_file_not_found",
-            "The requested attachment file was not found."
-          );
-        }
-        return attachmentFile;
-      },
-      async deleteAttachmentFile(input) {
-        const access = await requireAttachmentAccess({
-          ...input,
-          write: true
-        });
-        const attachment = await requireScopedAttachment({
-          workspace: access.workspace,
-          groupKeys: access.groupKeys,
-          attachmentId: input.attachmentId
-        });
-        const attachmentFile = await repository.getAttachmentFileById(
-          input.attachmentFileId.trim()
-        );
-        if (
-          !attachmentFile ||
-          attachmentFile.attachmentId !== attachment.attachmentId ||
-          attachmentFile.tenantId !== access.workspace.tenantId ||
-          attachmentFile.workspaceId !== access.workspace.workspaceId
-        ) {
-          throw new FirstSliceError(
-            404,
-            "attachment_file_not_found",
-            "The requested attachment file was not found."
-          );
-        }
-        await repository.deleteAttachmentFile(attachmentFile.attachmentFileId);
-        await recordWorkspaceActivity({
-          tenantId: access.workspace.tenantId,
-          workspaceId: access.workspace.workspaceId,
-          eventType: "attachment_file_deleted",
-          actorId: access.actorAdminUserId,
-          subjectType: "test_run",
-          subjectId: attachment.testRunId,
-          summary: `Deleted attachment image '${attachmentFile.fileName}' for '${attachment.loginKey}'.`,
-          details: {
-            attachmentId: attachment.attachmentId,
-            attachmentFileId: attachmentFile.attachmentFileId,
-            groupKey: attachment.groupKey,
-            loginKey: attachment.loginKey,
-            bookletKey: attachment.bookletKey,
-            unitKey: attachment.unitKey,
-            variableId: attachment.variableId
-          }
-        });
-        return requireScopedAttachment({
-          workspace: access.workspace,
-          groupKeys: access.groupKeys,
-          attachmentId: attachment.attachmentId
-        });
-      }
-    },
+    attachments,
+    originalAttachments,
     adminAuth: {
       async bootstrapAdminUser(input) {
         const existingAdminUsers = await repository.listAdminUsers();

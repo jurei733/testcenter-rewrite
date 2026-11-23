@@ -15,6 +15,7 @@ import QrScanner from "qr-scanner";
 import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
 
 import { AttachmentManagerService } from "./attachment-manager.service";
+import { NativeAttachmentContext } from "./native-monitor/native-attachment-context";
 import { AttachmentCameraScanner } from "./attachment-camera-scanner";
 import { AttachmentQrDecoder } from "./attachment-qr-decoder";
 import { attachmentCameraMirrored, attachmentPageGeometry } from "./attachment-page-geometry";
@@ -76,7 +77,7 @@ type AttachmentScope = {
       <p class="capture-intro">
         {{ customText('am_capture_image_instructions', 'Align the printed page with the camera preview and its QR code with the highlighted box. Check the image, participant, booklet, unit and variable before uploading.') }}
       </p>
-      <p class="scope-line">
+      <p class="scope-line" *ngIf="!nativeAttachment">
         <span><strong>Tenant:</strong> {{ tenantKey || 'not selected' }}</span>
         <span><strong>Workspace:</strong> {{ workspaceKey || 'not selected' }}</span>
       </p>
@@ -139,7 +140,7 @@ type AttachmentScope = {
             <div id="attachmentCaptureTarget" class="capture-panel" *ngIf="attachment as target">
               <h3>Page belongs to</h3>
               <p><strong>{{ target.personLabel }}</strong></p>
-              <p>{{ target.groupKey }} / {{ target.loginKey }}</p>
+              <p *ngIf="target.groupKey || target.loginKey">{{ target.groupKey }} / {{ target.loginKey }}</p>
               <p>{{ target.testLabel }}</p>
               <p>{{ target.unitLabel }} · {{ target.variableId }}</p>
               <p class="capture-code">{{ target.attachmentId }}</p>
@@ -172,7 +173,7 @@ type AttachmentScope = {
         <p id="attachmentCaptureStatus" class="capture-status" [class.is-error]="statusIsError" role="status" aria-live="polite">{{ status }}</p>
         <div class="actions">
           <button id="resetAttachmentCaptureButton" class="ghost" type="button" *ngIf="!capturePreviewUrl || !attachment || !canCaptureTarget" [disabled]="busy" (click)="resetTarget()">Scan another page</button>
-          <a id="backToAttachmentManager" class="button-link secondary" routerLink="/runtime">{{ customText('am_goto_attachment_overview', 'Back to Attachment Manager') }}</a>
+          <a id="backToAttachmentManager" class="button-link secondary" [routerLink]="nativeAttachment ? '../attachment-overview' : '/runtime'">{{ customText('am_goto_attachment_overview', 'Back to Attachment Manager') }}</a>
         </div>
       </ng-container>
     </article>
@@ -188,6 +189,7 @@ export class AttachmentCaptureComponent
   private readonly captureCanvas!: ElementRef<HTMLCanvasElement>;
 
   private readonly manager = inject(AttachmentManagerService);
+  readonly nativeAttachment = inject(NativeAttachmentContext, {optional: true});
   private readonly interfaceMode = inject(InterfaceModeService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -209,11 +211,13 @@ export class AttachmentCaptureComponent
 
   customText(key: AttachmentCustomTextKey, rewriteFallback: string): string {
     return resolveAttachmentText(this.applicationSettings.settings().customTexts,
-      this.operatorAccess.customTexts, key, this.interfaceMode.mode() === "original" ? undefined : rewriteFallback);
+      this.nativeAttachment?.customTexts ?? this.operatorAccess.customTexts,
+      key, this.interfaceMode.mode() === "original" ? undefined : rewriteFallback);
   }
 
   attachmentCode = "";
-  attachment: WorkspaceAttachment | null = null;
+  attachment: (Pick<WorkspaceAttachment, 'attachmentId' | 'attachmentType' | 'dataType' | 'personLabel' | 'testLabel' | 'unitLabel' | 'variableId'> &
+    Partial<Pick<WorkspaceAttachment, 'groupKey' | 'loginKey'>>) | null = null;
   captureBlob: Blob | null = null;
   captureFileName = "";
   capturePreviewUrl: string | null = null;
@@ -256,6 +260,7 @@ export class AttachmentCaptureComponent
   }
 
   get hasSessionScope(): boolean {
+    if (this.nativeAttachment) return !!this.nativeAttachment.token;
     return Boolean(
       this.uiState.ops.adminSessionToken.trim() &&
       this.tenantKey &&
@@ -264,6 +269,7 @@ export class AttachmentCaptureComponent
   }
 
   get canWrite(): boolean {
+    if (this.nativeAttachment) return !!this.nativeAttachment.token;
     return (
       this.hasSessionScope &&
       !this.operatorAccess.isReadOnlyAdmin &&
@@ -537,18 +543,13 @@ export class AttachmentCaptureComponent
     try {
       const dataBase64 = this.arrayBufferToBase64(await captureBlob.arrayBuffer());
       if (!current() || !this.canWrite) return;
-      const updated = await this.manager.upload(
-        scope,
-        attachment.attachmentId,
-        {
-          fileName,
-          mediaType: captureBlob.type,
-          dataBase64
-        }
-      );
+      const file = {fileName, mediaType: captureBlob.type, dataBase64};
+      let personLabel = attachment.personLabel;
+      if (this.nativeAttachment) await this.nativeAttachment.upload(attachment.attachmentId, file);
+      else personLabel = (await this.manager.upload(scope, attachment.attachmentId, file)).personLabel;
       if (!current()) return;
       this.resetTarget();
-      this.showUploadNotice(`Attachment uploaded for ${updated.personLabel}. Ready for the next page.`);
+      this.showUploadNotice(`Attachment uploaded for ${personLabel}. Ready for the next page.`);
     } catch (error) {
       if (!current()) return;
       this.status = this.manager.describeError(error);
@@ -650,7 +651,7 @@ export class AttachmentCaptureComponent
     // Manual/image lookups cannot reassign the previous target's photograph.
     if (!preserveCapture) this.clearCapture();
     try {
-      const attachment = await this.manager.get(scope, attachmentId);
+      const attachment = await (this.nativeAttachment ? this.nativeAttachment.get(attachmentId) : this.manager.get(scope, attachmentId));
       if (!current()) return;
       this.attachment = attachment;
       this.attachmentCode = this.attachment.attachmentId;
@@ -678,6 +679,7 @@ export class AttachmentCaptureComponent
   }
 
   private scope(): AttachmentScope {
+    if (this.nativeAttachment) return {sessionToken: this.nativeAttachment.token, tenantKey: '', workspaceKey: this.nativeAttachment.group()};
     return {
       sessionToken: this.uiState.ops.adminSessionToken.trim(),
       tenantKey: this.tenantKey,
