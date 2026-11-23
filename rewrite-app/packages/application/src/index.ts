@@ -32907,7 +32907,17 @@ export const createFirstSliceServices = (
       admin:async(token,root)=>{const session=await requireActiveAdminSession(repository,token,now(),{enforceAccessWindow:true});if(root)requireAdminRole(session.roleAssignments,['platform_admin']);return session.adminUser;}}),
     originalUnit:createOriginalUnitPort({auth:originalAuthentication,repository,now,id:idGenerator,file:(scope,name)=>originalTestFiles.unit(scope,name)}),
     originalReview:createOriginalReviewPort({auth:originalAuthentication,repository,now,id:idGenerator,timeZone:participantAccessTimeZone,labels:(scope,name)=>originalTestFiles.reviewLabels(scope,parseOriginalTestName(name).fileId)}),
-    originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator}),
+    originalCommand: createOriginalCommandPort({auth:originalAuthentication,repository,now,id:idGenerator,
+      resolveTimerDestination:async(person,run,alias)=>{
+        const name=run.originalResultState?.bookletName;
+        if(!name)return undefined;
+        let booklet:ContentReleaseBookletEntry;
+        try{({booklet}=await currentOriginalBooklet(person,parseOriginalTestName(name).fileId));}
+        catch(error){if(error instanceof FirstSliceError&&error.statusCode===404)return undefined;throw error;}
+        const unit=booklet.unitEntries.find(entry=>sameOriginalTestName(entry.unitKey,alias));
+        return unit?resolveTimedTestletForUnit(booklet,unit.unitKey)?.testletKey??null:undefined;
+      }
+    }),
     originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository,now,id:idGenerator,
       async profiles(actor){const entry=(await operationalDefinition(actor,actor.originalLoginKey))?.definition;
         return entry?.originalMonitorProfiles??(entry?.monitorProfiles.length===0?[]:undefined);},
@@ -32924,7 +32934,7 @@ export const createFirstSliceServices = (
         const unit=booklet.unitEntries.find(entry=>sameOriginalTestName(entry.unitKey,alias));
         const timed=resolveTimedTestletForUnit(booklet,unit?.unitKey??null);
         const limit=timed?.restrictions?.timeMax;
-        return timed&&limit?{key:timed.testletKey,minutes:limit.minutes}:null;
+        return timed&&limit?{key:timed.testletKey,minutes:limit.minutes,leave:limit.leave}:null;
       }
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),

@@ -1,5 +1,5 @@
 import type {DatabaseSync} from 'node:sqlite';
-import {readOriginalNativeStateBase,assertOriginalCommandActorMetadata,assertOriginalCommandPacket,assertOriginalTestLogInput,nextOriginalCommandNumber,selectOriginalCommands,prepareOriginalCommandPolling,originalParticipantGroupKeysEqual,resultParentUnavailable,type OriginalCommandActor,type OriginalCommandRepository,type OriginalCommandDelivery,type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
+import {readOriginalNativeStateBase,assertOriginalCommandActorMetadata,assertOriginalCommandPacket,assertOriginalTestLogInput,nextOriginalCommandNumber,selectOriginalCommands,prepareOriginalCommandPolling,prepareOriginalNativeTimerControl,originalParticipantGroupKeysEqual,resultParentUnavailable,type OriginalCommandActor,type OriginalCommandRepository,type OriginalCommandDelivery,type OriginalTestNumberRecord} from '@testcenter-rewrite-app/application';
 import {guardResultArtifactParent,withResultArtifactParent} from './result-artifact-parent.js';
 import {rollbackAfterFailure} from './transaction-rollback.js';
 function actor(db:DatabaseSync,input:OriginalCommandActor):void{
@@ -33,12 +33,17 @@ export function createOriginalCommandRepository(db:DatabaseSync):OriginalCommand
  for(const t of targets)db.prepare('INSERT INTO original_native_commands(command_number,test_number,test_run_id,participant_session_id,tenant_id,workspace_id,content_release_id,commander_participant_session_id,keyword,arguments_json,timestamp_seconds,executed) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)').run(command.id,t.testNumber,t.testRunId,t.participantSessionId,t.tenantId,t.workspaceId,t.contentReleaseId,input.participantSessionId,command.keyword,JSON.stringify(command.arguments),command.timestamp);db.exec('COMMIT');
  }catch(error){return rollbackAfterFailure(db,error);}},
  async listOriginalCommands(input,lastCommandId){return withResultArtifactParent(db,input,()=>{owner(db,input);const rows=db.prepare('SELECT command_number,keyword,arguments_json,timestamp_seconds,executed FROM original_native_commands WHERE test_number=?').all(input.testNumber);return selectOriginalCommands(rows.map(row=>({id:String(row.command_number),keyword:String(row.keyword),arguments:JSON.parse(String(row.arguments_json)),timestamp:String(row.timestamp_seconds),executed:row.executed===1}as OriginalCommandDelivery)),lastCommandId);});},
- async acknowledgeOriginalCommand(input,number,nativeStateProtocol=false){return withResultArtifactParent(db,input,()=>{
-  owner(db,input);const row=db.prepare('SELECT executed FROM original_native_commands WHERE test_number=? AND command_number=?').get(input.testNumber,number);if(!row)return null;
-  const metadata=nativeStateProtocol?db.prepare('SELECT original_result_state_json FROM test_runs WHERE test_run_id=?').get(input.testRunId):undefined;
-  const nativeStateBase=metadata?readOriginalNativeStateBase(metadata.original_result_state_json==null?undefined:JSON.parse(String(metadata.original_result_state_json))):undefined;
+ async acknowledgeOriginalCommand(input,number,nativeStateProtocol=false,timerTransition){return withResultArtifactParent(db,input,()=>{
+  owner(db,input);const row=db.prepare('SELECT executed,keyword,arguments_json FROM original_native_commands WHERE test_number=? AND command_number=?').get(input.testNumber,number);if(!row)return null;
+  const metadata=nativeStateProtocol||timerTransition?db.prepare('SELECT original_result_state_json FROM test_runs WHERE test_run_id=?').get(input.testRunId):undefined;
+  const before=metadata?.original_result_state_json==null?undefined:JSON.parse(String(metadata.original_result_state_json));
+  const nativeStateBase=nativeStateProtocol?readOriginalNativeStateBase(before):undefined;
   const outcome=row.executed===1?'already' as const:'executed' as const;
-  if(!row.executed)db.prepare('UPDATE original_native_commands SET executed=1 WHERE test_number=? AND command_number=?').run(input.testNumber,number);
+  if(!row.executed){
+   const next=timerTransition?prepareOriginalNativeTimerControl(before,{id:number,keyword:String(row.keyword),arguments:JSON.parse(String(row.arguments_json))},timerTransition):undefined;
+   if(next)db.prepare('UPDATE test_runs SET original_result_state_json=? WHERE test_run_id=?').run(JSON.stringify(next),input.testRunId);
+   db.prepare('UPDATE original_native_commands SET executed=1 WHERE test_number=? AND command_number=?').run(input.testNumber,number);
+  }
   return nativeStateBase?{outcome,nativeStateBase}:outcome;
  });},
  async touchOriginalCommandPolling(input,timestamp){return withResultArtifactParent(db,input,()=>{owner(db,input);const row=db.prepare('SELECT original_test_state_json,original_result_state_json FROM test_runs WHERE test_run_id=?').get(input.testRunId)!;const effect=prepareOriginalCommandPolling(timestamp,row.original_test_state_json==null?undefined:JSON.parse(String(row.original_test_state_json)),row.original_result_state_json==null?undefined:JSON.parse(String(row.original_result_state_json)));if(!effect)return false;db.prepare('UPDATE test_runs SET updated_at=?,original_result_state_json=? WHERE test_run_id=?').run(effect.updatedAt,JSON.stringify(effect.originalResultState),input.testRunId);return true;});}

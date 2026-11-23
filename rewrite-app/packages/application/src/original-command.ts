@@ -1,7 +1,8 @@
 import {originalTestLogIdPrefix} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
-import type {OriginalCommandActor} from './original-command-queue.js';
+import type {OriginalCommandActor,OriginalTimerTransition} from './original-command-queue.js';
+import type {ParticipantSession,TestRun} from '@testcenter-rewrite-app/domain';
 import {parseOriginalCommandFields,prepareOriginalCommandInsert,readOriginalLastCommandId,formatOriginalCommandsJson,originalCommandInteger} from './original-command-codec.js';
 import {resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
 import {FirstSliceError} from './first-slice-error.js';
@@ -16,7 +17,9 @@ export type OriginalCommandPort={
  connectionLost(input:{token:string;testNumber:string;stillDisconnected:()=>boolean}):Promise<void>;
  acknowledge(input:{token:string;testNumber:string;commandNumber:string;nativeStateProtocol?:unknown}):Promise<AcknowledgementReason|{reason:AcknowledgementReason;nativeStateBase:OriginalNativeStateWriteBase}>;
 };
-export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort;repository:FirstSliceRepository;now:()=>string;id:()=>string}):OriginalCommandPort{
+export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort;repository:FirstSliceRepository;now:()=>string;id:()=>string;
+ resolveTimerDestination?:(person:ParticipantSession,run:TestRun,unitAlias:string)=>Promise<string|null|undefined>
+}):OriginalCommandPort{
  const monitor=async(token:string):Promise<OriginalCommandActor>=>{const state=await input.auth.read({token});if(state.kind!=='person'||state.participantSession.originalOperationalMode!=='monitor-group'||state.participantSession.originalLoginKey===undefined)throw new FirstSliceError(403,'original_monitor_forbidden','A current native group monitor is required.');const person=state.participantSession;return{tenantId:person.tenantId,workspaceId:person.workspaceId,participantSessionId:person.participantSessionId,originalLoginKey:person.originalLoginKey!,groupKey:person.groupKey};};
  return{
   async requireMonitor({token}){await monitor(token);},
@@ -62,9 +65,22 @@ export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort
    return wire;
   },
   async acknowledge({token,testNumber,commandNumber,nativeStateProtocol}){
-   const {scope}=await resolveOriginalOwnedTestScope(input,token,testNumber),number=originalCommandInteger(commandNumber).toString();
+   const {person,scope}=await resolveOriginalOwnedTestScope(input,token,testNumber),number=originalCommandInteger(commandNumber).toString();
    if(nativeStateProtocol!==undefined&&nativeStateProtocol!=='1')throw new FirstSliceError(400,'original_state_protocol_invalid','Invalid native Test-state protocol.');
-   const result=await input.repository.acknowledgeOriginalCommand(scope,number,nativeStateProtocol==='1');
+   const native=nativeStateProtocol==='1';
+   let transition:OriginalTimerTransition|undefined;
+   if(native){
+    const run=await input.repository.getTestRunById(scope.testRunId);
+    let gotoBlock:string|null|undefined;
+    if(run?.originalResultState?.nativeTestletTimers&&input.resolveTimerDestination){
+     const command=(await input.repository.listOriginalCommands(scope,null)).find(row=>row.id===number);
+     if(command?.keyword.toLowerCase()==='goto'&&command.arguments[0]==='id'&&command.arguments[1]){
+      gotoBlock=await input.resolveTimerDestination(person,run,command.arguments[1]);
+     }
+    }
+    transition={timestamp:input.now(),...(gotoBlock===undefined?{}:{gotoBlock})};
+   }
+   const result=await input.repository.acknowledgeOriginalCommand(scope,number,native,transition);
    const outcome=typeof result==='object'&&result?result.outcome:result;
    if(outcome===null)throw new FirstSliceError(404,'original_command_missing',`Command \`${number}\` not found on test \`${scope.testNumber}\``);
    const reason=outcome==='executed'?'OK' as const:'OK, was already marked as executed' as const;

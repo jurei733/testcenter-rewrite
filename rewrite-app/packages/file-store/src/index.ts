@@ -1721,7 +1721,7 @@ const createFileRepository = (
     async findOriginalCommandTarget(actor,testNumber){return findOriginalCommandTargetCollection(await getState(),actor,testNumber);},
     async appendOriginalCommand(actor,command,targets){await mutate(state=>appendOriginalCommandCollection(state,actor,command,targets));},
     async listOriginalCommands(scope,lastCommandId){return listOriginalCommandsCollection(await getState(),scope,lastCommandId);},
-    async acknowledgeOriginalCommand(scope,commandNumber,nativeStateProtocol){return mutate(state=>acknowledgeOriginalCommandCollection(state,scope,commandNumber,nativeStateProtocol));},
+    async acknowledgeOriginalCommand(scope,commandNumber,nativeStateProtocol,timerTransition){return mutate(state=>acknowledgeOriginalCommandCollection(state,scope,commandNumber,nativeStateProtocol,timerTransition));},
     async touchOriginalCommandPolling(scope,timestamp){return mutate(state=>touchOriginalCommandPollingCollection(state,scope,timestamp));},
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
       const state = await getState();

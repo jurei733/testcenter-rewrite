@@ -68,7 +68,7 @@ type LeaveCheckResult =
   // user just acknowledges (no real choice involved)
   | { kind: 'deny'; notify?: string; infoDialog?: { title: string; content: string } }
   // block unless the user explicitly confirms leaving
-  | { kind: 'confirm'; title: string; content: string; onConfirmed: () => string | undefined };
+  | { kind: 'confirm'; title: string; content: string; onConfirmed: () => string | undefined | Promise<void> };
 
 @Injectable({
   providedIn: 'root'
@@ -134,6 +134,7 @@ export class TestControllerService {
   timers$ = new Subject<TimerData>();
   timers: KeyValuePairNumber = {}; // TODO remove the redundancy with timers$
   currentTimerId = '';
+  private timerUnitAlias?: string;
   private timerIntervalSubscription: Subscription | null = null;
   timerWarningPoints: number[] = [];
 
@@ -544,26 +545,33 @@ export class TestControllerService {
     this.updateSingleLock(testlet, 'time', false);
   }
 
-  startTimer(testlet: Testlet): void {
-    if (!testlet.restrictions?.timeMax) {
-      return;
+  async startTimer(testlet: Testlet, unit: Unit): Promise<boolean> {
+    const clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter'),{defaultValue:null});
+    if(!this.nativeCurrent||this.currentUnit!==unit||!clock)return false;
+    if(clock.testletKey!==testlet.id||!Number.isSafeInteger(clock.remainingMilliseconds)||clock.remainingMilliseconds<0){
+      throw new Error('Ungültige serverseitige Testzeit.');
     }
-    const timeLeftMinutes = (this.timers[testlet.id] && (this.timers[testlet.id] > 0)) ?
-      Math.min(this.timers[testlet.id], testlet.restrictions.timeMax.minutes) :
-      testlet.restrictions.timeMax.minutes;
-    if (this.timerIntervalSubscription !== null) {
-      this.timerIntervalSubscription.unsubscribe();
+    this.finishTimer();
+    if(clock.status==='paused'){
+      await this.pause();
+      return false;
     }
-    this.timers$.next(new TimerData(timeLeftMinutes, testlet.id, MaxTimerEvent.STARTED));
+    if(clock.status!=='running'||clock.remainingMilliseconds===0){
+      if(!this.testMode.forceTimeRestrictions)return true;
+      this.timers$.next(new TimerData(0,testlet.id,MaxTimerEvent.ENDED));
+      return false;
+    }
+    const deadline=performance.now()+clock.remainingMilliseconds;
+    const remainingSeconds=()=>Math.max(0,Math.ceil((deadline-performance.now())/1000));
     this.currentTimerId = testlet.id;
+    this.timerUnitAlias=unit.alias;
+    this.timers$.next(new TimerData(remainingSeconds()/60,testlet.id,MaxTimerEvent.STARTED));
 
     const timeTicker$ = createTicker();
     this.timerIntervalSubscription = this.owned(() => timeTicker$
       .pipe(
-        takeUntil(
-          timer(timeLeftMinutes * 60 * 1000)
-        ),
-        map(val => (timeLeftMinutes * 60) - val - 1)
+        takeUntil(timer(clock.remainingMilliseconds)),
+        map(remainingSeconds)
       ).subscribe({
         next: val => {
           this.timers$.next(new TimerData(val / 60, testlet.id, MaxTimerEvent.STEP));
@@ -572,10 +580,12 @@ export class TestControllerService {
           throw e;
         },
         complete: () => {
-          this.timers$.next(new TimerData(0, testlet.id, MaxTimerEvent.ENDED));
           this.finishTimer();
+          this.timers$.next(new TimerData(0, testlet.id, MaxTimerEvent.ENDED));
+          this.owned(()=>this.bs.timer(this.nativeTestId,unit.alias,'expire').subscribe({error:()=>{}}));
         }
       }));
+    return true;
   }
 
   private finishTimer() {
@@ -584,6 +594,7 @@ export class TestControllerService {
     }
     this.timerIntervalSubscription = null;
     this.currentTimerId = '';
+    this.timerUnitAlias=undefined;
   }
 
   cancelTimer(): void {
@@ -598,6 +609,14 @@ export class TestControllerService {
       this.timers$.next(new TimerData(0, this.currentTimerId, MaxTimerEvent.INTERRUPTED));
     }
     this.finishTimer();
+  }
+
+  private async leaveTimedBlock(action:'cancel'|'interrupt'): Promise<void> {
+    const alias=this.timerUnitAlias,timerId=this.currentTimerId;
+    if(alias)await firstValueFrom(this.bs.timer(this.nativeTestId,alias,action),{defaultValue:null});
+    if(!this.nativeCurrent||timerId!==this.currentTimerId)return;
+    if(action==='cancel')this.cancelTimer();
+    else this.interruptTimer();
   }
 
   async terminateTest(logEntryKey: string, force: boolean, lockTest: boolean = false): Promise<boolean> {
@@ -981,34 +1000,31 @@ export class TestControllerService {
 
     // when time restrictions aren't enforced (test/preview mode), interrupt the timer and let the
     // caller show an informational toast instead of actually blocking/asking
-    const allowWithNotice = (text: string): LeaveCheckResult => {
-      this.interruptTimer();
-      return { kind: 'allow', notify: text };
-    };
+    const allowWithNotice = (text: string): Observable<LeaveCheckResult> =>
+      from(this.leaveTimedBlock('interrupt')).pipe(map(()=>({kind:'allow',notify:text})));
 
     if (this.testlets[this.currentTimerId].restrictions.timeMax?.leave === 'forbidden') {
       if (!this.testMode.forceTimeRestrictions) {
-        return of(allowWithNotice('Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.'));
+        return allowWithNotice('Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.');
       }
       return of({ kind: 'deny', notify: 'Es darf erst weiter geblättert werden, wenn die Zeit abgelaufen ist.' });
     }
 
     if (this.testlets[this.currentTimerId].restrictions.timeMax?.leave === 'allowed') {
-      this.cancelTimer();
-      return of({ kind: 'allow' });
+      return from(this.leaveTimedBlock('cancel')).pipe(map(()=>({kind:'allow'})));
     }
 
     if (!this.testMode.forceTimeRestrictions) {
-      return of(allowWithNotice(
+      return allowWithNotice(
         'Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.'
-      ));
+      );
     }
 
     return of({
       kind: 'confirm',
       title: this.cts.getCustomText('booklet_warningLeaveTimerBlockTitle'),
       content: this.cts.getCustomText('booklet_warningLeaveTimerBlockTextPrompt'),
-      onConfirmed: () => { this.cancelTimer(); return undefined; } // does lock the block
+      onConfirmed: () => this.leaveTimedBlock('cancel')
     });
   }
 
@@ -1105,21 +1121,22 @@ export class TestControllerService {
           confirmText: 'Hier bleiben',
           cancelText: 'Trotzdem weiter'
         }).pipe(
-          concatMap(cdresult => {
+          concatMap(async cdresult => {
             if (cdresult !== false) {
-              return of(false); // user chose "Hier bleiben" - stay
+              return false; // user chose "Hier bleiben" - stay
             }
-            const followUpNotify = result.onConfirmed();
+            const followUpNotify = await result.onConfirmed();
             if (followUpNotify) {
               this.ms.showSnackbar(followUpNotify);
             }
             if (!alsoEndsTest) {
-              return of(true);
+              return true;
             }
             // terminateConfirmedLeave() transitions state$ away from RUNNING/PAUSED before this
             // resolves, so confirmEndTestIfNeeded() (called next, by TestControllerDeactivateGuard)
             // will see that and skip its own dialog/termination.
-            return from(this.terminateConfirmedLeave()).pipe(map(() => true));
+            await this.terminateConfirmedLeave();
+            return true;
           })
         );
       default:

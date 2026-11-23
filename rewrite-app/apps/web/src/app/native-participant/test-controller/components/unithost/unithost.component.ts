@@ -361,10 +361,10 @@ export class UnithostComponent implements OnInit, OnDestroy {
       this.tcs.currentUnit.sequenceId,
       [{ key: 'PLAYER', timeStamp: Date.now(), content: 'LOADING' }]
     );
-    this.runUnit();
+    void this.runUnit();
   }
 
-  private runUnit(): void {
+  private async runUnit(): Promise<void> {
     if (this.tcs.currentUnit && this.tcs.currentUnit.parent.locked) {
       if (this.tcs.testMode.showCode) {
         this.messageService.showSnackbar(
@@ -379,21 +379,20 @@ export class UnithostComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.startTimerIfNecessary();
+    const unit=this.tcs.currentUnit;
+    const timerId=unit?.parent.timerId;
+    try{
+      if(unit&&timerId&&timerId!==this.tcs.currentTimerId&&
+        !await this.tcs.startTimer(this.tcs.testlets[timerId],unit))return;
+    }catch(error){
+      if(!this.destroyed&&this.mds.http.isCurrent&&this.tcs.currentUnit===unit){
+        this.mds.appError=new AppError({label:'Die Testzeit konnte nicht geladen werden.',description:String(error),type:'network'});
+      }
+      return;
+    }
+    if(this.destroyed||!this.mds.http.isCurrent||this.tcs.currentUnit!==unit)return;
     this.prepareIframe();
     this.tcs.updateNavigationState();
-  }
-
-  private startTimerIfNecessary(): void {
-    if (!this.tcs.currentUnit?.parent.timerId) {
-      return;
-    }
-    if (this.tcs.currentTimerId &&
-      (this.tcs.currentUnit.parent.timerId === this.tcs.currentTimerId)
-    ) {
-      return;
-    }
-    this.tcs.startTimer(this.tcs.testlets[this.tcs.currentUnit.parent.timerId]);
   }
 
   private prepareIframe(): void {
@@ -482,7 +481,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
     }
     if (this.isValidCode(code)) {
       this.tcs.clearCodeLock(this.tcs.currentUnit.parent.locked.through.id);
-      this.runUnit();
+      void this.runUnit();
     } else {
       this.codeInputErrorText =
         `Freigabewort '${code}' für '${this.tcs.currentUnit?.parent.locked?.through.label}' stimmt nicht.`;

@@ -882,7 +882,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async findOriginalCommandTarget(actor,testNumber){return findOriginalCommandTargetCollection(state,actor,testNumber);},
     async appendOriginalCommand(actor,command,targets){appendOriginalCommandCollection(state,actor,command,targets);},
     async listOriginalCommands(scope,lastCommandId){return listOriginalCommandsCollection(state,scope,lastCommandId);},
-    async acknowledgeOriginalCommand(scope,commandNumber,nativeStateProtocol){return acknowledgeOriginalCommandCollection(state,scope,commandNumber,nativeStateProtocol);},
+    async acknowledgeOriginalCommand(scope,commandNumber,nativeStateProtocol,timerTransition){return acknowledgeOriginalCommandCollection(state,scope,commandNumber,nativeStateProtocol,timerTransition);},
     async touchOriginalCommandPolling(scope,timestamp){return touchOriginalCommandPollingCollection(state,scope,timestamp);},
     async listOriginalOperationalLoginsByWorkspace(tenantId, workspaceId) {
       return structuredClone(state.originalOperationalLogins.get(`${tenantId}::${workspaceId}`) ?? []);

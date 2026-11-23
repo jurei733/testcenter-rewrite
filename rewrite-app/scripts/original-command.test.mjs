@@ -182,6 +182,61 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    const after=await poll(target,'{"lastCommandId":9007199254740992}');assert.match(after,/^\[\{"id":9007199254740993,/);assert.equal(await ack('9007199254740993',target),'OK');assert.equal(await ack('9007199254740993',target),'OK, was already marked as executed');
    await close();await open();assert.equal(await poll(target,'{"lastCommandId":9007199254740992}'),'[]');
   });
+  await t.test('only scoped monitor acknowledgements can pause and reopen a server deadline',async()=>{
+   await upload('timed.xml',xml('Booklet','<Metadata><Id>ORACLE.POW.TIMED</Id><Label>Timed</Label></Metadata><Units><Testlet id="timed" label="Timed block"><Restrictions><TimeMax minutes="1" leave="forbidden"/></Restrictions><Unit id="ORACLE.POW.UNIT" label="Owned Unit"/></Testlet><Unit id="ORACLE.POW.UNIT" alias="OUTSIDE" label="Outside the timed block"/></Units>'));
+   const {person}=await authenticate('owned-command-canonical');
+   const testNumber=await services.originalTest.create({token:person.token,bookletName:'ORACLE.POW.TIMED'});
+   const scope=await current(testNumber,person);
+   let now=Date.now();
+   const clockService=()=>createFirstSliceServices({repository,now:()=>new Date(now).toISOString(),originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+   let timed=clockService();
+   const read={token:person.token,testNumber,nativeStateProtocol:'1'},unitAlias='ORACLE.POW.UNIT';
+   const enter=(action='enter')=>timed.originalTest.enterTimer({...read,body:{unitAlias,action}});
+   const control=async(keyword,args=[])=>{
+    await send({keyword,arguments:args,timestamp:Math.floor(now/1000),testIds:[Number(testNumber)]});
+    const [pending]=await repository.listOriginalCommands(scope,null);
+    assert.equal(pending.keyword,keyword);
+    const acknowledged=await timed.originalCommand.acknowledge({...read,commandNumber:pending.id});
+    assert.equal(acknowledged.reason,'OK');
+    return pending.id;
+   };
+   await timed.originalTest.read(read);
+   const initial=await enter();
+   assert.equal(initial.remainingMilliseconds,60000);
+   await assert.rejects(enter('interrupt'),error=>error.statusCode===409);
+   await assert.rejects(enter('cancel'),error=>error.statusCode===409);
+
+   now=Date.parse(initial.startedAt)+5000;
+   const pauseId=await control('pause');
+   const paused=await enter();
+   assert.equal(paused.status,'paused');
+   const pauseTimestamp=(await run(testNumber,person)).originalResultState.nativeTestletTimers.timed.updatedAt;
+   assert.equal(paused.remainingMilliseconds,Date.parse(initial.expiresAt)-Date.parse(pauseTimestamp));
+   assert.ok(paused.remainingMilliseconds>=54990&&paused.remainingMilliseconds<=55000);
+   now+=30000;
+   await close();await open();timed=clockService();
+   assert.deepEqual(await enter(),paused);
+   await control('resume');
+   const resumed=await enter();
+   assert.equal(resumed.status,'running');
+   assert.equal(resumed.remainingMilliseconds,paused.remainingMilliseconds);
+   const repeated=await timed.originalCommand.acknowledge({...read,commandNumber:pauseId});
+   assert.equal(repeated.reason,'OK, was already marked as executed');
+   assert.equal((await enter()).expiresAt,resumed.expiresAt);
+
+   now=Date.parse(resumed.expiresAt)+1;
+   assert.equal((await enter('expire')).status,'expired');
+   await control('goto',['id',unitAlias,'| closed timeblock reopened - new remaining time 7']);
+   const reopened=await enter();
+   assert.equal(reopened.remainingMilliseconds,60000,'A monitor grant is capped at the authored minute');
+   now+=500;
+   assert.equal((await enter()).expiresAt,reopened.expiresAt);
+   assert.ok((await enter()).remainingMilliseconds<reopened.remainingMilliseconds);
+   await control('goto',['id','OUTSIDE','']);
+   const cancelled=await enter();
+   assert.equal(cancelled.status,'cancelled');
+   assert.equal(cancelled.remainingMilliseconds,0);
+  });
   await t.test('deleting only the commander retains recipient commands and clears its private creator reference',async()=>{
    const group='ORACLE.RETIRED.COMMANDER',now=new Date().toISOString();await repository.getOrCreateOriginalParticipantGroup({...ids,groupKey:group,groupLabel:'Retired commander',createdAt:now});
    await repository.bindOriginalLoginGroup({...ids,loginKey:monitorName,groupKey:group,groupSnapshotKey:group,authenticatedAt:now});

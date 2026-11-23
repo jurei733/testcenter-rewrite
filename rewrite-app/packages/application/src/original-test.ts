@@ -99,7 +99,7 @@ export function createOriginalTestPort(input: {
   readBooklet:(person:ParticipantSession,fileId:string)=>Promise<OriginalBookletFiles>;
   readResource:(scope:{tenantId:string;workspaceId:string},path:string)=>Promise<{bytes:Uint8Array;contentType:string}>;
   currentBooklet: (person: ParticipantSession, fileId: string) => Promise<{contentReleaseId: string; booklet: ContentReleaseBookletEntry}>;
-  timedBlock: (booklet: ContentReleaseBookletEntry, unitAlias: string) => {key:string;minutes:number}|null;
+  timedBlock: (booklet: ContentReleaseBookletEntry, unitAlias: string) => {key:string;minutes:number;leave:'forbidden'|'confirm'|'allowed'}|null;
 }): OriginalTestPort {
   const personFor=(token:string)=>readOriginalTestPerson(input.auth,token);
   const number=parseOriginalNativeTestNumber;
@@ -110,15 +110,20 @@ export function createOriginalTestPort(input: {
   return {
     async enterTimer({token,testNumber:raw,body}){
       const{person,run,testNumber}=await owned(token,raw);
-      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).length!==1||
+      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>key!=='unitAlias'&&key!=='action')||
         !('unitAlias' in body)||typeof body.unitAlias!=='string'||!body.unitAlias||body.unitAlias.length>255){
         throw new FirstSliceError(400,'native_timer_entry_invalid','A native timer entry requires a Unit alias.');
       }
+      const action='action' in body?body.action:'enter';
+      if(action!=='enter'&&action!=='cancel'&&action!=='interrupt'&&action!=='expire'){
+        throw new FirstSliceError(400,'native_timer_entry_invalid','Invalid native timer action.');
+      }
+      const unitAlias=body.unitAlias;
       unlocked(run,testNumber);
       const identity=run.originalResultState;
       if(typeof identity?.bookletName!=='string'||!identity.lastOpenedAt)throw unavailable();
       const{booklet}=await input.currentBooklet(person,orderedName(identity.bookletName).fileId);
-      const block=input.timedBlock(booklet,body.unitAlias);
+      const block=input.timedBlock(booklet,unitAlias);
       const durationMilliseconds=block?Math.round(block.minutes*60000):0;
       if(!block||!Number.isSafeInteger(durationMilliseconds)||durationMilliseconds<=0){
         throw new FirstSliceError(409,'native_timer_unavailable','The Unit has no authored time limit.');
@@ -129,19 +134,42 @@ export function createOriginalTestPort(input: {
         const timestamp=input.now(),now=Date.parse(timestamp);
         const timers=testRun.originalResultState?.nativeTestletTimers??{};
         const current=Object.hasOwn(timers,block.key)?timers[block.key]:undefined;
-        let timer:TestletTimerState;
+        const control=testRun.originalResultState?.nativeTimerControl;
+        const mode=participantExecutionModeDefinitions[testRun.executionMode??defaultParticipantExecutionMode]
+          ??participantExecutionModeDefinitions[defaultParticipantExecutionMode];
+        if(mode.forceTimeRestrictions&&(action==='interrupt'||action==='cancel'&&block.leave==='forbidden')){
+          throw new FirstSliceError(409,'native_timer_exit_forbidden','The authored timer cannot be interrupted by the participant.');
+        }
+        const reopen=action==='enter'&&current?.status!=='running'&&control?.reopen&&current?.reopenCommandId!==control.commandId&&
+          originalParticipantGroupKeysEqual(control.reopen.unitAlias,unitAlias)?control.reopen:undefined;
+        let timer:TestletTimerState & {reopenCommandId?:string};
+        if(action!=='enter'&&!current){
+          throw new FirstSliceError(409,'native_timer_unavailable','The Unit has no active server timer.');
+        }
+        if(control?.paused&&!current){
+          throw new FirstSliceError(409,'native_timer_unavailable','The test is paused.');
+        }
         if(current){
           remainingMilliseconds=current.status==='running'&&current.expiresAt ?
             Math.max(0,Date.parse(current.expiresAt)-now) : Math.max(0,Math.round(current.remainingSeconds*1000));
           if(!Number.isSafeInteger(remainingMilliseconds)){
             throw new FirstSliceError(409,'native_timer_unavailable','The saved timer deadline is unavailable.');
           }
-          if(current.status!=='running'||remainingMilliseconds>0)return null;
-          timer={...current,status:'expired',remainingSeconds:0,updatedAt:timestamp,endedAt:current.expiresAt??timestamp};
+          if(current.status==='running'&&remainingMilliseconds===0&&!reopen){
+            timer={...current,status:'expired',remainingSeconds:0,updatedAt:timestamp,endedAt:current.expiresAt??timestamp};
+          }else if(current.status==='running'&&(action==='cancel'||action==='interrupt')){
+            if(action==='cancel')remainingMilliseconds=0;
+            timer={...current,status:action==='cancel'?'cancelled':'paused',remainingSeconds:remainingMilliseconds/1000,
+              expiresAt:null,updatedAt:timestamp,endedAt:action==='cancel'?timestamp:null};
+          }else if(action==='enter'&&(reopen||current.status==='paused'&&!control?.paused)){
+            if(reopen)remainingMilliseconds=Math.min(durationMilliseconds,reopen.minutes*60000);
+            timer={...current,status:remainingMilliseconds===0?'expired':'running',remainingSeconds:remainingMilliseconds/1000,
+              expiresAt:remainingMilliseconds===0?null:new Date(now+remainingMilliseconds).toISOString(),
+              updatedAt:timestamp,endedAt:remainingMilliseconds===0?timestamp:null,
+              ...(reopen?{reopenCommandId:control!.commandId}:{})};
+          }else return null;
         }else{
           remainingMilliseconds=durationMilliseconds;
-          const mode=participantExecutionModeDefinitions[testRun.executionMode??defaultParticipantExecutionMode]
-            ??participantExecutionModeDefinitions[defaultParticipantExecutionMode];
           const snapshot=savedState(testRun).TESTLETS_TIMELEFT;
           if(mode.saveResponses&&typeof snapshot==='string'){
             let old:unknown;
@@ -150,6 +178,7 @@ export function createOriginalTestPort(input: {
               remainingMilliseconds=Math.min(durationMilliseconds,Math.round(old*60000));
             }
           }
+          if(reopen)remainingMilliseconds=Math.min(durationMilliseconds,reopen.minutes*60000);
           if(!Number.isFinite(new Date(now+remainingMilliseconds).getTime())){
             throw new FirstSliceError(409,'native_timer_unavailable','The authored time limit is outside the supported clock range.');
           }
@@ -157,7 +186,8 @@ export function createOriginalTestPort(input: {
             testletKey:block.key,status:remainingMilliseconds>0?'running':'expired',
             durationSeconds:durationMilliseconds/1000,remainingSeconds:remainingMilliseconds/1000,startedAt:timestamp,
             expiresAt:remainingMilliseconds>0?new Date(now+remainingMilliseconds).toISOString():null,
-            updatedAt:timestamp,endedAt:remainingMilliseconds>0?null:timestamp
+            updatedAt:timestamp,endedAt:remainingMilliseconds>0?null:timestamp,
+            ...(reopen?{reopenCommandId:control!.commandId}:{})
           };
         }
         return {testRun,originalNativeTestletTimers:{...timers,[block.key]:timer},testLogs:[],activityEvents:[]};

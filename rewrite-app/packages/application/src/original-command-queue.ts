@@ -14,12 +14,13 @@ import type {OriginalNativeStateWriteBase} from '@testcenter-rewrite-app/domain'
 
 export type OriginalCommandActor=Pick<ParticipantSession,'tenantId'|'workspaceId'|'participantSessionId'|'groupKey'> & {originalLoginKey:string};
 export type OriginalCommandDelivery=OriginalTestNumberRecord & OriginalCommandPacket & {commanderParticipantSessionId:string|null;executed:boolean};
+export type OriginalTimerTransition={timestamp:string;gotoBlock?:string|null};
 export type OriginalCommandRepository={
   reserveOriginalCommandNumber():Promise<string>;
   findOriginalCommandTarget(actor:OriginalCommandActor,testNumber:string):Promise<OriginalTestNumberRecord|null>;
   appendOriginalCommand(actor:OriginalCommandActor,command:OriginalCommandPacket,targets:OriginalTestNumberRecord[]):Promise<void>;
   listOriginalCommands(scope:OriginalTestNumberRecord,lastCommandId:string|null):Promise<OriginalCommandPacket[]>;
-  acknowledgeOriginalCommand(scope:OriginalTestNumberRecord,commandNumber:string,nativeStateProtocol?:boolean):Promise<'executed'|'already'|{outcome:'executed'|'already';nativeStateBase:OriginalNativeStateWriteBase}|null>;
+  acknowledgeOriginalCommand(scope:OriginalTestNumberRecord,commandNumber:string,nativeStateProtocol?:boolean,timerTransition?:OriginalTimerTransition):Promise<'executed'|'already'|{outcome:'executed'|'already';nativeStateBase:OriginalNativeStateWriteBase}|null>;
   touchOriginalCommandPolling(scope:OriginalTestNumberRecord,timestamp:string):Promise<boolean>;
 };
 type Collection<Row>=Map<string,Row>|Record<string,Row>;
@@ -85,10 +86,42 @@ export function selectOriginalCommands(rows:OriginalCommandDelivery[],lastComman
 export function listOriginalCommandsCollection(state:OriginalCommandCollections,scope:OriginalTestNumberRecord,lastCommandId:string|null):OriginalCommandPacket[]{
   currentMapping(state,scope);return selectOriginalCommands(values(state.originalNativeCommands).filter(row=>row.testNumber===scope.testNumber&&row.testRunId===scope.testRunId&&row.participantSessionId===scope.participantSessionId&&row.tenantId===scope.tenantId&&row.workspaceId===scope.workspaceId&&row.contentReleaseId===scope.contentReleaseId),lastCommandId);
 }
-export function acknowledgeOriginalCommandCollection(state:OriginalCommandCollections,scope:OriginalTestNumberRecord,commandNumber:string,nativeStateProtocol=false):'executed'|'already'|{outcome:'executed'|'already';nativeStateBase:OriginalNativeStateWriteBase}|null{
+export function prepareOriginalNativeTimerControl(
+  before:TestRun['originalResultState'], command:Pick<OriginalCommandPacket,'id'|'keyword'|'arguments'>,
+  {timestamp,gotoBlock}:OriginalTimerTransition
+):TestRun['originalResultState']{
+  const keyword=command.keyword.toLowerCase();
+  if(!before||!['pause','resume','goto','terminate'].includes(keyword)||
+    (before.nativeTimerControl&&BigInt(before.nativeTimerControl.commandId)>=BigInt(command.id)))return undefined;
+  const now=Date.parse(timestamp),paused=keyword==='pause';
+  const reopen=keyword==='goto'&&command.arguments[0]==='id'&&command.arguments[1]&&
+    /^\| closed timeblock reopened - new remaining time (\d+)$/.exec(command.arguments[2]??'');
+  const minutes=reopen?Number(reopen[1]):0;
+  if(!before.nativeTestletTimers&&!before.nativeTimerControl&&!(minutes>0&&Number.isSafeInteger(minutes)))return undefined;
+  const control={commandId:command.id,paused,
+    ...(minutes>0&&Number.isSafeInteger(minutes)?{reopen:{unitAlias:command.arguments[1]!,minutes}}:{})};
+  const timers=before.nativeTestletTimers;
+  if(!timers||(keyword!=='pause'&&keyword!=='terminate'&&(keyword!=='goto'||gotoBlock===undefined)))return {...before,nativeTimerControl:control};
+  const stopped=Object.fromEntries(Object.entries(timers).map(([id,timer])=>{
+    if(keyword==='goto'&&id===gotoBlock)return [id,timer];
+    if(timer.status!=='running'&&(timer.status!=='paused'||paused))return [id,timer];
+    const remaining=timer.expiresAt?Math.max(0,(Date.parse(timer.expiresAt)-now)/1000):timer.remainingSeconds;
+    if(remaining<=0)return [id,{...timer,status:'expired' as const,remainingSeconds:0,updatedAt:timestamp,endedAt:timer.expiresAt??timestamp}];
+    return [id,{...timer,status:paused?'paused' as const:'cancelled' as const,
+      remainingSeconds:paused?remaining:0,expiresAt:null,updatedAt:timestamp,endedAt:paused?null:timestamp}];
+  }));
+  return {...before,nativeTimerControl:control,nativeTestletTimers:stopped};
+}
+export function acknowledgeOriginalCommandCollection(state:OriginalCommandCollections,scope:OriginalTestNumberRecord,commandNumber:string,nativeStateProtocol=false,timerTransition?:OriginalTimerTransition):'executed'|'already'|{outcome:'executed'|'already';nativeStateBase:OriginalNativeStateWriteBase}|null{
   currentMapping(state,scope);const key=JSON.stringify([scope.testRunId,commandNumber]),row=get(state.originalNativeCommands,key);if(!row||row.testNumber!==scope.testNumber||row.participantSessionId!==scope.participantSessionId||row.tenantId!==scope.tenantId||row.workspaceId!==scope.workspaceId||row.contentReleaseId!==scope.contentReleaseId)return null;
-  const nativeStateBase=nativeStateProtocol?readOriginalNativeStateBase(get(state.testRuns,scope.testRunId)?.originalResultState):undefined;
-  const outcome=row.executed?'already':'executed';if(!row.executed)put(state.originalNativeCommands,key,{...row,executed:true});
+  const run=get(state.testRuns,scope.testRunId)!;
+  const nativeStateBase=nativeStateProtocol?readOriginalNativeStateBase(run.originalResultState):undefined;
+  const outcome=row.executed?'already':'executed';
+  if(!row.executed){
+    const originalResultState=timerTransition?prepareOriginalNativeTimerControl(run.originalResultState,row,timerTransition):undefined;
+    if(originalResultState)put(state.testRuns,scope.testRunId,{...run,originalResultState});
+    put(state.originalNativeCommands,key,{...row,executed:true});
+  }
   return nativeStateBase?{outcome,nativeStateBase}:outcome;
 }
 export function prepareOriginalCommandPolling(timestamp:string,state:unknown,before:TestRun['originalResultState']):Pick<TestRun,'updatedAt'|'originalResultState'>|null{

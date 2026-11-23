@@ -10,6 +10,12 @@ import {
 } from '../interfaces/test-controller.interfaces';
 import { MainDataService } from '../../shared/services/maindata/maindata.service';
 
+export interface NativeTimerClock {
+  testletKey: string;
+  status: 'running'|'paused'|'expired'|'cancelled';
+  remainingMilliseconds: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -65,6 +71,10 @@ export class BackendService {
 
   getTestData(testId: string): Observable<TestData> {
     return this.http.get<TestData>(`${this.backendUrl}test/${testId}`,{nativeStateProtocol:true});
+  }
+
+  timer(testId: string, unitAlias: string, action: 'enter'|'cancel'|'interrupt'|'expire'): Observable<NativeTimerClock> {
+    return this.http.patch<NativeTimerClock>(`${this.backendUrl}test/${testId}/timer`, {unitAlias, action});
   }
 
   prepareUnitJournal(saving:boolean):Promise<void>{return this.http.prepareUnitJournal(saving);}
