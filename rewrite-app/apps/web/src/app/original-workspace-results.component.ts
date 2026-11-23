@@ -9,7 +9,6 @@ import {MatSnackBar} from '@angular/material/snack-bar';
 import {MatSort,MatSortHeader,type Sort} from '@angular/material/sort';
 import {MatTableModule,MatTableDataSource} from '@angular/material/table';
 import {MatTooltip} from '@angular/material/tooltip';
-import {ApplicationSettingsService} from './application-settings.service';
 import {OriginalParticipantConfirmationDialogComponent} from './original-participant-confirmation-dialog.component';
 import {OriginalWorkspaceFileIconComponent} from './original-workspace-file-icon.component';
 import {OriginalWorkspaceFileNoticeComponent} from './original-workspace-file-notice.component';
@@ -32,7 +31,6 @@ export class OriginalWorkspaceResultsComponent implements OnChanges,OnDestroy {
  private readonly changed=inject(ChangeDetectorRef);
  private readonly dialogs=inject(MatDialog);
  private readonly snacks=inject(MatSnackBar);
- private readonly settings=inject(ApplicationSettingsService);
  private destroyed=false;
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
  readonly resultDataSource=new MatTableDataSource<OriginalResultRow>([]);
@@ -74,9 +72,9 @@ export class OriginalWorkspaceResultsComponent implements OnChanges,OnDestroy {
   const message=groups?'Es werden alle Antwort- und Logdaten in der Datenbank für diese '+
    (plural?`${captured.count} Gruppen `:`Gruppe "${captured.groups[0]}" `)+'gelöscht. Fortsetzen?':
    `Sie haben ${plural?captured.count:'eine'} Test-Session${plural?'s':''} ausgewählt. Soll${plural?'en':''} diese gelöscht werden?`;
-  this.deletion=this.dialogs.open(OriginalParticipantConfirmationDialogComponent,{panelClass:'original-participant-confirmation-dialog',
+  this.deletion=this.dialogs.open(OriginalParticipantConfirmationDialogComponent,{panelClass:'original-participant-confirmation-dialog',autoFocus:'dialog',
    data:{title:groups?'Löschen von Gruppendaten':'Löschen von Test-Sessions',message,confirmLabel:groups?'Gruppendaten löschen':'Löschen',
-    cancelLabel:'Abbrechen',safeMode:this.settings.settings().themeName==='Primar'}});
+    cancelLabel:'Abbrechen',safeMode:false}});
   this.deletion.afterClosed().subscribe(async accepted=>{
    this.deletion=null;if(!accepted||this.destroyed||!captured.current())return;
    if(await captured.confirm()&&!this.destroyed&&this.controller.notice)this.snacks.open(this.controller.notice,groups?'OK':'Schließen',{duration:groups?5000:3000});

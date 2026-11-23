@@ -47,6 +47,18 @@ async function open(context,username='owned-results-writer',view='results'){
  await page.locator('[data-view-nav="content"]').click();await page.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
  await tab(view==='tests'?'Tests löschen':'Ergebnisse/Antworten');return page;
 }
+async function cancelDeletion(trigger,confirmLabel,message){
+ await trigger.and(page.locator(':enabled')).press('Enter');
+ await waitForMaterialDialog(page);
+ const dialog=page.getByRole('dialog');
+ await page.waitForFunction(()=>document.activeElement===document.querySelector('mat-dialog-container'));
+ assert.deepEqual(await dialog.locator('mat-dialog-actions button').allTextContents(),[confirmLabel,'Abbrechen']);
+ assert.ok(await dialog.locator('mat-dialog-actions button').evaluateAll(buttons=>buttons.every(button=>button.classList.contains('mat-mdc-outlined-button'))));
+ await dialog.getByText(message,{exact:true}).waitFor();
+ await page.keyboard.press('Escape');
+ await dialog.waitFor({state:'detached'});
+ assert.ok(await trigger.evaluate(button=>button===document.activeElement));
+}
 const selectGroup=async(label)=>{await page.locator('#originalWorkspaceResults mat-row').filter({hasText:label}).locator('input[type=checkbox]').check();await page.locator('[data-cy="download-responses"]:enabled').waitFor();};
 async function assertResultsIconSpacing(target,expectedMargin){
  const icons=target.locator('#originalWorkspaceResults button[data-cy] mat-icon');
@@ -134,19 +146,20 @@ try{
     assert.equal(await page.locator('#originalWorkspaceResults mat-row input:checked').count(),0);
    }
    await selectGroup('Ergebnisgruppe A');await page.waitForFunction(()=>document.querySelector('#originalWorkspaceResults mat-header-cell input')?.indeterminate===true);
-   if(role==='RW'){await page.locator('[data-cy="delete-files"]').click();await waitForMaterialDialog(page);await page.locator('[data-cy="dialog-cancel"]').click();}
-   else assert.equal(await page.locator('[data-cy="delete-files"]').isDisabled(),true);
+   const deleteGroups=page.locator('[data-cy="delete-files"]');
+   if(role==='RW')await cancelDeletion(deleteGroups,'Gruppendaten löschen',
+    'Es werden alle Antwort- und Logdaten in der Datenbank für diese Gruppe "OWNED.RESULT.A" gelöscht. Fortsetzen?');
+   else assert.equal(await deleteGroups.isDisabled(),true);
    assert.equal(await page.locator('#originalWorkspaceResults mat-row input:checked').count(),1);
    if(visual)await visual.compare({...visualInput,view:'results',selected:true});
    await waitForFiniteDocumentAnimations(page);await page.screenshot({path:join(artifacts,theme+'-'+width+'-'+role+'-results-selected.png'),fullPage:true});
    await tab('Tests löschen');assert.equal(await page.locator('#originalWorkspaceTests mat-row').count(),3);
    if(visual)await visual.compare({...visualInput,view:'tests',selected:false});
    await page.locator('#originalWorkspaceTests mat-row input').first().check();await page.getByText('1 Test-Session(s) zum Löschen ausgewählt',{exact:true}).waitFor();
-   if(role==='RW'){
-    await page.locator('#originalWorkspaceTests .sidebar button').click();await waitForMaterialDialog(page);
-    await page.locator('[data-cy="dialog-content"]').getByText('Sie haben eine Test-Session ausgewählt. Soll diese gelöscht werden?',{exact:true}).waitFor();
-    await page.locator('[data-cy="dialog-cancel"]').click();await page.locator('mat-dialog-container').waitFor({state:'detached'});
-   }else assert.equal(await page.locator('#originalWorkspaceTests .sidebar button').isDisabled(),true);
+   const deleteTests=page.locator('#originalWorkspaceTests .sidebar button');
+   if(role==='RW')await cancelDeletion(deleteTests,'Löschen','Sie haben eine Test-Session ausgewählt. Soll diese gelöscht werden?');
+   else assert.equal(await deleteTests.isDisabled(),true);
+   assert.equal(await page.locator('#originalWorkspaceTests mat-row input:checked').count(),1);
    if(visual)await visual.compare({...visualInput,view:'tests',selected:true});
    await page.screenshot({path:join(artifacts,theme+'-'+width+'-'+role+'-tests-selected.png'),fullPage:true});
    await page.reload({waitUntil:'domcontentloaded'});await page.locator('#originalWorkspaceTests[aria-busy="false"]').waitFor();

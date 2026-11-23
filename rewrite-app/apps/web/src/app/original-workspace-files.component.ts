@@ -169,9 +169,9 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  deleteFiles():void {
    const captured=this.controller.captureDeletion();if(!captured || this.deletion)return;
    const plural=captured.count>1;
-   this.deletion=this.dialogs.open(OriginalParticipantConfirmationDialogComponent,{panelClass:'original-participant-confirmation-dialog',
+   this.deletion=this.dialogs.open(OriginalParticipantConfirmationDialogComponent,{panelClass:'original-participant-confirmation-dialog',autoFocus:'dialog',
      data:{title:'Löschen von Dateien',message:`Sie haben ${plural?captured.count:'eine'} Datei${plural?'en':''} ausgewählt. Soll${plural?'en':''} diese gelöscht werden?`,
-       confirmLabel:'Löschen',cancelLabel:'Abbrechen',safeMode:this.settings.settings().themeName==='Primar'}});
+       confirmLabel:'Löschen',cancelLabel:'Abbrechen',safeMode:false}});
    this.deletion.afterClosed().subscribe(async accepted=>{
      this.deletion=null;if(!accepted || this.destroyed)return;
      if(await captured.confirm() && !this.destroyed && this.controller.notice)this.snacks.open(this.controller.notice,'',{duration:1000});
