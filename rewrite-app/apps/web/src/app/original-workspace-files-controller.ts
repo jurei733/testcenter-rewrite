@@ -3,7 +3,7 @@ import {productionApiRoutes, resolveRoutePath, type DeleteSourcePackagesResponse
   type PublicAdminRoleAssignment, type UploadWorkspaceFileResponse} from '@testcenter-rewrite-app/contracts';
 import type {WorkspaceCatalogFile, WorkspaceOverview, WorkspaceFileType,WorkspaceArchiveUploadReport} from '@testcenter-rewrite-app/domain';
 
-export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; workspaceKey:string; roles:PublicAdminRoleAssignment[]};
+export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; workspaceKey:string; roles:PublicAdminRoleAssignment[];nativeRole?:'RO'|'RW'};
 export type OriginalWorkspaceFilesTransport = <T>(method:string,path:string,body:unknown,token:string)=>Promise<T>;
 export type OriginalWorkspaceFile = WorkspaceCatalogFile & {name:string; isChecked:boolean};
 export type OriginalWorkspaceUpload = {name:string; type:string; read:()=>Promise<string>};
@@ -62,10 +62,15 @@ export class OriginalWorkspaceFilesController {
   get canWrite():boolean {
     if(!this.owner || !this.owns(this.owner) || !this.overview)return false;
     const {tenant,workspace}=this.overview;
-    return this.current().roles.some(role=>role.role==='platform_admin' ||
-      role.role==='tenant_admin' && role.tenantId===tenant.tenantId ||
-      role.role==='workspace_admin' && role.workspaceId===workspace.workspaceId &&
-        role.tenantId===tenant.tenantId && role.accessMode==='read_write');
+    const {roles,nativeRole}=this.current();
+    if(nativeRole==='RO')return false;
+    return roles.some(role=>
+      (!nativeRole && (role.role==='platform_admin' ||
+        role.role==='tenant_admin' && role.tenantId===tenant.tenantId)) ||
+      (role.role==='workspace_admin' && role.workspaceId===workspace.workspaceId &&
+        role.tenantId===tenant.tenantId && (role.accessMode==='read_write' ||
+          (nativeRole==='RW' && role.accessMode===undefined)))
+    );
   }
   get selected():OriginalWorkspaceFile[] { return this.files.filter(file=>file.isChecked); }
   get dependencyRowIds():string[] {

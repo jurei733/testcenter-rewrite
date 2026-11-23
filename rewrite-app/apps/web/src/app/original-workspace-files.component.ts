@@ -15,6 +15,7 @@ import {MatProgressSpinner} from '@angular/material/progress-spinner';
 import {MatSort,MatSortHeader,type Sort} from '@angular/material/sort';
 import {MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,MatCellDef,MatCell,MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow} from '@angular/material/table';
 import {MatTooltip} from '@angular/material/tooltip';
+import {combineLatest} from 'rxjs';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import type {WorkspaceFileType} from '@testcenter-rewrite-app/domain';
 import {OriginalWorkspaceFilesController,type OriginalWorkspaceFile} from './original-workspace-files-controller';
@@ -38,6 +39,8 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  @Input({required:true}) sessionToken='';
  @Input({required:true}) tenantKey='';
  @Input({required:true}) workspaceKey='';
+ @Input() workspaceNumber='';
+ @Input() nativeRole?:'RO'|'RW';
  private readonly state=inject(RewriteAppUiStateService);
  private readonly request=inject(RewriteAppShellRequestService);
  private readonly api=inject(RewriteAppApiService);
@@ -58,7 +61,7 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  // view still follows the normalized query parameter, including the default.
  readonly tabRouteMatch={paths:'exact',queryParams:'ignored',matrixParams:'ignored',fragment:'ignored'} as const;
  // Original uses Material's default spacing when Results is the document's first view.
- compactResultsToolbar=this.route.snapshot.queryParamMap.get('tab')!=='results' ||
+ compactResultsToolbar=(this.route.snapshot.paramMap.get('workspaceTab')??this.route.snapshot.queryParamMap.get('tab'))!=='results' ||
    !!(this.router.currentNavigation()??this.router.lastSuccessfulNavigation())?.previousNavigation;
  resultsRole:''|'RO'|'RW'='';
  private readonly snacks=inject(MatSnackBar);
@@ -67,13 +70,20 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
  readonly controller=new OriginalWorkspaceFilesController((method,path,body,token)=>
    this.request.request('Dateiverwaltung',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
-   ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments}),
+   ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments,nativeRole:this.nativeRole}),
    ()=>{if(!this.destroyed){this.header.title.set(this.title);this.changed.markForCheck();}},
    ()=>{void this.systemCheckInstallation.refresh();});
- private readonly routeChanges=this.route.queryParamMap.subscribe(params=>{
-   const value=params.get('tab'),next=value==='syscheck'||value==='results'||value==='tests'?value:'files';
+ private readonly routeChanges=combineLatest([this.route.paramMap,this.route.queryParamMap]).subscribe(([params,query])=>{
+   const workspaceNumber=params.get('workspaceNumber')??'';
+   const value=workspaceNumber?params.get('workspaceTab'):query.get('tab');
+   const next=value==='syscheck'||value==='results'||value==='tests'?value:'files';
    if(next!=='results')this.compactResultsToolbar=true;
-   if(this.tab!==next){this.tab=next;this.resultsRole='';this.deletion?.close(false);void this.controller.connect();}
+   if(this.tab===next)return;
+   this.tab=next;
+   this.resultsRole='';
+   this.deletion?.close(false);
+   // On a workspace switch, wait for the verified scope inputs in ngOnChanges.
+   if(workspaceNumber===this.workspaceNumber)void this.controller.connect();
  });
  readonly fileTypes:WorkspaceFileType[]=['Testtakers','Booklet','SysCheck','Unit','Resource','Package'];
  readonly labels:Record<WorkspaceFileType,string>={Testtakers:'Teilnehmerlisten',Booklet:'Testhefte',SysCheck:'Systemcheck-Definitionen',Unit:'Units',Resource:'Ressourcen',Package:'Pakete'};
@@ -89,7 +99,7 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    {label:'Systemcheck-Definitionen',versions:'18'},{label:'Units',versions:'17'},{label:'Verona-Player',versions:'2–6'}];
  readonly trackFile=(_index:number,file:OriginalWorkspaceFile)=>file.sourcePackageId;
  reloadReports():void {globalThis.location.reload();}
- ngOnChanges():void {this.deletion?.close(false);void this.controller.connect();}
+ ngOnChanges():void {this.deletion?.close(false);this.resultsRole='';void this.controller.connect();}
  ngOnDestroy():void {this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.controller.destroy();this.header.title.set('Verwaltung');}
  setResultsRole(role: ''|'RO'|'RW'):void {
    this.resultsRole=role;

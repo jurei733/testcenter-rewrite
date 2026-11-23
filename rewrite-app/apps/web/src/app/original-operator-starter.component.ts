@@ -101,8 +101,8 @@ export class OriginalOperatorStarterComponent implements AfterViewInit, OnDestro
     this.state.workspace.tenantKey = choice.tenantKey;
     this.state.workspace.workspaceKey = choice.workspaceKey;
     this.viewState.persistShellState();
-    void this.router.navigate(["/content"], {
-      queryParams: { ui: "original", tab: "files", tenant: choice.tenantKey, workspace: choice.workspaceKey }
+    void this.router.navigate(["/admin", choice.workspaceNumber, "files"], {
+      queryParams: { ui: "original" }
     });
   }
 }

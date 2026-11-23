@@ -29,6 +29,7 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
  @Input({required:true}) sessionToken='';
  @Input({required:true}) tenantKey='';
  @Input({required:true}) workspaceKey='';
+ @Input() nativeRole?:'RO'|'RW';
  private readonly state=inject(RewriteAppUiStateService);
  private readonly request=inject(RewriteAppShellRequestService);
  private readonly api=inject(RewriteAppApiService);
@@ -41,7 +42,7 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
  readonly columns=['selectCheckbox','syscheckLabel','number','details-os','details-browser'];
  readonly controller=new OriginalSystemCheckReportsController((method,path,body,token)=>
   this.request.request('Systemcheck Berichte',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
-  ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey}),
+  ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,nativeRole:this.nativeRole}),
   ()=>{if(!this.destroyed){this.data.data=this.controller.rows;this.changed.markForCheck();}});
  @ViewChild(MatSort) set sort(value:MatSort){this.data.sort=value;}
  constructor(){

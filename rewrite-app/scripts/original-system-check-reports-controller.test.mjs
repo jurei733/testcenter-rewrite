@@ -39,6 +39,17 @@ test('a read-only reader captures Source confirmation; authoritative 403 preserv
  assert.equal(f.controller.problem,'Protected read-only denial.');assert.equal(f.controller.notice,'');assert.equal(f.calls.length,3,'A rejected request must not clear/refetch the unchanged table.');
  const result=await f.controller.download(async()=>new Blob(['owned']));assert.equal(await result.blob.text(),'owned');assert.equal(f.controller.selected.size,0);
 });
+test('confirming deletion cannot use platform privileges on a numeric link with explicit read-only access',async()=>{
+ const roles=[{role:'platform_admin'},role('a','read_only')];
+ const f=fixture(normal,{...scope('a','owned-token',roles),nativeRole:'RO'});
+ await f.controller.connect();
+ f.controller.checkAll();
+ const confirmation=f.controller.captureDeletion();
+ assert.equal(await confirmation.confirm(),false);
+ assert.equal(f.calls.some(call=>call.method==='DELETE'),false);
+ assert.equal(f.controller.selected.size,1);
+ assert.equal(f.controller.problem,'Der Arbeitsbereich ist schreibgeschützt.');
+});
 test('cached role metadata cannot replace an authoritative server refusal',async()=>{
  for(const roles of [[role()],[{role:'tenant_admin',tenantId:'tenant-a'}],[{role:'platform_admin'}]]){
   const f=fixture(call=>{if(call.method==='DELETE')throw {statusCode:403,message:'Grant was revoked at the server.'};return normal(call);},scope('a','owned-token',roles));

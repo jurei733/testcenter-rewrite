@@ -4,8 +4,9 @@
   <div class="workspace-files-view">
     <nav mat-tab-nav-bar [tabPanel]="tabPanel">
       @for (link of tabs; track link.id) {
-        <a mat-tab-link routerLink="/content" [attr.data-cy]="link.label" [queryParams]="{tab:link.id}"
-          queryParamsHandling="merge" routerLinkActive #rla="routerLinkActive"
+        <a mat-tab-link [routerLink]="workspaceNumber ? ['/admin',workspaceNumber,link.id] : ['/content']"
+          [attr.data-cy]="link.label" [queryParams]="workspaceNumber ? {ui:'original'} : {tab:link.id}"
+          [queryParamsHandling]="workspaceNumber ? 'replace' : 'merge'" routerLinkActive #rla="routerLinkActive"
           [routerLinkActiveOptions]="tabRouteMatch" [active]="rla.isActive && tab === link.id"><h2>{{link.label}}</h2></a>
       }
     </nav>
@@ -21,7 +22,7 @@
       }
     } @else if (tab === 'syscheck') {
       @defer (when true) {
-        <app-original-system-check-reports [sessionToken]="sessionToken" [tenantKey]="tenantKey" [workspaceKey]="workspaceKey" />
+        <app-original-system-check-reports [sessionToken]="sessionToken" [tenantKey]="tenantKey" [workspaceKey]="workspaceKey" [nativeRole]="nativeRole" />
       } @placeholder { <p role="status">Berichte werden geladen…</p> }
       @error {
         <p role="alert">Die Berichtsverwaltung konnte nicht geladen werden.</p>

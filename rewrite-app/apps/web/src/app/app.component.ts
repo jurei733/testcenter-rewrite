@@ -150,7 +150,10 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get isOriginalWorkspaceFiles(): boolean {
-    return this.interfaceMode.mode()==='original' && this.activeRouteView==='content' && this.app.hasAdminSession;
+    this.routeVersion();
+    const nativePath = this.router.url.split("?", 1)[0].startsWith("/admin/");
+    return this.app.hasAdminSession &&
+      (nativePath || (this.interfaceMode.mode() === "original" && this.activeRouteView === "content"));
   }
 
   get isNativeMonitorView(): boolean { return ['/group-monitor','/native-test','/native-start'].some(path=>this.router.url.split('?',1)[0].startsWith(path)); }

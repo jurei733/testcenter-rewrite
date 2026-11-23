@@ -237,7 +237,11 @@ export class RewriteAppOpsService {
     if (token !== this.opsState.adminSessionToken.trim()) {
       return;
     }
-    this.applyAdminAuthPayload(payload);
+    this.applyAdminAuthPayload({
+      adminUser: payload.adminUser,
+      adminSession: payload.adminSession,
+      roleAssignments: payload.roleAssignments
+    });
     if (publishOriginalRights) {
       this.uiState.publishOriginalAccountRights();
     } else {

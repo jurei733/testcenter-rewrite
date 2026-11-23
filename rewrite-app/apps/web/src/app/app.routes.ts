@@ -5,8 +5,9 @@ import {
   rejectSystemCheckOperator,
   requireAuthenticatedOperator,
   requireAdministrativeOperator,
-  requireSignedInWorkspaceStarter
+  requireOriginalWorkspaceSession
 } from "./rewrite-app-admin-route.guard";
+import { matchOriginalNumericWorkspace, resolveOriginalNumericWorkspace } from "./original-workspace-browser-route";
 import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
 
 const canonicalRoutes: Routes = [
@@ -30,7 +31,13 @@ const canonicalRoutes: Routes = [
       import("./original-operator-starter.component").then(
         module => module.OriginalOperatorStarterComponent
       ),
-    canActivate: [requireAdministrativeOperator, requireSignedInWorkspaceStarter]
+    canActivate: [requireAdministrativeOperator, requireOriginalWorkspaceSession]
+  },
+  {
+    matcher: matchOriginalNumericWorkspace,
+    loadComponent: () => import("./original-numeric-workspace.component").then(module => module.OriginalNumericWorkspaceComponent),
+    canActivate: [requireAdministrativeOperator, requireOriginalWorkspaceSession],
+    resolve: { originalWorkspace: resolveOriginalNumericWorkspace }
   },
   {
     path: "content",

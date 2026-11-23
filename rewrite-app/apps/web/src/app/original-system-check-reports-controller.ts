@@ -4,7 +4,7 @@ import type {SystemCheckReportStatistics,WorkspaceOverview} from '@testcenter-re
 import type {OriginalWorkspaceFilesScope,OriginalWorkspaceFilesTransport} from './original-workspace-files-controller';
 
 type Owner={epoch:number;token:string;tenantKey:string;workspaceKey:string};
-type Scope=Pick<OriginalWorkspaceFilesScope,'token'|'tenantKey'|'workspaceKey'>;
+type Scope=Pick<OriginalWorkspaceFilesScope,'token'|'tenantKey'|'workspaceKey'|'nativeRole'>;
 const errorText=(error:unknown):string=>error && typeof error==='object' && 'message' in error && typeof error.message==='string'
  ? error.message : 'Die Berichte konnten nicht verarbeitet werden.';
 
@@ -82,6 +82,11 @@ export class OriginalSystemCheckReportsController {
   let used=false;
   return {ids:[...ids],current:()=>this.owns(owner),confirm:async()=>{
    if(used || !this.owns(owner) || this.busy)return false;used=true;
+   if(this.current().nativeRole==='RO'){
+    this.problem='Der Arbeitsbereich ist schreibgeschützt.';
+    this.changed();
+    return false;
+   }
    this.busy=true;this.problem='';this.notice='';this.changed();let deleted=0,accepted=0,completed=false;
    try{
     // The protected API accepts at most 100 Check IDs per request. Capture all

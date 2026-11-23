@@ -1130,6 +1130,7 @@ export type AdminSignInResponse = {
 
 export type OriginalOperatorWorkspaceChoice = {
   workspaceId: string;
+  workspaceNumber: string;
   tenantKey: string;
   workspaceKey: string;
   label: string;

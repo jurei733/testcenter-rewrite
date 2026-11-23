@@ -72,6 +72,16 @@ test('resolved workspace UUIDs determine write access; readonly, foreign grants 
 for(const roles of [[role()],[{role:'tenant_admin',tenantId:'tenant-a'}],[{role:'platform_admin'}]])test('verified role permits file writes: '+roles[0].role,async()=>{
  const f=fixture(call=>normal(call),scope('a','owned-token',roles));await f.controller.connect();assert.equal(f.controller.canWrite,true);
 });
+test('a numeric workspace link keeps explicit read-only access alongside a platform role',async()=>{
+ const roles=[{role:'platform_admin'},role('a','read_only')];
+ const f=fixture(call=>normal(call),{...scope('a','owned-token',roles),nativeRole:'RO'});
+ await f.controller.connect();
+ assert.equal(f.controller.canWrite,false);
+ f.controller.checkAll('Unit',true);
+ assert.equal(f.controller.captureDeletion(),null);
+ await f.controller.upload([{name:'owned.xml',type:'application/xml',read:()=>{throw Error('Read-only must not read local bytes.');}}]);
+ assert.equal(f.calls.some(call=>call.method==='POST'),false);
+});
 test('late catalog/overview responses cannot populate another workspace or another login',async()=>{
  for(const replacement of [scope('b'),scope('a','replacement-token')]){
   const held=pending();let count=0;

@@ -3200,7 +3200,8 @@ const serveFrontendRequest = async (
   // Recognize the exact client routes before applying the asset extension rule.
   const nativeMonitorRoute = /^group-monitor(?:\/[^/]+){0,2}\/?$/.test(relativePath);
   const nativeSystemCheckRoute = /^check\/[^/]+\/[^/]+(?:\/[wnuqr])?\/?$/.test(relativePath);
-  if (relativePath === "" || nativeMonitorRoute || nativeSystemCheckRoute || !relativePath.includes(".")) {
+  const nativeWorkspaceRoute = /^admin\/[^/]+(?:\/[^/]+)*\/?$/.test(relativePath);
+  if (relativePath === "" || nativeMonitorRoute || nativeSystemCheckRoute || nativeWorkspaceRoute || !relativePath.includes(".")) {
     const html = await readFile(frontendIndexPath, "utf8");
     sendHtml(response, 200, html);
     return true;

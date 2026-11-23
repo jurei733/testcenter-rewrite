@@ -223,8 +223,18 @@ try {
       await readPage.locator('#ownAdminPasswordChangeDialog').waitFor();
       await readPage.locator('#ownAdminPasswordCancelButton').click();
       await readPage.locator('#ownAdminPasswordChangeDialog').waitFor({state:'detached'});
-      await readPage.locator('[data-cy="workspace-card-Eigener Arbeitsbereich '+width+'"] button').press('Enter');
+      const nativeNumber=originalWorkspaceChoices[0].workspaceNumber;
+      assert.match(nativeNumber,/^[1-9][0-9]*$/);
+      await card.press('Enter');
       await readPage.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
+      const nativeFilesPath='/admin/'+nativeNumber+'/files';
+      assert.equal(new URL(readPage.url()).pathname,'/app'+nativeFilesPath);
+      await readPage.goto(base+'/#'+nativeFilesPath);
+      await readPage.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
+      assert.equal(new URL(readPage.url()).pathname,'/app'+nativeFilesPath);
+      assert.equal(await readPage.locator('[data-cy="upload-files"]').isDisabled(),true);
+      // Reloaded numeric routes verify and publish the operator's account rights
+      // before the file view opens.
       await accountTrigger.click();await account.waitFor();
       assert.deepEqual((await account.locator('dd').allTextContents()).slice(0,-1),[username,'','Verwaltung von Testinhalten']);
       await account.getByRole('button',{name:'Nutzerinformationen schließen'}).click();

@@ -139,21 +139,29 @@ export function createOriginalAdminSessionPort(input: {
     }
     return choices;
   };
+  const assignWorkspaceNumbers = (s: OriginalAdminSessionSnapshot, user: AdminUser) => {
+    const workspaceNumbers: OriginalWorkspaceNumberRecord[] = [];
+    let workspaceCounter = s.workspaceCounter;
+    const memberships = workspaceMemberships(s, user).map(membership => {
+      const {workspace} = membership;
+      const existing = s.workspaceNumbers.find(row => row.workspaceId === workspace.workspaceId);
+      const prepared = prepareOriginalWorkspaceNumber(workspace, workspace, existing, workspaceCounter);
+      workspaceCounter = prepared.counter;
+      if (prepared.changed) workspaceNumbers.push(prepared.record);
+      return {...membership, workspaceNumber: prepared.record.workspaceNumber};
+    });
+    return {memberships, workspaceNumbers, workspaceCounter};
+  };
   const accessSet = (s: OriginalAdminSessionSnapshot, user: AdminUser, token: string): Pick<OriginalAdminSessionEffect, 'value' | 'number' | 'counter' | 'workspaceNumbers' | 'workspaceCounter'> => {
     const identity = prepareOriginalAdminNumber(user, s.number, s.counter);
-    const workspaces: OriginalAdminAccessSet['claims']['workspaceAdmin'] = [];
-    const numbers: OriginalWorkspaceNumberRecord[] = [];
-    let workspaceCounter = s.workspaceCounter;
-    for (const {workspace, mode} of workspaceMemberships(s, user)) {
-      const prepared = prepareOriginalWorkspaceNumber(workspace, workspace, s.workspaceNumbers.find(row => row.workspaceId === workspace.workspaceId), workspaceCounter);
-      workspaceCounter = prepared.counter;
-      if (prepared.changed) numbers.push(prepared.record);
-      workspaces.push({id: prepared.record.workspaceNumber, type: 'workspaceAdmin', label: workspace.displayName, flags: {mode}});
-    }
+    const {memberships, workspaceNumbers, workspaceCounter} = assignWorkspaceNumbers(s, user);
+    const workspaces: OriginalAdminAccessSet['claims']['workspaceAdmin'] = memberships.map(({workspace, workspaceNumber, mode}) => ({
+      id: workspaceNumber, type: 'workspaceAdmin', label: workspace.displayName, flags: {mode}
+    }));
     const claims: OriginalAdminAccessSet['claims'] = {workspaceAdmin: workspaces};
     const access: OriginalAdminAccessSet['access'] = {workspaceAdmin: workspaces.map(w => w.id)};
     if (s.roles.some(role => role.adminUserId === user.adminUserId && role.role === 'platform_admin')) {claims.superAdmin = []; access.superAdmin = [];}
-    return {...identity, workspaceNumbers: numbers, workspaceCounter,
+    return {...identity, workspaceNumbers, workspaceCounter,
       value: {token, displayName: user.username, loginName: user.username, groupLabel: null, id: identity.number.adminNumber,
         pwSetByAdmin: user.passwordChangeRequired, customTexts: {}, flags: [], claims, groupToken: null, viewSettings: [], access}};
   };
@@ -222,10 +230,13 @@ export function createOriginalAdminSessionPort(input: {
       const effect = await input.repository.mutateOriginalAdminSession({token, at:timestamp}, s => {
         active(s, token, timestamp);
         if (s.user!.passwordChangeRequired && !superAdmin(s)) return {workspaceChoices:[]};
-        return {workspaceChoices:workspaceMemberships(s, s.user!).map(({workspace,tenant,mode})=>({
-          workspaceId:workspace.workspaceId, tenantKey:tenant.tenantKey, workspaceKey:workspace.workspaceKey,
-          label:workspace.displayName, mode
-        }))};
+        const {memberships, workspaceNumbers, workspaceCounter} = assignWorkspaceNumbers(s, s.user!);
+        const workspaceChoices = memberships.map(({workspace, tenant, workspaceNumber, mode}) => ({
+          workspaceId: workspace.workspaceId, workspaceNumber,
+          tenantKey: tenant.tenantKey, workspaceKey: workspace.workspaceKey,
+          label: workspace.displayName, mode
+        }));
+        return {workspaceChoices, ...(workspaceNumbers.length ? {workspaceNumbers, workspaceCounter} : {})};
       });
       if (effect.error) throw effect.error;
       return effect.workspaceChoices!;
