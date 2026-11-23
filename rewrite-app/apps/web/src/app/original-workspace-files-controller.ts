@@ -1,7 +1,7 @@
 import {productionApiRoutes, resolveRoutePath, type DeleteSourcePackagesResponse,
   type GetWorkspaceFileCatalogResponse, type GetWorkspaceOverviewResponse,
   type PublicAdminRoleAssignment, type UploadWorkspaceFileResponse} from '@testcenter-rewrite-app/contracts';
-import type {OriginalWorkspaceUploadReport,WorkspaceCatalogFile,WorkspaceOverview,WorkspaceFileType,WorkspaceArchiveUploadReport,WorkspaceFileValidationReport} from '@testcenter-rewrite-app/domain';
+import type {OriginalWorkspaceFileDeletionReport,OriginalWorkspaceUploadReport,WorkspaceCatalogFile,WorkspaceOverview,WorkspaceFileType,WorkspaceArchiveUploadReport,WorkspaceFileValidationReport} from '@testcenter-rewrite-app/domain';
 
 export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; workspaceKey:string; roles:PublicAdminRoleAssignment[];nativeRole?:'RO'|'RW';workspaceNumber?:string};
 export type OriginalWorkspaceFilesTransport = <T>(method:string,path:string,body:unknown,token:string)=>Promise<T>;
@@ -31,7 +31,7 @@ export class OriginalWorkspaceFilesController {
   notice:{message:string;action:string}|null=null;
   uploads:OriginalWorkspaceUploadResult[]=[];
   selectedRowId='';
-  deletionReport:DeleteSourcePackagesResponse['report']|null=null;
+  deletionReport:DeleteSourcePackagesResponse['report']|OriginalWorkspaceFileDeletionReport|null=null;
   private epoch=0;
   private owner:Owner|null=null;
   private destroyed=false;
@@ -212,21 +212,34 @@ export class OriginalWorkspaceFilesController {
   }
   clearUploads():void {if(!this.busy){this.uploads=[];this.changed();}}
   captureDeletion():{confirm:()=>Promise<boolean>;count:number}|null {
-    const owner=this.owner,selected=this.selected.map(file=>({sourcePackageId:file.sourcePackageId,confirmation:file.fileName}));
+    const owner=this.owner,files=this.selected;
+    const selected=files.map(file=>({sourcePackageId:file.sourcePackageId,confirmation:file.fileName}));
+    const nativePaths=owner?.workspaceNumber&&files.every(file=>file.fileType!=='Package')
+      ?files.map(file=>file.fileType+'/'+file.name):null;
     if(!owner || !this.owns(owner) || !this.canWrite || this.busy || !selected.length)return null;
     let used=false;
     return {count:selected.length,confirm:async()=>{
       if(used || !this.owns(owner) || !this.canWrite || this.busy)return false;
       used=true;this.busy=true;this.problem='';this.notice=null;this.changed();
       try {
-        const result=await this.request<DeleteSourcePackagesResponse>(owner,'POST',productionApiRoutes.workspace.deleteSourcePackages,{items:selected});
-        this.deletionReport=result.report;
-        const report=result.report,messages=[];
-        if(report.deleted.length)messages.push(`${report.deleted.length} Dateien erfolgreich gelöscht.`);
-        if(report.notAllowed.length)messages.push(`${report.notAllowed.length} Dateien konnten nicht gelöscht werden.`);
-        if(report.wasUsed.length)messages.push(`${report.wasUsed.length} Dateien werden von anderen verwendet und wurden nicht gelöscht.`);
-        if(report.didNotExist.length)messages.push(`${report.didNotExist.length} Dateien existieren nicht mehr.`);
-        if(report.errors.length)messages.push(`${report.errors.length} Dateien konnten wegen eines Fehlers nicht gelöscht werden.`);
+        const messages=[];
+        if(nativePaths){
+          const path='/workspace/'+encodeURIComponent(owner.workspaceNumber!)+'/files';
+          const report=await this.transport<OriginalWorkspaceFileDeletionReport>('DELETE',path,{f:nativePaths},owner.token);
+          if(!this.owns(owner))return false;
+          this.deletionReport=report;
+          if(report.deleted.length)messages.push(`${report.deleted.length} Dateien erfolgreich gelöscht.`);
+          if(report.not_allowed.length)messages.push(`${report.not_allowed.length} Dateien konnten nicht gelöscht werden.`);
+          if(report.was_used.length)messages.push(`${report.was_used.length} Dateien werden von anderen verwendet und wurden nicht gelöscht.`);
+        }else{
+          const {report}=await this.request<DeleteSourcePackagesResponse>(owner,'POST',productionApiRoutes.workspace.deleteSourcePackages,{items:selected});
+          this.deletionReport=report;
+          if(report.deleted.length)messages.push(`${report.deleted.length} Dateien erfolgreich gelöscht.`);
+          if(report.notAllowed.length)messages.push(`${report.notAllowed.length} Dateien konnten nicht gelöscht werden.`);
+          if(report.wasUsed.length)messages.push(`${report.wasUsed.length} Dateien werden von anderen verwendet und wurden nicht gelöscht.`);
+          if(report.didNotExist.length)messages.push(`${report.didNotExist.length} Dateien existieren nicht mehr.`);
+          if(report.errors.length)messages.push(`${report.errors.length} Dateien konnten wegen eines Fehlers nicht gelöscht werden.`);
+        }
         if(messages.length)this.notice={message:messages.join('<br>'),action:messages.length>1?'Achtung':''};
         await this.load(owner);return true;
       } catch(error){if(this.owns(owner))this.problem=problemText(error,'Löschen fehlgeschlagen.');return false;}

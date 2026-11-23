@@ -7,6 +7,8 @@ import {originalCommandInteger,originalCommandFloatString} from './original-comm
 import {OriginalPhpNumber,OriginalPhpObject} from './original-test-log-json.js';
 import {originalOpaqueWorkspaceRole} from './original-workspace-role.js';
 import type {OriginalWorkspaceWriteAuthority} from './original-workspace-write.js';
+import {originalWorkspaceFileMutationBlocked} from './original-workspace-write.js';
+import {randomUUID} from 'node:crypto';
 
 export type OriginalWorkspaceAdministrationScope={tenantId:string;workspaceId:string;tenantKey:string;workspaceKey:string};
 type WorkspaceLocator={token:string;workspacePathSegment:string};
@@ -14,6 +16,7 @@ export type OriginalWorkspaceAdministrationPort={
   context(input:{token:string;tenantKey:string;workspaceKey:string}):Promise<{workspaceId:string;role:'RO'|'RW'}>;
   resolve(input:WorkspaceLocator&{write:boolean}):Promise<OriginalWorkspaceAdministrationScope>;
   authorizeWrite(input:WorkspaceLocator):Promise<OriginalWorkspaceAdministrationScope&{authority:OriginalWorkspaceWriteAuthority}>;
+  acquireFileMutation(input:OriginalWorkspaceAdministrationScope&{token:string}):Promise<{id:string;release:()=>Promise<void>}>;
   delete(input:WorkspaceLocator&{kind:'groups'|'tests';body:unknown}):Promise<void>;
 };
 type Collection<T>=Map<string,T>|Record<string,T>;
@@ -78,6 +81,14 @@ export function createOriginalWorkspaceAdministrationPort(input:{repository:Firs
   },async authorizeWrite(request){
     const scope=await port.resolve({...request,write:true});
     return {...scope,authority:{token:request.token,tenantId:scope.tenantId,workspaceId:scope.workspaceId,now:input.now}};
+  },async acquireFileMutation(request){
+    const {tenantId,workspaceId,token}=request;
+    const id=randomUUID();
+    const authority={tenantId,workspaceId,token,now:input.now};
+    if(!await input.repository.acquireOriginalWorkspaceFileMutation({authority,id})){
+      throw originalWorkspaceFileMutationBlocked();
+    }
+    return {id,release:()=>input.repository.releaseOriginalWorkspaceFileMutation({tenantId,workspaceId,id})};
   },async delete(request){
     const scope=await port.authorizeWrite(request);
     const result=request.kind==='groups'?await input.repository.deleteOriginalGroupResults({...scope,groups:prepareOriginalNativeGroupSelection(request.body)})

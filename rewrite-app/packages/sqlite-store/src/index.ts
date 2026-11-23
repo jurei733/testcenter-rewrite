@@ -3,6 +3,7 @@ import {originalAttachmentHistoryProjector} from '@testcenter-rewrite-app/applic
 import {readOriginalAttachmentMetadata, readOriginalAttachmentTestNumbers} from './original-attachment-files.js';
 import {refreshOriginalWorkspaceContentType,readOriginalSystemCheckDirectory} from './original-workspace-content-type.js';
 import {guardOriginalWorkspaceWrite} from './original-workspace-write.js';
+import {originalWorkspaceFileMutationLifetimeMs} from '@testcenter-rewrite-app/application';
 import {transactOriginalSystemCheck} from './original-system-check.js';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {readOriginalAssetAssignmentLayers} from '@testcenter-rewrite-app/application';
@@ -1852,6 +1853,10 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
  CREATE TABLE original_application_assets(application_asset_id TEXT PRIMARY KEY REFERENCES application_assets(application_asset_id) ON DELETE CASCADE,
  asset_number INTEGER NOT NULL UNIQUE CHECK(asset_number BETWEEN 1 AND 2147483647),stored_name TEXT NOT NULL UNIQUE);`}
 ,{version:83,name:'original_workspace_content_type',sql:`ALTER TABLE workspaces ADD COLUMN original_content_type TEXT NOT NULL DEFAULT 'mixed' CHECK(original_content_type IN ('mixed','test','sysCheck')); CREATE INDEX original_workspace_content_type ON workspaces(original_content_type,status);`}
+,{version:84,name:'original_workspace_file_mutation',sql:`
+ ALTER TABLE workspaces ADD COLUMN original_file_mutation_id TEXT;
+ ALTER TABLE workspaces ADD COLUMN original_file_mutation_expires_at INTEGER;`}
+
 
 ];
 
@@ -3030,6 +3035,22 @@ export const createSqliteFirstSliceStorage = (
         database.exec("COMMIT");
         return true;
       }catch(error){database.exec("ROLLBACK");throw error;}
+    },
+    async acquireOriginalWorkspaceFileMutation({authority,id}) {
+      database.exec('BEGIN IMMEDIATE');
+      try{
+        guardOriginalWorkspaceWrite(database,{...authority,authority});
+        const at=Date.parse(authority.now());
+        const result=database.prepare(`UPDATE workspaces SET original_file_mutation_id=?, original_file_mutation_expires_at=?
+          WHERE tenant_id=? AND workspace_id=? AND (original_file_mutation_id IS NULL OR original_file_mutation_expires_at<=?)`)
+          .run(id,at+originalWorkspaceFileMutationLifetimeMs,authority.tenantId,authority.workspaceId,at);
+        database.exec('COMMIT');
+        return Number(result.changes)===1;
+      }catch(error){rollbackAfterFailure(database,error);}
+    },
+    async releaseOriginalWorkspaceFileMutation({tenantId,workspaceId,id}) {
+      database.prepare(`UPDATE workspaces SET original_file_mutation_id=NULL, original_file_mutation_expires_at=NULL
+        WHERE tenant_id=? AND workspace_id=? AND original_file_mutation_id=?`).run(tenantId,workspaceId,id);
     },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,

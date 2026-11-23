@@ -187,6 +187,18 @@ test('confirmation captures exact original IDs/filenames, retains partial outcom
  assert.deepEqual(f.controller.deletionReport,report);
  assert.deepEqual(f.controller.notice,{message:'1 Dateien werden von anderen verwendet und wurden nicht gelöscht.',action:''});
 });
+test('native deletion uses the same numeric workspace and mutation protection as the upload',async()=>{
+ const reports={deleted:['Unit/owned.xml'],did_not_exist:[],not_allowed:[],was_used:[],incorrect_path:[],error:[]};
+ const native={...scope(),nativeRole:'RW',workspaceNumber:'17'};
+ const f=fixture(call=>call.method==='DELETE'?reports:normal(call,[file('UNIT','owned.xml')]),native);
+ await f.controller.connect();
+ f.controller.checkAll('Unit',true);
+ assert.equal(await f.controller.captureDeletion().confirm(),true);
+ const writes=f.calls.filter(call=>call.method==='DELETE'||call.method==='POST');
+ assert.deepEqual(writes,[{method:'DELETE',path:'/workspace/17/files',body:{f:['Unit/owned.xml']},token:native.token}]);
+ assert.deepEqual(f.controller.deletionReport,reports);
+ assert.equal(f.controller.notice.message,'1 Dateien erfolgreich gelöscht.');
+});
 test('old confirmation and download ownership are invalid after workspace change, logout or destruction',async()=>{
  for(const transition of ['scope','logout','destroy']){
   const f=fixture(call=>normal(call));await f.controller.connect();f.controller.checkAll('Unit',true);

@@ -96,8 +96,9 @@ export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletio
 import {createOriginalWorkspaceReportPort,isOriginalReportLog,prepareOriginalWorkspaceReviewRows,type PreparedOriginalWorkspaceReviews} from './original-workspace-reports.js';
 export {selectOriginalReportParents,projectOriginalWorkspaceReport,assertOriginalReportRowCount,readOriginalWorkspaceReportCollections,originalReportUnitIdentity,originalReportFormat,originalReportQuery} from './original-workspace-reports.js';
 export type {OriginalReportMetadata,OriginalReportParent,OriginalReportRun,OriginalReportFamily,OriginalReportRequest,OriginalWorkspaceReportSnapshot,OriginalReportStoredUnit,OriginalReportStoredReview} from './original-workspace-reports.js';
-export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,originalWorkspaceWriteSqlSnapshot} from './original-workspace-write.js';
-export type {OriginalWorkspaceWriteAuthority,OriginalWorkspaceWriteSnapshot} from './original-workspace-write.js';
+export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,originalWorkspaceWriteSqlSnapshot,
+  originalWorkspaceFileMutationActive,originalWorkspaceFileMutationLifetimeMs} from './original-workspace-write.js';
+export type {OriginalWorkspaceWriteAuthority,OriginalWorkspaceWriteSnapshot,OriginalWorkspaceFileMutation} from './original-workspace-write.js';
 import {createOriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
 export {findOriginalWorkspaceFile, projectOriginalWorkspaceFileDigests, readOriginalWorkspaceFileSelection} from './original-workspace-files.js';
 export {deleteOriginalWorkspaceFiles, readOriginalWorkspaceFileDeletion} from './original-workspace-file-deletion.js';
@@ -1636,6 +1637,8 @@ export type FirstSliceRepository = import('./original-system-check.js').Original
     expectedWorkspaceSourcePackageReferenceRevision: string;
   }): Promise<boolean>;
   publishWorkspaceFiles(input: WorkspaceFilePublicationInput): Promise<boolean>;
+  acquireOriginalWorkspaceFileMutation(input:{authority:OriginalWorkspaceWriteAuthority;id:string}):Promise<boolean>;
+  releaseOriginalWorkspaceFileMutation(input:{tenantId:string;workspaceId:string;id:string}):Promise<void>;
   reserveWorkspaceFileUpload(input: {
     sourcePackage: SourcePackage;
     createdActivityEvent: WorkspaceActivityEvent;
@@ -27531,7 +27534,7 @@ export const createFirstSliceServices = (
         // Validation failures belong to this member. Infrastructure, scope and
         // optimistic-concurrency failures remain request failures.
         if(!(error instanceof FirstSliceError)||![400,409,413,422].includes(error.statusCode)||
-          ['workspace_file_upload_conflict','source_package_replacement_conflict','workspace_file_replacement_conflict'].includes(error.errorCode))throw error;
+          ['workspace_file_upload_conflict','source_package_replacement_conflict','workspace_file_replacement_conflict','original_workspace_file_mutation_blocked'].includes(error.errorCode))throw error;
         const diagnostics=workspaceFileReportErrors(member.projected,error);
         if(error.errorCode==='workspace_file_identifier_duplicate'){
           const id=error.details&&typeof error.details==='object'&&'conflictingSourcePackageId'in error.details?error.details.conflictingSourcePackageId:null;

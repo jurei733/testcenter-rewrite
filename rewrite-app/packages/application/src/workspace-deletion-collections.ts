@@ -12,6 +12,7 @@ export type WorkspaceDeletionCollections={
  participantRunCommands:Rows<Scope>;originalNativeCommands:Rows<Scope>;participantProgressDeliveries:Rows<Scope>;originalLoginBindings:Rows<Scope>;
  originalSessionTokens:Rows<Scope>;originalParticipantGroups:Rows<Scope>;originalNativeUnits:Rows<Scope>;originalNativeReviews:Rows<Scope>;originalPersonNumbers:Rows<Scope>;
  originalTestNumbers?:Rows<Scope&{testNumber:string}>;originalTestRunsByNumber:Rows<string>;originalWorkspaceNumbers?:Rows<Scope>;originalWorkspaceContentTypes?:Rows<unknown>;
+ originalWorkspaceFileMutations?:Rows<unknown>;
  testRuns:Rows<Scope&{testRunId:string}>;participantPresence:Rows<unknown>;participantSessions:Rows<Scope&{participantSessionId:string}>;participantAccessCredentials:Rows<unknown>;
  attachmentFiles:Rows<Scope>;workspaceActivityEvents:Rows<Scope>;workspaceReviews:Rows<Scope>;sourcePackages:Rows<Scope&{sourcePackageId:string}>;
  importJobs:Rows<Scope>;contentReleases:Rows<Scope&{contentReleaseId:string}>;participantRosterEntries:Rows<Scope>;participantLoginAttempts:Rows<Scope>;participantTestLogs:Rows<Scope>;
@@ -31,6 +32,7 @@ export function deleteWorkspaceCollections(state:WorkspaceDeletionCollections,in
  if(state.originalTestNumbers)erase(state.originalTestNumbers,row=>{if(!matches(row))return false;remove(state.originalTestRunsByNumber,row.testNumber);return true;});
  if(state.originalWorkspaceNumbers)erase(state.originalWorkspaceNumbers,matches);
  if(state.originalWorkspaceContentTypes)remove(state.originalWorkspaceContentTypes,input.workspaceId);
+ if(state.originalWorkspaceFileMutations)remove(state.originalWorkspaceFileMutations,input.workspaceId);
  for(const run of values(state.testRuns))if(matches(run))remove(state.participantPresence,run.testRunId);
  for(const session of values(state.participantSessions))if(matches(session))remove(state.participantAccessCredentials,session.participantSessionId);
  if(dirty){for(const row of values(state.sourcePackages))if(matches(row))dirty.source.add(row.sourcePackageId);for(const row of values(state.contentReleases))if(matches(row))dirty.release.add(row.contentReleaseId);}

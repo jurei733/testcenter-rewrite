@@ -378,7 +378,19 @@ for(const kind of kinds)test(kind+': native Test read has a durable private cons
    try{await entry;await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:roster('OWNED.ADM.MOVED')});await services.originalAuthentication.login({name:'owned-adm-r53-code',password:''});}finally{release();}
    assert.equal(formatOriginalTestAdministrationJson(await pending),before);const current=JSON.parse(await read());assert.ok(current['OWNED.ADM.MOVED']);assert.equal(current['OWNED.ADM.MOVED'].length,2);
   });
-  await verifyNativeWorkspaceWrite(t,{repository,services,scope,ids,auth,loginName:peers.at(-1),role:nativeRoles.writer,workspaceNumber:nativeWorkspaceNumber,connectionString:url?.toString()});
+  const openConcurrentStorage=url?()=>createPostgresFirstSliceStorage(url.toString()):kind==='sqlite'?()=>createSqliteFirstSliceStorage(file):undefined;
+  await verifyNativeWorkspaceWrite(t,{repository,services,scope,ids,auth,loginName:peers.at(-1),role:nativeRoles.writer,
+   workspaceNumber:nativeWorkspaceNumber,connectionString:url?.toString(),openConcurrentStorage});
+  if(kind==='file')await t.test('native workspace mutation ownership survives a file writer reopen',async()=>{
+   const token=(await services.adminAuth.signIn({username:'writer',password:'Owned-test-admin-reader-secret'})).adminSession.token;
+   const request=await services.originalWorkspaceAdministration.authorizeWrite({token,workspacePathSegment:nativeWorkspaceNumber});
+   const {id}=await services.originalWorkspaceAdministration.acquireFileMutation({...request,token});
+   await close();await open();
+   await assert.rejects(services.originalWorkspaceAdministration.acquireFileMutation({...request,token}),error=>error.statusCode===409);
+   await repository.releaseOriginalWorkspaceFileMutation({...ids,id});
+   const acquired=await services.originalWorkspaceAdministration.acquireFileMutation({...request,token});
+   await acquired.release();
+  });
  }finally{await close();if(created){assert.equal(Number((await admin.query('SELECT count(*) AS count FROM pg_stat_activity WHERE application_name=$1',[schema])).rows[0].count),0);await admin.query('DROP SCHEMA "'+schema+'" CASCADE');}await admin?.end();await rm(directory,{recursive:true,force:true});}
 });
 

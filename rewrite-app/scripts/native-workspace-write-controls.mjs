@@ -1,4 +1,5 @@
 import {verifyNativeWorkspaceWritePostgres} from './native-workspace-write-postgres-controls.mjs';
+import {verifyNativeWorkspaceFileMutation} from './native-workspace-file-mutation-controls.mjs';
 import assert from 'node:assert/strict';
 import {createServer,request} from 'node:http';
 import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
@@ -6,7 +7,7 @@ import {handleOriginalWorkspaceHttp} from '../apps/api/dist/apps/api/src/origina
 
 /** Real native HTTP handler, services and durable stores. Only the body/writer
  * scheduling is held; no permission result or deletion effect is mocked. */
-export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,ids,auth,loginName,role,workspaceNumber,connectionString}){
+export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,ids,auth,loginName,role,workspaceNumber,connectionString,openConcurrentStorage}){
  const user=await repository.getAdminUserById(role.adminUserId),tenant=await repository.getTenantByKey(scope.tenantKey),workspace=await repository.getWorkspaceByScope(scope.tenantKey,scope.workspaceKey);
  const groupKey='OWNED.REVOCATION.GROUP',person=await auth(loginName),testNumber=await services.originalTest.create({token:person.token,bookletName:'OWNED.ADM.B'});
  const originalRun=await repository.findOriginalTestNumber({...ids,participantSessionId:person.participantSession.participantSessionId,testNumber});
@@ -78,6 +79,12 @@ export async function verifyNativeWorkspaceWrite(t,{repository,services,scope,id
   await verifyNativeWorkspaceWritePostgres(t,{repository,services,ids,role,workspaceNumber,groupKey,sourcePackage,connectionString});
   await repository.getOrCreateOriginalParticipantGroup({...ids,groupKey,groupLabel:'Owned revocation control',createdAt:new Date().toISOString()});
  }
+ await restore();
+ const fileToken=(await services.adminAuth.signIn({username:user.username,password:'Owned-test-admin-reader-secret'})).adminSession.token;
+ const concurrent=await openConcurrentStorage?.();
+ try{
+  await verifyNativeWorkspaceFileMutation(t,{repository,independentRepository:concurrent?.repository,services,scope,role,token:fileToken,workspaceNumber,sourcePackage});
+ }finally{await concurrent?.shutdown();}
  await t.test('a still-authorized native transaction deletes the actual selected Test and group only',async()=>{
   await restore();const token=(await services.adminAuth.signIn({username:user.username,password:'Owned-test-admin-reader-secret'})).adminSession.token;
   await services.originalWorkspaceAdministration.delete({token,workspacePathSegment:workspaceNumber,kind:'tests',body:{personSessions:[{loginName,bookletName:'OWNED.ADM.B'}]}});

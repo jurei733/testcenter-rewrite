@@ -4,7 +4,8 @@ import {transactOriginalSystemCheckCollections} from '@testcenter-rewrite-app/ap
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {prepareOriginalApplicationAssets,type OriginalApplicationAssetIdentity} from '@testcenter-rewrite-app/application';
 import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
-import {guardOriginalWorkspaceWriteCollections} from '@testcenter-rewrite-app/application';
+import {guardOriginalWorkspaceWriteCollections,originalWorkspaceFileMutationActive,originalWorkspaceFileMutationLifetimeMs,
+  type OriginalWorkspaceFileMutation} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceAdministrationCollection} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
@@ -142,6 +143,7 @@ type InMemoryFirstSliceState = {
   originalWorkspaceNumbers: Map<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
   originalWorkspaceContentTypes: Map<string,OriginalWorkspaceContentType>;
+  originalWorkspaceFileMutations: Map<string,OriginalWorkspaceFileMutation>;
   originalAdminNumbers: Map<string,OriginalAdminNumber>;
   originalAdminNumberCounter: string;
   originalNativeCommands: Map<string,OriginalCommandDelivery>;
@@ -196,6 +198,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   originalAdminNumberCounter: '0',
   originalWorkspaceNumbers: new Map(),
   originalWorkspaceContentTypes: new Map(),
+  originalWorkspaceFileMutations: new Map(),
   originalWorkspaceNumberCounter: "0",
   originalNativeCommands: new Map(),
   originalNativeCommandCounter: '0',
@@ -569,6 +572,17 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       if(release)state.contentReleases.set(release.contentReleaseId,structuredClone(release));
       for(const event of input.activityEvents)state.workspaceActivityEvents.set(event.activityEventId,structuredClone(event));
       return true;
+    },
+    async acquireOriginalWorkspaceFileMutation({authority,id}) {
+      const key=authority.workspaceId;
+      guardOriginalWorkspaceWriteCollections(state,state.adminSessionsByToken,{...authority,authority});
+      const at=Date.parse(authority.now());
+      if(originalWorkspaceFileMutationActive(state.originalWorkspaceFileMutations.get(key),at))return false;
+      state.originalWorkspaceFileMutations.set(key,{id,expiresAt:at+originalWorkspaceFileMutationLifetimeMs});
+      return true;
+    },
+    async releaseOriginalWorkspaceFileMutation({workspaceId,id}) {
+      if(state.originalWorkspaceFileMutations.get(workspaceId)?.id===id)state.originalWorkspaceFileMutations.delete(workspaceId);
     },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,

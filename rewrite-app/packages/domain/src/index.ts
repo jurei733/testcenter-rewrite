@@ -41,6 +41,9 @@ export const sourcePackageStatuses = [
 ] as const satisfies readonly SourcePackageStatus[];
 export type WorkspaceFileValidationReport={error?:string[];warning?:string[];info?:string[]};
 export type OriginalWorkspaceUploadReport=Record<string, WorkspaceFileValidationReport | []> | [];
+export type OriginalWorkspaceFileDeletionReport = {
+  deleted:string[]; did_not_exist:string[]; not_allowed:string[]; was_used:string[]; incorrect_path:string[]; error:string[];
+};
 export type WorkspaceArchiveUploadReport = {
   fileName:string;
   sha256:string;

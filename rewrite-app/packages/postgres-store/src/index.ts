@@ -3,6 +3,7 @@ import {originalAttachmentHistoryProjector} from '@testcenter-rewrite-app/applic
 import {readOriginalAttachmentMetadata, readOriginalAttachmentTestNumbers} from './original-attachment-files.js';
 import {refreshOriginalWorkspaceContentType,readOriginalSystemCheckDirectory} from './original-workspace-content-type.js';
 import {guardOriginalWorkspaceWrite} from './original-workspace-write.js';
+import {originalWorkspaceFileMutationLifetimeMs} from '@testcenter-rewrite-app/application';
 import {transactOriginalSystemCheck} from './original-system-check.js';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {readOriginalAssetAssignmentLayers} from '@testcenter-rewrite-app/application';
@@ -1784,6 +1785,10 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
  CREATE TABLE original_application_assets(application_asset_id TEXT PRIMARY KEY REFERENCES application_assets(application_asset_id) ON DELETE CASCADE,
  asset_number INTEGER NOT NULL UNIQUE CHECK(asset_number BETWEEN 1 AND 2147483647),stored_name TEXT NOT NULL UNIQUE);`}
 ,{version:77,name:'original_workspace_content_type',sql:`ALTER TABLE workspaces ADD COLUMN original_content_type TEXT NOT NULL DEFAULT 'mixed' CHECK(original_content_type IN ('mixed','test','sysCheck')); CREATE INDEX original_workspace_content_type ON workspaces(original_content_type,status);`}
+,{version:78,name:'original_workspace_file_mutation',sql:`
+ ALTER TABLE workspaces ADD COLUMN original_file_mutation_id TEXT;
+ ALTER TABLE workspaces ADD COLUMN original_file_mutation_expires_at BIGINT;`}
+
 
 ];
 
@@ -2885,6 +2890,19 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         await client.query("COMMIT");
         return true;
       }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+    },
+    acquireOriginalWorkspaceFileMutation({authority,id}) {
+      return withWorkspaceMutationLock(authority.tenantId,authority.workspaceId,async client=>{
+        await guardOriginalWorkspaceWrite(client,{...authority,authority});
+        const at=Date.parse(authority.now());
+        return (await client.query(`UPDATE workspaces SET original_file_mutation_id=$1, original_file_mutation_expires_at=$2
+          WHERE tenant_id=$3 AND workspace_id=$4 AND (original_file_mutation_id IS NULL OR original_file_mutation_expires_at<=$5)`,
+          [id,at+originalWorkspaceFileMutationLifetimeMs,authority.tenantId,authority.workspaceId,at])).rowCount===1;
+      });
+    },
+    async releaseOriginalWorkspaceFileMutation({tenantId,workspaceId,id}) {
+      await pool.query(`UPDATE workspaces SET original_file_mutation_id=NULL, original_file_mutation_expires_at=NULL
+        WHERE tenant_id=$1 AND workspace_id=$2 AND original_file_mutation_id=$3`,[tenantId,workspaceId,id]);
     },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,

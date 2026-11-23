@@ -4,7 +4,8 @@ import {transactOriginalSystemCheckCollections} from '@testcenter-rewrite-app/ap
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {prepareOriginalApplicationAssets,type OriginalApplicationAssetIdentity} from '@testcenter-rewrite-app/application';
 import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
-import {guardOriginalWorkspaceWriteCollections} from '@testcenter-rewrite-app/application';
+import {guardOriginalWorkspaceWriteCollections,originalWorkspaceFileMutationActive,originalWorkspaceFileMutationLifetimeMs,
+  type OriginalWorkspaceFileMutation} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceReportCollections} from '@testcenter-rewrite-app/application';
 import {readOriginalWorkspaceAdministrationCollection} from '@testcenter-rewrite-app/application';
 import {prepareOriginalTestDeletionInput,deleteOriginalSelectedTestsFromCollections} from '@testcenter-rewrite-app/application';
@@ -160,6 +161,7 @@ type PersistedFirstSliceState = {
   originalWorkspaceNumbers: Record<string,OriginalWorkspaceNumberRecord>;
   originalWorkspaceNumberCounter: string;
   originalWorkspaceContentTypes: Record<string,OriginalWorkspaceContentType>;
+  originalWorkspaceFileMutations: Record<string,OriginalWorkspaceFileMutation>;
   originalAdminNumbers: Record<string,OriginalAdminNumber>;
   originalAdminNumberCounter: string;
   originalNativeCommands: Record<string,OriginalCommandDelivery>;
@@ -236,6 +238,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   originalAdminNumberCounter: '0',
   originalWorkspaceNumbers: {},
   originalWorkspaceContentTypes: {},
+  originalWorkspaceFileMutations: {},
   originalWorkspaceNumberCounter: "0",
   originalNativeCommands: {},
   originalNativeCommandCounter: '0',
@@ -1359,6 +1362,23 @@ const createFileRepository = (
         for(const event of input.activityEvents)state.workspaceActivityEvents[event.activityEventId]=structuredClone(event);
         return true;
       });
+    },
+    acquireOriginalWorkspaceFileMutation({authority,id}) {
+      return mutate(state=>{
+        const key=authority.workspaceId;
+        guardOriginalWorkspaceWriteCollections(state,state.adminSessions,{...authority,authority});
+        const at=Date.parse(authority.now());
+        if(originalWorkspaceFileMutationActive(state.originalWorkspaceFileMutations[key],at))return false;
+        state.originalWorkspaceFileMutations[key]={id,expiresAt:at+originalWorkspaceFileMutationLifetimeMs};
+        return true;
+      },Boolean);
+    },
+    async releaseOriginalWorkspaceFileMutation({workspaceId,id}) {
+      await mutate(state=>{
+        if(state.originalWorkspaceFileMutations[workspaceId]?.id!==id)return false;
+        delete state.originalWorkspaceFileMutations[workspaceId];
+        return true;
+      },Boolean);
     },
     reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
       assemblyActivityEvent:input.createdActivityEvent,

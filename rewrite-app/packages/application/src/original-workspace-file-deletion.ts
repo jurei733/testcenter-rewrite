@@ -1,4 +1,4 @@
-import type {WorkspaceCatalogFile, WorkspaceFileCatalog, WorkspaceSourcePackageDeletionReadiness} from '@testcenter-rewrite-app/domain';
+import type {OriginalWorkspaceFileDeletionReport, WorkspaceCatalogFile, WorkspaceFileCatalog, WorkspaceSourcePackageDeletionReadiness} from '@testcenter-rewrite-app/domain';
 import type {ContentIntakePort} from './index.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {findOriginalWorkspaceFile} from './original-workspace-files.js';
@@ -17,7 +17,7 @@ export function readOriginalWorkspaceFileDeletion(body: unknown): string[] {
   return paths;
 }
 
-type DeletionStatus = 'deleted' | 'did_not_exist' | 'not_allowed' | 'was_used' | 'incorrect_path' | 'error';
+type DeletionStatus = keyof OriginalWorkspaceFileDeletionReport;
 type Selection = {path: string; status: DeletionStatus; file?: undefined}
   | {path: string; status?: DeletionStatus; file: WorkspaceCatalogFile};
 
@@ -38,7 +38,7 @@ export async function deleteOriginalWorkspaceFiles(
   catalog: WorkspaceFileCatalog,
   paths: string[],
   deleteSourcePackage: ContentIntakePort['deleteSourcePackage']
-): Promise<Record<DeletionStatus, string[]>> {
+): Promise<OriginalWorkspaceFileDeletionReport> {
   const selection = paths.map(path => selectPath(catalog, path));
   let pending = selection.filter(row => row.file !== undefined);
   while (pending.length) {
@@ -82,7 +82,7 @@ export async function deleteOriginalWorkspaceFiles(
     }
     pending = deferred;
   }
-  const report: Record<DeletionStatus, string[]> = {
+  const report: OriginalWorkspaceFileDeletionReport = {
     deleted: [], did_not_exist: [], not_allowed: [], was_used: [], incorrect_path: [], error: []
   };
   for (const row of selection) report[row.status ?? 'error'].push(row.path);

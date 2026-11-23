@@ -6,15 +6,23 @@ import {originalOpaqueWorkspaceRole} from './original-workspace-role.js';
 
 /** Server-owned authorization travels to the actual durable deletion boundary.
  * The clock is evaluated there, after any writer/row-lock wait. */
-export type OriginalWorkspaceWriteAuthority={token:string;tenantId:string;workspaceId:string;now:()=>string};
+export type OriginalWorkspaceWriteAuthority={token:string;tenantId:string;workspaceId:string;now:()=>string;fileMutationId?:string};
+export type OriginalWorkspaceFileMutation={id:string;expiresAt:number};
+export const originalWorkspaceFileMutationLifetimeMs=12*60*1000;
+export const originalWorkspaceFileMutationBlocked=()=>new FirstSliceError(409,'original_workspace_file_mutation_blocked',
+  'Workspace blocked by another upload or deletion action.');
+export const originalWorkspaceFileMutationActive=(lease:OriginalWorkspaceFileMutation|null|undefined,at:number)=>
+  !!lease&&lease.expiresAt>at;
 export type OriginalWorkspaceWriteSnapshot={
  user:Pick<AdminUser,'adminUserId'|'status'|'passwordChangeRequired'|'validFrom'|'validTo'|'validForMinutes'|'firstSignedInAt'>|null;
  sessions:Array<Pick<AdminSession,'token'|'adminUserId'|'revokedAt'|'expiresAt'>>;
  roles:Array<Pick<AdminRoleAssignment,'adminUserId'|'role'|'tenantId'|'workspaceId'|'accessMode'|'nativeWorkspaceRole'>>;
  tenant:Pick<Tenant,'tenantId'|'status'>|null;workspace:Pick<Workspace,'tenantId'|'workspaceId'|'status'>|null;
+ fileMutation?: OriginalWorkspaceFileMutation|null;
 };
 export function assertOriginalWorkspaceWrite(scope:{tenantId:string;workspaceId:string},authority:OriginalWorkspaceWriteAuthority,s:OriginalWorkspaceWriteSnapshot):void{
- if(!originalAdminMetadataAllowed(s,{token:authority.token,at:authority.now()}))throw new FirstSliceError(403,'original_admin_token_invalid','Invalid admin token.');
+ const at=authority.now();
+ if(!originalAdminMetadataAllowed(s,{token:authority.token,at}))throw new FirstSliceError(403,'original_admin_token_invalid','Invalid admin token.');
  if(s.user!.passwordChangeRequired&&!s.roles.some(r=>r.adminUserId===s.user!.adminUserId&&r.role==='platform_admin')&&
   s.roles.some(r=>r.adminUserId===s.user!.adminUserId&&(r.role==='workspace_admin'||r.role==='tenant_admin')))
   throw new FirstSliceError(403,'admin_password_change_required','The administrator-set password must be changed before continuing.');
@@ -26,15 +34,20 @@ export function assertOriginalWorkspaceWrite(scope:{tenantId:string;workspaceId:
  if(opaque!==null)throw new FirstSliceError(403,'original_workspace_opaque_role','Access Denied: Role `RW` on this workspace is needed. Only `'+opaque+'` provided.');
  if(!access)throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
  if(access!=='RW')throw new FirstSliceError(403,'original_workspace_read_only','Access Denied: Role `RW` on this workspace is needed. Only `RO` provided.');
+ if(authority.fileMutationId&&(s.fileMutation?.id!==authority.fileMutationId||
+   !originalWorkspaceFileMutationActive(s.fileMutation,Date.parse(at))))throw originalWorkspaceFileMutationBlocked();
 }
 type Rows<T>=Map<string,T>|Record<string,T>;
 const values=<T>(rows:Rows<T>):T[]=>rows instanceof Map?[...rows.values()]:Object.values(rows);
-export function guardOriginalWorkspaceWriteCollections(state:{adminUsers:Rows<AdminUser>;adminRoleAssignments:Rows<AdminRoleAssignment>;tenants:Rows<Tenant>;workspacesByScope:Rows<Workspace>},
+export function guardOriginalWorkspaceWriteCollections(state:{adminUsers:Rows<AdminUser>;adminRoleAssignments:Rows<AdminRoleAssignment>;tenants:Rows<Tenant>;workspacesByScope:Rows<Workspace>;
+  originalWorkspaceFileMutations:Rows<OriginalWorkspaceFileMutation>},
  sessions:Rows<AdminSession>,input:{tenantId:string;workspaceId:string;authority?:OriginalWorkspaceWriteAuthority}):void{
  if(!input.authority)return;
  const session=values(sessions).find(s=>s.token===input.authority!.token),user=values(state.adminUsers).find(u=>u.adminUserId===session?.adminUserId)??null;
  assertOriginalWorkspaceWrite(input,input.authority,{user,sessions:session?[session]:[],roles:values(state.adminRoleAssignments).filter(r=>r.adminUserId===user?.adminUserId),
-  tenant:values(state.tenants).find(t=>t.tenantId===input.tenantId)??null,workspace:values(state.workspacesByScope).find(w=>w.tenantId===input.tenantId&&w.workspaceId===input.workspaceId)??null});
+  tenant:values(state.tenants).find(t=>t.tenantId===input.tenantId)??null,workspace:values(state.workspacesByScope).find(w=>w.tenantId===input.tenantId&&w.workspaceId===input.workspaceId)??null,
+  fileMutation:state.originalWorkspaceFileMutations instanceof Map
+    ?state.originalWorkspaceFileMutations.get(input.workspaceId):state.originalWorkspaceFileMutations[input.workspaceId]});
 }
 /** Both SQL stores project only actor/scope metadata; never credentials or data. */
 export function originalWorkspaceWriteSqlSnapshot(row:Record<string,unknown>|undefined,roles:Array<Record<string,unknown>>):OriginalWorkspaceWriteSnapshot{
@@ -44,5 +57,6 @@ export function originalWorkspaceWriteSqlSnapshot(row:Record<string,unknown>|und
   sessions:row?[{token:String(row.session_token),adminUserId:String(row.admin_user_id),revokedAt:text('revoked_at'),expiresAt:String(row.expires_at)}]:[],
   roles:roles.map(r=>({adminUserId:String(r.admin_user_id),role:r.role as AdminRoleAssignment['role'],tenantId:r.tenant_id==null?null:String(r.tenant_id),workspaceId:r.workspace_id==null?null:String(r.workspace_id),accessMode:r.access_mode as AdminRoleAssignment['accessMode'],...r.native_workspace_role==null?{}:{nativeWorkspaceRole:String(r.native_workspace_role)}})),
   tenant:row?{tenantId:String(row.tenant_id),status:row.tenant_status as Tenant['status']}:null,
-  workspace:row?{tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),status:row.workspace_status as Workspace['status']}:null};
+  workspace:row?{tenantId:String(row.tenant_id),workspaceId:String(row.workspace_id),status:row.workspace_status as Workspace['status']}:null,
+  fileMutation:row?.original_file_mutation_id?{id:String(row.original_file_mutation_id),expiresAt:Number(row.original_file_mutation_expires_at)}:null};
 }

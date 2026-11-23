@@ -51,6 +51,7 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
   input.header('cache-control','private, no-store');
   const operation=match[2], download=!!match[4];
   const upload=operation==='file';
+  const deleteFiles=operation==='files'&&input.request.method==='DELETE';
   const methods=operation==='files-dependencies'||upload?['POST']
     :download||operation==='results'||match[3]?['GET']:operation==='responses'?['DELETE']:['GET','DELETE'];
   const readJson=async(decode:(payload:Uint8Array)=>unknown)=>{
@@ -71,16 +72,37 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
       }
     };
     const confirmScope=async()=>confirmCurrentScope(await administration.resolve(access));
-    if(upload){
-      const contentType=input.request.headers['content-type']??'';
-      if(!/^multipart\/form-data(?:;|$)/i.test(contentType)){
-        throw new FirstSliceError(400,'original_workspace_multipart_invalid','A workspace file upload requires multipart form data.');
+    if(upload||deleteFiles){
+      const lock=await administration.acquireFileMutation({...scope,token});
+      let status:number,report:unknown;
+      try{
+        const writableScope=async()=>{
+          const writable=await administration.authorizeWrite(access);
+          confirmCurrentScope(writable);
+          return {...writable,authority:{...writable.authority,fileMutationId:lock.id}};
+        };
+        if(upload){
+          const contentType=input.request.headers['content-type']??'';
+          if(!/^multipart\/form-data(?:;|$)/i.test(contentType)){
+            throw new FirstSliceError(400,'original_workspace_multipart_invalid','A workspace file upload requires multipart form data.');
+          }
+          const files=await readOriginalWorkspaceUpload(contentType,await input.readUpload());
+          const result=await input.services.contentIntake.uploadOriginalWorkspaceFiles({...await writableScope(),files});
+          status=result.containsErrors?207:201;
+          report=result.report;
+        }else{
+          const body=await readJson(decodeJson);
+          const writable=await writableScope();
+          const paths=readOriginalWorkspaceFileDeletion(body);
+          const catalog=await input.services.workspaceAdminRead.getWorkspaceFileCatalog(scope);
+          await confirmScope();
+          report=await deleteOriginalWorkspaceFiles(writable,catalog,paths,input.services.contentIntake.deleteSourcePackage);
+          status=207;
+        }
+      }finally{
+        await lock.release();
       }
-      const files=await readOriginalWorkspaceUpload(contentType,await input.readUpload());
-      const writable=await administration.authorizeWrite(access);
-      confirmCurrentScope(writable);
-      const result=await input.services.contentIntake.uploadOriginalWorkspaceFiles({...writable,files});
-      input.raw(result.containsErrors?207:201,encodeOriginalReportJson(result.report),'application/json');
+      input.raw(status,encodeOriginalReportJson(report),'application/json');
       return true;
     }
     if(download){
@@ -101,17 +123,6 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
         });
       await confirmScope();
       input.download(Buffer.from(result.dataBase64,'base64'),fileName,fileType==='Resource'?'application/octet-stream':'text/xml');
-      return true;
-    }
-    if(operation==='files'&&input.request.method==='DELETE'){
-      const body=await readJson(decodeJson);
-      const writable=await administration.authorizeWrite(access);
-      confirmCurrentScope(writable);
-      const paths=readOriginalWorkspaceFileDeletion(body);
-      const catalog=await input.services.workspaceAdminRead.getWorkspaceFileCatalog(scope);
-      await confirmScope();
-      const report=await deleteOriginalWorkspaceFiles(writable,catalog,paths,input.services.contentIntake.deleteSourcePackage);
-      input.raw(207,encodeOriginalReportJson(report),'application/json');
       return true;
     }
     if(operation==='files'||operation==='files-dependencies'){
