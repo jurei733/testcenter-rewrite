@@ -1238,23 +1238,15 @@ export type ListAttachmentsResponse = {
   items: WorkspaceAttachment[];
 };
 
-/** _testId is retained as decimal text in the application, written as JSON int64. */
 export type OriginalAttachment = {
   attachmentId: string;
   attachmentType: string;
   dataType: 'image' | 'missing';
   attachmentFileIds: string[];
   lastModified: number | null;
-  _groupName: string;
-  _groupLabel: string;
-  _loginName: string;
-  _loginNameSuffix: string;
   testLabel: string;
-  _bookletName: string;
   unitLabel: string;
   personLabel: string;
-  _testId: string;
-  _unitName: string;
   variableId: string;
 };
 

@@ -113,7 +113,6 @@ export type {OriginalSessionTest} from './original-session.js';
 import {selectOriginalParticipantAssignments} from './original-participant-assignments.js';
 import {createOriginalSessionPort} from './original-session.js';
 import {createOriginalAttachmentPort} from './original-attachment.js';
-export {formatOriginalAttachmentJson} from './original-attachment.js';
 import {createOriginalAdminDirectoryPort} from './original-admin-directory.js';
 import {createOriginalAdminPermissionsPort} from './original-admin-permissions.js';
 export {validateOriginalAdminRoleChanges} from './original-admin-permissions.js';

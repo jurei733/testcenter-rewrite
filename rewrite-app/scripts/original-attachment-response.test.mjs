@@ -19,7 +19,7 @@ const schemas = {Unit:'unit-xml/17.6',Booklet:'testcenter-booklet-xml/18.0',Test
 const xml = (type, body) => `<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${schemas[type]}">${body}</${type}>`;
 const group = 'experimental-attachment';
 const unitId = 'OWNED.ATTACHMENT';
-const alias = 'PAGE.ALIAS';
+const alias = 'Page.Alias';
 const image = fileName => ({fileName, mediaType:'image/png',
   dataBase64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII='});
 const rejected = (status, code) => error => error.statusCode === status && error.errorCode === code;
@@ -112,6 +112,14 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     assert.deepEqual(await storage.repository.listAttachmentFilesByWorkspace(tenant.tenantId, workspace.workspaceId), []);
   });
   const [legacyRequest] = await services.originalAttachments.list(monitor.token);
+  assert.deepEqual(legacyRequest, {
+    attachmentId, attachmentType:'capture-image', dataType:'missing', attachmentFileIds:[], lastModified:null,
+    testLabel:'Owned Booklet', unitLabel:alias, personLabel:'Owned/owned-test', variableId:'page'
+  });
+  const originalQrTarget = {...target, attachmentId:[testNumber, alias.toUpperCase(), 'page'].join(':')};
+  assert.deepEqual(await services.originalAttachments.get(originalQrTarget), legacyRequest);
+  await assert.rejects(services.originalAttachments.get({...originalQrTarget,token:outsider.token}),
+    rejected(404, 'original_attachment_not_found'));
   const inventory = await storage.repository.getOriginalTestAdministrationInventory(tenant.tenantId, workspace.workspaceId);
   const {testRunId} = inventory.numbers.find(row => row.testNumber === testNumber);
   const legacyId = 'att-' + Buffer.from(JSON.stringify([testRunId, alias, 'page'])).toString('base64url');

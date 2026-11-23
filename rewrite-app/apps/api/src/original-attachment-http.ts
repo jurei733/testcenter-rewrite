@@ -1,5 +1,5 @@
 import type {IncomingMessage} from 'node:http';
-import {FirstSliceError, formatOriginalAttachmentJson, type FirstSliceServices} from '@testcenter-rewrite-app/application';
+import {FirstSliceError, encodeOriginalReportJson, type FirstSliceServices} from '@testcenter-rewrite-app/application';
 import type {UploadAttachmentFileRequest} from '@testcenter-rewrite-app/contracts';
 import type {WorkspaceAttachment} from '@testcenter-rewrite-app/domain';
 
@@ -50,7 +50,7 @@ export async function handleOriginalAttachmentHttp(input: {
   const reference = item ? {token, attachmentId: decodeIdentifier(item[1]!)} : null;
   if (pathname === '/attachments/list') {
     const rows = await port.list(token);
-    input.json(200, '[' + rows.map(formatOriginalAttachmentJson).join(',') + ']');
+    input.json(200, encodeOriginalReportJson(rows));
   } else if (pathname === '/attachments/pages' || operation === 'page') {
     const label = input.searchParams.get('labelTemplate');
     if (label && label.length > 500) {
@@ -64,7 +64,7 @@ export async function handleOriginalAttachmentHttp(input: {
     }
     input.binary('application/pdf', await input.pdf(attachments, label), false, 'pages.pdf');
   } else if (reference && operation === 'data') {
-    input.json(200, formatOriginalAttachmentJson(await port.get(reference)));
+    input.json(200, encodeOriginalReportJson(await port.get(reference)));
   } else if (reference && request.method === 'POST') {
     await port.preflight(reference);
     await port.upload(reference, await input.readUpload());

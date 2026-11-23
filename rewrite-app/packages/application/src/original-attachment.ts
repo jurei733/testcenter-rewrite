@@ -4,7 +4,6 @@ import {FirstSliceError} from './first-slice-error.js';
 import type {AttachmentPort} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import type {OriginalTestAdministrationInventory} from './original-test-administration.js';
-import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 import {orderedOriginalAttachmentFiles} from './original-attachment-response.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 
@@ -28,12 +27,6 @@ export type OriginalAttachmentPort = {
 };
 
 const validNumber = (id: string) => /^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= 9223372036854775807n;
-export function formatOriginalAttachmentJson(row: OriginalAttachment): string {
-  if (!validNumber(row._testId)) throw missing();
-  return '{' + Object.entries(row).map(([key, value]) =>
-    encodeOriginalReportJson(key) + ':' + (key === '_testId' ? row._testId : encodeOriginalReportJson(value))).join(',') + '}';
-}
-
 export function createOriginalAttachmentPort(input: {
   auth: OriginalAuthenticationPort;
   workspace: (scope: {tenantId: string; workspaceId: string}) => Promise<NativeAccess['workspace'] | undefined>;
@@ -88,9 +81,7 @@ export function createOriginalAttachmentPort(input: {
       const source: OriginalAttachment = {
         attachmentId, attachmentType: stored.attachmentType, dataType: stored.dataType,
         attachmentFileIds: stored.attachmentFileIds, lastModified: stored.lastModified,
-        _groupName: group, _groupLabel: groupLabel, _loginName: person.originalLoginKey,
-        _loginNameSuffix: suffix, testLabel: run.bookletLabel ?? stored.testLabel, _bookletName: run.bookletName,
-        unitLabel: stored.unitKey, personLabel, _testId: mapping.testNumber, _unitName: stored.unitKey,
+        testLabel: run.bookletLabel ?? stored.testLabel, unitLabel: stored.unitKey, personLabel,
         variableId: stored.variableId
       };
       if (targets.has(attachmentId)) throw new FirstSliceError(409, 'original_attachment_ambiguous', 'The attachment identity is ambiguous.');
@@ -105,7 +96,18 @@ export function createOriginalAttachmentPort(input: {
     if (!number || !validNumber(number) || !unit || !variable || extra !== undefined) {
       throw new FirstSliceError(400, 'original_attachment_invalid', 'Invalid attachment identifier.');
     }
-    const target = targets.get(attachmentId);
+    let target = targets.get(attachmentId);
+    // Original's printed QR codes use the uppercase Unit file ID. Preserve
+    // addresses already issued by the Rewrite and resolve Source spellings
+    // only when there is exactly one matching target in this monitor's scope.
+    if (!target && !/[a-z]/.test(unit)) {
+      const matches = [...targets.values()].filter(candidate => {
+        const [candidateNumber, candidateUnit, candidateVariable] = candidate.source.attachmentId.split(':');
+        return candidateNumber === number && candidateVariable === variable &&
+          candidateUnit?.replace(/[a-z]/g, letter => letter.toUpperCase()) === unit;
+      });
+      if (matches.length === 1) target = matches[0];
+    }
     if (!target) throw missing();
     return {target, workspace, sessionToken: token, workspaceKey: workspace.workspaceKey, tenantKey: workspace.tenantKey,
       attachmentId: target.stored.attachmentId};
