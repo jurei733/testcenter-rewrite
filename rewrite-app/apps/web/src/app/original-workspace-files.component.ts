@@ -18,7 +18,7 @@ import {MatTooltip} from '@angular/material/tooltip';
 import {combineLatest} from 'rxjs';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import type {WorkspaceFileType} from '@testcenter-rewrite-app/domain';
-import {OriginalWorkspaceFilesController,type OriginalWorkspaceFile} from './original-workspace-files-controller';
+import {OriginalWorkspaceFilesController,type OriginalWorkspaceFile,type OriginalWorkspaceUploadTransfer} from './original-workspace-files-controller';
 import {RewriteAppShellRequestService} from './rewrite-app-shell-request.service';
 import {RewriteAppApiService} from './rewrite-app-api.service';
 import {RewriteAppOperatorAccessService} from './rewrite-app-operator-access.service';
@@ -68,9 +68,12 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  private readonly systemCheckInstallation=inject(NativeSystemCheckInstallationService);
  private destroyed=false;
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
- readonly controller=new OriginalWorkspaceFilesController(<T>(method:string,path:string,body:unknown,token:string)=>
-   path.startsWith('/workspace/') ? this.api.send<T>(method,path,body,{AuthToken:token}).then(result=>result.payload) :
-     this.request.request<T>('Dateiverwaltung',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
+ readonly controller=new OriginalWorkspaceFilesController(<T>(method:string,path:string,body:unknown,token:string,
+   upload?:OriginalWorkspaceUploadTransfer)=>{
+   if(upload && body instanceof FormData)return this.api.uploadMultipart<T>(path,body,{AuthToken:token},upload);
+   return path.startsWith('/workspace/') ? this.api.send<T>(method,path,body,{AuthToken:token}).then(result=>result.payload) :
+     this.request.request<T>('Dateiverwaltung',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}});
+ },
    ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments,nativeRole:this.nativeRole,workspaceNumber:this.workspaceNumber}),
    ()=>{if(!this.destroyed){this.header.title.set(this.title);this.changed.markForCheck();}},
    ()=>{void this.systemCheckInstallation.refresh();});

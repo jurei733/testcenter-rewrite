@@ -86,6 +86,54 @@ export class RewriteAppApiService {
     };
   }
 
+  uploadMultipart<T>(
+    path: string,
+    body: FormData,
+    extraHeaders: Record<string, string>,
+    {signal, onProgress}: {signal: AbortSignal; onProgress: (percent: number) => void}
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const canceled = () => new Error("Hochladen abgebrochen.");
+      if (signal.aborted) {
+        reject(canceled());
+        return;
+      }
+      const request = new XMLHttpRequest();
+      request.open("POST", path);
+      request.setRequestHeader("Accept", "application/json");
+      for (const [name, value] of Object.entries(extraHeaders)) {
+        request.setRequestHeader(name, value);
+      }
+      request.upload.addEventListener("progress", event => {
+        if (event.lengthComputable && event.total > 0) {
+          onProgress(Math.floor(event.loaded * 100 / event.total));
+        }
+      });
+      request.upload.addEventListener("load", () => onProgress(100), { once: true });
+      request.addEventListener("load", () => {
+        try {
+          const contentType = request.getResponseHeader("Content-Type") ?? "";
+          const payload: unknown = contentType.includes("application/json")
+            ? JSON.parse(request.responseText)
+            : request.responseText;
+          if (request.status < 200 || request.status >= 300) {
+            reject(this.normalizeApiError(request.status, payload));
+          } else {
+            resolve(payload as T);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      }, { once: true });
+      request.addEventListener("error", () => reject(new Error("Hochladen fehlgeschlagen.")), { once: true });
+      const abort = () => request.abort();
+      request.addEventListener("abort", () => reject(canceled()), { once: true });
+      request.addEventListener("loadend", () => signal.removeEventListener("abort", abort), { once: true });
+      signal.addEventListener("abort", abort, { once: true });
+      request.send(body);
+    });
+  }
+
   isApiError(value: unknown): value is ApiErrorLike {
     return value != null && typeof value === "object" && "error" in value;
   }

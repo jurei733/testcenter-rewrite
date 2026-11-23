@@ -117,6 +117,11 @@ button:hover { transform:none; } button.mat-mdc-button-base:disabled { opacity:1
 mat-checkbox { display:inline-block; }
 [role=alert] { color:var(--mat-sys-error); } .subheading-2 { box-sizing:content-box; color:#003333; margin-bottom:0.7em; margin-top:1.7em; border-bottom:1px solid silver; }
 .subheading-2.success { color:green; } .subheading-2.error { color:#821324; }
+.upload-reading { animation: workspace-upload-reading 2s infinite; }
+@keyframes workspace-upload-reading {
+  from, to { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 
 :host { display:flex; flex:1; flex-direction:column; min-height:0; color-scheme:light; }
 app-original-overlay-styles,app-original-workspace-file-surface-styles { display:none; }

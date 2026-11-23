@@ -17,7 +17,10 @@ const scope=(key='a',token='owned-token',roles=[role(key)])=>({tenantKey:key,wor
 const emptyReport=()=>({requestedCount:0,deleted:[],didNotExist:[],notAllowed:[],wasUsed:[],errors:[]});
 const fixture=(handler,initial=scope(),uploadSettled=()=>{})=>{
  let current=initial;const calls=[],changes=[];
- const controller=new Controller(async(method,path,body,token)=>{const call={method,path,body,token};calls.push(call);return handler(call);},()=>current,()=>changes.push(true),uploadSettled);
+ const controller=new Controller(async(method,path,body,token,upload)=>{
+  const call={method,path,body,token,...upload?{upload}:{}};
+  calls.push(call);return handler(call);
+ },()=>current,()=>changes.push(true),uploadSettled);
  return {controller,calls,changes,setScope:value=>{current=value;}};
 };
 const normal=(call,rows=[file()])=>call.path.endsWith('/files')?{items:rows,totalCount:rows.length,dependencySizesCalculated:true}:overview();
@@ -63,7 +66,18 @@ test('native report for a retired numeric workspace cannot update the current vi
  const f=fixture(call=>call.method==='POST'?held.promise:normal(call),native,()=>refreshes++);
  await f.controller.connect();
  const uploading=f.controller.uploadNative([new File(['owned'],'old.txt')]);
+ const post=f.calls.find(call=>call.method==='POST');
+ assert.equal(f.controller.nativeUploadProgress,0);
+ assert.equal(f.controller.loadingFiles,false);
+ post.upload.onProgress(39.7);post.upload.onProgress(24);post.upload.onProgress(NaN);
+ assert.equal(f.controller.nativeUploadProgress,39);
+ f.controller.check(f.controller.files[0],true);
+ assert.equal(f.controller.selected.length,1);assert.equal(f.controller.captureDeletion(),null);
+ post.upload.onProgress(102);assert.equal(f.controller.nativeUploadProgress,100);
  f.setScope({...native,workspaceNumber:'18'});await f.controller.connect();
+ assert.equal(post.upload.signal.aborted,true);
+ post.upload.onProgress(76);
+ assert.equal(f.controller.nativeUploadProgress,null);
  held.resolve({'old.txt':[]});await uploading;
  assert.equal(refreshes,1);assert.equal(f.controller.busy,false);assert.deepEqual(f.controller.uploads,[]);
 });

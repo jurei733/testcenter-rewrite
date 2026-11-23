@@ -30,9 +30,9 @@
       }
     } @else {
 <section id="originalWorkspaceFiles" class="columnhost"
-  [attr.aria-busy]="controller.busy">
+  [attr.aria-busy]="controller.loadingFiles">
   <div class="filelist">
-    @if (controller.busy) { <mat-progress-bar mode="indeterminate" /> }
+    @if (controller.loadingFiles) { <mat-progress-bar mode="indeterminate" /> }
     @if (controller.problem) {
       <p role="alert">{{controller.problem}}</p>
       <button mat-raised-button [disabled]="controller.busy"
@@ -55,12 +55,12 @@
               <ng-container matColumnDef="checked">
                 <mat-header-cell *matHeaderCellDef class="checkboxcell">
                   <mat-checkbox [attr.data-cy]="'files-checkAll-'+type"
-                    [disabled]="controller.busy"
+                    [disabled]="controller.loadingFiles"
                     (change)="controller.checkAll(type,$event.checked)" />
                 </mat-header-cell>
                 <mat-cell *matCellDef="let file" class="checkboxcell">
                   <mat-checkbox [attr.data-cy]="'files-checkbox-'+file.metadata.identifier"
-                    [checked]="file.isChecked" [disabled]="controller.busy"
+                    [checked]="file.isChecked" [disabled]="controller.loadingFiles"
                     (change)="controller.check(file,$event.checked)" />
                 </mat-cell>
               </ng-container>
@@ -125,7 +125,7 @@
                 <mat-header-cell *matHeaderCellDef mat-sort-header>
                   Volle Größe</mat-header-cell>
                 <mat-cell *matCellDef="let file" style="white-space:nowrap">
-                  @if (controller.busy) { <mat-spinner [diameter]="25" /> }
+                  @if (controller.loadingFiles) { <mat-spinner [diameter]="25" /> }
                   @else { {{size(file.totalSizeBytes)}} }
                 </mat-cell>
               </ng-container>
@@ -146,7 +146,7 @@
         matTooltip="Markierte Dateien löschen" matTooltipPosition="above"
         [disabled]="!controller.canWrite || controller.busy || !controller.selected.length"
         (click)="deleteFiles()">
-        @if (!controller.busy) { <mat-icon originalWorkspaceFileIcon name="delete" /> }
+        @if (!controller.loadingFiles) { <mat-icon originalWorkspaceFileIcon name="delete" /> }
         @else { <mat-spinner [diameter]="15" /> }
         Löschen
       </button>
@@ -164,8 +164,11 @@
       <mat-card appearance="raised">
         <mat-card-header><mat-card-title>Upload-Report</mat-card-title></mat-card-header>
         <mat-card-content data-cy="upload-report">
+          @let progress = controller.nativeUploadProgress;
           @for (upload of controller.uploads; track $index) {
-            @if (upload.archiveEntries) {
+            @if (progress !== null) {
+              <div class="subheading-2">{{upload.name}}</div>
+            } @else if (upload.archiveEntries) {
               <section data-cy="archive-upload-report">
                 @for (entry of upload.archiveEntries; track entry.entryName) {
                   <div class="subheading-2" [class.error]="entry.status === 'rejected'"
@@ -216,6 +219,18 @@
                   [text]="upload.message" />
               }
             }
+          }
+          @if (progress !== null) {
+            <div>
+              <mat-progress-bar class="upload-progress-bar" [value]="progress"
+                [mode]="progress < 100 ? 'determinate' : 'indeterminate'" />
+            </div>
+            <div>
+              {{progress}}% Hochgeladen
+              @if (progress === 100) {
+                <span class="upload-reading"> · Dateien werden eingelesen</span>
+              }
+            </div>
           }
         </mat-card-content>
         <mat-card-actions>

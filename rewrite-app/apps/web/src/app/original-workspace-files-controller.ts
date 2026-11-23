@@ -4,7 +4,9 @@ import {productionApiRoutes, resolveRoutePath, type DeleteSourcePackagesResponse
 import type {OriginalWorkspaceFileDeletionReport,OriginalWorkspaceUploadReport,WorkspaceCatalogFile,WorkspaceOverview,WorkspaceFileType,WorkspaceArchiveUploadReport,WorkspaceFileValidationReport} from '@testcenter-rewrite-app/domain';
 
 export type OriginalWorkspaceFilesScope = {token:string; tenantKey:string; workspaceKey:string; roles:PublicAdminRoleAssignment[];nativeRole?:'RO'|'RW';workspaceNumber?:string};
-export type OriginalWorkspaceFilesTransport = <T>(method:string,path:string,body:unknown,token:string)=>Promise<T>;
+export type OriginalWorkspaceUploadTransfer = {signal:AbortSignal;onProgress:(percent:number)=>void};
+export type OriginalWorkspaceFilesTransport = <T>(method:string,path:string,body:unknown,token:string,
+  upload?:OriginalWorkspaceUploadTransfer)=>Promise<T>;
 export type OriginalWorkspaceFile = WorkspaceCatalogFile & {name:string; isChecked:boolean};
 export type OriginalWorkspaceUpload = {name:string; type:string; read:()=>Promise<string>};
 export type OriginalWorkspaceUploadResult = {name:string; status:'queued'|'uploading'|'completed'|'error'; message:string;publicationProblem?:string;archiveEntries?:WorkspaceArchiveUploadReport['entries'];validationReport?:WorkspaceFileValidationReport};
@@ -30,10 +32,12 @@ export class OriginalWorkspaceFilesController {
   problem='';
   notice:{message:string;action:string}|null=null;
   uploads:OriginalWorkspaceUploadResult[]=[];
+  nativeUploadProgress:number|null=null;
   selectedRowId='';
   deletionReport:DeleteSourcePackagesResponse['report']|OriginalWorkspaceFileDeletionReport|null=null;
   private epoch=0;
   private owner:Owner|null=null;
+  private uploadAbort:AbortController|null=null;
   private destroyed=false;
   private sort={active:'name',direction:'asc'};
   private grouped=new Map<WorkspaceFileType,{source:OriginalWorkspaceFile[];rows:OriginalWorkspaceFile[]}>();
@@ -73,6 +77,7 @@ export class OriginalWorkspaceFilesController {
     );
   }
   get selected():OriginalWorkspaceFile[] { return this.files.filter(file=>file.isChecked); }
+  get loadingFiles():boolean { return this.busy && this.nativeUploadProgress===null; }
   get dependencyRowIds():string[] {
     if(!this.selectedRowId)return [];
     return this.files.filter(file=>file.dependencies.some(dep=>dep.sourcePackageId===this.selectedRowId)).map(file=>file.sourcePackageId);
@@ -85,11 +90,11 @@ export class OriginalWorkspaceFilesController {
     const rows=this.files.filter(file=>file.fileType===type);this.grouped.set(type,{source:this.files,rows});return rows;
   }
   checkAll(type:WorkspaceFileType,checked:boolean):void {
-    if(this.busy || !this.owner || !this.owns(this.owner))return;
+    if(this.loadingFiles || !this.owner || !this.owns(this.owner))return;
     this.rows(type).forEach(file=>file.isChecked=checked);this.changed();
   }
   check(file:OriginalWorkspaceFile,checked:boolean):void {
-    if(this.busy || !this.owner || !this.owns(this.owner) || !this.files.includes(file))return;
+    if(this.loadingFiles || !this.owner || !this.owns(this.owner) || !this.files.includes(file))return;
     file.isChecked=checked;this.changed();
   }
   selectRow(file:OriginalWorkspaceFile):void {
@@ -122,9 +127,11 @@ export class OriginalWorkspaceFilesController {
     this.selectedRowId='';this.order();
   }
   async connect():Promise<void> {
+    this.uploadAbort?.abort();
+    this.uploadAbort=null;
     const scope=this.current();this.epoch++;
     const owner={epoch:this.epoch,token:scope.token,tenantKey:scope.tenantKey,workspaceKey:scope.workspaceKey,workspaceNumber:scope.workspaceNumber};this.owner=owner;
-    this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.problem='';this.notice=null;this.selectedRowId='';
+    this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.nativeUploadProgress=null;this.deletionReport=null;this.problem='';this.notice=null;this.selectedRowId='';
     this.busy=!!owner.token && !!owner.tenantKey && !!owner.workspaceKey;this.changed();
     if(!this.busy)return;
     try { await this.load(owner); }
@@ -182,19 +189,31 @@ export class OriginalWorkspaceFilesController {
     if(!owner?.workspaceNumber || !this.owns(owner) || !this.canWrite || this.busy || !files.length)return;
     this.busy=true;this.problem='';this.notice=null;
     this.uploads=files.map(file=>({name:file.name,status:'uploading',message:''}));
+    this.nativeUploadProgress=0;
+    const abort=this.uploadAbort=new AbortController();
     this.changed();
     const form=new FormData();
     for(const file of files)form.append('fileforvo[]',file);
     form.append('ws','workspace');
     try {
       const path='/workspace/'+encodeURIComponent(owner.workspaceNumber)+'/file';
-      const report=await this.transport<OriginalWorkspaceUploadReport>('POST',path,form,owner.token);
+      const report=await this.transport<OriginalWorkspaceUploadReport>('POST',path,form,owner.token,{
+        signal:abort.signal,
+        onProgress:percent=>{
+          if(abort.signal.aborted || !this.owns(owner) || this.nativeUploadProgress===null || !Number.isFinite(percent))return;
+          const next=Math.min(100,Math.floor(percent));
+          if(next<=this.nativeUploadProgress)return;
+          this.nativeUploadProgress=next;
+          this.changed();
+        }
+      });
       if(!this.owns(owner))return;
       this.uploads=Object.entries(report).sort(([a],[b])=>a<b?-1:a>b?1:0)
         .map(([name,reportRow])=>{
           const validationReport=Array.isArray(reportRow)?{}:reportRow;
           return {name,status:validationReport.error?.length?'error':'completed',message:'',validationReport};
         });
+      this.nativeUploadProgress=null;
       await this.load(owner);
     } catch(error) {
       if(this.owns(owner)){
@@ -202,7 +221,7 @@ export class OriginalWorkspaceFilesController {
       }
     } finally {
       this.uploadSettled();
-      if(this.owns(owner)){this.busy=false;this.changed();}
+      if(this.owns(owner)){this.uploadAbort=null;this.nativeUploadProgress=null;this.busy=false;this.changed();}
     }
   }
   private cancelPendingUploads():void {
@@ -251,5 +270,10 @@ export class OriginalWorkspaceFilesController {
     return {path:this.path(owner,productionApiRoutes.workspace.downloadWorkspaceFile,file.sourcePackageId),name:file.name,token:owner.token,
       current:()=>this.owns(owner)};
   }
-  destroy():void {this.destroyed=true;this.epoch++;this.owner=null;this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.deletionReport=null;this.selectedRowId='';this.busy=false;this.problem='';this.notice=null;this.changed();}
+  destroy():void {
+    this.destroyed=true;this.epoch++;this.owner=null;
+    this.uploadAbort?.abort();this.uploadAbort=null;
+    this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.nativeUploadProgress=null;this.deletionReport=null;this.selectedRowId='';this.busy=false;this.problem='';this.notice=null;
+    this.changed();
+  }
 }
