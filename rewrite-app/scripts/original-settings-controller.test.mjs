@@ -10,8 +10,9 @@ const load=(file,bindings={})=>{
  new Function('exports',...Object.keys(bindings),ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,...Object.values(bindings));return exports;
 };
 const {originalSettingsCustomTextCatalog:catalog}=load('original-settings-catalog.ts');
+const {originalNoticeDefaults}=load('original-notice-defaults.ts');
 const {OriginalApplicationSettingsController:Controller,originalWarningExpiration,originalWarningDay}=load('original-application-settings-controller.ts',{
- productionApiRoutes,defaultApplicationSettings,originalSettingsCustomTextCatalog:catalog
+ productionApiRoutes,defaultApplicationSettings,originalSettingsCustomTextCatalog:catalog,originalNoticeDefaults
 });
 const clone=v=>structuredClone(v),defer=()=>{let resolve;const promise=new Promise(done=>resolve=done);return{resolve,promise};};
 const fixture=(handler)=>{
@@ -48,6 +49,39 @@ test('general reset never discards a separately edited custom text or asset assi
  const f=fixture();await f.controller.connect('owned');f.controller.setCustomText('gm_headline','Pending');f.controller.setAssignment('logo','owned.png');
  f.controller.general.appTitle='changed';f.controller.resetGeneral();assert.equal(f.controller.generalDirty,false);
  assert.equal(f.controller.customTextChanges.get('gm_headline'),'Pending');assert.equal(f.controller.assignments.logo,'owned.png');
+});
+test('the general editor displays Original notice defaults and preserves raw configuration',async()=>{
+ const f=fixture();
+ const raw=clone(f.server);
+ await f.controller.connect('owned');
+ for(const [key,text] of Object.entries(originalNoticeDefaults))assert.equal(f.controller.general[key],text);
+ assert.equal(f.controller.generalDirty,false);
+ assert.deepEqual(f.server,raw);
+ assert.deepEqual(f.accepted,[raw]);
+ assert.equal(await f.controller.saveGeneral(),false);
+
+ // An independent writer may add notices after the editor was opened.
+ f.server.privacyNotice='External configured notice';
+ f.controller.general.appTitle='Edited title';
+ assert.equal(await f.controller.saveGeneral(),true);
+ const save=f.calls.find(call=>call.method==='PATCH').body;
+ assert.ok(Object.keys(originalNoticeDefaults).every(key=>!Object.hasOwn(save,key)));
+ assert.equal(f.server.privacyNotice,'External configured notice');
+ assert.equal(f.controller.general.privacyNotice,'External configured notice');
+ assert.equal(f.controller.generalDirty,false);
+});
+test('editing a configured notice and clearing it are explicit patch operations',async()=>{
+ const f=fixture();
+ f.server.legalNoticeHtml='<p>Owned notice</p>';
+ await f.controller.connect('owned');
+ assert.equal(f.controller.general.legalNoticeHtml,'<p>Owned notice</p>');
+ f.controller.general.legalNoticeHtml='';
+ assert.equal(await f.controller.saveGeneral(),true);
+ const clear=f.calls.find(call=>call.method==='PATCH').body;
+ assert.equal(clear.legalNoticeHtml,'');
+ assert.equal(f.server.legalNoticeHtml,'');
+ assert.equal(f.controller.general.legalNoticeHtml,originalNoticeDefaults.legalNoticeHtml);
+ assert.equal(f.controller.generalDirty,false);
 });
 test('general and assignment writes leave the other editor maps out of their replacement payload',async()=>{
  const f=fixture();await f.controller.connect('owned');f.controller.general.appTitle='Saved';assert.equal(await f.controller.saveGeneral(),true);

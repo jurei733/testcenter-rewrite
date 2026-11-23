@@ -5,6 +5,7 @@ import { productionApiRoutes, type ApplicationAssetSummary, type GetApplicationS
 import { defaultApplicationSettings, type ApplicationAssetSlotName, type ApplicationSettings } from "@testcenter-rewrite-app/domain";
 import type { OriginalAdministrationTransport } from "./original-administration-controller";
 import { originalSettingsCustomTextCatalog } from "./original-settings-catalog";
+import { originalNoticeDefaults, type OriginalNoticeKey } from "./original-notice-defaults";
 
 export type OriginalGeneralSettings = Pick<ApplicationSettings,
   "appTitle"|"legalNoticeHtml"|"privacyNotice"|"accessibilityNotice"|"themeName"> & {
@@ -22,8 +23,11 @@ export const originalWarningExpiration = (day:string,hour:string):string|null =>
 };
 const generalSettings = (settings:ApplicationSettings):OriginalGeneralSettings => {
   const expiry=settings.globalWarningExpiresAt?new Date(settings.globalWarningExpiresAt):null;
-  return {appTitle:settings.appTitle,legalNoticeHtml:settings.legalNoticeHtml,privacyNotice:settings.privacyNotice,
-    accessibilityNotice:settings.accessibilityNotice,themeName:settings.themeName,
+  return {appTitle:settings.appTitle,
+    legalNoticeHtml:settings.legalNoticeHtml||originalNoticeDefaults.legalNoticeHtml,
+    privacyNotice:settings.privacyNotice||originalNoticeDefaults.privacyNotice,
+    accessibilityNotice:settings.accessibilityNotice||originalNoticeDefaults.accessibilityNotice,
+    themeName:settings.themeName,
     globalWarningText:settings.globalWarningText??"",warningDay:expiry?originalWarningDay(expiry):"",
     warningHour:expiry?String(expiry.getHours()).padStart(2,"0"):""};
 };
@@ -87,8 +91,14 @@ export class OriginalApplicationSettingsController {
     const draft=clone(this.general);
     return this.run(async owner=>{
       const {warningDay,warningHour,...fields}=draft;
-      await this.patch(owner,{...fields,
-        globalWarningExpiresAt:originalWarningExpiration(warningDay,warningHour)});
+      const changes:PatchOriginalApplicationSettingsRequest={...fields,
+        globalWarningExpiresAt:originalWarningExpiration(warningDay,warningHour)};
+      // Display defaults belong to the editor. Only send a notice when it was
+      // edited, including an explicit clear, so unrelated saves preserve it.
+      for(const key of Object.keys(originalNoticeDefaults) as OriginalNoticeKey[]){
+        if(fields[key]===this.generalBaseline[key])delete changes[key];
+      }
+      await this.patch(owner,changes);
       this.resetGeneral();
     },"Konfigurationsdaten der Anwendung gespeichert");
   }

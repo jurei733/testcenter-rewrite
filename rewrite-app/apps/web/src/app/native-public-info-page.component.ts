@@ -6,6 +6,7 @@ import {InterfaceModeService} from './interface-mode.service';
 import {NativeAssetContext} from './native-asset-context.service';
 import {NativePublicHeaderService} from './native-public-header.service';
 import {NativeThemeContext} from './native-theme-context.service';
+import {originalNoticeDefaults} from './original-notice-defaults';
 
 // Public information layout and unset defaults adapted from the IQB Testcenter.
 // See ORIGINAL-UI-LICENSE.txt.
@@ -13,17 +14,17 @@ const notices = {
   'legal-notice': {
     title: 'Rechtliches',
     key: 'legalNoticeHtml',
-    empty: '<p>Anbieter:<br>Max Mustermann<br>Musterstraße 1<br>13088 Berlin<br><br>Kontakt:<br>Telefon: 030/1234567-8<br>Telefax: 030/1234567-9<br>E-Mail: mail@mustermann.de<br>Website: www.mustermann.de</p>'
+    empty: originalNoticeDefaults.legalNoticeHtml
   },
   privacy: {
     title: 'Datenschutz',
     key: 'privacyNotice',
-    empty: 'privacyNotice text nicht definiert'
+    empty: originalNoticeDefaults.privacyNotice
   },
   accessibility: {
     title: 'Barrierefreiheit',
     key: 'accessibilityNotice',
-    empty: 'accessibilityNotice text nicht definiert'
+    empty: originalNoticeDefaults.accessibilityNotice
   }
 } as const;
 
