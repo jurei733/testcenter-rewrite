@@ -301,6 +301,7 @@
   height: 100dvh;
   padding: 0;
   overflow: hidden;
+  background: var(--mat-sys-surface);
 }
 
 .original-operator-starter-page > .home-stage {
