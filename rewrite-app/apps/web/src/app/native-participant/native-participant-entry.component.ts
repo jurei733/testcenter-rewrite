@@ -71,6 +71,7 @@ export class NativeParticipantEntryComponent {
  readonly directLoginName=this.route?.data.directLogin===true?this.route.queryParamMap.get('name'):null;
  readonly explicitLogin=this.route?.data.explicitLogin===true;
  readonly missingRoute=this.route?.data.notFound===true?this.route.queryParamMap.get('path')??'':null;
+ private readonly legacyEntry=this.route?.data.legacyEntry;
  private readonly initialNavigation=this.router.getCurrentNavigation()?.previousNavigation===null;
  private singleActor:string|undefined;
  private readonly view=new AbortController();private logoutCleanup:(()=>void)|undefined;
@@ -97,7 +98,10 @@ export class NativeParticipantEntryComponent {
    untracked(()=>{
     this.bindTexts(access?.customTexts??{});
     if(!restoring)this.updatePublicHeader(this.explicitLogin?null:access);
-    if(access&&!pending&&this.initialNavigation&&!this.explicitLogin&&!this.directLoginName)void this.startSingleCheck(access);
+    if(access&&!pending&&this.initialNavigation&&!this.explicitLogin&&!this.directLoginName&&this.legacyEntry!=='starter'){
+     if(this.legacyEntry==='dispatch')void this.startSingleTest(access,true);
+     void this.startSingleCheck(access,this.legacyEntry==='dispatch');
+    }
    });
   });
   if(this.directLoginName)void this.openDirectLogin(this.directLoginName);
@@ -123,7 +127,8 @@ export class NativeParticipantEntryComponent {
  }
  private async startSingleTest(access:OriginalAccessSet,replaceUrl=false){
   const tests=access.claims.test;
-  if(access.flags.includes('codeRequired')||tests?.length!==1||Object.keys(access.claims).length!==1)return;
+  if(access.flags.includes('codeRequired')||tests?.length!==1||Object.keys(access.claims).length!==1||this.singleActor===access.token)return;
+  this.singleActor=access.token;
   const scope=this.session.accessSignal;
   this.startingTest.set(true);
   try{

@@ -15,6 +15,7 @@ import { RecordCollectionComponent } from "./record-collection.component";
 import { SummaryCardsComponent } from "./summary-cards.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalAdminLoginComponent } from "./original-admin-login.component";
+import { isExplicitOriginalAdminLogin } from "./native-participant/original-participant-bookmark";
 import { OriginalSystemAdministrationComponent } from "./original-system-administration.component";
 
 @Component({
@@ -261,7 +262,7 @@ import { OriginalSystemAdministrationComponent } from "./original-system-adminis
       </article>
 
     </ng-template>
-    @if (interfaceMode.mode() === 'original' && !view.canUseAdminSession) {
+    @if (interfaceMode.mode() === 'original' && (!view.canUseAdminSession || explicitOriginalLogin)) {
       @defer (when true) {
         <app-original-admin-login [authenticate]="authenticateOriginal" />
       } @error {
@@ -1251,6 +1252,9 @@ export class OpsViewComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   activeAdminSection: AdministrationSection = "users";
+  get explicitOriginalLogin(): boolean {
+    return isExplicitOriginalAdminLogin(this.router.url);
+  }
   // A captured callback survives the authorized shell transition. An output
   // emitted after that transition would be lost with the old lazy component.
   readonly authenticateOriginal = async (): Promise<void> => {
@@ -1276,7 +1280,7 @@ export class OpsViewComponent implements OnInit {
         this.activeAdminSection =
           params.get("adminSection") === "settings" ? "settings" : params.get("adminSection") === "workspaces" ? "workspaces" : "users";
       });
-    if (this.route.snapshot.queryParamMap.get("demoAdmin") === "sign-in") {
+    if (!this.explicitOriginalLogin && this.route.snapshot.queryParamMap.get("demoAdmin") === "sign-in") {
       void this.signInLocalDemoAdmin();
     }
   }

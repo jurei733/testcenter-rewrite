@@ -35,6 +35,7 @@ import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
 import { NativeErrorPresenterService } from "./native-error-presenter.service";
 import { openNativeSystemCheckInstallationError } from "./native-system-check/native-system-check-installation-error";
+import { isExplicitOriginalAdminLogin } from "./native-participant/original-participant-bookmark";
 
 const routeViews: AppView[] = [
   "home",
@@ -142,11 +143,13 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get isOriginalAdminLogin(): boolean {
-    return this.interfaceMode.mode() === "original" && this.isSignedOutOpsView;
+    return this.interfaceMode.mode() === "original" &&
+      (this.isSignedOutOpsView || isExplicitOriginalAdminLogin(this.router.url));
   }
 
   get isOriginalAdministration(): boolean {
-    return this.interfaceMode.mode() === "original" && this.activeRouteView === "ops" && this.app.isPlatformAdmin;
+    return this.interfaceMode.mode() === "original" && this.activeRouteView === "ops" &&
+      this.app.isPlatformAdmin && !isExplicitOriginalAdminLogin(this.router.url);
   }
 
   get isOriginalWorkspaceFiles(): boolean {

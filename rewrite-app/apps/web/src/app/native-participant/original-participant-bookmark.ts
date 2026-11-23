@@ -4,14 +4,32 @@ const reservedEntryNames = new Set([
   'native-start', 'native-test', 'group-monitor', 'system-check', 'attachment-capture',
   'ops', 'legal-notice', 'privacy', 'accessibility'
 ]);
-const originalRootRoutes = new Set(['login', 'admin-login', 'check-starter', 'route-dispatcher', 'code-input', 'starter']);
+const originalAdminLoginPath = '/ops?ui=original&legacyLogin=1';
+const originalRootDestinations = new Map([
+  ['', '/native-start/dispatch'],
+  ['r', '/native-start/dispatch'],
+  ['r/route-dispatcher', '/native-start/dispatch'],
+  ['r/code-input', '/native-start/dispatch'],
+  ['r/starter', '/native-start/starter'],
+  ['r/login', '/native-start'],
+  ['r/admin-login', originalAdminLoginPath],
+  ['r/check-starter', '/r/check-starter'],
+]);
 const invalidSegment = (value: string) =>
   value === '.' || value === '..' || /[\/\\?#();\x00-\x1f\x7f]/.test(value);
 
 export function originalParticipantBookmark(hash: string): string | null {
+  const path = hash.split('?', 1)[0];
   const login = /^#\/r\/login(?:\/([^/?#]+))?\/?$/.exec(hash);
   const direct = /^#\/([^/?#;]+)$/.exec(hash);
   try {
+    if (path?.startsWith('#/')) {
+      const segments = path.slice(2).replace(/([^/])\/$/, '$1').split('/').map(decodeURIComponent);
+      if (segments.every(segment => !invalidSegment(segment))) {
+        const destination = originalRootDestinations.get(segments.join('/'));
+        if (destination) return destination;
+      }
+    }
     if (login) {
       return login[1]
         ? '/native-start/login?' + new URLSearchParams({returnTo: decodeURIComponent(login[1])})
@@ -32,7 +50,7 @@ export function originalMissingRouteBookmark(hash: string): string | null {
   try {
     const first = decodeURIComponent(nested[1]!);
     const second = decodeURIComponent(nested[2]!);
-    if (reservedEntryNames.has(first) && (first !== 'r' || originalRootRoutes.has(second))) return null;
+    if (reservedEntryNames.has(first) && (first !== 'r' || originalRootDestinations.has('r/' + second))) return null;
     return '/native-start/not-found?' + new URLSearchParams({path: hash.slice(1)});
   } catch {
     return null;
@@ -47,6 +65,7 @@ export function originalParticipantReturnPath(target: string): string {
   } catch {
     return '/native-start';
   }
+  if (/^\/r\/admin-login\/?$/.test(path)) return originalAdminLoginPath;
   if (/^\/r\/(?:starter|code-input|route-dispatcher)\/?$/.test(path) || /^\/r\/?$/.test(path)) {
     return '/native-start';
   }
@@ -59,4 +78,9 @@ export function originalParticipantReturnPath(target: string): string {
     return '/native-start';
   }
   return queryParts.length ? destination + '?' + queryParts.join('?') : destination;
+}
+
+export function isExplicitOriginalAdminLogin(url: string): boolean {
+  const [path, query] = url.split('?', 2);
+  return path === '/ops' && new URLSearchParams(query).get('legacyLogin') === '1';
 }

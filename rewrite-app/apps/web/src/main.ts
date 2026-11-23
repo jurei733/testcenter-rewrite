@@ -30,6 +30,8 @@ const normalizeOriginalEntry = (): void => {
     if (destination) {
       const bookmark = new URL("/app" + destination, url.origin);
       url.pathname = bookmark.pathname;
+      // The legacy sign-in cannot opt into the modern operator demo or return hooks.
+      if (bookmark.pathname === "/app/ops") url.search = "";
       bookmark.searchParams.forEach((value, key) => url.searchParams.set(key, value));
       url.hash = "";
     }

@@ -25,7 +25,7 @@ function load(relative){
  });return exports;
 }
 const {NativePublicHeaderService}=load('native-public-header.service.ts');
-const {originalMissingRouteBookmark,originalParticipantBookmark,originalParticipantReturnPath}=load('native-participant/original-participant-bookmark.ts');
+const {isExplicitOriginalAdminLogin,originalMissingRouteBookmark,originalParticipantBookmark,originalParticipantReturnPath}=load('native-participant/original-participant-bookmark.ts');
 test('Original participant bookmarks distinguish direct logins, explicit returns and reserved routes',()=>{
  assert.equal(originalParticipantBookmark('#/r/login'),'/native-start');
  assert.equal(originalParticipantBookmark('#/r/login/%2Fr%2Fstarter'),'/native-start/login?returnTo=%2Fr%2Fstarter');
@@ -44,6 +44,26 @@ test('Original return destinations stay inside the existing guarded application 
  for(const destination of ['https://owned.invalid','//owned.invalid','/gm/../login','/api/session','/t/123/(aux:other)','/gm/a\\b']){
   assert.equal(originalParticipantReturnPath(destination),'/native-start',destination);
  }
+});
+test('Recognized Original root bookmarks choose the same guarded entry without importing operator query hooks',()=>{
+ const admin='/ops?ui=original&legacyLogin=1';
+ const entries=[
+  ['', '/native-start/dispatch'],['r','/native-start/dispatch'],['r/route-dispatcher','/native-start/dispatch'],
+  ['r/code-input','/native-start/dispatch'],['r/starter','/native-start/starter'],
+  ['r/check-starter','/r/check-starter'],['r/admin-login',admin]
+ ];
+ for(const [source,destination]of entries){
+  assert.equal(originalParticipantBookmark('#/'+source),destination,source);
+  assert.equal(originalParticipantBookmark('#/'+(source?source+'/':'')+'?demoAdmin=sign-in'),destination,source);
+  assert.equal(originalMissingRouteBookmark('#/'+source),null,source);
+ }
+ assert.equal(originalParticipantReturnPath('/r/admin-login?demoAdmin=sign-in&returnUrl=%2Fhome'),admin);
+ assert.equal(originalParticipantBookmark('#/%72/admin-login'),admin);
+ assert.equal(originalParticipantBookmark('#/r%2Fadmin-login'),null);
+ assert.equal(originalParticipantBookmark('#//'),null);
+ assert.equal(isExplicitOriginalAdminLogin(admin),true);
+ assert.equal(isExplicitOriginalAdminLogin('/ops?ui=original'),false);
+ assert.equal(isExplicitOriginalAdminLogin('/home?legacyLogin=1'),false);
 });
 test('Unknown nested Original bookmarks display their full path without turning it into credentials',()=>{
  const hash='#/archiv/fehlt?seite=1', destination=originalMissingRouteBookmark(hash);
