@@ -9,7 +9,15 @@ import {TestModeData} from './native-monitor/common/test-mode-data.class';
 import {originalErrorTimestamp} from './original-error-timestamp';
 import {OriginalOverlayStylesComponent} from './original-overlay-styles.component';
 
-// Pinned Original shared/error-dialog, before any authenticated Test exists.
+export type NativeErrorDialogData = {
+  error: AppError;
+  url: string;
+  timestamp: number;
+  reload: () => void;
+  login?: string;
+};
+
+// Pinned Original shared/error-dialog, outside an active Test.
 @Component({selector:'app-native-login-error',standalone:true,
  imports:[MatButton,MatDialogActions,MatDialogContent,MatDialogTitle,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatIcon,OriginalOverlayStylesComponent],
  template:`<app-original-overlay-styles /><h2 mat-dialog-title><mat-icon svgIcon="error" />{{data.error.label}}</h2>
@@ -33,14 +41,14 @@ import {OriginalOverlayStylesComponent} from './original-overlay-styles.componen
    <p><b>Browser: </b>{{browser.browser.name}} {{browser.browser.version}}</p>
    <p><b>Betriebssystem: </b>{{browser.os.name}} {{browser.os.version}}</p>
    <p><b>Gerät: </b>{{browser.device.type}} {{browser.device.vendor}} {{browser.device.model}}</p>
-   <p><b>Booklet: </b></p><p><b>Login: </b>??</p><p><b>Mode: </b>{{defaultModeLabel}}</p><p>{{data.error.details}}</p>
+   <p><b>Booklet: </b></p><p><b>Login: </b>{{data.login ?? '??'}}</p><p><b>Mode: </b>{{defaultModeLabel}}</p><p>{{data.error.details}}</p>
   </mat-expansion-panel>
  </mat-dialog-content>
  <mat-dialog-actions><button mat-raised-button (click)="data.reload()" data-cy="close">Schließen und neu laden</button></mat-dialog-actions>`,
  styles:[`h3,b{font-family:"Nunito Sans Diagnostics","Nunito Sans",sans-serif}.mat-mdc-dialog-actions{--mat-dialog-actions-alignment:center}h2 mat-icon{margin-right:15px;color:#A92319}.mat-expansion-panel{margin-bottom:10px}`]})
 export class NativeLoginErrorDialogComponent {
  readonly defaultModeLabel=TestModeData.labels['RUN-DEMO'];
- readonly data=inject<{error:AppError;url:string;timestamp:number;reload:()=>void}>(MAT_DIALOG_DATA);
+ readonly data=inject<NativeErrorDialogData>(MAT_DIALOG_DATA);
  readonly timestamp=originalErrorTimestamp(this.data.timestamp);
  readonly browser=new UAParser().getResult();
 }

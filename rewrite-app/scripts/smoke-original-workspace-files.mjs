@@ -240,6 +240,29 @@ try {
       await account.getByRole('button',{name:'Nutzerinformationen schließen'}).click();
       await account.waitFor({state:'detached'});
       console.log('native_workspace_files_account_restored_session=passed');
+      const deniedRequests=[];
+      const observeDenied=request=>{
+        if(new URL(request.url()).pathname.startsWith('/api/v1/tenants/'))deniedRequests.push(request.url());
+      };
+      readPage.on('request',observeDenied);
+      await readPage.goto(base+'/app/admin/9223372036854775808/files?ui=original');
+      const denied=readPage.getByRole('dialog',{name:'Daten/Objekt nicht gefunden.'});
+      await waitForMaterialDialog(readPage);
+      await denied.waitFor();
+      await readPage.keyboard.press('Escape');
+      await denied.waitFor();
+      assert.equal(await readPage.locator('#originalWorkspaceFileFrame,[data-cy="upload-files"]').count(),0);
+      assert.deepEqual(deniedRequests,[]);
+      readPage.off('request',observeDenied);
+      const details=denied.getByRole('button',{name:'Fehlerdetails'});
+      assert.equal(await details.getAttribute('aria-expanded'),'false');
+      await details.press('Enter');
+      await denied.getByText('Dieser Arbeitsbereich ist für Sie nicht freigegeben.',{exact:true}).waitFor();
+      await denied.locator('[data-cy="close"]').press('Enter');
+      await readPage.locator('#originalOperatorStarterHeader').waitFor();
+      await card.press('Enter');
+      await readPage.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
+      console.log('native_workspace_files_denied_dialog_returns_to_overview=passed');
     }
     await readPage.locator('[data-cy="files-checkAll-Unit"] input').check();
     assert.equal(await readPage.locator('[data-cy="delete-files"]').isDisabled(),true);

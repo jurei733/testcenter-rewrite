@@ -1,16 +1,16 @@
 @use '@angular/material' as mat;
 
-:root[data-interface-mode='original']:has(#originalWorkspaceFileFrame),
-:root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame) { height:100%; overflow:hidden; }
-:root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame) { background:white; color-scheme:light; }
+:root[data-interface-mode='original']:has(#originalWorkspaceFileFrame, app-original-numeric-workspace),
+:root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame, app-original-numeric-workspace) { height:100%; overflow:hidden; }
+:root[data-interface-mode='original'] body:has(#originalWorkspaceFileFrame, app-original-numeric-workspace) { background:white; color-scheme:light; }
 :root[data-interface-mode='original'] #originalWorkspaceFileFrame .mat-mdc-tab-header-pagination-chevron {
  // Source's border-drawn Material chevrons use the default content box.
  box-sizing:content-box;
 }
-:root[data-interface-mode='original'] .page:has(#originalWorkspaceFileFrame) {
+:root[data-interface-mode='original'] .page:has(#originalWorkspaceFileFrame, app-original-numeric-workspace) {
  display:flex; flex-direction:column; height:100dvh; min-height:0; max-width:none; padding:0; overflow:visible;
 }
-:root[data-interface-mode='original'] .home-stage:has(#originalWorkspaceFileFrame),
+:root[data-interface-mode='original'] .home-stage:has(#originalWorkspaceFileFrame, app-original-numeric-workspace),
 :root[data-interface-mode='original'] app-content-view:has(#originalWorkspaceFileFrame) {
  display:flex; flex:1; flex-direction:column; min-height:0; overflow:visible;
 }
