@@ -1227,6 +1227,8 @@ export type OriginalTestResultState = {
   lastTestModifiedAt?: string | null;
   hasTestState?: boolean;
   nativeWriteGuard?: OriginalNativeWriteGuard;
+  /** Native controller clock metadata, independent of the Original's saved-state snapshots. */
+  nativeTestletTimers?: Record<string, TestletTimerState>;
 };
 
 export type TestRun = {

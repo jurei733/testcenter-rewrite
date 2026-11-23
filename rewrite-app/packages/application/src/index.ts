@@ -32919,7 +32919,13 @@ export const createFirstSliceServices = (
     originalTest: createOriginalTestPort({auth: originalAuthentication, repository, now, id: idGenerator,
       readBooklet:(scope,fileId)=>originalTestFiles.booklet(scope,fileId),
       readResource:(scope,path)=>originalTestFiles.resource(scope,path),
-      currentBooklet:currentOriginalBooklet
+      currentBooklet:currentOriginalBooklet,
+      timedBlock:(booklet,alias)=>{
+        const unit=booklet.unitEntries.find(entry=>sameOriginalTestName(entry.unitKey,alias));
+        const timed=resolveTimedTestletForUnit(booklet,unit?.unitKey??null);
+        const limit=timed?.restrictions?.timeMax;
+        return timed&&limit?{key:timed.testletKey,minutes:limit.minutes}:null;
+      }
     }),
     originalGroupResults: createOriginalGroupResultsPort(repository, (tenantKey, workspaceKey) => requireWorkspace(repository, tenantKey, workspaceKey)),
     originalWorkspaceAdministration: createOriginalWorkspaceAdministrationPort({repository,now,admin:token=>requireActiveAdminSession(repository,token,now(),{enforceAccessWindow:true})}),

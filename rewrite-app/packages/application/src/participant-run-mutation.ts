@@ -20,6 +20,7 @@ export type ParticipantRunMutationEffect = ParticipantRunCommandEffect & {
   commandInput?: ParticipantRunCommandInput;
   progressDelivery?: ParticipantProgressDelivery;
   originalNativeStateKeys?: string[];
+  originalNativeTestletTimers?: NonNullable<NonNullable<TestRun["originalResultState"]>["nativeTestletTimers"]>;
   initializeOriginalNativeWriteGuard?: true;
 };
 export type ParticipantRunMutationResult = {
@@ -54,7 +55,7 @@ export const prepareParticipantRunMutation = (
   const { testRun, participantSession } = context;
   const effect = structuredClone(transform(structuredClone(context)));
   if (effect?.terminationNoop !== undefined && (effect.terminationNoop !== true || effect.controllerDispatch !== undefined ||
-      effect.controllerEntryActive !== undefined || effect.originalResultOpenedAt !== undefined || effect.originalResultTestStateAt !== undefined || effect.originalResultModifiedAt !== undefined || effect.originalTestState !== undefined || effect.originalNativeStateKeys !== undefined || effect.initializeOriginalNativeWriteGuard !== undefined || effect.participantSession !== undefined || effect.commandInput !== undefined ||
+      effect.controllerEntryActive !== undefined || effect.originalResultOpenedAt !== undefined || effect.originalResultTestStateAt !== undefined || effect.originalResultModifiedAt !== undefined || effect.originalTestState !== undefined || effect.originalNativeStateKeys !== undefined || effect.originalNativeTestletTimers !== undefined || effect.initializeOriginalNativeWriteGuard !== undefined || effect.participantSession !== undefined || effect.commandInput !== undefined ||
       JSON.stringify(effect.testRun) !== JSON.stringify(testRun) || effect.activityEvents.length > 0 ||
       effect.testLogs.some(log => log.logKey !== "command executed"))) {
     throw new Error("A terminal early return cannot change its Run, parent, entry, dispatch highwater or state artifacts.");
@@ -79,12 +80,13 @@ export const prepareParticipantRunMutation = (
   }
   if (effect && participantControllerDispatchSuperseded(testRun, effect.controllerDispatch)) {
     effect.testRun = testRun; delete effect.participantSession; delete effect.controllerEntryActive; delete effect.originalResultOpenedAt; delete effect.originalResultTestStateAt; delete effect.originalResultModifiedAt; delete effect.originalTestState;
-    delete effect.originalNativeStateKeys; delete effect.initializeOriginalNativeWriteGuard;
+    delete effect.originalNativeStateKeys; delete effect.originalNativeTestletTimers; delete effect.initializeOriginalNativeWriteGuard;
     effect.testLogs = effect.testLogs.filter(log => log.logKey === "command executed"); effect.activityEvents = []; effect.superseded = true;
   }
   if (effect) effect.testRun = withOriginalResultState(testRun, effect.testRun,
     {openedAt: effect.originalResultOpenedAt, testStateAt: effect.originalResultTestStateAt, modifiedAt: effect.originalResultModifiedAt, nativeTestState: effect.originalTestState,
-      nativeStateKeys: effect.originalNativeStateKeys, initializeNativeWriteGuard: effect.initializeOriginalNativeWriteGuard});
+      nativeStateKeys: effect.originalNativeStateKeys, nativeTestletTimers:effect.originalNativeTestletTimers,
+      initializeNativeWriteGuard: effect.initializeOriginalNativeWriteGuard});
   if (effect) effect.testRun = withParticipantRunRevision(testRun,
     withParticipantControllerDispatch(testRun, withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive), effect.controllerDispatch));
   return { result: structuredClone({ testRun: effect?.testRun ?? testRun,

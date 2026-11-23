@@ -23,6 +23,7 @@ export function originalResourceLogPath(pathname:string):string|null{
 export function originalTestRouteLabel(method:string,pathname:string):string|null{
  if(originalResourceLogPath(pathname))return method+' /file/:groupToken/ws_:workspace/:resourcePath';
  let path=pathname;try{path=decodeURIComponent(pathname);}catch{}
+ if(/^\/test\/[^/]+\/timer$/.test(path))return method+' /test/:testId/timer';
  if(/^\/test\/[^/]+\/unit\/[^/]+\/alias\/[^/]+$/.test(path))return method+' /test/:testId/unit/:unitName/alias/:alias';
  const unitWrite=/^\/test\/[^/]+\/unit\/[^/]+\/(state|response|log)$/.exec(path);if(unitWrite)return method+' /test/:testId/unit/:unitName/'+unitWrite[1];
  if(/^\/test\/[^/]+\/unit\/[^/]+$/.test(path))return method+' /test/:testId/unit/:unitName';
@@ -32,12 +33,13 @@ export function originalTestRouteLabel(method:string,pathname:string):string|nul
 export async function handleOriginalTestHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;readBody:(allowEmpty?:boolean,decode?:(payload:Uint8Array)=>unknown,purpose?:'unit-progress')=>Promise<unknown>;send:(status:number,value:unknown)=>void;raw:(status:number,text:string,contentType:string)=>void;binary:(bytes:Uint8Array,contentType:string)=>void;header:(name:string,value:string)=>void;reason:(text:string)=>void;subscribe?:(target:{channel:'commands';testNumber:string},credential:string)=>Promise<void>}):Promise<boolean>{
  let pathname:string;try{pathname=decodeURIComponent(input.pathname);}catch{if(!/^\/(?:test|file)(?:\/|$)/.test(input.pathname))return false;input.header('cache-control','private, no-store');input.send(400,'Invalid path.');return true;}
  const read=/^\/test\/([^/]+)$/.exec(pathname),state=/^\/test\/([^/]+)\/state$/.exec(pathname),log=/^\/test\/([^/]+)\/log$/.exec(pathname),lock=/^\/test\/([^/]+)\/lock$/.exec(pathname),file=/^\/file\/([^/]+)\/ws_([^/]+)\/(.*)$/.exec(pathname);
+ const timer=/^\/test\/([^/]+)\/timer$/.exec(pathname);
  const commands=/^\/test\/([^/]+)\/commands$/.exec(pathname),executed=/^\/test\/([^/]+)\/command\/([^/]+)\/executed$/.exec(pathname),producer=pathname==='/monitor/command';
  const nativeCommand=Boolean(commands||executed||producer);
  const unitRead=/^\/test\/([^/]+)\/unit\/([^/]+)(?:\/alias\/([^/]+))?$/.exec(pathname),unitWrite=/^\/test\/([^/]+)\/unit\/([^/]+)\/(state|response|log)$/.exec(pathname);
  const nativeUnitState=unitWrite?.[3]==='state',nativeWriteErrors=Boolean(log||lock||nativeCommand||nativeUnitState);
- if(pathname!=='/test'&&!read&&!state&&!log&&!lock&&!file&&!unitRead&&!unitWrite&&!nativeCommand)return false;
- input.header('cache-control','private, no-store');const method=file||read||unitRead||commands?'GET':state||lock||executed||unitWrite?.[3]==='state'?'PATCH':'PUT';
+ if(pathname!=='/test'&&!read&&!state&&!log&&!lock&&!file&&!unitRead&&!unitWrite&&!nativeCommand&&!timer)return false;
+ input.header('cache-control','private, no-store');const method=file||read||unitRead||commands?'GET':state||lock||executed||timer||unitWrite?.[3]==='state'?'PATCH':'PUT';
  if(input.request.method!==method){input.header('allow',method);if(nativeWriteErrors)sendNativeTestWriteError(input,405,'Method not allowed. Must be one of: '+method);else input.send(405,'Method not allowed');return true;}
  try{
   if(file){const groupToken=file[1]!,workspaceNumber=file[2]!,path=file[3]!;
@@ -53,6 +55,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
    if(typeof result==='object'){input.header('X-Native-State-Base',JSON.stringify(result.nativeStateBase));input.reason(result.reason);}else input.reason(result);input.raw(200,'','text/html; charset=UTF-8');return true;}
   if(log||lock)await input.services.originalTest.requireOwner({token,testNumber:(log??lock)![1]!});
   if(unitWrite)await input.services.originalTest.requireOwner({token,testNumber:unitWrite[1]!});
+  if(timer)await input.services.originalTest.requireOwner({token,testNumber:timer[1]!});
   if(unitRead){const result=await input.services.originalUnit.read({token,testNumber:unitRead[1]!,unitName:unitRead[2]!,nativeUnitProtocol:input.request.headers['x-native-unit-protocol'],...(unitRead[3]===undefined?{}:{alias:unitRead[3]})});input.raw(200,formatOriginalUnitReadJson(result),'application/json');return true;}
   if(read){const testNumber=read[1]!;
    const result=await input.services.originalTest.read({token,testNumber,nativeStateProtocol:input.request.headers['x-native-state-protocol']});
@@ -62,6 +65,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   // ownership checks. Unit logs and ordinary controller commands keep theirs.
   const purpose=unitWrite&&(unitWrite[3]==='state'||unitWrite[3]==='response')?'unit-progress':undefined;
   let body:unknown;try{body=await input.readBody(nativeWriteErrors,(log||lock||nativeCommand)?decodeOriginalTestLogJson:undefined,purpose);}catch(error){if(error instanceof SyntaxError){if(nativeWriteErrors){sendNativeTestWriteError(input,500,'Internal error.');return true;}throw new FirstSliceError(400,'original_json_invalid','Request body must be valid JSON.');}throw error;}
+  if(timer){input.send(200,await input.services.originalTest.enterTimer({token,testNumber:timer[1]!,body}));return true;}
   if(producer){await input.services.originalCommand.send({token,body});input.raw(201,'','text/html; charset=UTF-8');return true;}
   if(commands){const wire=await input.services.originalCommand.poll({token,testNumber:commands[1]!,body});await input.subscribe?.({channel:'commands',testNumber:commands[1]!},token);input.raw(200,wire,'application/json');return true;}
   if(lock){await input.services.originalTest.patchLock({token,testNumber:lock[1]!,body});input.raw(200,'','text/html; charset=UTF-8');return true;}

@@ -226,7 +226,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
     await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-native-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'en',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
     await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.NATIVE.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-native-player@1.2.3">Owned definition</Definition>'));
     await upload('assigned.xml',booklet('OWNED.ASSIGNED','Assigned',true));await upload('unassigned.xml',booklet(native.bookletName,labels.firstLabel));
-    const namesOwned=['owned-create','owned-other','owned-entry','owned-atomic','owned-review','owned-after-delete','owned-legacy','owned-cross-writer','owned-unit-native','owned-unit-peer','owned-unit-delivery','owned-test-delivery','owned-large-state'];
+    const namesOwned=['owned-create','owned-other','owned-entry','owned-timer','owned-timer-http','owned-atomic','owned-review','owned-after-delete','owned-legacy','owned-cross-writer','owned-unit-native','owned-unit-peer','owned-unit-delivery','owned-test-delivery','owned-large-state'];
     await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="Owned.Create" label="Owned create">'+namesOwned.map(name=>`<Login name="${name}" pw="${password}" mode="${name==='owned-review'?'run-review':'run-hot-return'}"><Booklet codes="Owned">OWNED.ASSIGNED</Booklet></Login>`).join('')+'</Group>')});
     const auth=async name=>{const login=await services.originalAuthentication.login({name,password});return{login,person:await services.originalAuthentication.person({loginToken:login.token,code:'Owned'})};};
     const main=await auth('owned-create'),other=await auth('owned-other');let number,run,nativeWorkspaceNumber;
@@ -563,7 +563,7 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       await services.originalUnit.putResponse({token:review.person.token,testNumber:id,unitName,body:{timeStamp:1,dataParts:{answer:'retained in native review mode'},responseType:'review/type'}});
       const result=await services.originalUnit.read({token:review.person.token,testNumber:id,unitName:'OWNED.NATIVE.UNIT',alias:unitName});assert.equal(result.state.review,'native write is allowed');assert.equal(result.dataParts[0][1],'retained in native review mode');assert.deepEqual(await repository.getTestRunById(saved.testRunId),beforeUnits);
     });
-    await t.test('a created native Test remains available and starts its real controller and timer only on canonical entry',async()=>{
+    await t.test('canonical entry activates an unopened native Test and starts its authored timer',async()=>{
       const entry=await auth('owned-entry');const id=await request(entry,'owned.assigned');const [before]=await owned(entry.person);
       assert.equal((await services.participantRuntime.getRuntimeState({participantSessionId:before.participantSessionId})).booklets[0].status,'available');
       assert.equal((await services.originalSession.read({token:entry.person.token})).claims.test[0].flags.running,false);
@@ -576,6 +576,46 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
       for(const type of ['testlet_timer_started','participant_session_resumed'])assert.equal(events.filter(row=>row.eventType===type).length,1);
       assert.equal(opened.testletTimers.timed.status,'running');assert.ok(opened.originalResultState.lastOpenedAt);assert.equal(opened.originalResultState.bookletName,'owned.assigned');
       assert.equal((await services.originalSession.read({token:entry.person.token})).claims.test[0].flags.running,true);assert.equal(await request(entry,'OWNED.ASSIGNED'),id);
+    });
+    await t.test('native timer entry preserves one server deadline across retries and store reopening',async()=>{
+      const entry=await auth('owned-timer'),id=await request(entry,'OWNED.ASSIGNED');
+      const input={token:entry.person.token,testNumber:id,body:{unitAlias:'OWNED.NATIVE.UNIT'}};
+      let clock=Date.now();
+      const clockService=()=>createFirstSliceServices({repository,now:()=>new Date(clock).toISOString(),
+        originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'}).originalTest;
+      let timer=clockService();
+      await assert.rejects(timer.enterTimer(input),denied(409));
+      const read={token:input.token,testNumber:id,nativeStateProtocol:'1'};
+      const opened=await timer.read(read);
+      await assert.rejects(timer.enterTimer({...input,token:other.person.token}),denied(403));
+      await assert.rejects(timer.enterTimer({...input,body:{...input.body,remainingMilliseconds:60001}}),denied(400));
+      await assert.rejects(timer.enterTimer({...input,body:{unitAlias:'NOT.IN.BOOKLET'}}),denied(409));
+      const starts=await Promise.all(Array.from({length:5},()=>timer.enterTimer(input)));
+      assert.equal(new Set(starts.map(value=>value.expiresAt)).size,1);
+      const first=starts[0];
+      assert.equal(first.testletKey,'timed');
+      assert.equal(first.status,'running');
+      assert.equal(Date.parse(first.expiresAt)-Date.parse(first.startedAt),60000);
+      const reopenedController=await timer.read(read);
+      assert.deepEqual(reopenedController.laststate,opened.laststate);
+      assert.deepEqual(reopenedController.nativeStateBase,opened.nativeStateBase);
+
+      await reopen();timer=clockService();clock=Date.parse(first.startedAt)+3000;
+      await timer.patchState({token:input.token,testNumber:id,patch:[
+        {key:'TESTLETS_TIMELEFT',content:'{"timed":1000}',timeStamp:clock}
+      ]});
+      const continued=await timer.enterTimer(input);
+      assert.equal(continued.expiresAt,first.expiresAt);
+      assert.ok(continued.remainingMilliseconds<=57000&&continued.remainingMilliseconds>=56990);
+
+      clock=Date.parse(first.expiresAt)+1000;
+      const expired=await timer.enterTimer(input);
+      assert.equal(expired.status,'expired');
+      assert.equal(expired.remainingMilliseconds,0);
+      assert.equal(expired.expiresAt,first.expiresAt);
+      await reopen();
+      assert.deepEqual(await clockService().enterTimer(input),expired);
+      assert.equal((await clockService().read(read)).laststate.TESTLETS_TIMELEFT,'{"timed":1000}');
     });
     await t.test('concurrent same-name requests reserve one Test and one stable number',async()=>{
       const simultaneous=await auth('owned-atomic');const values=await Promise.all(Array.from({length:12},(_,index)=>request(simultaneous,index%2?native.bookletName:native.bookletName.toLowerCase())));
@@ -939,6 +979,21 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
           const response=await fetch(base+path,{method,headers:{...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});
           const bytes=Buffer.from(await response.arrayBuffer());assert.equal(response.status,status,method+' native endpoint status');return{bytes,text:bytes.toString('utf8'),headers:response.headers};
         };
+        const timerPerson=await auth('owned-timer-http'),timedTest=await request(timerPerson,'OWNED.ASSIGNED');
+        const timerPath='/test/'+timedTest+'/timer',timerBody={unitAlias:'OWNED.NATIVE.UNIT'};
+        await nativeRequest('PATCH',timerPath,undefined,timerBody,401);
+        await nativeRequest('PATCH',timerPath,other.person.token,timerBody,403);
+        await nativeRequest('GET',timerPath,timerPerson.person.token,undefined,405);
+        await nativeRequest('PATCH',timerPath,timerPerson.person.token,timerBody,409);
+        await nativeRequest('GET','/test/'+timedTest,timerPerson.person.token);
+        const timerStart=await nativeRequest('PATCH',timerPath,timerPerson.person.token,timerBody);
+        const firstTimer=JSON.parse(timerStart.text);
+        assert.equal(timerStart.headers.get('cache-control'),'private, no-store');
+        assert.deepEqual(Object.keys(firstTimer).sort(),['expiresAt','remainingMilliseconds','startedAt','status','testletKey']);
+        assert.equal(firstTimer.remainingMilliseconds,60000);
+        const continuedTimer=JSON.parse((await nativeRequest('PATCH',timerPath,timerPerson.person.token,timerBody)).text);
+        assert.equal(continuedTimer.expiresAt,firstTimer.expiresAt);
+        assert.ok(continuedTimer.remainingMilliseconds<=firstTimer.remainingMilliseconds);
         await nativeRequest('GET','/test/'+expected,httpPerson.login.token,undefined,403);await nativeRequest('GET','/test/'+expected,other.person.token,undefined,403);
         const opened=await nativeRequest('GET','/test/'+expected,httpPerson.person.token),nativeValue=JSON.parse(opened.text);
         assert.equal(opened.headers.get('content-type'),'application/json');assert.equal(opened.headers.get('cache-control'),'private, no-store');assert.equal(nativeValue.firstStart,true);assert.deepEqual(nativeValue.laststate,[]);assert.equal(nativeValue.resources['OWNED.NATIVE.UNIT'].usesPlayer[0],'Resource/player.html');

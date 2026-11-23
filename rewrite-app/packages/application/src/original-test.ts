@@ -9,7 +9,7 @@ import {readOriginalTestLockFields,parseOriginalTestLockLog,parseOriginalTestLog
 import {hashOriginalSessionToken} from './original-session-token.js';
 import type {OriginalBookletFiles} from './original-test-files.js';
 import {parseOriginalNativeTestNumber,readOriginalTestPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
-import {defaultParticipantExecutionMode,type ParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
+import {defaultParticipantExecutionMode,participantExecutionModeDefinitions,type ParticipantExecutionMode,type TestletTimerState} from '@testcenter-rewrite-app/domain';
 import {originalTestDelivery,prepareOriginalNativeDelivery} from './original-native-delivery.js';
 import type {OriginalNativeStateWriteBase, OriginalNativeStateWriteResult} from '@testcenter-rewrite-app/domain';
 import {parseOriginalNativeStateWriteBase, prepareOriginalNativeStateWrite} from './original-native-write-state.js';
@@ -41,6 +41,9 @@ export type OriginalTestPort = {
   patchLock(input:{token:string;testNumber:string;body:unknown}):Promise<void>;
   create(input: {token: string; bookletName: string}): Promise<string>;
   read(input:{token:string;testNumber:string;nativeStateProtocol?:unknown}):Promise<OriginalTestRead>;
+  enterTimer(input:{token:string;testNumber:string;body:unknown}):Promise<{
+    testletKey:string;status:TestletTimerState['status'];startedAt:string;expiresAt:string|null;remainingMilliseconds:number
+  }>;
   patchState(input:{token:string;testNumber:string;patch:unknown;deliveryId?:unknown;stateBase?:unknown}):Promise<OriginalNativeStateWriteResult|void>;
   resource(input:{groupToken:string;workspaceNumber:string;path:string}):Promise<{bytes:Uint8Array;contentType:string}>;
 };
@@ -96,6 +99,7 @@ export function createOriginalTestPort(input: {
   readBooklet:(person:ParticipantSession,fileId:string)=>Promise<OriginalBookletFiles>;
   readResource:(scope:{tenantId:string;workspaceId:string},path:string)=>Promise<{bytes:Uint8Array;contentType:string}>;
   currentBooklet: (person: ParticipantSession, fileId: string) => Promise<{contentReleaseId: string; booklet: ContentReleaseBookletEntry}>;
+  timedBlock: (booklet: ContentReleaseBookletEntry, unitAlias: string) => {key:string;minutes:number}|null;
 }): OriginalTestPort {
   const personFor=(token:string)=>readOriginalTestPerson(input.auth,token);
   const number=parseOriginalNativeTestNumber;
@@ -104,6 +108,64 @@ export function createOriginalTestPort(input: {
   const unlocked=(run:TestRun,testNumber:string)=>{if(run.locked)throw new FirstSliceError(423,'original_test_locked',`Test #${testNumber} \`${run.originalResultState?.bookletLabel??''}\` is locked.`);};
   const savedState=(run:TestRun)=>{if(run.originalTestState!==undefined){assertOriginalTestState(run.originalTestState);return structuredClone(run.originalTestState);}if(run.originalResultState?.hasTestState===false)return{};throw new FirstSliceError(409,'original_test_state_unknown','The historical saved Test state is unavailable.');};
   return {
+    async enterTimer({token,testNumber:raw,body}){
+      const{person,run,testNumber}=await owned(token,raw);
+      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).length!==1||
+        !('unitAlias' in body)||typeof body.unitAlias!=='string'||!body.unitAlias||body.unitAlias.length>255){
+        throw new FirstSliceError(400,'native_timer_entry_invalid','A native timer entry requires a Unit alias.');
+      }
+      unlocked(run,testNumber);
+      const identity=run.originalResultState;
+      if(typeof identity?.bookletName!=='string'||!identity.lastOpenedAt)throw unavailable();
+      const{booklet}=await input.currentBooklet(person,orderedName(identity.bookletName).fileId);
+      const block=input.timedBlock(booklet,body.unitAlias);
+      const durationMilliseconds=block?Math.round(block.minutes*60000):0;
+      if(!block||!Number.isSafeInteger(durationMilliseconds)||durationMilliseconds<=0){
+        throw new FirstSliceError(409,'native_timer_unavailable','The Unit has no authored time limit.');
+      }
+      let remainingMilliseconds=0;
+      const result=await input.repository.mutateParticipantRun(run,({testRun})=>{
+        unlocked(testRun,testNumber);
+        const timestamp=input.now(),now=Date.parse(timestamp);
+        const timers=testRun.originalResultState?.nativeTestletTimers??{};
+        const current=Object.hasOwn(timers,block.key)?timers[block.key]:undefined;
+        let timer:TestletTimerState;
+        if(current){
+          remainingMilliseconds=current.status==='running'&&current.expiresAt ?
+            Math.max(0,Date.parse(current.expiresAt)-now) : Math.max(0,Math.round(current.remainingSeconds*1000));
+          if(!Number.isSafeInteger(remainingMilliseconds)){
+            throw new FirstSliceError(409,'native_timer_unavailable','The saved timer deadline is unavailable.');
+          }
+          if(current.status!=='running'||remainingMilliseconds>0)return null;
+          timer={...current,status:'expired',remainingSeconds:0,updatedAt:timestamp,endedAt:current.expiresAt??timestamp};
+        }else{
+          remainingMilliseconds=durationMilliseconds;
+          const mode=participantExecutionModeDefinitions[testRun.executionMode??defaultParticipantExecutionMode]
+            ??participantExecutionModeDefinitions[defaultParticipantExecutionMode];
+          const snapshot=savedState(testRun).TESTLETS_TIMELEFT;
+          if(mode.saveResponses&&typeof snapshot==='string'){
+            let old:unknown;
+            try{old=JSON.parse(snapshot)?.[block.key];}catch{/* Older malformed snapshots cannot grant additional time. */}
+            if(typeof old==='number'&&Number.isFinite(old)&&(old>0||old===0&&mode.forceTimeRestrictions)){
+              remainingMilliseconds=Math.min(durationMilliseconds,Math.round(old*60000));
+            }
+          }
+          if(!Number.isFinite(new Date(now+remainingMilliseconds).getTime())){
+            throw new FirstSliceError(409,'native_timer_unavailable','The authored time limit is outside the supported clock range.');
+          }
+          timer={
+            testletKey:block.key,status:remainingMilliseconds>0?'running':'expired',
+            durationSeconds:durationMilliseconds/1000,remainingSeconds:remainingMilliseconds/1000,startedAt:timestamp,
+            expiresAt:remainingMilliseconds>0?new Date(now+remainingMilliseconds).toISOString():null,
+            updatedAt:timestamp,endedAt:remainingMilliseconds>0?null:timestamp
+          };
+        }
+        return {testRun,originalNativeTestletTimers:{...timers,[block.key]:timer},testLogs:[],activityEvents:[]};
+      });
+      const timer=result?.testRun.originalResultState?.nativeTestletTimers?.[block.key];
+      if(!timer)throw forbidden(raw);
+      return {testletKey:timer.testletKey,status:timer.status,startedAt:timer.startedAt,expiresAt:timer.expiresAt,remainingMilliseconds};
+    },
     async read({token,testNumber:raw,nativeStateProtocol}){
       const{person,run,testNumber}=await owned(token,raw);unlocked(run,testNumber);
       if(nativeStateProtocol!==undefined&&nativeStateProtocol!=='1')throw new FirstSliceError(400,'original_state_protocol_invalid','Invalid native Test-state protocol.');

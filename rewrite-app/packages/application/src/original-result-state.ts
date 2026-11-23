@@ -21,7 +21,8 @@ const time = (value: unknown): string => {
  * Original's Test timestamp. Legacy unknown evidence is never fabricated. */
 export function withOriginalResultState(previous: TestRun, projected: TestRun,
   input: {openedAt?: string; testStateAt?: string; modifiedAt?: string; nativeTestState?: Record<string,unknown>;
-    nativeStateKeys?: string[]; initializeNativeWriteGuard?: true} = {}): TestRun {
+    nativeStateKeys?: string[]; nativeTestletTimers?: OriginalTestResultState['nativeTestletTimers'];
+    initializeNativeWriteGuard?: true} = {}): TestRun {
   const before = previous.originalResultState;
   if (before !== undefined && (!before || typeof before !== 'object' || Array.isArray(before) ||
     before.hasTestState !== undefined && typeof before.hasTestState !== 'boolean')) {
@@ -51,11 +52,12 @@ export function withOriginalResultState(previous: TestRun, projected: TestRun,
   if(input.nativeTestState!==undefined)result.originalTestState=structuredClone(input.nativeTestState);
   else if(previous.originalTestState!==undefined&&stateAt===undefined)result.originalTestState=structuredClone(previous.originalTestState);
   else delete result.originalTestState;
-  if (before === undefined && openedAt === undefined && stateAt === undefined && modifiedAt === undefined && !input.initializeNativeWriteGuard) {
+  if (before === undefined && openedAt === undefined && stateAt === undefined && modifiedAt === undefined && !input.initializeNativeWriteGuard && input.nativeTestletTimers === undefined) {
     delete result.originalResultState;
     return result;
   }
   const evidence: OriginalTestResultState = {...before,
+    ...(input.nativeTestletTimers === undefined ? {} : {nativeTestletTimers: structuredClone(input.nativeTestletTimers)}),
     ...(openedAt === undefined ? {} : {lastOpenedAt: openedAt}),
     ...(stateAt === undefined ? {} : {lastTestStateAt: stateAt, hasTestState: input.nativeTestState===undefined?true:Object.keys(input.nativeTestState).length>0}),
     ...(modifiedAt === undefined ? {} : {lastTestModifiedAt: modifiedAt})};
