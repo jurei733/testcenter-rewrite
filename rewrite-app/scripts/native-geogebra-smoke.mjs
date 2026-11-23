@@ -146,6 +146,16 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
   });
   page.setDefaultTimeout(25_000);page.on('pageerror',error=>errors.push(String(error)));
   const wait=async(predicate,label)=>{const end=Date.now()+25_000;while(Date.now()<end){const value=await predicate();if(value)return value;await new Promise(resolve=>setTimeout(resolve,25));}throw Error('Native GeoGebra deadline: '+label);};
+  const waitForGestureSave=(path,coordinates)=>{
+    let checked;
+    // The Player can already have saved intermediate pointer positions.
+    return wait(()=>{
+      const packet=writes.findLast(row=>row.path===path);
+      if(!packet||packet===checked)return false;
+      checked=packet;
+      return emittedPoint(packet.body.dataParts)===coordinates?packet:false;
+    },'GeoGebra autosave contains the exact completed gesture');
+  };
   const snapshot=element=>element.evaluate(()=>{
     const api=window.owned_geometry,documentXml=new DOMParser().parseFromString(api.getXML('B'),'application/xml');
     const point=documentXml.querySelector('element[label="B"] > coords');
@@ -191,7 +201,6 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     await page.goto(base+'/app/native-start?ui=original');
     await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill(fixture.login);await page.locator('[data-cy=login-user]').click();
     await page.getByLabel('Kennwort',{exact:true}).fill(fixture.password);await page.locator('[data-cy=login-user]').click();
-    await page.locator('[data-cy="booklet-NATIVE.GEOGEBRA"]').getByRole('button').click();
     await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
     testId=/\/native-test\/([1-9][0-9]*)/.exec(new URL(page.url()).pathname)[1];
     const element=await ready(),geometry=await snapshot(element);
@@ -214,11 +223,10 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     mark('native-official-Aspect-executes-real-GeoGebra-through-an-installed-ITCR-resource-package');
     await writeFile(join(out,'native-geogebra-initialized.json'),JSON.stringify({success:true,testId,geometry,isolation,resources,errors,manifest:fixture.manifest,definitionSha256:fixture.definitionSha256},null,2));
     await configure('native-geogebra-edit',0);
-    await drag(element,geometry);
+    const edited=await drag(element,geometry);
     const responsePath=`/test/${testId}/unit/1/response`;
-    await wait(()=>responseReceipts.some(row=>row.phase==='native-geogebra-edit'&&row.path===responsePath&&row.status===201),'actual GeoGebra response autosave');
-    const edited=await snapshot(element),packet=writes.filter(row=>row.path===responsePath).at(-1);
-    assert.ok(packet);assert.equal(packet.body.responseType,fixture.manifest.player.unitStateType);
+    const packet=await waitForGestureSave(responsePath,edited.pointCoordinates);
+    assert.equal(packet.body.responseType,fixture.manifest.player.unitStateType);
     assert.ok(Object.keys(packet.body.dataParts).length);assert.ok(Object.values(packet.body.dataParts).every(value=>typeof value==='string'));
     const token=await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session'));
     const reply=await context.request.get(base+`/test/${testId}/unit/NATIVE.GEOMETRY/alias/1`,{headers:{AuthToken:token,'X-Native-Unit-Protocol':'1'}});
@@ -237,11 +245,9 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     const largeElement=await ready(),largeBefore=await snapshot(largeElement);
     await writeFile(join(out,'native-geogebra-large-before.json'),JSON.stringify({geometry:largeBefore,controls:await largeElement.evaluate(()=>[...document.querySelectorAll('[title],[aria-label],[role=button]')].map(node=>({tag:node.tagName,css:node.className,title:node.title,label:node.getAttribute('aria-label'),text:node.textContent?.slice(0,100)})))},null,2));
     assert.notEqual(largeBefore.pointCoordinates,edited.pointCoordinates,'The second Unit must load the official large construction');
-    await drag(largeElement,largeBefore);
+    const largeEdited=await drag(largeElement,largeBefore);
     const largePath=`/test/${testId}/unit/2/response`;
-    await wait(()=>responseReceipts.some(row=>row.phase==='native-geogebra-large'&&row.path===largePath&&row.status===201),'large actual GeoGebra autosave');
-    const largeEdited=await snapshot(largeElement),largePacket=writes.filter(row=>row.path===largePath).at(-1);
-    assert.ok(largePacket);assert.equal(emittedPoint(largePacket.body.dataParts),largeEdited.pointCoordinates);
+    const largePacket=await waitForGestureSave(largePath,largeEdited.pointCoordinates);
     const largeBytes=Buffer.byteLength(JSON.stringify(largePacket.body));assert.ok(largeBytes>1024*1024,'Actual GeoGebra data must exceed the ordinary one-MiB ingress budget');
     const unitUrl=base+`/test/${testId}/unit/NATIVE.GEOMETRY.LARGE/alias/2`;
     const readUnit=async()=>{const reply=await context.request.get(unitUrl,{headers:{AuthToken:token,'X-Native-Unit-Protocol':'1'}});assert.equal(reply.status(),200);return reply.json();};

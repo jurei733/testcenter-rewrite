@@ -15,7 +15,7 @@ async function runCapacityCase({browser,base,out,mark:report,fixture,responseRec
  let run;
  try{
   await configure(stem+'-setup',0);await page.goto(base+'/app/native-start?ui=original');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('stars-4');await page.locator('[data-cy=login-user]').click();await page.getByLabel('Kennwort',{exact:true}).fill('123');await page.locator('[data-cy=login-user]').click();
-  const card=page.locator('[data-cy^="booklet-"]').filter({hasText:fixture.source.booklet.bookletKey});await card.waitFor();assert.equal(await card.count(),1);await card.getByRole('button',{name:'Starten',exact:true}).click();await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
+  await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
   const testId=/\/native-test\/([1-9][0-9]*)/.exec(new URL(page.url()).pathname)[1],first=page.frameLocator('iframe').locator('[data-cy="button-0"] input');await first.waitFor({state:'attached'});
   const save=page.waitForResponse(response=>new URL(response.url()).pathname===`/test/${testId}/unit/1/response`&&response.request().method()==='PUT'&&response.status()===201);await first.dispatchEvent('click');const body=(await save).request().postDataJSON();
   await wait(()=>page.evaluate(testId=>{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith('testcenter-native-unit-journal:v1:')&&key.includes(':'+testId+':')&&JSON.parse(localStorage.getItem(key)).entries.length)return false;}return true;},testId),'initial Source Unit buffers empty');

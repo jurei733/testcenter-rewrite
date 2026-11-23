@@ -23,6 +23,7 @@ import {nativeLoginProblemText} from '../native-login-problem';
 import {NativeLoginFailureService} from '../native-login-failure.service';
 import {OriginalParticipantLogoutDialogComponent} from '../original-participant-logout-dialog.component';
 import {NativeStarterComponent} from './starter/native-starter.component';
+import {NativeTestStarterService} from './native-test-starter.service';
 import {NativeCodeLoginComponent} from './native-code-login.component';
 import {AssetService} from './shared/services/asset.service';
 import {NativeTerminalCompletionService} from './native-terminal-completion.service';
@@ -32,7 +33,7 @@ import {NativePublicHeaderService} from '../native-public-header.service';
 import type {CodeInputType} from './app.interfaces';
 @Component({selector:'app-native-participant-entry',standalone:true,
  imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent],
- providers:[NativeLoginFailureService,AssetService,CustomtextService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
+ providers:[NativeLoginFailureService,AssetService,CustomtextService,NativeTestStarterService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
  template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(!session.busy()&&!codeRequired){@if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
  @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
  @if(session.restoring()||refreshing()){<p role="status">Sitzung wird geprüft …</p>}
@@ -40,6 +41,7 @@ import type {CodeInputType} from './app.interfaces';
  <div class="native-login-outlet"><div class="native-login-host"><div class="login-page"><div class="welcome-section"><img [src]="settings.assetUrl('loginIllustration')" alt=""/><div><p class="heading">Willkommen im IQB‑Testcenter</p><p>Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.</p></div></div>
  <div class="login-section">@if(!passwordStep()){<form (ngSubmit)="submit()"><h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" required minlength="3" autocomplete="username" autocapitalize="off" /></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>@if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}@else{<form (ngSubmit)="submit()"><div class="password-headline"><button matIconButton type="button" (click)="passwordStep.set(false);password=''" aria-label="Zurück"><mat-icon svgIcon="chevron_left" /></button><h2>Kennwort eingeben</h2></div><mat-form-field appearance="outline"><mat-label>Kennwort</mat-label><input matInput name="password" autofocus (keyup)="passwordKeyUp($event)" [(ngModel)]="password" [type]="showPassword?'text':'password'" autocomplete="current-password"/><button mat-icon-button matSuffix type="button" aria-label="Kennwort anzeigen" [attr.aria-pressed]="showPassword" (click)="showPassword=!showPassword"><mat-icon svgIcon="visibility" /></button></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>@if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}<app-native-login-browser-notice /><div class="button-section"><button matButton="tonal" type="button" routerLink="/ops" data-cy="login-admin-form">Adminbereich</button></div></div></div></div></div>
  }@else if(codeRequired){<div class="native-login-outlet"><app-native-code-login [inputType]="codeInputType" [length]="codeLength" [disabled]="session.busy()" [problemText]="problem()" (submitCode)="code($event)" /></div>}
+ @else if(startingTest()){<p role="status">Test wird geöffnet …</p>}
  @else if(refreshFailed()){<button matButton="filled" (click)="refreshStarter()">Übersicht erneut laden</button>}
  @else{<div class="native-login-outlet">@for(scope of ownerKeys;track scope){<app-native-starter />}</div>}@if(!session.access()){<app-original-footer />}`})
 export class NativeParticipantEntryComponent {
@@ -52,6 +54,8 @@ export class NativeParticipantEntryComponent {
  private singleActor:string|undefined;
  private readonly view=new AbortController();private logoutCleanup:(()=>void)|undefined;
  private readonly completions=inject(NativeTerminalCompletionService);
+ private readonly testStarter=inject(NativeTestStarterService);
+ readonly startingTest=signal(false);
  readonly refreshing=signal(false);
  readonly refreshFailed=signal(false);
  private textScope:AbortSignal|undefined;
@@ -82,6 +86,22 @@ export class NativeParticipantEntryComponent {
   if(this.view.signal.aborted||this.session.access()!==access||this.singleActor===access.token||access.flags.includes('codeRequired')||access.claims.sysCheck?.length!==1||Object.keys(access.claims).length!==1)return;
   this.singleActor=access.token;const check=access.claims.sysCheck[0]!;await this.router.navigate(['/check',check.workspaceId,check.id,'w']);
  }
+ private async startSingleTest(access:OriginalAccessSet){
+  const tests=access.claims.test;
+  if(access.flags.includes('codeRequired')||tests?.length!==1||Object.keys(access.claims).length!==1)return;
+  const scope=this.session.accessSignal;
+  this.startingTest.set(true);
+  try{
+   const id=await this.testStarter.start(tests[0]!.id,this.view.signal);
+   if(!this.view.signal.aborted&&!scope.aborted&&scope===this.session.accessSignal){
+    await this.router.navigate(['/native-test',id]);
+   }
+  }catch{
+   // A failed automatic start leaves the signed-in user at the chooser.
+  }finally{
+   if(!this.view.signal.aborted)this.startingTest.set(false);
+  }
+ }
  private bindTexts(texts:Record<string,string>){
   const scope=this.session.accessSignal;if(this.textScope===scope)return;
   this.refreshFailed.set(false);this.problem.set('');
@@ -92,8 +112,9 @@ export class NativeParticipantEntryComponent {
  get ownerKeys(){this.session.access();this.session.busy();return [this.session.accessSignal];}
  get codeInputType():CodeInputType{const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.type??'text-field':'text-field';}
  get codeLength(){const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.length:undefined;}
- async submit(){if(this.session.busy()||this.name.trim().length<3)return;this.problem.set('');const passwordStep=this.passwordStep();if(passwordStep)this.clearLoginWarning();else this.loginProblemCode.set(0);try{
+ async submit(){if(this.session.busy()||this.startingTest()||this.name.trim().length<3)return;this.problem.set('');const passwordStep=this.passwordStep();if(passwordStep)this.clearLoginWarning();else this.loginProblemCode.set(0);try{
   const access=await this.session.loginParticipant(this.name.trim(),passwordStep?this.password:'',this.view.signal);if(this.view.signal.aborted||this.session.access()!==access)return;this.bindTexts(access.customTexts);this.password='';this.passwordStep.set(false);
+  await this.startSingleTest(access);
   await this.startSingleCheck(access);
  }catch(error){if(this.view.signal.aborted||(error instanceof Error&&error.name==='AbortError'))return;if(error instanceof NativeMonitorHttpError){
    this.loginProblemCode.set(error.status);
@@ -102,7 +123,18 @@ export class NativeParticipantEntryComponent {
    if(text){this.passwordStep.set(false);this.name='';this.password='';this.loginProblem.set(text);this.loginProblemLevel.set('error');this.session.problem.set('');return;}
    this.loginProblem.set('Problem bei der Anmeldung.');this.loginProblemLevel.set('error');this.session.problem.set('');await this.loginFailure.show(error,this.view.signal);return;
   }this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');}}
- async code(value:string){if(this.session.busy())return;this.problem.set('');try{const access=await this.session.person(value,this.view.signal);if(!this.view.signal.aborted&&this.session.access()===access)this.bindTexts(access.customTexts);}catch(error){if(!this.view.signal.aborted)this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');}}
+ async code(value:string){
+  if(this.session.busy()||this.startingTest())return;
+  this.problem.set('');
+  try{
+   const access=await this.session.person(value,this.view.signal);
+   if(this.view.signal.aborted||this.session.access()!==access)return;
+   this.bindTexts(access.customTexts);
+   await this.startSingleTest(access);
+  }catch(error){
+   if(!this.view.signal.aborted)this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');
+  }
+ }
  logoClick(){if(!this.codeRequired||this.view.signal.aborted)return;const pending=this.session.logout(),scope=this.session.accessSignal;void pending.catch(error=>{if(!this.view.signal.aborted&&scope===this.session.accessSignal&&!this.session.access())this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.');});}
  logout(){if(this.logoutCleanup||this.view.signal.aborted)return;const claims=this.session.access()?.claims,isOperator=['superAdmin','workspaceAdmin','testGroupMonitor'].some(key=>!!claims&&Object.hasOwn(claims,key));const scope=this.session.accessSignal,ref=this.dialog.open(OriginalParticipantLogoutDialogComponent,{panelClass:'original-participant-logout-dialog',data:{safeMode:!isOperator&&this.settings.effectiveThemeName()==='Primar'},autoFocus:'dialog'}),subscriptions=new Subscription();
   const retire=()=>{subscriptions.unsubscribe();ref.componentRef?.location.nativeElement.remove();ref.close();if(this.logoutCleanup===retire)this.logoutCleanup=undefined;};this.logoutCleanup=retire;subscriptions.add(fromEvent(scope,'abort').subscribe(retire));

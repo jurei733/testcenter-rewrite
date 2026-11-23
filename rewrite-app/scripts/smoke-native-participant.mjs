@@ -133,9 +133,13 @@ try{
  await page.getByLabel('Kennwort',{exact:true}).fill(password);await page.locator('[data-cy=login-user]').click();await page.locator('[data-cy=code-input]').waitFor();mark('actual-ui-password-work-to-native-code-input');
  assert.equal(await page.locator('[data-cy=header] .center').innerText(),sourceCodeHeader.initial.headerTitle);
  await page.reload();await page.locator('[data-cy=code-input]').waitFor();assert.equal(await page.locator('[data-cy=header] .center').innerText(),sourceCodeHeader.restored.headerTitle??'');mark('public-code-header-retains-the-login-title-and-full-reload-restores-the-Source-blank-header');
+ const card=page.locator('[data-cy="booklet-OWNED.BROWSER"]');
+ const starts=()=>wire.filter(({method,path})=>method==='PUT'&&path==='/test');
+ assert.equal(starts().length,0,'No Test may start before the person code is accepted');
+ const start=page.waitForResponse(response=>response.request().method()==='PUT'&&new URL(response.url()).pathname==='/test');
  await page.locator('[data-cy=code-input]').fill('sHaReD');await page.locator('[data-cy=continue]').click();
- const card=page.locator('[data-cy="booklet-OWNED.BROWSER"]');await card.waitFor();assert.equal(await card.innerText().then(t=>t.includes('Owned Native Booklet')),true);await page.screenshot({path:join(out,'starter.png')});mark('source-card-ui-after-real-code-work');
- await card.getByRole('button',{name:'Starten',exact:true}).click();await page.waitForURL(/\/native-test\/9007199254740993(?:\/|$)/);mark('actual-ui-start-preserves-unsafe-integer-native-route');
+ const started=await start;assert.deepEqual(started.request().postDataJSON(),{bookletName:'OWNED.BROWSER'});
+ await page.waitForURL(/\/native-test\/9007199254740993(?:\/|$)/);assert.equal(starts().length,1);mark('valid-code-auto-starts-one-source-test-with-unsafe-integer-native-route');
  const input=page.frameLocator('iframe').getByRole('textbox',{name:'Owned answer'});await input.waitFor();await page.frameLocator('iframe').locator('body[data-started=true]').waitFor();await page.waitForFunction(()=>document.querySelector('iframe')?.isConnected);await input.fill('Owned native UI Ω');mark('actual-source-controller-and-opaque-player-are-interactive');
  await page.waitForResponse(r=>/\/test\/9007199254740993\/unit\/OWNED.UNIT\/response$/.test(new URL(r.url()).pathname)&&r.request().method()==='PUT'&&r.status()===201);mark('actual-player-state-reaches-real-native-response-write');
  const player=page.frameLocator('iframe'),shared=[{key:'owned-locale',value:'Ä/β Ω'}];

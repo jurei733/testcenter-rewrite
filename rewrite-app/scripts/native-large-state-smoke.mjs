@@ -13,7 +13,7 @@ export async function runNativeLargeStateSmoke({browser,base,out,password,mark,c
  try{
   await configure('native-large-state-setup',0);
   await page.goto(base+'/app/native-start?ui=original');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('native-large-state');await page.locator('[data-cy=login-user]').click();await page.getByLabel('Kennwort',{exact:true}).fill(password);await page.locator('[data-cy=login-user]').click();
-  await page.locator('[data-cy="booklet-OWNED.BROWSER"]').getByRole('button',{name:'Starten',exact:true}).click();await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
+  await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
   testId=/\/native-test\/([1-9][0-9]*)/.exec(new URL(page.url()).pathname)[1];
   const answer=()=>page.frameLocator('iframe').getByLabel('Owned answer',{exact:true});await answer().waitFor();await wait(async()=>await answer().isEnabled(),'real Verona Player starts');
   const type=async value=>answer().evaluate((input,value)=>{input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));},value);

@@ -24,7 +24,7 @@ export async function runNativeBackgroundLockedSmoke({browser,base,file,out,pass
  try{
   await configure('native-background-locked',0);
   await page.goto(base+'/app/native-start?ui=original');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('native-background');await page.locator('[data-cy=login-user]').click();await page.getByLabel('Kennwort',{exact:true}).fill(password);await page.locator('[data-cy=login-user]').click();
-  const card=page.locator('[data-cy="booklet-OWNED.BROWSER"]');await card.waitFor();await card.getByRole('button',{name:'Starten',exact:true}).click();await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
+  await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
   const testId=/\/native-test\/([1-9][0-9]*)/.exec(new URL(page.url()).pathname)[1],actorToken=await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session'));
   const player=page.frameLocator('iframe');await player.locator('body[data-started=true]').waitFor();await page.evaluate(()=>navigator.serviceWorker.ready);
   const answer='Owned locked background answer Ω  ';await player.getByRole('textbox',{name:'Owned answer',exact:true}).fill(answer);

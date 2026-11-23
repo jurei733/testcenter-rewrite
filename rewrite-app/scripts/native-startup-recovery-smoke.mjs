@@ -15,7 +15,7 @@ export async function runNativeStartupRecoverySmoke({browser,base,file,out,passw
  try{
   await configure('native-startup-prepare',0);
   await page.goto(base+'/app/native-start?ui=original');await page.getByRole('textbox',{name:'Anmeldename',exact:true}).fill('native-startup');await page.locator('[data-cy=login-user]').click();await page.getByLabel('Kennwort',{exact:true}).fill(password);await page.locator('[data-cy=login-user]').click();
-  const card=page.locator('[data-cy="booklet-OWNED.BROWSER"]');await card.waitFor();await card.getByRole('button',{name:'Starten',exact:true}).click();await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
+  await page.waitForURL(/\/native-test\/[1-9][0-9]*\/u\/1(?:\?|$)/);
   const testId=/\/native-test\/([1-9][0-9]*)/.exec(new URL(page.url()).pathname)[1],url=page.url(),player=page.frameLocator('iframe');await player.locator('body[data-started=true]').waitFor();await page.evaluate(()=>navigator.serviceWorker.ready);assert.equal(await player.locator('#shared-start').textContent(),'[]');
   const shared=[{key:'owned-startup',value:'Worker before Player Ω'}],expected=JSON.stringify(shared);
   await player.getByRole('textbox',{name:'Shared key',exact:true}).fill(shared[0].key);await player.getByRole('textbox',{name:'Shared value',exact:true}).fill(shared[0].value);await player.getByRole('button',{name:'Share parameter',exact:true}).click();

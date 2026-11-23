@@ -33,6 +33,7 @@ function fixture(Entry){
  bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},ChangeDetectorRef:{markForCheck(){}},Router:{events:new rx.Subject(),getCurrentNavigation:()=>null,navigate:async()=>true},ActivatedRoute:{firstChild:null},MatDialog:{},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},CustomtextService:{restoreDefault(){},addCustomTexts(){}},NativeTerminalCompletionService:{},NativeLoginFailureService:{show:async(error,owner)=>failures.push({error,owner})}}));
  bindings.set('NativePublicHeaderService',new NativePublicHeaderService());
  bindings.set('NativeBackgroundService',{});
+ bindings.set('NativeTestStarterService',{});
  const component=new Entry();component.name='owned-login';return {component,session,failures};
 }
 for(const [entry,Entry]of entries){

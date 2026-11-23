@@ -107,6 +107,7 @@ try {
         page.locator('[data-cy="login-user"]').click()]); assert.equal(response.status(), 200);
       const access = await response.json(); assert.equal(access.loginName, actor);
       if (coded) await page.locator('tc-code-input').waitFor();
+      else if (actor === 'native-passwordless-no-code') await page.waitForURL(/\/native-test\/[1-9][0-9]*\//);
       else await page.getByRole('button', {name: 'Nutzerinformationen', exact: true}).waitFor();
       assert.deepEqual(observed.filter(request => !request.startsWith('GET ')), ['PUT /session/login'], 'The actual Source empty-secret name step requires neither a challenge nor an extra credential write');
       assert.equal(await page.locator('.password-headline').count(), 0);
@@ -116,6 +117,36 @@ try {
     } finally {page.off('request', observe);}
   }
   await writeFile(join(artifacts, 'passwordless-name-steps.json'), JSON.stringify(passwordlessCases, null, 2));
+  setPhase('passwordless-test-start-fallback');
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(base + '/app/native-start?ui=original');
+  const testStarts = [];
+  const isTestStart = request => request.method() === 'PUT' && new URL(request.url()).pathname === '/test';
+  const observeTestStart = request => {if (isTestStart(request)) testStarts.push(request.postDataJSON());};
+  const rejectFirstTestStart = route => isTestStart(route.request()) && testStarts.length === 1
+    ? route.fulfill({status: 503, body: 'Test is temporarily unavailable'})
+    : route.continue();
+  page.on('request', observeTestStart);
+  await page.route('**/test', rejectFirstTestStart);
+  try {
+    await page.getByRole('textbox', {name: 'Anmeldename', exact: true}).fill('native-passwordless-no-code');
+    await page.locator('[data-cy="login-user"]').click();
+    const card = page.locator('[data-cy="booklet-OWNED.BROWSER"]');
+    await card.waitFor();
+    assert.deepEqual(testStarts, [{bookletName: 'OWNED.BROWSER'}]);
+    await page.reload();
+    await card.waitFor();
+    assert.deepEqual(testStarts, [{bookletName: 'OWNED.BROWSER'}]);
+    await card.getByRole('button', {name: 'Weiter', exact: true}).click();
+    await page.waitForURL(/\/native-test\/[1-9][0-9]*\//);
+    assert.deepEqual(testStarts, [{bookletName: 'OWNED.BROWSER'}, {bookletName: 'OWNED.BROWSER'}]);
+    mark('native-auto-start-failure-retains-chooser-and-reload-requires-manual-start');
+    const token = await page.evaluate(() => localStorage.getItem('testcenter-native-monitor-session'));
+    assert.equal((await fetch(base + '/session', {method: 'DELETE', headers: {AuthToken: token}, signal: AbortSignal.timeout(15000)})).status, 205);
+  } finally {
+    await page.unroute('**/test', rejectFirstTestStart);
+    page.off('request', observeTestStart);
+  }
   await page.evaluate(() => localStorage.clear()); await page.goto(base + '/app/participant?ui=original', {waitUntil: 'domcontentloaded'});
   await request('PUT', '/session/login', {name: 'native-browser', password}, undefined, 400);
   await request('GET', '/session', undefined, undefined, 401);
