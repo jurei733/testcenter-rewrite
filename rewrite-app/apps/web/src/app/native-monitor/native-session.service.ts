@@ -6,7 +6,7 @@ const key='testcenter-native-monitor-session';
 const finishKey=key+'-unfinished-finish';
 const purposeKey=key+'-purpose';
 type NativeSessionPurpose='monitor'|'participant';
-type CredentialRequest={kind:'login';name:string;password:string}|{kind:'person';code:string;token:string};
+type CredentialRequest={kind:'login';name:string;password?:string}|{kind:'person';code:string;token:string};
 const allows=(access:OriginalAccessSet,purpose:NativeSessionPurpose)=>!!access.token&&!!access.claims&&
  (purpose==='monitor'?!!access.claims.testGroupMonitor?.length:Array.isArray(access.flags));
 // Opening a Test updates running flags. That is not an actor or grant change.
@@ -35,7 +35,7 @@ export class NativeMonitorSessionService {
  async login(name:string,password:string,owner?:AbortSignal):Promise<OriginalAccessSet>{
   return this.authenticate({kind:'login',name,password},'monitor',owner);
  }
- async loginParticipant(name:string,password:string,owner?:AbortSignal):Promise<OriginalAccessSet>{
+ async loginParticipant(name:string,password?:string,owner?:AbortSignal):Promise<OriginalAccessSet>{
   return this.authenticate({kind:'login',name,password},'participant',owner);
  }
  async person(code:string,owner?:AbortSignal):Promise<OriginalAccessSet>{
@@ -63,7 +63,7 @@ export class NativeMonitorSessionService {
    catch(error){
     current();
     if(!(error instanceof NativeMonitorHttpError)||error.status!==400||!error.message.includes('Brute Force protection active'))throw error;
-    const challenge=await credentialJson<OriginalWorkChallenge&{maxnumber?:number}>('POST',request.kind==='login'?'/session/challenge':'/session/person/challenge',request.kind==='login'?{loginType:'login',name:request.name,password:request.password}:{code:request.code});
+    const challenge=await credentialJson<OriginalWorkChallenge&{maxnumber?:number}>('POST',request.kind==='login'?'/session/challenge':'/session/person/challenge',request.kind==='login'?{loginType:'login',name:request.name,password:request.password??''}:{code:request.code});
     current();const {solveChallengeWorkers}=await import('altcha-lib');current();
     const workers:Worker[]=[];let abortWork:()=>void=()=>{},failWork:(error:Error)=>void=()=>{},workTimer:ReturnType<typeof setTimeout>|undefined;
     const workerFailed=(event:Event)=>{event.preventDefault();failWork(new Error('Die Sicherheitsprüfung konnte nicht geladen werden. Bitte erneut versuchen.'));};

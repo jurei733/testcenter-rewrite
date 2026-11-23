@@ -3,7 +3,7 @@ import {NativeThemeContext} from '../native-theme-context.service';
 import {NativeAssetContext} from '../native-asset-context.service';
 import {Component,effect,inject,signal,untracked} from '@angular/core';
 import {FormsModule} from '@angular/forms';
-import {Router,RouterLink} from '@angular/router';
+import {ActivatedRoute,Router,RouterLink} from '@angular/router';
 import {MatToolbar} from '@angular/material/toolbar';
 import {MatInput} from '@angular/material/input';
 import {MatFormField,MatLabel,MatSuffix} from '@angular/material/form-field';
@@ -31,17 +31,19 @@ import {NativeBackgroundService} from './native-background.service';
 import {CustomtextService} from './shared/services/customtext/customtext.service';
 import {NativePublicHeaderService} from '../native-public-header.service';
 import type {CodeInputType} from './app.interfaces';
+import {originalParticipantReturnPath} from './original-participant-bookmark';
 @Component({selector:'app-native-participant-entry',standalone:true,
  imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent],
  providers:[NativeLoginFailureService,AssetService,CustomtextService,NativeTestStarterService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
  template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(!session.busy()&&!codeRequired){@if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
  @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
- @if(session.restoring()||refreshing()){<p role="status">Sitzung wird geprüft …</p>}
- @else if(!session.access()){
+ @if(session.restoring()||refreshing()||(directLoginName&&session.busy())){<p role="status">Sitzung wird geprüft …</p>}
+ @else if(startingTest()){<p role="status">Test wird geöffnet …</p>}
+ @else if(directLoginName){}
+ @else if(explicitLogin||!session.access()){
  <div class="native-login-outlet"><div class="native-login-host"><div class="login-page"><div class="welcome-section"><img [src]="settings.assetUrl('loginIllustration')" alt=""/><div><p class="heading">Willkommen im IQB‑Testcenter</p><p>Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.</p></div></div>
  <div class="login-section">@if(!passwordStep()){<form (ngSubmit)="submit()"><h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" required minlength="3" autocomplete="username" autocapitalize="off" /></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>@if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}@else{<form (ngSubmit)="submit()"><div class="password-headline"><button matIconButton type="button" (click)="passwordStep.set(false);password=''" aria-label="Zurück"><mat-icon svgIcon="chevron_left" /></button><h2>Kennwort eingeben</h2></div><mat-form-field appearance="outline"><mat-label>Kennwort</mat-label><input matInput name="password" autofocus (keyup)="passwordKeyUp($event)" [(ngModel)]="password" [type]="showPassword?'text':'password'" autocomplete="current-password"/><button mat-icon-button matSuffix type="button" aria-label="Kennwort anzeigen" [attr.aria-pressed]="showPassword" (click)="showPassword=!showPassword"><mat-icon svgIcon="visibility" /></button></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>@if(session.busy()){<p role="status">Sicherheitsprüfung …</p>}</form>}<app-native-login-browser-notice /><div class="button-section"><button matButton="tonal" type="button" routerLink="/ops" data-cy="login-admin-form">Adminbereich</button></div></div></div></div></div>
  }@else if(codeRequired){<div class="native-login-outlet"><app-native-code-login [inputType]="codeInputType" [length]="codeLength" [disabled]="session.busy()" [problemText]="problem()" (submitCode)="code($event)" /></div>}
- @else if(startingTest()){<p role="status">Test wird geöffnet …</p>}
  @else if(refreshFailed()){<button matButton="filled" (click)="refreshStarter()">Übersicht erneut laden</button>}
  @else{<div class="native-login-outlet">@for(scope of ownerKeys;track scope){<app-native-starter />}</div>}@if(!session.access()){<app-original-footer />}`})
 export class NativeParticipantEntryComponent {
@@ -50,6 +52,9 @@ export class NativeParticipantEntryComponent {
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
  private readonly cts=inject(CustomtextService);private readonly router=inject(Router);private readonly dialog=inject(MatDialog);
+ private readonly route=inject(ActivatedRoute).snapshot;
+ readonly directLoginName=this.route?.data.directLogin===true?this.route.queryParamMap.get('name'):null;
+ readonly explicitLogin=this.route?.data.explicitLogin===true;
  private readonly initialNavigation=this.router.getCurrentNavigation()?.previousNavigation===null;
  private singleActor:string|undefined;
  private readonly view=new AbortController();private logoutCleanup:(()=>void)|undefined;
@@ -65,8 +70,21 @@ export class NativeParticipantEntryComponent {
  readonly loginProblem=signal('');readonly loginProblemCode=signal(0);readonly loginProblemLevel=signal<'error'|'warning'>('error');
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
- constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(NativeBackgroundService);inject(InterfaceModeService).select('original');effect(()=>{const access=this.session.access(),restoring=this.session.restoring(),pending=restoring||this.session.busy();untracked(()=>{this.bindTexts(access?.customTexts??{});if(!restoring)this.updatePublicHeader(access);if(access&&!pending&&this.initialNavigation)void this.startSingleCheck(access);});});
-  if(this.session.access()&&!this.codeRequired)void this.refreshStarter();
+ constructor(){
+  this.assets.activate(this.view.signal);
+  inject(NativeThemeContext).activate(this.view.signal);
+  inject(NativeBackgroundService);
+  inject(InterfaceModeService).select('original');
+  effect(()=>{
+   const access=this.session.access(),restoring=this.session.restoring(),pending=restoring||this.session.busy();
+   untracked(()=>{
+    this.bindTexts(access?.customTexts??{});
+    if(!restoring)this.updatePublicHeader(this.explicitLogin?null:access);
+    if(access&&!pending&&this.initialNavigation&&!this.explicitLogin&&!this.directLoginName)void this.startSingleCheck(access);
+   });
+  });
+  if(this.directLoginName)void this.openDirectLogin(this.directLoginName);
+  else if(!this.explicitLogin&&this.session.access()&&!this.codeRequired)void this.refreshStarter();
  }
  private updatePublicHeader(access:OriginalAccessSet|null){
   if(this.view.signal.aborted)return;
@@ -82,11 +100,11 @@ export class NativeParticipantEntryComponent {
   catch(error){if(current()){this.refreshFailed.set(true);this.problem.set(error instanceof Error?error.message:'Die Übersicht konnte nicht aktualisiert werden.');}}
   finally{if(!this.view.signal.aborted)this.refreshing.set(false);}
  }
- private async startSingleCheck(access:OriginalAccessSet){
+ private async startSingleCheck(access:OriginalAccessSet,replaceUrl=false){
   if(this.view.signal.aborted||this.session.access()!==access||this.singleActor===access.token||access.flags.includes('codeRequired')||access.claims.sysCheck?.length!==1||Object.keys(access.claims).length!==1)return;
-  this.singleActor=access.token;const check=access.claims.sysCheck[0]!;await this.router.navigate(['/check',check.workspaceId,check.id,'w']);
+  this.singleActor=access.token;const check=access.claims.sysCheck[0]!;await this.router.navigate(['/check',check.workspaceId,check.id,'w'],{replaceUrl});
  }
- private async startSingleTest(access:OriginalAccessSet){
+ private async startSingleTest(access:OriginalAccessSet,replaceUrl=false){
   const tests=access.claims.test;
   if(access.flags.includes('codeRequired')||tests?.length!==1||Object.keys(access.claims).length!==1)return;
   const scope=this.session.accessSignal;
@@ -94,7 +112,7 @@ export class NativeParticipantEntryComponent {
   try{
    const id=await this.testStarter.start(tests[0]!.id,this.view.signal);
    if(!this.view.signal.aborted&&!scope.aborted&&scope===this.session.accessSignal){
-    await this.router.navigate(['/native-test',id]);
+    await this.router.navigate(['/native-test',id],{replaceUrl});
    }
   }catch{
    // A failed automatic start leaves the signed-in user at the chooser.
@@ -108,14 +126,40 @@ export class NativeParticipantEntryComponent {
   this.textScope?.removeEventListener('abort',this.clearTexts);this.clearTexts();this.textScope=scope;
   if(!scope.aborted){this.cts.addCustomTexts(texts);scope.addEventListener('abort',this.clearTexts,{once:true});}
  }
+ private async openDirectLogin(name:string):Promise<void>{
+  try{
+   const access=await this.session.loginParticipant(name,undefined,this.view.signal);
+   if(this.view.signal.aborted||this.session.access()!==access)return;
+   await this.startSingleTest(access,true);
+   await this.startSingleCheck(access,true);
+   if(!this.view.signal.aborted&&this.session.access()===access){
+    await this.router.navigate(['/native-start'],{replaceUrl:true});
+   }
+  }catch(error){
+   if(this.view.signal.aborted||(error instanceof Error&&error.name==='AbortError'))return;
+   this.session.problem.set('');
+   if(error instanceof NativeMonitorHttpError)await this.loginFailure.show(error,this.view.signal);
+   else this.problem.set('Problem bei der Anmeldung.');
+  }
+ }
+ private async navigateAfterLogin(access:OriginalAccessSet):Promise<void>{
+  if(this.explicitLogin){
+   const route=originalParticipantReturnPath(this.route.queryParamMap.get('returnTo')??'');
+   if(!await this.router.navigateByUrl(route,{replaceUrl:true})&&!this.view.signal.aborted&&this.session.access()===access){
+    await this.router.navigate(['/native-start'],{replaceUrl:true});
+   }
+   return;
+  }
+  await this.startSingleTest(access);
+  await this.startSingleCheck(access);
+ }
  get codeRequired(){return this.session.access()?.flags.includes('codeRequired')??false;}
  get ownerKeys(){this.session.access();this.session.busy();return [this.session.accessSignal];}
  get codeInputType():CodeInputType{const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.type??'text-field':'text-field';}
  get codeLength(){const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.length:undefined;}
  async submit(){if(this.session.busy()||this.startingTest()||this.name.trim().length<3)return;this.problem.set('');const passwordStep=this.passwordStep();if(passwordStep)this.clearLoginWarning();else this.loginProblemCode.set(0);try{
   const access=await this.session.loginParticipant(this.name.trim(),passwordStep?this.password:'',this.view.signal);if(this.view.signal.aborted||this.session.access()!==access)return;this.bindTexts(access.customTexts);this.password='';this.passwordStep.set(false);
-  await this.startSingleTest(access);
-  await this.startSingleCheck(access);
+  await this.navigateAfterLogin(access);
  }catch(error){if(this.view.signal.aborted||(error instanceof Error&&error.name==='AbortError'))return;if(error instanceof NativeMonitorHttpError){
    this.loginProblemCode.set(error.status);
    if(!passwordStep){this.passwordStep.set(true);this.session.problem.set('');return;}

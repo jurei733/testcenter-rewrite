@@ -25,6 +25,26 @@ function load(relative){
  });return exports;
 }
 const {NativePublicHeaderService}=load('native-public-header.service.ts');
+const {originalParticipantBookmark,originalParticipantReturnPath}=load('native-participant/original-participant-bookmark.ts');
+test('Original participant bookmarks distinguish direct logins, explicit returns and reserved routes',()=>{
+ assert.equal(originalParticipantBookmark('#/r/login'),'/native-start');
+ assert.equal(originalParticipantBookmark('#/r/login/%2Fr%2Fstarter'),'/native-start/login?returnTo=%2Fr%2Fstarter');
+ assert.equal(originalParticipantBookmark('#/Owned.Name'),'/native-start/direct?name=Owned.Name');
+ for(const bookmark of ['#/privacy','#/admin','#/person/child','#/a%2Fb','#/a%5Cb','#/a%3Bb','#/%2e%2e','#/%FF']){
+  assert.equal(originalParticipantBookmark(bookmark),null,bookmark);
+ }
+});
+test('Original return destinations stay inside the existing guarded application routes',()=>{
+ for(const [source,destination]of [
+  ['/r/starter','/native-start'],['/r/code-input','/native-start'],
+  ['/t/9/u/2?ui=original','/native-test/9/u/2?ui=original'],
+  ['/gm/group.one/full','/group-monitor/group.one/full'],['/check/1/hardware','/check/1/hardware'],
+  ['/privacy','/privacy']
+ ])assert.equal(originalParticipantReturnPath(source),destination);
+ for(const destination of ['https://owned.invalid','//owned.invalid','/gm/../login','/api/session','/t/123/(aux:other)','/gm/a\\b']){
+  assert.equal(originalParticipantReturnPath(destination),'/native-start',destination);
+ }
+});
 const entries=[['monitor',load('native-monitor/native-monitor-entry.component.ts').NativeMonitorEntryComponent],['participant',load('native-participant/native-participant-entry.component.ts').NativeParticipantEntryComponent]];
 function fixture(Entry){
  const scope=new AbortController(),problem$=new rx.BehaviorSubject('');

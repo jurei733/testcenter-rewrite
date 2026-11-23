@@ -2,6 +2,7 @@ import { bootstrapApplication } from "@angular/platform-browser";
 
 import { appConfig } from "./app/app.config";
 import { BootstrapRootComponent } from "./app/bootstrap-root.component";
+import { originalParticipantBookmark } from "./app/native-participant/original-participant-bookmark";
 
 const registerAppShellServiceWorker = async (): Promise<void> => {
   if (!("serviceWorker" in navigator)) {
@@ -21,12 +22,17 @@ const registerAppShellServiceWorker = async (): Promise<void> => {
   }
 };
 
-const normalizeOriginalWorkspaceEntry = (): void => {
+const normalizeOriginalEntry = (): void => {
   const url = new URL(window.location.href);
   const originalBookmark = /^#(\/admin\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*\/?)$/i.exec(url.hash);
-  if (originalBookmark && /^\/(?:app\/?)?$/.test(url.pathname)) {
-    url.pathname = "/app" + originalBookmark[1];
-    url.hash = "";
+  if (/^\/(?:app\/?)?$/.test(url.pathname)) {
+    const destination = originalBookmark?.[1] ?? originalParticipantBookmark(url.hash);
+    if (destination) {
+      const bookmark = new URL("/app" + destination, url.origin);
+      url.pathname = bookmark.pathname;
+      bookmark.searchParams.forEach((value, key) => url.searchParams.set(key, value));
+      url.hash = "";
+    }
   }
   if (url.pathname.startsWith("/app/admin/") && url.searchParams.get("ui") !== "original") {
     url.searchParams.set("ui", "original");
@@ -36,7 +42,7 @@ const normalizeOriginalWorkspaceEntry = (): void => {
   }
 };
 
-normalizeOriginalWorkspaceEntry();
+normalizeOriginalEntry();
 bootstrapApplication(BootstrapRootComponent, appConfig)
   .then(() => registerAppShellServiceWorker())
   .catch(error => {
