@@ -25,7 +25,7 @@ export async function handleOriginalAttachmentHttp(input: {
   searchParams: URLSearchParams;
   services: FirstSliceServices;
   readUpload: () => Promise<UploadAttachmentFileRequest>;
-  pdf: (attachments: WorkspaceAttachment[], labelTemplate: string | null) => Promise<Buffer>;
+  pdf: (attachments: WorkspaceAttachment[], labelTemplate: string | null, fileName: 'pages.pdf' | 'pages.zip') => Promise<void>;
   header: (name: string, value: string) => void;
   json: (status: number, body: string) => void;
   binary: (mediaType: string, body: Buffer, inline: boolean, fileName: string) => void;
@@ -62,7 +62,7 @@ export async function handleOriginalAttachmentHttp(input: {
       throw new FirstSliceError(attachments.length ? 400 : 404, 'original_attachment_pages_unavailable',
         'Attachment pages require between one and 500 capture targets.');
     }
-    input.binary('application/pdf', await input.pdf(attachments, label), false, 'pages.pdf');
+    await input.pdf(attachments, label, reference ? 'pages.zip' : 'pages.pdf');
   } else if (reference && operation === 'data') {
     input.json(200, encodeOriginalReportJson(await port.get(reference)));
   } else if (reference && request.method === 'POST') {

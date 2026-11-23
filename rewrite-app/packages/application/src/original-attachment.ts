@@ -10,7 +10,12 @@ import {originalParticipantGroupKeysEqual} from './original-participant-group.js
 export const isOriginalAttachmentGroup = (group: string): boolean => group.startsWith('experimental');
 const missing = () => new FirstSliceError(404, 'original_attachment_not_found', 'The requested attachment was not found.');
 
-type NativeTarget = {source: OriginalAttachment; stored: WorkspaceAttachment; contentReleaseId: string};
+type NativeTarget = {
+  source: OriginalAttachment;
+  stored: WorkspaceAttachment;
+  contentReleaseId: string;
+  bookletName: string;
+};
 type AttachmentRequest = {token: string; attachmentId: string};
 type NativeAccess = {workspace: Workspace & {tenantKey: string}; actorAdminUserId: string; groupKeys: string[]};
 
@@ -27,6 +32,15 @@ export type OriginalAttachmentPort = {
 };
 
 const validNumber = (id: string) => /^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= 9223372036854775807n;
+const originalUnitName = (unit: string): string => unit.replace(/[a-z]/g, letter => letter.toUpperCase());
+
+function originalCode(target: NativeTarget): string {
+  const [number] = target.source.attachmentId.split(':');
+  return [number, originalUnitName(target.stored.unitKey), target.stored.variableId].join(':');
+}
+
+type FindTarget = (attachmentId: string) => NativeTarget | null | undefined;
+
 export function createOriginalAttachmentPort(input: {
   auth: OriginalAuthenticationPort;
   workspace: (scope: {tenantId: string; workspaceId: string}) => Promise<NativeAccess['workspace'] | undefined>;
@@ -61,6 +75,7 @@ export function createOriginalAttachmentPort(input: {
     const runs = new Map(inventory.runs.map(row => [row.testRunId, row]));
     const numbers = new Map(inventory.numbers.map(row => [row.testRunId, row]));
     const targets = new Map<string, NativeTarget>();
+    const originalCodes = new Map<string, NativeTarget | null>();
     for (const stored of attachments) {
       if (stored.groupKey !== group) continue;
       const person = people.get(stored.participantSessionId);
@@ -85,36 +100,40 @@ export function createOriginalAttachmentPort(input: {
         variableId: stored.variableId
       };
       if (targets.has(attachmentId)) throw new FirstSliceError(409, 'original_attachment_ambiguous', 'The attachment identity is ambiguous.');
-      targets.set(attachmentId, {source, stored, contentReleaseId: run.contentReleaseId});
+      const target = {source, stored, contentReleaseId: run.contentReleaseId, bookletName: run.bookletName};
+      targets.set(attachmentId, target);
+      const code = originalCode(target);
+      originalCodes.set(code, originalCodes.has(code) ? null : target);
     }
-    return {workspace, targets};
+    const find: FindTarget = id => targets.get(id) ?? originalCodes.get(id);
+    return {workspace, targets, find};
   };
 
   const resolve = async ({token, attachmentId}: AttachmentRequest) => {
-    const {workspace, targets} = await scopedTargets(token);
+    const {workspace, find} = await scopedTargets(token);
     const [number, unit, variable, extra] = attachmentId.split(':');
     if (!number || !validNumber(number) || !unit || !variable || extra !== undefined) {
       throw new FirstSliceError(400, 'original_attachment_invalid', 'Invalid attachment identifier.');
     }
-    let target = targets.get(attachmentId);
-    // Original's printed QR codes use the uppercase Unit file ID. Preserve
-    // addresses already issued by the Rewrite and resolve Source spellings
-    // only when there is exactly one matching target in this monitor's scope.
-    if (!target && !/[a-z]/.test(unit)) {
-      const matches = [...targets.values()].filter(candidate => {
-        const [candidateNumber, candidateUnit, candidateVariable] = candidate.source.attachmentId.split(':');
-        return candidateNumber === number && candidateVariable === variable &&
-          candidateUnit?.replace(/[a-z]/g, letter => letter.toUpperCase()) === unit;
-      });
-      if (matches.length === 1) target = matches[0];
-    }
+    const target = find(attachmentId);
     if (!target) throw missing();
-    return {target, workspace, sessionToken: token, workspaceKey: workspace.workspaceKey, tenantKey: workspace.tenantKey,
+    return {target, find, workspace, sessionToken: token, workspaceKey: workspace.workspaceKey, tenantKey: workspace.tenantKey,
       attachmentId: target.stored.attachmentId};
   };
-  const page = (target: NativeTarget): WorkspaceAttachment => ({...target.stored,
-    attachmentId: target.source.attachmentId, personLabel: target.source.personLabel, testLabel: target.source.testLabel,
-    unitLabel: target.source.unitLabel});
+  const page = (target: NativeTarget, find: FindTarget): WorkspaceAttachment => {
+    const code = originalCode(target);
+    const unit = originalUnitName(target.stored.unitKey);
+    return {
+      ...target.stored,
+      // A printed code must resolve to the same target even if published aliases differ only by case.
+      attachmentId: find(code) === target ? code : target.source.attachmentId,
+      personLabel: target.source.personLabel,
+      bookletKey: target.bookletName,
+      testLabel: target.source.testLabel,
+      unitKey: unit,
+      unitLabel: unit
+    };
+  };
 
   const hydrateResponses = async (workspace: Workspace, targets: NativeTarget[]) => {
     const withFiles = targets.filter(({stored}) => stored.attachmentFileIds.length);
@@ -155,8 +174,14 @@ export function createOriginalAttachmentPort(input: {
       return target.source;
     },
     async preflight(request) {await resolve(request);},
-    async pages(token) {return [...(await scopedTargets(token)).targets.values()].map(page);},
-    async page(request) {return page((await resolve(request)).target);},
+    async pages(token) {
+      const {targets, find} = await scopedTargets(token);
+      return [...targets.values()].map(target => page(target, find));
+    },
+    async page(request) {
+      const {target, find} = await resolve(request);
+      return page(target, find);
+    },
     async upload(request, file) {await operations.uploadAttachmentFile({...await resolve(request), ...file});},
     async file(request) {return operations.getAttachmentFile({...await resolve(request), attachmentFileId: request.attachmentFileId});},
     async delete(request) {await operations.deleteAttachmentFile({...await resolve(request), attachmentFileId: request.attachmentFileId});}

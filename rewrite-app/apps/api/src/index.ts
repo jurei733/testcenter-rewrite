@@ -5043,7 +5043,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           }
           return readMultipartAttachmentUpload(request, contentType, runtime.config.maxSourcePackageJsonBodyBytes);
         },
-        pdf: (attachments, labelTemplate) => createAttachmentPagesPdf({attachments, labelTemplate, layout: 'original'}),
+        pdf: async (attachments, labelTemplate, fileName) => {
+          const body = await createAttachmentPagesPdf({attachments, labelTemplate, layout: 'original'});
+          sendAsset(response, 200, 'application/pdf', body, {
+            'content-disposition': `attachment; filename=${fileName}`,
+            'cache-control': 'private, no-store',
+            'content-length': String(body.byteLength)
+          });
+        },
         header: (name, value) => response.setHeader(name, value),
         json: (status, text) => {response.writeHead(status, {...securityHeaders, 'content-type': 'application/json'}); endResponse(response, text);},
         binary: (mediaType, body, inline, fileName) => sendAsset(response, 200, mediaType, body, {

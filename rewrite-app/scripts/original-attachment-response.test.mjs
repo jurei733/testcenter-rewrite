@@ -118,6 +118,11 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
   });
   const originalQrTarget = {...target, attachmentId:[testNumber, alias.toUpperCase(), 'page'].join(':')};
   assert.deepEqual(await services.originalAttachments.get(originalQrTarget), legacyRequest);
+  const printable = await services.originalAttachments.page(target);
+  assert.equal(printable.attachmentId, originalQrTarget.attachmentId);
+  assert.equal(printable.unitKey, alias.toUpperCase());
+  assert.equal(printable.bookletKey, 'OWNED.ATTACHMENT.BOOK');
+  assert.deepEqual(await services.originalAttachments.pages(monitor.token), [printable]);
   await assert.rejects(services.originalAttachments.get({...originalQrTarget,token:outsider.token}),
     rejected(404, 'original_attachment_not_found'));
   const inventory = await storage.repository.getOriginalTestAdministrationInventory(tenant.tenantId, workspace.workspaceId);
