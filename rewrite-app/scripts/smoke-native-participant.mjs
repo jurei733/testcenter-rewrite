@@ -118,7 +118,7 @@ const mark=name=>{checks.push(name);console.log('native_participant_ui='+name+':
 try{
  server=spawn(process.execPath,[join(app,'scripts/native-participant-server.mjs')],{cwd:app,stdio:['ignore','ignore','inherit','ipc'],env:{...process.env,FIRST_SLICE_STORE:'sqlite',FIRST_SLICE_SQLITE_FILE:file,FIRST_SLICE_BOOTSTRAP_DEMO:'false',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_XML_SCHEMA_PROFILE:'original-19',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'participant,second_code',FIRST_SLICE_PROOF_OF_WORK_SECRET:randomBytes(32).toString('hex'),FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET:'',FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER:'12',FIRST_SLICE_PROOF_OF_WORK_TTL_MS:'60000',REQUIRE_LOGIN_PASSWORD:'false'}});
  server.on('message',message=>{serverMessages.push(message);if(message?.nativeResponse)responseReceipts.push(message.nativeResponse);if(message?.nativeCommand)commandReceipts.push(message.nativeCommand);if(message?.nativeTestWrite)testWriteReceipts.push(message.nativeTestWrite);if(message?.nativeResource)resourceReceipts.push(message.nativeResource);});
- const serverEvent=async(key,value)=>{const end=Date.now()+20000;while(Date.now()<end){const found=serverMessages.find(m=>m?.[key]===value);if(found)return found;await new Promise(done=>setTimeout(done,10));}throw Error('Owned server event deadline: '+key);};
+ const serverEvent=async(key,value,after=0)=>{const end=Date.now()+20000;while(Date.now()<end){const found=serverMessages.slice(after).find(m=>m?.[key]===value);if(found)return found;await new Promise(done=>setTimeout(done,10));}throw Error('Owned server event deadline: '+key);};
  const configure=(phase,failures,target='response',matchDeliveryId,options={})=>new Promise((resolve,reject)=>{const listener=message=>{if(message?.faultReady===phase){clearTimeout(timer);server.removeListener('message',listener);resolve();}};const timer=setTimeout(()=>{server.removeListener('message',listener);reject(Error('Owned fault configuration deadline'));},20000);server.on('message',listener);server.send({nativeFault:{phase,failures,target,matchDeliveryId,...options}});});
  const receipts=async(phase,count)=>{const end=Date.now()+20000;while(Date.now()<end){const found=responseReceipts.filter(r=>r.phase===phase);if(found.length>=count)return found;await new Promise(done=>setTimeout(done,10));}throw Error('Native receipt observation deadline');};
  const testReceipts=async(phase,kind)=>{const end=Date.now()+20000;while(Date.now()<end){const found=testWriteReceipts.filter(row=>row.phase===phase&&row.probe&&row.path.endsWith('/'+kind));if(found.length>=2)return found;await new Promise(done=>setTimeout(done,10));}throw Error('Native Test delivery receipt deadline');};
@@ -351,7 +351,11 @@ try{
  if(largeStateOnly||!backgroundOnly&&!starsOnly&&!capacityOnly&&!starsClosureOnly&&!geometryOnly)await runNativeLargeStateSmoke({browser,base,out,password,mark,configure,responseReceipts});
  if(starsClosureOnly||!backgroundOnly&&!starsOnly&&!capacityOnly&&!largeStateOnly&&!geometryOnly)await runNativeStarsClosedRunsSmoke({browser,base,file,out,fixture:starsFixture,mark,configure,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},responseReceipts,testWriteReceipts,serverMessages});
  if(geoGebraFixture){
-   const geometryControls={browser,base,configure,responseReceipts,resourceReceipts,release:async phase=>{server.send({nativeRelease:phase});return(await serverEvent('nativeReleased',phase)).released;},serverMessages};
+   const geometryControls={browser,base,configure,responseReceipts,resourceReceipts,release:async phase=>{
+     const after=serverMessages.length;
+     server.send({nativeRelease:phase});
+     return(await serverEvent('nativeReleased',phase,after)).released;
+   },serverMessages};
    if(!rootZipOnly)await runNativeGeoGebraSmoke({...geometryControls,out,fixture:geoGebraFixture,mark,workerRestart:workerRestartOnly});
    if(!workerRestartOnly){
      const archiveOut=join(out,'root-zip');await mkdir(archiveOut,{recursive:true});

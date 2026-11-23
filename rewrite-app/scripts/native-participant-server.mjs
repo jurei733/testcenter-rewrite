@@ -27,7 +27,7 @@ const proxy=createServer((incoming,outgoing)=>{
  if(sessionRead)outgoing.once('finish',()=>process.send?.({nativeSession:{...record,status:outgoing.statusCode}}));
  if(commandAck)outgoing.once('finish',()=>process.send?.({nativeCommand:{...record,status:outgoing.statusCode}}));
  if(testStateWrite||testLogWrite)outgoing.once('finish',()=>process.send?.({nativeTestWrite:{...record,deliveryId:incoming.headers['x-native-delivery-id'],stateBase:incoming.headers['x-native-state-base'],status:outgoing.statusCode}}));
- const hold=(key,deliver)=>{const value={outgoing,forward:deliver};held.set(key,value);outgoing.once('close',()=>{if(held.get(key)===value){held.delete(key);process.send?.({nativeHeldCancelled:key});}});process.send?.({nativeHeld:key});};
+ const hold=(key,deliver,onCancelled)=>{const value={outgoing,forward:deliver};held.set(key,value);outgoing.once('close',()=>{if(held.get(key)===value){held.delete(key);onCancelled?.();process.send?.({nativeHeldCancelled:key});}});process.send?.({nativeHeld:key});};
  const holdStartupRead=testRead&&target==='startup-worker-state'&&remaining>0;
  if(holdStartupRead)remaining--;
  const forward=(body,loseAcknowledgement=false)=>{
@@ -69,7 +69,7 @@ const proxy=createServer((incoming,outgoing)=>{
    trace('body-end');
    const body=Buffer.concat(chunks);record.body=body.toString('utf8');
    if(offlineAtStart){fail();return;}
-   if(closureGate&&!closureGate.seen.has(testNumber)){closureGate.seen.add(testNumber);hold(closureGate.key,()=>forward(body));return;}
+   if(closureGate&&!closureGate.seen.has(testNumber)){closureGate.seen.add(testNumber);hold(closureGate.key,()=>forward(body),()=>closureGate.seen.delete(testNumber));return;}
    if(responseWrite&&target==='stars-interrupted'&&selectedTests.includes(path.split('/')[2])&&JSON.parse(record.body).dataParts?.ownedRecovery?.startsWith('nativeInterrupted:')){if(remaining===0){fail();return;}remaining--;}
    if(testStateWrite&&target==='startup-worker-state'&&incoming.headers['x-native-delivery-id']===matchDeliveryId){hold(record.phase,()=>forward(body));return;}
    if(testStateWrite&&target==='test-state-lost-ack'||testLogWrite&&(target==='test-log-lost-ack'||target==='terminal-log-lost-ack')){

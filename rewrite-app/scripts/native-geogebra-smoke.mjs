@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash,randomUUID} from 'node:crypto';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {join,basename,dirname} from 'node:path';
+import {isDeepStrictEqual} from 'node:util';
 import {brotliDecompressSync,inflateRawSync} from 'node:zlib';
 import {runNativeResourceUploadSmoke} from './native-resource-upload-smoke.mjs';
 import {runNativeWorkspaceZipSmoke} from './native-workspace-zip-smoke.mjs';
@@ -156,6 +157,43 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
       return emittedPoint(packet.body.dataParts)===coordinates?packet:false;
     },'GeoGebra autosave contains the exact completed gesture');
   };
+  const partReceipts=packets=>packets.map(({deliveryId,body})=>({
+    deliveryId,clock:body.timeStamp,keys:Object.keys(body.dataParts)
+  }));
+  const readCommittedUnit=async(path,url,token)=>{
+    let observed,expected,accepted,lastReadCount;
+    try{
+      return await wait(async()=>{
+        const count=writes.filter(row=>row.path===path).length;
+        if(count===lastReadCount)return false;
+        lastReadCount=count;
+        const reply=await context.request.get(url,{headers:{AuthToken:token,'X-Native-Unit-Protocol':'1'}});
+        assert.equal(reply.status(),200);
+        const saved=await reply.json();
+        accepted=writes.filter(row=>row.path===path);
+        const parts=new Map();
+        // The Original DAO updates each supplied part only at a newer timestamp.
+        for(const {body} of accepted){
+          for(const [id,value] of Object.entries(body.dataParts)){
+            const previous=parts.get(id);
+            if(!previous||previous.clock<body.timeStamp)parts.set(id,{value,clock:body.timeStamp});
+          }
+        }
+        expected=Object.fromEntries(parts);
+        observed=Object.fromEntries(Object.entries(saved.dataParts).map(([id,value])=>[id,{value,clock:saved.nativeClocks.partClocks[id]}]));
+        if(!isDeepStrictEqual(observed,expected)||!isDeepStrictEqual(Object.keys(saved.nativeClocks.partClocks).sort(),Object.keys(expected).sort()))return false;
+        return {...saved,acknowledged:partReceipts(accepted)};
+      },'stored parts and clocks match the acknowledged response sequence');
+    }catch(error){
+      if(!observed||!expected)throw error;
+      const digest=parts=>Object.fromEntries(Object.entries(parts).map(([id,{value,clock}])=>[id,{sha256:hash(JSON.stringify(value)),clock}]));
+      await writeFile(join(out,'native-geogebra-part-mismatch.json'),JSON.stringify({
+        path,expected:digest(expected),observed:digest(observed),
+        acknowledged:partReceipts(accepted)
+      },null,2));
+      throw error;
+    }
+  };
   const snapshot=element=>element.evaluate(()=>{
     const api=window.owned_geometry,documentXml=new DOMParser().parseFromString(api.getXML('B'),'application/xml');
     const point=documentXml.querySelector('element[label="B"] > coords');
@@ -229,15 +267,16 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     assert.equal(packet.body.responseType,fixture.manifest.player.unitStateType);
     assert.ok(Object.keys(packet.body.dataParts).length);assert.ok(Object.values(packet.body.dataParts).every(value=>typeof value==='string'));
     const token=await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session'));
-    const reply=await context.request.get(base+`/test/${testId}/unit/NATIVE.GEOMETRY/alias/1`,{headers:{AuthToken:token,'X-Native-Unit-Protocol':'1'}});
-    assert.equal(reply.status(),200);const saved=await reply.json();assert.deepEqual(saved.dataParts,packet.body.dataParts);
-    assert.equal(emittedPoint(packet.body.dataParts),edited.pointCoordinates);
+    const smallUnitUrl=base+`/test/${testId}/unit/NATIVE.GEOMETRY/alias/1`;
+    const saved=await readCommittedUnit(responsePath,smallUnitUrl,token);
+    assert.equal(emittedPoint(saved.dataParts),edited.pointCoordinates);
     mark('native-real-GeoGebra-pointer-edit-saves-exact-string-data-parts-through-production-API');
     await page.reload();const restored=await snapshot(await ready());
     assert.equal(restored.pointCoordinates,edited.pointCoordinates);assert.equal(restored.display,edited.display);assert.deepEqual(errors,[]);
     mark('native-real-GeoGebra-reloads-the-saved-construction-without-relaxing-opaque-isolation');
     await page.screenshot({path:join(out,'native-geogebra-restored.png')});
     await writeFile(join(out,'native-geogebra-recovered.json'),JSON.stringify({success:true,testId,isolation,resources,actualPointerEdit:true,initialPoint:geometry.pointCoordinates,editedPoint:edited.pointCoordinates,restoredPoint:restored.pointCoordinates,
+      acknowledged:saved.acknowledged,storedPartClocks:saved.nativeClocks.partClocks,
       responseType:packet.body.responseType,deliveryId:packet.deliveryId,partHashes:Object.fromEntries(Object.entries(packet.body.dataParts).map(([key,value])=>[key,hash(value)])),errors,manifest:fixture.manifest,definitionSha256:fixture.definitionSha256},null,2));
 
     await configure('native-geogebra-large',0);
@@ -250,27 +289,30 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     const largePacket=await waitForGestureSave(largePath,largeEdited.pointCoordinates);
     const largeBytes=Buffer.byteLength(JSON.stringify(largePacket.body));assert.ok(largeBytes>1024*1024,'Actual GeoGebra data must exceed the ordinary one-MiB ingress budget');
     const unitUrl=base+`/test/${testId}/unit/NATIVE.GEOMETRY.LARGE/alias/2`;
-    const readUnit=async()=>{const reply=await context.request.get(unitUrl,{headers:{AuthToken:token,'X-Native-Unit-Protocol':'1'}});assert.equal(reply.status(),200);return reply.json();};
-    const largeSaved=await readUnit();assert.deepEqual(largeSaved.dataParts,largePacket.body.dataParts);
+    const largeSaved=await readCommittedUnit(largePath,unitUrl,token);
+    assert.equal(emittedPoint(largeSaved.dataParts),largeEdited.pointCoordinates);
     await page.reload();const largeRestoredElement=await ready(),largeRestored=await snapshot(largeRestoredElement);
     assert.equal(largeRestored.pointCoordinates,largeEdited.pointCoordinates);
     mark('native-real-large-GeoGebra-image-construction-saves-and-reloads-beyond-the-ordinary-request-budget');
 
     await configure('native-geogebra-large-pending',0,'stars-offline',undefined,{testIds:[testId]});
     const gestureAt=Date.now(),pendingPoint=await drag(largeRestoredElement,largeRestored);
-    const firstStaged=await wait(async()=>{
+    const readStagedConstruction=async()=>{
       const documents=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('testcenter-native-unit-journal:v1:')).map(key=>({key,...JSON.parse(localStorage.getItem(key))})));
       for(const document of documents)for(const entry of document.entries){
-        if(document.testId===testId&&entry.kind==='response'&&entry.unitAlias==='2'&&emittedPoint(JSON.parse(entry.payload).dataParts)===pendingPoint.pointCoordinates)return{key:document.key,actor:document.actor,entry};
+        if(document.testId===testId&&document.actor===hash(token)&&entry.phase==='staged'&&entry.kind==='response'&&entry.unitAlias==='2'&&entry.originalUnitId==='NATIVE.GEOMETRY.LARGE'&&emittedPoint(JSON.parse(entry.payload).dataParts)===pendingPoint.pointCoordinates)return{key:document.key,actor:document.actor,entry};
       }
-    },'the exact real large construction is captured in its production local journal');
+    };
+    const firstStaged=await wait(readStagedConstruction,'the exact real large construction is captured in its production local journal');
     assert.ok(Buffer.byteLength(firstStaged.entry.payload)>1024*1024);
     // Another real Player notification may replace this staged ID before the
     // asynchronous mirror is observed. Require exact current bytes, identity,
     // revision and the actual final pointer construction, not an obsolete sample.
     const pending=await wait(async()=>{
-      const current=await readCurrentNativeUnitMirror(page,{bucket:firstStaged.key,actor:firstStaged.actor,testId,
-        id:firstStaged.entry.id,unitAlias:firstStaged.entry.unitAlias,originalUnitId:firstStaged.entry.originalUnitId,queuedAt:firstStaged.entry.queuedAt});
+      const live=await readStagedConstruction();
+      if(!live)return false;
+      const {id,unitAlias,originalUnitId,queuedAt}=live.entry;
+      const current=await readCurrentNativeUnitMirror(page,{bucket:live.key,actor:live.actor,testId,id,unitAlias,originalUnitId,queuedAt});
       return current&&emittedPoint(JSON.parse(current.entry.payload).dataParts)===pendingPoint.pointCoordinates?current:false;
     },'production IndexedDB mirror of the actual current large draft');
     const pendingBytes=Buffer.byteLength(pending.entry.payload);assert.ok(pendingBytes>1024*1024);
@@ -278,10 +320,16 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     mark('native-real-large-GeoGebra-draft-enters-production-IndexedDB-before-the-five-second-response-window');
     await configure('native-geogebra-large-closed',0,'stars-closure',undefined,{testIds:[testId],closureIds:[pending.entry.id]});
     const worker=context.serviceWorkers()[0];assert.ok(worker);
+    const writesBeforeClosure=writes.length;
     page.on('dialog',dialog=>dialog.accept());const closed=page.waitForEvent('close');await page.close({runBeforeUnload:true});await closed;
     assert.equal(context.pages().length,0);
     const closedElapsedMs=Date.now()-gestureAt;assert.ok(closedElapsedMs<5000,'The actor page actually closes before the Source response window');
-    await wait(()=>serverMessages.some(message=>message.nativeHeld==='native-geogebra-large-closed:'+testId),'actual worker reaches the held large response');
+    const closureKey='native-geogebra-large-closed:'+testId;
+    const activeClosure=()=>{
+      const event=serverMessages.findLast(message=>message.nativeHeld===closureKey||message.nativeHeldCancelled===closureKey);
+      return event?.nativeHeld===closureKey?event:false;
+    };
+    await wait(activeClosure,'actual worker reaches the held large response');
     // A staged draft may coalesce another real Player notification, including
     // beforeunload. The sealed revision is the immutable delivery contract.
     // Read it while the actual worker request is held, before any acknowledgement.
@@ -299,18 +347,31 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     assert.equal(writes.filter(row=>row.deliveryId===pending.entry.id).length,0);
     if(workerRestart)await runNativeWorkerRestartSmoke({browser,context,worker,configure,release,testId,entry:sealed.entry,revision:sealed.revision,out,wait,serverMessages,responseReceipts,writes,mark});
     else {
-      assert.equal(await release('native-geogebra-large-closed:'+testId),true);
+      let attempted;
+      // Releasing a cancelled socket cannot acknowledge a delivery. Wait for
+      // the naturally retried attempt while the actor still has no open pages.
+      await wait(()=>{
+        const active=activeClosure();
+        if(!active||active===attempted)return false;
+        attempted=active;
+        return release(closureKey);
+      },'a live worker response can be released');
       await wait(()=>writes.some(row=>row.deliveryId===pending.entry.id),'worker receives the real large response acknowledgement');
     }
     const delivered=writes.filter(row=>row.deliveryId===pending.entry.id);assert.equal(delivered.length,1);
     assert.equal(delivered[0].worker,true);assert.equal(delivered[0].zeroActorPagesAtReply,true);
     assert.ok(JSON.stringify(delivered[0].body)===sealed.entry.payload,'Actual worker must deliver the exact sealed journal bytes');
     assert.equal(delivered[0].actorHash,pending.actor);assert.equal(pending.actor,hash(token));
-    const deliveredRead=await readUnit();
+    const deliveredRead=await readCommittedUnit(largePath,unitUrl,token);
     await writeFile(join(out,'native-geogebra-large-worker-comparison.json'),JSON.stringify({largeBytes,pendingBytes,captureElapsedMs,deliveryId:pending.entry.id,actorHash:pending.actor,worker:delivered[0].worker,zeroActorPagesAtReply:delivered[0].zeroActorPagesAtReply,packetClock:delivered[0].body.timeStamp,nativeClocks:deliveredRead.nativeClocks,packetPoint:emittedPoint(delivered[0].body.dataParts),storedPoint:emittedPoint(deliveredRead.dataParts),parts:Object.fromEntries(Object.entries(delivered[0].body.dataParts).map(([key,value])=>[key,{packet:hash(value),stored:hash(deliveredRead.dataParts[key]||'')}]))},null,2));
-    assert.deepEqual(deliveredRead.dataParts,{...largeSaved.dataParts,...delivered[0].body.dataParts});
-    for(const key of Object.keys(largeSaved.dataParts))if(!(key in delivered[0].body.dataParts))assert.equal(deliveredRead.nativeClocks.partClocks[key],largeSaved.nativeClocks.partClocks[key]);
-    const smallUnchanged=await context.request.get(base+`/test/${testId}/unit/NATIVE.GEOMETRY/alias/1`,{headers:{AuthToken:token,'X-Native-Unit-Protocol':'1'}});assert.equal(smallUnchanged.status(),200);assert.deepEqual((await smallUnchanged.json()).dataParts,saved.dataParts);
+    assert.equal(emittedPoint(deliveredRead.dataParts),pendingPoint.pointCoordinates);
+    for(const [key,value] of Object.entries(delivered[0].body.dataParts)){
+      assert.equal(deliveredRead.dataParts[key],value);
+      assert.equal(deliveredRead.nativeClocks.partClocks[key],delivered[0].body.timeStamp);
+    }
+    const smallUnchanged=await readCommittedUnit(responsePath,smallUnitUrl,token);
+    assert.equal(emittedPoint(smallUnchanged.dataParts),edited.pointCoordinates);
+    assert.ok(!writes.slice(writesBeforeClosure).some(row=>row.path===responsePath&&row.worker),'The large Unit worker must not write to the small Unit');
     const queue=await wait(async()=>{
       const value=await worker.evaluate(async()=>{
         const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('testcenter-native-save-v1',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
@@ -331,12 +392,15 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     mark('native-Source-Starter-reconciles-the-real-large-GeoGebra-worker-receipt-and-restores-its-edited-point');
     await page.screenshot({path:join(out,'native-geogebra-large-worker-restored.png')});
     await writeFile(join(out,'native-geogebra-large-recovered.json'),JSON.stringify({success:true,testId,actualPointerEdit:true,largeBytes,pendingBytes,captureElapsedMs,
+      acknowledged:deliveredRead.acknowledged,storedPartClocks:deliveredRead.nativeClocks.partClocks,
+      closureEvents:serverMessages.filter(message=>[message.nativeHeld,message.nativeHeldCancelled,message.nativeReleased].includes(closureKey)),
       editedPoint:largeEdited.pointCoordinates,reloadedPoint:largeRestored.pointCoordinates,pendingPoint:pendingPoint.pointCoordinates,restoredAfterWorker:afterWorker.pointCoordinates,
       deliveryId:pending.entry.id,actorHash:pending.actor,payloadSha256:hash(sealed.entry.payload),draftPayloadSha256:hash(pending.entry.payload),closedElapsedMs,stagedDraftCoalescedBeforeSeal:pending.entry.payload!==sealed.entry.payload,unchangedPartsAndClocksPreserved:true,foreignUnitUnchanged:true,reopenedQueuesEmpty:true,worker:true,zeroActorPagesAtReply:true,manualWorkerWake:false,queue,
       partHashes:Object.fromEntries(Object.entries(delivered[0].body.dataParts).map(([key,value])=>[key,hash(value)])),largeSource:fixture.manifest.largeGeometry,
       largeDefinitionSha256:fixture.largeDefinitionSha256,errors},null,2));
   } catch(error) {
     await page.screenshot({path:join(out,'native-geogebra-failure.png')}).catch(()=>{});
-    await writeFile(join(out,'native-geogebra-failure.json'),JSON.stringify({error:String(error),testId,errors,resources,body:await page.locator('body').innerText().catch(()=>''),frames:page.frames().map(frame=>({url:frame.url()})),responses:responseReceipts.filter(row=>row.phase.startsWith('native-geogebra'))},null,2));throw error;
+    const closureEvents=serverMessages.filter(message=>[message.nativeHeld,message.nativeHeldCancelled,message.nativeReleased].some(key=>key==='native-geogebra-large-closed:'+testId));
+    await writeFile(join(out,'native-geogebra-failure.json'),JSON.stringify({error:String(error),testId,errors,resources,closureEvents,body:await page.locator('body').innerText().catch(()=>''),frames:page.frames().map(frame=>({url:frame.url()})),responses:responseReceipts.filter(row=>row.phase.startsWith('native-geogebra'))},null,2));throw error;
   } finally {await context.close();}
 }
