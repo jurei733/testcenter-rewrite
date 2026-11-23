@@ -1,3 +1,6 @@
+import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
+import {originalAttachmentHistoryProjector} from '@testcenter-rewrite-app/application';
+import {readOriginalAttachmentMetadata, readOriginalAttachmentTestNumbers} from './original-attachment-files.js';
 import {refreshOriginalWorkspaceContentType,readOriginalSystemCheckDirectory} from './original-workspace-content-type.js';
 import {transactOriginalSystemCheck} from './original-system-check.js';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
@@ -3819,14 +3822,31 @@ export const createSqliteFirstSliceStorage = (
     },
     async deleteOriginalSelectedTests(input){return deleteOriginalSelectedTests(database,input);},
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(database, input);},
-    async listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds) {
-      const sql = 'SELECT unit_json FROM original_native_units WHERE tenant_id=? AND workspace_id=?';
-      const records = testRunIds
-        ? database.prepare(sql + ' AND test_run_id IN (SELECT value FROM json_each(?))').all(tenantId, workspaceId, JSON.stringify(testRunIds))
-        : database.prepare(sql).all(tenantId, workspaceId);
-      return records.map(row => JSON.parse(String(row.unit_json)));
+    async listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds, options) {
+      const read = ():OriginalNativeUnit[] => {
+        const sql = 'SELECT unit_json FROM original_native_units WHERE tenant_id=? AND workspace_id=?';
+        const records = testRunIds
+          ? database.prepare(sql + ' AND test_run_id IN (SELECT value FROM json_each(?))').all(tenantId, workspaceId, JSON.stringify(testRunIds))
+          : database.prepare(sql).all(tenantId, workspaceId);
+        return records.map(row => JSON.parse(String(row.unit_json)));
+      };
+      if (!options?.includeLegacyAttachmentParts) return read();
+      database.exec('BEGIN');
+      try {
+        const units = read();
+        const scope = {tenantId, workspaceId};
+        const runIds = [...new Set(units.map(unit => unit.testRunId))];
+        const files = readOriginalAttachmentMetadata(database, scope, runIds);
+        const project = originalAttachmentHistoryProjector(scope, files,
+          files.length ? readOriginalAttachmentTestNumbers(database, scope, runIds) : []);
+        const projected = units.map(project);
+        database.exec('COMMIT');
+        return projected;
+      } catch (error) {
+        return rollbackAfterFailure(database,error);
+      }
     },
-    async getOriginalUnit(input){return readOriginalNativeUnit(database,input);},
+    async getOriginalUnit(input, testNumber){return readOriginalNativeUnit(database,input,testNumber);},
     async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(database,input,transform);},
     async mutateOriginalAttachment(input){await mutateOriginalNativeUnit(database,input,input);},
     async listOriginalReviews(scope){return listOriginalNativeReviews(database,scope);},

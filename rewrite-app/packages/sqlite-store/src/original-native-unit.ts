@@ -1,6 +1,7 @@
+import {readOriginalAttachmentMetadata} from './original-attachment-files.js';
 import {originalParticipantGroupKeysEqual} from '@testcenter-rewrite-app/application';
 import type {AttachmentFile,OriginalNativeUnit,ParticipantProgressDelivery,TestRun} from '@testcenter-rewrite-app/domain';
-import {prepareOriginalAttachmentResponse, type OriginalAttachmentMutation} from '@testcenter-rewrite-app/application';
+import {indexOriginalAttachmentFiles, prepareOriginalAttachmentResponse, projectOriginalAttachmentHistory, type OriginalAttachmentMutation} from '@testcenter-rewrite-app/application';
 import {prepareOriginalUnitDelivery} from '@testcenter-rewrite-app/application';
 import {assertOriginalUnitInput,assertOriginalUnitRecord,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitParentMatches,resultParentUnavailable,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from '@testcenter-rewrite-app/application';
 import {withResultArtifactParent} from './result-artifact-parent.js';
@@ -20,8 +21,14 @@ export function readOriginalNativeUnitInTransaction(database:DatabaseSync,input:
  const row=database.prepare('SELECT unit_json FROM original_native_units WHERE test_run_id=? AND unit_name=?').get(input.testRunId,name);if(!row)return null;
  const unit=JSON.parse(String(row.unit_json)) as OriginalNativeUnit;assertOriginalUnitRecord(unit);if(!originalUnitParentMatches(input,unit)||unit.unitName!==name)throw resultParentUnavailable();return unit;
 }
-export function readOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput):OriginalNativeUnit|null{
- assertOriginalUnitInput(input);return withResultArtifactParent(database,input,()=>readOriginalNativeUnitInTransaction(database,input));
+export function readOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput,testNumber?:string):OriginalNativeUnit|null{
+ assertOriginalUnitInput(input);
+ return withResultArtifactParent(database,input,()=>{
+  const unit=readOriginalNativeUnitInTransaction(database,input);
+  if(!unit||unit.unknownHistory||testNumber===undefined)return unit;
+  const files=indexOriginalAttachmentFiles(readOriginalAttachmentMetadata(database,input,[input.testRunId]),input);
+  return projectOriginalAttachmentHistory(unit,testNumber,files.get(input.testRunId));
+ });
 }
 export function mutateOriginalNativeUnit(database:DatabaseSync,input:OriginalUnitInput,mutation:OriginalUnitTransform | OriginalAttachmentMutation):OriginalNativeUnit|null{
  assertOriginalUnitInput(input);return withResultArtifactParent(database,input,()=>{

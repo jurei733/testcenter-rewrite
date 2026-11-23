@@ -1,4 +1,4 @@
-import type {OriginalLoginBinding,OriginalNativeUnit,ParticipantSession,ParticipantTestLog,TestRun} from '@testcenter-rewrite-app/domain';
+import type {AttachmentFile,OriginalLoginBinding,OriginalNativeUnit,ParticipantSession,ParticipantTestLog,TestRun} from '@testcenter-rewrite-app/domain';
 import {exactParticipantTestLogTimestamp,originalUnitLogIdPrefix,originalTestLogIdPrefix,originalTestStateLogIdPrefix} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalPersonNumberRecord} from './original-person-number.js';
@@ -12,6 +12,7 @@ import {formatOriginalParticipantLogEntry} from './original-report-csv.js';
 import {formatOriginalResponseReport,formatOriginalLogReport,formatOriginalReviewReport,formatOriginalUnitStateReport,formatOriginalReviewTimestamp,
   type OriginalResponseReportRecord,type OriginalLogReportRecord,type OriginalReviewReportRecord,type OriginalReportLabels} from './original-workspace-report-wire.js';
 import {FirstSliceError} from './first-slice-error.js';
+import {originalAttachmentHistoryProjector, type OriginalAttachmentFileMetadata} from './original-attachment-response.js';
 
 type Scope={tenantId:string;workspaceId:string};
 type Person=Pick<ParticipantSession,'participantSessionId'|'tenantId'|'workspaceId'|'contentReleaseId'|'groupKey'|'originalLoginKey'|'originalNameSuffix'>;
@@ -30,7 +31,7 @@ export type OriginalReportStoredUnit=OriginalUnitScope&{unitName:string;unit:Uni
 export type OriginalReportStoredReview=OriginalUnitScope&{kind:string;reviewNumber:string;reviewId:string;review:OriginalNativeReview};
 type LegacyUnit={testRunId:string;unitName:string};
 export type OriginalReportFamily={units:OriginalReportStoredUnit[];legacyUnits:LegacyUnit[];logs:ParticipantTestLog[];reviews:OriginalReportStoredReview[];
-  legacyReviews:Array<{testRunId:string;reviewId:string}>;testNumbers:OriginalTestNumberRecord[];personNumbers:OriginalPersonNumberRecord[]};
+  legacyReviews:Array<{testRunId:string;reviewId:string}>;testNumbers:OriginalTestNumberRecord[];personNumbers:OriginalPersonNumberRecord[];attachmentFiles?:OriginalAttachmentFileMetadata[]};
 type ReviewData=Omit<OriginalReviewReportRecord,'page'|'reviewtime'>&{page:string|null;updatedAt:string};
 type ReviewLabelReader=(scope:Scope,name:string)=>Promise<{bookletLabel:string;unitLabels:Record<string,string>}>;
 export type PreparedOriginalWorkspaceReviews={
@@ -91,13 +92,14 @@ export function projectOriginalWorkspaceReport(input:OriginalReportRequest,paren
   if(input.type==='response'){
     assertOriginalReportRowCount(family.units.length);
     const compare=createOriginalReportTextComparator(),rows:OriginalResponseReportRecord[]=[];
+    const withAttachments=originalAttachmentHistoryProjector(input,family.attachmentFiles??[],family.testNumbers);
     for(const stored of family.units){
       const parent=byRun.get(stored.testRunId);if(!parent)throw unavailable();
       const unit=ownedUnit(parent,stored) as OriginalNativeUnit;assertOriginalUnitRecord(unit);
       if(unit.unknownHistory||unit.stateInitialized===undefined&&!Object.keys(unit.state).length&&!Object.keys(unit.stateClocks).length)throw unavailable();
       rows.push({...identity(parent),unitname:unit.unitName,originalUnitId:unit.originalUnitId,
         laststate:unit.stateInitialized===true||Object.keys(unit.state).length||Object.keys(unit.stateClocks).length?formatOriginalUnitStateReport(unit.state):null,
-        responses:unit.parts.map(p=>({...p})).sort((a,b)=>compare(a.id,b.id))});
+        responses:withAttachments(unit).parts.map(p=>({...p})).sort((a,b)=>compare(a.id,b.id))});
     }
     for(const stored of family.units)findUnit(stored,stored.unitName);
     for(const legacy of family.legacyUnits){const parent=byRun.get(legacy.testRunId);if(!parent||!findUnit(parent.run,legacy.unitName))throw unavailable();}
@@ -155,12 +157,16 @@ export function originalReportUnitIdentity(unit:OriginalNativeUnit):UnitIdentity
 export function readOriginalWorkspaceReportCollections(state:{participantSessions:Collection<ParticipantSession>;originalLoginBindings:Collection<OriginalLoginBinding>;testRuns:Collection<TestRun>;
   originalNativeUnits:Collection<OriginalNativeUnit>;participantTestLogs:Collection<ParticipantTestLog>;originalNativeReviews:Collection<OriginalNativeReview>;
   workspaceReviews:Collection<{testRunId:string;reviewId:string;unitKey:string|null}>;workspaceActivityEvents:Collection<{subjectId:string;subjectType:string;eventType:string;details:unknown}>;
-  originalTestNumbers:Collection<OriginalTestNumberRecord>;originalPersonNumbers:Collection<OriginalPersonNumberRecord>},input:OriginalReportRequest):OriginalWorkspaceReportSnapshot {
+  originalTestNumbers:Collection<OriginalTestNumberRecord>;originalPersonNumbers:Collection<OriginalPersonNumberRecord>;attachmentFiles:Collection<AttachmentFile>},input:OriginalReportRequest):OriginalWorkspaceReportSnapshot {
   const parents=selectOriginalReportParents({people:values(state.participantSessions),bindings:values(state.originalLoginBindings),runs:values(state.testRuns).map(r=>({
     ...Object.fromEntries(scopeKeys.map(k=>[k,r[k]])),bookletName:r.originalResultState?.bookletName} as OriginalReportRun))},input);
   const selected=new Set(parents.map(p=>p.run.testRunId)),family:OriginalReportFamily={units:[],legacyUnits:[],logs:[],reviews:[],legacyReviews:[],testNumbers:[],personNumbers:[]};
   if(input.type==='response'){
     family.units=values(state.originalNativeUnits).filter(u=>selected.has(u.testRunId)).map(unit=>({...originalReportUnitIdentity(unit),unit}));
+    if(family.units.length){
+      family.attachmentFiles=values(state.attachmentFiles).filter(file=>inScope(file,input));
+      if(family.attachmentFiles.length)family.testNumbers=values(state.originalTestNumbers).filter(n=>selected.has(n.testRunId));
+    }
     family.legacyUnits=values(state.testRuns).filter(r=>selected.has(r.testRunId)).flatMap(r=>Object.keys(r.unitResponses).map(unitName=>({testRunId:r.testRunId,unitName})));
     family.legacyUnits.push(...values(state.workspaceReviews).filter(r=>selected.has(r.testRunId)&&r.unitKey!==null).map(r=>({testRunId:r.testRunId,unitName:r.unitKey!})));
     for(const event of values(state.workspaceActivityEvents))if(event.subjectType==='test_run'&&selected.has(event.subjectId)&&['review_created','review_updated','review_deleted'].includes(event.eventType)){

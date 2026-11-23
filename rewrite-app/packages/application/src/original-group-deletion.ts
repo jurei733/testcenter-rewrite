@@ -1,3 +1,4 @@
+import {readAttachmentStorageId} from './attachment-storage-id.js';
 import type {OriginalWorkspaceWriteAuthority} from './original-workspace-write.js';
 import type {OriginalNativeReview} from './original-review-record.js';
 import type {OriginalCommandDelivery} from './original-command-queue.js';
@@ -32,13 +33,7 @@ export function selectOriginalGroupDeletionKeys(input: OriginalGroupDeletionInpu
 
 /** Existing attachment identities encode the exact Run/Unit/variable tuple. */
 export function attachmentTestRunId(attachmentId: string): string | null {
-  if (!/^att-[A-Za-z0-9_-]+$/.test(attachmentId)) return null;
-  try {
-    const encoded = attachmentId.slice(4), bytes = Buffer.from(encoded, 'base64url');
-    if (bytes.toString('base64url') !== encoded) return null;
-    const tuple: unknown = JSON.parse(bytes.toString('utf8'));
-    return Array.isArray(tuple) && tuple.length === 3 && tuple.every(value => typeof value === 'string') && tuple[0].length > 0 ? tuple[0] as string : null;
-  } catch {return null;}
+  return readAttachmentStorageId(attachmentId)?.[0] ?? null;
 }
 
 type Collection<Row> = Map<string, Row> | Record<string, Row>;

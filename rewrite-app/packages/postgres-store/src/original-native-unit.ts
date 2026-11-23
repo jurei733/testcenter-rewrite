@@ -1,6 +1,7 @@
+import {readOriginalAttachmentMetadata} from './original-attachment-files.js';
 import {originalParticipantGroupKeysEqual} from '@testcenter-rewrite-app/application';
 import type {AttachmentFile,OriginalNativeUnit,ParticipantProgressDelivery,TestRun} from '@testcenter-rewrite-app/domain';
-import {prepareOriginalAttachmentResponse, type OriginalAttachmentMutation} from '@testcenter-rewrite-app/application';
+import {indexOriginalAttachmentFiles, prepareOriginalAttachmentResponse, projectOriginalAttachmentHistory, type OriginalAttachmentMutation} from '@testcenter-rewrite-app/application';
 import {prepareOriginalUnitDelivery} from '@testcenter-rewrite-app/application';
 import {assertOriginalUnitInput,assertOriginalUnitRecord,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitParentMatches,resultParentUnavailable,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from '@testcenter-rewrite-app/application';
 import {withResultArtifactParent} from './result-artifact-parent.js';
@@ -20,8 +21,16 @@ export async function readOriginalNativeUnitInTransaction(client:PoolClient,inpu
  const row=(await client.query('SELECT unit_json FROM original_native_units WHERE test_run_id=$1 AND unit_name=$2',[input.testRunId,name])).rows[0];if(!row)return null;
  const unit=JSON.parse(String(row.unit_json)) as OriginalNativeUnit;assertOriginalUnitRecord(unit);if(!originalUnitParentMatches(input,unit)||unit.unitName!==name)throw resultParentUnavailable();return unit;
 }
-export async function readOriginalNativeUnit(pool:Pool,input:OriginalUnitInput):Promise<OriginalNativeUnit|null>{
- assertOriginalUnitInput(input);return withResultArtifactParent(pool,input,client=>readOriginalNativeUnitInTransaction(client,input));
+export async function readOriginalNativeUnit(pool:Pool,input:OriginalUnitInput,testNumber?:string):Promise<OriginalNativeUnit|null>{
+ assertOriginalUnitInput(input);
+ return withResultArtifactParent(pool,input,async client=>{
+  const unit=await readOriginalNativeUnitInTransaction(client,input);
+  if(!unit||unit.unknownHistory||testNumber===undefined)return unit;
+  const files=indexOriginalAttachmentFiles(await readOriginalAttachmentMetadata(client,input,[input.testRunId]),input);
+  return projectOriginalAttachmentHistory(unit,testNumber,files.get(input.testRunId));
+ // The shared parent/Run lock conflicts with the lock held by a native
+ // attachment mutation, so these reads see a coherent file/response pair.
+ });
 }
 export async function mutateOriginalNativeUnit(pool:Pool,input:OriginalUnitInput,mutation:OriginalUnitTransform | OriginalAttachmentMutation):Promise<OriginalNativeUnit|null>{
  assertOriginalUnitInput(input);return withResultArtifactParent(pool,input,async client=>{

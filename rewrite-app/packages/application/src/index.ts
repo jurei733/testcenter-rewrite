@@ -52,11 +52,13 @@ export {decodeOriginalTestLogJson,encodeOriginalTestLogContent,parseOriginalTest
 export {prepareOriginalTestLock,lockOriginalTestCollection} from './original-test-lock.js';
 export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection,formatOriginalTestLogEntry} from './original-test-log.js';
 import {createOriginalUnitPort} from './original-unit.js';
-import {attachmentStorageId, type AttachmentFileChange, type OriginalAttachmentMutation} from './original-attachment-response.js';
+import {type AttachmentFileChange, type OriginalAttachmentMutation} from './original-attachment-response.js';
+import {attachmentStorageId} from './attachment-storage-id.js';
 export {formatOriginalUnitReadJson} from './original-unit.js';
 export type {OriginalUnitPort,OriginalUnitRead} from './original-unit.js';
-export {readOriginalUnitCollection,mutateOriginalUnitCollection,mutateOriginalAttachmentCollection,invalidateOriginalUnitCollection} from './original-unit-collections.js';
-export {prepareOriginalAttachmentResponse, type OriginalAttachmentMutation} from './original-attachment-response.js';
+export {readOriginalUnitCollection,readOriginalUnitAttachmentCollection,mutateOriginalUnitCollection,mutateOriginalAttachmentCollection,invalidateOriginalUnitCollection} from './original-unit-collections.js';
+export {prepareOriginalAttachmentResponse, indexOriginalAttachmentFiles, originalAttachmentHistoryProjector, projectOriginalAttachmentHistory, type OriginalAttachmentFileMetadata, type OriginalAttachmentMutation} from './original-attachment-response.js';
+export {groupAttachmentStorageRunPrefixes} from './attachment-storage-id.js';
 export {originalUnitHistoryUnavailable,assertOriginalUnitParent,assertOriginalUnitInput,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitRecordKey,selectOriginalUnitName,prepareOriginalUnitMutation,patchOriginalUnitState,patchOriginalUnitParts} from './original-unit-record.js';
 export type {OriginalUnitScope,OriginalUnitInput,OriginalUnitEffect,OriginalUnitTransform} from './original-unit-record.js';
 export {originalUnitDelivery,prepareOriginalUnitDelivery} from './original-unit-delivery.js';
@@ -1724,10 +1726,10 @@ export type FirstSliceRepository = import('./original-system-check.js').Original
   /** Session claims read only scope/identity/lock/opening metadata, never answer or timer payloads. */
   listOriginalSessionTestFlags(participantSessionId: string): Promise<import('./original-session.js').OriginalSessionTest[]>;
   /** One committed inventory snapshot; never returns response/timer values or private review text. */
-  getOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
+  getOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput, attachmentTestNumber?: string): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   mutateOriginalUnit(input: import('./original-unit-record.js').OriginalUnitInput, transform: import('./original-unit-record.js').OriginalUnitTransform): Promise<import('@testcenter-rewrite-app/domain').OriginalNativeUnit | null>;
   mutateOriginalAttachment(input: OriginalAttachmentMutation): Promise<void>;
-  listOriginalUnitsByWorkspace(tenantId: string, workspaceId: string, testRunIds?: string[]): Promise<import("@testcenter-rewrite-app/domain").OriginalNativeUnit[]>;
+  listOriginalUnitsByWorkspace(tenantId: string, workspaceId: string, testRunIds?: string[], options?: {includeLegacyAttachmentParts: true}): Promise<import("@testcenter-rewrite-app/domain").OriginalNativeUnit[]>;
   listOriginalReviews(scope:import('./original-review-record.js').OriginalReviewScope):Promise<import('./original-review-record.js').OriginalNativeReview[]>;
   mutateOriginalReview(scope:import('./original-review-record.js').OriginalReviewScope,operation:import('./original-review-record.js').OriginalReviewMutation):Promise<import('./original-review-record.js').OriginalNativeReview|null>;
   listOriginalReviewsByPerson(scope:{participantSessionId:string;tenantId:string;workspaceId:string}):Promise<import('./original-review-record.js').OriginalNativeReview[]>;

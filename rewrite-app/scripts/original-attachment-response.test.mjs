@@ -121,11 +121,38 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     await storage.repository.saveAttachmentFile(olderFile);
     assert.deepEqual((await metadata()).attachmentFileIds, [olderFile.attachmentFileId]);
     assert.equal(legacyRequest.attachmentId, attachmentId);
+    assert.deepEqual((await unitRead()).dataParts, []);
     await services.originalAttachments.delete({...target,attachmentFileId:olderFile.attachmentFileId});
     assert.equal((await metadata()).dataType, 'missing');
   });
   await services.originalUnit.patchState({...unit, body:{originalUnitId:unitId, newState:[{key:'CURRENT_PAGE', content:'1', timeStamp:1}]}});
   await services.originalUnit.putResponse({...unit, body:{responseType:'owned@1.0', timeStamp:2, dataParts:{ordinary:'owned answer'}}});
+  await t.test('untouched legacy attachments appear in both exports and the task read without a storage write', async () => {
+    await storage.repository.saveAttachmentFile(olderFile);
+    const selectedRun = inventory.numbers.find(row => row.testNumber === testNumber);
+    const rawBefore = await storage.repository.getOriginalUnit({...selectedRun, unitName:alias});
+    const timestamp = Date.parse('2026-11-23T12:00:00Z');
+    await verifyAttachment([olderFile.attachmentFileId], timestamp);
+    const normalizedAlias = await services.originalUnit.read({...unit, unitName:unitId, alias:alias.toLowerCase()});
+    const recovered = JSON.parse(Object.fromEntries(normalizedAlias.dataParts)[attachmentId]);
+    assert.deepEqual(recovered, [{id:'page', value:[olderFile.attachmentFileId], status:'VALUE_CHANGED'}]);
+
+    const request = {...scope,type:'response',dataIds:group,accept:'application/json',useNewVersion:true};
+    const native = JSON.parse((await services.originalWorkspaceReport.read(request)).body);
+    assert.ok(native.some(row => row.responses.some(part => part.id === attachmentId && part.ts === timestamp)));
+    const foreignReport = await services.originalWorkspaceReport.read({...request,dataIds:'experimental-other'});
+    assert.ok(!foreignReport.body.includes(olderFile.attachmentFileId));
+    await assert.rejects(services.originalUnit.read({...unit,token:outsider.token,unitName:unitId,alias}),
+      rejected(403, 'original_test_forbidden'));
+
+    await storage.shutdown();
+    await open();
+    await verifyAttachment([olderFile.attachmentFileId], timestamp);
+    assert.deepEqual(await storage.repository.getOriginalUnit({...selectedRun,unitName:alias}), rawBefore);
+    assert.ok(!rawBefore.parts.some(part => part.id === attachmentId));
+    await services.originalAttachments.delete({...target,attachmentFileId:olderFile.attachmentFileId});
+    await verifyAttachment([], null);
+  });
   if (kind === 'sqlite' || kind === 'postgres') await t.test('a failed Unit write rolls back the file insert', async () => {
     const sqlite = kind === 'sqlite' ? new DatabaseSync(join(folder, 'state.sqlite')) : null;
     const pg = url ? new Pool({connectionString: url.toString()}) : null;
@@ -163,6 +190,10 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     assert.equal(new Set(ids).size, 3);
     [second, third] = ids.slice(1);
     await verifyAttachment(ids, Date.parse('2026-11-23T12:00:00Z'));
+    const before = await unitRead();
+    await storage.repository.saveAttachmentFile(olderFile);
+    assert.deepEqual(await unitRead(), before, 'A stored attachment part wins over fallback history.');
+    await storage.repository.deleteAttachmentFile(olderFile.attachmentFileId);
   });
   await t.test('reopening preserves the linkage and denies a foreign monitor even with the exact file ID', async () => {
     await storage.shutdown();

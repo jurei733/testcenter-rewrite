@@ -130,7 +130,10 @@ export function createOriginalAttachmentPort(input: {
         row.participantSessionId === stored.participantSessionId && row.contentReleaseId === contentReleaseId &&
         !row.unknownHistory && originalParticipantGroupKeysEqual(row.unitName, stored.unitKey));
       const part = unit?.parts.find(row => row.id === source.attachmentId && row.responseType === 'iqb-standard@1.0');
-      if (!part) continue;
+      if (!part) {
+        if (source.lastModified !== null) source.lastModified = Math.floor(source.lastModified / 1000) * 1000;
+        continue;
+      }
       source.attachmentFileIds = orderedOriginalAttachmentFiles(stored.attachmentFileIds, part, stored.variableId);
       source.lastModified = part.ts;
     }

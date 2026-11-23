@@ -11,10 +11,16 @@ export async function readOriginalArchiveNativeUnits(repository: FirstSliceRepos
   if (!input.groupKeys.length) return [];
   const people = new Map(input.participantSessions.map(person => [person.participantSessionId, person]));
   const runs = new Map(input.testRuns.map(run => [run.testRunId, run]));
+  const groups = new Set(input.groupKeys);
+  const selectedRuns = input.testRuns.filter(run => {
+    const person = people.get(run.participantSessionId);
+    return person && groups.has(person.groupKey);
+  }).map(run => run.testRunId);
   const units: OriginalNativeUnit[] = [];
-  for (const unit of await repository.listOriginalUnitsByWorkspace(input.tenantId, input.workspaceId)) {
+  for (const unit of await repository.listOriginalUnitsByWorkspace(input.tenantId, input.workspaceId, selectedRuns,
+    {includeLegacyAttachmentParts:true})) {
     const run = runs.get(unit.testRunId), person = people.get(unit.participantSessionId);
-    if (!person || !input.groupKeys.includes(person.groupKey)) continue;
+    if (!person || !groups.has(person.groupKey)) continue;
     assertOriginalUnitRecord(unit);
     assertOriginalUnitParent(unit, run, person);
     if (unit.unknownHistory) throw originalUnitHistoryUnavailable();

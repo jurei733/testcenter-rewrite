@@ -1,6 +1,9 @@
 import type {AttachmentFile, OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
 import {FirstSliceError} from './first-slice-error.js';
-import {assertOriginalUnitRecord, originalUnitHistoryUnavailable, originalUnitText, type OriginalUnitInput} from './original-unit-record.js';
+import {assertOriginalUnitRecord, originalUnitHistoryUnavailable, originalUnitParentMatches, originalUnitText, type OriginalUnitInput} from './original-unit-record.js';
+import {attachmentStorageId, readAttachmentStorageId} from './attachment-storage-id.js';
+import type {OriginalTestNumberRecord} from './original-test-number.js';
+import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 import {encodeOriginalReportJson} from './original-workspace-report-wire.js';
 
 export type AttachmentFileChange = {file: AttachmentFile} | {deleteFileId: string};
@@ -15,8 +18,92 @@ type AttachmentFileIdentity = Pick<AttachmentFile, 'attachmentFileId' | 'created
 type ResponsePart = OriginalNativeUnit['parts'][number];
 const responseType = 'iqb-standard@1.0';
 
-export const attachmentStorageId = (testRunId: string, unitName: string, variableId: string): string =>
-  'att-' + Buffer.from(JSON.stringify([testRunId, unitName, variableId]), 'utf8').toString('base64url');
+export type OriginalAttachmentFileMetadata = Pick<AttachmentFile,
+  'attachmentId' | 'attachmentFileId' | 'createdAt' | 'tenantId' | 'workspaceId'>;
+type StoredAttachment = {unitName: string; variableId: string; fileId: string; time: number};
+
+const attachmentSecond = (milliseconds: number): number => Math.floor(milliseconds / 1000) * 1000;
+const attachmentResponsePart = (id: string, variableId: string, fileIds: string[], ts: number): ResponsePart => ({
+  id, responseType, ts, content: encodeOriginalReportJson([{id: variableId, value: fileIds, status: 'VALUE_CHANGED'}])
+});
+
+export function indexOriginalAttachmentFiles(rows: readonly OriginalAttachmentFileMetadata[],
+  scope: Pick<OriginalNativeUnit, 'tenantId' | 'workspaceId'>): Map<string, StoredAttachment[]> {
+  const result = new Map<string, StoredAttachment[]>();
+  for (const row of rows) {
+    if (row.tenantId !== scope.tenantId || row.workspaceId !== scope.workspaceId) continue;
+    const tuple = readAttachmentStorageId(row.attachmentId);
+    const time = Date.parse(row.createdAt);
+    if (!tuple || attachmentStorageId(...tuple) !== row.attachmentId || !Number.isFinite(time) ||
+        !/^image:[^/\\\s:]+\.(png|jpe?g)$/.test(row.attachmentFileId)) continue;
+    const [testRunId, unitName, variableId] = tuple;
+    if (!unitName || !variableId || /[:/\\\u0000-\u001f\u007f]/.test(unitName + variableId)) continue;
+    const files = result.get(testRunId) ?? [];
+    files.push({unitName, variableId, fileId: row.attachmentFileId, time});
+    result.set(testRunId, files);
+  }
+  return result;
+}
+
+/** Older uploads wrote the file before the native attachment response existed.
+ * Recover only missing parts of a known Unit from its surviving files. */
+export function projectOriginalAttachmentHistory(unit: OriginalNativeUnit, testNumber: string,
+  files: readonly StoredAttachment[] | undefined): OriginalNativeUnit {
+  if (!files?.length || unit.unknownHistory || !/^[1-9][0-9]{0,18}$/.test(testNumber) ||
+      BigInt(testNumber) > 9223372036854775807n) return unit;
+
+  const parts = new Map<string, StoredAttachment[]>();
+  for (const file of files) {
+    if (!originalParticipantGroupKeysEqual(file.unitName, unit.unitName)) continue;
+    const related = parts.get(file.variableId) ?? [];
+    related.push(file);
+    parts.set(file.variableId, related);
+  }
+
+  const existing = new Set(unit.parts.map(part => part.id));
+  const recovered: ResponsePart[] = [];
+  for (const [variableId, group] of parts) {
+    const alias = group[0]!.unitName;
+    const id = [testNumber, alias, variableId].join(':');
+    if (existing.has(id) || Array.from(id).length > 50 || group.some(file => file.unitName !== alias)) continue;
+    const ordered = group.sort((a, b) => a.time - b.time || a.fileId.localeCompare(b.fileId));
+    const fileIds = [...new Set(ordered.map(file => file.fileId))];
+    recovered.push(attachmentResponsePart(id, variableId, fileIds, attachmentSecond(ordered.at(-1)!.time)));
+  }
+  if (!recovered.length) return unit;
+
+  // Keep the relative order of persisted parts, including parts with unusual
+  // client clocks. A backfilled old upload must not displace a later response.
+  recovered.sort((a, b) => a.ts - b.ts || a.id.localeCompare(b.id));
+  let cursor = 0;
+  const combined: ResponsePart[] = [];
+  for (const part of unit.parts) {
+    while (cursor < recovered.length && recovered[cursor]!.ts <= part.ts) combined.push(recovered[cursor++]!);
+    combined.push(part);
+  }
+  combined.push(...recovered.slice(cursor));
+  const result = {...unit, parts: combined};
+  assertOriginalUnitRecord(result);
+  return result;
+}
+
+export function originalAttachmentHistoryProjector(scope: Pick<OriginalNativeUnit, 'tenantId' | 'workspaceId'>,
+  files: readonly OriginalAttachmentFileMetadata[], numbers: readonly OriginalTestNumberRecord[]): (unit: OriginalNativeUnit) => OriginalNativeUnit {
+  const filesByRun = indexOriginalAttachmentFiles(files, scope);
+  const numbersByRun = new Map<string, OriginalTestNumberRecord[]>();
+  for (const number of numbers) {
+    if (!filesByRun.has(number.testRunId)) continue;
+    const entries = numbersByRun.get(number.testRunId) ?? [];
+    entries.push(number);
+    numbersByRun.set(number.testRunId, entries);
+  }
+  return unit => {
+    const entries = numbersByRun.get(unit.testRunId);
+    return entries?.length === 1 && originalUnitParentMatches(unit, entries[0])
+      ? projectOriginalAttachmentHistory(unit, entries[0]!.testNumber, filesByRun.get(unit.testRunId))
+      : unit;
+  };
+}
 
 export function orderedOriginalAttachmentFiles(fileIds: readonly string[], part: ResponsePart | undefined, variableId: string): string[] {
   const remaining = new Set(fileIds);
@@ -64,9 +151,8 @@ export function prepareOriginalAttachmentResponse(
   if (!previous) return null;
   const unit = {...previous, parts: previous.parts.filter(candidate => candidate.id !== input.partId)};
   if (fileIds.length) {
-    const timestamp = Math.floor(Date.parse(input.occurredAt) / 1000) * 1000;
-    unit.parts.push({id: input.partId, responseType, ts: Math.max(part?.ts ?? timestamp, timestamp),
-      content: encodeOriginalReportJson([{id: input.variableId, value: fileIds, status: 'VALUE_CHANGED'}])});
+    const timestamp = attachmentSecond(Date.parse(input.occurredAt));
+    unit.parts.push(attachmentResponsePart(input.partId, input.variableId, fileIds, Math.max(part?.ts ?? timestamp, timestamp)));
   }
   assertOriginalUnitRecord(unit);
   return unit;

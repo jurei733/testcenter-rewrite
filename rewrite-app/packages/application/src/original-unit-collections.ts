@@ -1,5 +1,5 @@
 import type {AttachmentFile,OriginalNativeUnit,ParticipantSession,ParticipantTestLog,ParticipantProgressDelivery,TestRun,WorkspaceReview,WorkspaceActivityEvent} from '@testcenter-rewrite-app/domain';
-import {prepareOriginalAttachmentResponse, type OriginalAttachmentMutation} from './original-attachment-response.js';
+import {indexOriginalAttachmentFiles, prepareOriginalAttachmentResponse, projectOriginalAttachmentHistory, type OriginalAttachmentMutation} from './original-attachment-response.js';
 import {FirstSliceError} from './first-slice-error.js';
 import {prepareOriginalUnitDelivery} from './original-unit-delivery.js';
 import {assertOriginalUnitParent,assertOriginalUnitRecord,originalUnitParentMatches,originalUnitRecordKey,selectOriginalUnitName,prepareOriginalUnitMutation,originalUnitHistoryUnavailable,type OriginalUnitInput,type OriginalUnitTransform} from './original-unit-record.js';
@@ -19,6 +19,13 @@ export function readOriginalUnitCollection(state:State,input:OriginalUnitInput):
   if([...legacy??[]].some(key=>originalParticipantGroupKeysEqual(key,input.unitName)))throw originalUnitHistoryUnavailable();}
  return structuredClone(row);
 }
+export function readOriginalUnitAttachmentCollection(state:State & {attachmentFiles:Collection<AttachmentFile>},
+  input:OriginalUnitInput, testNumber?:string):OriginalNativeUnit|null {
+  const unit = readOriginalUnitCollection(state, input);
+  if (!unit || unit.unknownHistory || testNumber === undefined) return unit;
+  return projectOriginalAttachmentHistory(unit, testNumber, indexOriginalAttachmentFiles(values(state.attachmentFiles), input).get(input.testRunId));
+}
+
 /** Generic canonical projections cannot silently masquerade as native history. */
 export function invalidateOriginalUnitCollection(state:Pick<State,'originalNativeUnits'>,previous:TestRun|undefined,next:TestRun):void{
  if(!previous)return;

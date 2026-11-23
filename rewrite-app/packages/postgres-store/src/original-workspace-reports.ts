@@ -1,3 +1,4 @@
+import {readOriginalAttachmentMetadata, readOriginalAttachmentTestNumbers} from './original-attachment-files.js';
 import {selectOriginalReportParents,projectOriginalWorkspaceReport,assertOriginalReportRowCount,type OriginalReportMetadata,type OriginalReportFamily,type OriginalReportRequest,type OriginalWorkspaceReportSnapshot,type OriginalReportStoredUnit,type OriginalReportStoredReview} from '@testcenter-rewrite-app/application';
 import {readParticipantTestLogTimestamp,type ParticipantTestLog} from '@testcenter-rewrite-app/domain';
 import type {Pool} from 'pg';
@@ -20,6 +21,10 @@ export async function readOriginalWorkspaceReportSnapshot(pool:Pool,input:Origin
  if(input.type==='response'){
   const units=await all("SELECT test_run_id AS \"testRunId\",participant_session_id AS \"participantSessionId\",tenant_id AS \"tenantId\",workspace_id AS \"workspaceId\",content_release_id AS \"contentReleaseId\",unit_name AS \"unitName\",unit_json AS payload FROM original_native_units WHERE test_run_id=ANY($1::text[]) LIMIT 50001",selected);assertOriginalReportRowCount(units.length);
   family.units=units.map(row=>({...scope(row),unitName:row.unitName as string,unit:JSON.parse(String(row.payload))}));
+  if(family.units.length){
+   family.attachmentFiles=await readOriginalAttachmentMetadata(client,input,family.units.map(unit=>unit.testRunId));
+   if(family.attachmentFiles.length)family.testNumbers=await readOriginalAttachmentTestNumbers(client,input,runIds);
+  }
   family.legacyUnits=[...await all("SELECT t.test_run_id AS \"testRunId\",j.key AS \"unitName\" FROM test_runs t CROSS JOIN LATERAL jsonb_object_keys(t.unit_responses_json::jsonb) j(key) WHERE t.test_run_id=ANY($1::text[])",selected),...await all("SELECT test_run_id AS \"testRunId\",unit_key AS \"unitName\" FROM workspace_reviews WHERE test_run_id=ANY($1::text[]) AND unit_key IS NOT NULL",selected),...await all("SELECT subject_id AS \"testRunId\",details_json::json->>'unitKey' AS \"unitName\" FROM workspace_activity_events WHERE subject_id=ANY($1::text[]) AND subject_type='test_run' AND event_type IN ('review_created','review_updated','review_deleted') AND details_json::json->>'unitKey' IS NOT NULL",selected)] as unknown as OriginalReportFamily['legacyUnits'];
  }else{
   family.units=(await all("SELECT test_run_id AS \"testRunId\",participant_session_id AS \"participantSessionId\",tenant_id AS \"tenantId\",workspace_id AS \"workspaceId\",content_release_id AS \"contentReleaseId\",unit_name AS \"unitName\",unit_json::json->>'testRunId' AS \"unit_testRunId\",unit_json::json->>'participantSessionId' AS \"unit_participantSessionId\",unit_json::json->>'tenantId' AS \"unit_tenantId\",unit_json::json->>'workspaceId' AS \"unit_workspaceId\",unit_json::json->>'contentReleaseId' AS \"unit_contentReleaseId\",unit_json::json->>'unitName' AS \"unit_unitName\",unit_json::json->>'originalUnitId' AS \"unit_originalUnitId\" FROM original_native_units WHERE test_run_id=ANY($1::text[])",selected)).map(unitIdentity);
@@ -30,7 +35,7 @@ export async function readOriginalWorkspaceReportSnapshot(pool:Pool,input:Origin
    const reviews=await all("SELECT test_run_id AS \"testRunId\",participant_session_id AS \"participantSessionId\",tenant_id AS \"tenantId\",workspace_id AS \"workspaceId\",content_release_id AS \"contentReleaseId\",review_number AS \"reviewNumber\",review_id AS \"reviewId\",kind,review_json AS payload FROM original_native_reviews WHERE test_run_id=ANY($1::text[]) LIMIT 50001",selected);assertOriginalReportRowCount(reviews.length);
    family.reviews=reviews.map(row=>({...scope(row),kind:row.kind as string,reviewNumber:row.reviewNumber as string,reviewId:row.reviewId as string,review:JSON.parse(String(row.payload))})) as OriginalReportStoredReview[];
    family.legacyReviews=await all("SELECT test_run_id AS \"testRunId\",review_id AS \"reviewId\" FROM workspace_reviews WHERE test_run_id=ANY($1::text[])",selected) as unknown as OriginalReportFamily['legacyReviews'];
-   family.testNumbers=await all("SELECT test_run_id AS \"testRunId\",participant_session_id AS \"participantSessionId\",tenant_id AS \"tenantId\",workspace_id AS \"workspaceId\",content_release_id AS \"contentReleaseId\",test_number AS \"testNumber\" FROM original_test_numbers WHERE test_run_id=ANY($1::text[])",selected) as unknown as OriginalReportFamily['testNumbers'];
+   family.testNumbers=await readOriginalAttachmentTestNumbers(client,input,runIds);
    const people=parents.map(p=>p.person.participantSessionId);
    family.personNumbers=await all("SELECT participant_session_id AS \"participantSessionId\",tenant_id AS \"tenantId\",workspace_id AS \"workspaceId\",original_login_key AS \"originalLoginKey\",original_name_suffix AS \"originalNameSuffix\",person_number AS \"personNumber\" FROM original_person_numbers WHERE participant_session_id=ANY($1::text[])",[people]) as unknown as OriginalReportFamily['personNumbers'];
   }

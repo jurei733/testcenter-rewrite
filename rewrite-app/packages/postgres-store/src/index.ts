@@ -1,3 +1,6 @@
+import type {OriginalNativeUnit} from '@testcenter-rewrite-app/domain';
+import {originalAttachmentHistoryProjector} from '@testcenter-rewrite-app/application';
+import {readOriginalAttachmentMetadata, readOriginalAttachmentTestNumbers} from './original-attachment-files.js';
 import {refreshOriginalWorkspaceContentType,readOriginalSystemCheckDirectory} from './original-workspace-content-type.js';
 import {transactOriginalSystemCheck} from './original-system-check.js';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
@@ -3650,14 +3653,35 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async deleteOriginalSelectedTests(input){return deleteOriginalSelectedTests(pool,input);},
     async deleteOriginalGroupResults(input) {return deleteOriginalGroupResults(pool, input);},
-    async listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds) {
-      const sql = 'SELECT unit_json FROM original_native_units WHERE tenant_id=$1 AND workspace_id=$2';
-      const {rows} = testRunIds
-        ? await pool.query(sql + ' AND test_run_id = ANY($3::text[])', [tenantId, workspaceId, testRunIds])
-        : await pool.query(sql, [tenantId, workspaceId]);
-      return rows.map(row => JSON.parse(String(row.unit_json)));
+    async listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds, options) {
+      const read = async (client: Pick<Pool,'query'>):Promise<OriginalNativeUnit[]> => {
+        const sql = 'SELECT unit_json FROM original_native_units WHERE tenant_id=$1 AND workspace_id=$2';
+        const {rows} = testRunIds
+          ? await client.query(sql + ' AND test_run_id = ANY($3::text[])', [tenantId, workspaceId, testRunIds])
+          : await client.query(sql, [tenantId, workspaceId]);
+        return rows.map(row => JSON.parse(String(row.unit_json)));
+      };
+      if (!options?.includeLegacyAttachmentParts) return read(pool);
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+        const units = await read(client);
+        const scope = {tenantId, workspaceId};
+        const runIds = [...new Set(units.map(unit => unit.testRunId))];
+        const files = await readOriginalAttachmentMetadata(client, scope, runIds);
+        const project = originalAttachmentHistoryProjector(scope, files,
+          files.length ? await readOriginalAttachmentTestNumbers(client, scope, runIds) : []);
+        const projected = units.map(project);
+        await client.query('COMMIT');
+        return projected;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
     },
-    async getOriginalUnit(input){return readOriginalNativeUnit(pool,input);},
+    async getOriginalUnit(input, testNumber){return readOriginalNativeUnit(pool,input,testNumber);},
     async mutateOriginalUnit(input,transform){return mutateOriginalNativeUnit(pool,input,transform);},
     async mutateOriginalAttachment(input){await mutateOriginalNativeUnit(pool,input,input);},
     async listOriginalReviews(scope){return listOriginalNativeReviews(pool,scope);},
