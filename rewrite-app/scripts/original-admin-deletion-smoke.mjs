@@ -61,6 +61,7 @@ export async function runOriginalAdminDeletionSmoke({page,users,nativeUserIds,ap
  ]);
  const remaining=(await api('/api/v1/admin/users?limit=100')).items;
  assert.ok(users.every(user=>!remaining.some(item=>item.adminUser.adminUserId===user.adminUser.adminUserId)));
- await page.locator('#originalAdministrationHeader .logo a').click();await page.locator('#deleteWorkspaceButton').waitFor();
+ await page.locator('#originalAdministrationHeader .logo a').click();
+ await page.locator('#originalOperatorStarterHeader').waitFor();
  console.log('deletion_confirmation=original-'+screen+'-native-single-actions-pending-cancel-retry-and-cache:passed');
 }

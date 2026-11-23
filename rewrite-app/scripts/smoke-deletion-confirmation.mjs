@@ -97,6 +97,7 @@ try {
         const nativeUserIds=[];
         for(const user of users)nativeUserIds.push(await nativeAdminId(user.adminUser.adminUserId));
         await runOriginalAdminDeletionSmoke({page,users,nativeUserIds,api,password,wrongPassword,screen,deletions});
+        await page.goto(`${baseUrl}/app/workspace?ui=original`,{waitUntil:'domcontentloaded'});
       } else {
       await page.locator("#adminSignOutButton").waitFor();
       await page.locator("#adminUsersButton").click();
