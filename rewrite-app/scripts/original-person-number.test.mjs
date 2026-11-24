@@ -1,3 +1,4 @@
+import {workspaceFileMutationRollbackSql} from './original-workspace-migration-fixture.mjs';
 import assert from 'node:assert/strict';
 import {createHash, randomUUID} from 'node:crypto';
 import {mkdtemp, readFile, writeFile, rm, rename, mkdir} from 'node:fs/promises';
@@ -93,6 +94,8 @@ for (const kind of kinds) test(`${kind}: atomic native person numbers retain sco
         await storage.shutdown();
         control = kind === 'sqlite' ? new DatabaseSync(file) : new Pool({connectionString: url.toString()});
         const numberVersion=Number((await query("SELECT version FROM schema_migrations WHERE name='original_native_person_numbers'"))[0].version);
+        if (kind === 'sqlite') control.exec(workspaceFileMutationRollbackSql);
+        else await control.query(workspaceFileMutationRollbackSql);
         await query('DROP INDEX IF EXISTS original_workspace_content_type');await query('ALTER TABLE workspaces DROP COLUMN original_content_type');
         await query('DROP TABLE IF EXISTS original_application_assets');await query('DROP TABLE IF EXISTS original_application_asset_counter');await query('ALTER TABLE participant_roster_entries DROP COLUMN original_asset_assignment_layers_json');
         await query('DROP TABLE IF EXISTS original_admin_numbers');await query('DROP TABLE IF EXISTS original_admin_number_counter');
