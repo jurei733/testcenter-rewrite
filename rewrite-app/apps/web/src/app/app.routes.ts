@@ -157,7 +157,8 @@ export const appRoutes: Routes = [
       {path:'',pathMatch:'full',redirectTo:'attachment-overview'},
       {path:'attachment-overview',loadComponent:()=>
         import('./native-monitor/native-attachment-overview.component').then(module=>module.NativeAttachmentOverviewComponent)},
-      {path:'capture-image',loadComponent:()=>import('./attachment-capture.component').then(module=>module.AttachmentCaptureComponent)}
+      {path:'capture-image',loadComponent:()=>import('./native-monitor/native-attachment-capture.component')
+        .then(module=>module.NativeAttachmentCaptureComponent)}
     ]},
   {path:'group-monitor',canActivate:[gateLegacyGroupMonitorBookmark],loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),children:[
     {path:':group-name/:profile-id',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)},

@@ -1,0 +1,153 @@
+@if (hasSessionScope) {
+  <mat-sidenav-container id="attachmentCaptureCard" [class.mobile]="mobile().matches">
+    <mat-sidenav [mode]="mobile().matches ? 'over' : 'side'" [opened]="sidebarOpen()"
+      (openedChange)="sidebarOpen.set($event)" fixedInViewport [fixedTopGap]="55">
+      <div class="corner-menu">
+        <button mat-icon-button type="button" [attr.aria-label]="customText('am_sidebar_button', 'Seitenleiste')"
+          (click)="sidebarOpen.set(false)">
+          <mat-icon svgIcon="close" />
+        </button>
+      </div>
+      <h2>{{ customText('am_capture_image', 'Seite aufnehmen') }}</h2>
+
+      @if (!capturePreviewUrl) {
+        <div class="toolbar-section">
+          <mat-form-field appearance="fill">
+            <mat-label>{{ customText('am_available_cameras', 'Verfügbare Cameras') }}</mat-label>
+            <mat-select id="attachmentCameraSelect" [(ngModel)]="selectedCameraId"
+              [disabled]="busy || cameraStarting" (selectionChange)="selectCamera()">
+              @if (!selectedCameraIsListed) {
+                <mat-option [value]="selectedCameraId">Standardkamera</mat-option>
+              }
+              @for (camera of cameras; track camera.id) {
+                <mat-option [value]="camera.id">{{ camera.label || camera.id }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <br>
+          <mat-checkbox id="toggleAttachmentFlashButton" [checked]="flashOn"
+            [disabled]="!cameraActive || !hasFlash" (change)="toggleFlash()">
+            {{ customText('gm_flash_checkbox', 'Blitz') }}
+          </mat-checkbox>
+        </div>
+      }
+
+      @if (attachment; as target) {
+        <div id="attachmentCaptureTarget" class="toolbar-section">
+          <p>Seite gehört zu: <b>{{ target.personLabel }}: {{ target.testLabel }}</b></p>
+          @if (captureBlob && canCaptureTarget) {
+            <button id="uploadCapturedAttachmentButton" mat-raised-button data-cy="dialog-confirm" type="button"
+              [disabled]="busy || !canWrite" (click)="uploadCapture()">{{ busy ? 'Wird hochgeladen…' : 'Upload' }}</button>
+          }
+        </div>
+      }
+      @if (attachment; as target) {
+        <details class="toolbar-section target-details">
+          <summary>Aufgabe und Variable</summary>
+          <p>{{ target.unitLabel }} · {{ target.variableId }}</p>
+        </details>
+      }
+      @if (capturePreviewUrl || statusIsError) {
+        <div class="toolbar-section">
+          <button id="retakeAttachmentCaptureButton" mat-raised-button data-cy="new-capture" type="button"
+            [disabled]="busy" (click)="resetTarget()">Neue Aufnahme</button>
+        </div>
+      }
+
+      @if (!capturePreviewUrl) {
+        <details class="toolbar-section camera-options">
+          <summary>Weitere Aufnahmeoptionen</summary>
+          @if (cameraActive) {
+            <button id="stopAttachmentCameraButton" mat-button type="button" (click)="stopRequestedCamera()">Kamera stoppen</button>
+          }
+          <label>
+            QR-Code aus einer Bilddatei lesen
+            <input id="attachmentQrImageInput" type="file" accept="image/png,image/jpeg,image/webp"
+              [disabled]="busy" (change)="scanQrImage($event)" />
+          </label>
+          <form (ngSubmit)="resolveCode()">
+            <label>
+              Aufgedruckten Anhangscode eingeben
+              <input id="attachmentCaptureCode" name="attachmentCode" type="text" autocomplete="off"
+                [(ngModel)]="attachmentCode" />
+            </label>
+            <button id="resolveAttachmentCodeButton" mat-button type="submit"
+              [disabled]="busy || !attachmentCode.trim()">Code prüfen</button>
+          </form>
+          @if (attachment && canCaptureTarget) {
+            @if (cameraActive) {
+              <button id="captureAttachmentFrameButton" mat-button type="button" [disabled]="busy"
+                (click)="capturePage()">Kamerabild übernehmen</button>
+            }
+            <label>
+              Foto aufnehmen oder auswählen
+              <input id="attachmentCaptureFileInput" type="file" accept="image/png,image/jpeg" capture="environment"
+                [disabled]="busy" (change)="selectCaptureFile($event)" />
+            </label>
+          }
+        </details>
+      }
+      <div class="toolbar-bottom">
+        <a id="backToAttachmentManager" mat-raised-button routerLink="../attachment-overview">
+          {{ customText('am_goto_attachment_overview', 'Zurück zur Übersicht') }}
+        </a>
+      </div>
+    </mat-sidenav>
+
+    <mat-sidenav-content>
+      @if (!sidebarOpen()) {
+        <div class="corner-menu">
+          <button mat-icon-button type="button" aria-label="Einstellungen" (click)="sidebarOpen.set(true)">
+            <mat-icon svgIcon="menu" />
+          </button>
+        </div>
+      }
+
+      <div class="camera-pane">
+        @if (!capturePreviewUrl) {
+          <div class="capture-guide">
+            <mat-icon svgIcon="info" />
+            <span>{{ customText('am_capture_image_instructions', 'Halten Sie den QR-Code oben links in den markierten Bereich.') }}</span>
+          </div>
+          @if (!cameraActive) {
+            <div class="start-control">
+              <button id="startAttachmentCameraButton" mat-raised-button type="button"
+                [disabled]="busy || cameraStarting" (click)="requestCamera()">
+                {{ cameraStarting ? 'Kamerazugriff wird angefragt…' : 'Kamera starten' }}
+              </button>
+            </div>
+          }
+        }
+        @if (statusIsError) {
+          <div id="attachmentCaptureStatus" class="camera-error" role="alert">
+            <mat-icon svgIcon="error" />
+            <span>{{ status }}</span>
+          </div>
+        } @else if (busy) {
+          <p id="attachmentCaptureStatus" role="status">Bitte warten…</p>
+        }
+        @if (uploadNotice) {
+          <p id="attachmentCaptureUploadStatus" class="upload-notice" role="status">Anhang hochgeladen.</p>
+        }
+
+        <div class="camera-stage">
+          <div class="camera-shell" [class.active]="cameraActive && !capturePreviewUrl">
+            <video #cameraVideo id="attachmentCaptureVideo" playsinline muted
+              [style.width.%]="cameraGeometry?.videoWidthPercent || 100"
+              [style.height.%]="cameraGeometry?.videoHeightPercent || 100"
+              (loadedmetadata)="onCameraMetadataLoaded()"></video>
+            @if (cameraActive) {
+              <div class="scan-frame" [style.left.%]="cameraGeometry?.scanLeftPercent" aria-hidden="true"></div>
+            }
+          </div>
+          @if (capturePreviewUrl) {
+            <img id="attachmentCapturePreview" [src]="capturePreviewUrl" alt="Aufgenommenes Aufgabenblatt" />
+          }
+          <canvas #captureCanvas hidden></canvas>
+        </div>
+      </div>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+} @else {
+  <p role="alert">Für die Aufnahme ist eine gültige Sitzung der Anhangsverwaltung erforderlich.</p>
+}

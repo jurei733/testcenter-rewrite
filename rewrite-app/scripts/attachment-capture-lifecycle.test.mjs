@@ -159,6 +159,19 @@ test("destroy cancels pending upload-notice presentation", t => {
   assert.equal(c.uploadNotice, "Owned uploaded page");
 });
 
+test("reset after a file-only capture clears the target without starting a camera", () => {
+  const f = fixture();
+  f.component.cameraActive = false;
+  f.component.startCamera = () => assert.fail("File-only capture must not request camera access");
+  f.component.captureBlob = image("selected file");
+
+  f.component.resetTarget(false);
+
+  assert.equal(f.component.attachment, null);
+  assert.equal(f.component.attachmentCode, "");
+  assert.equal(f.component.captureBlob, null);
+});
+
 test("a failed encoding does not stop the camera or resolve a scanned target", async () => {
   const f = fixture(), c = f.component;
   c.attachment = null; c.attachmentCode = "";

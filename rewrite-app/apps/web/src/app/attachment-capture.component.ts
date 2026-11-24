@@ -580,7 +580,7 @@ export class AttachmentCaptureComponent
     }, 3_000);
   }
 
-  resetTarget(): void {
+  resetTarget(resumeCamera = true): void {
     this.targetVersion++;
     this.operationVersion++;
     this.busy = false;
@@ -589,7 +589,7 @@ export class AttachmentCaptureComponent
     this.clearCapture();
     this.status = "Scan a QR code or enter an attachment code to begin.";
     this.statusIsError = false;
-    if (!this.cameraActive) void this.startCamera();
+    if (resumeCamera && !this.cameraActive) void this.startCamera();
   }
 
   private async handleScannedCode(code: string): Promise<void> {
