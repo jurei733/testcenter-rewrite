@@ -60,6 +60,17 @@ async function rendered(input) {
   });
 }
 
+test("Original labels print WinAnsi punctuation with one fallback per unsupported Unicode character", async () => {
+  const labelTemplate = "Grüße € „A“ ’ – — œ Ł Ω 🙂";
+  const [{content, pdf}] = await rendered({attachments:[attachment], layout:"original", labelTemplate});
+  const text = content.match(/<([a-f\d]+)> Tj/i)?.[1];
+  const x = Number(content.match(/1 0 0 1 ([-\d.]+) [-\d.]+ Tm/)?.[1]);
+  assert.ok(text);
+  assert.equal(new TextDecoder("windows-1252").decode(Buffer.from(text,"hex")), "Grüße € „A“ ’ – — œ ? ? ?");
+  near(x, 227.396);
+  assert.equal(pdf.getTitle(),labelTemplate);
+});
+
 test("Original printed QR occupies the Source 20/20/40/40 mm region on each attachment's final label page",async()=>{
   const rows = await rendered({attachments:[attachment,{...attachment,attachmentId:"second-owned-qr"}],layout:"original",labelTemplate:"Own long label ".repeat(30)});
   assert.equal(rows.length,2);

@@ -15,6 +15,15 @@ const ORIGINAL_CELL_PADDING = 2.835;
 const ORIGINAL_LINE_HEIGHT = 15;
 const ORIGINAL_BASELINE_FROM_TOP = 40.086;
 const ORIGINAL_LINES_PER_PAGE = 50;
+const ORIGINAL_LABEL_SIZE = 12;
+// TCPDF 6.10's built-in Helvetica positioning differs from AFM widths
+// for these printable WinAnsi characters. Units are thousandths of an em.
+const ORIGINAL_CHARACTER_WIDTHS: Readonly<Record<string, number>> = {
+  "]": 277, "¡": 278, "«": 448, "°": 606, "²": 350, "³": 350, "¹": 350, "»": 448,
+  "¼": 869, "½": 869, "¾": 879, "¿": 556, "Þ": 666, "æ": 896,
+  "ì": 251, "í": 251, "î": 251, "ï": 251, "þ": 555,
+  "€": 655, "Ÿ": 667, "ƒ": 278, "‹": 250, "›": 250, "œ": 938, "’": 221
+};
 
 const originalBookmarkTitle = (label: string): string => label
   .replace(/<br\s?\/>|<\/(?:blockquote|dd|dl|div|dt|h[1-6]|hr|li|ol|p|pre|ul|tcpdf|table|tr|td)>/gi, "\n")
@@ -169,6 +178,17 @@ export const createAttachmentPagesPdf = async (input: {
   pdf.setSubject("Printable QR handoff pages for participant attachments");
   const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const originalCharacters = new Set(regularFont.getCharacterSet());
+  const characterWidths = new Map<string, number>();
+  const measureOriginalCharacter = (character: string): number => {
+    const cached = characterWidths.get(character);
+    if (cached !== undefined) return cached;
+    const units = ORIGINAL_CHARACTER_WIDTHS[character];
+    const width = units === undefined ? regularFont.widthOfTextAtSize(character, ORIGINAL_LABEL_SIZE)
+      : units * ORIGINAL_LABEL_SIZE / 1000;
+    characterWidths.set(character, width);
+    return width;
+  };
   const bookmarks: Array<{ title: string; page: PDFRef; height: number }> = [];
 
   for (const [index, attachment] of input.attachments.entries()) {
@@ -178,20 +198,16 @@ export const createAttachmentPagesPdf = async (input: {
     if (originalLayout) bookmarks.push({
       title: originalBookmarkTitle(authoredLabel), page: page.ref, height: page.getHeight()
     });
+    // TCPDF's standard Helvetica uses WinAnsi. Unsupported characters fall
+    // back once per code point, while the Unicode bookmark remains intact.
     const label = originalLayout
-      ? authoredLabel.replaceAll("\r", "").split("\n").map(toPdfSafeText).join("\n")
+      ? Array.from(authoredLabel.replace(/[\r\uFFFD]/g, ""), character =>
+          character === "\n" || originalCharacters.has(character.codePointAt(0)!) ? character : "?"
+        ).join("")
       : toPdfSafeText(authoredLabel);
     // Unmodified Source AttachmentTemplate uses TCPDF's regular Helvetica 12.
-    const labelSize = originalLayout ? 12 : 16;
+    const labelSize = originalLayout ? ORIGINAL_LABEL_SIZE : 16;
     const labelFont = originalLayout ? regularFont : boldFont;
-    const characterWidths = new Map<string, number>();
-    const measureOriginalCharacter = (character: string): number => {
-      const cached = characterWidths.get(character);
-      if (cached !== undefined) return cached;
-      const width = regularFont.widthOfTextAtSize(character, labelSize);
-      characterWidths.set(character, width);
-      return width;
-    };
     const measureLine = (value: string): number => originalLayout
       ? Array.from(value).reduce((width, character) => width + measureOriginalCharacter(character), 0)
       : labelFont.widthOfTextAtSize(value, labelSize);
