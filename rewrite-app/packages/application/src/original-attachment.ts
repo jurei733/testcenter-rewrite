@@ -15,6 +15,10 @@ type NativeTarget = {
   stored: WorkspaceAttachment;
   contentReleaseId: string;
   bookletName: string;
+  legacyId: string;
+  legacyQrId: string;
+  originalId: string;
+  originalUnitName: string;
 };
 type AttachmentRequest = {token: string; attachmentId: string};
 type NativeAccess = {workspace: Workspace & {tenantKey: string}; actorAdminUserId: string; groupKeys: string[]};
@@ -32,12 +36,10 @@ export type OriginalAttachmentPort = {
 };
 
 const validNumber = (id: string) => /^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= 9223372036854775807n;
-const originalUnitName = (unit: string): string => unit.replace(/[a-z]/g, letter => letter.toUpperCase());
-
-function originalCode(target: NativeTarget): string {
-  const [number] = target.source.attachmentId.split(':');
-  return [number, originalUnitName(target.stored.unitKey), target.stored.variableId].join(':');
-}
+const toOriginalUnitName = (unit: string): string => unit.replace(/[a-z]/g, letter => letter.toUpperCase());
+const attachmentAddress = (number: string, unit: string, variable: string): string => [number, unit, variable].join(':');
+const indexAddress = (index: Map<string, NativeTarget | null>, key: string, target: NativeTarget) =>
+  index.set(key, index.has(key) ? null : target);
 
 type FindTarget = (attachmentId: string) => NativeTarget | null | undefined;
 
@@ -45,7 +47,7 @@ export function createOriginalAttachmentPort(input: {
   auth: OriginalAuthenticationPort;
   workspace: (scope: {tenantId: string; workspaceId: string}) => Promise<NativeAccess['workspace'] | undefined>;
   inventory: (tenantId: string, workspaceId: string) => Promise<OriginalTestAdministrationInventory>;
-  attachments: (workspace: Workspace) => Promise<WorkspaceAttachment[]>;
+  attachments: (workspace: Workspace) => Promise<{attachment: WorkspaceAttachment; originalUnitId: string}[]>;
   units: (tenantId: string, workspaceId: string, testRunIds: string[]) => Promise<OriginalNativeUnit[]>;
   scopedOperations: (authorize: OriginalAttachmentPort['authorize']) => AttachmentPort;
 }): OriginalAttachmentPort {
@@ -75,8 +77,9 @@ export function createOriginalAttachmentPort(input: {
     const runs = new Map(inventory.runs.map(row => [row.testRunId, row]));
     const numbers = new Map(inventory.numbers.map(row => [row.testRunId, row]));
     const targets = new Map<string, NativeTarget>();
+    const legacyCodes = new Map<string, NativeTarget | null>();
     const originalCodes = new Map<string, NativeTarget | null>();
-    for (const stored of attachments) {
+    for (const {attachment: stored, originalUnitId} of attachments) {
       if (stored.groupKey !== group) continue;
       const person = people.get(stored.participantSessionId);
       const run = runs.get(stored.testRunId);
@@ -89,23 +92,33 @@ export function createOriginalAttachmentPort(input: {
           mapping.contentReleaseId !== run.contentReleaseId ||
           person.contentReleaseId !== run.contentReleaseId ||
           stored.unitKey.includes(':') || stored.variableId.includes(':')) continue;
-      const attachmentId = [mapping.testNumber, stored.unitKey, stored.variableId].join(':');
+      const legacyId = attachmentAddress(mapping.testNumber, stored.unitKey, stored.variableId);
+      const legacyQrId = attachmentAddress(mapping.testNumber, toOriginalUnitName(stored.unitKey), stored.variableId);
+      const originalUnitName = toOriginalUnitName(originalUnitId);
+      const originalId = attachmentAddress(mapping.testNumber, originalUnitName, stored.variableId);
       const groupLabel = stored.groupLabel ?? group;
       const suffix = person.originalNameSuffix ?? '';
       const personLabel = groupLabel + '/' + person.originalLoginKey + (suffix && suffix !== '0' ? '/' + suffix : '');
       const source: OriginalAttachment = {
-        attachmentId, attachmentType: stored.attachmentType, dataType: stored.dataType,
+        attachmentId: legacyId, attachmentType: stored.attachmentType, dataType: stored.dataType,
         attachmentFileIds: stored.attachmentFileIds, lastModified: stored.lastModified,
         testLabel: run.bookletLabel ?? stored.testLabel, unitLabel: stored.unitKey, personLabel,
         variableId: stored.variableId
       };
-      if (targets.has(attachmentId)) throw new FirstSliceError(409, 'original_attachment_ambiguous', 'The attachment identity is ambiguous.');
-      const target = {source, stored, contentReleaseId: run.contentReleaseId, bookletName: run.bookletName};
-      targets.set(attachmentId, target);
-      const code = originalCode(target);
-      originalCodes.set(code, originalCodes.has(code) ? null : target);
+      if (targets.has(legacyId)) throw new FirstSliceError(409, 'original_attachment_ambiguous', 'The attachment identity is ambiguous.');
+      const target = {source, stored, contentReleaseId: run.contentReleaseId, bookletName: run.bookletName,
+        legacyId, legacyQrId, originalId, originalUnitName};
+      targets.set(legacyId, target);
+      indexAddress(legacyCodes, legacyQrId, target);
+      if (originalUnitName && !/[:/\\\u0000-\u001f\u007f]/.test(originalUnitName)) indexAddress(originalCodes, originalId, target);
     }
-    const find: FindTarget = id => targets.get(id) ?? originalCodes.get(id);
+    // Keep old addresses authoritative and publish a definition ID only if it selects this occurrence.
+    const find: FindTarget = id => targets.get(id) ?? (legacyCodes.has(id) ? legacyCodes.get(id) : originalCodes.get(id));
+    for (const target of targets.values()) {
+      if (find(target.originalId) !== target) continue;
+      target.source.attachmentId = target.originalId;
+      target.source.unitLabel = target.originalUnitName;
+    }
     return {workspace, targets, find};
   };
 
@@ -121,12 +134,12 @@ export function createOriginalAttachmentPort(input: {
       attachmentId: target.stored.attachmentId};
   };
   const page = (target: NativeTarget, find: FindTarget): WorkspaceAttachment => {
-    const code = originalCode(target);
-    const unit = originalUnitName(target.stored.unitKey);
+    const usesOriginalAddress = target.source.attachmentId === target.originalId;
+    const unit = usesOriginalAddress ? target.originalUnitName : toOriginalUnitName(target.stored.unitKey);
     return {
       ...target.stored,
-      // A printed code must resolve to the same target even if published aliases differ only by case.
-      attachmentId: find(code) === target ? code : target.source.attachmentId,
+      attachmentId: usesOriginalAddress || find(target.legacyQrId) !== target
+        ? target.source.attachmentId : target.legacyQrId,
       personLabel: target.source.personLabel,
       bookletKey: target.bookletName,
       testLabel: target.source.testLabel,
@@ -146,11 +159,11 @@ export function createOriginalAttachmentPort(input: {
       known.push(unit);
       unitsByRun.set(unit.testRunId, known);
     }
-    for (const {stored, source, contentReleaseId} of withFiles) {
+    for (const {stored, source, contentReleaseId, legacyId} of withFiles) {
       const unit = unitsByRun.get(stored.testRunId)?.find(row =>
         row.participantSessionId === stored.participantSessionId && row.contentReleaseId === contentReleaseId &&
         !row.unknownHistory && originalParticipantGroupKeysEqual(row.unitName, stored.unitKey));
-      const part = unit?.parts.find(row => row.id === source.attachmentId && row.responseType === 'iqb-standard@1.0');
+      const part = unit?.parts.find(row => row.id === legacyId && row.responseType === 'iqb-standard@1.0');
       if (!part) {
         if (source.lastModified !== null) source.lastModified = Math.floor(source.lastModified / 1000) * 1000;
         continue;

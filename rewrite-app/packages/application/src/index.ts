@@ -25012,9 +25012,9 @@ export const createFirstSliceServices = (
     };
   };
 
-  const buildWorkspaceAttachments = async (
+  const buildWorkspaceAttachmentTargets = async (
     workspace: Workspace
-  ): Promise<WorkspaceAttachment[]> => {
+  ) => {
     const [attachmentFiles, testRuns, participantSessions, rosterEntries, releases] =
       await Promise.all([
         repository.listAttachmentFilesByWorkspace(
@@ -25080,7 +25080,7 @@ export const createFirstSliceServices = (
               ? Date.parse(latestFile.createdAt)
               : null;
 
-            return {
+            const attachment: WorkspaceAttachment = {
               attachmentId,
               tenantId: workspace.tenantId,
               workspaceId: workspace.workspaceId,
@@ -25104,12 +25104,13 @@ export const createFirstSliceServices = (
                 lastModified !== null && Number.isFinite(lastModified)
                   ? lastModified
                   : null
-            } satisfies WorkspaceAttachment;
+            };
+            return {attachment, originalUnitId: unitEntry.originalUnitId ?? unitEntry.unitKey};
           })
         );
       })
       .sort(
-        (left, right) =>
+        ({attachment: left}, {attachment: right}) =>
           left.groupKey.localeCompare(right.groupKey) ||
           left.loginKey.localeCompare(right.loginKey) ||
           left.bookletKey.localeCompare(right.bookletKey) ||
@@ -25118,6 +25119,8 @@ export const createFirstSliceServices = (
           left.attachmentId.localeCompare(right.attachmentId)
       );
   };
+  const buildWorkspaceAttachments = async (workspace: Workspace): Promise<WorkspaceAttachment[]> =>
+    (await buildWorkspaceAttachmentTargets(workspace)).map(({attachment}) => attachment);
 
   const requireScopedAttachment = async (input: {
     workspace: Workspace;
@@ -28599,7 +28602,7 @@ export const createFirstSliceServices = (
       return workspace && tenant ? {...workspace, tenantKey: tenant.tenantKey} : undefined;
     },
     inventory: (tenantId, workspaceId) => repository.getOriginalTestAdministrationInventory(tenantId, workspaceId),
-    attachments: buildWorkspaceAttachments,
+    attachments: buildWorkspaceAttachmentTargets,
     units: (tenantId, workspaceId, testRunIds) => repository.listOriginalUnitsByWorkspace(tenantId, workspaceId, testRunIds),
     scopedOperations: authorize => attachmentOperations(async request => {
       const access = await authorize(request.sessionToken);

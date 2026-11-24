@@ -12,6 +12,7 @@ import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
 import {createPostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
 import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
+import {createOriginalAttachmentPort} from '../packages/application/dist/packages/application/src/original-attachment.js';
 
 const schemaCache = resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE || '.data/original-xml-schemas');
 const validator = await prepareOriginalXmlSchemaValidator(schemaCache, process.env.FIRST_SLICE_XML_SCHEMA_DOWNLOAD !== 'false');
@@ -23,6 +24,43 @@ const alias = 'Page.Alias';
 const image = fileName => ({fileName, mediaType:'image/png',
   dataBase64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII='});
 const rejected = (status, code) => error => error.statusCode === status && error.errorCode === code;
+
+test('a physical code shared by two eligible occurrences cannot choose an attachment', async () => {
+  const scope = {tenantId:'owned-tenant',workspaceId:'owned-workspace'};
+  const workspace = {...scope,tenantKey:'owned',workspaceKey:'owned'};
+  const participantSessionId = 'fixture-participant';
+  const contentReleaseId = 'fixture-release';
+  const testRunId = 'fixture-run';
+  const testNumber = '2';
+  const loginKey = 'fixture-owner';
+  const aliases = ['First.Page','Second.Page'];
+  const attachments = aliases.map(unitKey=>({
+    originalUnitId:unitId,
+    attachment:{...scope,unitKey,attachmentId:'stored-'+unitKey,participantSessionId,testRunId,groupKey:group,loginKey,
+      variableId:'page',attachmentType:'capture-image',attachmentFileIds:[],lastModified:null,dataType:'missing'}
+  }));
+  const port = createOriginalAttachmentPort({
+    auth:{read:async()=>({kind:'person',participantSession:{...scope,originalOperationalMode:'monitor-group',
+      groupKey:group,participantSessionId:'fixture-monitor'}})},
+    workspace:async()=>workspace,
+    inventory:async()=>({
+      people:[{participantSessionId,contentReleaseId,originalLoginKey:loginKey,groupKey:group}],
+      bindings:[{loginKey,groupKey:group}],
+      runs:[{testRunId,participantSessionId,contentReleaseId,bookletName:'fixture-booklet'}],
+      numbers:[{testRunId,participantSessionId,contentReleaseId,testNumber}]
+    }),
+    attachments:async()=>attachments, units:async()=>[], scopedOperations:()=>({})
+  });
+  const reference = unit => ({token:'fixture-token',attachmentId:[testNumber,unit,'page'].join(':')});
+  await assert.rejects(port.get(reference(unitId)),rejected(404,'original_attachment_not_found'));
+  assert.deepEqual((await port.list('fixture-token')).map(row=>row.attachmentId),aliases.map(alias=>reference(alias).attachmentId));
+  for (const alias of aliases) {
+    const row = await port.get(reference(alias));
+    const printed = await port.page(reference(alias));
+    assert.equal(printed.attachmentId,reference(alias.toUpperCase()).attachmentId);
+    assert.deepEqual(await port.get(reference(alias.toUpperCase())),row);
+  }
+});
 
 function archiveText(buffer, fileName) {
   for (let offset = 0; buffer.readUInt32LE(offset) === 0x04034b50;) {
@@ -112,15 +150,17 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     assert.deepEqual(await storage.repository.listAttachmentFilesByWorkspace(tenant.tenantId, workspace.workspaceId), []);
   });
   const [legacyRequest] = await services.originalAttachments.list(monitor.token);
+  const originalQrTarget = {...target, attachmentId:[testNumber, unitId, 'page'].join(':')};
   assert.deepEqual(legacyRequest, {
-    attachmentId, attachmentType:'capture-image', dataType:'missing', attachmentFileIds:[], lastModified:null,
-    testLabel:'Owned Booklet', unitLabel:alias, personLabel:'Owned/owned-test', variableId:'page'
+    attachmentId:originalQrTarget.attachmentId, attachmentType:'capture-image', dataType:'missing', attachmentFileIds:[], lastModified:null,
+    testLabel:'Owned Booklet', unitLabel:unitId, personLabel:'Owned/owned-test', variableId:'page'
   });
-  const originalQrTarget = {...target, attachmentId:[testNumber, alias.toUpperCase(), 'page'].join(':')};
   assert.deepEqual(await services.originalAttachments.get(originalQrTarget), legacyRequest);
+  assert.deepEqual(await services.originalAttachments.get(target), legacyRequest);
+  assert.deepEqual(await services.originalAttachments.get({...target,attachmentId:[testNumber,alias.toUpperCase(),'page'].join(':')}), legacyRequest);
   const printable = await services.originalAttachments.page(target);
   assert.equal(printable.attachmentId, originalQrTarget.attachmentId);
-  assert.equal(printable.unitKey, alias.toUpperCase());
+  assert.equal(printable.unitKey, unitId);
   assert.equal(printable.bookletKey, 'OWNED.ATTACHMENT.BOOK');
   assert.deepEqual(await services.originalAttachments.pages(monitor.token), [printable]);
   await assert.rejects(services.originalAttachments.get({...originalQrTarget,token:outsider.token}),
@@ -133,7 +173,7 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
   await t.test('a stored file from before response linkage remains manageable before first Unit entry', async () => {
     await storage.repository.saveAttachmentFile(olderFile);
     assert.deepEqual((await metadata()).attachmentFileIds, [olderFile.attachmentFileId]);
-    assert.equal(legacyRequest.attachmentId, attachmentId);
+    assert.equal(legacyRequest.attachmentId, originalQrTarget.attachmentId);
     assert.deepEqual((await unitRead()).dataParts, []);
     await services.originalAttachments.delete({...target,attachmentFileId:olderFile.attachmentFileId});
     assert.equal((await metadata()).dataType, 'missing');
@@ -192,7 +232,7 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
   let originalFirst, second, third;
   await t.test('serialized writes at the same Source clock retain all files and unrelated responses', async () => {
     await storage.repository.saveAttachmentFile(olderFile);
-    await services.originalAttachments.upload(target,image('first.png'));
+    await services.originalAttachments.upload(originalQrTarget,image('first.png'));
     const initialIds = (await metadata()).attachmentFileIds;
     assert.equal(initialIds[0], olderFile.attachmentFileId);
     await services.originalAttachments.delete({...target,attachmentFileId:olderFile.attachmentFileId});
