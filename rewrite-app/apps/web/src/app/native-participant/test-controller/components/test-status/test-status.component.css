@@ -2,3 +2,7 @@
   margin-top: 10%;
   width: 80%;
 }
+
+.mat-card-box {
+  --mat-card-elevated-container-color: var(--mat-sys-surface);
+}
