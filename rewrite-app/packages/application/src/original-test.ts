@@ -27,7 +27,7 @@ function orderedName(input:string):{name:string;fileId:string;states:Map<string,
   return {fileId, name: fileId + (states.size ? '#' + [...states].map(([key, value]) => `${key}:${value}`).join(';') : ''), states};
 }
 export function parseOriginalTestName(input:string):{name:string;fileId:string;states:Record<string,string>}{const parsed=orderedName(input);return{...parsed,states:Object.fromEntries(parsed.states)};}
-export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode|NonNullable<ParticipantSession['originalOperationalMode']>;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>;nativeStateBase?:OriginalNativeStateWriteBase};
+export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode|NonNullable<ParticipantSession['originalOperationalMode']>;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>;nativeStateBase?:OriginalNativeStateWriteBase;nativeResumePending?:true};
 export function formatOriginalTestReadJson(value:OriginalTestRead):string{
  const resources=Object.entries(value.resources);
  const resourceJson=originalPhpMap(resources);
@@ -228,9 +228,13 @@ export function createOriginalTestPort(input: {
         return{testRun:timestamp?{...context.testRun,updatedAt:timestamp}:context.testRun,testLogs:[],activityEvents:[],
           ...(timestamp?{originalResultOpenedAt:timestamp}:{}),...(initialize?{initializeOriginalNativeWriteGuard:true as const}:{})};});
       if(!result)throw forbidden(raw);
-      const guard=result.testRun.originalResultState?.nativeWriteGuard;
-      return{...files,workspaceId,mode:person.originalOperationalMode??entry?.executionMode??defaultParticipantExecutionMode,laststate:savedState(result.testRun),firstStart,presetBookletStates:orderedName(identity.bookletName).states,
-        ...(nativeStateProtocol==='1'&&guard?{nativeStateBase:{version:1 as const,revision:guard.revision,controlEpoch:guard.controlEpoch}}:{})};
+      const evidence=result.testRun.originalResultState,guard=evidence?.nativeWriteGuard;
+      const laststate=savedState(result.testRun),control=evidence?.nativeTimerControl;
+      const nativeResumePending=nativeStateProtocol==='1'&&guard&&laststate.CONTROLLER==='PAUSED'&&
+        control?.paused===false&&control.resumeFromControllerRevision===(guard.fields.CONTROLLER??0);
+      return{...files,workspaceId,mode:person.originalOperationalMode??entry?.executionMode??defaultParticipantExecutionMode,laststate,firstStart,presetBookletStates:orderedName(identity.bookletName).states,
+        ...(nativeStateProtocol==='1'&&guard?{nativeStateBase:{version:1 as const,revision:guard.revision,controlEpoch:guard.controlEpoch}}:{}),
+        ...(nativeResumePending?{nativeResumePending:true as const}:{})};
     },
     async patchState({token,testNumber:raw,patch,deliveryId,stateBase}){
       const{run,testNumber}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch),base=parseOriginalNativeStateWriteBase(stateBase);

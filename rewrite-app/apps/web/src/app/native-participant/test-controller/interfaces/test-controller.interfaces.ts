@@ -54,6 +54,7 @@ export interface TestData {
   laststate: { [k in TestStateKey]?: string };
   resources: TestDataResourcesMap;
   firstStart: boolean;
+  resumePending?: boolean;
   workspaceId: string;
   presetBookletStates: { [ k :string]: string };
 }

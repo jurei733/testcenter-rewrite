@@ -1,6 +1,6 @@
 import {NATIVE_BACKEND_URL,NATIVE_FILE_SERVER_URL} from '../../native-tokens';
 import { Inject, Injectable , inject } from '@angular/core';
-import { type HttpEvent, HttpEventType } from '@angular/common/http';
+import { type HttpEvent, HttpEventType, type HttpResponse } from '@angular/common/http';
 import {NativeHttpClient as HttpClient} from '../../native-http-client';
 import { Observable, Subscription } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
@@ -71,7 +71,10 @@ export class BackendService {
   }
 
   getTestData(testId: string): Observable<TestData> {
-    return this.http.get<TestData>(`${this.backendUrl}test/${testId}`,{nativeStateProtocol:true});
+    return this.http.get<TestData>(`${this.backendUrl}test/${testId}`,{nativeStateProtocol:true,observe:'response'}).pipe(
+      map(({body,headers}:HttpResponse<TestData>) =>
+        body && headers.get('X-Native-Resume-Pending')==='1' ? {...body,resumePending:true} : body!)
+    );
   }
 
   timer(testId: string, unitAlias: string, action: 'enter'|'cancel'|'interrupt'|'expire'|'reenter',

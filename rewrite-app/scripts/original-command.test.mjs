@@ -193,6 +193,11 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    let timed=clockService();
    const read={token:person.token,testNumber,nativeStateProtocol:'1'},unitAlias='ORACLE.POW.UNIT';
    const enter=(action='enter')=>timed.originalTest.enterTimer({...read,body:{unitAlias,action}});
+   const writeController=async content=>{
+    const {nativeStateBase}=await timed.originalTest.read(read);
+    await timed.originalTest.patchState({token:person.token,testNumber,deliveryId:randomUUID(),
+     stateBase:nativeStateBase,patch:[{key:'CONTROLLER',content,timeStamp:now}]});
+   };
    const control=async(keyword,args=[])=>{
     await send({keyword,arguments:args,timestamp:Math.floor(now/1000),testIds:[Number(testNumber)]});
     const [pending]=await repository.listOriginalCommands(scope,null);
@@ -217,8 +222,25 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    now+=30000;
    await close();await open();timed=clockService();
    assert.deepEqual(await enter(),paused);
+   await writeController('PAUSED');
+   assert.equal((await timed.originalTest.read(read)).nativeResumePending,undefined);
+   const resumeId=await control('resume');
+   await close();await open();timed=clockService();
+   const recovery=await timed.originalTest.read(read);
+   assert.equal(recovery.laststate.CONTROLLER,'PAUSED');
+   assert.equal(recovery.nativeResumePending,true);
+   assert.equal((await timed.originalTest.read({token:person.token,testNumber})).nativeResumePending,undefined);
+   await writeController('PAUSED');
+   assert.equal((await timed.originalTest.read(read)).nativeResumePending,undefined,
+    'A controller snapshot accepted after Resume takes precedence');
+   assert.equal((await timed.originalCommand.acknowledge({...read,commandNumber:resumeId})).reason,
+    'OK, was already marked as executed');
+   assert.equal((await timed.originalTest.read(read)).nativeResumePending,undefined);
    await control('resume');
+   assert.equal((await timed.originalTest.read(read)).nativeResumePending,true);
    const resumed=await enter();
+   await writeController('RUNNING');
+   assert.equal((await timed.originalTest.read(read)).nativeResumePending,undefined);
    assert.equal(resumed.status,'running');
    assert.equal(resumed.remainingMilliseconds,paused.remainingMilliseconds);
    const repeated=await timed.originalCommand.acknowledge({...read,commandNumber:pauseId});

@@ -113,8 +113,14 @@ export function prepareOriginalNativeTimerControl(
     }
   }
   if(!before.nativeTestletTimers&&!before.nativeTimerControl&&!reopen)return undefined;
-  const control={commandId:command.id,paused,...(reopen?{reopen}:{})};
   const timers=before.nativeTestletTimers;
+  const guard=before.nativeWriteGuard;
+  // A committed Resume can outlive its browser response. A controller write
+  // accepted after this ACK takes precedence, including a late Pause response.
+  const resumeFromControllerRevision=keyword==='resume'&&guard&&Object.values(timers??{}).some(timer=>timer.status==='paused')
+    ? guard.fields.CONTROLLER??0 : undefined;
+  const control={commandId:command.id,paused,...(reopen?{reopen}:{}),
+    ...(resumeFromControllerRevision===undefined?{}:{resumeFromControllerRevision})};
   if(!timers||(keyword!=='pause'&&keyword!=='terminate'&&(keyword!=='goto'||!destination)))return {...before,nativeTimerControl:control};
   const stopped=Object.fromEntries(Object.entries(timers).map(([id,timer])=>{
     if(keyword==='goto'&&id===destination?.timerKey)return [id,timer];
