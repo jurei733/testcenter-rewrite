@@ -20,6 +20,7 @@
 :root[data-interface-mode='original'] .original-application-logo-tooltip,
 :root[data-interface-mode='original'] .original-native-login-error-dialog,
 :root[data-interface-mode='original'] .original-participant-error-dialog,
+:root[data-interface-mode='original'] .original-native-participant-snackbar,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog {
   @include theme.apply();
 }

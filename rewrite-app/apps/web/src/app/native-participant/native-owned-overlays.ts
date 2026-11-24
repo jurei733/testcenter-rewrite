@@ -55,7 +55,7 @@ export class NativeOwnedSnackBar {
   if(this.retired||!this.http.isCurrent)return;
   const panel='native-participant-notice-'+crypto.randomUUID().replaceAll('-','');
   const panelClass=typeof config?.panelClass==='string'?[config.panelClass]:config?.panelClass??[];
-  const ref=this.parent.open(message,action,{...config,panelClass:[...panelClass,panel]});this.refs.set(ref,panel);
+  const ref=this.parent.open(message,action,{...config,panelClass:[...panelClass,'original-native-participant-snackbar',panel]});this.refs.set(ref,panel);
   ref.afterDismissed().subscribe(()=>this.refs.delete(ref));
   if(this.retired||!this.http.isCurrent){this.document.querySelectorAll('.'+panel).forEach(node=>node.remove());ref.dismiss();this.refs.delete(ref);}
   return ref;

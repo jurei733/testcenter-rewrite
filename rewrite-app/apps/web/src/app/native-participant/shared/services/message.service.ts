@@ -44,6 +44,7 @@ export class MessageService {
     const safeMode: boolean = !isAdmin && this.themeService.activeTheme.targetAudience === 'children';
     return this.dialog.open(ConfirmDialogComponent, {
       data: { ...dialogData, safeMode },
+      panelClass: 'original-participant-confirmation-dialog',
       autoFocus: 'dialog'
     }).afterClosed();
   }
