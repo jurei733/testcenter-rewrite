@@ -71,6 +71,16 @@ test("Original labels print WinAnsi punctuation with one fallback per unsupporte
   assert.equal(pdf.getTitle(),labelTemplate);
 });
 
+test("Original wraps the authored Unicode before measuring the encoded line for centering", async () => {
+  const labelTemplate = "Bögen – Łódź Ω/zulu-person-12094744 | CY-BKLT_TC-5-12094744 | CY-UNIT.SAMPLE-101 | sheet";
+  const [{content}] = await rendered({attachments:[attachment], layout:"original", labelTemplate});
+  const lines = [...content.matchAll(/<([a-f\d]+)> Tj/gi)];
+  assert.equal(lines.length, 1);
+  assert.equal(new TextDecoder("windows-1252").decode(Buffer.from(lines[0][1],"hex")),
+    "Bögen – ?ód? ?/zulu-person-12094744 | CY-BKLT_TC-5-12094744 | CY-UNIT.SAMPLE-101 | sheet");
+  near(Number(content.match(/1 0 0 1 ([-\d.]+) [-\d.]+ Tm/)?.[1]),31.172);
+});
+
 test("Original printed QR occupies the Source 20/20/40/40 mm region on each attachment's final label page",async()=>{
   const rows = await rendered({attachments:[attachment,{...attachment,attachmentId:"second-owned-qr"}],layout:"original",labelTemplate:"Own long label ".repeat(30)});
   assert.equal(rows.length,2);

@@ -16,6 +16,7 @@ const ORIGINAL_LINE_HEIGHT = 15;
 const ORIGINAL_BASELINE_FROM_TOP = 40.086;
 const ORIGINAL_LINES_PER_PAGE = 50;
 const ORIGINAL_LABEL_SIZE = 12;
+const ORIGINAL_HELVETICA_DEFAULT_WIDTH = 513;
 // TCPDF 6.10's built-in Helvetica positioning differs from AFM widths
 // for these printable WinAnsi characters. Units are thousandths of an em.
 const ORIGINAL_CHARACTER_WIDTHS: Readonly<Record<string, number>> = {
@@ -67,42 +68,43 @@ const wrapOriginalPdfText = (
 ): string[] => {
   // Source preserves authored spaces/newlines and does not apply AFM kerning
   // or the Rewrite's four-line ellipsis. Its empty MultiCell prints a space.
-  const value = text.replaceAll("\r", "") || " ";
+  const characters = Array.from(text.replaceAll("\r", "") || " ");
+  const slice = (start: number, end?: number): string => characters.slice(start, end).join("");
   const pageWidth = ORIGINAL_PAGE_WIDTH - ORIGINAL_CELL_MARGIN * 2;
   const maxWidth = pageWidth - ORIGINAL_CELL_PADDING * 2;
   const lines: string[] = [];
   let start = 0;
   let separator = -1;
   let width = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    const character = value[index]!;
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index]!;
     if (character === "\n") {
-      lines.push(value.slice(start, index));
+      lines.push(slice(start, index));
       start = index + 1;
       separator = -1;
       width = 0;
       continue;
     }
-    const hyphen = character === "-" && /[A-Za-z]/.test(value[index - 1] ?? "")
-      && /[A-Za-z]/.test(value[index + 1] ?? "");
+    const hyphen = character === "-" && /\p{L}/u.test(characters[index - 1] ?? "")
+      && /\p{L}/u.test(characters[index + 1] ?? "");
     if (character === " " || hyphen) separator = index;
     width += measureCharacter(character);
     if (width <= maxWidth || index === start) continue;
 
-    const nextWord = separator < start ? "" : value.slice(separator + 1).split(/\s/, 1)[0]!;
+    const nextWord = separator < start ? "" : slice(separator + 1).split(/\s/, 1)[0]!;
     const nextWordWidth = Array.from(nextWord).reduce((sum, part) => sum + measureCharacter(part), 0);
     if (separator >= start && nextWordWidth <= pageWidth) {
-      lines.push(value.slice(start, separator + (value[separator] === "-" ? 1 : 0)));
+      lines.push(slice(start, separator + (characters[separator] === "-" ? 1 : 0)));
       start = separator + 1;
     } else {
-      lines.push(value.slice(start, index));
+      lines.push(slice(start, index));
       start = index;
     }
     index = start - 1;
     separator = -1;
     width = 0;
   }
-  if (start < value.length) lines.push(value.slice(start));
+  if (start < characters.length) lines.push(slice(start));
   return lines;
 };
 
@@ -189,6 +191,17 @@ export const createAttachmentPagesPdf = async (input: {
     characterWidths.set(character, width);
     return width;
   };
+  // TCPDF wraps Unicode before converting the line to Helvetica's WinAnsi
+  // encoding. Characters outside the legacy width table use its default width.
+  const measureOriginalWrapCharacter = (character: string): number => {
+    const code = character.codePointAt(0)!;
+    return code <= 255 && originalCharacters.has(code) ? measureOriginalCharacter(character)
+      : ORIGINAL_HELVETICA_DEFAULT_WIDTH * ORIGINAL_LABEL_SIZE / 1000;
+  };
+  const encodeOriginalLine = (line: string): string =>
+    Array.from(line.replaceAll("\uFFFD", ""), character =>
+      originalCharacters.has(character.codePointAt(0)!) ? character : "?"
+    ).join("");
   const bookmarks: Array<{ title: string; page: PDFRef; height: number }> = [];
 
   for (const [index, attachment] of input.attachments.entries()) {
@@ -198,21 +211,15 @@ export const createAttachmentPagesPdf = async (input: {
     if (originalLayout) bookmarks.push({
       title: originalBookmarkTitle(authoredLabel), page: page.ref, height: page.getHeight()
     });
-    // TCPDF's standard Helvetica uses WinAnsi. Unsupported characters fall
-    // back once per code point, while the Unicode bookmark remains intact.
-    const label = originalLayout
-      ? Array.from(authoredLabel.replace(/[\r\uFFFD]/g, ""), character =>
-          character === "\n" || originalCharacters.has(character.codePointAt(0)!) ? character : "?"
-        ).join("")
-      : toPdfSafeText(authoredLabel);
     // Unmodified Source AttachmentTemplate uses TCPDF's regular Helvetica 12.
     const labelSize = originalLayout ? ORIGINAL_LABEL_SIZE : 16;
     const labelFont = originalLayout ? regularFont : boldFont;
     const measureLine = (value: string): number => originalLayout
       ? Array.from(value).reduce((width, character) => width + measureOriginalCharacter(character), 0)
       : labelFont.widthOfTextAtSize(value, labelSize);
-    const labelLines = originalLayout ? wrapOriginalPdfText(label, measureOriginalCharacter)
-      : wrapPdfText(label, A4_WIDTH - PAGE_MARGIN * 2, measureLine);
+    const labelLines = originalLayout
+      ? wrapOriginalPdfText(authoredLabel, measureOriginalWrapCharacter).map(encodeOriginalLine)
+      : wrapPdfText(toPdfSafeText(authoredLabel), A4_WIDTH - PAGE_MARGIN * 2, measureLine);
 
     if (!originalLayout) page.drawText("Attachment capture page", {
       x: PAGE_MARGIN,
