@@ -59,6 +59,7 @@ export class MessageService {
   showErrorDialog(errorMessage?: string): void {
     this.dialog.open(ErrorDialogComponent, {
       data: errorMessage,
+      panelClass: 'original-participant-error-dialog',
       disableClose: true,
       autoFocus: 'dialog'
     });
