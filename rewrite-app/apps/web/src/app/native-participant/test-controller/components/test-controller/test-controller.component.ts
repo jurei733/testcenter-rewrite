@@ -341,7 +341,6 @@ export class TestControllerComponent implements OnInit, OnDestroy {
   }
 
   private async handleTimer(timer: TimerData): Promise<boolean> {
-    const minute = timer.timeLeftSeconds / 60;
     switch (timer.type) {
       case MaxTimerEvent.STARTED:
         if (this.tcs.shouldShowConfirmationUI()) {
@@ -393,21 +392,23 @@ export class TestControllerComponent implements OnInit, OnDestroy {
       case MaxTimerEvent.INTERRUPTED:
         this.timerValue = null;
         return true;
-      case MaxTimerEvent.STEP:
+      case MaxTimerEvent.STEP: {
         this.timerValue = timer;
         this.tcs.timers[timer.id] = timer.timeLeftSeconds / 60;
         if ((timer.timeLeftSeconds % 15) === 0) {
           // attention: TODO store timer as well in localStorage to prevent F5-cheating
           this.tcs.addToTestStateBuffer('TESTLETS_TIMELEFT', JSON.stringify(this.tcs.timers));
         }
-        if (this.tcs.timerWarningPoints.includes(minute) && this.tcs.shouldShowConfirmationUI()) {
-          const text = this.cts.getCustomText('booklet_msgSoonTimeOver').replace('%s', minute.toString(10));
+        const displayedMinutes = timer.displayedSeconds / 60;
+        if (this.tcs.timerWarningPoints.includes(displayedMinutes) && this.tcs.shouldShowConfirmationUI()) {
+          const text = this.cts.getCustomText('booklet_msgSoonTimeOver').replace('%s', displayedMinutes.toString(10));
           this.snackBar.open(text, '', {
             duration: 5000,
             panelClass: ['snackbar-timerWarning']
           });
         }
         return true;
+      }
       default:
         return true;
     }

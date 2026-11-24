@@ -34,11 +34,15 @@ export class TimerData {
   id: string;
   type: MaxTimerEvent;
 
-  get timeLeftString(): string {
+  get displayedSeconds(): number {
     // The Original counts its first ticker update as the end of the first
     // displayed second. Keep that display convention separate from the clock.
     const elapsedDisplayTick = this.type === MaxTimerEvent.STEP ? 1 : 0;
-    const displaySeconds = Math.max(0, Math.round(this.timeLeftSeconds) - elapsedDisplayTick);
+    return Math.max(0, Math.round(this.timeLeftSeconds) - elapsedDisplayTick);
+  }
+
+  get timeLeftString(): string {
+    const displaySeconds = this.displayedSeconds;
     const minutes = Math.floor(displaySeconds / 60);
     const seconds = String(displaySeconds % 60).padStart(2, '0');
     return `${minutes}:${seconds}`;

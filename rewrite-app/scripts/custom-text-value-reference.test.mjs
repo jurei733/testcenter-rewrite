@@ -13,12 +13,15 @@ assert.equal(reference.originalCommit, "eedae41840cbe90e5547c0211da818bdf620f5aa
 for (const file of reference.files) assert.equal(createHash("sha256").update(file.source).digest("hex"), file.sha256);
 const catalogFixture = JSON.parse(readFileSync(new URL(reference.catalogFixture, fixtureRoot), "utf8"));
 const catalog = JSON.parse(catalogFixture.files.find(file => file.path.endsWith("custom-texts.json")).source);
-function members(suffix, className, names) {
-  const file = reference.files.find(file => file.path.endsWith(suffix));
-  const ast = ts.createSourceFile(suffix, file.source, ts.ScriptTarget.Latest, true);
+function classMembers(filename, source, className, names) {
+  const ast = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
   const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === className);
   assert.ok(declaration);
   return declaration.members.filter(node => names.includes(node.name?.getText(ast)) || names.includes("constructor") && ts.isConstructorDeclaration(node)).map(node => node.getText(ast)).join("\n");
+}
+function members(suffix, className, names) {
+  const file = reference.files.find(file => file.path.endsWith(suffix));
+  return classMembers(suffix, file.source, className, names);
 }
 const actualSource = `export class ReferenceService { ${members("customtext.service.ts", "CustomtextService", ["customTexts", "addCustomTexts", "addCustomTextsFromDefs", "addCustomText", "getCustomText$", "getCustomText"])} }
 export class ReferencePipe { ${members("customtext.pipe.ts", "CustomtextPipe", ["constructor", "transform"])} }
@@ -152,6 +155,41 @@ export class ActualParticipant {
 new Function("exports", "of", "UnitNavigationTarget", "MaxTimerEvent", ts.transpileModule(directSource, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
 }).outputText)(directExports, of, { ERROR: "error" }, { STEP: "step" });
+
+test("native rest-time warnings follow the displayed tick and preserve the saved balance", async () => {
+  const nativeRoot = new URL("../apps/web/src/app/native-participant/test-controller/", import.meta.url);
+  const readMembers = (file, className, names) =>
+    classMembers(file, readFileSync(new URL(file, nativeRoot), "utf8"), className, names);
+  const { TimerData, NativeController } = await import(moduleUrl(`
+const MaxTimerEvent = { STEP: "STEP" };
+export class TimerData {
+  ${readMembers("classes/test-controller.classes.ts", "TimerData",
+    ["timeLeftSeconds", "id", "type", "constructor", "displayedSeconds", "timeLeftString"])}
+}
+export class NativeController {
+  ${readMembers("components/test-controller/test-controller.component.ts", "TestControllerComponent", ["handleTimer"])}
+}`));
+  const notices = [], writes = [];
+  const controller = Object.assign(new NativeController(), {
+    tcs: {
+      timers: {}, timerWarningPoints: [1, 0], shouldShowConfirmationUI: () => true,
+      addToTestStateBuffer: (key, payload) => writes.push([key, JSON.parse(payload)])
+    },
+    cts: { getCustomText: () => "Noch %s Minuten" },
+    snackBar: { open: text => notices.push(text) }
+  });
+  const tick = async (seconds, visible, expectedNotices) => {
+    await controller.handleTimer(new TimerData(seconds / 60, "block", "STEP"));
+    assert.equal(controller.timerValue.timeLeftString, visible);
+    assert.equal(controller.tcs.timers.block, seconds / 60);
+    assert.deepEqual(notices, expectedNotices);
+  };
+  await tick(62, "1:01", []);
+  await tick(61, "1:00", ["Noch 1 Minuten"]);
+  await tick(60, "0:59", ["Noch 1 Minuten"]);
+  await tick(1, "0:00", ["Noch 1 Minuten", "Noch 0 Minuten"]);
+  assert.deepEqual(writes, [["TESTLETS_TIMELEFT", { block: 1 }]]);
+});
 
 function directFixture(item, keys) {
   const scopes = item.scopes.map(scope => Object.hasOwn(scope, "value") ? Object.fromEntries(keys.map(key => [key, scope.value])) : {});
