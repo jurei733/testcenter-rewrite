@@ -1143,7 +1143,19 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
             if(scenario.locked)assert.deepEqual(after,{...before,locked:true,updatedAt:after.updatedAt,originalResultState:{...before.originalResultState,lastTestModifiedAt:after.updatedAt}});else assert.deepEqual(after,before);
             const actual=(await repository.listParticipantTestLogsByWorkspace(ids.tenantId,ids.workspaceId)).filter(x=>x.testRunId===value.scope.testRunId);assert.equal(actual.length,scenario.appendCount);assert.deepEqual(actual.map(formatOriginalTestLogEntry),scenario.entries.map(x=>x.logentry));
             if(scenario.label==='int64-max')assert.equal(actual[0].originalClientTimestamp,'9223372036854775807');if(scenario.label==='int64-min')assert.equal(actual[0].originalClientTimestamp,'-9223372036854775808');
-            await nativeRequest('PUT','/test',httpPerson.person.token,{bookletName:value.bookletName},scenario.locked?423:201);
+            const launch=await nativeRequest('PUT','/test',httpPerson.person.token,{bookletName:value.bookletName},scenario.locked?423:201);
+            if(scenario.locked){
+              const reentry=await nativeRequest('GET','/test/'+value.testNumber,httpPerson.person.token,undefined,423);
+              assert.equal(reentry.text,launch.text);
+              assert.match(reentry.text,new RegExp('^Test #'+value.testNumber+' `.+` is locked\\.$'));
+              for(const {headers} of [launch,reentry]){
+                assert.equal(headers.get('content-type'),'text/html;charset=UTF-8');
+                assert.equal(headers.get('test-mode'),'NO');
+                assert.match(headers.get('error-id'),/^error-/);
+                assert.equal(headers.get('cache-control'),'private, no-store');
+              }
+              assert.deepEqual(await repository.getTestRunById(value.scope.testRunId),after);
+            }
           }
           const padded=await createHttpLock('padded'),ok=await rawLog('/test/000'+padded.testNumber+'/lock',httpPerson.person.token,'{"timeStamp":0}',200,'PATCH');assert.equal(ok.bytes.length,0);
           const wrong=await rawLog(padded.path,httpPerson.person.token,undefined,405,'PUT');assert.equal(wrong.headers.get('allow'),'PATCH');assert.equal(wrong.text,'Method not allowed. Must be one of: PATCH');

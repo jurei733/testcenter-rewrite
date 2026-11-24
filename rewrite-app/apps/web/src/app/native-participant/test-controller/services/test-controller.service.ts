@@ -730,7 +730,8 @@ export class TestControllerService {
     this.totalLoadingProgress = 0;
     this.state$.next('ERROR');
     if(this.booklet)void this.setUnitNavigationRequest(UnitNavigationTarget.ERROR);
-    else this.messageService.showErrorDialog(this.cts.getCustomText('booklet_errormessage'));
+    // A locked Test read fails before the Original can open the Booklet error dialog.
+    else if(this.mds.appError?.code!==423)this.messageService.showErrorDialog(this.cts.getCustomText('booklet_errormessage'));
   }
 
   pause(): Promise<boolean> {

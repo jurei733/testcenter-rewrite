@@ -5,7 +5,7 @@ import {FirstSliceError,formatOriginalTestReadJson,formatOriginalUnitReadJson,ty
 import {encodeOriginalReportJson,decodeOriginalTestLogJson} from '@testcenter-rewrite-app/application';
 export const originalTestCreationPath='/test';
 type NativeErrorResponse={header:(name:string,value:string)=>void;raw:(status:number,text:string,contentType:string)=>void};
-function sendNativeTestWriteError(input:NativeErrorResponse,status:number,message:string):void{
+function sendNativeTestError(input:NativeErrorResponse,status:number,message:string):void{
  const text=(status>=500?'Internal error.':message).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
  input.header('Error-ID','error-'+randomUUID());input.header('Test-Mode','NO');
  input.raw(status,text,'text/html;charset=UTF-8');
@@ -40,7 +40,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
  const nativeUnitState=unitWrite?.[3]==='state',nativeWriteErrors=Boolean(log||lock||nativeCommand||nativeUnitState);
  if(pathname!=='/test'&&!read&&!state&&!log&&!lock&&!file&&!unitRead&&!unitWrite&&!nativeCommand&&!timer)return false;
  input.header('cache-control','private, no-store');const method=file||read||unitRead||commands?'GET':state||lock||executed||timer||unitWrite?.[3]==='state'?'PATCH':'PUT';
- if(input.request.method!==method){input.header('allow',method);if(nativeWriteErrors)sendNativeTestWriteError(input,405,'Method not allowed. Must be one of: '+method);else input.send(405,'Method not allowed');return true;}
+ if(input.request.method!==method){input.header('allow',method);if(nativeWriteErrors)sendNativeTestError(input,405,'Method not allowed. Must be one of: '+method);else input.send(405,'Method not allowed');return true;}
  try{
   if(file){const groupToken=file[1]!,workspaceNumber=file[2]!,path=file[3]!;
    const result=await input.services.originalTest.resource({groupToken,workspaceNumber,path});
@@ -65,7 +65,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   // Select the progress budget only after decoded route, method and native
   // ownership checks. Unit logs and ordinary controller commands keep theirs.
   const purpose=unitWrite&&(unitWrite[3]==='state'||unitWrite[3]==='response')?'unit-progress':undefined;
-  let body:unknown;try{body=await input.readBody(nativeWriteErrors,(log||lock||nativeCommand)?decodeOriginalTestLogJson:undefined,purpose);}catch(error){if(error instanceof SyntaxError){if(nativeWriteErrors){sendNativeTestWriteError(input,500,'Internal error.');return true;}throw new FirstSliceError(400,'original_json_invalid','Request body must be valid JSON.');}throw error;}
+  let body:unknown;try{body=await input.readBody(nativeWriteErrors,(log||lock||nativeCommand)?decodeOriginalTestLogJson:undefined,purpose);}catch(error){if(error instanceof SyntaxError){if(nativeWriteErrors){sendNativeTestError(input,500,'Internal error.');return true;}throw new FirstSliceError(400,'original_json_invalid','Request body must be valid JSON.');}throw error;}
   if(timer){input.send(200,await input.services.originalTest.enterTimer({token,testNumber:timer[1]!,body}));return true;}
   if(producer){await input.services.originalCommand.send({token,body});input.raw(201,'','text/html; charset=UTF-8');return true;}
   if(commands){const wire=await input.services.originalCommand.poll({token,testNumber:commands[1]!,body});await input.subscribe?.({channel:'commands',testNumber:commands[1]!},token);input.raw(200,wire,'application/json');return true;}
@@ -74,7 +74,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
   if(unitWrite){const request={token,testNumber:unitWrite[1]!,unitName:unitWrite[2]!,body,deliveryId:input.request.headers['x-native-delivery-id']};
    if(nativeUnitState){
     try{await input.services.originalUnit.patchState(request);}
-    catch(error){if(error instanceof FirstSliceError)throw error;sendNativeTestWriteError(input,500,'Internal error.');return true;}
+    catch(error){if(error instanceof FirstSliceError)throw error;sendNativeTestError(input,500,'Internal error.');return true;}
    }else if(unitWrite[3]==='response')await input.services.originalUnit.putResponse(request);else await input.services.originalUnit.putLog(request);
    input.raw(unitWrite[3]==='state'?200:201,'','text/html; charset=UTF-8');return true;}
   if(state){const result=await input.services.originalTest.patchState({token,testNumber:state[1]!,patch:body,deliveryId:input.request.headers['x-native-delivery-id'],stateBase:input.request.headers['x-native-state-base']});
@@ -85,9 +85,10 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
  }catch(error){
   // Source RequireToken distinguishes a missing header (401) from a retired
   // or unknown supplied bearer (403). Keep the bearer redacted, as on Session.
-  if(error instanceof FirstSliceError&&error.errorCode==='original_session_invalid')sendNativeTestWriteError(input,403,'Invalid token.');
-  else if(nativeWriteErrors){if(error instanceof FirstSliceError)sendNativeTestWriteError(input,error.statusCode,error.message);else throw error;}
-  else{if(!(error instanceof FirstSliceError))throw error;input.raw(error.statusCode,encodeOriginalReportJson(error.message),'application/json');}
+  if(!(error instanceof FirstSliceError))throw error;
+  if(error.errorCode==='original_session_invalid')sendNativeTestError(input,403,'Invalid token.');
+  else if(nativeWriteErrors||error.errorCode==='original_test_locked')sendNativeTestError(input,error.statusCode,error.message);
+  else input.raw(error.statusCode,encodeOriginalReportJson(error.message),'application/json');
  }
  return true;
 }
