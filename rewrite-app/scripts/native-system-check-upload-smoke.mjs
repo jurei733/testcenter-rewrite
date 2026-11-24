@@ -76,10 +76,27 @@ export async function runNativeSystemCheckUploadChecks({browser,out,mark}){
   await chooseWorkspaceFiles();
   assert.equal(await page.evaluate(()=>performance.timeOrigin),documentTime);assert.equal(modes.at(-1),false);
   const contentPath=new URL(page.url()).pathname;
-  const upload=async(text,label,expected,status=201)=>{
-   const pending=page.waitForResponse(response=>new URL(response.url()).pathname===scope+'/files'&&response.request().method()==='POST');
+  const nativeUploadPath='/workspace/'+number+'/file';
+  const submitRoster=async (text,status=201)=>{
+   const pending=page.waitForResponse(response=>new URL(response.url()).pathname===nativeUploadPath&&response.request().method()==='POST');
+   void pending.catch(()=>{});
+   await page.locator('[data-cy=upload-file-select]').setInputFiles({name:'people.xml',mimeType:'application/xml',buffer:Buffer.from(text)});
+   const response=await pending;
+   assert.equal(response.status(),status);
+   const headers=await response.request().allHeaders();
+   assert.ok(headers.authtoken);
+   assert.equal(headers.authorization,undefined);
+   assert.match(headers['content-type'],/^multipart\/form-data; boundary=/);
+   const report=await response.json();
+   assert.deepEqual(Object.keys(report),['people.xml']);
+   return report['people.xml'];
+  };
+  const upload=async(text,label,expected,rejected=false)=>{
    const modeReply=page.waitForResponse(async response=>new URL(response.url()).pathname==='/sys-check-mode'&&response.status()===200&&await response.json()===expected);
-   await page.locator('[data-cy=upload-file-select]').setInputFiles({name:'people.xml',mimeType:'application/xml',buffer:Buffer.from(text)});assert.equal((await pending).status(),status);await modeReply;await page.locator('#originalWorkspaceFiles[aria-busy=false]').waitFor();await page.locator('[data-cy=close-upload-report]').click();assert.equal(await page.evaluate(()=>performance.timeOrigin),documentTime);await capture(label);
+   void modeReply.catch(()=>{});
+   const result=await submitRoster(text,rejected?207:201);
+   assert.equal(Boolean(result.error?.length),rejected);
+   await modeReply;await page.locator('#originalWorkspaceFiles[aria-busy=false]').waitFor();await page.locator('[data-cy=close-upload-report]').click();assert.equal(await page.evaluate(()=>performance.timeOrigin),documentTime);await capture(label);
   };
   const backToNative=async()=>{
    // Select the real existing browser-history entry once. Repeated goBack()
@@ -99,12 +116,16 @@ export async function runNativeSystemCheckUploadChecks({browser,out,mark}){
   const openReport=async()=>{await page.getByRole('button',{name:'Owned upload check',exact:true}).click();await page.locator('#syscheck-next-step:enabled').waitFor();await page.locator('#syscheck-next-step').click();await page.locator('#originalSystemCheckReport').waitFor();};
   await upload(roster('sys-check-login'),'own-upload-private',true);passed('same-document-real-admin-upload-refreshes-private-mode');
   await backToNative();await openReport();const denied=page.waitForResponse(response=>response.request().method()==='PUT'&&new URL(response.url()).pathname==='/workspace/'+number+'/sys-check/R105.CHECK/report');await page.locator('#saveSystemCheckReportButton').click();assert.equal((await denied).status(),400);await page.getByRole('dialog').waitFor();assert.equal(await page.locator('#systemCheckSaveReportKey').count(),0);assert.equal('keyPhrase' in bodies.at(-1),false);assert.equal('title' in bodies.at(-1),false);await capture('retained-canonical-native-private-error');passed('retained-canonical-administrator-is-not-promoted-to-native-person');
+  const beforeReturn=wire.length;
   await returnToFiles();
-  await upload(roster('monitor-group'),'own-replacement-public',false);assert.ok(wire.filter(row=>row.method==='POST'&&row.path===scope+'/files').every(row=>row.canonicalDigest===browserDigest));passed('same-document-return-keeps-real-canonical-credential-and-refreshes-public-mode');
+  const sessionReads=wire.slice(beforeReturn).filter(row=>row.method==='GET'&&row.path==='/api/v1/admin/auth/current-session');
+  assert.ok(sessionReads.length);
+  assert.ok(sessionReads.every(row=>row.canonicalDigest===browserDigest));
+  await upload(roster('monitor-group'),'own-replacement-public',false);passed('same-document-return-keeps-real-canonical-credential-and-refreshes-public-mode');
   await backToNative();await openReport();await page.locator('#saveSystemCheckReportButton').click();await page.locator('#systemCheckSaveReportKey').waitFor();await capture('same-document-public-save-dialog');await page.locator('#systemCheckSaveReportCancelButton').click();passed('refreshed-public-mode-restores-source-key-title-dialog');
   await returnToFiles();
-  await upload('<SysCheck/>','invalid-upload-refresh',false,400);passed('rejected-real-upload-also-refreshes-public-mode');
-  await configureFault(true);const posted=page.waitForResponse(response=>new URL(response.url()).pathname===scope+'/files'&&response.request().method()==='POST');await page.locator('[data-cy=upload-file-select]').setInputFiles({name:'people.xml',mimeType:'application/xml',buffer:Buffer.from(roster('sys-check-login'))});assert.equal((await posted).status(),201);
+  await upload('<SysCheck/>','invalid-upload-refresh',false,true);passed('rejected-real-upload-also-refreshes-public-mode');
+  await configureFault(true);assert.ok(!(await submitRoster(roster('sys-check-login'))).error?.length);
   const networkDialog=page.locator('.original-native-login-error-dialog');await networkDialog.getByRole('heading',{name:'Netzwerkfehler',exact:true}).waitFor();assert.equal(normalize(await networkDialog.innerText()),sourceNetworkError);await capture('global-mode-network-error');await backToNative();await networkDialog.waitFor({state:'hidden'});await configureFault(false);assert.equal(await api('/sys-check-mode',undefined,'GET',200,''),true);
   await openReport();await page.locator('#saveSystemCheckReportButton').click();await page.locator('#systemCheckSaveReportKey').waitFor();await page.locator('#systemCheckSaveReportCancelButton').click();await backToNative();await page.reload();await page.getByRole('button',{name:'Owned upload check',exact:true}).waitFor();assert.notEqual(await page.evaluate(()=>performance.timeOrigin),documentTime);assert.equal(await networkDialog.count(),0);passed('actual-tcp-failure-keeps-source-cache-and-history-dismisses-dialog-before-reload');
   await configureFault(true);otherContext=await browser.newContext({viewport:{width:1280,height:850}});const other=await otherContext.newPage();observe(other);await other.goto(base+'/app/r/check-starter');const startupError=other.locator('.original-native-login-error-dialog');await startupError.getByRole('heading',{name:'Netzwerkfehler',exact:true}).waitFor();assert.equal(normalize(await startupError.innerText()),sourceNetworkError);await configureFault(false);const startupTime=await other.evaluate(()=>performance.timeOrigin);await startupError.locator('[data-cy=close]').click();await other.waitForURL(url=>url.pathname==='/app/native-start');await other.getByRole('textbox',{name:'Anmeldename',exact:true}).waitFor();assert.notEqual(await other.evaluate(()=>performance.timeOrigin),startupTime);assert.equal(await startupError.count(),0);await other.goto(base+'/app/r/check-starter');await other.getByRole('button',{name:'Owned upload check',exact:true}).waitFor();passed('actual-startup-mode-failure-is-visible-and-reload-recovers');
@@ -140,7 +161,7 @@ export async function runNativeSystemCheckUploadChecks({browser,out,mark}){
   await otherContext.close();await configure({nativeModeHold:true,nativeModeFault:true});otherContext=await browser.newContext({viewport:{width:1280,height:850}});page=await otherContext.newPage();observe(page);
   await page.goto(base+'/app/r/check-starter');await page.getByRole('button',{name:'Owned upload check',exact:true}).click();await page.locator('#syscheck-next-step:enabled').waitFor();await page.goBack();await page.waitForURL(url=>url.pathname==='/app/r/check-starter');await page.getByRole('button',{name:'Owned upload check',exact:true}).waitFor();assert.equal(await page.locator('.original-native-login-error-dialog').count(),0);
   await configure({nativeModeHold:false});await page.locator('.original-native-login-error-dialog').getByRole('heading',{name:'Netzwerkfehler',exact:true}).waitFor();passed('a-new-actual-request-failure-after-history-navigation-still-opens-its-error');await configureFault(false);
-  assert.ok(wire.filter(row=>row.path==='/sys-check-mode'||row.path==='/sys-checks'||row.path.startsWith('/workspace/')).every(row=>!row.nativeToken&&!row.canonicalToken));assert.equal((await api(scope+'/system-check-reports?checkId=R105.CHECK')).items.length,0);assert.deepEqual(errors,[]);
+  assert.ok(wire.filter(row=>row.path==='/sys-check-mode'||row.path==='/sys-checks'||/^\/workspace\/[^/]+\/sys-check\//.test(row.path)).every(row=>!row.nativeToken&&!row.canonicalToken));assert.equal((await api(scope+'/system-check-reports?checkId=R105.CHECK')).items.length,0);assert.deepEqual(errors,[]);
   await writeFile(join(out,'result.json'),JSON.stringify({success:true,browser:browser.version(),checks,wire,modes,bodies,errors,sourceFixture:manifest.sourceCommit,sourceInitialUnknownModeFixture:initialManifest.sourceCommit,unknownModeSuccessfulReads:unknownModes.length,sourceNetworkDialogExactText:true,actualReportsPersisted:0,canonicalAdministratorEstablishedByActualUI:true,visualParityProven:false},null,2)+'\n');return checks;
  }catch(error){await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),stack:error.stack,url:page?.url(),text:await page?.locator('body').innerText().catch(()=>''),checks,wire,modes,bodies,errors},null,2)+'\n');throw error;}
  finally{await otherContext?.close();await context?.close();if(server)await stopNativeSmokeServer(server);}
