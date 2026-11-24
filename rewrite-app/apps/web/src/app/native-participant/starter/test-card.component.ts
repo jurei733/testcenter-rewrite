@@ -84,6 +84,7 @@ import { CustomtextPipe } from '../shared/pipes/customtext/customtext.pipe';
     button.test-done {
       background-color: transparent;
       color: var(--mat-sys-primary);
+      opacity: 1;
     }
   `
 })
