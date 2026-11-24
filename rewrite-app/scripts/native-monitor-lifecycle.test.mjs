@@ -185,14 +185,19 @@ test('mixed, missing and obsolete Booklet-state values sort without killing the 
  f.streams.get('mixed').next([packet('1','A',{route:'b'}),packet('2','B',{})]);assert.equal(manager.sessions.length,2);
  f.streams.get('mixed').next([packet('1','A',{route:'obsolete'}),packet('2','B',{}),packet('3','A',{})]);assert.equal(manager.sessions.length,3);assert.equal(manager.sessions[0].data.testId,'3');manager.disconnect();
 });
-test('finish locks materialized pending tests but never sends terminate to pending or nonpositive IDs',t=>{
+test('finish locks started offline tests and leaves allocated pending tests untouched',t=>{
  clock(t);const f=managerFixture();f.manager.connect('A');
  f.streams.get('A').next([
   {testId:'9007199254740993',personLabel:'Running',bookletName:'BOOK',testState:{status:'running',CONNECTION:'POLLING'},timestamp:1},
   {testId:'9007199254740994',personLabel:'Pending',bookletName:'BOOK',testState:{status:'pending'},timestamp:1},
+  {testId:'9007199254740995',personLabel:'Offline',bookletName:'BOOK',testState:{status:'running',CONNECTION:'LOST'},timestamp:1},
   {testId:'0',personLabel:'Ghost',bookletName:'BOOK',testState:{status:'pending'},timestamp:1}
  ]);
- f.manager.commandFinishEverything().subscribe();assert.deepEqual(f.writes[0].ids,['9007199254740994','9007199254740993']);t.mock.timers.tick(1500);assert.deepEqual(f.writes[1].ids,['9007199254740993']);f.manager.disconnect();
+ f.manager.commandFinishEverything().subscribe();
+ assert.deepEqual(f.writes[0].ids.slice().sort(),['9007199254740993','9007199254740995']);
+ t.mock.timers.tick(1500);
+ assert.deepEqual(f.writes[1].ids,['9007199254740993']);
+ f.manager.disconnect();
 });
 test('the actual Goto producer uses captured targets and cannot start after its group was retired',()=>{
  const f=managerFixture();f.manager.connect('A');
@@ -247,7 +252,7 @@ test('finish before first render waits for a fresh complete snapshot and uses it
  clock(t);const f=managerFixture(),fresh=new rx.Subject();f.manager.connect('A');let reads=0;f.backend.getSessionsMonitor=group=>{assert.equal(group,'A');reads++;return fresh;};
  f.manager.commandFinishEverything().subscribe();assert.equal(reads,1);assert.deepEqual(f.writes,[]);
  fresh.next([finishPacket('9007199254740993'),finishPacket('9007199254740994',{status:'pending'}),finishPacket('0',{status:'pending'})]);
- assert.deepEqual(f.writes,[{type:'lock',group:'A',ids:['9007199254740993','9007199254740994']}]);
+ assert.deepEqual(f.writes,[{type:'lock',group:'A',ids:['9007199254740993']}]);
  t.mock.timers.tick(1500);assert.deepEqual(f.writes[1],{type:'terminate',args:['lock'],ids:['9007199254740993']});f.manager.disconnect();
 });
 test('finish gets current native targets independently of stale rendered material',t=>{

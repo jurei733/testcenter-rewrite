@@ -161,8 +161,8 @@ try{
  assert.equal((await page.locator('tc-test-session[data-test-id="'+secondId+'"] .booklet-states').innerText()).trim(),'Alpha');await page.getByText('Owned Route',{exact:true}).click();await page.waitForFunction(id=>document.querySelector('tc-test-session')?.getAttribute('data-test-id')===id,secondId);check('obsolete-booklet-state-renders-and-sorts-with-live-defaults');
  const beforeCancel=wire.length;await page.locator('[data-cy=GM_end_button]').click();await page.locator('[data-cy=dialog-cancel]').click();assert.ok(!wire.slice(beforeCancel).some(r=>r.path.endsWith('/tests/lock')));check('native-finish-cancel-has-no-side-effects');
  await verifyNativeFinishBusy({page,base,wire,directory:join(artifactRoot,'native-monitor')});check('finish-shield-and-single-flight-appear-without-poll-and-retire-safely');
- // Materialize a real unopened Test, leaving lastOpenedAt null. It must
- // be locked by finish-all, without being targeted by a terminate command.
+ // Materialize a real unopened Test, leaving lastOpenedAt null. Its pending
+ // row must remain eligible for first entry after the group Finish.
  const pendingName='owned-ui-pending';let pendingAccess,pendingId;
  const pendingStore=createSqliteFirstSliceStorage(file);
  try{
@@ -174,11 +174,25 @@ try{
  const lockedAll=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/tests/lock'));
  const terminatedAll=page.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT');
  await page.locator('[data-cy=GM_end_button]').click();await page.locator('[data-cy=dialog-confirm]').click();assert.equal((await lockedAll).status(),200);assert.equal((await terminatedAll).status(),201);
- const finishBody=wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').at(-1).body;assert.ok(finishBody.includes(firstId)&&finishBody.includes(secondId));assert.ok(!finishBody.includes(pendingId));const lockBody=wire.filter(r=>r.path.endsWith('/tests/lock')).at(-1).body;assert.ok(lockBody.includes(pendingId));const monitorToken=await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session'));const finalSnapshot=await native('GET','/monitor/group/'+encodeURIComponent(group)+'/test-sessions',monitorToken);assert.equal(finalSnapshot.length,3);assert.ok(finalSnapshot.every(row=>row.testState.status==='locked'));assert.deepEqual(await native('GET','/test/'+pendingId+'/commands',pendingAccess.token),[]);check('finish-locks-real-positive-id-pending-test-without-terminate');
+ const finishBody=wire.filter(r=>r.path==='/monitor/command'&&r.method==='PUT').at(-1).body;
+ assert.ok(finishBody.includes(firstId)&&finishBody.includes(secondId));
+ assert.ok(!finishBody.includes(pendingId));
+ const lockBody=wire.filter(r=>r.path.endsWith('/tests/lock')).at(-1).body;
+ assert.ok(lockBody.includes(firstId)&&lockBody.includes(secondId));
+ assert.ok(!lockBody.includes(pendingId));
+ const monitorToken=await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session'));
+ const finalSnapshot=await native('GET','/monitor/group/'+encodeURIComponent(group)+'/test-sessions',monitorToken);
+ assert.equal(finalSnapshot.length,3);
+ const unopened=finalSnapshot.find(row=>row.personLabel===pendingName);
+ assert.equal(unopened?.testState.status,'pending');
+ assert.ok(finalSnapshot.filter(row=>row!==unopened).every(row=>row.testState.status==='locked'));
+ assert.deepEqual(await native('GET','/test/'+pendingId+'/commands',pendingAccess.token),[]);
+ assert.equal((await native('GET','/test/'+pendingId,pendingAccess.token)).firstStart,true);
+ check('finish-leaves-real-positive-id-pending-test-available-for-first-entry');
  for(let i=0;i<2;i++){const command=(await native('GET','/test/'+[firstId,secondId][i]+'/commands',people[i].token)).at(-1);assert.equal(command.keyword,'terminate');assert.deepEqual(command.arguments,['lock']);}
  await page.waitForURL(url=>url.pathname==='/app/group-monitor');await page.locator('tc-test-card[data-cy^="gm-card-"]').first().waitFor();assert.equal(await page.locator('tc-test-card[data-cy^="gm-card-"]').count(),2);assert.ok(await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session')));check('native-finish-locks-original-targets-and-returns-to-native-chooser');
  await page.locator('tc-test-card[data-cy^="gm-card-"]').filter({hasText:'Vollständig'}).getByRole('button',{name:'Gruppen-Monitor Starten',exact:true}).click();await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),3);
- // Remove the owned extra login only after its lock/queue effects are proven.
+ // Remove the owned extra login after verifying its first entry.
  const removePending=createSqliteFirstSliceStorage(file);try{const current=createFirstSliceServices({repository:removePending.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});await current.workspaceAdminRead.importParticipantRoster({...scope,rosterText:initialRoster.replace('</Testtakers>',`<Group id="OWNED.UI.RETIRED" label="Retired"><Login name="${pendingName}" pw="${password}" mode="run-hot-return"><Booklet>OWNED.UI.BOOK</Booklet></Login></Group></Testtakers>`)} );}finally{await removePending.shutdown();}await page.waitForFunction(()=>document.querySelectorAll('tc-test-session').length===2);
 
  await openLogoutFromStarter();await page.locator('[data-cy=dialog-cancel]').click();await page.locator('mat-dialog-container').waitFor({state:'detached'});await page.locator('tc-test-card[data-cy^="gm-card-"]').filter({hasText:'Vollständig'}).getByRole('button',{name:'Gruppen-Monitor Starten',exact:true}).click();await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);await openLogoutFromStarter();const loggedOut=page.waitForResponse(r=>new URL(r.url()).pathname==='/session'&&r.request().method()==='DELETE');void loggedOut.catch(()=>{});await page.locator('[data-cy=dialog-confirm]').click();assert.equal((await loggedOut).status(),205);await page.locator('input[name=name]').waitFor();assert.equal(await page.locator('tc-test-session').count(),0);check('real-native-logout-stay-confirm-and-view-cleanup');
@@ -208,7 +222,7 @@ try{
 
  // Separate real groups exercise completion before the first rendered rows.
  // Keep either the first poll or its private material pending. A failed fresh
- // read must leave every owner queue untouched; a retry uses all native IDs.
+ // read must leave every owner queue untouched; a retry claims every started Test.
  for(const item of earlyCases.filter(item=>item.mode!=='recovery')){
   const earlyContext=await browser.newContext({viewport:{width:1280,height:850},serviceWorkers:'block'}),earlyPage=await earlyContext.newPage(),requests=[];
   let phase='initial',first=true,closing=false,releaseHeld,heldStarted;const held=new Promise(done=>{releaseHeld=done;}),started=new Promise(done=>{heldStarted=done;});
@@ -227,9 +241,23 @@ try{
    for(const owner of item.tests)assert.deepEqual(await native('GET','/test/'+owner.id+'/commands',owner.token),[]);check('finish-'+item.mode+'-loading-read-failure-sends-no-command');
    phase='success';const beforeRetry=requests.length,locked=earlyPage.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/tests/lock')),terminated=earlyPage.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT');void locked.catch(()=>{});void terminated.catch(()=>{});
    await earlyPage.locator('[data-cy=GM_end_button]').click();await earlyPage.locator('[data-cy=dialog-confirm]').click();assert.equal((await locked).status(),200);assert.ok(requests.slice(beforeRetry).some(r=>r.method==='GET'&&r.path.endsWith('/test-sessions')));releaseHeld();assert.equal((await terminated).status(),201);await earlyPage.waitForURL(url=>url.pathname==='/app/group-monitor');
-   const lockBody=JSON.parse(requests.find(r=>r.path.endsWith('/tests/lock')).body);assert.deepEqual(lockBody.testIds.map(String).sort(),item.tests.map(owner=>owner.id).sort());
-   const token=await earlyPage.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session')),snapshot=await native('GET','/monitor/group/'+encodeURIComponent(item.group)+'/test-sessions',token);assert.equal(snapshot.length,3);assert.ok(snapshot.every(row=>row.testState.status==='locked'));
-   for(const owner of item.tests.slice(0,2)){const commands=await native('GET','/test/'+owner.id+'/commands',owner.token);assert.equal(commands.at(-1).keyword,'terminate');assert.deepEqual(commands.at(-1).arguments,['lock']);}assert.deepEqual(await native('GET','/test/'+item.tests[2].id+'/commands',item.tests[2].token),[]);check('finish-'+item.mode+'-loading-locks-complete-fresh-native-targets');
+   const startedTests=item.tests.slice(0,2),unopenedTest=item.tests[2];
+   const lockBody=JSON.parse(requests.find(r=>r.path.endsWith('/tests/lock')).body);
+   assert.deepEqual(lockBody.testIds.map(String).sort(),startedTests.map(owner=>owner.id).sort());
+   const token=await earlyPage.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session'));
+   const snapshot=await native('GET','/monitor/group/'+encodeURIComponent(item.group)+'/test-sessions',token);
+   assert.equal(snapshot.length,3);
+   const pendingRow=snapshot.find(row=>row.personLabel===item.names[2]);
+   assert.equal(pendingRow?.testState.status,'pending');
+   assert.ok(snapshot.filter(row=>row!==pendingRow).every(row=>row.testState.status==='locked'));
+   for(const owner of startedTests){
+    const command=(await native('GET','/test/'+owner.id+'/commands',owner.token)).at(-1);
+    assert.equal(command.keyword,'terminate');
+    assert.deepEqual(command.arguments,['lock']);
+   }
+   assert.deepEqual(await native('GET','/test/'+unopenedTest.id+'/commands',unopenedTest.token),[]);
+   assert.equal((await native('GET','/test/'+unopenedTest.id,unopenedTest.token)).firstStart,true);
+   check('finish-'+item.mode+'-loading-locks-complete-fresh-native-targets');
   }finally{closing=true;releaseHeld();await earlyContext.close();}
  }
 

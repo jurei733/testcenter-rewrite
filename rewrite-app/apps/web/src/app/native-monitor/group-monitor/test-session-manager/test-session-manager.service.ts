@@ -365,13 +365,13 @@ export class TestSessionManager {
       take(1),
       switchMap(rows => {
         if (!current()) return EMPTY;
-        const unlocked = rows.filter(row => BigInt(row.testId) > 0n &&
-          !TestSessionUtil.hasState(row.testState, 'status', 'locked'));
-        const lockIds = unlocked.map(row => row.testId);
+        // A reserved Test remains pending until the participant opens it.
+        const started = rows.filter(row => BigInt(row.testId) > 0n &&
+          !TestSessionUtil.hasState(row.testState, 'status', 'pending'));
+        const lockIds = started.filter(row => !TestSessionUtil.hasState(row.testState, 'status', 'locked'))
+          .map(row => row.testId);
         const pending = new Set(this.bs.pendingFinishTargets(group));
-        const eligible = rows.filter(row => BigInt(row.testId) > 0n &&
-          !TestSessionUtil.hasState(row.testState, 'status', 'pending') &&
-          !TestSessionUtil.hasState(row.testState, 'CONTROLLER', 'TERMINATED'));
+        const eligible = started.filter(row => !TestSessionUtil.hasState(row.testState, 'CONTROLLER', 'TERMINATED'));
         const remaining = new Set(eligible.map(row => row.testId));
         for (const id of pending) if (!remaining.has(id)) pending.delete(id);
         const terminateIds = eligible.filter(row => pending.has(row.testId) ||
