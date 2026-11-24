@@ -31,6 +31,10 @@
   background-color: var(--mat-sys-secondary);
 }
 
+.lock-overlay mat-card {
+  --mat-card-elevated-container-color: var(--mat-sys-surface);
+}
+
 .lock-overlay tc-code-input {
   flex: 1;
   max-height: 100%;
