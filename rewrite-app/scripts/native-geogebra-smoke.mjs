@@ -211,7 +211,7 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     await element.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     return element;
   };
-  const drag=async(element,before)=>{
+  const drag=async(element,before,{deltaX=-40,deltaY=20}={})=>{
     // This is a real foreground pointer interaction; background rAF throttling
     // must not turn its rendered drag steps into seconds-long idle waits.
     await page.bringToFront();assert.equal(await page.evaluate(()=>document.visibilityState),'visible');
@@ -226,7 +226,7 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     // trusted pointer step a rendered frame in both supported browser builds.
     const rendered=()=>element.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await rendered();
-    for(let step=1;step<=8;step++){await page.mouse.move(x-40*step/8,y+20*step/8);await rendered();}
+    for(let step=1;step<=8;step++){await page.mouse.move(x+deltaX*step/8,y+deltaY*step/8);await rendered();}
     await page.mouse.up();await rendered();
     return wait(async()=>{const value=await snapshot(element);return value.x!==before.x||value.y!==before.y?value:false;},'trusted drag changes the real GeoGebra point');
   };
@@ -295,8 +295,14 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     assert.equal(largeRestored.pointCoordinates,largeEdited.pointCoordinates);
     mark('native-real-large-GeoGebra-image-construction-saves-and-reloads-beyond-the-ordinary-request-budget');
 
+    // The Source response buffer runs periodically, including while the
+    // Player starts after reload. Use a real save to observe a window boundary
+    // before measuring whether a subsequent draft survives tab closure.
+    const synchronizedPoint=await drag(largeRestoredElement,largeRestored,{deltaX:20,deltaY:-10});
+    const previousWindow=await waitForGestureSave(largePath,synchronizedPoint.pointCoordinates);
+    const previousWindowAcknowledgedAt=Date.now();
     await configure('native-geogebra-large-pending',0,'stars-offline',undefined,{testIds:[testId]});
-    const gestureAt=Date.now(),pendingPoint=await drag(largeRestoredElement,largeRestored);
+    const gestureAt=Date.now(),pendingPoint=await drag(largeRestoredElement,synchronizedPoint);
     const readStagedConstruction=async()=>{
       const documents=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('testcenter-native-unit-journal:v1:')).map(key=>({key,...JSON.parse(localStorage.getItem(key))})));
       for(const document of documents)for(const entry of document.entries){
@@ -320,6 +326,8 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     mark('native-real-large-GeoGebra-draft-enters-production-IndexedDB-before-the-five-second-response-window');
     await configure('native-geogebra-large-closed',0,'stars-closure',undefined,{testIds:[testId],closureIds:[pending.entry.id]});
     const worker=context.serviceWorkers()[0];assert.ok(worker);
+    assert.ok(!responseReceipts.some(row=>row.deliveryId===pending.entry.id),
+      'No response delivery may leave the live page before closure');
     const writesBeforeClosure=writes.length;
     page.on('dialog',dialog=>dialog.accept());const closed=page.waitForEvent('close');await page.close({runBeforeUnload:true});await closed;
     assert.equal(context.pages().length,0);
@@ -340,6 +348,8 @@ export async function runNativeGeoGebraSmoke({browser,base,out,fixture,mark,conf
     assert.equal(sealed?.sealed,true);assert.ok(sealed.entry);assert.equal(sealed.entry.id,pending.entry.id);
     assert.equal(emittedPoint(JSON.parse(sealed.entry.payload).dataParts),pendingPoint.pointCoordinates);
     await writeFile(join(out,'native-geogebra-large-sealed.json'),JSON.stringify({deliveryId:pending.entry.id,zeroActorPages:context.pages().length===0,closedElapsedMs,captureElapsedMs,
+      previousWindowDeliveryId:previousWindow.deliveryId,
+      gestureAfterPreviousAcknowledgementMs:gestureAt-previousWindowAcknowledgedAt,
       initialDraftPayloadSha256:hash(firstStaged.entry.payload),draftPayloadSha256:hash(pending.entry.payload),
       stagedDraftCoalescedBeforeMirror:firstStaged.entry.payload!==pending.entry.payload,
       mirroredLocalRevision:pending.localRevision,mirroredIndexedDbRevision:pending.mirrorRevision,
