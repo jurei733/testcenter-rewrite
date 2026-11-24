@@ -74,7 +74,7 @@ test("Original labels print WinAnsi punctuation with one fallback per unsupporte
   const x = Number(content.match(/1 0 0 1 ([-\d.]+) [-\d.]+ Tm/)?.[1]);
   assert.ok(text);
   assert.equal(new TextDecoder("windows-1252").decode(Buffer.from(text,"hex")), "Grüße € „A“ ’ – — œ ? ? ?");
-  near(x, 227.396);
+  assert.equal(x, 227.396);
   assert.equal(pdf.getTitle(),labelTemplate);
 });
 

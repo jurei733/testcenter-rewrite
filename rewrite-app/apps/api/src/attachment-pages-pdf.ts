@@ -260,8 +260,11 @@ export const createAttachmentPagesPdf = async (input: {
       }
       if (originalLayout && !line) return;
       const lineWidth = measureLine(line);
+      const x = (page.getWidth() - lineWidth) / 2;
       page.drawText(line, {
-        x: (page.getWidth() - lineWidth) / 2,
+        // TCPDF serializes glyph origins to six decimals. Keeping that
+        // rounding also preserves rasterization at subpixel boundaries.
+        x: originalLayout ? Number(x.toFixed(6)) : x,
         y: originalLayout
           ? A4_HEIGHT - ORIGINAL_BASELINE_FROM_TOP - (lineIndex % ORIGINAL_LINES_PER_PAGE) * ORIGINAL_LINE_HEIGHT
           : A4_HEIGHT - PAGE_MARGIN - 38 - lineIndex * 22,
