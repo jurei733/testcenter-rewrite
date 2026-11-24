@@ -1,4 +1,4 @@
-import { PDFDocument, PDFHexString, PDFName, type PDFRef, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFHexString, PDFName, type PDFPage, type PDFRef, StandardFonts, rgb } from "pdf-lib";
 import QRCode from "qrcode";
 
 import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
@@ -16,6 +16,7 @@ const ORIGINAL_LINE_HEIGHT = 15;
 const ORIGINAL_BASELINE_FROM_TOP = 40.086;
 const ORIGINAL_LINES_PER_PAGE = 50;
 const ORIGINAL_LABEL_SIZE = 12;
+const POINTS_PER_MILLIMETER = 72 / 25.4;
 const ORIGINAL_HELVETICA_DEFAULT_WIDTH = 513;
 // TCPDF 6.10's built-in Helvetica positioning differs from AFM widths
 // for these printable WinAnsi characters. Units are thousandths of an em.
@@ -153,6 +154,32 @@ const wrapPdfText = (
   return truncatedLines;
 };
 
+const drawOriginalAttachmentQr = (page: PDFPage, attachmentId: string): void => {
+  const { modules } = QRCode.create(attachmentId, { errorCorrectionLevel: "L" });
+  const left = 20 * POINTS_PER_MILLIMETER;
+  const top = page.getHeight() - left;
+  const moduleSize = 40 * POINTS_PER_MILLIMETER / modules.size;
+  const dimension = moduleSize.toFixed(6);
+  const operators = ["q", "0 0 0 rg"];
+
+  // TCPDF fills each dark module at its PDF coordinates and leaves the
+  // light modules transparent, including where the label crosses the QR.
+  for (let row = 0; row < modules.size; row++) {
+    const y = (top - row * moduleSize).toFixed(6);
+    for (let column = 0; column < modules.size; column++) {
+      if (modules.get(row, column)) {
+        const x = (left + column * moduleSize).toFixed(6);
+        operators.push(`${x} ${y} ${dimension} -${dimension} re f`);
+      }
+    }
+  }
+
+  operators.push("Q");
+  const context = page.doc.context;
+  const qr = context.flateStream(operators.join("\n") + "\n");
+  page.node.addContentStream(context.register(qr));
+};
+
 export const createAttachmentPagesPdf = async (input: {
   attachments: WorkspaceAttachment[];
   labelTemplate?: string | null;
@@ -205,7 +232,6 @@ export const createAttachmentPagesPdf = async (input: {
   const bookmarks: Array<{ title: string; page: PDFRef; height: number }> = [];
 
   for (const [index, attachment] of input.attachments.entries()) {
-    const mm = 72 / 25.4;
     let page = pdf.addPage([originalLayout ? ORIGINAL_PAGE_WIDTH : A4_WIDTH, A4_HEIGHT]);
     const authoredLabel = applyAttachmentLabelTemplate(attachment, input.labelTemplate, originalLayout);
     if (originalLayout) bookmarks.push({
@@ -245,20 +271,22 @@ export const createAttachmentPagesPdf = async (input: {
       });
     });
 
+    if (originalLayout) {
+      drawOriginalAttachmentQr(page, attachment.attachmentId);
+      continue;
+    }
+
     const qrPng = await QRCode.toBuffer(attachment.attachmentId, {
       errorCorrectionLevel: "L",
-      margin: originalLayout ? 0 : 2,
+      margin: 2,
       type: "png",
       width: 640
     });
     const qrImage = await pdf.embedPng(qrPng);
-    // Current Original AttachmentTemplate: A4, QRCODE,L, 20/20/40/40 mm.
-    // PDF coordinates start at the bottom; retain the Rewrite layout by default.
-    const qrSize = originalLayout ? 40 * mm : 226.77;
-    const qrX = originalLayout ? 20 * mm : (A4_WIDTH - qrSize) / 2;
-    const qrY = originalLayout ? A4_HEIGHT - 60 * mm
-      : A4_HEIGHT - PAGE_MARGIN - 38 - labelLines.length * 22 - qrSize - 40;
-    if (!originalLayout) page.drawRectangle({
+    const qrSize = 226.77;
+    const qrX = (A4_WIDTH - qrSize) / 2;
+    const qrY = A4_HEIGHT - PAGE_MARGIN - 38 - labelLines.length * 22 - qrSize - 40;
+    page.drawRectangle({
       x: qrX - 8,
       y: qrY - 8,
       width: qrSize + 16,
@@ -273,10 +301,6 @@ export const createAttachmentPagesPdf = async (input: {
       width: qrSize,
       height: qrSize
     });
-
-    // Source prints the authored label and QR, without the Rewrite handoff
-    // caption, repeated attachment code or page footer.
-    if (originalLayout) continue;
 
     const codeSize = 7.5;
     const codeLabelY = qrY - 52;

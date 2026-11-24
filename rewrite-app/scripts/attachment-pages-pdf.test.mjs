@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
+import QRCode from "qrcode";
 import { PDFArray, PDFDocument, PDFName, PDFNull, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 
 // Inspect the PDF actually produced by the production renderer, including its
@@ -42,8 +43,14 @@ async function rendered(input) {
   const pages = pdf.getPages();
   return pages.map(page => {
     const streams = pdf.context.lookup(page.node.Contents(), PDFArray);
-    const content = Array.from({length:streams.size()},(_,i)=>Buffer.from(decodePDFRawStream(
-      pdf.context.lookup(streams.get(i),PDFRawStream)).decode()).toString("ascii")).join("\n");
+    const streamsText = Array.from({length:streams.size()},(_,i)=>Buffer.from(decodePDFRawStream(
+      pdf.context.lookup(streams.get(i),PDFRawStream)).decode()).toString("ascii"));
+    const content = streamsText.join("\n");
+    const nativeQrStreams = streamsText.filter(stream=>stream.startsWith("q\n0 0 0 rg\n"));
+    const modules = nativeQrStreams.flatMap(stream=>stream.trimEnd().split("\n").slice(2,-1).map(operator=>{
+      assert.match(operator,/^[-\d.]+ [-\d.]+ [-\d.]+ [-\d.]+ re f$/);
+      return operator.split(" ").slice(0,4).map(Number);
+    }));
     const images = content.split("q\n").filter(block=>/\/Image[^\s]* Do/.test(block));
     const image = images[0];
     // Source can overflow the authored label onto another page; only its final
@@ -56,7 +63,7 @@ async function rendered(input) {
       matrix=[aa*a+cc*b,bb*a+dd*b,aa*c+cc*d,bb*c+dd*d,aa*e+cc*f+ee,bb*e+dd*f+ff];
     }
     const fonts = page.node.Resources().lookup(PDFName.of("Font"));
-    return {page,content,matrix,fonts,pdf,imageCount:images.length};
+    return {page,content,matrix,fonts,pdf,imageCount:images.length,nativeQrCount:nativeQrStreams.length,modules};
   });
 }
 
@@ -82,15 +89,22 @@ test("Original wraps the authored Unicode before measuring the encoded line for 
 });
 
 test("Original printed QR occupies the Source 20/20/40/40 mm region on each attachment's final label page",async()=>{
-  const rows = await rendered({attachments:[attachment,{...attachment,attachmentId:"second-owned-qr"}],layout:"original",labelTemplate:"Own long label ".repeat(30)});
+  const attachments = [attachment,{...attachment,attachmentId:"second-owned-qr"}];
+  const rows = await rendered({attachments,layout:"original",labelTemplate:"Own long label ".repeat(30)});
   assert.equal(rows.length,2);
-  for(const {page,matrix,imageCount} of rows) {
-    assert.ok(matrix,"Each five-line attachment page must contain its real QR");
-    assert.equal(imageCount,1);
+  for(const [index,{page,nativeQrCount,imageCount,modules}] of rows.entries()) {
+    assert.equal(nativeQrCount,1);
+    assert.equal(imageCount,0,"Only the dark modules may paint over the label");
     near(page.getWidth(),595.276); near(page.getHeight(),841.89);
-    near(matrix[0],40*mm); near(matrix[3],40*mm);
-    near(matrix[4],20*mm); near(page.getHeight()-matrix[5]-matrix[3],20*mm);
-    near(matrix[1],0); near(matrix[2],0);
+    const {modules: qr} = QRCode.create(attachments[index].attachmentId,{errorCorrectionLevel:"L"});
+    const expected = [];
+    const size = 40 * mm / qr.size;
+    for(let row=0;row<qr.size;row++) for(let column=0;column<qr.size;column++) {
+      if(qr.get(row,column)) expected.push([
+        20 * mm + column * size, page.getHeight() - 20 * mm - row * size, size, -size
+      ].map(value=>Number(value.toFixed(6))));
+    }
+    assert.deepEqual(modules,expected);
   }
 });
 
@@ -102,14 +116,15 @@ for(const reference of originalReference.cases) {
       personLabel:"Own Group/own-login/own-code",bookletKey:"Own Booklet",unitKey:"Own Unit"}],
       layout:"original",labelTemplate:reference.labelTemplate});
     assert.equal(rows.length,reference.pages.length,"All Source pages must be retained");
-    for(const [index,{page,content,matrix,fonts,pdf,imageCount}] of rows.entries()) {
+    for(const [index,{page,content,fonts,pdf,imageCount,nativeQrCount,modules}] of rows.entries()) {
       const expected = reference.pages[index];
       near(page.getWidth(),expected.width); near(page.getHeight(),expected.height);
-      assert.equal(Boolean(matrix),expected.qr,"The QR belongs on the same Source page");
-      assert.equal(imageCount,Number(expected.qr),"Exactly one QR per attachment, with none on earlier overflow pages");
-      if(matrix) {
-        near(matrix[0],40*mm); near(matrix[3],40*mm); near(matrix[4],20*mm);
-        near(page.getHeight()-matrix[5]-matrix[3],20*mm);
+      assert.equal(nativeQrCount,Number(expected.qr),"The QR belongs on the same Source page");
+      assert.equal(imageCount,0);
+      if(expected.qr) {
+        assert.ok(modules.length>100);
+        assert.ok(Math.abs(modules[0][0]-20*mm)<.000001);
+        assert.ok(Math.abs(page.getHeight()-modules[0][1]-20*mm)<.000001);
       }
       const text = [...content.matchAll(/BT\n([\s\S]*?)ET/g)].map(match=>{
         const position = match[1].match(/1 0 0 1 ([-\d.]+) ([-\d.]+) Tm/);
@@ -143,8 +158,8 @@ test("default and explicit Rewrite PDFs retain the existing centered 80 mm QR ge
 });
 
 test("Original PDF matches rendered Source regular Helvetica 12 and excludes handoff captions/footer",async()=>{
-  const [{content,fonts,pdf,imageCount}] = await rendered({attachments:[attachment],layout:"original",labelTemplate:"Own label"});
-  assert.equal(imageCount,1);
+  const [{content,fonts,pdf,nativeQrCount}] = await rendered({attachments:[attachment],layout:"original",labelTemplate:"Own label"});
+  assert.equal(nativeQrCount,1);
   assert.equal(pdf.getCreator(),"IQB-Testcenter");
   const text = [...content.matchAll(/\/([^\s]+) ([\d.]+) Tf/g)];
   assert.equal(text.length,1,"Only the authored label is visible text");
