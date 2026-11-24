@@ -7,6 +7,7 @@ export const attachmentPageGeometry = (width: number, height: number, mirrored =
   const scale = pageHeight / 297;
   const x = mirrored ? width - pageWidth : 0;
   return {
+    mirrored,
     page: { x, y: 0, width: pageWidth, height: pageHeight },
     scanRegion: {
       x: x + 20 * .9 * scale,

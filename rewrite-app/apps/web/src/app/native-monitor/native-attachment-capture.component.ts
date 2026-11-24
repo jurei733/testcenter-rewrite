@@ -9,6 +9,7 @@ import { MatOption, MatSelect } from "@angular/material/select";
 import { MatSidenavModule } from "@angular/material/sidenav";
 import { RouterLink } from "@angular/router";
 import { AttachmentCaptureComponent } from "../attachment-capture.component";
+import { originalAttachmentTextFallbacks } from "../attachment-custom-texts";
 import { NativeMonitorIconComponent } from "./native-monitor-icon.component";
 
 // Attachment layout adapted from IQB Testcenter. See ORIGINAL-UI-LICENSE.txt.
@@ -27,6 +28,7 @@ export class NativeAttachmentCaptureComponent extends AttachmentCaptureComponent
     { requireSync: true }
   );
   readonly sidebarOpen = signal(!this.mobile().matches);
+  readonly captureOptionsOpen = signal(false);
   private resumeRequestedCamera = false;
 
   constructor() {
@@ -44,7 +46,39 @@ export class NativeAttachmentCaptureComponent extends AttachmentCaptureComponent
     this.stopCamera();
   }
 
+  get cameraInstructions(): string {
+    const key = "am_capture_image_instructions";
+    const defaultInstructions = originalAttachmentTextFallbacks[key];
+    const instructions = this.customText(key, defaultInstructions);
+    return this.cameraGeometry?.mirrored && instructions === defaultInstructions
+      ? "Halten Sie die Seite so in die Kamera, dass der aufgedruckte QR-Code in der oberen rechten Ecke liegt"
+      : instructions;
+  }
+
+  openCaptureOptions(): void {
+    this.sidebarOpen.set(true);
+    this.captureOptionsOpen.set(true);
+  }
+
   override resetTarget(): void {
     super.resetTarget(this.resumeRequestedCamera);
+  }
+
+  protected override onCameraStartFailure(error: unknown): void {
+    super.onCameraStartFailure(error);
+    this.resumeRequestedCamera = false;
+    switch (error instanceof DOMException ? error.name : "") {
+      case "NotAllowedError":
+        this.status = "Kamerazugriff verweigert. Prüfen Sie die Kameraberechtigung im Browser.";
+        break;
+      case "NotFoundError":
+        this.status = "Keine Kamera gefunden. Schließen Sie eine Kamera an und versuchen Sie es erneut.";
+        break;
+      case "NotReadableError":
+        this.status = "Die Kamera ist nicht verfügbar. Schließen Sie andere Anwendungen, die die Kamera nutzen.";
+        break;
+      default:
+        this.status = "Die Kamera konnte nicht gestartet werden.";
+    }
   }
 }

@@ -340,13 +340,17 @@ export class AttachmentCaptureComponent
       if (!this.cameraActive) this.status = "Camera paused while this tab is hidden.";
     } catch (error) {
       this.destroyScanner();
-      this.cameraMessage = this.describeCameraError(error);
-      this.status = "Camera unavailable. Use a saved QR image or the manual code fallback.";
-      this.statusIsError = true;
+      this.onCameraStartFailure(error);
     } finally {
       this.cameraStarting = false;
       this.refreshView();
     }
+  }
+
+  protected onCameraStartFailure(error: unknown): void {
+    this.cameraMessage = this.describeCameraError(error);
+    this.status = "Camera unavailable. Use a saved QR image or the manual code fallback.";
+    this.statusIsError = true;
   }
 
   stopCamera(): void {

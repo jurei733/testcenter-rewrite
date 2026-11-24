@@ -55,7 +55,8 @@
       }
 
       @if (!capturePreviewUrl) {
-        <details class="toolbar-section camera-options">
+        <details #captureOptions class="toolbar-section camera-options" [open]="captureOptionsOpen()"
+          (toggle)="captureOptionsOpen.set(captureOptions.open)">
           <summary>Weitere Aufnahmeoptionen</summary>
           @if (cameraActive) {
             <button id="stopAttachmentCameraButton" mat-button type="button" (click)="stopRequestedCamera()">Kamera stoppen</button>
@@ -107,7 +108,7 @@
         @if (!capturePreviewUrl) {
           <div class="capture-guide">
             <mat-icon svgIcon="info" />
-            <span>{{ customText('am_capture_image_instructions', 'Halten Sie den QR-Code oben links in den markierten Bereich.') }}</span>
+            <span>{{ cameraInstructions }}</span>
           </div>
           @if (!cameraActive) {
             <div class="start-control">
@@ -123,6 +124,11 @@
             <mat-icon svgIcon="error" />
             <span>{{ status }}</span>
           </div>
+          @if (!cameraActive && !capturePreviewUrl) {
+            <div class="start-control">
+              <button mat-button type="button" (click)="openCaptureOptions()">Aufnahme ohne Kamera</button>
+            </div>
+          }
         } @else if (busy) {
           <p id="attachmentCaptureStatus" role="status">Bitte warten…</p>
         }
