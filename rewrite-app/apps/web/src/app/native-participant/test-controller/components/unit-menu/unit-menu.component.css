@@ -52,10 +52,6 @@ a:last-of-type {
   margin-bottom: 0;
 }
 
-.current {
-  background: var(--accent) !important;
-}
-
 .mat-mdc-button-base {
   height: auto !important;
   min-height: 36px;
