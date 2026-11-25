@@ -47,7 +47,8 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
   await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-review-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'en',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
   await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-review-player@1.2.3">Owned definition</Definition>'));
   await upload('booklet.xml',xml('Booklet','<Metadata><Id>OWNED.REVIEW</Id><Label>  Booklet Ω  </Label></Metadata><Units><Unit id="OWNED.UNIT" label="  Unit β  "/></Units>'));
-  await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="OWNED.GROUP" label="Owned group">'+modes.map(mode=>`<Login name="owned-${mode}" mode="${mode}"><Booklet>OWNED.REVIEW</Booklet></Login>`).join('')+'<Login name="owned-peer" mode="run-trial"><Booklet>OWNED.REVIEW</Booklet></Login></Group>')});
+  await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="OWNED.GROUP" label="Owned group">'+modes.map(mode=>`<Login name="owned-${mode}" mode="${mode}"><Booklet>OWNED.REVIEW</Booklet></Login>`).join('')+'<Login name="owned-peer" mode="run-trial"><Booklet>OWNED.REVIEW</Booklet></Login></Group>'+
+   ['Z','Ö','A'].map((key,index)=>`<Group id="OWNED.${key}" label="Group ${key}"><Login name="ordered-${index}" mode="run-trial"><Booklet>OWNED.REVIEW</Booklet></Login></Group>`).join(''))});
   const owner=await services.originalAuthentication.login({name:'owned-run-trial',password:''}),peer=await services.originalAuthentication.login({name:'owned-peer',password:''});
   assert.equal(owner.kind,'person');assert.equal(peer.kind,'person');
   const testNumber=await services.originalTest.create({token:owner.token,bookletName:'OWNED.REVIEW'}),peerNumber=await services.originalTest.create({token:peer.token,bookletName:'OWNED.REVIEW'});
@@ -227,6 +228,17 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
    assert.ok((await services.workspaceAdminRead.exportOriginalResultArchive({...scope,groupKeys:['OWNED.UNKNOWN']})).body.length>0);
    await repository.deleteWorkspaceReview(legacy.reviewId);
   });
+  const readArchive = async groupKeys => {
+    const {body: zip} = await services.workspaceAdminRead.exportOriginalResultArchive({...scope, groupKeys});
+    const files = new Map();
+    for (let offset = 0; zip.readUInt32LE(offset) === 0x04034b50;) {
+     const length = zip.readUInt32LE(offset + 18), nameLength = zip.readUInt16LE(offset + 26);
+     const start = offset + 30 + nameLength + zip.readUInt16LE(offset + 28);
+     files.set(zip.toString('utf8', offset + 30, offset + 30 + nameLength), zip.toString('utf8', start, start + length));
+     offset = start + length;
+    }
+    return files;
+  };
   await t.test('operator ZIP shares workspace-wide native review order and current labels across interleaved people', async () => {
    const peerUnit = {token: peer.token, testNumber: peerNumber, unitName: 'OWNED.UNIT'};
    for (const [target, entry, categories] of [
@@ -237,17 +249,6 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
    ]) await services.originalReview.create({...target, body: {...body, entry, categories}});
    await upload('booklet.xml', xml('Booklet', '<Metadata><Id>OWNED.REVIEW</Id><Label>Current booklet Ω</Label></Metadata><Units><Unit id="OWNED.UNIT" label="Current unit β"/></Units>'));
    await reopen();
-   const readArchive = async groupKeys => {
-    const {body: zip} = await services.workspaceAdminRead.exportOriginalResultArchive({...scope, groupKeys});
-    const files = new Map();
-    for (let offset = 0; zip.readUInt32LE(offset) === 0x04034b50;) {
-     const length = zip.readUInt32LE(offset + 18), nameLength = zip.readUInt16LE(offset + 26);
-     const start = offset + 30 + nameLength + zip.readUInt16LE(offset + 28);
-     files.set(zip.toString('utf8', offset + 30, offset + 30 + nameLength), zip.toString('utf8', start, start + length));
-     offset = start + length;
-    }
-    return files;
-   };
    const files = await readArchive(['OWNED.GROUP']);
    for (const [format, accept] of [['json', 'application/json'], ['csv', 'text/csv']]) {
     const report = await services.originalWorkspaceReport.read({...scope, type: 'review', dataIds: 'OWNED.GROUP', accept, useNewVersion: true});
@@ -279,6 +280,29 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
    assert.equal(typeof mixed.at(-1).priority, 'string');
    const lowerCase = JSON.parse((await readArchive(['owned.group'])).get('reviews.json'));
    assert.deepEqual(lowerCase.map(row => row.entry), ['Legacy owned.group']);
+  });
+  await t.test('each workspace review branch follows Original group collation after reopening the store',async()=>{
+   for(let index=0;index<3;index++){
+    const person=await services.originalAuthentication.login({name:'ordered-'+index,password:''});
+    const testNumber=await services.originalTest.create({token:person.token,bookletName:'OWNED.REVIEW'});
+    await services.originalReview.create({token:person.token,testNumber,unitName:null,body:{...body,entry:'Booklet '+index}});
+    await services.originalReview.create({token:person.token,testNumber,unitName:'OWNED.UNIT',body:{...body,entry:'Unit '+index}});
+   }
+   await reopen();
+   for(const dataIds of ['OWNED.Z,OWNED.Ö,OWNED.A','owned.a,OWNED.Z,OWNED.Ö']){
+    for(const useNewVersion of [false,true]){
+     const review=await services.originalWorkspaceReport.read({...scope,type:'review',dataIds,accept:'application/json',useNewVersion});
+     const rows=JSON.parse(review.body);
+     assert.deepEqual(rows.map(row=>row.groupname),['OWNED.A','OWNED.Ö','OWNED.Z','OWNED.A','OWNED.Ö','OWNED.Z']);
+     assert.deepEqual(rows.map(row=>row.entry),['Unit 2','Unit 1','Unit 0','Booklet 2','Booklet 1','Booklet 0']);
+    }
+   }
+   const groupKeys=['OWNED.Z','OWNED.Ö','OWNED.A'];
+   const archive=await readArchive(groupKeys);
+   for(const [extension,accept] of [['json','application/json'],['csv','text/csv']]){
+    const review=await services.originalWorkspaceReport.read({...scope,type:'review',dataIds:groupKeys.join(','),accept,useNewVersion:true});
+    assert.equal(archive.get('reviews.'+extension),review.body);
+   }
   });
   await t.test('Source57 native response and log report bytes survive durable reopen',async()=>{
    const previous=at;try{await assertNativeResultReportWitness({services:()=>services,tenantKey:tenant.tenantKey,setNow:value=>{at=value;},reopen});}finally{at=previous;}

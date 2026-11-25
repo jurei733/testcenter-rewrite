@@ -77,7 +77,7 @@ function ownedUnit(parent:OriginalReportParent,stored:OriginalReportStoredUnit):
   return stored.unit;
 }
 /** Only the requested family is materialized. Unit identities in log/review
- * snapshots contain neither state nor response parts. Raw branch order stays intact. */
+ * snapshots contain neither state nor response parts. */
 export function projectOriginalWorkspaceReport(input:OriginalReportRequest,parents:OriginalReportParent[],family:OriginalReportFamily):OriginalWorkspaceReportSnapshot {
   const byRun=new Map(parents.map(p=>[p.run.testRunId,p]));
   const unitsByRun=new Map<string,OriginalReportStoredUnit[]>();for(const unit of family.units){const rows=unitsByRun.get(unit.testRunId)??[];rows.push(unit);unitsByRun.set(unit.testRunId,rows);}
@@ -137,7 +137,8 @@ export function projectOriginalWorkspaceReport(input:OriginalReportRequest,paren
   const testsByRun=new Map<string,OriginalTestNumberRecord[]>(),peopleBySession=new Map<string,OriginalPersonNumberRecord[]>();
   for(const number of family.testNumbers){const rows=testsByRun.get(number.testRunId)??[];rows.push(number);testsByRun.set(number.testRunId,rows);}
   for(const number of family.personNumbers){const rows=peopleBySession.get(number.participantSessionId)??[];rows.push(number);peopleBySession.set(number.participantSessionId,rows);}
-  const rows=[...family.reviews.filter(r=>r.review.unitName!==null),...family.reviews.filter(r=>r.review.unitName===null)].map(stored=>{
+  const unitReviews:ReviewData[]=[],testReviews:ReviewData[]=[];
+  for(const stored of family.reviews){
     const parent=byRun.get(stored.testRunId),review=stored.review;if(!parent)throw unavailable();assertOriginalNativeReview(review);
     if(!originalUnitParentMatches(parent.run,stored)||!originalUnitParentMatches(stored,review)||stored.kind!==(review.unitName===null?'test':'unit')||stored.reviewNumber!==review.reviewNumber||stored.reviewId!==review.reviewId)throw unavailable();
     const tests=testsByRun.get(review.testRunId)??[],people=peopleBySession.get(review.participantSessionId)??[];
@@ -145,10 +146,14 @@ export function projectOriginalWorkspaceReport(input:OriginalReportRequest,paren
       typeof parent.person.originalLoginKey!=='string'||typeof parent.person.originalNameSuffix!=='string'||
       selectOriginalPersonNumber({...parent.person,originalLoginKey:parent.person.originalLoginKey,originalNameSuffix:parent.person.originalNameSuffix},people[0],parent.person)!==review.personNumber)throw unavailable();
     const unit=review.unitName===null?null:unitsFor(parent,review.unitName);
-    return {...identity(parent),unitname:unit?.unitName??'',originalUnitId:unit?.originalUnitId??'',priority:review.priority,categories:review.categories,
-      updatedAt:review.updatedAt,entry:review.entry,page:review.page,pagelabel:review.pageLabel,userAgent:review.userAgent,reviewer:review.reviewer};
-  });
-  return {type:'review',rows};
+    const branch=unit===null?testReviews:unitReviews;
+    branch.push({...identity(parent),unitname:unit?.unitName??'',originalUnitId:unit?.originalUnitId??'',priority:review.priority,categories:review.categories,
+      updatedAt:review.updatedAt,entry:review.entry,page:review.page,pagelabel:review.pageLabel,userAgent:review.userAgent,reviewer:review.reviewer});
+  }
+  // The observed Original plan drives each UNION branch through the workspace
+  // and group index. Keep equal-group rows in the supplied order.
+  const compareGroups=(left:ReviewData,right:ReviewData)=>compareOriginalParticipantGroupKeys(left.groupname,right.groupname);
+  return {type:'review',rows:[...unitReviews.sort(compareGroups),...testReviews.sort(compareGroups)]};
 }
 type Collection<T>=Map<string,T>|Record<string,T>;
 const values=<T>(c:Collection<T>):T[]=>c instanceof Map?[...c.values()]:Object.values(c);
