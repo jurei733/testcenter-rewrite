@@ -32,15 +32,25 @@ export class BackendService {
  }
  observeSessionsMonitor(groupName:string):Observable<TestSessionData[]>{
   const scope=this.session.accessSignal;
+  const path='/monitor/group/'+encodeURIComponent(groupName)+'/test-sessions';
   return observeNativeRealtime<TestSessionData[]>({channel:'test-sessions',scope,current:()=>scope===this.session.accessSignal&&!scope.aborted,
-   read:async(signal)=>{let subscribeToken:string|null=null;const text=await this.session.text('GET','/monitor/group/'+encodeURIComponent(groupName)+'/test-sessions',undefined,undefined,false,signal,value=>{subscribeToken=value;});return{data:parseNativeMonitorSnapshot(text),subscribeToken};},
+   read:async(signal)=>{
+    let subscribeToken:string|null=null;
+    const text=await this.session.text('GET',path,undefined,undefined,false,signal,value=>{subscribeToken=value;})
+     .catch(error=>{
+      if(!(error instanceof TypeError)||signal.aborted)throw error;
+      // Fetch reports a network outage as TypeError. Original XHR reports status 0.
+      throw new NativeMonitorHttpError(0,'error',{url:path,statusText:'Unknown Error'});
+     });
+    return {data:parseNativeMonitorSnapshot(text),subscribeToken};
+   },
    decode:parseNativeMonitorBroadcast,revalidate:()=>this.session.verifyAccess(scope),
    onConnecting:()=>this.connectionStatus$.next('ws-offline'),
    status:status=>{this.connectionStatus$.next(status);if(status==='polling-sleep'||status==='ws-online')this.problem$.next('');},
    error:(error,owner)=>{
-    // The Original leaves the current work visible behind its reload dialog
-    // when the authenticated monitor snapshot is temporarily unavailable.
-    if(error instanceof NativeMonitorHttpError&&(error.status===502||error.status===503)){
+    // A failed HTTP snapshot waits for the Original's explicit reload.
+    // A revoked access is already retired by the request before this runs.
+    if(error instanceof NativeMonitorHttpError){
      this.snapshotOutage$.next({error,owner});return 'wait-for-reload';
     }
     this.problem$.next(error instanceof Error?error.message:'Verbindungsfehler');

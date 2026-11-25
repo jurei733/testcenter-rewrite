@@ -42,8 +42,12 @@ export class NativeLoginFailureService implements OnDestroy {
    mapped.description=redactBugReportText(mapped.description);mapped.details=redactBugReportText(mapped.details??'');
    ref=this.dialogs.open(NativeLoginErrorDialogComponent,{panelClass:'original-native-login-error-dialog',disableClose:true,autoFocus:'dialog',
     data:{error:mapped,url:redactBugReportText(window.location.href),timestamp:Date.now(),login:context?.login,reload:()=>{
-     if(!current())return;retire();if(mapped.type==='session')this.session.clear();
-     window.location.href=new URL(context?.returnPath??'native-start',document.baseURI).href;
+     if(!current())return;
+     retire();
+     const expiredSession=mapped.type==='session';
+     if(expiredSession)this.session.clear();
+     const returnPath=expiredSession?'native-start':context?.returnPath??'native-start';
+     window.location.href=new URL(returnPath,document.baseURI).href;
     }}});
    ref.afterClosed().subscribe(retire);
    if(!current())retire();

@@ -89,9 +89,9 @@ test('snapshot failure is not a successful empty snapshot and a later tick can r
  t.mock.timers.tick(0);await settle();assert.deepEqual(rows,[]);assert.equal(backend.connectionStatus$.value,'error');assert.equal(backend.problem$.value,'Owned timeout');
  t.mock.timers.tick(5000);await settle();assert.deepEqual(rows,[[]]);assert.equal(backend.problem$.value,'');sub.unsubscribe();
 });
-test('an unavailable monitor snapshot retains its rows and awaits an owned reload',async t=>{
+for(const status of [404,410,500,503,504])test('HTTP '+status+' retains the previous monitor snapshot and awaits an owned reload',async t=>{
  clock(t);const {backend,session}=transport(),rows=[],outages=[];let reads=0;
- const error=new NativeMonitorHttpError(503,'Owned temporary outage');
+ const error=new NativeMonitorHttpError(status,'Owned snapshot failure');
  session.text=async()=>{if(++reads===2)throw error;return '[]';};
  backend.snapshotOutage$.subscribe(value=>outages.push(value));
  const sub=backend.observeSessionsMonitor('owned').subscribe(value=>rows.push(value));
@@ -103,6 +103,26 @@ test('an unavailable monitor snapshot retains its rows and awaits an owned reloa
  assert.equal(outages[0].owner.aborted,false);
  t.mock.timers.tick(15000);await settle();assert.equal(reads,2);
  backend.cutConnection();assert.equal(outages[0].owner.aborted,true);assert.equal(sub.closed,true);
+});
+test('a rejected monitor grant retires before its HTTP error can display stale private context',async t=>{
+ clock(t);const {backend,session,controller}=transport(),outages=[];let reads=0;
+ session.text=async()=>{reads++;controller.abort();throw new NativeMonitorHttpError(403,'Owned revoked grant');};
+ backend.snapshotOutage$.subscribe(value=>outages.push(value));
+ const sub=backend.observeSessionsMonitor('owned').subscribe();
+ await settle();t.mock.timers.tick(15000);await settle();
+ assert.equal(sub.closed,true);assert.equal(reads,1);assert.deepEqual(outages,[]);assert.equal(backend.problem$.value,'');
+});
+test('a browser network rejection is presented as a scoped status-zero snapshot failure',async t=>{
+ clock(t);const {backend,session}=transport(),outages=[];let reads=0;
+ session.text=async()=>{reads++;throw new TypeError('Failed to fetch');};
+ backend.snapshotOutage$.subscribe(value=>outages.push(value));
+ const sub=backend.observeSessionsMonitor('owned group').subscribe();
+ await settle();t.mock.timers.tick(15000);await settle();
+ assert.equal(reads,1);assert.equal(outages.length,1);
+ const {error,owner}=outages[0];
+ assert.equal(error.status,0);assert.equal(error.message,'error');
+ assert.deepEqual(error.response,{url:'/monitor/group/owned%20group/test-sessions',statusText:'Unknown Error'});
+ assert.equal(owner.aborted,false);sub.unsubscribe();assert.equal(owner.aborted,true);
 });
 test('Booklet errors retry while successful results remain shared and scoped',async()=>{
  let count=0;const backend={cacheIdentity:{owned:1},accessSignal:new AbortController().signal,connectionClosed$:new rx.Subject(),getBooklet:()=>rx.defer(()=>{count++;return rx.of(count===1?{error:'general',species:null}:'owned XML');})};

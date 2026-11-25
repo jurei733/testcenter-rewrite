@@ -231,12 +231,20 @@ function dialogFixture(t){
  const previousWindow=globalThis.window,previousDocument=globalThis.document;let location='http://owned.invalid/app/native-start';globalThis.window={location:{get href(){return location;},set href(value){location=value;reloads++;}}};globalThis.document={baseURI:'http://owned.invalid/app/'};t.after(()=>{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;});
  const session={get accessSignal(){return scope.signal;},clear(){clears++;}},dialogs={open(component,config){const ref={componentRef:{location:{nativeElement:{remove(){removed++;}}}},close(){closes++;closed.next();closed.complete();},afterClosed:()=>closed};opens.push({component,config,ref});return ref;}};
  bindings=new Map(Object.entries({MatDialog:dialogs,NativeMonitorSessionService:session,NativeErrorPresenterService:{register(){}}}));const service=new NativeLoginFailureService();
- return {service,view,opens,replace(){const old=scope;scope=new AbortController();old.abort();},get removed(){return removed;},get closes(){return closes;},get reloads(){return reloads;},get clears(){return clears;}};
+ return {service,view,opens,replace(){const old=scope;scope=new AbortController();old.abort();},get removed(){return removed;},get closes(){return closes;},get reloads(){return reloads;},get clears(){return clears;},get location(){return location;}};
 }
 test('unexpected login dialog uses the Source status mapping and only a live owner can reload',async t=>{
  const f=dialogFixture(t);await f.service.show(new HttpError(500),f.view.signal);assert.equal(f.opens.length,1);
  const {config}=f.opens[0];assert.equal(config.disableClose,true);assert.equal(config.autoFocus,'dialog');assert.equal(config.data.error.label,'Allgemeines Server-Problem.');assert.equal(config.data.error.type,'backend');
  config.data.reload();config.data.reload();assert.equal(f.reloads,1);assert.equal(f.clears,0);assert.equal(f.closes,1);assert.equal(f.removed,1);f.service.ngOnDestroy();
+});
+for(const status of [410,429])test('a group monitor session error '+status+' reloads the public sign-in for any role',async t=>{
+ const f=dialogFixture(t);
+ await f.service.show(new HttpError(status),f.view.signal,undefined,{login:'Owned monitor',returnPath:'group-monitor'});
+ const {data}=f.opens[0].config;
+ assert.equal(data.error.type,'session');
+ data.reload();
+ assert.equal(f.clears,1);assert.equal(f.closes,1);assert.equal(f.location,'http://owned.invalid/app/native-start');
 });
 for(const retirement of ['view','session','service'])test('a pending login error presentation cannot open after '+retirement+' retirement',async t=>{
  const f=dialogFixture(t),pending=f.service.show(new HttpError(500),f.view.signal);
