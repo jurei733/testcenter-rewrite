@@ -419,5 +419,57 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
     await services.workspaceAdminRead.exportOriginalResultArchive({tenantKey:tenant.tenantKey,workspaceKey:witness.workspaceKey,groupKeys:[witness.groupKey]});
    }finally{at=previous;}
   });
+  await t.test('native report and archive rows follow a new group only after credential login',async()=>{
+   const loginName='report-history-person',firstGroup='OWNED.HISTORY.A',secondGroup='OWNED.HISTORY.B';
+   const publish=group=>upload('history.xml',xml('Testtakers',`<Metadata/><Group id="${group}" label="History group"><Login name="${loginName}" mode="run-trial"><Booklet codes="Alpha Beta">OWNED.REVIEW</Booklet></Login></Group>`));
+   await publish(firstGroup);
+   const login=await services.originalAuthentication.login({name:loginName,password:''});
+   const enter=code=>services.originalAuthentication.person({loginToken:login.token,code});
+   const tests=new Map();
+   for(const [index,code] of ['Alpha','Beta'].entries()){
+    const person=await enter(code);
+    const token=person.token,testNumber=await services.originalTest.create({token,bookletName:'OWNED.REVIEW'});
+    const unitName='08',target={token,testNumber,unitName};
+    const timeStamp=100+10*index;
+    await services.originalTest.read({token,testNumber});
+    await services.originalUnit.patchState({...target,body:{originalUnitId:'OWNED.UNIT',newState:[{key:'PRESENTATION_PROGRESS',content:'complete',timeStamp}]}});
+    await services.originalUnit.putResponse({...target,body:{timeStamp:timeStamp+1,dataParts:{answer:'Owned answer '+code},responseType:'owned'}});
+    await services.originalTest.putLog({token,testNumber,body:[{key:'HISTORY',content:code,timeStamp:timeStamp+2}]});
+    await services.originalReview.create({...target,body:{...body,entry:'Owned review '+code}});
+    tests.set(code,testNumber);
+   }
+   const reports=async group=>{
+    const request={...scope,dataIds:group,accept:'application/json'};
+    return Promise.all([['response',false],['log',false],['review',false],['review',true]].map(async([type,useNewVersion])=>{
+     const {body}=await services.originalWorkspaceReport.read({...request,type,useNewVersion});
+     return body?JSON.parse(body):[];
+    }));
+   };
+   const withoutGroup=rows=>rows.map(report=>report.map(({groupname,...row})=>row));
+   const before=await reports(firstGroup);
+   assert.ok(before.every(rows=>new Set(rows.map(row=>row.code)).size===2));
+   assert.deepEqual(await reports(secondGroup),[[],[],[],[]]);
+
+   await publish(secondGroup);
+   const codeOnly=await enter('Alpha');
+   assert.equal(await services.originalTest.create({token:codeOnly.token,bookletName:'OWNED.REVIEW'}),tests.get('Alpha'));
+   await reopen();
+   assert.deepEqual(await reports(firstGroup),before);
+   assert.deepEqual(await reports(secondGroup),[[],[],[],[]]);
+   const reentry=await services.originalAuthentication.login({name:loginName,password:''});
+   assert.equal(reentry.token,login.token);
+   await reopen();
+   assert.deepEqual(await reports(firstGroup),[[],[],[],[]]);
+   const moved=await reports(secondGroup);
+   assert.ok(moved.every(rows=>rows.every(row=>row.groupname===secondGroup)));
+   assert.deepEqual(withoutGroup(moved),withoutGroup(before));
+   const archive=await readArchive([secondGroup]);
+   for(const [file,report] of [['responses',0],['logs',1],['reviews',3]]){
+    assert.deepEqual(JSON.parse(archive.get(file+'.json')),moved[report]);
+   }
+   const secondPerson=await enter('Beta');
+   assert.equal(await services.originalTest.create({token:secondPerson.token,bookletName:'OWNED.REVIEW'}),tests.get('Beta'));
+   assert.deepEqual(await reports(secondGroup),moved);
+  });
  }finally{await storage?.shutdown();if(admin){await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);await admin.end();}await rm(directory,{recursive:true,force:true});}
 });
