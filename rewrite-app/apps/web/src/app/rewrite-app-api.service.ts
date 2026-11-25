@@ -50,14 +50,7 @@ export class RewriteAppApiService {
     }
 
     if (!response.ok) {
-      const error = this.normalizeApiError(response.status, payload);
-      if (path.startsWith("/workspace/")) {
-        error.response = {
-          errorId: response.headers.get("error-id"),
-          testMode: response.headers.get("test-mode"),
-          statusText: response.statusText
-        };
-      }
+      const error = this.responseError(path, response, payload);
       if (path === productionApiRoutes.admin.currentSession && error.error === "admin_session_invalid") {
         error.response = {
           errorId: response.headers.get("x-request-id"),
@@ -90,7 +83,7 @@ export class RewriteAppApiService {
       const payload = contentType.includes("application/json")
         ? await response.json()
         : await response.text();
-      throw this.normalizeApiError(response.status, payload);
+      throw this.responseError(path, response, payload);
     }
 
     return {
@@ -152,6 +145,18 @@ export class RewriteAppApiService {
 
   isApiError(value: unknown): value is ApiErrorLike {
     return value != null && typeof value === "object" && "error" in value;
+  }
+
+  private responseError(path: string, response: Response, payload: unknown): ApiErrorLike {
+    const error = this.normalizeApiError(response.status, payload);
+    if (path.startsWith("/workspace/")) {
+      error.response = {
+        errorId: response.headers.get("error-id"),
+        testMode: response.headers.get("test-mode"),
+        statusText: response.statusText
+      };
+    }
+    return error;
   }
 
   private normalizeApiError(statusCode: number, payload: unknown): ApiErrorLike {

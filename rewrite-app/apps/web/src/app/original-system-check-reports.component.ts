@@ -52,7 +52,7 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
  private readonly toasts=inject(OriginalToastService);
  private destroyed=false;
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
- private deletionError:MatDialogRef<NativeLoginErrorDialogComponent>|null=null;
+ private reportError:MatDialogRef<NativeLoginErrorDialogComponent>|null=null;
  readonly data=new MatTableDataSource<SystemCheckTableRow>([]);
  readonly columns=['selectCheckbox','syscheckLabel','number','details-os','details-browser'];
  readonly controller=new OriginalSystemCheckReportsController(<T>(method:string,path:string,body:unknown,token:string)=>path.startsWith('/workspace/')?
@@ -67,11 +67,15 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
    this.details(key==='details-os'?row.operatingSystemVersions:row.browserVersions).map(item=>item.value).join('\n');
  }
  details(rows:SystemCheckReportBreakdown[]):SystemCheckReportBreakdown[]{return [...rows].sort((a,b)=>a.value<b.value?-1:a.value>b.value?1:0);}
- ngOnChanges():void {this.deletion?.close(false);this.closeDeletionError();void this.controller.connect();}
- ngOnDestroy():void {this.destroyed=true;this.deletion?.close(false);this.closeDeletionError();this.controller.destroy();}
+ ngOnChanges():void {this.deletion?.close(false);this.closeReportError();void this.controller.connect();}
+ ngOnDestroy():void {this.destroyed=true;this.deletion?.close(false);this.closeReportError();this.controller.destroy();}
  async download():Promise<void>{
-  const result=await this.controller.download(async(path,token)=>(await this.api.download(path,path.startsWith('/workspace/')?
-    {AuthToken:token,Accept:'text/csv'}:{authorization:'Bearer '+token})).blob);
+  if(this.reportError)return;
+  const result=await this.controller.download(
+    async(path,token)=>(await this.api.download(path,path.startsWith('/workspace/')?
+      {AuthToken:token,Accept:'text/csv'}:{authorization:'Bearer '+token})).blob,
+    (error,path,current)=>this.showReportError(error,path,current,'download')
+  );
   if(!result || !result.current() || this.destroyed)return;
   if(this.workspaceNumber && !result.blob.size){this.toasts.show('Keine Daten verfügbar.');return;}
   const url=URL.createObjectURL(result.blob),link=document.createElement('a');
@@ -79,7 +83,7 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
   setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  deleteReports():void {
-  const captured=this.controller.captureDeletion();if(!captured || this.deletion || this.deletionError)return;
+  const captured=this.controller.captureDeletion();if(!captured || this.deletion || this.reportError)return;
   const prompt=captured.ids.length>1?`Es werden alle Berichte für diese ${captured.ids.length} Systemchecks `:
    `Es werden alle Berichte für diesen Systemcheck "${captured.ids[0]}" `;
   this.deletion=this.dialogs.open(OriginalParticipantConfirmationDialogComponent,{panelClass:'original-participant-confirmation-dialog',autoFocus:'dialog',
@@ -91,22 +95,27 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
     if(!this.destroyed && captured.current())this.snacks.open(message,action,{
       duration:1000,...(this.workspaceNumber?{panelClass:'original-workspace-report-snackbar'}:{})
     });
-   },(error,path)=>this.showDeletionError(error,path,captured.current));
+   },(error,path)=>this.showReportError(error,path,captured.current,'deletion'));
   });
  }
 
- private showDeletionError(error:unknown,path:string,current:()=>boolean):void {
-  if(this.destroyed || this.deletionError || !current())return;
+ private showReportError(error:unknown,path:string,current:()=>boolean,operation:'download'|'deletion'):void {
+  if(this.destroyed || this.reportError || !current())return;
   const apiError=this.api.isApiError(error)?error:null;
   const response=apiError?.response;
-  const mapped=nativeRequestError(apiError?new HttpErrorResponse({
-    status:apiError.statusCode,error:apiError.message,statusText:response?.statusText,
+  const transportFailure=operation==='download'&&error instanceof TypeError;
+  const mapped=nativeRequestError(apiError||transportFailure?new HttpErrorResponse({
+    status:apiError?.statusCode??0,error:apiError?.message??'error',statusText:response?.statusText,
     url:new URL(path,window.location.origin).href,
     headers:new HttpHeaders({
       ...(response?.errorId?{'error-id':response.errorId}:{}),
       ...(response?.testMode?{'test-mode':response.testMode}:{})
     })
   }):error);
+  if(operation==='download' && apiError){
+    mapped.label='Download konnte nicht bereitgestellt werden!';
+    mapped.type='network';
+  }
   mapped.description=redactBugReportText(mapped.description);
   mapped.details=redactBugReportText(mapped.details??'');
   const dialog=this.dialogs.open(NativeLoginErrorDialogComponent,{
@@ -116,8 +125,8 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
       error:mapped,url:redactBugReportText(window.location.href),timestamp:Date.now(),
       login:this.access.displayName,
       reload:()=>{
-        if(this.destroyed || this.deletionError!==dialog || !current())return;
-        this.closeDeletionError();
+        if(this.destroyed || this.reportError!==dialog || !current())return;
+        this.closeReportError();
         if(mapped.type==='session'){
           // The Original removes the browser's active login on recovery. The
           // admin token is independent of any participant or monitor login.
@@ -126,18 +135,19 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
           this.state.ops.adminAccessWindowNotice='';
           this.persistence.persistShellState();
         }
-        const destination=mapped.type==='session'?'native-start/login':'native-start/dispatch';
+        const destination=operation==='download'?'native-start/bookmarked-starter':
+          mapped.type==='session'?'native-start/login':'native-start/dispatch';
         window.location.assign(new URL(destination,document.baseURI).href);
       }
     } satisfies NativeErrorDialogData
   });
-  this.deletionError=dialog;
-  dialog.afterClosed().subscribe(()=>{if(this.deletionError===dialog)this.deletionError=null;});
+  this.reportError=dialog;
+  dialog.afterClosed().subscribe(()=>{if(this.reportError===dialog)this.reportError=null;});
  }
 
- private closeDeletionError():void {
-  const dialog=this.deletionError;
-  this.deletionError=null;
+ private closeReportError():void {
+  const dialog=this.reportError;
+  this.reportError=null;
   dialog?.componentRef?.location.nativeElement.remove();
   dialog?.close();
  }

@@ -255,3 +255,39 @@ test('retired native report failures cannot present an error for a new token or 
   assert.equal(f.controller.rows[0].reportCount,3);
  }
 });
+test('a numeric download clears its submitted selection and reports only a current failure',async()=>{
+ const reply=held(),error={statusCode:403,message:'Invalid admin token.'};
+ const f=fixture(call=>call.path.endsWith('/overview')?[nativeRow('A'),nativeRow('B')]:overview(),
+   {...scope(),workspaceNumber:'12'});
+ await f.controller.connect();f.controller.check('A',true);
+ const shown=[];
+ const pending=f.controller.download(async(path,token)=>{
+  assert.equal(path,'/workspace/12/report/sys-check?dataIds=A&useNewVersion=false');
+  assert.equal(token,'owned-token');
+  return reply.promise;
+ },(problem,path,current)=>shown.push({problem,path,current:current()}));
+ assert.equal(f.controller.selected.size,0);
+ assert.equal(f.controller.busy,false);
+ f.controller.check('B',true);
+ reply.reject(error);
+ assert.equal(await pending,null);
+ assert.deepEqual(shown,[{problem:error,path:'/workspace/12/report/sys-check?dataIds=A&useNewVersion=false',current:true}]);
+ assert.deepEqual([...f.controller.selected],['B']);
+ assert.equal(f.controller.problem,'');
+});
+test('retired numeric download responses release neither a file nor an error',async()=>{
+ for(const failed of [false,true]){
+  const reply=held();
+  const f=fixture(call=>call.path.endsWith('/overview')?[nativeRow('A')]:overview(),
+   {...scope(),workspaceNumber:'12'});
+  await f.controller.connect();f.controller.checkAll();
+  const pending=f.controller.download(()=>reply.promise,()=>assert.fail('A retired export cannot open its error dialog.'));
+  f.setScope({...scope(),workspaceNumber:'21'});await f.controller.connect();
+  f.controller.checkAll();
+  if(failed)reply.reject({statusCode:403,message:'Old request.'});
+  else reply.resolve(new Blob(['old private report']));
+  assert.equal(await pending,null);
+  assert.deepEqual([...f.controller.selected],['A']);
+  assert.equal(f.controller.problem,'');
+ }
+});

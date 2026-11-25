@@ -6,6 +6,7 @@ import type {OriginalWorkspaceFilesScope,OriginalWorkspaceFilesTransport} from '
 type Scope=Pick<OriginalWorkspaceFilesScope,'token'|'tenantKey'|'workspaceKey'|'nativeRole'|'workspaceNumber'>;
 type Owner=Omit<Scope,'nativeRole'>&{epoch:number};
 type NativeReportOverview={id:string;label:string;count:number;details:{os:Record<string,number>;browser:Record<string,number>}};
+type ReportDownloadFailure=(error:unknown,path:string,current:()=>boolean)=>void;
 type ReportDeletionConfirmation={
  ids:string[];
  current:()=>boolean;
@@ -82,7 +83,7 @@ export class OriginalSystemCheckReportsController {
   try{await this.load(owner);}catch(error){if(this.owns(owner))this.problem=errorText(error);}
   finally{if(this.owns(owner)){this.busy=false;this.changed();}}
  }
- async download(read:(path:string,token:string)=>Promise<Blob>):Promise<{blob:Blob;current:()=>boolean}|null>{
+ async download(read:(path:string,token:string)=>Promise<Blob>,showFailure?:ReportDownloadFailure):Promise<{blob:Blob;current:()=>boolean}|null>{
   const owner=this.owner;if(!owner || !this.owns(owner) || this.busy || !this.selected.size)return null;
   const ids=this.rows.filter(row=>this.selected.has(row.checkId)).map(row=>row.checkId);if(!ids.length)return null;
   const native=this.nativePath(owner,'report/sys-check');
@@ -93,13 +94,27 @@ export class OriginalSystemCheckReportsController {
    ids.forEach(id=>query.append('checkId',id));
   }
   if(native)query.set('useNewVersion','false');
-  this.busy=true;this.problem='';this.changed();
+  const path=(native??this.path(owner,productionApiRoutes.workspace.exportSystemCheckReportsCsv))+'?'+query;
+  if(native)this.selected=new Set();
+  else this.busy=true;
+  this.problem='';this.changed();
   try{
-   const blob=await read((native??this.path(owner,productionApiRoutes.workspace.exportSystemCheckReportsCsv))+'?'+query,owner.token);
+   const blob=await read(path,owner.token);
    if(!this.owns(owner))return null;
-   this.selected=new Set();return {blob,current:()=>this.owns(owner)};
-  }catch(error){if(this.owns(owner))this.problem=errorText(error);return null;}
-  finally{if(this.owns(owner)){this.busy=false;this.changed();}}
+   if(!native)this.selected=new Set();
+   return {blob,current:()=>this.owns(owner)};
+  }catch(error){
+   if(this.owns(owner)){
+    if(native && showFailure)showFailure(error,path,()=>this.owns(owner));
+    else this.problem=errorText(error);
+   }
+   return null;
+  }finally{
+   if(this.owns(owner)){
+    if(!native)this.busy=false;
+    this.changed();
+   }
+  }
  }
  captureDeletion():ReportDeletionConfirmation|null {
   const owner=this.owner;if(!owner || !this.owns(owner) || !this.overview || this.busy)return null;
