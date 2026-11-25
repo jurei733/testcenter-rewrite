@@ -1,6 +1,6 @@
 import {originalAttachmentHistoryProjector} from '@testcenter-rewrite-app/application';
 import {refreshOriginalWorkspaceContentCollection,readOriginalSystemCheckModeCollection,readOriginalSystemCheckDirectoryCollection,projectOriginalWorkspaceFile,type OriginalWorkspaceContentType} from '@testcenter-rewrite-app/application';
-import {transactOriginalSystemCheckCollections} from '@testcenter-rewrite-app/application';
+import {deleteOriginalSystemCheckReportEventsFromCollections,transactOriginalSystemCheckCollections} from '@testcenter-rewrite-app/application';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {prepareOriginalApplicationAssets,type OriginalApplicationAssetIdentity} from '@testcenter-rewrite-app/application';
 import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
@@ -528,6 +528,10 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async readOriginalSystemCheckMode(){return readOriginalSystemCheckModeCollection(state);},
     async readOriginalSystemCheckDirectory(){return readOriginalSystemCheckDirectoryCollection(state);},
     async transactOriginalSystemCheck(selector,transform){return transactOriginalSystemCheckCollections(state,selector,transform);},
+    async deleteOriginalSystemCheckReportEvents({authority,activityEventIds}) {
+      guardOriginalWorkspaceWriteCollections(state,state.adminSessionsByToken,{...authority,authority});
+      return deleteOriginalSystemCheckReportEventsFromCollections(state.workspaceActivityEvents,{...authority,activityEventIds});
+    },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
       let deletedCount = 0;
       for (const activityEventId of activityEventIds) {

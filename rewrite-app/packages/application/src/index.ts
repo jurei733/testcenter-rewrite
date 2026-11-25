@@ -103,6 +103,8 @@ import {createOriginalWorkspaceAdministrationPort} from './original-workspace-ad
 export {findOriginalWorkspaceFile, projectOriginalWorkspaceFileDigests, readOriginalWorkspaceFileSelection} from './original-workspace-files.js';
 export {deleteOriginalWorkspaceFiles, readOriginalWorkspaceFileDeletion} from './original-workspace-file-deletion.js';
 import type {OriginalWorkspaceWriteAuthority} from './original-workspace-write.js';
+export {deleteOriginalSystemCheckReportEventsFromCollections} from './original-system-check.js';
+export {prepareOriginalSystemCheckReportSelection} from './original-workspace-administration.js';
 export {readOriginalWorkspaceAdministrationCollection,parseOriginalWorkspaceNumber,originalExplicitWorkspaceAccess,prepareOriginalNativeTestSelection,prepareOriginalNativeGroupSelection} from './original-workspace-administration.js';
 export type {OriginalWorkspaceAdministrationScope,OriginalWorkspaceAdministrationPort} from './original-workspace-administration.js';
 import {createOriginalTestAdministrationPort} from './original-test-administration.js';
@@ -332,6 +334,7 @@ import type {
   SourcePackageUnitEntry,
   SystemCheckReport,
   SystemCheckReportDeletion,
+  OriginalWorkspaceFileDeletionReport,
   SystemCheckReportEntry,
   SystemCheckReportStatistics,
   Tenant,
@@ -889,6 +892,12 @@ export type WorkspaceResultsPort = {
     checkIds: string[];
     confirmation: string;
   }): Promise<SystemCheckReportDeletion>;
+  deleteOriginalSystemCheckReports(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkIds: string[];
+    authority: OriginalWorkspaceWriteAuthority;
+  }): Promise<OriginalWorkspaceFileDeletionReport>;
   importSystemCheckReport(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -1645,6 +1654,10 @@ export type FirstSliceRepository = import('./original-system-check.js').Original
     activityEvent: WorkspaceActivityEvent
   ): Promise<void>;
   deleteWorkspaceActivityEventsByIds(activityEventIds: string[]): Promise<number>;
+  deleteOriginalSystemCheckReportEvents(input: {
+    authority: OriginalWorkspaceWriteAuthority;
+    activityEventIds: string[];
+  }): Promise<string[]>;
   getSourcePackageById(sourcePackageId: string): Promise<SourcePackage | null>;
   listSourcePackagesByWorkspace(
     tenantId: string,
@@ -26774,10 +26787,10 @@ export const createFirstSliceServices = (
     const originalCheckIds = input.originalCheckIds ? new Set(input.originalCheckIds) : null;
     const events = await repository.listWorkspaceActivityEventsByWorkspace(
       workspace.tenantId,
-      workspace.workspaceId
+      workspace.workspaceId,
+      ['system_check_report_saved']
     );
     const records = events
-      .filter(event => event.eventType === "system_check_report_saved")
       .flatMap(event => {
         const stored = event.details.report;
         if (!stored || typeof stored !== "object" || Array.isArray(stored)) return [];
@@ -32178,6 +32191,25 @@ export const createFirstSliceServices = (
           workspaceKey: input.workspaceKey,
           groupKeys: input.groupKeys
         });
+      },
+      async deleteOriginalSystemCheckReports({authority,checkIds,...scope}) {
+        const result: OriginalWorkspaceFileDeletionReport = {
+          deleted: [], did_not_exist: [], not_allowed: [], was_used: [], incorrect_path: [], error: []
+        };
+        const records = checkIds.length ? await readSystemCheckReportRecords({...scope,originalCheckIds:checkIds}) : [];
+        const deletable = records.filter(record => {
+          if (!record.report.originalFileName?.includes('..')) return true;
+          result.not_allowed.push(originalSystemCheckReportIdentity(record).id);
+          return false;
+        });
+        const removed=new Set(await repository.deleteOriginalSystemCheckReportEvents({
+          authority,activityEventIds:deletable.map(record=>record.activityEventId)
+        }));
+        for(const record of deletable){
+          const status=removed.has(record.activityEventId)?'deleted':'did_not_exist';
+          result[status].push(originalSystemCheckReportIdentity(record).id);
+        }
+        return result;
       },
       async deleteSystemCheckReports(input) {
         const workspace = await requireWorkspace(

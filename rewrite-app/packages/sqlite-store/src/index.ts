@@ -2942,6 +2942,22 @@ export const createSqliteFirstSliceStorage = (
         if(['source_package_created','source_package_replaced'].includes(activityEvent.eventType))refreshOriginalWorkspaceContentType(database,{source:mapSourcePackage,event:mapWorkspaceActivityEvent},activityEvent.tenantId,activityEvent.workspaceId);
       });
     },
+    async deleteOriginalSystemCheckReportEvents({authority,activityEventIds}) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        guardOriginalWorkspaceWrite(database,{...authority,authority});
+        const rows = database.prepare(`
+          DELETE FROM workspace_activity_events
+          WHERE tenant_id = ? AND workspace_id = ? AND event_type = 'system_check_report_saved'
+            AND activity_event_id IN (SELECT value FROM json_each(?))
+          RETURNING activity_event_id
+        `).all(authority.tenantId,authority.workspaceId,JSON.stringify(activityEventIds));
+        database.exec("COMMIT");
+        return rows.map(row => String(row.activity_event_id));
+      } catch (error) {
+        return rollbackAfterFailure(database,error);
+      }
+    },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
       if (activityEventIds.length === 0) {
         return 0;

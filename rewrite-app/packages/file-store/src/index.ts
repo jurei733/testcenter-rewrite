@@ -1,6 +1,6 @@
 import {originalAttachmentHistoryProjector} from '@testcenter-rewrite-app/application';
 import {refreshOriginalWorkspaceContentCollection,readOriginalSystemCheckModeCollection,readOriginalSystemCheckDirectoryCollection,projectOriginalWorkspaceFile,type OriginalWorkspaceContentType} from '@testcenter-rewrite-app/application';
-import {transactOriginalSystemCheckCollections} from '@testcenter-rewrite-app/application';
+import {deleteOriginalSystemCheckReportEventsFromCollections,transactOriginalSystemCheckCollections} from '@testcenter-rewrite-app/application';
 import {originalApplicationAssetScope} from '@testcenter-rewrite-app/application';
 import {prepareOriginalApplicationAssets,type OriginalApplicationAssetIdentity} from '@testcenter-rewrite-app/application';
 import {deleteWorkspaceCollections,workspaceDeletionScopeExists} from '@testcenter-rewrite-app/application';
@@ -1300,6 +1300,12 @@ const createFileRepository = (
         state.workspaceActivityEvents[activityEvent.activityEventId] = activityEvent;
         if(['source_package_created','source_package_replaced'].includes(activityEvent.eventType))refreshOriginalWorkspaceContentCollection(state,activityEvent,projectOriginalWorkspaceFile);
       });
+    },
+    async deleteOriginalSystemCheckReportEvents({authority,activityEventIds}) {
+      return mutate(state => {
+        guardOriginalWorkspaceWriteCollections(state,state.adminSessions,{...authority,authority});
+        return deleteOriginalSystemCheckReportEventsFromCollections(state.workspaceActivityEvents,{...authority,activityEventIds});
+      }, removed => removed.length > 0);
     },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
       let deletedCount = 0;

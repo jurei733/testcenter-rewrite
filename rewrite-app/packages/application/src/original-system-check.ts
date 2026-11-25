@@ -21,6 +21,19 @@ export type OriginalSystemCheckRepository={readOriginalSystemCheckMode():Promise
 type Collection<Row>=Map<string,Row>|Record<string,Row>;
 const values=<Row>(rows:Collection<Row>):Row[]=>rows instanceof Map?[...rows.values()]:Object.values(rows);
 const get=<Row>(rows:Collection<Row>,key:string):Row|undefined=>rows instanceof Map?rows.get(key):rows[key];
+export function deleteOriginalSystemCheckReportEventsFromCollections(
+ events:Collection<WorkspaceActivityEvent>,
+ {tenantId,workspaceId,activityEventIds}:{tenantId:string;workspaceId:string;activityEventIds:string[]}
+):string[]{
+ const removed:string[]=[];
+ for(const id of activityEventIds){
+  const event=get(events,id);
+  if(event?.eventType!=='system_check_report_saved'||event.tenantId!==tenantId||event.workspaceId!==workspaceId)continue;
+  if(events instanceof Map)events.delete(id);else delete events[id];
+  removed.push(id);
+ }
+ return removed;
+}
 export type OriginalSystemCheckCollections={tenants:Collection<Tenant>;workspacesByScope:Collection<Workspace>;originalWorkspaceNumbers?:Collection<OriginalWorkspaceNumberRecord>;
  participantSessions:Collection<ParticipantSession>;participantAccessCredentials:Collection<ParticipantAccessCredential>;originalLoginBindings:Collection<OriginalLoginBinding>;
  operationalLoginMigrationCandidates:Collection<OperationalLoginMigrationCandidate[]>;originalOperationalLogins?:Collection<OriginalOperationalLogin[]>;

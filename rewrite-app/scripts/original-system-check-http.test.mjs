@@ -135,6 +135,24 @@ for(const kind of kinds)test(kind+': actual protected native Systemcheck HTTP, p
    assert.match(mixedCsv,/"A current answer"/);
    assert.match(mixedCsv,/"Historical file column"/);
 
+   const deletion='/workspace/'+workspaceNumber+'/sys-check/reports';
+   const saved=await services.workspaceResults.importSystemCheckReport({...input,fileName:'protected..json'});
+   await http('DELETE',deletion,{body:{checkIds:['R98.CHECK']},status:401});
+   await http('DELETE',deletion,{token:actor.token,body:{checkIds:['R98.CHECK']},status:403});
+   await http('DELETE',deletion,{token:admin.token,body:{checkIds:'R98.CHECK'},status:500});
+   const noEffect={deleted:[],did_not_exist:[],not_allowed:[],was_used:[],incorrect_path:[],error:[]};
+   for(const body of [undefined,{checkIds:null},{checkIds:['r98.check']},{checkIds:[true]}]){
+    assert.deepEqual((await http('DELETE',deletion,{token:admin.token,body,status:207})).value,noEffect);
+   }
+   const selection={token:admin.token,body:{checkIds:['R98.CHECK','R98.CHECK']},status:207};
+   const retained={...noEffect,not_allowed:['R98.CHECK']};
+   assert.deepEqual((await http('DELETE',deletion,selection)).value,{...retained,deleted:Array(3).fill('R98.CHECK')});
+   assert.deepEqual((await http('DELETE',deletion,selection)).value,retained);
+   const remaining=(await records()).map(row=>row.details.report);
+   assert.deepEqual(remaining.map(report=>report.checkId).sort(),['R98.CHECK','R99.UNITCHECK','R99.UNITCHECK']);
+   assert.ok(remaining.some(report=>report.systemCheckReportId===saved.report.systemCheckReportId));
+   await http('GET',deletion,{status:404});
+
    async function selectedDownload(){
     const response=await fetch(base+reports+'?dataIds=R98.CHECK',{headers:{AuthToken:admin.token,Accept:'text/csv'}});
     assert.equal(response.status,200);

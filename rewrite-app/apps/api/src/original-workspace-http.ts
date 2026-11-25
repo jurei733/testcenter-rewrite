@@ -1,10 +1,13 @@
 import {randomUUID} from 'node:crypto';
 import type {IncomingMessage} from 'node:http';
 import {FirstSliceError,originalReportFormat,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,findOriginalWorkspaceFile,projectOriginalWorkspaceFileDigests,readOriginalWorkspaceFileSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
-import {deleteOriginalWorkspaceFiles,readOriginalWorkspaceFileDeletion} from '@testcenter-rewrite-app/application';
+import {deleteOriginalWorkspaceFiles,readOriginalWorkspaceFileDeletion,prepareOriginalSystemCheckReportSelection} from '@testcenter-rewrite-app/application';
 
-const route=/^\/workspace\/([^/]+)\/(files(?:-dependencies)?|results|responses(?:\/detailed)?|report\/([^/]+)|file(?:\/([^/]+)\/([^/]+))?|sys-check\/reports\/overview)$/;
+const route=/^\/workspace\/([^/]+)\/(files(?:-dependencies)?|results|responses(?:\/detailed)?|report\/([^/]+)|file(?:\/([^/]+)\/([^/]+))?|sys-check\/reports(?:\/overview)?)$/;
 const contextRoute=/^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/original-administration$/;
+export function isOriginalSystemCheckReportDeletion(method:string|undefined,pathname:string):boolean {
+  return method==='DELETE'&&route.exec(pathname)?.[2]==='sys-check/reports';
+}
 async function readOriginalWorkspaceUpload(contentType:string,bytes:Buffer) {
   if(!bytes.length)throw new FirstSliceError(400,'original_workspace_upload_missing','No Upload File.');
   let form:FormData;
@@ -52,7 +55,9 @@ async function readOriginalWorkspaceUpload(contentType:string,bytes:Buffer) {
 }
 export function originalWorkspaceRouteLabel(method:string,pathname:string):string|null {
   if(contextRoute.test(pathname))return method+' /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/original-administration';
-  const match=route.exec(pathname);return match?method+' /workspace/:workspaceId/'+(match[3]?'report/:reportType':match[4]?'file/:fileType/:fileName':match[2]):null;
+  const match=route.exec(pathname);
+  if(!match||(match[2]==='sys-check/reports'&&method!=='DELETE'))return null;
+  return method+' /workspace/:workspaceId/'+(match[3]?'report/:reportType':match[4]?'file/:fileType/:fileName':match[2]);
 }
 /** Native routes always require a current admin capability, independently of
  * canonical operator-demo configuration and its inherited role model. */
@@ -81,13 +86,14 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
     }
     return true;
   }
-  if(!match)return false;
+  if(!match||(match[2]==='sys-check/reports'&&input.request.method!=='DELETE'))return false;
   input.header('cache-control','private, no-store');
   const operation=match[2], download=!!match[4];
   const upload=operation==='file';
   const deleteFiles=operation==='files'&&input.request.method==='DELETE';
   const methods=operation==='files-dependencies'||upload?['POST']
-    :download||operation==='results'||operation==='sys-check/reports/overview'||match[3]?['GET']:operation==='responses'?['DELETE']:['GET','DELETE'];
+    :download||operation==='results'||operation==='sys-check/reports/overview'||match[3]?['GET']:
+      operation==='responses'||operation==='sys-check/reports'?['DELETE']:['GET','DELETE'];
   const readJson=async(decode:(payload:Uint8Array)=>unknown)=>{
     try{return await input.readBody(decode);}
     catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_workspace_json_invalid','Internal error.');throw error;}
@@ -167,6 +173,15 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
       await confirmScope();
       input.raw(200,encodeOriginalReportJson(projectOriginalWorkspaceFileDigests(catalog,selection)),'application/json');
       return true;
+    }
+    if(operation==='sys-check/reports'){
+      const body=await readJson(bytes=>bytes.length?decodeOriginalTestLogJson(bytes):{});
+      const writable=await administration.authorizeWrite(access);
+      confirmCurrentScope(writable);
+      const report=await input.services.workspaceResults.deleteOriginalSystemCheckReports({
+        ...writable,checkIds:prepareOriginalSystemCheckReportSelection(body)
+      });
+      input.raw(207,encodeOriginalReportJson(report),'application/json');return true;
     }
     if(input.request.method==='GET'){
       if(operation==='sys-check/reports/overview'){

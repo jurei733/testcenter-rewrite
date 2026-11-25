@@ -1,14 +1,17 @@
 import {randomUUID} from 'node:crypto';
 import type {IncomingMessage} from 'node:http';
 import {FirstSliceError,encodeOriginalReportJson,type FirstSliceServices} from '@testcenter-rewrite-app/application';
+import {isOriginalSystemCheckReportDeletion} from './original-workspace-http.js';
 const route=/^\/workspace\/([^/]+)\/sys-check\/([^/]+)(?:\/(unit-and-player|report))?$/;
 export function originalSystemCheckRouteLabel(method:string,pathname:string):string|null{
  if(pathname==='/sys-check-mode'||pathname==='/sys-checks')return method+' '+pathname;
+ if(isOriginalSystemCheckReportDeletion(method,pathname))return null;
  const match=route.exec(pathname);return match?method+' /workspace/:workspaceId/sys-check/:checkName'+(match[3]?'/'+match[3]:''):null;
 }
 export async function handleOriginalSystemCheckHttp(input:{request:IncomingMessage;pathname:string;services:FirstSliceServices;
  readBody:()=>Promise<unknown>;propagateError:(error:unknown)=>boolean;header:(name:string,value:string)=>void;
  raw:(status:number,text:string,contentType:string)=>void;reportError:(receipt:{errorId:string;errorCode:string;statusCode:number})=>void}):Promise<boolean>{
+ if(isOriginalSystemCheckReportDeletion(input.request.method,input.pathname))return false;
  const directory=input.pathname==='/sys-check-mode'||input.pathname==='/sys-checks';
  const match=route.exec(input.pathname);if(!match&&!directory)return false;
  input.header('cache-control','private, no-store');

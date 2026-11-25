@@ -131,6 +131,40 @@ for(const kind of kinds)test(kind+': selected Original Systemcheck exports retai
    assert.deepEqual(await json({checkIds:['CHECK.A','CHECK.B']}),completeSelection);
    assert.deepEqual(await repository.listWorkspaceActivityEventsByWorkspace(tenant.tenantId,workspace.workspaceId),snapshot);
   });
+  await t.test('native deletion protects dormant grants and foreign events, and concurrent requests count each removed report once',async()=>{
+   const service=services();
+   const credentials={username:'owned-selection-writer',password:'Owned selection writer password!'};
+   const {adminUser}=await service.adminAuth.bootstrapAdminUser(credentials);
+   const {tenantId,workspaceId}=workspace;
+   await repository.saveAdminRoleAssignment({roleAssignmentId:randomUUID(),adminUserId:adminUser.adminUserId,
+    role:'workspace_admin',accessMode:'read_write',tenantId,workspaceId,groupKey:null,monitorProfiles:[],
+    monitorBookletVisibility:'visible',createdAt:timestamp});
+   const workspacePathSegment=await repository.getOrCreateOriginalWorkspaceNumber({tenantId,workspaceId});
+   const authorize=async()=>{
+    const {adminSession}=await service.adminAuth.signIn(credentials);
+    return (await service.originalWorkspaceAdministration.authorizeWrite({token:adminSession.token,workspacePathSegment})).authority;
+   };
+   const revoked=await authorize();
+   await service.adminAuth.signOut({sessionToken:revoked.token});
+   const ownedReport=snapshot.find(row=>row.eventType==='system_check_report_saved');
+   await assert.rejects(repository.deleteOriginalSystemCheckReportEvents({
+    authority:revoked,activityEventIds:[ownedReport.activityEventId]
+   }),error=>error.statusCode===403);
+   assert.deepEqual(await repository.listWorkspaceActivityEventsByWorkspace(tenantId,workspaceId),snapshot);
+   const authority=await authorize();
+   const foreignEvents=await repository.listWorkspaceActivityEventsByWorkspace(tenantId,foreign.workspaceId);
+   const foreignReport=foreignEvents.find(row=>row.eventType==='system_check_report_saved');
+   const ownMetadata=snapshot.find(row=>row.eventType!=='system_check_report_saved');
+   assert.ok(foreignReport&&ownMetadata);
+   assert.deepEqual(await repository.deleteOriginalSystemCheckReportEvents({
+    authority,activityEventIds:[foreignReport.activityEventId,ownMetadata.activityEventId]
+   }),[]);
+   const remove=()=>service.workspaceResults.deleteOriginalSystemCheckReports({...scope,authority,checkIds:['CHECK.A']});
+   const results=await Promise.all([remove(),remove()]);
+   assert.deepEqual(results.flatMap(row=>row.deleted),Array(501).fill('CHECK.A'));
+   assert.deepEqual(await repository.listWorkspaceActivityEventsByWorkspace(tenantId,foreign.workspaceId),foreignEvents);
+   assert.deepEqual((await json({})).map(report=>report.checkId),['CHECK.C','CHECK.B','CHECK.B','CHECK.B']);
+  });
  }finally{
   try{await storage?.shutdown();}finally{try{if(created)await root.query(`DROP SCHEMA "${schema}" CASCADE`);}finally{try{await root?.end();}finally{await rm(directory,{recursive:true,force:true});}}}
  }

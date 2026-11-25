@@ -123,3 +123,10 @@ export function prepareOriginalNativeGroupSelection(body:unknown):string[] {
   if(!selected||selected.some(value=>typeof value!=='string'))throw internal();
   return selected as string[];
 }
+export function prepareOriginalSystemCheckReportSelection(body:unknown):string[] {
+  const checkIds=field(body,'checkIds')??[];
+  if(!Array.isArray(checkIds))throw internal();
+  // A PHP loose comparison can make a Boolean select every report. Count
+  // only explicit check IDs as selections for this destructive operation.
+  return checkIds.filter((value):value is string=>typeof value==='string');
+}

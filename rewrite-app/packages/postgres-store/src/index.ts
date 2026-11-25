@@ -2799,6 +2799,18 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         }
       );
     },
+    async deleteOriginalSystemCheckReportEvents({authority,activityEventIds}) {
+      return withWorkspaceMutationLock(authority.tenantId,authority.workspaceId,async client => {
+        await guardOriginalWorkspaceWrite(client,{...authority,authority});
+        const {rows} = await client.query<{activity_event_id:string}>(`
+          DELETE FROM workspace_activity_events
+          WHERE tenant_id = $1 AND workspace_id = $2 AND event_type = 'system_check_report_saved'
+            AND activity_event_id = ANY($3::text[])
+          RETURNING activity_event_id
+        `,[authority.tenantId,authority.workspaceId,activityEventIds]);
+        return rows.map(row => row.activity_event_id);
+      });
+    },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
       if (activityEventIds.length === 0) {
         return 0;
