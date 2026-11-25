@@ -5,6 +5,7 @@ const reservedEntryNames = new Set([
   'ops', 'legal-notice', 'privacy', 'accessibility'
 ]);
 const originalAdminLoginPath = '/ops?ui=original&legacyLogin=1';
+const originalStarterBookmark = '/native-start/bookmarked-starter';
 const originalRootDestinations = new Map([
   ['', '/native-start/dispatch'],
   ['r', '/native-start/dispatch'],
@@ -23,7 +24,23 @@ const invalidSegment = (value: string) =>
 export const legacyBookmarkQueryKey = 'legacyBookmark';
 const originalResultsPath = /^\/admin\/0*[1-9]\d*\/results(?:\?|$)/;
 const originalOperatorTabKey = 'testcenter:original-operator-tab';
+const originalStarterRoleKey = 'testcenter:original-starter-role';
+type OriginalStarterRole = 'admin' | 'native';
 let originalResultsOpenedFromOperatorTab = false;
+
+export function rememberOriginalStarterRole(role: OriginalStarterRole): void {
+  // Original has one saved login. Only a completed sign-in changes which of
+  // the Rewrite's independent sessions the old overview link should open.
+  try { localStorage.setItem(originalStarterRoleKey, role); } catch {}
+}
+
+export function originalStarterRole(): OriginalStarterRole | null {
+  try {
+    const role = localStorage.getItem(originalStarterRoleKey);
+    if (role === 'admin' || role === 'native') return role;
+  } catch {}
+  return null;
+}
 
 export function rememberOriginalOperatorTab(tab: Pick<Window, 'sessionStorage'>, active: boolean): void {
   try {
@@ -83,7 +100,10 @@ export function originalParticipantBookmark(hash: string): string | null {
     if (path?.startsWith('#/')) {
       const segments = path.slice(2).replace(/([^/])\/$/, '$1').split('/').map(decodeURIComponent);
       if (segments.every(segment => !invalidSegment(segment))) {
-        const destination = originalRootDestinations.get(segments.join('/'));
+        const entry = segments.join('/');
+        const destination = entry === 'r/starter'
+          ? originalStarterBookmark
+          : originalRootDestinations.get(entry);
         if (destination) return destination;
         const encodedPath = '/' + segments.map(encodeURIComponent).join('/');
         const check = originalSystemCheckBookmark(encodedPath);

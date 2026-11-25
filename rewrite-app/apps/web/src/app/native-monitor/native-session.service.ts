@@ -1,5 +1,6 @@
 import {Injectable,signal} from '@angular/core';
 import type {OriginalAccessSet,OriginalWorkChallenge} from '@testcenter-rewrite-app/contracts/original-session';
+import {rememberOriginalStarterRole} from '../native-participant/original-participant-bookmark';
 import {NativeMonitorHttpError} from './native-http-error';
 export {NativeMonitorHttpError} from './native-http-error';
 const key='testcenter-native-monitor-session';
@@ -81,7 +82,7 @@ export class NativeMonitorSessionService {
    // Read their result and revoke only an orphan, never a replacement access.
    if(attempt.signal.aborted||revision!==this.revision){if(access.token&&access.token!==this.access()?.token)await this.text('DELETE','/session',undefined,access.token);current();}
    if(!allows(access,purpose)){if(access.token)await this.text('DELETE','/session',undefined,access.token);throw new Error('Dieser Zugang hat keine Berechtigung für den Gruppenmonitor.');}
-   current();this.set(access,purpose);return access;
+   current();this.set(access,purpose);rememberOriginalStarterRole('native');return access;
   }catch(error){if(attempt.signal.aborted||revision!==this.revision)throw new DOMException('Die Anmeldung wurde abgebrochen.','AbortError');if(request.kind==='person'&&error instanceof NativeMonitorHttpError&&[401,403].includes(error.status))this.clear();this.problem.set(error instanceof Error?error.message:'Problem bei der Anmeldung.');throw error;}
   finally{owner?.removeEventListener('abort',cancel);if(this.loginController===attempt)this.loginController=null;if(revision===this.revision)this.busy.set(false);}
  }

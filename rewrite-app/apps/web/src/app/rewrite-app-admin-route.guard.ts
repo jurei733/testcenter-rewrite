@@ -1,9 +1,11 @@
-import { Injector, inject } from "@angular/core";
+import { Injector, inject, runInInjectionContext } from "@angular/core";
 import { Router, type CanActivateFn, type UrlTree } from "@angular/router";
+import { resolveOperatorAccessMode } from "@testcenter-rewrite-app/contracts";
+import { firstValueFrom, isObservable } from "rxjs";
 
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
-import { legacyBookmarkQueryKey } from "./native-participant/original-participant-bookmark";
+import { legacyBookmarkQueryKey, originalStarterRole } from "./native-participant/original-participant-bookmark";
 
 const redirectSignedOutOperator = async (
   requestedUrl: string
@@ -85,6 +87,43 @@ export const requireOriginalNumericWorkspaceActor: CanActivateFn = (route, state
     return inject(Router).parseUrl("/native-start/dispatch");
   }
   return requireAdministrativeOperator(route, state);
+};
+
+export const resolveLegacyStarterBookmark: CanActivateFn = async () => {
+  const router = inject(Router);
+  const injector = inject(Injector);
+  const login = router.parseUrl("/native-start/login");
+  const preferredRole = originalStarterRole();
+  try {
+    if (preferredRole !== "admin") {
+      const [{NativeMonitorSessionService}, {afterNativeSessionRestore}] = await Promise.all([
+        import("./native-monitor/native-session.service"),
+        import("./native-monitor/native-session-route.guard")
+      ]);
+      const native = injector.get(NativeMonitorSessionService);
+      const restored = runInInjectionContext(injector, () =>
+        afterNativeSessionRestore(native, () => !!native.access())
+      );
+      if (isObservable(restored) ? await firstValueFrom(restored) : restored) {
+        return router.parseUrl("/native-start/starter");
+      }
+      if (preferredRole === "native") return login;
+    }
+
+    const { AppShellFacade } = await import("./app-shell.facade");
+    injector.get(AppShellFacade).init();
+    if (!injector.get(RewriteAppUiStateService).ops.adminSessionToken.trim()) return login;
+
+    const { RewriteAppOpsService } = await import("./rewrite-app-ops.service");
+    const session = await injector.get(RewriteAppOpsService).refreshAdminSession({publishOriginalRights: true});
+    if (!session) return login;
+    const mode = resolveOperatorAccessMode(session.roleAssignments);
+    return mode === "admin" || mode === "admin_read_only"
+      ? router.createUrlTree(["/operator-start"], {queryParams: {ui: "original"}})
+      : login;
+  } catch {
+    return login;
+  }
 };
 
 export const resolveLegacySuperadminBookmark: CanActivateFn = async route => {

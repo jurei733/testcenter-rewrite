@@ -9,8 +9,12 @@ code=code.replaceAll("'@angular/core'",JSON.stringify(import.meta.resolve('@angu
 const errorCode=ts.transpileModule(await readFile(new URL('../apps/web/src/app/native-monitor/native-http-error.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 const errorModuleUrl='data:text/javascript;base64,'+Buffer.from(errorCode).toString('base64');
 code=code.replaceAll("'./native-http-error'",JSON.stringify(errorModuleUrl));
+const bookmarkCode=ts.transpileModule(await readFile(new URL('../apps/web/src/app/native-participant/original-participant-bookmark.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+const bookmarkModuleUrl='data:text/javascript;base64,'+Buffer.from(bookmarkCode).toString('base64');
+code=code.replace("'../native-participant/original-participant-bookmark'",JSON.stringify(bookmarkModuleUrl));
 const sessionModuleUrl='data:text/javascript;base64,'+Buffer.from(code).toString('base64');
 const {NativeMonitorSessionService,NativeMonitorHttpError}=await import(sessionModuleUrl);
+const {originalStarterRole,rememberOriginalStarterRole}=await import(bookmarkModuleUrl);
 const {createEnvironmentInjector,Injector}=await import('@angular/core');
 let starterCode=ts.transpileModule(await readFile(new URL('../apps/web/src/app/native-participant/native-test-starter.service.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,experimentalDecorators:true}}).outputText;
 starterCode=starterCode.replaceAll("'@angular/core'",JSON.stringify(import.meta.resolve('@angular/core'))).replace("'../native-monitor/native-session.service'",JSON.stringify(sessionModuleUrl));
@@ -38,6 +42,21 @@ test('a current verification of revoked credentials retires the actor and a stal
  const pending=deferred();globalThis.fetch=async(_path,o)=>o.method==='PUT'?response(access('next')):pending.promise;await session.login('owned','password');const checking=session.verifyAccess(new AbortController().signal);globalThis.fetch=async()=>response(access('replacement'));await session.login('owned','password');pending.resolve(response('old revoked',401));await assert.rejects(checking);assert.equal(session.access().token,'replacement');
 }));
 async function fixture(run,token){const oldFetch=globalThis.fetch,oldStorage=globalThis.localStorage,oldTabStorage=globalThis.sessionStorage,oldSecure=globalThis.isSecureContext,values=new Map(token?[[storageKey,token]]:[]),tabValues=new Map();globalThis.localStorage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};globalThis.sessionStorage={getItem:key=>tabValues.get(key)??null,setItem:(key,value)=>tabValues.set(key,value),removeItem:key=>tabValues.delete(key)};globalThis.isSecureContext=true;try{await run(values,tabValues);}finally{globalThis.fetch=oldFetch;globalThis.localStorage=oldStorage;globalThis.sessionStorage=oldTabStorage;globalThis.isSecureContext=oldSecure;}}
+
+test('only an acknowledged native sign-in updates the last role for the old overview',()=>fixture(async()=>{
+ rememberOriginalStarterRole('admin');
+ globalThis.fetch=async()=>response(access('saved-monitor'));
+ const session=new NativeMonitorSessionService();
+ await settle();
+ assert.equal(session.access().token,'saved-monitor');
+ assert.equal(originalStarterRole(),'admin');
+ globalThis.fetch=async()=>response('invalid login',403);
+ await assert.rejects(session.login('owned','password'));
+ assert.equal(originalStarterRole(),'admin');
+ globalThis.fetch=async()=>response(access('signed-in-monitor'));
+ await session.login('owned','password');
+ assert.equal(originalStarterRole(),'native');
+},'saved-monitor'));
 
 for(const status of [401,403])test('monitor snapshot '+status+' clears access before reporting only the rejection status',()=>fixture(async values=>{
  globalThis.fetch=async()=>response(access('current'));
@@ -194,7 +213,8 @@ test('late code completion cannot revoke a credential now owned by a replacement
 }));
 test('revoked current Login credentials clear the code stage without exposing its token',()=>fixture(async values=>{
  globalThis.fetch=async path=>path==='/session/login'?response(participant('private-login',['codeRequired'],{})):response('revoked private-login',403);
- const session=new NativeMonitorSessionService();await session.loginParticipant('owned','');await assert.rejects(session.person('code'),error=>error.status===403&&!error.message.includes('private-login'));assert.equal(session.access(),null);assert.equal(session.busy(),false);assert.equal(values.size,0);
+ const session=new NativeMonitorSessionService();await session.loginParticipant('owned','');await assert.rejects(session.person('code'),error=>error.status===403&&!error.message.includes('private-login'));assert.equal(session.access(),null);assert.equal(session.busy(),false);
+ assert.deepEqual([...values.values()],['native']);
 }));
 test('running-only participant refresh retains ownership; actual grant, lock and group changes retire it',()=>fixture(async()=>{
  let result=participant('person');globalThis.fetch=async()=>response(result);const session=new NativeMonitorSessionService();await session.loginParticipant('owned','');const scope=session.accessSignal;

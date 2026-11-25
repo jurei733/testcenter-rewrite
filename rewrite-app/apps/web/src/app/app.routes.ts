@@ -7,6 +7,7 @@ import {
   requireAdministrativeOperator,
   requireOriginalWorkspaceSession,
   requireOriginalNumericWorkspaceActor,
+  resolveLegacyStarterBookmark,
   resolveLegacySuperadminBookmark
 } from "./rewrite-app-admin-route.guard";
 import { matchOriginalNumericWorkspace, resolveOriginalNumericWorkspace } from "./original-workspace-browser-route";
@@ -146,6 +147,7 @@ export const appRoutes: Routes = [
   {path:'native-start/direct',loadComponent:participantEntry,data:{directLogin:true}},
   {path:'native-start/login',loadComponent:participantEntry,data:{explicitLogin:true}},
   {path:'native-start/not-found',loadComponent:participantEntry,data:{notFound:true}},
+  {path:'native-start/bookmarked-starter',canActivate:[resolveLegacyStarterBookmark],children:[]},
   {path:'native-start/starter',loadComponent:participantEntry,data:{legacyEntry:'starter'}},
   {path:'native-start/dispatch',loadComponent:participantEntry,data:{legacyEntry:'dispatch'}},
   {path:'native-start',loadComponent:participantEntry},

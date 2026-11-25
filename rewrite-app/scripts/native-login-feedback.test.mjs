@@ -106,7 +106,7 @@ test('Recognized Original root bookmarks choose the same guarded entry without i
  const admin='/ops?ui=original&legacyLogin=1';
  const entries=[
   ['', '/native-start/dispatch'],['r','/native-start/dispatch'],['r/route-dispatcher','/native-start/dispatch'],
-  ['r/code-input','/native-start/dispatch'],['r/starter','/native-start/starter'],
+  ['r/code-input','/native-start/dispatch'],['r/starter','/native-start/bookmarked-starter'],
   ['r/check-starter','/r/check-starter'],['r/admin-login',admin]
  ];
  for(const [source,destination]of entries){

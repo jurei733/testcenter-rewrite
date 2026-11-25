@@ -31,6 +31,7 @@ import {
   formatMonitorDateCustomText,
   mergeMonitorCustomTextScopes,
   productionApiRoutes,
+  resolveOperatorAccessMode,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -39,6 +40,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
+import { rememberOriginalStarterRole } from "./native-participant/original-participant-bookmark";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
@@ -171,6 +173,8 @@ export class RewriteAppOpsService {
       `${payload.adminUser.username} has ${payload.roleAssignments.length} role assignment(s).`
     );
     this.persistence.persistShellState();
+    const mode = resolveOperatorAccessMode(payload.roleAssignments);
+    if (mode === "admin" || mode === "admin_read_only") rememberOriginalStarterRole("admin");
   }
 
   private readAdminAccessWindowNotice(error: unknown): string | null {
