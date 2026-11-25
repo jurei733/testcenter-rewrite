@@ -1,6 +1,6 @@
 import {Injectable,signal} from '@angular/core';
 import type {OriginalAccessSet,OriginalWorkChallenge} from '@testcenter-rewrite-app/contracts/original-session';
-import {rememberOriginalStarterRole} from '../native-participant/original-participant-bookmark';
+import {OriginalStarterSessionRejection,rememberOriginalStarterRole} from '../native-participant/original-participant-bookmark';
 import {NativeMonitorHttpError} from './native-http-error';
 export {NativeMonitorHttpError} from './native-http-error';
 const key='testcenter-native-monitor-session';
@@ -20,6 +20,7 @@ export class NativeMonitorSessionService {
  readonly busy=signal(false);
  readonly restoring=signal(false);
  private revision=0;
+ private restoreRejection?:OriginalStarterSessionRejection;
  private readonly finishTargets=new Map<string,string[]>();
  private loginController:AbortController|null=null;
  private accessController=new AbortController();
@@ -30,8 +31,19 @@ export class NativeMonitorSessionService {
  private async restore(token:string,purpose:NativeSessionPurpose){
   const revision=this.revision;this.restoring.set(true);
   try{const access=await this.json<OriginalAccessSet>('GET','/session',undefined,token);if(revision===this.revision)this.set(access,purpose);}
-  catch{if(revision===this.revision)this.clear();}
+  catch(error){
+   if(revision!==this.revision)return;
+   this.clear();
+   if(error instanceof NativeMonitorHttpError&&(error.status===401||error.status===403)){
+    this.restoreRejection=new OriginalStarterSessionRejection(error.response?.errorId??null);
+   }
+  }
   finally{if(revision===this.revision)this.restoring.set(false);}
+ }
+ takeRestoreRejection():OriginalStarterSessionRejection|undefined{
+  const rejection=this.restoreRejection;
+  this.restoreRejection=undefined;
+  return rejection;
  }
  async login(name:string,password:string,owner?:AbortSignal):Promise<OriginalAccessSet>{
   return this.authenticate({kind:'login',name,password},'monitor',owner);
@@ -115,12 +127,13 @@ export class NativeMonitorSessionService {
  }
  private set(access:OriginalAccessSet,purpose:NativeSessionPurpose,refresh=false){
   if(!allows(access,purpose)){this.clear();throw new Error('Dieser Zugang hat keine Berechtigung für den Gruppenmonitor.');}
+  this.restoreRejection=undefined;
   const previous=this.access(),sameParticipant=refresh&&purpose==='participant'&&this.purpose()===purpose&&previous&&participantBinding(previous)===participantBinding(access);
   if(this.access()?.token!==access.token)this.restoreFinishTargets(access.token);
   if(!sameParticipant)this.renewAccessScope();this.purpose.set(purpose);this.access.set(access);try{if(purpose==='participant')localStorage.setItem(purposeKey,purpose);else localStorage.removeItem(purposeKey);localStorage.setItem(key,access.token);}catch{}
   for(const group of this.finishTargets.keys())if(!access.claims.testGroupMonitor?.some(claim=>claim.id===group))this.rememberFinishTargets(group,[]);
  }
- clear(){this.finishTargets.clear();try{sessionStorage.removeItem(finishKey);}catch{}this.loginController?.abort();this.loginController=null;this.renewAccessScope();this.revision++;this.restoring.set(false);this.busy.set(false);this.access.set(null);this.purpose.set('monitor');try{localStorage.removeItem(key);localStorage.removeItem(purposeKey);}catch{}}
+ clear(){this.restoreRejection=undefined;this.finishTargets.clear();try{sessionStorage.removeItem(finishKey);}catch{}this.loginController?.abort();this.loginController=null;this.renewAccessScope();this.revision++;this.restoring.set(false);this.busy.set(false);this.access.set(null);this.purpose.set('monitor');try{localStorage.removeItem(key);localStorage.removeItem(purposeKey);}catch{}}
  async exportReviews(owner:AbortSignal):Promise<string>{
   owner.throwIfAborted();
   const access=this.access(),scope=this.accessSignal;

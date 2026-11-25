@@ -28,6 +28,10 @@ const originalStarterRoleKey = 'testcenter:original-starter-role';
 type OriginalStarterRole = 'admin' | 'native';
 let originalResultsOpenedFromOperatorTab = false;
 
+export class OriginalStarterSessionRejection {
+  constructor(readonly errorId: string | null) {}
+}
+
 export function rememberOriginalStarterRole(role: OriginalStarterRole): void {
   // Original has one saved login. Only a completed sign-in changes which of
   // the Rewrite's independent sessions the old overview link should open.

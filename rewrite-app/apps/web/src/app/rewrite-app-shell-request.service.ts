@@ -42,6 +42,7 @@ export class RewriteAppShellRequestService {
       quiet?: boolean;
       headers?: Record<string, string>;
       onSuccess?: (payload: T, statusCode: number) => void;
+      onAdminSessionRejected?: (error: ApiErrorLike) => void;
     } = {}
   ): Promise<T> {
     if (!options.quiet) {
@@ -73,7 +74,7 @@ export class RewriteAppShellRequestService {
       options.onSuccess?.(payload, statusCode);
       return payload;
     } catch (error) {
-      this.resetInvalidAdminSession(error, requestAdminSessionToken);
+      this.resetInvalidAdminSession(error, requestAdminSessionToken, options.onAdminSessionRejected);
       if (!options.quiet) {
         const apiError = this.api.isApiError(error)
           ? error
@@ -186,7 +187,8 @@ export class RewriteAppShellRequestService {
 
   private resetInvalidAdminSession(
     error: unknown,
-    requestAdminSessionToken: string | null
+    requestAdminSessionToken: string | null,
+    onRejected?: (error: ApiErrorLike) => void
   ): void {
     const activeAdminSessionToken = this.uiState.ops.adminSessionToken.trim();
     if (
@@ -200,11 +202,12 @@ export class RewriteAppShellRequestService {
       return;
     }
 
-    this.adminSessionResetStarted = true;
+    this.adminSessionResetStarted = !onRejected;
     this.uiState.setAdminSessionToken("");
     this.uiState.ops.adminSessionView = "";
     this.uiState.ops.adminAccessWindowNotice = "";
     this.persistence.persistShellState();
-    globalThis.location.reload();
+    if (onRejected) onRejected(error);
+    else globalThis.location.reload();
   }
 }

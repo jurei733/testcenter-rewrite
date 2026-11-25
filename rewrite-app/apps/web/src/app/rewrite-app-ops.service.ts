@@ -41,6 +41,7 @@ import type {
 
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { rememberOriginalStarterRole } from "./native-participant/original-participant-bookmark";
+import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
@@ -223,8 +224,15 @@ export class RewriteAppOpsService {
     return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : value;
   }
 
-  async refreshAdminSession({publishOriginalRights = false, includeOriginalWorkspaceChoices = false} = {}):
-      Promise<GetAdminCurrentSessionResponse | undefined> {
+  async refreshAdminSession({
+    publishOriginalRights = false,
+    includeOriginalWorkspaceChoices = false,
+    onAdminSessionRejected
+  }: {
+    publishOriginalRights?: boolean;
+    includeOriginalWorkspaceChoices?: boolean;
+    onAdminSessionRejected?: (error: ApiErrorLike) => void;
+  } = {}): Promise<GetAdminCurrentSessionResponse | undefined> {
     const token = this.opsState.adminSessionToken.trim();
     if (!token) {
       return;
@@ -235,7 +243,7 @@ export class RewriteAppOpsService {
       productionApiRoutes.admin.currentSession +
         (includeOriginalWorkspaceChoices ? "?view=original-workspace-starter" : ""),
       undefined,
-      { headers: { authorization: `Bearer ${token}` }, quiet: publishOriginalRights }
+      { headers: { authorization: `Bearer ${token}` }, quiet: publishOriginalRights, onAdminSessionRejected }
     );
 
     if (token !== this.opsState.adminSessionToken.trim()) {

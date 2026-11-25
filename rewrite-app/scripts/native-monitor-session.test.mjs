@@ -58,6 +58,28 @@ test('only an acknowledged native sign-in updates the last role for the old over
  assert.equal(originalStarterRole(),'native');
 },'saved-monitor'));
 
+test('an invalid restored session reports only its error ID once and removes the credential',()=>fixture(async values=>{
+ globalThis.fetch=async()=>new Response('private revoked credential', {status:403,headers:{'error-id':'owned-error'}});
+ const session=new NativeMonitorSessionService();
+ await settle();
+ assert.equal(session.restoring(),false);
+ assert.equal(session.access(),null);
+ assert.equal(values.has(storageKey),false);
+ assert.deepEqual({...session.takeRestoreRejection()},{errorId:'owned-error'});
+ assert.equal(session.takeRestoreRejection(),undefined);
+},'saved-monitor'));
+
+test('a late rejected restoration does not report an error for a replacement login',()=>fixture(async values=>{
+ const pending=deferred();
+ globalThis.fetch=async(_path,options)=>options.method==='GET'?pending.promise:response(access('new'));
+ const session=new NativeMonitorSessionService();
+ await session.login('owned','password');
+ pending.resolve(response('private revoked credential',403));
+ await settle();
+ assert.equal(values.get(storageKey),'new');
+ assert.equal(session.takeRestoreRejection(),undefined);
+},'saved-monitor'));
+
 for(const status of [401,403])test('monitor snapshot '+status+' clears access before reporting only the rejection status',()=>fixture(async values=>{
  globalThis.fetch=async()=>response(access('current'));
  const session=new NativeMonitorSessionService();await session.login('owned','password');

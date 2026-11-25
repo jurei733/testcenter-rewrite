@@ -1,11 +1,11 @@
 import { Injector, inject, runInInjectionContext } from "@angular/core";
-import { Router, type CanActivateFn, type UrlTree } from "@angular/router";
+import { RedirectCommand, Router, type CanActivateFn, type UrlTree } from "@angular/router";
 import { resolveOperatorAccessMode } from "@testcenter-rewrite-app/contracts";
 import { firstValueFrom, isObservable } from "rxjs";
 
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
-import { legacyBookmarkQueryKey, originalStarterRole } from "./native-participant/original-participant-bookmark";
+import { legacyBookmarkQueryKey, OriginalStarterSessionRejection, originalStarterRole } from "./native-participant/original-participant-bookmark";
 
 const redirectSignedOutOperator = async (
   requestedUrl: string
@@ -94,6 +94,10 @@ export const resolveLegacyStarterBookmark: CanActivateFn = async () => {
   const injector = inject(Injector);
   const login = router.parseUrl("/native-start/login");
   const preferredRole = originalStarterRole();
+  let rejection: OriginalStarterSessionRejection | undefined;
+  const rejectedOrLogin = () => rejection
+    ? new RedirectCommand(router.parseUrl("/native-start/rejected-starter"), {info: rejection})
+    : login;
   try {
     if (preferredRole !== "admin") {
       const [{NativeMonitorSessionService}, {afterNativeSessionRestore}] = await Promise.all([
@@ -107,23 +111,36 @@ export const resolveLegacyStarterBookmark: CanActivateFn = async () => {
       if (isObservable(restored) ? await firstValueFrom(restored) : restored) {
         return router.parseUrl("/native-start/starter");
       }
-      if (preferredRole === "native") return login;
+      rejection = native.takeRestoreRejection();
+      if (preferredRole === "native") return rejectedOrLogin();
     }
 
     const { AppShellFacade } = await import("./app-shell.facade");
     injector.get(AppShellFacade).init();
-    if (!injector.get(RewriteAppUiStateService).ops.adminSessionToken.trim()) return login;
+    if (!injector.get(RewriteAppUiStateService).ops.adminSessionToken.trim()) return rejectedOrLogin();
 
     const { RewriteAppOpsService } = await import("./rewrite-app-ops.service");
-    const session = await injector.get(RewriteAppOpsService).refreshAdminSession({publishOriginalRights: true});
+    rejection = undefined;
+    const session = await injector.get(RewriteAppOpsService).refreshAdminSession({
+      publishOriginalRights: true,
+      onAdminSessionRejected: error => {
+        rejection = new OriginalStarterSessionRejection(error.response?.errorId ?? null);
+      }
+    });
     if (!session) return login;
     const mode = resolveOperatorAccessMode(session.roleAssignments);
     return mode === "admin" || mode === "admin_read_only"
       ? router.createUrlTree(["/operator-start"], {queryParams: {ui: "original"}})
       : login;
   } catch {
-    return login;
+    return rejectedOrLogin();
   }
+};
+
+export const requireOriginalStarterRejection: CanActivateFn = () => {
+  const router = inject(Router);
+  return router.currentNavigation()?.extras.info instanceof OriginalStarterSessionRejection
+    || router.parseUrl("/native-start/login");
 };
 
 export const resolveLegacySuperadminBookmark: CanActivateFn = async route => {

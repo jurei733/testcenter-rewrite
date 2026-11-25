@@ -1,6 +1,6 @@
 import { Injectable } from "@angular/core";
 
-import type { ApiErrorResponse } from "@testcenter-rewrite-app/contracts";
+import { productionApiRoutes, type ApiErrorResponse } from "@testcenter-rewrite-app/contracts";
 
 export type ApiErrorLike = ApiErrorResponse & {
   statusCode?: number;
@@ -55,6 +55,13 @@ export class RewriteAppApiService {
         error.response = {
           errorId: response.headers.get("error-id"),
           testMode: response.headers.get("test-mode"),
+          statusText: response.statusText
+        };
+      }
+      if (path === productionApiRoutes.admin.currentSession && error.error === "admin_session_invalid") {
+        error.response = {
+          errorId: response.headers.get("x-request-id"),
+          testMode: null,
           statusText: response.statusText
         };
       }
