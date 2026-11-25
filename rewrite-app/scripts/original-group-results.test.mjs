@@ -179,6 +179,7 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
       const administration = createFirstSliceServices({repository}), password = 'Owned-native-results-admin-2026!';
       const initial = await administration.adminAuth.bootstrapAdminUser({username: 'owned-results-admin', password});
       const foreign = await services.platform.createWorkspace({tenantKey: scope.tenantKey, workspaceKey: 'foreign', displayName: 'Owned foreign workspace'});
+      const workspaceNumber = await repository.getOrCreateOriginalWorkspaceNumber(ids);
       const tokens = {};
       for (const [name, workspaceId] of [['owned-reader', ids.workspaceId], ['foreign-reader', foreign.workspaceId]]) {
         const adminUserId = randomUUID();
@@ -212,6 +213,25 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
         assert.deepEqual(await get(tokens['owned-reader'], '?groups=%20ORACLE.NEXT'), []);
         assert.deepEqual(await get(tokens['owned-reader'], '?groups=missing'), []);
         assert.equal(JSON.stringify(rows).includes(privateResponse), false);
+
+        const nativePath = '/workspace/' + workspaceNumber + '/results';
+        const nativeGet = async (token, query, status, expected) => {
+          const response = await fetch(base + nativePath + query, {
+            headers: token ? {AuthToken: token} : {}, signal: AbortSignal.timeout(15_000)
+          });
+          assert.equal(response.status, status, query);
+          assert.equal(response.headers.get('cache-control'), 'private, no-store');
+          if (status === 200) assert.deepEqual(await response.json(), expected, query);
+        };
+        const reader = tokens['owned-reader'];
+        await nativeGet(undefined, '?groups=ORACLE.NEXT', 401);
+        await nativeGet(tokens['foreign-reader'], '?groups=ORACLE.NEXT', 404);
+        await nativeGet(reader, '?groups=%20ORACLE.NEXT', 200, []);
+        await nativeGet(reader, '?groups=', 200, rows);
+        await nativeGet(reader, '?groups=oracle.next,missing', 200, rows);
+        await nativeGet(reader, '?groups=ORACLE.NEXT&groups=missing', 200, []);
+        await nativeGet(reader, '?groups=ORACLE.NEXT&groups[]=missing', 500);
+        await nativeGet(reader, '?groups[]=missing&groups=oracle.next', 200, rows);
       } finally {
         if (server) await new Promise((done, reject) => server.close(error => error && error.code !== 'ERR_SERVER_NOT_RUNNING' ? reject(error) : done()));
       }
