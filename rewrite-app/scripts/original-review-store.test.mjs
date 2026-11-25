@@ -304,6 +304,62 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
     assert.equal(archive.get('reviews.'+extension),review.body);
    }
   });
+  await t.test('workspace reviews follow first Unit materialization and indexed review times',async()=>{
+   const previous=at;
+   try{
+    const person=await services.originalAuthentication.login({name:'ordered-2',password:''});
+    const test={token:person.token,testNumber:await services.originalTest.create({token:person.token,bookletName:'OWNED.REVIEW'}),unitName:null};
+    const first={...test,unitName:'A2'},second={...test,unitName:'A1'};
+    const saveState=(target,timeStamp)=>services.originalUnit.patchState({...target,body:{originalUnitId:'OWNED.UNIT',newState:[{key:'PAGE',content:String(timeStamp),timeStamp}]}});
+    await saveState(first,1);
+    await saveState(second,2);
+    if(kind==='postgres'){
+     await close();
+     const control=new Pool({connectionString:url.toString()});
+     try{
+      await control.query("ALTER TABLE original_native_units DROP COLUMN materialization_order; DELETE FROM schema_migrations WHERE name='original_native_unit_materialization_order'");
+     }finally{await control.end();}
+     await open();
+    }
+    const create=(target,entry)=>services.originalReview.create({...target,body:{...body,entry}});
+    const update=(target,reviewNumber,entry)=>services.originalReview.update({...target,reviewNumber,body:{...body,entry}});
+    const findNumber=async(target,entry)=>{
+     const authorized=await services.originalReview.authorize({...target,write:false});
+     return (await repository.listOriginalReviews(authorized)).find(row=>row.entry===entry).reviewNumber;
+    };
+    const later={...test,unitName:'A3'};
+    await create(later,'Order A3 created by review');
+    await create(second,'Order A1');
+    at='2026-10-31T18:53:30.900Z';
+    await create(first,'Order A2 edited');
+    await create(test,'Order test edited');
+    const firstEdit=await findNumber(first,'Order A2 edited'),testEdit=await findNumber(test,'Order test edited');
+    at='2026-10-31T18:53:31.800Z';
+    await create(first,'Order A2 peer one');
+    await create(test,'Order test peer one');
+    at='2026-10-31T18:53:31.900Z';
+    await create(first,'Order A2 peer two');
+    await create(test,'Order test peer two');
+    at='2026-10-31T18:53:31.950999Z';
+    await update(first,firstEdit,'Order A2 edited');
+    await update(test,testEdit,'Order test edited');
+    await saveState(first,3);
+    await reopen();
+    const groupKey='OWNED.A';
+    const archive=await readArchive([groupKey]);
+    for(const useNewVersion of [false,true]){
+     const report=await services.originalWorkspaceReport.read({...scope,type:'review',dataIds:groupKey,accept:'application/json',useNewVersion});
+     const rows=JSON.parse(report.body).filter(row=>row.entry.startsWith('Order '));
+     assert.deepEqual(rows.map(row=>row.entry),[
+      'Order A2 peer one','Order A2 peer two','Order A2 edited','Order A1','Order A3 created by review',
+      'Order test peer one','Order test peer two','Order test edited'
+     ]);
+     if(useNewVersion)assert.equal(archive.get('reviews.json'),report.body);
+    }
+    const csv=await services.originalWorkspaceReport.read({...scope,type:'review',dataIds:groupKey,accept:'text/csv',useNewVersion:true});
+    assert.equal(archive.get('reviews.csv'),csv.body);
+   }finally{at=previous;}
+  });
   await t.test('Source57 native response and log report bytes survive durable reopen',async()=>{
    const previous=at;try{await assertNativeResultReportWitness({services:()=>services,tenantKey:tenant.tenantKey,setNow:value=>{at=value;},reopen});}finally{at=previous;}
   });

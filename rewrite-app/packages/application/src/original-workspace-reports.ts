@@ -30,7 +30,9 @@ type UnitIdentity=OriginalUnitScope&Pick<OriginalNativeUnit,'unitName'|'original
 export type OriginalReportStoredUnit=OriginalUnitScope&{unitName:string;unit:UnitIdentity|OriginalNativeUnit};
 export type OriginalReportStoredReview=OriginalUnitScope&{kind:string;reviewNumber:string;reviewId:string;review:OriginalNativeReview};
 type LegacyUnit={testRunId:string;unitName:string};
-export type OriginalReportFamily={units:OriginalReportStoredUnit[];legacyUnits:LegacyUnit[];logs:ParticipantTestLog[];reviews:OriginalReportStoredReview[];
+export type OriginalReportFamily={
+  /** Review snapshots supply the persisted order in which Units appeared. */
+  units:OriginalReportStoredUnit[];legacyUnits:LegacyUnit[];logs:ParticipantTestLog[];reviews:OriginalReportStoredReview[];
   legacyReviews:Array<{testRunId:string;reviewId:string}>;testNumbers:OriginalTestNumberRecord[];personNumbers:OriginalPersonNumberRecord[];attachmentFiles?:OriginalAttachmentFileMetadata[]};
 type ReviewData=Omit<OriginalReviewReportRecord,'page'|'reviewtime'>&{page:string|null;updatedAt:string};
 type ReviewLabelReader=(scope:Scope,name:string)=>Promise<{bookletLabel:string;unitLabels:Record<string,string>}>;
@@ -137,7 +139,9 @@ export function projectOriginalWorkspaceReport(input:OriginalReportRequest,paren
   const testsByRun=new Map<string,OriginalTestNumberRecord[]>(),peopleBySession=new Map<string,OriginalPersonNumberRecord[]>();
   for(const number of family.testNumbers){const rows=testsByRun.get(number.testRunId)??[];rows.push(number);testsByRun.set(number.testRunId,rows);}
   for(const number of family.personNumbers){const rows=peopleBySession.get(number.participantSessionId)??[];rows.push(number);peopleBySession.set(number.participantSessionId,rows);}
-  const unitReviews:ReviewData[]=[],testReviews:ReviewData[]=[];
+  const unitOrder=new Map(family.units.map((unit,index)=>[unit,index]));
+  type OrderedReview={data:ReviewData;personNumber:bigint;testNumber:bigint;unitOrder:number;reviewTime:string;reviewNumber:bigint};
+  const unitReviews:OrderedReview[]=[],testReviews:OrderedReview[]=[];
   for(const stored of family.reviews){
     const parent=byRun.get(stored.testRunId),review=stored.review;if(!parent)throw unavailable();assertOriginalNativeReview(review);
     if(!originalUnitParentMatches(parent.run,stored)||!originalUnitParentMatches(stored,review)||stored.kind!==(review.unitName===null?'test':'unit')||stored.reviewNumber!==review.reviewNumber||stored.reviewId!==review.reviewId)throw unavailable();
@@ -145,15 +149,29 @@ export function projectOriginalWorkspaceReport(input:OriginalReportRequest,paren
     if(tests.length!==1||people.length!==1||!originalUnitParentMatches(parent.run,tests[0])||originalReviewNumber(tests[0]!.testNumber)!==review.testNumber||
       typeof parent.person.originalLoginKey!=='string'||typeof parent.person.originalNameSuffix!=='string'||
       selectOriginalPersonNumber({...parent.person,originalLoginKey:parent.person.originalLoginKey,originalNameSuffix:parent.person.originalNameSuffix},people[0],parent.person)!==review.personNumber)throw unavailable();
-    const unit=review.unitName===null?null:unitsFor(parent,review.unitName);
-    const branch=unit===null?testReviews:unitReviews;
-    branch.push({...identity(parent),unitname:unit?.unitName??'',originalUnitId:unit?.originalUnitId??'',priority:review.priority,categories:review.categories,
-      updatedAt:review.updatedAt,entry:review.entry,page:review.page,pagelabel:review.pageLabel,userAgent:review.userAgent,reviewer:review.reviewer});
+    const storedUnit=review.unitName===null?null:findUnit(parent.run,review.unitName);
+    if(storedUnit===undefined)throw unavailable();
+    const unit=storedUnit===null?null:ownedUnit(parent,storedUnit);
+    const branch=storedUnit===null?testReviews:unitReviews;
+    // Original creates comments at second precision and timestamps edits in PostgreSQL.
+    const [second,fraction='']=review.updatedAt.slice(0,-1).split('.');
+    branch.push({
+      personNumber:BigInt(review.personNumber),
+      testNumber:BigInt(review.testNumber),
+      unitOrder:storedUnit===null?0:unitOrder.get(storedUnit)!,
+      reviewTime:second+'.'+(review.updatedAt===review.createdAt?'000000':fraction.padEnd(6,'0')),
+      reviewNumber:BigInt(review.reviewNumber),
+      data:{...identity(parent),unitname:unit?.unitName??'',originalUnitId:unit?.originalUnitId??'',priority:review.priority,categories:review.categories,
+        updatedAt:review.updatedAt,entry:review.entry,page:review.page,pagelabel:review.pageLabel,userAgent:review.userAgent,reviewer:review.reviewer}
+    });
   }
-  // The observed Original plan drives each UNION branch through the workspace
-  // and group index. Keep equal-group rows in the supplied order.
-  const compareGroups=(left:ReviewData,right:ReviewData)=>compareOriginalParticipantGroupKeys(left.groupname,right.groupname);
-  return {type:'review',rows:[...unitReviews.sort(compareGroups),...testReviews.sort(compareGroups)]};
+  // The observed Original index walks reach each Test and first-seen Unit
+  // before reading comments by review time within that parent.
+  const compare=(a:OrderedReview,b:OrderedReview)=>
+    compareOriginalParticipantGroupKeys(a.data.groupname,b.data.groupname)||
+    Number(a.personNumber-b.personNumber)||Number(a.testNumber-b.testNumber)||a.unitOrder-b.unitOrder||
+    a.reviewTime.localeCompare(b.reviewTime)||Number(a.reviewNumber-b.reviewNumber);
+  return {type:'review',rows:[...unitReviews.sort(compare),...testReviews.sort(compare)].map(review=>review.data)};
 }
 type Collection<T>=Map<string,T>|Record<string,T>;
 const values=<T>(c:Collection<T>):T[]=>c instanceof Map?[...c.values()]:Object.values(c);

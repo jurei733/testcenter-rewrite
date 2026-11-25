@@ -1788,6 +1788,8 @@ CREATE INDEX participant_access_credentials_token_hash ON participant_access_cre
 ,{version:78,name:'original_workspace_file_mutation',sql:`
  ALTER TABLE workspaces ADD COLUMN original_file_mutation_id TEXT;
  ALTER TABLE workspaces ADD COLUMN original_file_mutation_expires_at BIGINT;`}
+,{version:79,name:'original_native_unit_materialization_order',sql:`
+ ALTER TABLE original_native_units ADD COLUMN IF NOT EXISTS materialization_order BIGINT GENERATED ALWAYS AS IDENTITY;`}
 
 
 ];
