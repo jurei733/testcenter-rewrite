@@ -85,7 +85,6 @@ import { OriginalSystemCheckReportComponent } from "./original-system-check-repo
     .welcome-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
     mat-card { flex-basis: 400px; min-width: 0; max-width: 100%; }
     .mat-mdc-card-title { margin-bottom: 10px; }
-    table { width: 100%; }
     table, tbody, tr, td { box-sizing: content-box; }
     button.mat-mdc-fab { font: revert; }
     button.mat-mdc-fab:disabled { opacity: 1; }

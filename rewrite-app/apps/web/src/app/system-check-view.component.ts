@@ -523,7 +523,12 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
     if (step !== "network") this.cancelNetworkCheck();
     this.step = step;
     if (step === "questionnaire") this.nativeQuestionnaireVisited = true;
-    if (step === "welcome") void this.captureEnvironment();
+    if (step === "welcome") {
+      // The Original starts a fresh questionnaire on re-entering Welcome.
+      this.answers = {};
+      this.nativeQuestionnaireVisited = false;
+      void this.captureEnvironment();
+    }
     this.refreshView();
   }
   private async loadNativeSystemCheck(binding: NativeSystemCheckBinding): Promise<void> {

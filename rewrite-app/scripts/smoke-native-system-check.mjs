@@ -105,6 +105,16 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     await page.locator('#syscheck-previous-step').click(); await page.waitForURL(/\/q$/);
     assert.equal(await page.locator('#answer').inputValue(), 'Owned native answer');
     assert.equal(await page.locator('#agree input').isChecked(), true);
+    await page.locator('#syscheck-previous-step').click(); await page.waitForURL(/\/u$/);
+    await page.locator('#syscheck-previous-step').click(); await page.waitForURL(/\/n$/);
+    await page.locator('#syscheck-previous-step').click(); await page.waitForURL(/\/w$/);
+    await next('n'); await next('u'); await next('q');
+    assert.equal(await page.locator('#answer').inputValue(), '');
+    assert.equal(await page.locator('#agree input').isChecked(), false);
+    await next('r');
+    assert.ok(await page.locator('#saveSystemCheckReportButton').isDisabled());
+    await page.locator('#syscheck-previous-step').click(); await page.waitForURL(/\/q$/);
+    await fillQuestions();
     await next('r'); await page.screenshot({path: join(out, 'report.png')});
     await page.locator('#saveSystemCheckReportButton').click(); await page.locator('#globalConfirmationTitle').waitFor();
     assert.equal(await page.locator('#systemCheckSaveReportBackdrop').count(), 0);
