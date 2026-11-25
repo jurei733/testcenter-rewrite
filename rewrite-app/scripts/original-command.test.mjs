@@ -260,6 +260,55 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    assert.equal(cancelled.status,'cancelled');
    assert.equal(cancelled.remainingMilliseconds,0);
   });
+  await t.test('a jump from Pause parks the old balance until the monitor jumps back to it',async()=>{
+   const block=(id,minutes)=>`<Testlet id="${id}" label="${id}"><Restrictions><TimeMax minutes="${minutes}" leave="forbidden"/></Restrictions><Unit id="ORACLE.POW.UNIT" alias="${id}" label="Owned Unit"/></Testlet>`;
+   await upload('parked-timers.xml',xml('Booklet','<Metadata><Id>ORACLE.POW.PARKED</Id><Label>Parked timers</Label></Metadata><Units>'+block('ALPHA',2)+block('BRAVO',1.5)+'</Units>'));
+   const {person}=await authenticate('owned-command-canonical');
+   const testNumber=await services.originalTest.create({token:person.token,bookletName:'ORACLE.POW.PARKED'});
+   const read={token:person.token,testNumber,nativeStateProtocol:'1'};
+   let now=Date.now();
+   const clockService=()=>createFirstSliceServices({repository,now:()=>new Date(now).toISOString(),originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+   let timed=clockService();
+   const enter=unitAlias=>timed.originalTest.enterTimer({...read,body:{unitAlias,action:'enter'}});
+   const control=async(keyword,args=[])=>{
+    await send({keyword,arguments:args,timestamp:Math.floor(now/1000),testIds:[Number(testNumber)]});
+    const [pending]=await repository.listOriginalCommands(await current(testNumber,person),null);
+    assert.equal((await timed.originalCommand.acknowledge({...read,commandNumber:pending.id})).reason,'OK');
+    return pending.id;
+   };
+   const goto=(alias,description='')=>control('goto',['id',alias,description]);
+   const clocks=async()=>(await run(testNumber,person)).originalResultState.nativeTestletTimers;
+   await timed.originalTest.read(read);
+   const alpha=await enter('ALPHA');
+   now+=10000;
+   await control('pause');
+   const alphaPaused=await enter('ALPHA');
+   assert.equal(alphaPaused.status,'paused');
+   await goto('BRAVO');
+   assert.equal((await clocks()).ALPHA.parkedByGoto,true);
+   assert.deepEqual(await enter('ALPHA'),alphaPaused);
+   const bravo=await enter('BRAVO');
+   assert.equal(bravo.remainingMilliseconds,90000);
+   now+=12000;
+   await control('pause');
+   const bravoPaused=await enter('BRAVO');
+   const jumpBack=await goto('ALPHA','| closed timeblock reopened - new remaining time 1');
+   await close();await open();timed=clockService();
+   const alphaResumed=await enter('ALPHA');
+   assert.equal(alphaResumed.status,'running');
+   assert.equal(alphaResumed.startedAt,alpha.startedAt);
+   assert.equal(alphaResumed.remainingMilliseconds,alphaPaused.remainingMilliseconds);
+   assert.equal((await clocks()).ALPHA.parkedByGoto,undefined);
+   assert.equal((await clocks()).BRAVO.parkedByGoto,true);
+   assert.deepEqual(await enter('BRAVO'),bravoPaused);
+   assert.equal((await timed.originalCommand.acknowledge({...read,commandNumber:jumpBack})).reason,'OK, was already marked as executed');
+   assert.equal((await enter('ALPHA')).expiresAt,alphaResumed.expiresAt);
+   await goto('BRAVO');
+   assert.equal((await enter('BRAVO')).remainingMilliseconds,bravoPaused.remainingMilliseconds);
+   assert.equal((await clocks()).ALPHA.status,'cancelled');
+   await control('terminate');
+   assert.equal((await clocks()).BRAVO.status,'cancelled');
+  });
   await t.test('a monitor can reopen an inherited deadline only at the commanded destination',async()=>{
    const unit=alias=>`<Unit id="ORACLE.POW.UNIT" alias="${alias}" label="${alias}"/>`;
    await upload('nested-timer.xml',xml('Booklet',

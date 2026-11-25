@@ -1232,14 +1232,20 @@ export type OriginalTestResultState = {
   hasTestState?: boolean;
   nativeWriteGuard?: OriginalNativeWriteGuard;
   /** Native controller clock metadata, independent of the Original's saved-state snapshots. */
-  nativeTestletTimers?: Record<string, TestletTimerState & { reopenCommandId?: string }>;
+  nativeTestletTimers?: Record<string, OriginalNativeTestletTimer>;
   nativeTimerControl?: {
     commandId: string;
     paused: boolean;
     resumeFromControllerRevision?: number;
+    resumeParkedTimer?: { unitAlias: string; timerKey: string };
     reopen?: { unitAlias: string; minutes: number; timerKey?: string } |
       { unitAlias: string; minutes: null; timerKey: string };
   };
+};
+
+export type OriginalNativeTestletTimer = TestletTimerState & {
+  reopenCommandId?: string;
+  parkedByGoto?: true;
 };
 
 export type TestRun = {

@@ -145,7 +145,7 @@ export class TestControllerService {
   currentTimerId = '';
   private timerUnitAlias?: string;
   private visibleTimer?: { startedAt: string; data: TimerData };
-  private pausedTimer?: PausedTimerDisplay;
+  private pausedTimers?: PausedTimerDisplay[];
   private timerIntervalSubscription: Subscription | null = null;
   timerWarningPoints: number[] = [];
 
@@ -382,7 +382,7 @@ export class TestControllerService {
 
     this.currentUnitSequenceId = -Infinity;
     this.pausedResumeUnitSequenceId = undefined;
-    this.pausedTimer = undefined;
+    this.pausedTimers = undefined;
     this.unitContentReady$.next(false);
 
     this.booklet = null;
@@ -617,23 +617,39 @@ export class TestControllerService {
   }
 
   private consumePausedTimerDisplay(clock: NativeTimerClock): number | undefined {
-    let saved=this.pausedTimer;
-    try {
-      saved??=JSON.parse(sessionStorage.getItem(this.pausedTimerKey) ?? 'null') as PausedTimerDisplay | undefined;
-    } catch {
-      // A browser may disable storage. In that case the server balance can still be shown.
-    }
-    this.clearPausedTimerDisplay();
-    if(saved?.testletKey===clock.testletKey&&saved.startedAt===clock.startedAt&&
+    const saved=this.takePausedTimerDisplay(clock.testletKey);
+    if(saved?.startedAt===clock.startedAt&&
       Number.isSafeInteger(saved.displayedSeconds)&&saved.displayedSeconds>=0){
       return saved.displayedSeconds;
     }
     return undefined;
   }
 
-  private clearPausedTimerDisplay(): void {
-    this.pausedTimer=undefined;
-    try { sessionStorage.removeItem(this.pausedTimerKey); } catch {}
+  private readPausedTimerDisplays(): PausedTimerDisplay[] {
+    if(this.pausedTimers)return this.pausedTimers;
+    try {
+      const stored=JSON.parse(sessionStorage.getItem(this.pausedTimerKey) ?? 'null') as PausedTimerDisplay | PausedTimerDisplay[] | null;
+      // Existing sessions stored one display for the paused block.
+      this.pausedTimers=(Array.isArray(stored)?stored:stored?[stored]:[]).filter(item=>item&&typeof item.testletKey==='string');
+    } catch {
+      // The server balance remains available when browser storage is disabled.
+    }
+    return this.pausedTimers??[];
+  }
+
+  private writePausedTimerDisplays(displays: PausedTimerDisplay[]): void {
+    this.pausedTimers=displays;
+    try {
+      if(displays.length)sessionStorage.setItem(this.pausedTimerKey,JSON.stringify(displays.length===1?displays[0]:displays));
+      else sessionStorage.removeItem(this.pausedTimerKey);
+    } catch {}
+  }
+
+  private takePausedTimerDisplay(testletKey: string): PausedTimerDisplay | undefined {
+    const displays=this.readPausedTimerDisplays();
+    const saved=displays.find(entry=>entry.testletKey===testletKey);
+    if(saved)this.writePausedTimerDisplays(displays.filter(entry=>entry.testletKey!==testletKey));
+    return saved;
   }
 
   private confirmTimerExpiry(unitAlias: string, clock: NativeTimerClock): Observable<NativeTimerClock> {
@@ -665,8 +681,8 @@ export class TestControllerService {
   }
 
   cancelTimer(): void {
-    this.clearPausedTimerDisplay();
     if (this.currentTimerId) {
+      this.takePausedTimerDisplay(this.currentTimerId);
       this.timers$.next(new TimerData(0, this.currentTimerId, MaxTimerEvent.CANCELLED));
     }
     this.finishTimer();
@@ -796,8 +812,8 @@ export class TestControllerService {
   pause(): Promise<boolean> {
     if(this.visibleTimer){
       const {startedAt,data}=this.visibleTimer;
-      this.pausedTimer={testletKey:data.id,startedAt,displayedSeconds:data.displayedSeconds};
-      try { sessionStorage.setItem(this.pausedTimerKey,JSON.stringify(this.pausedTimer)); } catch {}
+      const displays=this.readPausedTimerDisplays().filter(entry=>entry.testletKey!==data.id);
+      this.writePausedTimerDisplays([...displays,{testletKey:data.id,startedAt,displayedSeconds:data.displayedSeconds}]);
     }
     this.interruptTimer();
     this.state$.next('PAUSED');

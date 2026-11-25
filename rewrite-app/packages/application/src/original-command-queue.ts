@@ -100,6 +100,8 @@ export function prepareOriginalNativeTimerControl(
   const minutes=reopenMessage?Number(reopenMessage[1]):0;
   const timerKey=destination?.timerKey;
   const targetClock=timerKey?before.nativeTestletTimers?.[timerKey]:undefined;
+  const resumeParkedTimer=keyword==='goto'&&address==='id'&&unitAlias&&timerKey&&
+    targetClock?.status==='paused'&&targetClock.parkedByGoto ? {unitAlias,timerKey} : undefined;
   const hasRemainingTime=targetClock?.status==='running'&&Date.parse(targetClock.expiresAt??'')>now||
     targetClock?.status==='paused'&&targetClock.remainingSeconds>0;
   let reopen:NonNullable<OriginalTestResultState['nativeTimerControl']>['reopen'];
@@ -117,17 +119,23 @@ export function prepareOriginalNativeTimerControl(
   const guard=before.nativeWriteGuard;
   // A committed Resume can outlive its browser response. A controller write
   // accepted after this ACK takes precedence, including a late Pause response.
-  const resumeFromControllerRevision=keyword==='resume'&&guard&&Object.values(timers??{}).some(timer=>timer.status==='paused')
+  const resumeFromControllerRevision=keyword==='resume'&&guard&&Object.values(timers??{}).some(timer=>timer.status==='paused'&&!timer.parkedByGoto)
     ? guard.fields.CONTROLLER??0 : undefined;
-  const control={commandId:command.id,paused,...(reopen?{reopen}:{}),
+  const control={commandId:command.id,paused,...(reopen?{reopen}:{}),...(resumeParkedTimer?{resumeParkedTimer}:{}),
     ...(resumeFromControllerRevision===undefined?{}:{resumeFromControllerRevision})};
   if(!timers||(keyword!=='pause'&&keyword!=='terminate'&&(keyword!=='goto'||!destination)))return {...before,nativeTimerControl:control};
   const stopped=Object.fromEntries(Object.entries(timers).map(([id,timer])=>{
     if(keyword==='goto'&&id===destination?.timerKey)return [id,timer];
     if(timer.status!=='running'&&(timer.status!=='paused'||paused))return [id,timer];
+    // A jump from Pause leaves the old clock frozen. Only a later jump to
+    // that block can activate it. A jump away from a running clock closes it.
+    if(keyword==='goto'&&timer.status==='paused'&&timer.remainingSeconds>0){
+      return [id,{...timer,parkedByGoto:true as const}];
+    }
+    const {parkedByGoto: _,...stoppedTimer}=timer;
     const remaining=timer.expiresAt?Math.max(0,(Date.parse(timer.expiresAt)-now)/1000):timer.remainingSeconds;
-    if(remaining<=0)return [id,{...timer,status:'expired' as const,remainingSeconds:0,updatedAt:timestamp,endedAt:timer.expiresAt??timestamp}];
-    return [id,{...timer,status:paused?'paused' as const:'cancelled' as const,
+    if(remaining<=0)return [id,{...stoppedTimer,status:'expired' as const,remainingSeconds:0,updatedAt:timestamp,endedAt:timer.expiresAt??timestamp}];
+    return [id,{...stoppedTimer,status:paused?'paused' as const:'cancelled' as const,
       remainingSeconds:paused?remaining:0,expiresAt:null,updatedAt:timestamp,endedAt:paused?null:timestamp}];
   }));
   return {...before,nativeTimerControl:control,nativeTestletTimers:stopped};

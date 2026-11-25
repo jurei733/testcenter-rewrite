@@ -160,7 +160,8 @@ export const load = ({firstValueFrom, concat, defer, EMPTY, timer, createTicker,
  }
  return class NativeTestController {
   ${extractNativeMethods('services/test-controller.service.ts', 'TestControllerService',
-    ['startTimer', 'consumePausedTimerDisplay', 'clearPausedTimerDisplay', 'confirmTimerExpiry', 'finishTimer', 'interruptTimer'])}
+    ['startTimer', 'consumePausedTimerDisplay', 'readPausedTimerDisplays', 'writePausedTimerDisplays', 'takePausedTimerDisplay',
+      'confirmTimerExpiry', 'finishTimer', 'interruptTimer'])}
  };
 };`;
 const nativeTimerOutput = ts.transpileModule(nativeTimerSource, {
@@ -182,7 +183,7 @@ async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDi
   createTicker: () => interval(100, scheduler), performance: {now: () => scheduler.now()}, AppError: Error,
   MaxTimerEvent: {STARTED: 'STARTED', STEP: 'STEP', ENDED: 'ENDED', INTERRUPTED: 'INTERRUPTED'},
   concatMap, expand, filter, ignoreElements, take, takeUntil, tap,
-  sessionStorage: {getItem: key => savedTimers.get(key), removeItem: key => savedTimers.delete(key)},
+  sessionStorage: {getItem: key => savedTimers.get(key), setItem: (key, value) => savedTimers.set(key,value), removeItem: key => savedTimers.delete(key)},
  });
  const controller = new Controller();
  const unit = {alias: 'owned-unit'};
@@ -219,6 +220,16 @@ test('a reloaded timer restores the display only for the same server clock', asy
   assert.deepEqual(fixture.expirations,[2460]);
   assert.deepEqual(fixture.events,[[0,'STARTED'],[2460,'ENDED']]);
  }
+});
+
+test('resuming a clock leaves the other paused block displays available', async () => {
+ const current = {testletKey:'timed', startedAt:'2026-11-25T12:00:00.000Z', displayedSeconds:2};
+ const parked = {...current,testletKey:'other',displayedSeconds:15};
+ const fixture = await nativeExpiryFixture([],{remainingMilliseconds:2460,savedDisplay:[current,parked]});
+ assert.equal(fixture.controller.visibleTimer.data.displayedSeconds,2);
+ assert.deepEqual(JSON.parse([...fixture.savedTimers.values()][0]),parked);
+ assert.equal(fixture.controller.consumePausedTimerDisplay(parked),15);
+ assert.equal(fixture.savedTimers.size,0);
 });
 
 test('native countdown waits for the authoritative remaining milliseconds before advancing', async () => {

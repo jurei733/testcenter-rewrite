@@ -9,7 +9,7 @@ import {readOriginalTestLockFields,parseOriginalTestLockLog,parseOriginalTestLog
 import {hashOriginalSessionToken} from './original-session-token.js';
 import type {OriginalBookletFiles} from './original-test-files.js';
 import {parseOriginalNativeTestNumber,readOriginalTestPerson,resolveOriginalOwnedTest,resolveOriginalOwnedTestScope} from './original-test-access.js';
-import {defaultParticipantExecutionMode,participantExecutionModeDefinitions,type ParticipantExecutionMode,type TestletTimerState} from '@testcenter-rewrite-app/domain';
+import {defaultParticipantExecutionMode,participantExecutionModeDefinitions,type OriginalNativeTestletTimer,type ParticipantExecutionMode} from '@testcenter-rewrite-app/domain';
 import {originalTestDelivery,prepareOriginalNativeDelivery} from './original-native-delivery.js';
 import type {OriginalNativeStateWriteBase, OriginalNativeStateWriteResult} from '@testcenter-rewrite-app/domain';
 import {parseOriginalNativeStateWriteBase, prepareOriginalNativeStateWrite} from './original-native-write-state.js';
@@ -42,7 +42,7 @@ export type OriginalTestPort = {
   create(input: {token: string; bookletName: string}): Promise<string>;
   read(input:{token:string;testNumber:string;nativeStateProtocol?:unknown}):Promise<OriginalTestRead>;
   enterTimer(input:{token:string;testNumber:string;body:unknown}):Promise<{
-    testletKey:string;status:TestletTimerState['status'];startedAt:string;expiresAt:string|null;remainingMilliseconds:number
+    testletKey:string;status:OriginalNativeTestletTimer['status'];startedAt:string;expiresAt:string|null;remainingMilliseconds:number
   }>;
   patchState(input:{token:string;testNumber:string;patch:unknown;deliveryId?:unknown;stateBase?:unknown}):Promise<OriginalNativeStateWriteResult|void>;
   resource(input:{groupToken:string;workspaceNumber:string;path:string}):Promise<{bytes:Uint8Array;contentType:string}>;
@@ -149,7 +149,7 @@ export function createOriginalTestPort(input: {
           (grant.timerKey===undefined||grant.timerKey===block.key)&&
           originalParticipantGroupKeysEqual(grant.unitAlias,unitAlias)?grant:undefined;
         const grantedMilliseconds=reopen?.minutes!=null?Math.min(durationMilliseconds,reopen.minutes*60000):durationMilliseconds;
-        let timer:TestletTimerState & {reopenCommandId?:string};
+        let timer:OriginalNativeTestletTimer;
         if(action!=='enter'&&!current){
           throw new FirstSliceError(409,'native_timer_unavailable','The Unit has no active server timer.');
         }
@@ -157,6 +157,9 @@ export function createOriginalTestPort(input: {
           throw new FirstSliceError(409,'native_timer_unavailable','The test is paused.');
         }
         if(current){
+          const parkedTarget=control?.resumeParkedTimer;
+          const resume=current.status==='paused'&&!control?.paused&&(!current.parkedByGoto||
+            parkedTarget?.timerKey===block.key&&originalParticipantGroupKeysEqual(parkedTarget.unitAlias,unitAlias));
           remainingMilliseconds=current.status==='running'&&current.expiresAt ?
             Math.max(0,Date.parse(current.expiresAt)-now) : Math.max(0,Math.round(current.remainingSeconds*1000));
           if(!Number.isSafeInteger(remainingMilliseconds)){
@@ -177,9 +180,10 @@ export function createOriginalTestPort(input: {
             }
             timer={...current,status:'running',durationSeconds:remainingMilliseconds/1000,remainingSeconds:remainingMilliseconds/1000,
               startedAt:timestamp,expiresAt:expires.toISOString(),updatedAt:timestamp,endedAt:null};
-          }else if(action==='enter'&&(reopen||current.status==='paused'&&!control?.paused)){
+          }else if(action==='enter'&&(reopen||resume)){
             if(reopen)remainingMilliseconds=grantedMilliseconds;
-            timer={...current,status:remainingMilliseconds===0?'expired':'running',remainingSeconds:remainingMilliseconds/1000,
+            const {parkedByGoto: _,...runningTimer}=current;
+            timer={...runningTimer,status:remainingMilliseconds===0?'expired':'running',remainingSeconds:remainingMilliseconds/1000,
               expiresAt:remainingMilliseconds===0?null:new Date(now+remainingMilliseconds).toISOString(),
               updatedAt:timestamp,endedAt:remainingMilliseconds===0?timestamp:null,
               ...(reopen?{startedAt:timestamp,reopenCommandId:control!.commandId}:{})};
