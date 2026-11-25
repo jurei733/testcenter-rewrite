@@ -74,6 +74,7 @@ type LeaveCheckResult =
 interface PausedTimerDisplay {
   testletKey: string;
   startedAt: string;
+  expiresAt?: string;
   displayedSeconds: number;
 }
 
@@ -145,7 +146,7 @@ export class TestControllerService {
   timers: KeyValuePairNumber = {}; // TODO remove the redundancy with timers$
   currentTimerId = '';
   private timerUnitAlias?: string;
-  private visibleTimer?: { startedAt: string; data: TimerData };
+  private visibleTimer?: { startedAt: string; expiresAt: string | null; data: TimerData };
   private pausedTimers?: PausedTimerDisplay[];
   private timerIntervalSubscription: Subscription | null = null;
   timerWarningPoints: number[] = [];
@@ -557,7 +558,12 @@ export class TestControllerService {
 
   async startTimer(testlet: Testlet, unit: Unit, changedUnit: boolean, ownsEntry: () => boolean, gotoCommandId?: string): Promise<boolean> {
     const current=()=>this.nativeCurrent&&this.currentUnit===unit&&ownsEntry();
-    let clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter',undefined,gotoCommandId),{defaultValue:null});
+    const saved=this.readPausedTimerDisplays().find(display=>display.testletKey===testlet.id);
+    const pausedHint=saved&&typeof saved.startedAt==='string'&&saved.startedAt.length<=32&&
+      typeof saved.expiresAt==='string'&&saved.expiresAt.length<=32&&
+      Number.isSafeInteger(saved.displayedSeconds)&&saved.displayedSeconds>=0
+      ?{startedAt:saved.startedAt,expiresAt:saved.expiresAt,displayedSeconds:saved.displayedSeconds}:undefined;
+    let clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter',undefined,gotoCommandId,pausedHint),{defaultValue:null});
     if(!current()||!clock)return false;
     if(clock.testletKey===testlet.id&&changedUnit&&!this.testMode.forceTimeRestrictions&&
       (clock.status==='expired'||clock.status==='cancelled')){
@@ -578,14 +584,14 @@ export class TestControllerService {
       this.timers$.next(new TimerData(0,testlet.id,MaxTimerEvent.ENDED));
       return false;
     }
-    const resumedDisplayBudget=this.restoreResumedTimerDisplay(clock,pausedDisplay);
+    const resumedDisplayBudget=clock.displayCeilingSeconds??this.restoreResumedTimerDisplay(clock,pausedDisplay);
     const timeBudget=clock.remainingMilliseconds;
     const deadline=performance.now()+timeBudget;
     const publishTimer=(type:MaxTimerEvent,elapsedTicks=0)=>{
       const remaining=Math.max(0,Math.ceil((deadline-performance.now())/1000));
       const displayBalance=resumedDisplayBudget===undefined?undefined:Math.min(remaining,resumedDisplayBudget-elapsedTicks);
       const data=new TimerData(remaining/60,testlet.id,type,displayBalance);
-      this.visibleTimer={startedAt:clock.startedAt,data};
+      this.visibleTimer={startedAt:clock.startedAt,expiresAt:clock.expiresAt,data};
       this.timers$.next(data);
     };
     this.currentTimerId = testlet.id;
@@ -834,9 +840,10 @@ export class TestControllerService {
 
   pause(): Promise<boolean> {
     if(this.visibleTimer){
-      const {startedAt,data}=this.visibleTimer;
+      const {startedAt,expiresAt,data}=this.visibleTimer;
       const displays=this.readPausedTimerDisplays().filter(entry=>entry.testletKey!==data.id);
-      this.writePausedTimerDisplays([...displays,{testletKey:data.id,startedAt,displayedSeconds:data.displayedSeconds}]);
+      this.writePausedTimerDisplays([...displays,{testletKey:data.id,startedAt,displayedSeconds:data.displayedSeconds,
+        ...(expiresAt?{expiresAt}:{})}]);
     }
     this.interruptTimer();
     this.state$.next('PAUSED');

@@ -347,7 +347,7 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    let now=Date.now();
    const clockService=()=>createFirstSliceServices({repository,now:()=>new Date(now).toISOString(),originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
    let timed=clockService();
-   const enter=(unitAlias,gotoCommandId)=>timed.originalTest.enterTimer({...read,body:{unitAlias,action:'enter',gotoCommandId}});
+   const enter=(unitAlias,gotoCommandId,pausedDisplay)=>timed.originalTest.enterTimer({...read,body:{unitAlias,action:'enter',gotoCommandId,pausedDisplay}});
    const control=async(keyword,args=[])=>{
     await send({keyword,arguments:args,timestamp:Math.floor(now/1000),testIds:[Number(testNumber)]});
     const [pending]=await repository.listOriginalCommands(await current(testNumber,person),null);
@@ -372,10 +372,11 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    const bravoPaused=await enter('BRAVO');
    const jumpBack=await goto('ALPHA','| closed timeblock reopened - new remaining time 1');
    await close();await open();timed=clockService();
-   const alphaResumed=await enter('ALPHA');
+   const alphaResumed=await enter('ALPHA',jumpBack,{startedAt:alpha.startedAt,expiresAt:bravo.expiresAt,displayedSeconds:1});
    assert.equal(alphaResumed.status,'running');
    assert.equal(alphaResumed.startedAt,alpha.startedAt);
    assert.equal(alphaResumed.remainingMilliseconds,alphaPaused.remainingMilliseconds);
+   assert.equal(alphaResumed.displayCeilingSeconds,undefined);
    assert.equal((await clocks()).ALPHA.parkedByGoto,undefined);
    assert.equal((await clocks()).BRAVO.parkedByGoto,true);
    assert.deepEqual(await enter('BRAVO'),bravoPaused);
@@ -402,15 +403,26 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    assert.equal((await enter('BRAVO',newer)).status,'running');
    assert.equal((await enter('ALPHA',jumpBack)).status,'paused','Previously executed entry grants cannot be replayed');
    assert.equal((await enter('ALPHA',newer)).status,'paused','A different destination has no grant');
-   const late=await enter('ALPHA',earlier);
+   const resumedDisplay={startedAt:reopened.startedAt,expiresAt:reopened.expiresAt,displayedSeconds:Math.ceil(parked.remainingMilliseconds/1000)-1};
+   const late=await enter('ALPHA',earlier,resumedDisplay);
    assert.equal(late.startedAt,reopened.startedAt);
    assert.equal(late.remainingMilliseconds,parked.remainingMilliseconds);
    assert.equal(late.status,'running');
-   assert.equal((await clocks()).BRAVO.status,'cancelled');
+   assert.equal(late.displayCeilingSeconds,resumedDisplay.displayedSeconds);
+   const clocksAfterLate=await clocks();
+   assert.equal(Date.parse(late.expiresAt),Date.parse(clocksAfterLate.ALPHA.updatedAt)+parked.remainingMilliseconds);
+   assert.equal(clocksAfterLate.BRAVO.status,'cancelled');
    assert.equal((await run(testNumber,person)).originalResultState.nativeTimerControl.commandId,newer);
    assert.equal((await timed.originalCommand.acknowledge({...read,commandNumber:earlier})).reason,'OK, was already marked as executed');
-   assert.equal((await enter('ALPHA',earlier)).expiresAt,late.expiresAt);
+   await close();await open();timed=clockService();
+   for(const clock of [await enter('ALPHA'),await enter('ALPHA',earlier,{...resumedDisplay,displayedSeconds:0})]){
+    assert.equal(clock.status,'running');
+    assert.equal(clock.startedAt,late.startedAt);
+    assert.equal(clock.expiresAt,late.expiresAt);
+    assert.equal(clock.displayCeilingSeconds,late.displayCeilingSeconds);
+   }
    await control('pause');
+   assert.equal((await clocks()).ALPHA.displayCeilingSeconds,undefined);
    await goto('BRAVO','| closed timeblock reopened - new remaining time 1');
    await enter('BRAVO');
    assert.equal((await enter('ALPHA',earlier)).status,'paused');
@@ -425,7 +437,7 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    const beforeTerminate=await goto('ALPHA');
    await goto('BRAVO');
    await control('terminate');
-   assert.equal((await enter('ALPHA',beforeTerminate)).status,'cancelled');
+   assert.equal((await enter('ALPHA',beforeTerminate,resumedDisplay)).status,'cancelled');
   });
   await t.test('server expiry restores only the first accessible parked successor and survives a restart',async()=>{
    const unit=alias=>`<Unit id="ORACLE.POW.UNIT" alias="${alias}" label="${alias}"/>`;

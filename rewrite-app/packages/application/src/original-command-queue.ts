@@ -88,11 +88,12 @@ export function listOriginalCommandsCollection(state:OriginalCommandCollections,
   currentMapping(state,scope);return selectOriginalCommands(values(state.originalNativeCommands).filter(row=>row.testNumber===scope.testNumber&&row.testRunId===scope.testRunId&&row.participantSessionId===scope.participantSessionId&&row.tenantId===scope.tenantId&&row.workspaceId===scope.workspaceId&&row.contentReleaseId===scope.contentReleaseId),lastCommandId);
 }
 export function stopOriginalNativeTimer(timer:OriginalNativeTestletTimer,timestamp:string,paused=false):OriginalNativeTestletTimer{
-  const {parkedByGoto: _,pendingGotoEntries: _entries,...stoppedTimer}=timer;
+  const {parkedByGoto: _,pendingGotoEntries: _entries,displayCeilingSeconds: _display,pausedFromExpiresAt: _pause,...stoppedTimer}=timer;
   const remaining=timer.expiresAt?Math.max(0,(Date.parse(timer.expiresAt)-Date.parse(timestamp))/1000):timer.remainingSeconds;
   if(remaining<=0)return {...stoppedTimer,status:'expired',remainingSeconds:0,updatedAt:timestamp,endedAt:timer.expiresAt??timestamp};
   return {...stoppedTimer,status:paused?'paused':'cancelled',remainingSeconds:paused?remaining:0,
-    expiresAt:null,updatedAt:timestamp,endedAt:paused?null:timestamp};
+    expiresAt:null,updatedAt:timestamp,endedAt:paused?null:timestamp,
+    ...(paused&&timer.expiresAt?{pausedFromExpiresAt:timer.expiresAt}:{})};
 }
 export function prepareOriginalNativeTimerControl(
   before:TestRun['originalResultState'], command:Pick<OriginalCommandPacket,'id'|'keyword'|'arguments'>,

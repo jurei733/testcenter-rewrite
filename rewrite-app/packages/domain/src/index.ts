@@ -1247,6 +1247,10 @@ export type OriginalTestResultState = {
 export type OriginalNativeTestletTimer = TestletTimerState & {
   reopenCommandId?: string;
   parkedByGoto?: true;
+  /** The restored display balance for this running interval. It never grants time. */
+  displayCeilingSeconds?: number;
+  /** The running interval that the current pause captured. */
+  pausedFromExpiresAt?: string;
   /** Acknowledged jumps that can still enter this continuously parked clock. */
   pendingGotoEntries?: { commandId: string; unitAlias: string }[];
   expirySuccessor?: {
