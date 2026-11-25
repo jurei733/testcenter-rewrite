@@ -163,7 +163,7 @@
     @if (controller.uploads.length) {
       <mat-card appearance="raised">
         <mat-card-header><mat-card-title>Upload-Report</mat-card-title></mat-card-header>
-        <mat-card-content data-cy="upload-report">
+        <mat-card-content data-cy="upload-report" [class.native-upload-report]="workspaceNumber">
           @let progress = controller.nativeUploadProgress;
           @for (upload of controller.uploads; track $index) {
             @if (progress !== null) {
