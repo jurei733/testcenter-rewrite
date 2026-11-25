@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject, type OnChanges, type OnDestroy } from "@angular/core";
-import { Router, RouterLink, RouterLinkActive } from "@angular/router";
+import { RouterLink, RouterLinkActive } from "@angular/router";
 import { MatButton, MatFabButton, MatIconButton } from "@angular/material/button";
 import { MatCheckbox } from "@angular/material/checkbox";
 import { MatDialog, type MatDialogRef } from "@angular/material/dialog";
@@ -60,7 +60,6 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
   private readonly changed = inject(ChangeDetectorRef);
   private readonly dialogs = inject(MatDialog);
   private readonly confirmation = inject(ConfirmationDialogService);
-  private readonly router = inject(Router);
   private readonly toasts = inject(OriginalToastService);
   private readonly snackBar = inject(MatSnackBar);
   private lastNotice = "";
@@ -228,13 +227,13 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
     if(this.destroyed || this.directory.busy || this.logout)return;
     const token=this.connectedToken;trigger.closeMenu();
     this.logout=this.dialogs.open(OriginalParticipantLogoutDialogComponent,{
-      panelClass:"original-participant-logout-dialog",data:{safeMode:this.settings.settings().themeName==="Primar"},
+      panelClass:"original-participant-logout-dialog",data:{safeMode:false},
       autoFocus:"dialog",restoreFocus:true,ariaLabelledBy:"originalParticipantLogoutTitle",ariaDescribedBy:"originalParticipantLogoutMessage"
     });
     this.logout.afterClosed().subscribe(accepted=>{
       this.logout=null;
       if(accepted && !this.destroyed && this.connectedToken===token && this.sessionToken.trim()===token) {
-        void this.app.signOutAdmin().finally(()=>this.router.navigateByUrl("/ops"));
+        void this.app.signOutOriginalOperator();
       }
     });
   }

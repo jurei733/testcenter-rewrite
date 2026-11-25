@@ -5,7 +5,7 @@ import { MatDivider } from "@angular/material/divider";
 import { MatMenu, MatMenuTrigger } from "@angular/material/menu";
 import { MatToolbar } from "@angular/material/toolbar";
 import { MatTooltip } from "@angular/material/tooltip";
-import { Router, RouterLink } from "@angular/router";
+import { RouterLink } from "@angular/router";
 
 import { AppShellFacade } from "./app-shell.facade";
 import { ApplicationSettingsService } from "./application-settings.service";
@@ -34,7 +34,6 @@ export class OriginalWorkspaceOperatorHeaderComponent implements OnDestroy {
   readonly settings = inject(ApplicationSettingsService);
   private readonly state = inject(RewriteAppUiStateService);
   private readonly dialogs = inject(MatDialog);
-  private readonly router = inject(Router);
   private logout?: MatDialogRef<OriginalParticipantLogoutDialogComponent, boolean>;
 
   confirmLogout(trigger: MatMenuTrigger): void {
@@ -43,7 +42,7 @@ export class OriginalWorkspaceOperatorHeaderComponent implements OnDestroy {
     trigger.closeMenu();
     this.logout = this.dialogs.open(OriginalParticipantLogoutDialogComponent, {
       panelClass: "original-participant-logout-dialog",
-      data: { safeMode: this.settings.settings().themeName === "Primar" },
+      data: { safeMode: false },
       autoFocus: "dialog",
       restoreFocus: true,
       ariaLabelledBy: "originalParticipantLogoutTitle",
@@ -52,11 +51,7 @@ export class OriginalWorkspaceOperatorHeaderComponent implements OnDestroy {
     this.logout.afterClosed().subscribe(accepted => {
       this.logout = undefined;
       if (!accepted || this.state.ops.adminSessionToken !== token) return;
-      void this.app.signOutAdmin().finally(() => {
-        if (!this.state.ops.adminSessionToken || this.state.ops.adminSessionToken === token) {
-          void this.router.navigateByUrl("/ops");
-        }
-      });
+      void this.app.signOutOriginalOperator();
     });
   }
 

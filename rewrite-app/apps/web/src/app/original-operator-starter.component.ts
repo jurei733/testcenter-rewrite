@@ -53,7 +53,9 @@ export class OriginalOperatorStarterComponent implements AfterViewInit, OnDestro
       const signedIn = this.state.adminSessionActive();
       const passwordChangeRequired = this.shell.app.requiresAdminPasswordChange;
       if (!signedIn || !token) {
-        void this.router.navigateByUrl("/ops?ui=original", { replaceUrl: true });
+        if (!this.shell.app.originalOperatorSigningOut()) {
+          void this.router.navigateByUrl("/ops?ui=original", { replaceUrl: true });
+        }
         return;
       }
       if (this.identity?.token === token && this.identity.passwordChangeRequired === passwordChangeRequired) return;

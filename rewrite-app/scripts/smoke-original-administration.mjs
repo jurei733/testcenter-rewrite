@@ -329,11 +329,15 @@ try{
   console.log("original_administration_account=source-rights-and-focus:passed");
   await accountTrigger.click();
   await page.locator("#globalAdminSignOutButton").click();await waitForMaterialDialog(page);
+  assert.deepEqual((await page.locator("mat-dialog-container mat-dialog-actions button").allTextContents()).map(text=>text.trim()),
+    ["Abmelden","Hier bleiben"]);
   await page.locator("#originalParticipantLogoutCancelButton").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
   assert.equal((await fetch(base+"/api/v1/admin/auth/current-session",{headers:{authorization:`Bearer ${browserToken}`}})).status,200);
   await page.locator("#originalAdministrationAccountButton").click();await page.locator("#globalAdminSignOutButton").click();
   await waitForMaterialDialog(page);await page.locator("#originalParticipantLogoutConfirmButton").click();
-  await page.locator("#adminSignInButton").waitFor();
+  await page.waitForURL(/\/native-start\/login$/);
+  await page.locator('[data-cy="login-user"]').waitFor();
+  await page.locator('[data-cy="login-admin-form"]').waitFor();
   assert.equal((await fetch(base+"/api/v1/admin/auth/current-session",{headers:{authorization:`Bearer ${browserToken}`}})).status,401);
   assert.equal((await api("/api/v1/admin/auth/current-session")).adminUser.adminUserId,operator.adminUser.adminUserId);
   assert.deepEqual(errors,[]);await context.close();console.log("original_administration=all-real-api-actions-safe-logout-and-twelve-theme-captures:passed");

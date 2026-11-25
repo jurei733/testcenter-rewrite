@@ -1,4 +1,5 @@
-import { Injectable, inject } from "@angular/core";
+import { Injectable, inject, signal } from "@angular/core";
+import { Router } from "@angular/router";
 
 import {
   adminPasswordPolicy,
@@ -35,7 +36,10 @@ export class AppShellFacade {
   private readonly persistence = inject(RewriteAppShellPersistenceService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly adminPasswordChange = inject(AdminPasswordChangeService);
+  private readonly router = inject(Router);
+  private readonly signingOutOriginalOperator = signal(false);
 
+  readonly originalOperatorSigningOut = this.signingOutOriginalOperator.asReadonly();
   readonly renderVersion = this.uiState.renderVersion;
   readonly responseMeta = this.uiState.responseMeta;
   readonly lastResponse = this.uiState.lastResponse;
@@ -123,6 +127,22 @@ export class AppShellFacade {
 
   async signOutAdmin(): Promise<void> {
     await this.adminPasswordChange.signOut();
+  }
+
+  async signOutOriginalOperator(): Promise<void> {
+    if (this.signingOutOriginalOperator()) return;
+    this.signingOutOriginalOperator.set(true);
+    try {
+      await this.signOutAdmin();
+      if (!this.hasAdminSession) {
+        await this.router.navigateByUrl("/native-start/login");
+      }
+    } catch {
+      // The request service retains the failure. Keep the authenticated view
+      // available until the current session has actually been revoked.
+    } finally {
+      this.signingOutOriginalOperator.set(false);
+    }
   }
 
   get operatorAccessLabel(): string {
