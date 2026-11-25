@@ -21,6 +21,8 @@ const ORIGINAL_LINES_PER_PAGE = 50;
 const ORIGINAL_LABEL_SIZE = 12;
 const ORIGINAL_LABEL_FONT = PDFName.of("Helvetica");
 const SOFT_HYPHEN = "\u00ad";
+const NO_BREAK_SPACE = "\u00a0";
+const UNICODE_SPACE = /[\p{White_Space}\p{Z}]/u;
 const ORIGINAL_WRAP_SPACE = /(?!\u00a0)[\p{White_Space}\p{Z}]/u;
 const POINTS_PER_MILLIMETER = 72 / 25.4;
 const ORIGINAL_HELVETICA_DEFAULT_WIDTH = 513;
@@ -34,12 +36,76 @@ const ORIGINAL_CHARACTER_WIDTHS: Readonly<Record<string, number>> = {
   "€": 655, "Ÿ": 667, "ƒ": 278, "‹": 250, "›": 250, "œ": 938, "’": 221
 };
 
-const originalBookmarkTitle = (label: string): string => label
-  .replace(/<br\s?\/>|<\/(?:blockquote|dd|dl|div|dt|h[1-6]|hr|li|ol|p|pre|ul|tcpdf|table|tr|td)>/gi, "\n")
-  .replaceAll("\r", "")
-  .replace(/\n+/g, "\n")
-  .replace(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/?[A-Za-z][^>]*>/g, "")
-  .trim();
+// TCPDF omits U+200B when serializing UTF-16 metadata strings.
+const originalMetadataText = (text: string): string => text.replaceAll("\u200b", "");
+
+// Bookmark labels pass through PHP strip_tags, including its handling of quoted
+// angles, incomplete tags and spaced comparisons. The printed label is literal.
+const stripBookmarkMarkup = (text: string): string => {
+  const asciiSpace = /[\x09-\x0d ]/;
+  let mode: "text" | "tag" | "comment" | "declaration" | "instruction" | "xml" = "text";
+  let quote = "";
+  let nested = 0;
+  let parentheses = 0;
+  let result = "";
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i]!;
+    const next = text[i + 1] ?? "";
+    const previous = text[i - 1] ?? "";
+    if (mode === "text") {
+      if (char === "<" && !asciiSpace.test(next)) {
+        if (text.startsWith("<!--", i)) {
+          mode = "comment";
+          i += 3;
+        } else if (next === "?") {
+          mode = i > 0 && text.slice(i + 2, i + 5).toLowerCase() === "xml" ? "xml" : "instruction";
+          parentheses = 0;
+        } else {
+          mode = next === "!" && text.slice(i + 2, i + 9).toLowerCase() !== "doctype" ? "declaration" : "tag";
+        }
+      } else if (char !== "\0") {
+        result += char;
+      }
+      continue;
+    }
+    if (mode === "comment") {
+      if (char === ">" && text.slice(i - 2, i) === "--") mode = "text";
+      continue;
+    }
+    const tag = mode === "tag" || mode === "xml";
+    if ((char === '"' || char === "'") && (tag || previous !== "\\")) {
+      if (!quote || quote === char) quote = quote ? "" : char;
+    } else if (char === ">" && nested > 0) {
+      nested -= 1;
+    } else if (!quote) {
+      if (tag && char === "<" && !asciiSpace.test(next)) nested += 1;
+      if (mode === "instruction") {
+        if (char === "(") parentheses += 1;
+        if (char === ")") parentheses -= 1;
+        if (char === ">" && previous === "?" && parentheses === 0) mode = "text";
+      } else if (char === ">" && (mode !== "xml" || previous !== "-")) {
+        mode = "text";
+      }
+    }
+  }
+  return result;
+};
+
+const originalBookmarkTitle = (label: string): string => {
+  const text = stripBookmarkMarkup(label
+    .replace(/<br[\x09-\x0d ]?\/>|<\/(?:blockquote|dd|dl|div|dt|h[1-6]|hr|li|ol|p|pre|ul|tcpdf|table|tr|td)>/gi, "\n")
+    .replaceAll("\r", "")
+    .replace(/\n+/g, "\n"));
+  // The non-breaking-space exception applies to the start of each trim match.
+  let start = 0;
+  if (ORIGINAL_WRAP_SPACE.test(text[0] ?? "")) {
+    while (UNICODE_SPACE.test(text[start] ?? "")) start += 1;
+  }
+  let end = text.length;
+  while (end > start && UNICODE_SPACE.test(text[end - 1]!)) end -= 1;
+  while (end < text.length && text[end] === NO_BREAK_SPACE) end += 1;
+  return originalMetadataText(text.slice(start, end));
+};
 
 const toPdfSafeText = (value: string): string =>
   value
@@ -213,17 +279,12 @@ export const createAttachmentPagesPdf = async (input: {
   const originalLayout = input.layout === "original";
   pdf.setCreator(originalLayout ? "IQB-Testcenter" : "IQB Testcenter Rewrite");
   pdf.setProducer("IQB Testcenter Rewrite");
-  pdf.setTitle(
-    input.attachments.length === 1
-      ? applyAttachmentLabelTemplate(
-          input.attachments[0]!,
-          input.labelTemplate,
-          originalLayout
-        )
-      : originalLayout
-        ? [...new Set(input.attachments.map(attachment => attachment.groupLabel ?? attachment.groupKey))].join(", ")
-        : `Attachment QR pages - ${input.attachments.length} requests`
-  );
+  const documentTitle = input.attachments.length === 1
+    ? applyAttachmentLabelTemplate(input.attachments[0]!, input.labelTemplate, originalLayout)
+    : originalLayout
+      ? [...new Set(input.attachments.map(attachment => attachment.groupLabel ?? attachment.groupKey))].join(", ")
+      : `Attachment QR pages - ${input.attachments.length} requests`;
+  pdf.setTitle(originalLayout ? originalMetadataText(documentTitle) : documentTitle);
   pdf.setSubject("Printable QR handoff pages for participant attachments");
   const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);

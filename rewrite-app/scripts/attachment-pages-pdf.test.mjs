@@ -240,6 +240,47 @@ for(const reference of bookmarkReference.cases) {
   });
 }
 
+// Metadata values measured from the pinned PHP AttachmentTemplate and TCPDF.
+for (const [input, title, bookmark] of [
+  ["\u200bMüller\u200bWest\u200b", "MüllerWest", "MüllerWest"],
+  ["\u00a0\u202f\u2009\tNord\u00a0Süd\x0b\u202f\u00a0", null, "\u00a0\u202f\u2009\tNord\u00a0Süd"],
+  ["\u0085\u2003Nord\u3000\u0085", null, "Nord"],
+  ["\ufeffNord\ufeffWest\ufeff", null, "\ufeffNord\ufeffWest\ufeff"],
+  ["Nord\0Süd\tWest\ufffd\u0007👩🏿", null, "NordSüd\tWest\ufffd\u0007👩🏿"],
+  ["Vor <a title='Raum > Gruppe'>Nord</a> nach <日>Tokyo</日>", null, "Vor Nord nach Tokyo"],
+  ["Nord <?xml version=\"1.0\">West <?info (\"X ?> Y\") ?> Süd", null, "Nord West  Süd"],
+  ["Vor <!-- Kalender > ungelesen --> Nord <!NOTATION notice> Süd <a title=\"halb", null, "Vor  Nord  Süd"],
+]) test(`Original PDF normalizes bookmark and document metadata for ${JSON.stringify(input)}`, async () => {
+  const pdf = await PDFDocument.load(await createAttachmentPagesPdf({
+    attachments: [attachment], layout: "original", labelTemplate: input
+  }));
+  const outlines = pdf.catalog.lookup(PDFName.of("Outlines"));
+  const bookmarkItem = outlines.lookup(PDFName.of("First"));
+  assert.equal(pdf.getTitle(), title ?? input);
+  assert.equal(bookmarkItem.lookup(PDFName.of("Title")).decodeText(), bookmark);
+});
+
+test("Original PDF preserves bookmark order and destinations after a page overflow", async () => {
+  const label = "Abschnitt A\n" + "Zeile A\n".repeat(51) + "Ende A";
+  const attachments = [
+    { ...attachment, personLabel: label.replace("Abschnitt ", "Abschnitt\u200b "), groupLabel: "Nord" },
+    { ...attachment, attachmentId: "second-attachment", personLabel: "Abschnitt\u200bB\nEnde B", groupLabel: "Süd" },
+    { ...attachment, attachmentId: "third-attachment", personLabel: "Abschnitt\u200bC", groupLabel: "Süd" }
+  ];
+  const pdf = await PDFDocument.load(await createAttachmentPagesPdf({
+    attachments, layout: "original", labelTemplate: "%TESTTAKER%"
+  }));
+  assert.equal(pdf.getPageCount(), 4);
+  const outlines = pdf.catalog.lookup(PDFName.of("Outlines"));
+  let item = outlines.lookup(PDFName.of("First"));
+  for (const [page, title] of [[0, label], [2, "AbschnittB\nEnde B"], [3, "AbschnittC"]]) {
+    assert.equal(item.lookup(PDFName.of("Title")).decodeText(), title);
+    assert.equal(item.lookup(PDFName.of("Dest"), PDFArray).get(0).toString(), pdf.getPages()[page].ref.toString());
+    item = item.lookup(PDFName.of("Next"));
+  }
+  assert.equal(item, undefined);
+});
+
 test("default and explicit Rewrite retain their existing viewer mode without Original bookmarks",async()=>{
   for(const layout of [undefined,"rewrite"]) {
     const pdf=await PDFDocument.load(await createAttachmentPagesPdf({attachments:[attachment],layout}));
