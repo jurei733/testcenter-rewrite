@@ -15,7 +15,7 @@ import type { VeronaPlayerHostComponent } from "./verona-player-host.component";
     MatCard, MatCardContent, MatCardHeader, MatCardTitle],
   template: `
     <nav class="pageNav" id="originalSystemCheckPageNavigation" aria-label="Seitennavigation" *ngIf="!view.errorMessage">
-      <span style="color:white; padding-right:8px;">{{ view.pageNavigationPrompt }}</span>
+      <span style="color:white; padding-right:8px;">{{ view.pageNavigationPrompt }}&ngsp;</span>
       <button mat-stroked-button data-cy="page-navigation-backward" aria-label="Vorherige Seite"
         [disabled]="!view.hasPreviousPage" (click)="view.goToRelativePage(-1)">
         <i class="material-icons" aria-hidden="true">&lt;</i>
@@ -41,7 +41,14 @@ import type { VeronaPlayerHostComponent } from "./verona-player-host.component";
     .pageNav { position:absolute; right:0; bottom:0; height:45px; padding:0 30px; font-size:1.2em; background:transparent; max-width:100%; }
     .pageNav > span { overflow-wrap:anywhere; }
     button { height:34px !important; margin-bottom:2px; }
-    mat-button-toggle-group { height:34px; align-items:center; max-width:100%; overflow:auto; vertical-align:middle; }
+    .pageNav > button:disabled { opacity:1; }
+    mat-button-toggle-group {
+      box-sizing:content-box;
+      height:34px;
+      align-items:center;
+      max-width:calc(100% - 2px);
+      overflow:auto hidden;
+    }
     mat-button-toggle.mat-button-toggle-checked { background-color:transparent; }
     /* Material's inner toggle button has no own radius or hover transform;
        do not let the Rewrite's generic capsule button clip its label. */

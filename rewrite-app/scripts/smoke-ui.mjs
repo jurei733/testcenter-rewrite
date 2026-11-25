@@ -2993,7 +2993,11 @@ try {
     await page.waitForFunction(() => document.querySelector("#originalSystemCheckUnitTitle").getBoundingClientRect().bottom <=
       document.querySelector("#originalSystemCheckUnit").getBoundingClientRect().top);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-    assert.equal(await page.locator("#originalSystemCheckPageNavigation mat-button-toggle-group").evaluate(group => {
+    const pagerGroup = page.locator("#originalSystemCheckPageNavigation mat-button-toggle-group");
+    assert.equal(await pagerGroup.evaluate(group => group.getBoundingClientRect().height), 36);
+    const disabledPagerArrow = page.locator("#originalSystemCheckPageNavigation button:disabled");
+    assert.equal(await disabledPagerArrow.evaluate(arrow => getComputedStyle(arrow).opacity), "1");
+    assert.equal(await pagerGroup.evaluate(group => {
       const bounds = group.getBoundingClientRect();
       return [...group.querySelectorAll(".mat-button-toggle-label-content")].every(label => {
         const text = document.createRange();
