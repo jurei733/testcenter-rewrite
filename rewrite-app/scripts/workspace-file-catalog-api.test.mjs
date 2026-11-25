@@ -306,7 +306,12 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       await send(good,403,reader);
       await send(good,404,readOnly);
       await send(good,404,token);
-      await send([['bad.bin',raw,'other']],400);
+      await send([],403,reader);
+      const empty=await fetch(base+workspace+'/file',{method:'POST',headers:{AuthToken:writer}});
+      assert.equal(empty.status,400);
+      assert.equal(await empty.text(),'No Upload File.');
+      assert.equal(await send([],413),'Request size exceeds the maximum for post data!');
+      assert.equal(await send([['bad.bin',raw,'other']],400),'No Upload File in fileforvo');
       await send([['not-a-zip.zip',raw],...good],400);
       assert.equal((await api(scoped+'/files')).totalCount,0);
       const mixed=await send([

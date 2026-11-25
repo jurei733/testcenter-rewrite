@@ -13,7 +13,14 @@ async function readOriginalWorkspaceUpload(contentType:string,bytes:Buffer) {
   const array=form.getAll('fileforvo[]').filter(value=>typeof value!=='string');
   const single=form.getAll('fileforvo').filter(value=>typeof value!=='string').at(-1);
   const files=array.length?array:single?[single]:[];
-  if(!files.length)throw new FirstSliceError(400,'original_workspace_upload_missing','No Upload File in fileforvo');
+  if(!files.length){
+    // Original distinguishes a submitted form without any uploaded files
+    // from a form whose files use a different field.
+    if(!Array.from(form.values()).some(value=>typeof value!=='string')){
+      throw new FirstSliceError(413,'original_workspace_upload_missing','Request size exceeds the maximum for post data!');
+    }
+    throw new FirstSliceError(400,'original_workspace_upload_missing','No Upload File in fileforvo');
+  }
   return Promise.all(files.map(async file=>({fileName:file.name,bytes:new Uint8Array(await file.arrayBuffer())})));
 }
 export function originalWorkspaceRouteLabel(method:string,pathname:string):string|null {
@@ -84,6 +91,8 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
         if(upload){
           const contentType=input.request.headers['content-type']??'';
           if(!/^multipart\/form-data(?:;|$)/i.test(contentType)){
+            const hasBody=input.request.headers['transfer-encoding']||Number(input.request.headers['content-length']??0)>0;
+            if(!hasBody)throw new FirstSliceError(400,'original_workspace_upload_missing','No Upload File.');
             throw new FirstSliceError(400,'original_workspace_multipart_invalid','A workspace file upload requires multipart form data.');
           }
           const files=await readOriginalWorkspaceUpload(contentType,await input.readUpload());
