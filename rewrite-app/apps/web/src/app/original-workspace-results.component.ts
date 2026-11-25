@@ -12,13 +12,16 @@ import {MatTooltip} from '@angular/material/tooltip';
 import {OriginalParticipantConfirmationDialogComponent} from './original-participant-confirmation-dialog.component';
 import {OriginalWorkspaceFileIconComponent} from './original-workspace-file-icon.component';
 import {OriginalWorkspaceFileNoticeComponent} from './original-workspace-file-notice.component';
+import {OriginalToastContainerComponent} from './original-toast-container.component';
+import {OriginalToastService} from './original-toast.service';
 import {OriginalWorkspaceResultsController,type OriginalResultsView,type OriginalResultRow,type OriginalTestRow} from './original-workspace-results-controller';
 import {createOriginalWorkspaceResultsTransport} from './original-workspace-results-http';
 import {RewriteAppUiStateService} from './rewrite-app-ui-state.service';
 
 @Component({selector:'app-original-workspace-results',standalone:true,
+ providers:[OriginalToastService],
  imports:[CommonModule,MatButton,MatCheckbox,MatExpansionModule,MatProgressBar,MatSort,MatSortHeader,MatTableModule,MatTooltip,
-  OriginalWorkspaceFileIconComponent,OriginalWorkspaceFileNoticeComponent],
+  OriginalWorkspaceFileIconComponent,OriginalWorkspaceFileNoticeComponent,OriginalToastContainerComponent],
  templateUrl:'./original-workspace-results.component.html',
  styleUrls:['./original-workspace-results.component.css','./original-workspace-tests.component.css']})
 export class OriginalWorkspaceResultsComponent implements OnChanges,OnDestroy {
@@ -31,6 +34,7 @@ export class OriginalWorkspaceResultsComponent implements OnChanges,OnDestroy {
  private readonly changed=inject(ChangeDetectorRef);
  private readonly dialogs=inject(MatDialog);
  private readonly snacks=inject(MatSnackBar);
+ private readonly toasts=inject(OriginalToastService);
  private destroyed=false;
  private deletion:MatDialogRef<OriginalParticipantConfirmationDialogComponent>|null=null;
  readonly resultDataSource=new MatTableDataSource<OriginalResultRow>([]);
@@ -60,7 +64,7 @@ export class OriginalWorkspaceResultsComponent implements OnChanges,OnDestroy {
  private async download(type:'response'|'log'|'review',enhanced=false):Promise<void>{
   const result=await this.controller.download(type,enhanced);
   if(!result||!result.current()||this.destroyed)return;
-  if(!result.blob.size){this.snacks.open('Keine Daten verfügbar.','',{duration:3000});return;}
+  if(!result.blob.size){this.toasts.show('Keine Daten verfügbar.');return;}
   const url=URL.createObjectURL(result.blob),link=document.createElement('a');link.href=url;
   link.download='iqb-testcenter-'+({response:'responses',log:'logs',review:'reviews'}[type])+'.csv';
   document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);

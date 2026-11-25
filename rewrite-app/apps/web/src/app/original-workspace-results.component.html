@@ -3,6 +3,7 @@
   <button mat-raised-button [disabled]="controller.busy" (click)="controller.connect()">Erneut laden</button>
 }
 @if (view === 'results') {
+<app-original-toast-container />
 <div class="results-view">
 <div id="originalWorkspaceResults" class="columnhost flex-column" [attr.aria-busy]="controller.busy">
   <div class="flex-row">

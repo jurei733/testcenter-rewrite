@@ -100,6 +100,23 @@ test('Source immediate CSV selection clearing preserves a new selection across a
  f.c.check(f.c.rows[1],true);assert.deepEqual(f.c.selectedGroups.map(r=>r.groupName),['B']);
  gate.resolve(new Blob(['owned A']));assert.ok((await work).current());assert.deepEqual(f.c.selectedGroups.map(r=>r.groupName),['B']);
 });
+test('native Results reports and deletion keep the order of group selection',async()=>{
+ const f=fixture(call=>call.csv?new Blob(['owned data']):[row(),row('B'),row('C')]);
+ await f.c.connect();
+ const [alpha,beta,gamma]=f.c.rows;
+ f.c.check(beta,true);
+ f.c.checkAll(true);
+ assert.deepEqual(f.c.selectedGroups,[beta,alpha,gamma]);
+ f.c.check(beta,false);
+ f.c.check(beta,true);
+ assert.deepEqual(f.c.captureDeletion().groups,['A','C','B']);
+ assert.ok(await f.c.download('review',true));
+ const query=new URL(f.calls.at(-1).path,'http://owned').searchParams;
+ assert.equal(query.get('dataIds'),'A,C,B');
+ assert.equal(query.get('useNewVersion'),'true');
+ assert.ok(f.c.rows.every(row=>!row.checked));
+ assert.deepEqual(f.c.selectedGroups,[]);
+});
 test('one Original Test sort applies to every group and survives deletion refresh and workspace changes',async()=>{
  const f=fixture(call=>call.path.endsWith('/results')?[row()]:sessions,'tests');await f.c.connect();
  const expected=Object.entries(sessions).map(([name,rows])=>({name,rows:[...rows].sort((a,b)=>b.loginName.localeCompare(a.loginName))}));

@@ -18,6 +18,7 @@ export class OriginalWorkspaceResultsController {
  groups:Array<{name:string;rows:OriginalTestRow[]}>=[];
  busy=false;loaded=false;problem='';notice='';role:''|'RO'|'RW'='';
  private nativeId='';private epoch=0;private owner:Owner|null=null;private destroyed=false;private selection=0;
+ private readonly groupSelection=new Set<OriginalResultRow>();
  private testSort={active:'name',direction:'asc'};
  constructor(private readonly transport:OriginalWorkspaceResultsTransport,private readonly current:()=>OriginalResultsScope,
   private readonly changed:()=>void){}
@@ -30,7 +31,7 @@ export class OriginalWorkspaceResultsController {
   const value=await this.transport(method,path,body,o.token,o.abort.signal,csv);
   if(!this.owns(o))throw Error('Die Anmeldung oder der Arbeitsbereich hat sich geändert.');return value;
  }
- private clear():void{this.rows=[];this.groups=[];this.selection++;this.loaded=false;}
+ private clear():void{this.groupSelection.clear();this.rows=[];this.groups=[];this.selection++;this.loaded=false;}
  async connect():Promise<void>{
   this.owner?.abort.abort();const s=this.current();
   if(this.owner?.view!==s.view)this.testSort={active:'name',direction:'asc'};
@@ -78,17 +79,25 @@ export class OriginalWorkspaceResultsController {
   for(const group of this.groups)group.rows.sort((a,b)=>a[key].localeCompare(b[key])*direction);
  }
  get canWrite():boolean{return !!this.owner&&this.owns(this.owner)&&this.loaded&&this.role==='RW';}
- get selectedGroups():OriginalResultRow[]{return this.rows.filter(row=>row.checked);}
+ get selectedGroups():OriginalResultRow[]{return [...this.groupSelection];}
  get selectedTests():OriginalTestRow[]{return this.groups.flatMap(group=>group.rows.filter(row=>row.checked));}
  get selectedCount():number{return this.owner?.view==='results'?this.selectedGroups.length:this.selectedTests.length;}
  check(row:OriginalResultRow|OriginalTestRow,checked:boolean):void{
   if(this.busy||!this.owner||!this.owns(this.owner)||![...this.rows,...this.groups.flatMap(g=>g.rows)].includes(row))return;
-  row.checked=checked;this.selection++;this.changed();
+  if(this.owner.view==='results')this.setGroupChecked(row as OriginalResultRow,checked);
+  else row.checked=checked;
+  this.selection++;this.changed();
  }
  checkAll(checked:boolean,groupName?:string):void{
   if(this.busy||!this.owner||!this.owns(this.owner))return;
-  const rows=groupName===undefined?this.rows:this.groups.find(g=>g.name===groupName)?.rows??[];
-  rows.forEach(row=>row.checked=checked);this.selection++;this.changed();
+  if(groupName===undefined)this.rows.forEach(row=>this.setGroupChecked(row,checked));
+  else this.groups.find(g=>g.name===groupName)?.rows.forEach(row=>row.checked=checked);
+  this.selection++;this.changed();
+ }
+ private setGroupChecked(row:OriginalResultRow,checked:boolean):void{
+  row.checked=checked;
+  if(checked)this.groupSelection.add(row);
+  else this.groupSelection.delete(row);
  }
  all(groupName?:string):boolean{
   const rows=groupName===undefined?this.rows:this.groups.find(g=>g.name===groupName)?.rows??[];
@@ -102,7 +111,8 @@ export class OriginalWorkspaceResultsController {
   if(!o||!this.owns(o)||this.busy||o.view!=='results'||!groups.length)return null;
   // Source clears the submitted group selection immediately. A later reply
   // must not clear a new selection made while this CSV is downloading.
-  this.rows.forEach(row=>row.checked=false);this.selection++;this.problem='';this.changed();
+  for(const row of this.groupSelection)this.setGroupChecked(row,false);
+  this.selection++;this.problem='';this.changed();
   try{
    const params=new URLSearchParams({dataIds:groups.join(','),useNewVersion:String(enhanced)});
    const blob=await this.request(o,'GET','/workspace/'+this.nativeId+'/report/'+type+'?'+params,undefined,true);
