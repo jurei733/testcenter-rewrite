@@ -11,6 +11,36 @@ import {DOMParser,type Element} from '@xmldom/xmldom';
 import {normalizeWorkspacePlayerResourceId} from './workspace-file-catalog.js';
 type Scope={tenantId:string;workspaceId:string};
 export type OriginalBookletFiles={xml:string;resources:Record<string,Record<string,string[]>>};
+
+function originalReviewLabelKey(alias:string):string|bigint {
+  if(!/^(?:0|-?[1-9]\d{0,18})$/.test(alias))return alias;
+  const value=BigInt(alias);
+  return value>=-(1n<<63n)&&value<(1n<<63n)?value:alias;
+}
+
+function originalReviewUnitLabels(node:Element):Map<string|bigint,string> {
+  let labels=new Map<string|bigint,string>();
+  for(let child=node.firstChild;child;child=child.nextSibling){
+    if(child.nodeType!==1)continue;
+    const element=child as Element;
+    if(element.tagName==='Unit'){
+      const raw=element.getAttribute('alias');
+      const alias=raw&&raw!=='0'?raw:element.getAttribute('id')??'';
+      labels.set(originalReviewLabelKey(alias),element.getAttribute('label')??'');
+      continue;
+    }
+    // The Original merges each child's labels with PHP array_merge. It
+    // renumbers integer keys from both maps and preserves string aliases.
+    const nested=originalReviewUnitLabels(element),merged=new Map<string|bigint,string>();
+    let nextIndex=0n;
+    for(const entries of [labels,nested]){
+      for(const [key,label] of entries)merged.set(typeof key==='bigint'?nextIndex++:key,label);
+    }
+    labels=merged;
+  }
+  return labels;
+}
+
 export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;project:(source:SourcePackage)=>WorkspaceCatalogInput;decode:(source:SourcePackage)=>{bytes:Uint8Array}|null;
  readPackage:(source:SourcePackage,path:string)=>Uint8Array|null}){
  const cache=new Map<string,{revision:string;catalog:WorkspaceFileCatalog;bytes:number}>();let retainedBytes=0;
@@ -33,12 +63,9 @@ export function createOriginalTestFiles(deps:{repository:FirstSliceRepository;pr
    if(typeof xml!=='string')return{bookletLabel:'',unitLabels:{}};
    const document=new DOMParser({onError(){}}).parseFromString(xml,'application/xml'),root=document.documentElement;
    const metadata=Array.from(root?.childNodes??[]).find(node=>node.nodeType===1&&(node as Element).tagName==='Metadata') as Element|undefined;
-   const bookletLabel=metadata?.getElementsByTagName('Label')[0]?.textContent??'',unitLabels:Record<string,string>={};
+   const bookletLabel=metadata?.getElementsByTagName('Label')[0]?.textContent??'';
    const units=root?.getElementsByTagName('Units')[0];
-   for(const unit of Array.from(units?.getElementsByTagName('Unit')??[])){
-    const raw=unit.getAttribute('alias'),alias=raw&&raw!=='0'?raw:unit.getAttribute('id')??'';
-    Object.defineProperty(unitLabels,alias,{value:unit.getAttribute('label')??'',enumerable:true,writable:true,configurable:true});
-   }
+   const unitLabels=units?Object.fromEntries(Array.from(originalReviewUnitLabels(units),([key,label])=>[String(key),label])):{};
    return{bookletLabel,unitLabels};
   },
   async unit(scope:Scope,fileId:string):Promise<{definition:string;definitionType:string}>{

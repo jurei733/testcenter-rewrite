@@ -78,6 +78,18 @@ function ownedUnit(parent:OriginalReportParent,stored:OriginalReportStoredUnit):
   if(!originalUnitParentMatches(parent.run,stored)||!originalUnitParentMatches(stored,stored.unit)||stored.unitName!==stored.unit.unitName||typeof stored.unit.originalUnitId!=='string')throw unavailable();
   return stored.unit;
 }
+
+type ResponseOrder=Pick<OriginalResponseReportRecord,'groupname'|'loginname'|'code'|'bookletname'|'unitname'|'originalUnitId'>;
+export function compareOriginalResponseReportRows(left:ResponseOrder,right:ResponseOrder,compareLoginName:(a:string,b:string)=>number):number {
+  // AdminDAO orders by the columns' declared collations. Of these keys only
+  // login_sessions.name uses the database default instead of german2_ci.
+  return compareOriginalParticipantGroupKeys(left.groupname,right.groupname)||
+    compareLoginName(left.loginname,right.loginname)||
+    compareOriginalParticipantGroupKeys(left.code,right.code)||
+    compareOriginalParticipantGroupKeys(left.bookletname,right.bookletname)||
+    compareOriginalParticipantGroupKeys(left.unitname,right.unitname)||
+    compareOriginalParticipantGroupKeys(left.originalUnitId,right.originalUnitId);
+}
 /** Only the requested family is materialized. Unit identities in log/review
  * snapshots contain neither state nor response parts. */
 export function projectOriginalWorkspaceReport(input:OriginalReportRequest,parents:OriginalReportParent[],family:OriginalReportFamily):OriginalWorkspaceReportSnapshot {
@@ -105,7 +117,7 @@ export function projectOriginalWorkspaceReport(input:OriginalReportRequest,paren
     }
     for(const stored of family.units)findUnit(stored,stored.unitName);
     for(const legacy of family.legacyUnits){const parent=byRun.get(legacy.testRunId);if(!parent||!findUnit(parent.run,legacy.unitName))throw unavailable();}
-    rows.sort((a,b)=>compare(a.groupname,b.groupname)||compare(a.loginname,b.loginname)||compare(a.code,b.code)||compare(a.bookletname,b.bookletname)||compare(a.unitname,b.unitname)||compare(a.originalUnitId,b.originalUnitId));
+    rows.sort((a,b)=>compareOriginalResponseReportRows(a,b,compare));
     return {type:'response',rows};
   }
   const unitsFor=(parent:OriginalReportParent,name:string):UnitIdentity=>{

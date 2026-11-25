@@ -360,6 +360,46 @@ for(const kind of kinds)test(`${kind}: native Review is scoped, durable and atom
     assert.equal(archive.get('reviews.csv'),csv.body);
    }finally{at=previous;}
   });
+  await t.test('numeric Testlet aliases match Original labels and response order in workspace and ZIP reports',async()=>{
+   const groupKey='OWNED.A';
+   const labels={'8':'Direct','1':'First','2':'Second','19':'Nested','08':'Leading zero',
+    '-3':'Negative','9223372036854775808':'Outside int64'};
+   const unit=alias=>`<Unit id="OWNED.UNIT" alias="${alias}" label="${labels[alias]}"/>`;
+   const direct=unit('8'),nested=`<Testlet id="inner">${unit('19')}${unit('08')}</Testlet>`;
+   const block=`<Testlet id="outer">${unit('1')}${nested}${unit('2')}${unit('-3')}${unit('9223372036854775808')}</Testlet>`;
+   const publish=async(moved)=>{
+    const units=moved?block+direct:direct+block;
+    await upload('booklet.xml',xml('Booklet',`<Metadata><Id>OWNED.REVIEW</Id><Label>${moved?'Current':'Previous'} Booklet</Label></Metadata><Units>${units}</Units>`));
+   };
+   await publish(false);
+   const person=await services.originalAuthentication.login({name:'ordered-2',password:''});
+   const testNumber=await services.originalTest.create({token:person.token,bookletName:'OWNED.REVIEW'});
+   for(const unitName of Object.keys(labels)){
+    await services.originalReview.create({token:person.token,testNumber,unitName,body:{...body,entry:'Numbered '+unitName}});
+   }
+   const report=input=>services.originalWorkspaceReport.read({...scope,type:'review',dataIds:groupKey,accept:'application/json',...input});
+   const inspect=reportBody=>Object.fromEntries(JSON.parse(reportBody).filter(row=>row.entry.startsWith('Numbered ')).map(row=>[row.unitname,row.unitlabel]));
+   const expected={'8':'','1':'First','2':'Nested','19':'','08':'Leading zero','-3':'','9223372036854775808':'Outside int64'};
+   const previous=await report({useNewVersion:true});
+   assert.deepEqual(inspect(previous.body),expected);
+   const legacy=await report({useNewVersion:false});
+   await publish(true);
+   await reopen();
+   const current=await report({useNewVersion:true});
+   const currentLabels={...expected,'8':'Direct','1':'Nested','2':'Second'};
+   assert.deepEqual(inspect(current.body),currentLabels);
+   assert.deepEqual(await report({useNewVersion:false}),legacy);
+   const participant=await services.originalReview.export({token:person.token,format:'json'});
+   assert.deepEqual(inspect(participant.body),currentLabels);
+   const archive=await readArchive([groupKey]);
+   assert.equal(archive.get('reviews.json'),current.body);
+   assert.equal(archive.get('reviews.csv'),(await report({useNewVersion:true,accept:'text/csv'})).body);
+   const response=await report({type:'response',useNewVersion:false});
+   for(const json of [response.body,archive.get('responses.json')]){
+    const aliasOrder=JSON.parse(json).map(row=>row.unitname).filter(unitName=>Object.hasOwn(labels,unitName));
+    assert.deepEqual(aliasOrder,['-3','08','1','19','2','8','9223372036854775808']);
+   }
+  });
   await t.test('Source57 native response and log report bytes survive durable reopen',async()=>{
    const previous=at;try{await assertNativeResultReportWitness({services:()=>services,tenantKey:tenant.tenantKey,setNow:value=>{at=value;},reopen});}finally{at=previous;}
   });

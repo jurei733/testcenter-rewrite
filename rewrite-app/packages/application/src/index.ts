@@ -93,7 +93,7 @@ export type {OriginalResultTest} from './original-group-results.js';
 import {createOriginalGroupResultsPort, projectOriginalStartedTests, type OriginalGroupResultInventory} from './original-group-results.js';
 export {prepareOriginalTestSelection,prepareOriginalTestDeletionInput,selectOriginalTestDeletion,deleteOriginalSelectedTestsFromCollections} from './original-test-deletion.js';
 export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletionResult} from './original-test-deletion.js';
-import {createOriginalWorkspaceReportPort,isOriginalReportLog,prepareOriginalWorkspaceReviewRows,type PreparedOriginalWorkspaceReviews} from './original-workspace-reports.js';
+import {compareOriginalResponseReportRows,createOriginalWorkspaceReportPort,isOriginalReportLog,prepareOriginalWorkspaceReviewRows,type PreparedOriginalWorkspaceReviews} from './original-workspace-reports.js';
 export {selectOriginalReportParents,projectOriginalWorkspaceReport,assertOriginalReportRowCount,readOriginalWorkspaceReportCollections,originalReportUnitIdentity,originalReportFormat,originalReportQuery} from './original-workspace-reports.js';
 export type {OriginalReportMetadata,OriginalReportParent,OriginalReportRun,OriginalReportFamily,OriginalReportRequest,OriginalWorkspaceReportSnapshot,OriginalReportStoredUnit,OriginalReportStoredReview} from './original-workspace-reports.js';
 export {assertOriginalWorkspaceWrite,guardOriginalWorkspaceWriteCollections,originalWorkspaceWriteSqlSnapshot,
@@ -16357,7 +16357,7 @@ const buildOriginalResponseReportRows = (input: {
     })
     .sort(
       (left, right) =>
-        nativeCompare ? nativeCompare(left.groupname,right.groupname)||nativeCompare(left.loginname,right.loginname)||nativeCompare(left.code,right.code)||nativeCompare(left.bookletname,right.bookletname)||nativeCompare(left.unitname,right.unitname)||nativeCompare(left.originalUnitId,right.originalUnitId) :
+        nativeCompare ? compareOriginalResponseReportRows(left,right,nativeCompare) :
         left.groupname.localeCompare(right.groupname) ||
         left.loginname.localeCompare(right.loginname) ||
         left.bookletname.localeCompare(right.bookletname) ||
