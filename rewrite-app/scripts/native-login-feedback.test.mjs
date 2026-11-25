@@ -25,7 +25,9 @@ function load(relative){
  });return exports;
 }
 const {NativePublicHeaderService}=load('native-public-header.service.ts');
-const {isExplicitOriginalAdminLogin,originalMissingRouteBookmark,originalParticipantBookmark,originalParticipantReturnPath}=load('native-participant/original-participant-bookmark.ts');
+const {isExplicitOriginalAdminLogin,originalMissingRouteBookmark,originalParticipantBookmark,originalParticipantReturnPath,
+ originalResultsHashDestination,prepareOriginalResultsEntry,rememberOriginalOperatorTab,takeOriginalResultsEntryFromOperatorTab
+}=load('native-participant/original-participant-bookmark.ts');
 test('Original participant bookmarks distinguish direct logins, explicit returns and reserved routes',()=>{
  assert.equal(originalParticipantBookmark('#/r/login'),'/native-start/login');
  assert.equal(originalParticipantBookmark('#/r/login/%2Fr%2Fstarter'),'/native-start/login?returnTo=%2Fr%2Fstarter');
@@ -64,6 +66,27 @@ test('Original administrative bookmarks retain targets for role and workspace ch
  for(const path of ['admin/2%2F3/files','admin/2/%2e%2e','superadmin/%5Csettings','superadmin/(outside)']){
   assert.equal(originalParticipantBookmark('#/'+path),null,path);
  }
+});
+test('only the Results bookmark uses the presentation of an already open operator tab',()=>{
+ const values=new Map(),history={length:1};
+ const tab={history,sessionStorage:{getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)}};
+ const results=originalResultsHashDestination('#/admin/2/results?returnUrl=https://owned.invalid');
+ assert.equal(results,'/admin/2/results?legacyBookmark=1&ui=original');
+ for(const hash of ['#/admin/2/files','#/admin/2/results/extra','#/admin/2%2F3/results','#/admin/name/results','#/gm/2/results']){
+  assert.equal(originalResultsHashDestination(hash),null);
+ }
+ rememberOriginalOperatorTab(tab,true);
+ prepareOriginalResultsEntry(results,tab);
+ assert.equal(takeOriginalResultsEntryFromOperatorTab(),false,'a fresh tab may have copied storage from its opener');
+ history.length=2;
+ prepareOriginalResultsEntry('/admin/2/files?legacyBookmark=1',tab);
+ assert.equal(takeOriginalResultsEntryFromOperatorTab(),false);
+ prepareOriginalResultsEntry(results,tab);
+ assert.equal(takeOriginalResultsEntryFromOperatorTab(),true);
+ assert.equal(takeOriginalResultsEntryFromOperatorTab(),false,'reloading the normalized route does not reuse the presentation flag');
+ rememberOriginalOperatorTab(tab,false);
+ prepareOriginalResultsEntry(results,tab);
+ assert.equal(takeOriginalResultsEntryFromOperatorTab(),false);
 });
 test('Original public and Systemcheck bookmarks select their cold entry screens',()=>{
  for(const notice of ['legal-notice','privacy','accessibility']){

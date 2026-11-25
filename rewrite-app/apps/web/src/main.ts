@@ -2,7 +2,7 @@ import { bootstrapApplication } from "@angular/platform-browser";
 
 import { appConfig } from "./app/app.config";
 import { BootstrapRootComponent } from "./app/bootstrap-root.component";
-import { originalMissingRouteBookmark, originalParticipantBookmark } from "./app/native-participant/original-participant-bookmark";
+import { originalMissingRouteBookmark, originalParticipantBookmark, prepareOriginalResultsEntry } from "./app/native-participant/original-participant-bookmark";
 
 const registerAppShellServiceWorker = async (): Promise<void> => {
   if (!("serviceWorker" in navigator)) {
@@ -27,6 +27,7 @@ const normalizeOriginalEntry = (): void => {
   if (/^\/(?:app\/?)?$/.test(url.pathname)) {
     const destination = originalParticipantBookmark(url.hash) ?? originalMissingRouteBookmark(url.hash);
     if (destination) {
+      prepareOriginalResultsEntry(destination, window);
       const bookmark = new URL("/app" + destination, url.origin);
       url.pathname = bookmark.pathname;
       // The legacy sign-in cannot opt into the modern operator demo or return hooks.

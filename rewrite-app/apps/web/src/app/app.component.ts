@@ -35,7 +35,7 @@ import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
 import { NativeErrorPresenterService } from "./native-error-presenter.service";
 import { openNativeSystemCheckInstallationError } from "./native-system-check/native-system-check-installation-error";
-import { isExplicitOriginalAdminLogin } from "./native-participant/original-participant-bookmark";
+import { isExplicitOriginalAdminLogin, originalResultsHashDestination, rememberOriginalOperatorTab } from "./native-participant/original-participant-bookmark";
 
 const routeViews: AppView[] = [
   "home",
@@ -95,6 +95,16 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly routerEventsSubscription = this.router.events.subscribe(
     event => {
       if (event instanceof NavigationEnd) {
+        const original = this.interfaceMode.mode() === "original";
+        const fragment = this.router.parseUrl(event.urlAfterRedirects).fragment;
+        const resultsDestination = original && fragment ? originalResultsHashDestination("#" + fragment) : null;
+        if (resultsDestination) {
+          void this.router.navigateByUrl(resultsDestination, { replaceUrl: true });
+          return;
+        }
+        const path = event.urlAfterRedirects.split(/[?#]/, 1)[0] ?? "";
+        rememberOriginalOperatorTab(window, original &&
+          this.app.ops.adminSessionToken.trim() !== "" && /^\/(?:operator-start|ops|admin(?:\/.*)?|superadmin(?:\/.*)?)$/.test(path));
         queueMicrotask(() =>
           this.routeVersion.update(version => version + 1)
         );

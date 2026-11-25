@@ -21,6 +21,35 @@ const originalRootDestinations = new Map([
 const invalidSegment = (value: string) =>
   value === '.' || value === '..' || /[\/\\?#();\x00-\x1f\x7f]/.test(value);
 export const legacyBookmarkQueryKey = 'legacyBookmark';
+const originalResultsPath = /^\/admin\/0*[1-9]\d*\/results(?:\?|$)/;
+const originalOperatorTabKey = 'testcenter:original-operator-tab';
+let originalResultsOpenedFromOperatorTab = false;
+
+export function rememberOriginalOperatorTab(tab: Pick<Window, 'sessionStorage'>, active: boolean): void {
+  try {
+    if (active) tab.sessionStorage.setItem(originalOperatorTabKey, '1');
+    else tab.sessionStorage.removeItem(originalOperatorTabKey);
+  } catch { /* A browser without storage uses the fresh-document presentation. */ }
+}
+
+export function prepareOriginalResultsEntry(destination: string, tab: Pick<Window, 'history' | 'sessionStorage'>): void {
+  originalResultsOpenedFromOperatorTab = false;
+  if (!originalResultsPath.test(destination) || tab.history.length <= 1) return;
+  try {
+    originalResultsOpenedFromOperatorTab = tab.sessionStorage.getItem(originalOperatorTabKey) === '1';
+  } catch { /* Entry history only affects the toolbar spacing. */ }
+}
+
+export function takeOriginalResultsEntryFromOperatorTab(): boolean {
+  const previouslyOpen = originalResultsOpenedFromOperatorTab;
+  originalResultsOpenedFromOperatorTab = false;
+  return previouslyOpen;
+}
+
+export function originalResultsHashDestination(hash: string): string | null {
+  const destination = originalParticipantBookmark(hash);
+  return destination && originalResultsPath.test(destination) ? destination + '&ui=original' : null;
+}
 
 function protectedDestination(path: string): string | null {
   if (path === '/t/status') return '/native-test/status';

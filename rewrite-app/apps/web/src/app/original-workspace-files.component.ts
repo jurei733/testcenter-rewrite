@@ -1,4 +1,4 @@
-import {ChangeDetectorRef,Component,Input,inject,type OnChanges,type OnDestroy} from '@angular/core';
+import {ChangeDetectorRef,Component,Input,ViewChild,inject,type AfterViewInit,type OnChanges,type OnDestroy} from '@angular/core';
 import {HttpErrorResponse,HttpHeaders} from '@angular/common/http';
 import {MatButton} from '@angular/material/button';
 import {Router,RouterLink,RouterLinkActive,ActivatedRoute} from '@angular/router';
@@ -25,6 +25,7 @@ import {RewriteAppApiService,type ApiErrorLike} from './rewrite-app-api.service'
 import {RewriteAppOperatorAccessService} from './rewrite-app-operator-access.service';
 import {redactBugReportText} from '@testcenter-rewrite-app/contracts';
 import {nativeRequestError} from './native-participant/native-http-policy';
+import {takeOriginalResultsEntryFromOperatorTab} from './native-participant/original-participant-bookmark';
 import {NativeLoginErrorDialogComponent,type NativeErrorDialogData} from './native-login-error-dialog.component';
 import {OriginalWorkspaceOperatorHeaderState} from './original-workspace-operator-header.component';
 import {OriginalWorkspaceFileIconComponent} from './original-workspace-file-icon.component';
@@ -39,7 +40,7 @@ import {NativeSystemCheckInstallationService} from './native-system-check/native
    MatProgressBar,MatProgressSpinner,MatSort,MatSortHeader,MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,MatCellDef,MatCell,
    MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow,MatTooltip,OriginalWorkspaceFileIconComponent,OriginalWorkspaceFileNoticeComponent],
  templateUrl:'./original-workspace-files.component.html',styleUrls:['./original-login-theme.scss','./original-workspace-files.component.css']})
-export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
+export class OriginalWorkspaceFilesComponent implements AfterViewInit,OnChanges,OnDestroy {
  @Input({required:true}) sessionToken='';
  @Input({required:true}) tenantKey='';
  @Input({required:true}) workspaceKey='';
@@ -64,8 +65,11 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  // RouterLinkActive supplies the route's activation lifecycle. The selected
  // view still follows the normalized query parameter, including the default.
  readonly tabRouteMatch={paths:'exact',queryParams:'ignored',matrixParams:'ignored',fragment:'ignored'} as const;
+ @ViewChild(MatTabNav) private tabNavigation!:MatTabNav;
+ private readonly resultsOpenedFromOperatorTab=takeOriginalResultsEntryFromOperatorTab();
  // Original uses Material's default spacing when Results is the document's first view.
- compactResultsToolbar=(this.route.snapshot.paramMap.get('workspaceTab')??this.route.snapshot.queryParamMap.get('tab'))!=='results' ||
+ compactResultsToolbar=this.resultsOpenedFromOperatorTab ||
+   (this.route.snapshot.paramMap.get('workspaceTab')??this.route.snapshot.queryParamMap.get('tab'))!=='results' ||
    !!(this.router.currentNavigation()??this.router.lastSuccessfulNavigation())?.previousNavigation;
  resultsRole:''|'RO'|'RW'='';
  private readonly snacks=inject(MatSnackBar);
@@ -109,6 +113,17 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    {label:'Systemcheck-Definitionen',versions:'18'},{label:'Units',versions:'17'},{label:'Verona-Player',versions:'2–6'}];
  readonly trackFile=(_index:number,file:OriginalWorkspaceFile)=>file.sourcePackageId;
  reloadReports():void {globalThis.location.reload();}
+ ngAfterViewInit():void {
+   if(!this.resultsOpenedFromOperatorTab)return;
+   // Legacy addresses open a new document in the Rewrite. Align the active
+   // label after its fonts load, as on in-document navigation in the Original.
+   void document.fonts.ready.then(()=>{
+     if(this.destroyed||this.tab!=='results')return;
+     this.tabNavigation.updatePagination();
+     this.tabNavigation.selectedIndex=-1;
+     this.tabNavigation.updateActiveLink();
+   });
+ }
  ngOnChanges():void {this.deletion?.close(false);this.deletionError?.close();this.resultsRole='';void this.controller.connect();}
  ngOnDestroy():void {
    this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.deletionError?.close();
