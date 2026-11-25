@@ -172,6 +172,10 @@ export class NativeParticipantEntryComponent {
   }
  }
  private async navigateAfterLogin(access:OriginalAccessSet):Promise<void>{
+  if(access.claims.sysCheck?.length&&!access.flags.includes('codeRequired')&&Object.keys(access.claims).length===1){
+   // A Systemcheck-only chooser keeps the caption from the same-document login.
+   this.settings.claimTabSubtitle('Anmelden',this.session.accessSignal);
+  }
   const returnTo=this.explicitLogin?this.activeRoute.snapshot.queryParamMap.get('returnTo'):null;
   if(returnTo){
    const destination=originalParticipantReturnPath(returnTo);

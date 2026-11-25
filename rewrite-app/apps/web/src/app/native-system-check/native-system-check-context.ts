@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { Router } from '@angular/router';
+import { PRIMARY_OUTLET, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom, race, fromEvent, map } from 'rxjs';
 import {redactBugReportText} from '@testcenter-rewrite-app/contracts';
@@ -87,8 +87,12 @@ export class NativeSystemCheckContext {
   configure(workspaceId: string, name: string, step: string) { this.parameters.set({workspaceId, name, step}); }
   private presentLabel(label: string): void {
     this.currentLabel.set(label);
-    this.releaseTab?.();
-    this.releaseTab = this.settings.claimTabSubtitle(label ? `Systemcheck ${label}` : 'Systemcheck');
+    this.releaseTab = this.claimTab();
+  }
+
+  private claimTab(scope?: AbortSignal): () => void {
+    const label = this.currentLabel();
+    return this.settings.claimTabSubtitle(label ? `Systemcheck ${label}` : 'Systemcheck', scope);
   }
 
   get directReports():boolean{return this.installation.loginRequired()!==false;}
@@ -213,5 +217,16 @@ export class NativeSystemCheckContext {
     this.releaseTab?.(); this.releaseTab = undefined;
     for (const binding of bindings) binding.owner.abort();
   }
-  ngOnDestroy() { this.view.abort(); this.retire(); }
+  ngOnDestroy() {
+    const binding = this.bindings()[0];
+    const target = this.router.currentNavigation()?.finalUrl?.root.children[PRIMARY_OUTLET];
+    const path = target?.segments.map(segment => segment.path).join('/');
+    if (binding?.authenticated && this.current(binding) &&
+        (path === 'native-start' || path === 'native-start/starter' || path === 'native-start/dispatch')) {
+      // The signed-in chooser keeps the caption of the check it just left.
+      this.claimTab(binding.actor);
+    }
+    this.view.abort();
+    this.retire();
+  }
 }

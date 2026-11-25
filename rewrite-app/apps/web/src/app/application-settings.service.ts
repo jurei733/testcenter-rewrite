@@ -30,7 +30,7 @@ const defaultApplicationAssetNames: Record<ApplicationAssetSlotName, string> = {
 @Injectable({ providedIn: "root" })
 export class ApplicationSettingsService {
   private readonly api = inject(RewriteAppApiService);
-  private tabSubtitle: { value: string } | undefined;
+  private tabSubtitle: { value: string; release: () => void } | undefined;
   private warningExpirationTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly participantThemeOverride = signal<ApplicationSettings["themeName"] | null>(null);
   // Undefined means no native view owns the theme. Null means an active native
@@ -151,16 +151,22 @@ export class ApplicationSettingsService {
   /** Accept an already verified, current-session response from a settings editor. */
   applyServerSettings(settings: ApplicationSettings): void { this.apply(settings); }
 
-  /** The active view owns the subtitle. A retired view cannot clear its successor. */
-  claimTabSubtitle(value: string): () => void {
-    const claim = { value };
-    this.tabSubtitle = claim;
-    this.syncDocumentTitle();
-    return () => {
+  /** The current claim owns the subtitle until released or its optional scope ends. */
+  claimTabSubtitle(value: string, scope?: AbortSignal): () => void {
+    if (scope?.aborted) return () => {};
+    const release = () => {
+      scope?.removeEventListener("abort", release);
       if (this.tabSubtitle !== claim) return;
       this.tabSubtitle = undefined;
       this.syncDocumentTitle();
     };
+    const claim = { value, release };
+    const previous = this.tabSubtitle;
+    this.tabSubtitle = claim;
+    previous?.release();
+    scope?.addEventListener("abort", release, { once: true });
+    this.syncDocumentTitle();
+    return release;
   }
 
   private syncDocumentTitle(): void {

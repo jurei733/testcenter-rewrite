@@ -86,6 +86,7 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     };
     await login('r98-syscheck');
     await page.locator('[data-cy="syscheck-R101.FLOW"]').waitFor();
+    await page.waitForFunction(() => document.title === 'IQB-Testcenter | Anmelden');
     assert.equal(await page.locator('[data-cy^="syscheck-"]').count(), 3 + sourceNetwork.networkCases.length);
     assert.equal(await page.getByText('Für diese Anmeldung wurde kein Test gefunden.', {exact: true}).count(), 0);
     mark('native-system-check-source-starter-selection');
@@ -169,6 +170,7 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     assert.ok(!Object.hasOwn(reportBodies[0], 'keyPhrase')); assert.ok(!Object.hasOwn(reportBodies[0], 'title'));
     await page.screenshot({path: join(out, 'saved-dialog.png')});
     await page.locator('#globalConfirmationCancelButton').click(); await page.waitForURL(/\/native-start$/);
+    await page.waitForFunction(() => document.title === 'IQB-Testcenter | Systemcheck Owned native flow');
     mark('native-system-check-questionnaire-report-native-put-persistence');
     assert.ok(wire.every(row => !row.canonicalToken));
     assert.ok(wire.filter(row => row.path.includes('/sys-check/')).every(row => row.nativeToken));
@@ -192,6 +194,7 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     const logout = await fetch(base + '/session', {method: 'DELETE', headers: {AuthToken: token}}); assert.equal(logout.status, 205);
     await page.waitForURL(/\/native-start$/);
     assert.equal(await page.locator('app-original-system-check-content').count(), 0);
+    await page.waitForFunction(() => document.title === 'IQB-Testcenter | Anmelden');
     mark('native-system-check-revoked-person-retires-view');
     await login('r98-syscheck'); await page.locator('[data-cy="syscheck-R101.FLOW"]').waitFor();
     await openFlow(); await next('n');
