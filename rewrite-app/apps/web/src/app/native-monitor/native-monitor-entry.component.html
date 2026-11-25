@@ -7,7 +7,7 @@
    }
   </div>
   <div class="center"><h1>{{headerTitle}}</h1></div>
-  <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div>
+  <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" data-cy="logo" alt="Logo der Anwendung" matTooltip="Zur Startseite" matTooltipClass="original-application-logo-tooltip" /></a></div>
  </mat-toolbar>
 </header>
 @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}

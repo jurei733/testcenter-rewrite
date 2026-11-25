@@ -1,6 +1,7 @@
 import {Component,inject,signal} from '@angular/core';
 import {Router,RouterLink} from '@angular/router';
 import {MatToolbar} from '@angular/material/toolbar';
+import {MatTooltip} from '@angular/material/tooltip';
 import {MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions} from '@angular/material/card';
 import {MatButton} from '@angular/material/button';
 import {MatIcon} from '@angular/material/icon';
@@ -17,11 +18,11 @@ import {parseNativeSystemCheckDirectory,type NativeSystemCheckInfo} from './nati
 // Adapted from pinned Original app-root/sys-check-starter (MIT).
 // See assets/ORIGINAL-UI-LICENSE.txt.
 @Component({selector:'app-native-system-check-starter',standalone:true,providers:[NativeLoginFailureService],
- imports:[RouterLink,MatToolbar,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,MatButton,MatIcon,OriginalOverlayStylesComponent],
+ imports:[RouterLink,MatToolbar,MatTooltip,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,MatButton,MatIcon,OriginalOverlayStylesComponent],
  styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-system-check-content-theme.scss'],
  styles:[`:host{color:var(--mat-sys-on-surface)}.selection{display:flex;flex-wrap:wrap;justify-content:center}.selection .mat-mdc-card{width:400px}.booklet_title{font-size:16pt;text-align:center;white-space:pre-wrap;word-break:break-word;line-height:130%}.booklet_status{font-size:8pt;margin-top:0;color:mediumturquoise;text-align:center}.checks{display:flex;flex-direction:column;gap:10px}.mat-mdc-raised-button.starter{padding:1em;height:auto;display:flex;justify-content:center;align-items:center}`],
- template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side"></div><div class="center">@if(header.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
- <main class="native-login-outlet"><div class="selection"><mat-card appearance="raised"><mat-card-header><mat-card-title>{{settings.settings().appTitle}}</mat-card-title><mat-card-subtitle>Systemcheck Auswahl</mat-card-subtitle></mat-card-header>
+ template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side"></div><div class="center">@if(header.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a routerLink="/native-start" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" data-cy="logo" alt="Logo der Anwendung" matTooltip="Zur Startseite" matTooltipClass="original-application-logo-tooltip" /></a></div></mat-toolbar></header>
+ <main class="native-login-outlet"><div class="selection"><mat-card appearance="raised"><mat-card-header><mat-card-title>{{settings.settings().appTitle}}</mat-card-title><mat-card-subtitle>{{subtitle}}</mat-card-subtitle></mat-card-header>
  <mat-card-content><p>Hier können Sie ermitteln, ob das Computersystem, das Sie gerade benutzen, für die hier vorgesehenen Testungen geeignet ist.</p>
  @if(loading()){<p>Bitte warten... Konfiguration wird geladen</p>}@else if(!problem()){
  @if(checks().length===0){<p>Auf diesem Server ist aktuell kein Systemcheck verfügbar.</p>}
@@ -31,9 +32,11 @@ import {parseNativeSystemCheckDirectory,type NativeSystemCheckInfo} from './nati
  <div class="checks">@for(check of checks();track $index){<button mat-raised-button class="starter" (click)="start(check)"><div class="booklet_title">{{check.label}}</div><div class="booklet_status">{{check.description}}</div></button>}</div></mat-card-content>
  <mat-card-actions><button routerLink="/native-start" mat-raised-button><mat-icon>arrow_back</mat-icon> zurück zur Startseite</button></mat-card-actions></mat-card></div></main>`})
 export class NativeSystemCheckStarterComponent {
+ readonly subtitle='Systemcheck Auswahl';
  readonly header=inject(NativePublicHeaderService);
  readonly settings=inject(ApplicationSettingsService);readonly checks=signal<NativeSystemCheckInfo[]>([]);readonly loading=signal(true);readonly problem=signal('');
  private readonly session=inject(NativeMonitorSessionService);private readonly router=inject(Router);private readonly failure=inject(NativeLoginFailureService);private readonly owner=new AbortController();
+ private readonly releaseTab=this.settings.claimTabSubtitle(this.subtitle);
  constructor(){inject(NativeAssetContext).activate(this.owner.signal);inject(NativeThemeContext).activate(this.owner.signal);inject(InterfaceModeService).select('original');void this.load();}
  private async load(){
   try{const text=await this.session.text('GET','/sys-checks',undefined,'',false,this.owner.signal);this.owner.signal.throwIfAborted();this.checks.set(parseNativeSystemCheckDirectory(text));}
@@ -41,5 +44,5 @@ export class NativeSystemCheckStarterComponent {
   finally{if(!this.owner.signal.aborted)this.loading.set(false);}
  }
  start(check:NativeSystemCheckInfo){if(!this.owner.signal.aborted&&this.checks().includes(check))void this.router.navigate(['/check',check.workspaceId,check.name,'w']);}
- ngOnDestroy(){this.owner.abort();}
+ ngOnDestroy(){this.owner.abort();this.releaseTab();}
 }

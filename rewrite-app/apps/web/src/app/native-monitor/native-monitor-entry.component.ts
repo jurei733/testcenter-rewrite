@@ -11,6 +11,7 @@ import {MatButton,MatIconButton} from '@angular/material/button';
 import {MatInput} from '@angular/material/input';
 import {MatFormField,MatLabel,MatSuffix} from '@angular/material/form-field';
 import {MatToolbar} from '@angular/material/toolbar';
+import {MatTooltip} from '@angular/material/tooltip';
 import {MAT_MENU_DEFAULT_OPTIONS} from '@angular/material/menu';
 import {NativeAccountMenuComponent} from '../native-account-menu.component';
 import {NativeMonitorIconComponent as MatIcon} from './native-monitor-icon.component';
@@ -31,7 +32,7 @@ import {BackendService} from './group-monitor/backend.service';
 import {NativeStarterComponent} from '../native-participant/starter/native-starter.component';
 import {NativePublicHeaderService} from '../native-public-header.service';
 @Component({selector:'app-native-monitor-entry',standalone:true,
- imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,NativeStarterComponent],
+ imports:[FormsModule,RouterOutlet,RouterLink,MatButton,MatIconButton,MatInput,MatFormField,MatLabel,MatSuffix,MatToolbar,MatTooltip,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,NativeStarterComponent],
  providers:[NativeLoginFailureService,BackendService,BookletService,TestSessionManager,{provide:MAT_MENU_DEFAULT_OPTIONS,useFactory:()=>({...inject(MAT_MENU_DEFAULT_OPTIONS,{skipSelf:true}),overlayPanelClass:'original-native-monitor-menu'})},{provide:GROUP_MONITOR_CONFIG,useValue:{checkForIdleInterval:180000}}],
  templateUrl:'./native-monitor-entry.component.html',styleUrls:['./native-monitor-entry.component.css','../original-login-theme.scss']})
 export class NativeMonitorEntryComponent implements OnDestroy {

@@ -111,6 +111,13 @@ try{
  await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'?ui=original',{waitUntil:'networkidle'});await page.locator('input[name=name]').fill(monitorName);await page.locator('[data-cy=login-user]').click();await page.locator('input[name=password]').waitFor();await page.locator('input[name=password]').fill(password);await page.locator('[data-cy=login-user]').click();
  await page.locator('tc-test-card[data-cy^="gm-card-"]').first().waitFor();assert.equal(await page.locator('tc-test-card[data-cy^="gm-card-"]').count(),2);assert.ok(wire.some(r=>r.path==='/session/challenge'));assert.ok(wire.some(r=>r.path==='/session'&&r.method==='PUT'));check('real-native-protected-login-and-profile-choice');
  assert.equal(await page.locator('tc-test-session').count(),0);assert.ok(!wire.some(r=>r.path.endsWith('/test-sessions')));check('profiled-login-on-bare-group-requires-claim-choice');
+ const logo=page.locator('[data-cy=header] [data-cy=logo]');
+ await logo.hover();
+ const logoTooltip=page.locator('.mat-mdc-tooltip').filter({hasText:'Zur Startseite'});
+ await logoTooltip.waitFor();
+ await page.mouse.move(0,0);
+ await logoTooltip.waitFor({state:'hidden'});
+ check('native-monitor-chooser-logo-shows-and-retires-source-tooltip');
  const beforeInvalidProfile=wire.length;
  await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'/not-owned?ui=original',{waitUntil:'networkidle'});await page.locator('tc-test-card[data-cy^="gm-card-"]').first().waitFor();assert.equal(await page.locator('tc-test-card[data-cy^="gm-card-"]').count(),2);assert.equal(await page.locator('tc-test-session').count(),0);assert.ok(!wire.slice(beforeInvalidProfile).some(r=>r.path.startsWith('/monitor/profile/')||r.path.endsWith('/test-sessions')));check('restored-unclaimed-profile-shows-chooser-without-monitor-reads');
  await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'?ui=original',{waitUntil:'networkidle'});await page.locator('tc-test-card[data-cy^="gm-card-"]').first().waitFor();assert.equal(await page.locator('tc-test-card[data-cy^="gm-card-"]').count(),2);assert.equal(await page.locator('tc-test-session').count(),0);check('restored-bare-profiled-group-cannot-skip-chooser');
