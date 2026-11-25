@@ -21540,6 +21540,41 @@ const participantControllerUnitAccessible = (booklet: ContentReleaseBookletEntry
   return cause.by === "code" && first?.unitKey === unit.unitKey && !own.show && !own.time && !own.afterLeave;
 };
 
+const originalUnitAfterTimerExpiry = (booklet: ContentReleaseBookletEntry, run: TestRun, fromUnitAlias: string,
+  timers: NonNullable<NonNullable<TestRun["originalResultState"]>["nativeTestletTimers"]>, timestamp: string): string | null => {
+  const index = booklet.unitEntries.findIndex(unit => sameOriginalTestName(unit.unitKey, fromUnitAlias));
+  const state = run.originalTestState;
+  if (index < 0 || !state) return null;
+  const field = (key: string, fallback: unknown): unknown => {
+    if (!Object.hasOwn(state, key)) return fallback;
+    const raw = state[key];
+    if (typeof raw !== "string") return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  };
+  const unlocked = field("TESTLETS_CLEARED_CODE", []);
+  const locked = field("TESTLETS_LOCKED_AFTER_LEAVE", []);
+  const unitLocks = field("UNITS_LOCKED_AFTER_LEAVING", []);
+  const bookletStates = field("BOOKLET_STATES", {});
+  if (!Array.isArray(unlocked) || !unlocked.every(key => typeof key === "string") ||
+      !Array.isArray(locked) || !locked.every(key => typeof key === "string") ||
+      !Array.isArray(unitLocks) || !bookletStates || typeof bookletStates !== "object" || Array.isArray(bookletStates)) return null;
+  const lockedUnitKeys: string[] = [];
+  // Original saves one-based Unit positions for this field, not aliases.
+  for (const id of unitLocks) {
+    const sequence = typeof id === "number" || typeof id === "string" && /^[1-9]\d*$/.test(id) ? Number(id) : NaN;
+    if (!Number.isSafeInteger(sequence) || sequence < 1 || sequence > booklet.unitEntries.length) return null;
+    lockedUnitKeys.push(booklet.unitEntries[sequence - 1].unitKey);
+  }
+  const states = new Map<string, string>();
+  for (const [key, option] of Object.entries(bookletStates)) {
+    if (typeof option !== "string") return null;
+    states.set(key, option);
+  }
+  const navigationRun = {...run, testletTimers: timers, unlockedTestletKeys: unlocked, lockedTestletKeys: locked, lockedUnitKeys};
+  return booklet.unitEntries.slice(index + 1).find(unit =>
+    participantControllerUnitAccessible(booklet, navigationRun, unit, timestamp, states))?.unitKey ?? null;
+};
+
 const participantCurrentTestletCodeGate = (booklet: ContentReleaseBookletEntry | undefined, run: TestRun) => {
   const index = booklet?.unitEntries.findIndex(unit => unit.unitKey === run.currentUnitKey) ?? -1;
   if (!booklet || index < 0 || !participantCurrentUnitParentLocked(booklet, run)) return null;
@@ -33101,6 +33136,7 @@ export const createFirstSliceServices = (
       readBooklet:(scope,fileId)=>originalTestFiles.booklet(scope,fileId),
       readResource:(scope,path)=>originalTestFiles.resource(scope,path),
       currentBooklet:currentOriginalBooklet,
+      unitAfterTimerExpiry:originalUnitAfterTimerExpiry,
       timedBlock:(booklet,alias)=>{
         const unit=booklet.unitEntries.find(entry=>sameOriginalTestName(entry.unitKey,alias));
         const timed=resolveTimedTestletForUnit(booklet,unit?.unitKey??null);

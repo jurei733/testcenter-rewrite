@@ -1246,6 +1246,12 @@ export type OriginalTestResultState = {
 export type OriginalNativeTestletTimer = TestletTimerState & {
   reopenCommandId?: string;
   parkedByGoto?: true;
+  expirySuccessor?: {
+    fromUnitAlias: string;
+    unitAlias: string;
+    parkedStartedAt: string;
+    commandId: string;
+  };
 };
 
 export type TestRun = {

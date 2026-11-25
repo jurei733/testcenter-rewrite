@@ -100,6 +100,8 @@ export function createOriginalTestPort(input: {
   readResource:(scope:{tenantId:string;workspaceId:string},path:string)=>Promise<{bytes:Uint8Array;contentType:string}>;
   currentBooklet: (person: ParticipantSession, fileId: string) => Promise<{contentReleaseId: string; booklet: ContentReleaseBookletEntry}>;
   timedBlock: (booklet: ContentReleaseBookletEntry, unitAlias: string) => {key:string;minutes:number;leave:'forbidden'|'confirm'|'allowed'}|null;
+  unitAfterTimerExpiry: (booklet: ContentReleaseBookletEntry, run: TestRun, fromUnitAlias: string,
+    timers: Record<string,OriginalNativeTestletTimer>, timestamp: string) => string|null;
 }): OriginalTestPort {
   const personFor=(token:string)=>readOriginalTestPerson(input.auth,token);
   const number=parseOriginalNativeTestNumber;
@@ -149,7 +151,10 @@ export function createOriginalTestPort(input: {
           (grant.timerKey===undefined||grant.timerKey===block.key)&&
           originalParticipantGroupKeysEqual(grant.unitAlias,unitAlias)?grant:undefined;
         const grantedMilliseconds=reopen?.minutes!=null?Math.min(durationMilliseconds,reopen.minutes*60000):durationMilliseconds;
+        const running=testRun.originalTestState?.CONTROLLER==='RUNNING'&&!control?.paused;
+        const activeAlias=testRun.originalTestState?.CURRENT_UNIT_ID;
         let timer:OriginalNativeTestletTimer;
+        let resumedFrom:OriginalNativeTestletTimer|undefined;
         if(action!=='enter'&&!current){
           throw new FirstSliceError(409,'native_timer_unavailable','The Unit has no active server timer.');
         }
@@ -158,8 +163,20 @@ export function createOriginalTestPort(input: {
         }
         if(current){
           const parkedTarget=control?.resumeParkedTimer;
+          const monitorResume=parkedTarget?.timerKey===block.key&&originalParticipantGroupKeysEqual(parkedTarget.unitAlias,unitAlias);
+          if(action==='enter'&&current.status==='paused'&&current.parkedByGoto&&running&&mode.forceTimeRestrictions&&!monitorResume&&
+            typeof activeAlias==='string'&&
+            !Object.values(timers).some(clock=>clock.status==='running')){
+            resumedFrom=Object.values(timers).find(clock=>{
+              const successor=clock.expirySuccessor;
+              if(clock.status!=='expired'||!successor||successor.commandId!==control?.commandId||
+                successor.parkedStartedAt!==current.startedAt||!originalParticipantGroupKeysEqual(successor.unitAlias,unitAlias)||
+                ![successor.fromUnitAlias,successor.unitAlias].some(alias=>originalParticipantGroupKeysEqual(alias,activeAlias)))return false;
+              return input.unitAfterTimerExpiry(booklet,testRun,successor.fromUnitAlias,timers,timestamp)===successor.unitAlias;
+            });
+          }
           const resume=current.status==='paused'&&!control?.paused&&(!current.parkedByGoto||
-            parkedTarget?.timerKey===block.key&&originalParticipantGroupKeysEqual(parkedTarget.unitAlias,unitAlias));
+            monitorResume||resumedFrom!==undefined);
           remainingMilliseconds=current.status==='running'&&current.expiresAt ?
             Math.max(0,Date.parse(current.expiresAt)-now) : Math.max(0,Math.round(current.remainingSeconds*1000));
           if(!Number.isSafeInteger(remainingMilliseconds)){
@@ -167,6 +184,15 @@ export function createOriginalTestPort(input: {
           }
           if(current.status==='running'&&remainingMilliseconds===0&&!reopen){
             timer={...current,status:'expired',remainingSeconds:0,updatedAt:timestamp,endedAt:current.expiresAt??timestamp};
+            if(running&&control&&mode.forceTimeRestrictions&&(action==='expire'||action==='enter')&&typeof activeAlias==='string'&&
+              originalParticipantGroupKeysEqual(activeAlias,unitAlias)){
+              const nextAlias=input.unitAfterTimerExpiry(booklet,testRun,activeAlias,{...timers,[block.key]:timer},timestamp);
+              const nextBlock=nextAlias&&input.timedBlock(booklet,nextAlias);
+              const nextClock=nextBlock&&Object.hasOwn(timers,nextBlock.key)?timers[nextBlock.key]:undefined;
+              if(nextAlias&&nextClock?.status==='paused'&&nextClock.parkedByGoto&&nextClock.remainingSeconds>0){
+                timer.expirySuccessor={fromUnitAlias:activeAlias,unitAlias:nextAlias,parkedStartedAt:nextClock.startedAt,commandId:control.commandId};
+              }
+            }
           }else if(current.status==='running'&&(action==='cancel'||action==='interrupt')){
             if(action==='cancel')remainingMilliseconds=0;
             timer={...current,status:action==='cancel'?'cancelled':'paused',remainingSeconds:remainingMilliseconds/1000,
@@ -178,11 +204,12 @@ export function createOriginalTestPort(input: {
             if(!Number.isFinite(expires.getTime())){
               throw new FirstSliceError(409,'native_timer_unavailable','The authored time limit is outside the supported clock range.');
             }
-            timer={...current,status:'running',durationSeconds:remainingMilliseconds/1000,remainingSeconds:remainingMilliseconds/1000,
+            const {expirySuccessor: _,...previousClock}=current;
+            timer={...previousClock,status:'running',durationSeconds:remainingMilliseconds/1000,remainingSeconds:remainingMilliseconds/1000,
               startedAt:timestamp,expiresAt:expires.toISOString(),updatedAt:timestamp,endedAt:null};
           }else if(action==='enter'&&(reopen||resume)){
             if(reopen)remainingMilliseconds=grantedMilliseconds;
-            const {parkedByGoto: _,...runningTimer}=current;
+            const {parkedByGoto: _,expirySuccessor: _successor,...runningTimer}=current;
             timer={...runningTimer,status:remainingMilliseconds===0?'expired':'running',remainingSeconds:remainingMilliseconds/1000,
               expiresAt:remainingMilliseconds===0?null:new Date(now+remainingMilliseconds).toISOString(),
               updatedAt:timestamp,endedAt:remainingMilliseconds===0?timestamp:null,
@@ -210,7 +237,12 @@ export function createOriginalTestPort(input: {
             ...(reopen?{reopenCommandId:control!.commandId}:{})
           };
         }
-        return {testRun,originalNativeTestletTimers:{...timers,[block.key]:timer},testLogs:[],activityEvents:[]};
+        const nextTimers={...timers,[block.key]:timer};
+        if(resumedFrom){
+          const {expirySuccessor: _,...expiredTimer}=resumedFrom;
+          nextTimers[expiredTimer.testletKey]=expiredTimer;
+        }
+        return {testRun,originalNativeTestletTimers:nextTimers,testLogs:[],activityEvents:[]};
       });
       const timer=result?.testRun.originalResultState?.nativeTestletTimers?.[block.key];
       if(!timer)throw forbidden(raw);

@@ -309,6 +309,67 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    await control('terminate');
    assert.equal((await clocks()).BRAVO.status,'cancelled');
   });
+  await t.test('server expiry restores only the first accessible parked successor and survives a restart',async()=>{
+   const unit=alias=>`<Unit id="ORACLE.POW.UNIT" alias="${alias}" label="${alias}"/>`;
+   const block=id=>`<Testlet id="${id}" label="${id}"><Restrictions><TimeMax minutes="2" leave="forbidden"/></Restrictions>${unit(id)}</Testlet>`;
+   await upload('parked-successor.xml',xml('Booklet','<Metadata><Id>ORACLE.POW.SUCCESSOR</Id><Label>Parked successors</Label></Metadata><Units>'+block('ALPHA')+unit('GAP')+block('BRAVO')+block('CHARLIE')+'</Units>'));
+   const {person}=await authenticate('owned-command-canonical');
+   for(const invalidated of [false,true]){
+    const testNumber=await services.originalTest.create({token:person.token,bookletName:'ORACLE.POW.SUCCESSOR#scenario:'+String(invalidated)});
+    const read={token:person.token,testNumber,nativeStateProtocol:'1'};
+    let now=Date.now();
+    const clockService=()=>createFirstSliceServices({repository,now:()=>new Date(now).toISOString(),originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+    let timed=clockService();
+    const timer=(unitAlias,action='enter')=>timed.originalTest.enterTimer({...read,body:{unitAlias,action}});
+    const control=async(keyword,args=[])=>{
+     await send({keyword,arguments:args,timestamp:Math.floor(now/1000),testIds:[Number(testNumber)]});
+     const [pending]=await repository.listOriginalCommands(await current(testNumber,person),null);
+     assert.equal((await timed.originalCommand.acknowledge({...read,commandNumber:pending.id})).reason,'OK');
+     return pending.id;
+    };
+    const clocks=async()=>(await run(testNumber,person)).originalResultState.nativeTestletTimers;
+    const project=async(state)=>{
+     const {nativeStateBase}=await timed.originalTest.read(read);
+     await timed.originalTest.patchState({...read,deliveryId:randomUUID(),stateBase:nativeStateBase,
+      patch:Object.entries(state).map(([key,content])=>({key,content,timeStamp:now}))});
+    };
+    await timed.originalTest.read(read);
+    await timer('ALPHA');
+    for(const alias of ['CHARLIE','BRAVO','ALPHA']){
+     now+=5000;
+     await control('pause');
+     await control('goto',['id',alias,'']);
+     await timer(alias);
+    }
+    await project({CONTROLLER:'RUNNING',CURRENT_UNIT_ID:'ALPHA',UNITS_LOCKED_AFTER_LEAVING:'[2]'});
+    const bravoPaused=await timer('BRAVO');
+    assert.equal(bravoPaused.status,'paused');
+    const active=await timer('ALPHA','expire');
+    assert.equal(active.status,'running');
+    assert.equal((await clocks()).ALPHA.expirySuccessor,undefined);
+    now=Date.parse(active.expiresAt)+1;
+    assert.equal((await timer('ALPHA','expire')).status,'expired');
+    assert.equal((await clocks()).ALPHA.expirySuccessor.unitAlias,'BRAVO','The saved locked position is skipped');
+    assert.equal((await timer('CHARLIE')).status,'paused');
+    if(invalidated){
+     await control('pause');
+     await control('resume');
+     assert.deepEqual(await timer('BRAVO'),bravoPaused,'New Monitor commands invalidate the previous transition');
+    }else{
+     await close();await open();timed=clockService();
+     await project({CURRENT_UNIT_ID:'BRAVO',UNITS_LOCKED_AFTER_LEAVING:'[2,3]'});
+     assert.deepEqual(await timer('BRAVO'),bravoPaused,'The destination must still be accessible');
+     await project({UNITS_LOCKED_AFTER_LEAVING:'[2]'});
+     const resumed=await timer('BRAVO');
+     assert.equal(resumed.status,'running');
+     assert.equal(resumed.remainingMilliseconds,bravoPaused.remainingMilliseconds);
+     assert.equal(resumed.startedAt,bravoPaused.startedAt);
+     assert.equal((await clocks()).ALPHA.expirySuccessor,undefined);
+     assert.equal((await timer('BRAVO')).expiresAt,resumed.expiresAt);
+     assert.equal((await timer('CHARLIE')).status,'paused');
+    }
+   }
+  });
   await t.test('a monitor can reopen an inherited deadline only at the commanded destination',async()=>{
    const unit=alias=>`<Unit id="ORACLE.POW.UNIT" alias="${alias}" label="${alias}"/>`;
    await upload('nested-timer.xml',xml('Booklet',
