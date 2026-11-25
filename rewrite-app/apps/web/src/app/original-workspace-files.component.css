@@ -17,6 +17,7 @@
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: left;
+  isolation: isolate;
 }
 
 .filelist {
@@ -101,6 +102,12 @@ mat-cell:first-of-type, mat-header-cell:first-of-type, mat-footer-cell:first-of-
 .full-file-report mat-card-content {
   max-height: 15em;
   overflow-y: auto
+}
+
+/* Above the file preview, within the workspace's local stacking context. */
+.sidebar .buttons:has(> button:enabled) {
+  position: relative;
+  z-index: 1001;
 }
 
 .supported-versions {
