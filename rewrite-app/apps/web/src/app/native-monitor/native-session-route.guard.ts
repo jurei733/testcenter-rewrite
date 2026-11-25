@@ -3,6 +3,7 @@ import {toObservable} from '@angular/core/rxjs-interop';
 import {Router,type CanActivateFn} from '@angular/router';
 import {filter,map,take,timeout,type Observable} from 'rxjs';
 import {legacyBookmarkQueryKey} from '../native-participant/original-participant-bookmark';
+import {HeaderService} from './shared/services/header.service';
 import {NativeMonitorSessionService} from './native-session.service';
 
 export function afterNativeSessionRestore<T>(session:NativeMonitorSessionService,decide:()=>T):T|Observable<T>{
@@ -30,8 +31,14 @@ export const gateAttachmentManager:CanActivateFn=()=>{
 };
 
 export const gateLegacyGroupMonitorBookmark:CanActivateFn=route=>{
+ const router=inject(Router);
+ if(route.firstChild&&!router.lastSuccessfulNavigation()){
+  // Capture the public heading configuration before the restored token is
+  // verified. The verified session is still the only source of private labels.
+  inject(HeaderService).captureInitialRoute(route.firstChild);
+ }
  if(route.queryParamMap.get(legacyBookmarkQueryKey)!=='1')return true;
- const session=inject(NativeMonitorSessionService),router=inject(Router);
+ const session=inject(NativeMonitorSessionService);
  return afterNativeSessionRestore(session,()=>{
   const access=session.access();
   const claims=access?.claims.testGroupMonitor;

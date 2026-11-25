@@ -111,6 +111,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   bookletStates: { [p: string]: string } = {};
 
   private subscriptions: Subscription[] = [];
+  private releaseHeader: (() => void) | undefined;
   private readonly routeChanged$ = new Subject<void>();
 
   @ViewChild('adminbackground') mainElem!: ElementRef;
@@ -146,7 +147,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
         this.messageState.set([]);
         this.bookletStates = {};
         this.groupLabel = this.mds.getAccessObject('testGroupMonitor', params['group-name']).label;
-        this.headerService.title = `${this.mds.appTitle$.value} ${this.cts.getCustomText('gm_headline') ?? ''} - ${this.groupLabel}`;
+        this.releaseHeader = this.headerService.showGroup(this.route.snapshot, this.groupLabel);
         const profileId = params['profile-id'];
         const profile$: Observable<Profile | null> = profileId ? this.bs.getProfile(profileId) : of(null);
         return profile$.pipe(
@@ -175,9 +176,6 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
         .pipe(switchMap(() => interval(7000)))
         .subscribe(() => { this.messageState.update(messages => messages.slice(1)); })
     ];
-
-    this.mds.appSubTitle$.next(this.cts.getCustomText('gm_headline') ?? '');
-    this.headerService.title = `${this.mds.appTitle$.value} ${this.mds.appSubTitle$.value} - ${this.groupLabel}`;
   }
 
   private commandResponseToMessage(commandResponse: CommandResponse): UIMessage {
@@ -200,6 +198,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.releaseHeader?.();
     this.routeChanged$.next();
     this.routeChanged$.complete();
     this.tsm.disconnect();

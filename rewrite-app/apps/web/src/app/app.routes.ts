@@ -160,10 +160,10 @@ export const appRoutes: Routes = [
       {path:'capture-image',loadComponent:()=>import('./native-monitor/native-attachment-capture.component')
         .then(module=>module.NativeAttachmentCaptureComponent)}
     ]},
-  {path:'group-monitor',canActivate:[gateLegacyGroupMonitorBookmark],loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),children:[
-    {path:':group-name/:profile-id',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)},
-    {path:':group-name',loadComponent:()=>import('./native-monitor/group-monitor/group-monitor.component').then(module=>module.GroupMonitorComponent)}
-  ]},
+  {path:'group-monitor',canActivate:[gateLegacyGroupMonitorBookmark],
+    loadComponent:()=>import('./native-monitor/native-monitor-entry.component').then(module=>module.NativeMonitorEntryComponent),
+    loadChildren:()=>import('./native-monitor/group-monitor/group-monitor.routes').then(module=>module.groupMonitorRoutes)
+  },
   {path:"",canActivate:[async()=>{
     const injector=inject(Injector);
     const {AppShellFacade}=await import('./app-shell.facade');

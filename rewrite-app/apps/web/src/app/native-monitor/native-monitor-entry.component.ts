@@ -26,7 +26,6 @@ import {AlertComponent} from './shared/components/alert/alert.component';
 import {nativeLoginProblemText} from '../native-login-problem';
 import {NativeLoginFailureService} from '../native-login-failure.service';
 import {OriginalParticipantLogoutDialogComponent} from '../original-participant-logout-dialog.component';
-import {MainDataService} from './shared/shared.module';
 import {HeaderService} from './shared/services/header.service';
 import {BackendService} from './group-monitor/backend.service';
 import {NativeStarterComponent} from '../native-participant/starter/native-starter.component';
@@ -55,7 +54,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  clearLoginWarning(){this.loginProblem.set('');this.loginProblemCode.set(0);this.loginProblemLevel.set('error');}
  passwordKeyUp(event:KeyboardEvent){this.clearLoginWarning();if(typeof event.getModifierState==='function'&&event.getModifierState('CapsLock')){this.loginProblem.set('Feststelltaste ist aktiviert!');this.loginProblemLevel.set('warning');}}
  private readonly router=inject(Router);private readonly route=inject(ActivatedRoute);private readonly dialog=inject(MatDialog);
- constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
+ constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(InterfaceModeService).select('original');
   const detector=inject(ChangeDetectorRef);
   this.backendSubscription.add(this.backend.problem$.subscribe(problem=>this.backendProblem.set(problem)));
   this.backendSubscription.add(this.backend.snapshotOutage$.subscribe(({error,owner,accessRejected})=>{

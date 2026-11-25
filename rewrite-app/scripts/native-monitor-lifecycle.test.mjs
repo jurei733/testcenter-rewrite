@@ -29,6 +29,7 @@ function load(relative){
   if(spec==='rxjs/operators')return operators;
   if(spec.startsWith('@angular/'))return stubs;
   if(spec.endsWith('shared/shared.module'))return shared;
+  if(spec.endsWith('header.service'))return stubs;
   if(spec.endsWith('booklet-parser.service'))return {BookletParserService:class{}};
   if(spec.endsWith('.component')&&!spec.endsWith('/group-monitor.component'))return stubs;
   if(spec.startsWith('.'))return load(resolve(dirname(file),spec+'.ts'));
@@ -69,7 +70,7 @@ function componentFixture(){
  const filterDialog=new rx.Subject(),filterOpen=[];let filterCloses=0;const filterOverlay={open:(component,config)=>{filterOpen.push(config);return {afterClosed:()=>filterDialog,close:()=>{filterCloses++;}};}};
  const cts={getCustomText:()=>null};bindings.set(shared.CustomtextService,cts);
  bindings.set(token('MatDialog'),{open:()=>({afterClosed:()=>confirmations,close:()=>{finishCloses++;}})});const messages=new MessageService();
- const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog,close:()=>{gotoCloses++;},componentRef:{changeDetectorRef:{detectChanges(){dialogRenders++;}}}})}, {params},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group}),appTitle$:new rx.BehaviorSubject('Owned'),appSubTitle$:new rx.BehaviorSubject('')},filterOverlay,{},{},messages);
+ const component=new GroupMonitorComponent({open:()=>({afterClosed:()=>gotoDialog,close:()=>{gotoCloses++;},componentRef:{changeDetectorRef:{detectChanges(){dialogRenders++;}}}})}, {params,snapshot:{}},backend,tsm,{navigateByUrl:path=>{navigated.push(path);return Promise.resolve(true);}},cts,{getAccessObject:(_,group)=>({label:group})},filterOverlay,{},{showGroup:()=>()=>{}},messages);
  component.ngOnInit();
  return {component,params,profiles,connected,navigated,confirmations,controller,tsm,gotoDialog,gotos,filterDialog,filterOpen,get dialogRenders(){return dialogRenders;},get filterCloses(){return filterCloses;},get finishes(){return finishes;},get gotoCloses(){return gotoCloses;},get finishCloses(){return finishCloses;}};
 }
