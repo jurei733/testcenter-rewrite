@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal, untracked } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom, race, fromEvent, map } from 'rxjs';
@@ -45,6 +45,8 @@ export class NativeSystemCheckContext {
   readonly problem = signal('');
   private readonly currentLabel = signal('');
   readonly label = this.currentLabel.asReadonly();
+  private readonly savedReportOwner = signal<NativeSystemCheckBinding | null>(null);
+  readonly savedReportConfirmationOpen = computed(() => this.savedReportOwner() !== null);
   private releaseTab: (() => void) | undefined;
   private verifyTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -176,17 +178,22 @@ export class NativeSystemCheckContext {
         safeMode: this.settings.effectiveThemeName() === 'Primar'}
     });
     const retire = () => { ref.componentRef?.location.nativeElement.remove(); ref.close(); };
+    this.savedReportOwner.set(binding);
     binding.owner.signal.addEventListener('abort', retire, {once: true});
     try {
       await firstValueFrom(race(ref.afterClosed(), fromEvent(binding.owner.signal, 'abort').pipe(map(() => undefined))));
-      if (!this.current(binding)) return;
-      await new Promise<void>(resolve => {
-        const finish = () => { clearTimeout(timer); binding.owner.signal.removeEventListener('abort', finish); resolve(); };
-        const timer = setTimeout(finish, 500);
-        binding.owner.signal.addEventListener('abort', finish, {once: true});
-      });
-      if (this.current(binding)) await this.exit();
-    } finally { binding.owner.signal.removeEventListener('abort', retire); retire(); }
+    } finally {
+      if (this.savedReportOwner() === binding) this.savedReportOwner.set(null);
+      binding.owner.signal.removeEventListener('abort', retire);
+      retire();
+    }
+    if (!this.current(binding)) return;
+    await new Promise<void>(resolve => {
+      const finish = () => { clearTimeout(timer); binding.owner.signal.removeEventListener('abort', finish); resolve(); };
+      const timer = setTimeout(finish, 500);
+      binding.owner.signal.addEventListener('abort', finish, {once: true});
+    });
+    if (this.current(binding)) await this.exit();
   }
   private scheduleVerification(binding: NativeSystemCheckBinding): void {
     if (!binding.authenticated || !this.current(binding)) return;
@@ -202,6 +209,7 @@ export class NativeSystemCheckContext {
     this.verifyTimer = undefined;
     const bindings = this.bindings(); this.bindings.set([]);
     this.currentLabel.set('');
+    this.savedReportOwner.set(null);
     this.releaseTab?.(); this.releaseTab = undefined;
     for (const binding of bindings) binding.owner.abort();
   }

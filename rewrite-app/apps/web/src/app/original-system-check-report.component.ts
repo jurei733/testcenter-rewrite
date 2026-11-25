@@ -12,8 +12,10 @@ import { OriginalSystemCheckSaveReportComponent } from "./original-system-check-
   selector: "app-original-system-check-report", standalone: true,
   imports: [NgFor, NgIf, MatButton, MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardTitle, OriginalSystemCheckSaveReportComponent],
   template: `
+    @let confirmationOpen = view.native?.savedReportConfirmationOpen() ?? false;
+    @let controlsBusy = view.busy && !confirmationOpen;
     <div class="sys-check-body flex-row-center" id="originalSystemCheckReport">
-      <mat-card appearance="raised">
+      <mat-card appearance="raised" [attr.inert]="confirmationOpen ? '' : null">
         <mat-card-header><mat-card-title>Bericht</mat-card-title></mat-card-header>
         <mat-card-content>
           <section id="systemCheckQuestionnaireWarnings" *ngIf="view.unansweredRequiredQuestions.length > 0">
@@ -35,8 +37,8 @@ import { OriginalSystemCheckSaveReportComponent } from "./original-system-check-
         </mat-card-content>
         <mat-card-actions>
           <button id="saveSystemCheckReportButton" mat-raised-button data-cy="send sc-report"
-            [disabled]="view.busy || !view.canSaveReport" (click)="view.startReportSave()">Bericht senden</button>
-          <button id="cancelSystemCheckReportButton" mat-raised-button [disabled]="view.busy"
+            [disabled]="controlsBusy || !view.canSaveReport" (click)="view.startReportSave()">Bericht senden</button>
+          <button id="cancelSystemCheckReportButton" mat-raised-button [disabled]="controlsBusy"
             (click)="view.cancelSystemCheckReport()">Systemcheck abbrechen</button>
         </mat-card-actions>
       </mat-card>
@@ -59,6 +61,7 @@ import { OriginalSystemCheckSaveReportComponent } from "./original-system-check-
     .flex-row-center { display:flex; flex-direction:row; justify-content:center; }
     mat-card { width:810px; min-width:0; max-width:100%; }
     ul li { word-break:break-all; margin:3px; }
+    #systemCheckReportQuestionnaire > ul { margin-block-end: 0; }
     .warning-text { color:red; font-weight:bold; }
   `],
   styleUrl: "./original-login-theme.scss"

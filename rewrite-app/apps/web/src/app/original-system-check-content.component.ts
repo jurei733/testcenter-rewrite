@@ -18,10 +18,11 @@ import { OriginalSystemCheckReportComponent } from "./original-system-check-repo
   imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle, MatTooltip, NativeMonitorIconComponent, OriginalSystemCheckQuestionnaireComponent, OriginalSystemCheckNetworkComponent, OriginalSystemCheckUnitComponent, OriginalSystemCheckReportComponent],
   template: `
     @if (view.systemCheck || (view.native && view.canUseSystemChecks)) {
-      <div class="header">
+      @let confirmationOpen = view.native?.savedReportConfirmationOpen() ?? false;
+      <div class="header" [attr.inert]="confirmationOpen ? '' : null">
         <h2>Systemcheck: {{ view.systemCheck?.displayLabel ?? view.native?.label() }}</h2>
         <button id="syscheck-previous-step" matFab matTooltip="Zurück" aria-label="Zurück"
-          [disabled]="!view.systemCheck || view.stepIndex === 0 || view.busy || view.networkBusy" (click)="view.previousStep()">
+          [disabled]="!view.systemCheck || view.stepIndex === 0 || (view.busy && !confirmationOpen) || view.networkBusy" (click)="view.previousStep()">
           <mat-icon svgIcon="keyboard_arrow_left" />
         </button>
         <button id="syscheck-next-step" matFab matTooltip="Weiter" aria-label="Weiter"

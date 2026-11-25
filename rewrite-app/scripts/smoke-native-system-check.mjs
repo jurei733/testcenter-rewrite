@@ -108,6 +108,9 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     await next('r'); await page.screenshot({path: join(out, 'report.png')});
     await page.locator('#saveSystemCheckReportButton').click(); await page.locator('#globalConfirmationTitle').waitFor();
     assert.equal(await page.locator('#systemCheckSaveReportBackdrop').count(), 0);
+    for (const id of ['syscheck-previous-step', 'saveSystemCheckReportButton', 'cancelSystemCheckReportButton']) {
+      assert.ok(await page.locator('#' + id).evaluate(button => !button.disabled && button.closest('[inert]') !== null));
+    }
     const saved = await reports(); assert.equal(saved.length, 1);
     assert.equal(saved[0].details.report.title, 'r98-syscheck');
     assert.ok(saved[0].details.report.responses.some(row => row.id === 'answer' && row.content === 'Owned opaque Player answer'));
