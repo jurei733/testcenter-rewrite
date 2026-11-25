@@ -106,7 +106,12 @@ for(const kind of kinds)test(kind+': installed resource archives preserve scope,
     };
     const own=await prepare('own'),foreign=await prepare('foreign');
     const first=zip([['GeoGebra/deployggb.js','/* first Ω */'],['GeoGebra/pixel.bin',Buffer.from([0,255,128,13])],['removed.txt','old member']]);
-    const replacement=zip([['GeoGebra/deployggb.js','/* replacement Ω */']]);
+    // Generated with Python zipfile's ZIP_BZIP2 compression.
+    const replacement=Buffer.from(
+      'UEsDBC4AAAAMAOBhQV0rnBnjOwAAABQAAAAVAAAAR2VvR2VicmEvZGVwbG95Z2diLmpzQlpoOTFBWSZTWemPiRYA' +
+      'AAKRlEAQqgdUAAAgAAEgACKNMJk/UEAAAQVed88SH9yWmC7kinChIdMfEixQSwECLgMuAAAADADgYUFdK5wZ4zsA' +
+      'AAAUAAAAFQAAAAAAAAAAAAAAgAEAAAAAR2VvR2VicmEvZGVwbG95Z2diLmpzUEsFBgAAAAABAAEAQwAAAG4AAAAA' +
+      'AA==', 'base64');
     const put=(owner,bytes,name='GeoGebra.itcr.zip')=>owner.upload(name,'data:application/zip;base64,'+bytes.toString('base64'),'application/zip');
     let installed;
     await t.test('native group capability reads exact member bytes and content types without crossing workspaces',async()=>{
@@ -134,12 +139,21 @@ for(const kind of kinds)test(kind+': installed resource archives preserve scope,
       const ordinary=await put(own,first,'regular.zip');assert.equal(ordinary.sourcePackage,null);assert.equal(ordinary.archiveReport.importedCount,3);assert.equal(ordinary.archiveReport.rejectedCount,0);
       await assert.rejects(put(own,first,'.itcr.zip'),denied(400,'workspace_resource_package_invalid'));
     });
-    await t.test('replacement makes only the current archive visible and keeps old source bytes immutable',async()=>{
+    await t.test('BZIP2 replacement makes only the current archive visible and keeps old source bytes immutable',async()=>{
       const next=await put(own,replacement);assert.equal(next.replacedSourcePackageId,installed.sourcePackageId);installed=next.sourcePackage;
       assert.equal(Buffer.from((await own.resource('Resource/GeoGebra/GeoGebra/deployggb.js')).bytes).toString(),'/* replacement Ω */');
       await assert.rejects(own.resource('Resource/GeoGebra/removed.txt'),denied(404));
       const previous=await repository.getSourcePackageById(next.replacedSourcePackageId);assert.equal(previous.sourceDocument,'data:application/zip;base64,'+first.toString('base64'));
       assert.equal(Buffer.from((await foreign.resource('Resource/GeoGebra/GeoGebra/deployggb.js')).bytes).toString(),'private foreign script');
+    });
+    await t.test('a workspace ZIP can carry a BZIP2 resource package without flattening its members',async()=>{
+      const result=await put(own,zip([['resources/Nested.itcr.zip',replacement]],true),'resources.zip');
+      assert.equal(result.archiveReport.importedCount,1);
+      assert.equal(result.archiveReport.entries[0].entryName,'resources/Nested.itcr.zip');
+      const extracted=await own.resource('Resource/Nested/GeoGebra/deployggb.js');
+      assert.equal(extracted.contentType,'text/javascript');
+      assert.equal(Buffer.from(extracted.bytes).toString(),'/* replacement Ω */');
+      assert.deepEqual(Buffer.from((await own.resource('Resource/Nested.itcr.zip')).bytes),replacement);
     });
     await t.test('stored package prefix follows the Source case-sensitive suffix rule',async()=>{
       await put(own,zip([['member.txt','upper suffix']]),'Upper.ITCR.ZIP');

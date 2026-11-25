@@ -27451,8 +27451,10 @@ export const createFirstSliceServices = (
   // Source loose files are typed by extension/root, never by a caller's MIME
   // hint or a supplied runtime structure. The decoded bytes remain unchanged.
   const projectWorkspaceFile = projectOriginalWorkspaceFile;
+  const readWorkspaceZipEntry = (zip:Buffer,entry:ZipEntry,limit:number) =>
+    readZipEntryBuffer(zip,entry,limit,true);
   const originalResourcePackages=createOriginalResourcePackages({decode:decodePersistedSourceDocument,
-    entries:readZipEntries,read:readZipEntryBuffer,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath,
+    entries:readZipEntries,read:readWorkspaceZipEntry,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath,
     comment:bytes=>{
       const offset=findZipEndOfCentralDirectoryOffset(bytes);
       return offset<0?'':bytes.subarray(offset+22,offset+22+bytes.readUInt16LE(offset+20)).toString('utf8');
@@ -27516,7 +27518,7 @@ export const createFirstSliceServices = (
       'A current file of the same type already uses this identifier.',{conflictingSourcePackageId:duplicate.sourcePackageId});
   };
   const workspaceArchives=createOriginalWorkspaceArchives({decode:decodePersistedSourceDocument,
-    entries:readZipEntries,read:(zip,entry,limit)=>readZipEntryBuffer(zip,entry,limit,true),
+    entries:readZipEntries,read:readWorkspaceZipEntry,
     safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath});
   type WorkspaceUploadScope = {tenantKey:string; workspaceKey:string};
   type WorkspaceUploadMember = {entryName:string; fileName:string; bytes:Uint8Array; archiveOrigin?:WorkspaceArchiveOrigin};
