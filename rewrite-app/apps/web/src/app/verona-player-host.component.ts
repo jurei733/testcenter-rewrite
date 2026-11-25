@@ -916,7 +916,10 @@ export class VeronaPlayerHostComponent
     if (!targetPage || !this.frame?.contentWindow || this.status !== "running") {
       return;
     }
-    this.currentPageIndex = targetIndex;
+    // Systemcheck uses the page acknowledged by the Player for its controls.
+    if (!this.originalSystemCheckUi) {
+      this.currentPageIndex = targetIndex;
+    }
     const command: VeronaPageNavigationCommand = {
       type: "vopPageNavigationCommand",
       sessionId: this.sessionId,

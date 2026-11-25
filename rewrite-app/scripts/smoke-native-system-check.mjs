@@ -94,11 +94,38 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     assert.ok(wire.some(row => row.path.startsWith('/speed-test/random-package/64&uid=')));
     mark('native-system-check-real-time-and-network');
     await next('u');
-    const answer = page.frameLocator('app-original-system-check-unit iframe').getByLabel('Owned Systemcheck answer');
+    const playerFrame = page.frameLocator('app-original-system-check-unit iframe');
+    const answer = playerFrame.getByLabel('Owned Systemcheck answer');
     await answer.fill('Owned opaque Player answer');
-    assert.equal(await page.frameLocator('app-original-system-check-unit iframe').locator('body').getAttribute('data-definition-type'), 'unspecified');
+    const playerBody = playerFrame.locator('body');
+    assert.equal(await playerBody.getAttribute('data-definition-type'), 'unspecified');
     const sandbox = await page.locator('app-original-system-check-unit iframe').getAttribute('sandbox');
     assert.ok(sandbox.includes('allow-scripts')); assert.ok(!sandbox.includes('allow-same-origin'));
+    await playerBody.evaluate(() => {
+      const validPages = [{id: '1', label: 'First page'}, {id: '2', label: 'Second page'}];
+      const publishPage = currentPage => window.parent.postMessage({
+        type: 'vopStateChangedNotification', sessionId, playerState: {currentPage, validPages}
+      }, '*');
+      window.addEventListener('message', ({data}) => {
+        if (data?.type === 'vopPageNavigationCommand') document.body.dataset.requestedPage = data.target;
+      });
+      window.publishOwnedPage = publishPage;
+      publishPage('1');
+    });
+    const forward = page.locator('[data-cy="page-navigation-forward"]');
+    const backward = page.locator('[data-cy="page-navigation-backward"]');
+    const pageButton = index => page.locator(`[data-cy="page-navigation-${index}"] button`);
+    await pageButton(0).and(page.locator('[aria-checked="true"]')).waitFor();
+    await forward.click();
+    await playerFrame.locator('body[data-requested-page="2"]').waitFor();
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    assert.equal(await pageButton(0).getAttribute('aria-checked'), 'true');
+    assert.ok(await backward.isDisabled());
+    assert.ok(await forward.isEnabled());
+    await playerBody.evaluate(() => window.publishOwnedPage('2'));
+    await pageButton(1).and(page.locator('[aria-checked="true"]')).waitFor();
+    assert.ok(await backward.isEnabled());
+    assert.ok(await forward.isDisabled());
     mark('native-system-check-opaque-player-handshake-response');
     await next('q'); await fillQuestions(); await page.screenshot({path: join(out, 'questionnaire.png')});
     await next('r');
