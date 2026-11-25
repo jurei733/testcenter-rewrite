@@ -29,6 +29,23 @@ test('view teardown aborts the real read signal and a late HTTP payload cannot c
 test('failed HTTP reads remain errors while later polling can recover without a fabricated empty snapshot',async t=>{
  let reads=0;const f=setup(t,async()=>{if(++reads===1)throw Error('Owned failure');return{data:['real'],subscribeToken:null};});await flush();assert.deepEqual(f.data,[]);assert.equal(f.errors.length,1);t.mock.timers.tick(5000);await flush();assert.deepEqual(f.data,[['real']]);assert.equal(f.statuses.at(-1),'polling-sleep');
 });
+for(const fail of [false,true])test('the poll interval starts after a slow '+(fail?'failed':'successful')+' HTTP read settles',async t=>{
+ let finish,reads=0;
+ const first=new Promise((resolve,reject)=>{finish=()=>fail?reject(Error('Owned outage')):resolve({data:['initial'],subscribeToken:null});});
+ const f=setup(t,async()=>++reads===1?first:{data:['fresh'],subscribeToken:null});
+ t.mock.timers.tick(4400);
+ finish();
+ await flush();
+ assert.equal(f.statuses.at(-1),fail?'error':'polling-sleep');
+ assert.equal(f.sockets.length,0);
+ t.mock.timers.tick(4999);
+ await flush();
+ assert.equal(reads,1);
+ t.mock.timers.tick(1);
+ await flush();
+ assert.equal(reads,2);
+ assert.deepEqual(f.data,fail?[['fresh']]:[['initial'],['fresh']]);
+});
 test('an opening socket can be shown separately from initial polling and the authenticated live stream',async t=>{
  const f=setup(t,async()=>({data:[],subscribeToken:'a'.repeat(43)}),{
   channel:'test-sessions',onConnecting:()=>f.statuses.push('ws-offline')

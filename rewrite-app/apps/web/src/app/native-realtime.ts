@@ -12,23 +12,28 @@ export function observeNativeRealtime<T>(options:NativeRealtimeOptions<T>):Obser
  return new Observable(subscriber=>{
   const owner=new AbortController(),signal=AbortSignal.any([owner.signal,options.scope]);
   let socket:WebSocket|undefined,timer:ReturnType<typeof setTimeout>|undefined,opening:ReturnType<typeof setTimeout>|undefined;
-  let polling=true,reading=false;const interval=options.pollingInterval??5000;
+  let reading=false;const interval=options.pollingInterval??5000;
   const current=()=>!subscriber.closed&&!signal.aborted&&options.current();
   const stopSocket=()=>{
    const old=socket;socket=undefined;clearTimeout(opening);opening=undefined;
    if(old){old.onopen=null;old.onmessage=null;old.onclose=null;old.onerror=null;try{if(old.readyState===WebSocket.OPEN)old.send(JSON.stringify({event:'unsubscribe:'+options.channel}));old.close();}catch{}}
   };
-  const stop=()=>{clearInterval(ticks);clearTimeout(timer);timer=undefined;stopSocket();owner.abort();};
+  const stop=()=>{clearTimeout(timer);timer=undefined;stopSocket();owner.abort();};
   const retire=()=>{stop();subscriber.complete();};
-  const schedule=()=>{polling=true;};
-  const reconnect=()=>{if(current())timer=setTimeout(()=>{polling=true;void poll();},interval);};
+  // The interval begins after the completed read or disconnect. A slow
+  // response must not be followed by a poll on an earlier fixed timer tick.
+  const schedule=()=>{
+   if(!current())return;
+   clearTimeout(timer);
+   timer=setTimeout(()=>{timer=undefined;void poll();},interval);
+  };
   const fallback=(expected:WebSocket,revalidate=false)=>{
    if(socket!==expected)return;stopSocket();if(!current())return;
-   options.status('ws-offline');polling=false;clearTimeout(timer);
-   if(revalidate&&options.revalidate)void options.revalidate().catch(()=>{}).finally(reconnect);else reconnect();
+   options.status('ws-offline');clearTimeout(timer);
+   if(revalidate&&options.revalidate)void options.revalidate().catch(()=>{}).finally(schedule);else schedule();
   };
   const connect=(token:string)=>{
-   polling=false;const url=new URL('/ws',location.origin);url.protocol=location.protocol==='https:'?'wss:':'ws:';url.searchParams.set('token',token);
+   const url=new URL('/ws',location.origin);url.protocol=location.protocol==='https:'?'wss:':'ws:';url.searchParams.set('token',token);
    let ws:WebSocket;try{ws=new WebSocket(url);}catch{options.status('polling-sleep');schedule();return;}socket=ws;
    opening=setTimeout(()=>fallback(ws),20000);
    ws.onopen=()=>{if(socket!==ws)return;if(!current()){stopSocket();return;}clearTimeout(opening);options.status('ws-online');ws.send(JSON.stringify({event:'subscribe:'+options.channel}));};
@@ -49,7 +54,6 @@ export function observeNativeRealtime<T>(options:NativeRealtimeOptions<T>):Obser
     else{options.status('polling-sleep');schedule();}
    }catch(error){if(current()){options.status('error');options.error?.(error);schedule();}}finally{reading=false;}
   };
-  const ticks=setInterval(()=>{if(polling&&!socket&&!reading)void poll();},interval);
   const recovery=options.retry?.subscribe(()=>{if(socket)fallback(socket);});
   options.scope.addEventListener('abort',retire,{once:true});
   if(current())void poll();else retire();

@@ -73,14 +73,15 @@ function componentFixture(){
 }
 const profile=(settings={},filters=[])=>({settings,filters,filtersEnabled:{}});
 
-test('a six-second snapshot survives a five-second tick; unsubscribe still aborts its replacement',async t=>{
+test('a six-second snapshot settles before the next five-second interval and unsubscribe aborts its replacement',async t=>{
  clock(t);const {backend,session}=transport(),requests=[],rows=[];
  session.text=(...args)=>{const wait=deferred();requests.push({signal:args[5],wait});return wait.promise;};
  const subscription=backend.observeSessionsMonitor('owned').subscribe(value=>rows.push(value));
  t.mock.timers.tick(0);assert.equal(requests.length,1);t.mock.timers.tick(6000);
  assert.equal(requests[0].signal.aborted,false);assert.equal(requests.length,1);
  requests[0].wait.resolve('[]');await settle();assert.deepEqual(rows,[[]]);assert.equal(backend.connectionStatus$.value,'polling-sleep');
- t.mock.timers.tick(4000);assert.equal(requests.length,2);subscription.unsubscribe();assert.equal(requests[1].signal.aborted,true);
+ t.mock.timers.tick(4999);assert.equal(requests.length,1);
+ t.mock.timers.tick(1);assert.equal(requests.length,2);subscription.unsubscribe();assert.equal(requests[1].signal.aborted,true);
 });
 test('snapshot failure is not a successful empty snapshot and a later tick can recover',async t=>{
  clock(t);const {backend,session}=transport(),rows=[];let count=0;
