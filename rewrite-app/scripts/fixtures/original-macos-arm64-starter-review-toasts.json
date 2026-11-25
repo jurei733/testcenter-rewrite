@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "source": {
+    "repository": "iqb-berlin/testcenter",
+    "commit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+    "frontendLockSha256": "69322fcf80bc8f6431e4725225458c74b4a6e6e6215e2c6b5d64e55b1b43ca29"
+  },
+  "platform": "darwin",
+  "architecture": "arm64",
+  "nodeMajor": 22,
+  "browserVersion": "147.0.7727.15",
+  "browserPackage": "1.59.1",
+  "browserMode": "headless",
+  "referenceStatesSha256": "ac2a79be8efd2bb54ceeadf142627ddfcd9b21d1cb8f958793f0b16b94417b52",
+  "provenance": {
+    "method": "Real native Original Review Starter and authenticated empty CSV export",
+    "capturedSourceSha256": {
+      "Primar": "0d5d05b2c050aa7906db394db40f4f9c66d0cc1b5b3553b227a7926c86463bb1",
+      "Sekundar": "f35f5c3e48f29b290cb65a96374234de7acfbe5815d877f47e41292a20381ef4",
+      "Erwachsene": "00cd197a262a35e2c40a6afd8c4090c7eb926f99349c701a4fa44e85ba6a5cb1"
+    }
+  }
+}

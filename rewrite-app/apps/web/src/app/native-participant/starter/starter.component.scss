@@ -69,4 +69,12 @@
   display: flex;
   gap: 9px;
   padding: 20px;
+
+  .mat-tonal-button {
+    border: 1px solid var(--mat-sys-outline-variant);
+
+    &:hover {
+      transform: none;
+    }
+  }
 }

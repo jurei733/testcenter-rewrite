@@ -1,10 +1,21 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { overlayOriginalVisuals, validateOriginalVisualProfile, assertOriginalVisualBrowser, assertOriginalVisualCase } from "./qualified-original-visuals.mjs";
 const read = async name => JSON.parse(await readFile(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
 const profile = await read("original-linux-chromium147"), source = await read("original-browser-source");
 const environment = { platform: "linux", architecture: "x64", nodeMajor: 22, browserPackage: "1.59.1", browserMode: "visible" };
+test("the independent macOS Review toast capture qualifies all shared states", async () => {
+  const name = "original-starter-review-toasts";
+  const mac = await read("original-macos-arm64-starter-review-toasts");
+  assert.deepEqual(mac.source, source);
+  assert.deepEqual(Object.keys(mac.provenance.capturedSourceSha256), ["Primar", "Sekundar", "Erwachsene"]);
+  for (const sha of Object.values(mac.provenance.capturedSourceSha256)) assert.match(sha, /^[a-f0-9]{64}$/);
+  const { states } = overlayOriginalVisuals(await read(name), profile.fixtures[name]);
+  assert.equal(Object.keys(states).length, 18);
+  assert.equal(createHash("sha256").update(JSON.stringify(states)).digest("hex"), mac.referenceStatesSha256);
+});
 test("the verified Source capture qualifies the Linux renderer without relabeling its behavioral reference", async () => {
   validateOriginalVisualProfile(profile, source, environment);
   for (const [name, overlay] of Object.entries(profile.fixtures)) {

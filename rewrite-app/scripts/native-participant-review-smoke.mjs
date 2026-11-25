@@ -85,8 +85,15 @@ export async function runNativeParticipantReviewSmoke({browser,base,password,out
    mark(prefix+'-delete-removes-only-the-owned-native-unit-comment');
    if(mode==='review'){
     await page.goto(base+'/app/native-start?ui=original');let downloads=0;const onDownload=()=>downloads++;page.on('download',onDownload);
+    const downloadButton=page.locator('[data-cy=review-download]');
+    await downloadButton.hover();
+    const downloadStyle=await downloadButton.evaluate(button=>{
+     const style=getComputedStyle(button);
+     return {borderWidth:style.borderTopWidth,borderStyle:style.borderTopStyle,transform:style.transform};
+    });
+    assert.deepEqual(downloadStyle,{borderWidth:'1px',borderStyle:'solid',transform:'none'});
     const empty=page.waitForResponse(response=>new URL(response.url()).pathname==='/reviews/export'&&response.request().method()==='GET');void empty.catch(()=>{});
-    await page.locator('[data-cy=review-download]').click();assert.equal((await empty).status(),204);await page.getByText('Keine Kommentare verfügbar.',{exact:true}).waitFor();assert.equal(downloads,0);page.off('download',onDownload);
+    await downloadButton.click();assert.equal((await empty).status(),204);await page.getByText('Keine Kommentare verfügbar.',{exact:true}).waitFor();assert.equal(downloads,0);page.off('download',onDownload);
     mark(prefix+'-empty-Source-Starter-export-shows-feedback-without-a-download');
    }
    evidence.push({mode,width,realTrustedUi:true,unitReviewId:id,bookletReviewId:wholeId,unsafeIdsPreserved:true,actualProtectedJsonAndCsv:true});

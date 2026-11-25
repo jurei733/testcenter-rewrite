@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 const read = async name => JSON.parse(await readFile(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
 const qualifiedProvenance = await read("original-linux-chromium147-provenance");
@@ -38,19 +39,37 @@ export function validateOriginalVisualProfile(profile, source, environment) {
 export async function loadOriginalVisualReference(name) {
   assert.match(name, /^original-[a-z-]+$/);
   const base = await read(name);
-  if (process.platform !== "linux") return base;
-  const profile = await read("original-linux-chromium147");
-  const browserPackage = JSON.parse(await readFile(new URL("../node_modules/playwright/package.json", import.meta.url), "utf8"));
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase()) || process.env.CI !== "true";
-  validateOriginalVisualProfile(profile, await read("original-browser-source"), { platform: process.platform, architecture: process.arch,
-    nodeMajor: Number(process.versions.node.split(".")[0]), browserPackage: browserPackage.version, browserMode: headful ? "visible" : "headless" });
+  const macReviewToasts = name === "original-starter-review-toasts" && process.platform === "darwin" &&
+    process.arch === "arm64" && !headful && !process.env.UI_SMOKE_BROWSER_CHANNEL;
+  if (process.platform !== "linux" && !macReviewToasts) return base;
+  const profile = await read("original-linux-chromium147");
+  const source = await read("original-browser-source");
+  const browserPackage = JSON.parse(await readFile(new URL("../node_modules/playwright/package.json", import.meta.url), "utf8"));
+  const environment = { platform: process.platform, architecture: process.arch,
+    nodeMajor: Number(process.versions.node.split(".")[0]), browserPackage: browserPackage.version, browserMode: headful ? "visible" : "headless" };
   assert.ok(!process.env.UI_SMOKE_BROWSER_CHANNEL, "The qualified reference uses the lockfile's Chromium, not an alternate browser channel.");
   assert.ok(Object.hasOwn(profile.fixtures, name), `No qualified Original visual fixture ${name}`);
+  let qualification = profile;
+  if (macReviewToasts) {
+    qualification = await read("original-macos-arm64-starter-review-toasts");
+    assert.equal(qualification.version, 1);
+    assert.deepEqual(qualification.source, source);
+    assert.deepEqual(profile.source, source);
+    for (const [key, value] of Object.entries(environment)) assert.equal(qualification[key], value, `Unqualified Original ${key}`);
+  } else {
+    validateOriginalVisualProfile(profile, source, environment);
+  }
   const reference = overlayOriginalVisuals(base, profile.fixtures[name]);
-  reference.visualProfile = { source: profile.source, platform: profile.platform, browserVersion: profile.browserVersion,
-    browserMode: profile.browserMode, provenance: profile.provenance };
+  if (macReviewToasts) {
+    // Independent captures of all 18 macOS states matched these shared values.
+    const statesHash = createHash("sha256").update(JSON.stringify(reference.states)).digest("hex");
+    assert.equal(statesHash, qualification.referenceStatesSha256);
+  }
+  reference.visualProfile = { source: qualification.source, platform: qualification.platform, browserVersion: qualification.browserVersion,
+    browserMode: qualification.browserMode, provenance: qualification.provenance };
   reference.unqualifiedVisualCases = profile.unqualifiedCases.filter(key => key.startsWith(`${name}/`)).map(key => key.slice(name.length + 1));
-  console.log(`original_visual_reference=${name}/${profile.platform}/${profile.browserVersion}/${profile.source.commit}`);
+  console.log(`original_visual_reference=${name}/${qualification.platform}/${qualification.browserVersion}/${qualification.source.commit}`);
   return reference;
 }
 export function assertOriginalVisualBrowser(browser, reference) {
