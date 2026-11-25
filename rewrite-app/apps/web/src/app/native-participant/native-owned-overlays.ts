@@ -61,7 +61,7 @@ export class NativeOwnedDialog {
   if(!pane||!wrapper||!backdrop?.classList.contains('cdk-overlay-backdrop')||!surface)return;
 
   // Preserve the CDK paint order of the lower card, second veil and active
-  // dialog. The two decorative nodes introduce no dialog or focus trap.
+  // dialog. The lower card reflows with the viewport but stays collapsed.
   const lowerWrapper=wrapper.cloneNode(false) as HTMLElement;
   const lowerPane=pane.cloneNode(false) as HTMLElement;
   const veil=backdrop.cloneNode(false) as HTMLElement;
@@ -72,29 +72,28 @@ export class NativeOwnedDialog {
   lowerPane.style.pointerEvents='none';
   veil.ariaHidden='true';
   veil.style.pointerEvents='none';
-  let backing:HTMLElement|undefined;
+  // Use the collapsed content for sizing without adding a dialog or painting
+  // a second set of controls under the active dialog.
+  let backing=content.cloneNode(true) as HTMLElement;
+  backing.querySelector('.mat-expansion-panel-content-wrapper')?.remove();
+  backing.querySelectorAll('.mat-expanded').forEach(node=>node.classList.remove('mat-expanded'));
+  backing.querySelectorAll('[id],[data-cy]').forEach(node=>{
+   node.removeAttribute('id');
+   node.removeAttribute('data-cy');
+  });
+  backing.style.visibility='hidden';
   for(let original:HTMLElement|null=surface;original&&original!==pane;original=original.parentElement){
    const layer=this.document.createElement('div');
    layer.className=original.className;
    layer.style.cssText=original.style.cssText;
-   if(backing)layer.append(backing);
-   else layer.style.backgroundColor=getComputedStyle(surface).backgroundColor;
+   if(original===surface)layer.style.backgroundColor=getComputedStyle(surface).backgroundColor;
+   layer.append(backing);
    backing=layer;
   }
-  if(!backing)return;
   lowerPane.append(backing);
-  const size=()=>{
-   const {width,height}=pane.getBoundingClientRect();
-   lowerPane.style.width=width+'px';
-   lowerPane.style.height=height+'px';
-  };
-  size();
   lowerWrapper.append(lowerPane);
   wrapper.before(lowerWrapper,veil);
-  const observer=new ResizeObserver(size);
-  observer.observe(pane);
   return ()=>{
-   observer.disconnect();
    lowerWrapper.remove();
    veil.remove();
   };
