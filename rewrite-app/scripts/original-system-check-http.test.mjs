@@ -99,13 +99,47 @@ for(const kind of kinds)test(kind+': actual protected native Systemcheck HTTP, p
    assert.deepEqual({id:items[0].id,count:items[0].count,details:items[0].details},{
     id:'R99.UNITCHECK',count:2,details:{os:{' ':2},browser:{' ':2}}
    });
-   await services.workspaceResults.importSystemCheckReport({...scope,fileName:'report_old.json',report:{
-    checkId:'R98.CHECK',title:'Imported legacy report',envData:[{id:'browser',label:'Browser',value:'Legacy'}]
-   }});
+   const input={...scope,fileName:'report_old.json',report:{
+    checkId:'R98.CHECK',title:'Imported legacy report',
+    envData:[{id:'browser',label:'Browser',value:'Legacy'}],
+    questData:[{id:'legacy',label:'Historical question',value:'A previous answer'}]
+   }};
+   const imported=await services.workspaceResults.importSystemCheckReport(input);
+   assert.equal(imported.report.environment[0].value,'Legacy');
    const [old]=(await http('GET',reports+'?dataIds=R98.CHECK',{token:admin.token})).value;
    assert.equal(old.title,'Imported legacy report');
-   assert.equal(old.environment[0].value,'Legacy');
-   assert.equal(old.keyPhrase,'');
+   assert.equal(old.envData[0].value,'Legacy');
+   assert.equal(Object.hasOwn(old,'environment'),false);
+   assert.equal(Object.hasOwn(old,'keyPhrase'),false);
+   const variants=(await http('GET',overview,{token:admin.token})).value.find(row=>row.id==='R98.CHECK');
+   assert.deepEqual(variants.details.browser,{' ':1});
+   const mixed={...input,fileName:'mixed.json',report:{...input.report,keyPhrase:'owned-secret',
+    date:'',environment:[{id:'browser',label:'Browser',value:'Modern'}],
+    questionnaire:[{id:'current',label:'Historical question',value:'A current answer'}],
+    fileData:[{id:'remark',label:'Historical file column',value:'Retained'}]}};
+   const revision=await services.workspaceResults.importSystemCheckReport(mixed);
+   const repeat=await services.workspaceResults.importSystemCheckReport({...mixed,report:{...mixed.report,keyPhrase:'changed-secret'}});
+   assert.equal(repeat.disposition,'already_imported');
+   assert.equal(repeat.report.systemCheckReportId,revision.report.systemCheckReportId);
+   const revised={...mixed,report:{...mixed.report,envData:[{id:'browser',label:'Browser',value:'Another version'}]}};
+   const changed=await services.workspaceResults.importSystemCheckReport(revised);
+   assert.equal(changed.disposition,'imported');
+   assert.notEqual(changed.report.systemCheckReportId,revision.report.systemCheckReportId);
+   const raw=(await http('GET',reports+'?dataIds=R98.CHECK',{token:admin.token})).value;
+   const preserved=raw.find(report=>report.envData[0].value==='Another version');
+   assert.equal(preserved.date,'');
+   assert.equal(preserved.keyPhrase,'');
+   assert.equal(preserved.environment[0].value,'Modern');
+   assert.equal(preserved.fileData[0].value,'Retained');
+   const mixedCsv=await selectedDownload();
+   assert.match(mixedCsv,/"A current answer"/);
+   assert.match(mixedCsv,/"Historical file column"/);
+
+   async function selectedDownload(){
+    const response=await fetch(base+reports+'?dataIds=R98.CHECK',{headers:{AuthToken:admin.token,Accept:'text/csv'}});
+    assert.equal(response.status,200);
+    return response.text();
+   }
   });
   await t.test('server restart retains the native credential and report evidence',async()=>{
    const before=await records();await close();await start();assert.deepEqual((await http('GET','/session',{token:actor.token})).value.claims,actor.claims);assert.deepEqual(await records(),before);

@@ -179,7 +179,7 @@ import {
   scryptSync,
   timingSafeEqual
 } from "node:crypto";
-import { TextDecoder } from "node:util";
+import { isDeepStrictEqual, TextDecoder } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
@@ -203,9 +203,13 @@ import type {
 } from "@xmldom/xmldom";
 import { formatOriginalReportCsv, formatOriginalParticipantLogEntry } from "./original-report-csv.js";
 import {
+  captureOriginalSystemCheckImport,
   formatOriginalSystemCheckReports,
   originalSystemCheckDigest,
+  originalSystemCheckReportFields,
+  originalSystemCheckReportIdentity,
   summarizeOriginalSystemCheckReports,
+  type OriginalSystemCheckImportDocument,
   type OriginalSystemCheckReportOverview,
   type OriginalSystemCheckSections
 } from "./original-system-check-report-wire.js";
@@ -26749,6 +26753,7 @@ export const createFirstSliceServices = (
     activityEventId: string;
     report: SystemCheckReport;
     nativeSections?: OriginalSystemCheckSections;
+    nativeImportDocument?: OriginalSystemCheckImportDocument;
   }>> => {
     const workspace = await requireWorkspace(
       repository,
@@ -26783,12 +26788,13 @@ export const createFirstSliceServices = (
         return [{
           activityEventId: event.activityEventId,
           report,
-          nativeSections: native ? event.details.nativeSections as OriginalSystemCheckSections | undefined : undefined
+          nativeSections: native ? event.details.nativeSections as OriginalSystemCheckSections | undefined : undefined,
+          nativeImportDocument: event.details.nativeImportDocument as OriginalSystemCheckImportDocument | undefined
         }];
       })
       .filter(
         record =>
-          native ? originalCheckIds === null || originalCheckIds.has(record.report.checkId) :
+          native ? originalCheckIds === null || originalCheckIds.has(originalSystemCheckReportIdentity(record).id) :
             selectedCheckIds === null || selectedCheckIds.has(record.report.checkId.toUpperCase())
       )
       .sort((left, right) =>
@@ -26817,9 +26823,10 @@ export const createFirstSliceServices = (
     checkId?: string;
     checkIds?: string[];
   }): Promise<SystemCheckReportStatistics[]> => {
-    const reports = (await readSystemCheckReportRecords(input)).map(
-      record => record.report
-    );
+    const records = await readSystemCheckReportRecords(input);
+    const reports = records.map(record => record.report);
+    const digests = new Map(records.map(({report,nativeImportDocument}) =>
+      [report, originalSystemCheckDigest(report, nativeImportDocument)]));
     const breakdown = (values: string[], trim = true): Array<{ value: string; count: number }> => {
       const counts = new Map<string, number>();
       for (const rawValue of values) {
@@ -26865,8 +26872,8 @@ export const createFirstSliceServices = (
         browsers: breakdown(
           group.map(report => entryValue(report, "environment", ["browser"], ["browser"]))
         ),
-        operatingSystemVersions: breakdown(group.map(report => originalSystemCheckDigest(report).os), false),
-        browserVersions: breakdown(group.map(report => originalSystemCheckDigest(report).browser), false),
+        operatingSystemVersions: breakdown(group.map(report => digests.get(report)!.os), false),
+        browserVersions: breakdown(group.map(report => digests.get(report)!.browser), false),
         overallRatings: breakdown(
           group.map(report =>
             entryValue(report, "network", ["nw-overall"], ["gesamtbewertung"])
@@ -26883,7 +26890,7 @@ export const createFirstSliceServices = (
     checkIds?: string[];
     limit?: number;
   }): Promise<string> => {
-    const reports = (await readSystemCheckReportRecords(input)).map(record => record.report);
+    const records = await readSystemCheckReportRecords(input);
     const baseHeaders = [
       "Titel",
       "SysCheck-Id",
@@ -26894,7 +26901,8 @@ export const createFirstSliceServices = (
       "FileName"
     ];
     const dynamicHeaders: string[] = [];
-    const rows = reports.map(report => {
+    const rows = records.map(record => {
+      const {report} = record;
       const values = new Map<string, unknown>([
         ["Titel", report.title],
         ["SysCheck-Id", report.checkId],
@@ -26908,15 +26916,9 @@ export const createFirstSliceServices = (
           (Array.isArray(report.responses) && report.responses.length === 0)
             ? ""
             : JSON.stringify(report.responses)
-        ],
-        ...legacySystemCheckFileData(report).map(entry => [entry.label, entry.value] as const)
+        ]
       ]);
-      for (const entry of [
-        ...report.environment,
-        ...report.network,
-        ...report.questionnaire,
-        ...report.unit
-      ]) {
+      for (const entry of originalSystemCheckReportFields(record,legacySystemCheckFileData(report))) {
         values.set(entry.label, entry.value);
         if (!baseHeaders.includes(entry.label) && !dynamicHeaders.includes(entry.label)) {
           dynamicHeaders.push(entry.label);
@@ -32097,24 +32099,25 @@ export const createFirstSliceServices = (
           createdAt
         };
         report.sourceDigest = systemCheckReportMigrationDigest(report);
+        const nativeImportDocument = captureOriginalSystemCheckImport(source);
         const existingReport = (
           await readSystemCheckReportRecords({
             tenantKey: input.tenantKey,
             workspaceKey: input.workspaceKey
           })
         )
-          .map(record => record.report)
           .find(
-            candidate =>
+            ({report:candidate,nativeImportDocument:previousDocument}) =>
               candidate.originalFileName?.toUpperCase() ===
                 originalFileName.toUpperCase() &&
               (candidate.sourceDigest ??
                 systemCheckReportMigrationDigest(candidate)) ===
-                report.sourceDigest
+                report.sourceDigest &&
+              (!previousDocument || isDeepStrictEqual(previousDocument,nativeImportDocument))
           );
         if (existingReport) {
           return {
-            report: existingReport,
+            report: existingReport.report,
             disposition: "already_imported"
           };
         }
@@ -32127,6 +32130,7 @@ export const createFirstSliceServices = (
           summary: `Imported legacy system-check report '${originalFileName}' for '${report.checkId}'.`,
           details: {
             report,
+            nativeImportDocument,
             importFormat: "original_testcenter_json",
             importedAt
           }
