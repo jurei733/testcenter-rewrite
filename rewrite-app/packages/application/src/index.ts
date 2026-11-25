@@ -18957,6 +18957,7 @@ const extractTesttakersRosterDocumentsFromZipSourcePackage = (
 
 type TesttakersRosterIdentityValues = {
   groupIds: Map<string, string>;
+  exactGroupIds: Map<string, string>;
   loginNames: Map<string, string>;
 };
 
@@ -18985,6 +18986,7 @@ const collectTesttakersRosterIdentityValues = (
   }
 
   const groupIds = new Map<string, string>();
+  const exactGroupIds = new Map<string, string>();
   const loginNames = new Map<string, string>();
   for (const rosterDocument of rosterDocuments) {
     if (typeof rosterDocument.rosterText !== "string") {
@@ -18997,6 +18999,7 @@ const collectTesttakersRosterIdentityValues = (
       continue;
     }
     for (const group of structure.groups) {
+      if (group.groupId) exactGroupIds.set(group.groupId, group.groupId);
       const normalizedGroupId = group.groupId.toLocaleLowerCase("en-US");
       if (normalizedGroupId && !groupIds.has(normalizedGroupId)) {
         groupIds.set(normalizedGroupId, group.groupId);
@@ -19010,7 +19013,7 @@ const collectTesttakersRosterIdentityValues = (
     }
   }
   return groupIds.size > 0 || loginNames.size > 0
-    ? { groupIds, loginNames }
+    ? { groupIds, exactGroupIds, loginNames }
     : null;
 };
 
@@ -24702,6 +24705,7 @@ export const createFirstSliceServices = (
     workspace: Workspace;
     sourcePackage: SourcePackage;
     excludedSourcePackageIds?: string[];
+    exactOriginalGroupIds?: boolean;
   }): Promise<void> => {
     const incomingIdentities = collectTesttakersRosterIdentityValues(
       input.sourcePackage
@@ -24815,10 +24819,13 @@ export const createFirstSliceServices = (
           );
         }
       }
-      for (const [normalizedGroupId, groupId] of incomingIdentities.groupIds) {
-        const existingGroupId = existingIdentities.groupIds.get(
-          normalizedGroupId
-        );
+      // Original compares authored Group IDs exactly when checking physical
+      // Testtakers files. Group lookup uses a separate database collation.
+      const useExactGroups = input.exactOriginalGroupIds && sourcePackage.fileName.startsWith("Testtakers/");
+      const incomingGroups = useExactGroups ? incomingIdentities.exactGroupIds : incomingIdentities.groupIds;
+      const existingGroups = useExactGroups ? existingIdentities.exactGroupIds : existingIdentities.groupIds;
+      for (const [comparisonKey, groupId] of incomingGroups) {
+        const existingGroupId = existingGroups.get(comparisonKey);
         if (existingGroupId) {
           throw new FirstSliceError(
             409,
@@ -24830,6 +24837,7 @@ export const createFirstSliceServices = (
               conflictingSourcePackageId: sourcePackage.sourcePackageId,
               conflictingFileName: sourcePackage.fileName,
               conflictingWorkspaceKey: workspace.workspaceKey,
+              ...(input.exactOriginalGroupIds?{conflictingWorkspaceName:workspace.displayName}:{}),
               sameWorkspace:
                 workspace.workspaceId === input.workspace.workspaceId
             }
@@ -27688,7 +27696,9 @@ export const createFirstSliceServices = (
     }
     assertWorkspaceFileIdentity(sourcePackage,sourcePackages,activityEvents);
     assertWorkspaceFileDependencies(sourcePackage,sourcePackages,activityEvents);
-    if (file.fileType==='Testtakers') await assertTenantTesttakersIdentitiesAvailable({workspace,sourcePackage});
+    if (file.fileType==='Testtakers') await assertTenantTesttakersIdentitiesAvailable({
+      workspace,sourcePackage,exactOriginalGroupIds:authority!==undefined
+    });
     const rosterOnly=isRosterOnlyWorkspaceFile(sourcePackage);
     const independent = file.fileType==='Unit' || file.fileType==='Resource' || rosterOnly;
     sourcePackage.status='accepted';
@@ -27810,7 +27820,7 @@ export const createFirstSliceServices = (
     });
     if (!workspaceFile || projectWorkspaceFile(replacementSourcePackage).fileType==='Testtakers') {
       await assertTenantTesttakersIdentitiesAvailable({workspace,sourcePackage:replacementSourcePackage,
-        excludedSourcePackageIds:[replacedSourcePackage.sourcePackageId]});
+        excludedSourcePackageIds:[replacedSourcePackage.sourcePackageId],exactOriginalGroupIds:workspaceFile&&authority!==undefined});
     }
     const replacementActivityEvent: WorkspaceActivityEvent = {
       activityEventId: idGenerator(),

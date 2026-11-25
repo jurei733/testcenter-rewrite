@@ -49,6 +49,14 @@ export function readWorkspaceFileReport(input:WorkspaceCatalogInput,{unused=fals
  * added to the separate catalog read model. */
 export function workspaceFileReportErrors(input:WorkspaceCatalogInput,error:{errorCode:string;message:string;details?:unknown}):string[]{
   const details=error.details as {diagnostics?:Array<{severity:string;code:string;message:string}>;unresolvedReferences?:Array<{reference:string;fileType:string;relationship:string}>}|undefined;
+  if(error.errorCode==='source_package_testtakers_group_duplicate'){
+    const duplicate=error.details as {groupId:string;conflictingFileName:string;conflictingWorkspaceName?:string;sameWorkspace:boolean}|undefined;
+    if(duplicate?.conflictingWorkspaceName!==undefined){
+      const workspace=duplicate.sameWorkspace?'':`on workspace \`${duplicate.conflictingWorkspaceName}\` `;
+      const file=duplicate.conflictingFileName.split('/').at(-1);
+      return [`Duplicate group: \`${duplicate.groupId}\` - also ${workspace}in file \`${file}\``];
+    }
+  }
   const diagnostics=details?.diagnostics?.filter(row=>row.severity==='error');
   if(error.errorCode==='source_package_file_name_too_long')return['Filename too long!'];
   if(diagnostics?.some(row=>row.code==='testcenter_xml_schema_reference_missing')){

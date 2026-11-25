@@ -235,5 +235,41 @@ for(const kind of kinds)test(kind+': Source files become live without manual act
   assert.equal((await repository.getSourcePackageById(unpublished.sourcePackageId)).uploadedAt,unpublished.uploadedAt);
   await repository.saveSourcePackage(unpublished);assert.deepEqual([await references(one),await references(two)],localBefore);
  });
+ await t.test('native roster uploads distinguish Group ID spelling and reject an exact duplicate before replacing a file',async()=>{
+  const username='owned-live-group-admin',password='Owned-Live-Group-Secret!';
+  const {adminUser}=await services.adminAuth.bootstrapAdminUser({username,password});
+  const {adminSession}=await services.adminAuth.signIn({username,password});
+  const scopes=[];
+  for(const workspaceKey of ['native-group-one','native-group-two']){
+   const scope={tenantKey:tenant.tenantKey,workspaceKey};
+   const workspace=await services.platform.createWorkspace({...scope,displayName:workspaceKey});
+   const {tenantId,workspaceId}=workspace;
+   await repository.saveAdminRoleAssignment({roleAssignmentId:randomUUID(),adminUserId:adminUser.adminUserId,
+    role:'workspace_admin',accessMode:'read_write',tenantId,workspaceId,groupKey:null,monitorProfiles:[],
+    monitorBookletVisibility:'visible',createdAt:'2026-10-23T12:00:00.000Z'});
+   const workspacePathSegment=await repository.getOrCreateOriginalWorkspaceNumber({tenantId,workspaceId});
+   scopes.push(await services.originalWorkspaceAdministration.authorizeWrite({token:adminSession.token,workspacePathSegment}));
+  }
+  const fileName='people.xml';
+  const people=(group,name)=>xml('Testtakers','',`<Group id="${group}" label="Owned"><Login name="${name}" mode="monitor-study"/></Group>`);
+  const send=(scope,source)=>services.contentIntake.uploadOriginalWorkspaceFiles({...scope,files:[{fileName,bytes:Buffer.from(source)}]});
+  const [first,second]=scopes;
+  const uppercase=people('OWNED.SHARED','owned-native-group-first');
+  const lowercase=people('owned.shared','owned-native-group-second');
+  const exact=people('OWNED.SHARED','owned-native-group-second');
+  assert.equal((await send(first,uppercase)).containsErrors,false);
+  const expected={error:['Duplicate group: `OWNED.SHARED` - also on workspace `native-group-one` in file `people.xml`']};
+  assert.deepEqual((await send(second,exact)).report[fileName],expected);
+  await assert.rejects(services.contentIntake.uploadWorkspaceFile({...second,fileName,mediaType:'application/xml',sourceDocument:lowercase}),
+   error=>error.errorCode==='source_package_testtakers_group_duplicate');
+  assert.equal((await send(second,lowercase)).containsErrors,false);
+  const rosterId=async()=> (await services.workspaceAdminRead.getWorkspaceFileCatalog(second)).items.find(file=>file.fileType==='Testtakers').sourcePackageId;
+  const previous=await rosterId();
+  assert.deepEqual((await send(second,exact)).report[fileName],expected);
+  assert.equal(await rosterId(),previous);
+  assert.equal((await send(first,people('OWNED.RETIRED','owned-native-group-first'))).containsErrors,false);
+  assert.equal((await send(second,exact)).containsErrors,false);
+  assert.notEqual(await rosterId(),previous);
+ });
  }finally{if(storage)await storage.shutdown();if(pool){await pool.query('DROP SCHEMA \"'+schema+'\" CASCADE');await pool.end();}await rm(folder,{recursive:true,force:true});}
 });
