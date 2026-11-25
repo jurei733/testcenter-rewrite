@@ -15,7 +15,7 @@
           <mat-form-field appearance="fill">
             <mat-label>{{ customText('am_available_cameras', 'Verfügbare Cameras') }}</mat-label>
             <mat-select id="attachmentCameraSelect" [(ngModel)]="selectedCameraId"
-              [disabled]="busy || cameraStarting" (selectionChange)="selectCamera()">
+              [disabled]="busy || cameraStarting || cameraSwitching" (selectionChange)="selectCamera()">
               @if (!selectedCameraIsListed) {
                 <mat-option [value]="selectedCameraId">Standardkamera</mat-option>
               }
@@ -26,7 +26,7 @@
           </mat-form-field>
           <br>
           <mat-checkbox id="toggleAttachmentFlashButton" [checked]="flashOn"
-            [disabled]="!cameraActive || !hasFlash" (change)="toggleFlash()">
+            [disabled]="!cameraActive || !hasFlash || flashChanging" (change)="requestFlash($event.source)">
             {{ customText('gm_flash_checkbox', 'Blitz') }}
           </mat-checkbox>
         </div>
@@ -113,8 +113,8 @@
           @if (!cameraActive) {
             <div class="start-control">
               <button id="startAttachmentCameraButton" mat-raised-button type="button"
-                [disabled]="busy || cameraStarting" (click)="requestCamera()">
-                {{ cameraStarting ? 'Kamerazugriff wird angefragt…' : 'Kamera starten' }}
+                [disabled]="busy || cameraStarting || cameraSwitching" (click)="requestCamera()">
+                {{ cameraStarting || cameraSwitching ? 'Kamerazugriff wird angefragt…' : 'Kamera starten' }}
               </button>
             </div>
           }

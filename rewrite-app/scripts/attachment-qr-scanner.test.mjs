@@ -509,6 +509,59 @@ test("late selection failure after Stop cannot overwrite the stopped-camera stat
   });
 });
 
+test("a pending camera switch keeps the controls unavailable until the selected stream is active", async () => {
+  await withCapture(async ({ component }) => {
+    const pending = deferred();
+    component.scanner = {
+      setCamera: () => pending.promise, hasFlash: async () => false,
+      isFlashOn: () => false, destroy() {}
+    };
+    component.selectedCameraId = "front-device";
+    const changing = component.selectCamera();
+    assert.equal(component.cameraSwitching, true);
+    pending.resolve();
+    await changing;
+    assert.equal(component.cameraSwitching, false);
+  });
+});
+
+test("only one torch request can change the active stream at a time", async () => {
+  await withCapture(async ({ component }) => {
+    const first = deferred();
+    let requests = 0;
+    component.hasFlash = true;
+    component.scanner = {
+      toggleFlash() { requests++; return first.promise; },
+      isFlashOn: () => true, destroy() {}
+    };
+    const enabling = component.toggleFlash();
+    const another = component.toggleFlash();
+    const pending = component.flashChanging;
+    first.resolve();
+    await Promise.all([enabling, another]);
+    assert.equal(pending, true);
+    assert.equal(requests, 1);
+    assert.equal(component.flashOn, true);
+    assert.equal(component.flashChanging, false);
+  });
+});
+
+test("a previous stream's torch failure cannot change the current camera state", async () => {
+  await withCapture(async ({ component, video }) => {
+    const pending = deferred();
+    component.hasFlash = true;
+    component.scanner = { toggleFlash: () => pending.promise, destroy() {} };
+    const enabling = component.toggleFlash();
+    video.srcObject = { getVideoTracks: () => [] };
+    component.status = "Replacement stream is active.";
+    pending.reject(new DOMException("Previous camera was stopped.", "NotReadableError"));
+    await enabling;
+    assert.equal(component.statusIsError, false);
+    assert.equal(component.status, "Replacement stream is active.");
+    assert.equal(component.flashChanging, false);
+  });
+});
+
 const cameraDetailsScanner = (deviceId = "rear-device") => ({
   getActiveCameraId: () => deviceId, isActive: () => true,
   hasFlash: async () => false, destroy() {}

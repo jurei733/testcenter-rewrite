@@ -41,6 +41,12 @@ export class NativeAttachmentCaptureComponent extends AttachmentCaptureComponent
     this.resumeRequestedCamera = this.cameraActive;
   }
 
+  requestFlash(control: MatCheckbox): Promise<void> {
+    // MatCheckbox changes its own state before the device reports the result.
+    control.checked = this.flashOn;
+    return this.toggleFlash();
+  }
+
   stopRequestedCamera(): void {
     this.resumeRequestedCamera = false;
     this.stopCamera();

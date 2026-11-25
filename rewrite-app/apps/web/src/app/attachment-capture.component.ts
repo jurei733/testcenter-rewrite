@@ -107,13 +107,14 @@ type AttachmentScope = {
             <img id="attachmentCapturePreview" class="capture-preview" *ngIf="capturePreviewUrl" [src]="capturePreviewUrl" alt="Captured attachment page ready to review" />
             <canvas #captureCanvas hidden></canvas>
             <div class="actions" *ngIf="!capturePreviewUrl">
-              <button id="startAttachmentCameraButton" class="primary" type="button" [disabled]="busy || cameraActive || cameraStarting" (click)="startCamera()">Start camera</button>
+              <button id="startAttachmentCameraButton" class="primary" type="button" [disabled]="busy || cameraActive || cameraStarting || cameraSwitching" (click)="startCamera()">Start camera</button>
               <button id="stopAttachmentCameraButton" class="ghost" type="button" [disabled]="!cameraActive" (click)="stopCamera()">Stop camera</button>
-              <button id="toggleAttachmentFlashButton" class="ghost" type="button" [disabled]="!cameraActive || !hasFlash" [attr.aria-pressed]="flashOn" (click)="toggleFlash()">{{ customText('gm_flash_checkbox', flashOn ? 'Turn flash off' : 'Turn flash on') }}</button>
+              <button id="toggleAttachmentFlashButton" class="ghost" type="button" [disabled]="!cameraActive || !hasFlash || flashChanging" [attr.aria-pressed]="flashOn" (click)="toggleFlash()">{{ customText('gm_flash_checkbox', flashOn ? 'Turn flash off' : 'Turn flash on') }}</button>
             </div>
             <label *ngIf="!capturePreviewUrl && cameras.length > 1">
               {{ customText('am_available_cameras', 'Camera') }}
-              <select id="attachmentCameraSelect" [(ngModel)]="selectedCameraId" (change)="selectCamera()">
+              <select id="attachmentCameraSelect" [(ngModel)]="selectedCameraId"
+                [disabled]="busy || cameraStarting || cameraSwitching" (change)="selectCamera()">
                 <option *ngIf="!selectedCameraIsListed" [value]="selectedCameraId">{{ selectedCameraId ? 'Selected camera' : 'Default camera (rear preferred)' }}</option>
                 <option *ngFor="let camera of cameras" [value]="camera.id">{{ camera.label || camera.id }}</option>
               </select>
@@ -202,6 +203,7 @@ export class AttachmentCaptureComponent
   private scanInProgress = false;
   private cameraSelectionVersion = 0;
   private cameraDetailsVersion = 0;
+  private flashOperation: object | null = null;
   // Native encoding, QR decoding and HTTP can finish after a reset or switch.
   // Each result belongs to the scope, target and photo that started it.
   private captureVersion = 0;
@@ -225,6 +227,7 @@ export class AttachmentCaptureComponent
   selectedCameraId = "";
   cameraActive = false;
   cameraStarting = false;
+  cameraSwitching = false;
   cameraMessage = "";
   hasFlash = false;
   flashOn = false;
@@ -232,6 +235,8 @@ export class AttachmentCaptureComponent
   status = "Scan a QR code or enter an attachment code to begin.";
   statusIsError = false;
   uploadNotice: string | null = null;
+
+  get flashChanging(): boolean { return this.flashOperation !== null; }
 
   get cameraGeometry(): ReturnType<typeof attachmentPageGeometry> {
     const video = this.cameraVideo?.nativeElement;
@@ -298,7 +303,7 @@ export class AttachmentCaptureComponent
   }
 
   async startCamera(): Promise<void> {
-    if (this.busy || this.cameraActive || this.cameraStarting || !this.hasSessionScope) return;
+    if (this.busy || this.cameraActive || this.cameraStarting || this.cameraSwitching || !this.hasSessionScope) return;
     this.cameraStarting = true;
     this.cameraMessage = "Requesting camera access…";
     this.statusIsError = false;
@@ -321,6 +326,7 @@ export class AttachmentCaptureComponent
         active => {
           if (this.destroyRef.destroyed || this.scanner !== scanner) return;
           this.cameraActive = active;
+          this.flashOperation = null;
           this.hasFlash = false;
           this.flashOn = false;
           if (active) {
@@ -356,6 +362,8 @@ export class AttachmentCaptureComponent
   stopCamera(): void {
     this.cameraSelectionVersion++;
     this.scanner?.stop();
+    this.cameraSwitching = false;
+    this.flashOperation = null;
     this.cameraActive = false;
     this.flashOn = false;
     this.hasFlash = false;
@@ -365,8 +373,9 @@ export class AttachmentCaptureComponent
 
   async selectCamera(): Promise<void> {
     // Choosing a device while stopped only sets the preference for Start.
-    if (!this.scanner || !this.selectedCameraId || !this.cameraActive) return;
+    if (!this.scanner || !this.selectedCameraId || !this.cameraActive || this.cameraSwitching) return;
     const scanner = this.scanner;
+    this.cameraSwitching = true;
     const version = ++this.cameraSelectionVersion;
     const current = () => !this.destroyRef.destroyed && this.scanner === scanner &&
       version === this.cameraSelectionVersion;
@@ -384,20 +393,33 @@ export class AttachmentCaptureComponent
       this.status = this.describeCameraError(error);
       this.statusIsError = true;
     } finally {
-      if (current()) this.refreshView();
+      if (current()) {
+        this.cameraSwitching = false;
+        this.refreshView();
+      }
     }
   }
 
   async toggleFlash(): Promise<void> {
-    if (!this.scanner || !this.hasFlash) return;
+    const scanner = this.scanner;
+    if (!scanner || !this.cameraActive || !this.hasFlash || this.flashChanging) return;
+    const stream = this.cameraVideo?.nativeElement.srcObject;
+    const operation = this.flashOperation = {};
+    const current = () => this.flashOperation === operation && !this.destroyRef.destroyed &&
+      this.scanner === scanner && this.cameraActive && this.cameraVideo?.nativeElement.srcObject === stream;
     try {
-      await this.scanner.toggleFlash();
-      this.flashOn = this.scanner.isFlashOn();
+      await scanner.toggleFlash();
+      if (current()) this.flashOn = scanner.isFlashOn();
     } catch (error) {
-      this.status = this.describeCameraError(error);
-      this.statusIsError = true;
+      if (current()) {
+        this.status = this.describeCameraError(error);
+        this.statusIsError = true;
+      }
     } finally {
-      this.refreshView();
+      if (this.flashOperation === operation) {
+        this.flashOperation = null;
+        this.refreshView();
+      }
     }
   }
 
@@ -701,6 +723,8 @@ export class AttachmentCaptureComponent
     this.cameraSelectionVersion++;
     this.scanner?.destroy();
     this.scanner = null;
+    this.cameraSwitching = false;
+    this.flashOperation = null;
     this.cameraActive = false;
     this.hasFlash = false;
     this.flashOn = false;
