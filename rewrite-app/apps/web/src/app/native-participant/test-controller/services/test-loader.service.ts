@@ -138,7 +138,8 @@ export class TestLoaderService extends BookletParserService<Unit, Testlet, Bookl
       throw new AppError({
         label: `Unit konnte nicht geladen werden. ${info || ''}`,
         description: info || String(err),
-        type: 'network'
+        type: 'network',
+        stackedBackdrop: err instanceof AppError && err.stackedBackdrop
       });
     }
     return this.tcs.setUnitNavigationRequest(resumeTargetUnitSequenceId.toString(), recoverResume);
@@ -304,8 +305,9 @@ export class TestLoaderService extends BookletParserService<Unit, Testlet, Bookl
         this.tcs.units[queueEntry.sequenceId].loadingProgress[queueEntry.type] = progress$[i].asObservable();
       });
 
+    const lazy = this.tcs.booklet?.config.loading_mode === 'LAZY' && !testData.laststate.BOOKLET_STATES;
     return new Promise<void>(resolve => {
-      if (this.tcs.booklet?.config.loading_mode === 'LAZY' && !testData.laststate.BOOKLET_STATES) {
+      if (lazy) {
         resolve();
       }
 
@@ -314,7 +316,17 @@ export class TestLoaderService extends BookletParserService<Unit, Testlet, Bookl
           concatMap((queueEntry, queueIndex) => {
             const resourceLoading$ =
               this.bs.getResource(testData.workspaceId, queueEntry.file)
-                .pipe(shareReplay());
+                .pipe(
+                  tap({error: error => {
+                    if (!lazy || queueEntry.type !== 'definition' || !(error instanceof AppError)) return;
+                    const unit = this.tcs.currentUnit ??
+                      this.tcs.units[this.tcs.unitAliasMap[testData.laststate.CURRENT_UNIT_ID || '1']];
+                    if (unit && this.tcs.getUnitBlockIds(unit.sequenceId).includes(queueEntry.sequenceId)) {
+                      error.stackedBackdrop = true;
+                    }
+                  }}),
+                  shareReplay()
+                );
 
             resourceLoading$
               .pipe(

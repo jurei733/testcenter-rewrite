@@ -512,7 +512,7 @@ export class TestControllerService {
     return unit;
   }
 
-  private getUnitBlockIds(sequenceId: number): number[] {
+  getUnitBlockIds(sequenceId: number): number[] {
     const unit = this.getUnit(sequenceId);
     if (!unit.parent) {
       return [sequenceId];

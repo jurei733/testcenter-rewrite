@@ -57,9 +57,11 @@ export class MessageService {
   }
 
   showErrorDialog(errorMessage?: string): void {
+    const panelClass = ['original-participant-error-dialog'];
+    if (this.mds.appError?.stackedBackdrop) panelClass.push('original-participant-stacked-error-dialog');
     this.dialog.open(ErrorDialogComponent, {
       data: errorMessage,
-      panelClass: 'original-participant-error-dialog',
+      panelClass,
       disableClose: true,
       autoFocus: 'dialog'
     });

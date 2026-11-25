@@ -83,6 +83,7 @@ export interface AppErrorInterface {
   testMode?: TestModeName | null;
   details?: string;
   errorId?: string | null;
+  stackedBackdrop?: boolean;
 }
 
 export class AppError extends Error implements AppErrorInterface {
@@ -93,6 +94,7 @@ export class AppError extends Error implements AppErrorInterface {
   testMode?: TestModeName | null;
   details?: string;
   errorId?: string;
+  stackedBackdrop?: boolean;
   constructor(p: AppErrorInterface) {
     super();
     Object.assign(this, p);

@@ -15,6 +15,7 @@ export class NativeOwnedDialog {
  private readonly http=inject(NativeHttpClient);
  private readonly api=inject(VeronaAPIService);
  private readonly injector=inject(EnvironmentInjector);
+ private readonly document=inject(DOCUMENT);
  private readonly records=new Set<()=>void>();
  private retired=false;
  private readonly retire=()=>{this.retired=true;for(const close of [...this.records])close();};
@@ -25,8 +26,17 @@ export class NativeOwnedDialog {
   let ref;
   try{ref=this.parent.open<T,D,R>(component,{...config,injector:this.injector});}
   catch(error){release();throw error;}
+  const panelClasses=typeof config.panelClass==='string'?[config.panelClass]:config.panelClass??[];
+  let removeBacking: (()=>void)|undefined;
   let cleaned=false;
-  const cleanup=()=>{if(cleaned)return;cleaned=true;this.records.delete(cancel);lease?.signal.removeEventListener('abort',cancel);release();};
+  const cleanup=()=>{
+   if(cleaned)return;
+   cleaned=true;
+   removeBacking?.();
+   this.records.delete(cancel);
+   lease?.signal.removeEventListener('abort',cancel);
+   release();
+  };
   const cancel=()=>{cancelled.next();cancelled.complete();cleanup();ref.componentRef?.location.nativeElement.remove();ref.close();};
   this.records.add(cancel);lease?.signal.addEventListener('abort',cancel,{once:true});
   const current=()=>!this.retired&&this.http.isCurrent&&(!lease||this.api.channel.isCurrent(lease));
@@ -34,9 +44,62 @@ export class NativeOwnedDialog {
   ref.afterClosed().subscribe({next:cleanup,complete:()=>{cleanup();cancelled.complete();}});
   // Initialize Source forms once under the app's zoneless scheduler.
   try{ref.componentRef?.changeDetectorRef.detectChanges();}catch(error){cancel();throw error;}
+  if(panelClasses.includes('original-participant-stacked-error-dialog')){
+   ref.afterOpened().pipe(takeUntil(cancelled)).subscribe(()=>{
+    if(current()&&ref.componentRef)removeBacking=this.addStackedBacking(ref.componentRef.location.nativeElement);
+   });
+  }
   if(!current())cancel();
   return {afterClosed:()=>closed};
  }
+
+ private addStackedBacking(content:HTMLElement):(()=>void)|undefined{
+  const pane=content.closest<HTMLElement>('.cdk-overlay-pane');
+  const wrapper=pane?.parentElement;
+  const backdrop=wrapper?.previousElementSibling;
+  const surface=content.closest<HTMLElement>('.mat-mdc-dialog-surface');
+  if(!pane||!wrapper||!backdrop?.classList.contains('cdk-overlay-backdrop')||!surface)return;
+
+  // Preserve the CDK paint order of the lower card, second veil and active
+  // dialog. The two decorative nodes introduce no dialog or focus trap.
+  const lowerWrapper=wrapper.cloneNode(false) as HTMLElement;
+  const lowerPane=pane.cloneNode(false) as HTMLElement;
+  const veil=backdrop.cloneNode(false) as HTMLElement;
+  lowerPane.classList.remove('original-participant-stacked-error-dialog');
+  lowerPane.removeAttribute('id');
+  lowerWrapper.ariaHidden='true';
+  lowerWrapper.inert=true;
+  lowerPane.style.pointerEvents='none';
+  veil.ariaHidden='true';
+  veil.style.pointerEvents='none';
+  let backing:HTMLElement|undefined;
+  for(let original:HTMLElement|null=surface;original&&original!==pane;original=original.parentElement){
+   const layer=this.document.createElement('div');
+   layer.className=original.className;
+   layer.style.cssText=original.style.cssText;
+   if(backing)layer.append(backing);
+   else layer.style.backgroundColor=getComputedStyle(surface).backgroundColor;
+   backing=layer;
+  }
+  if(!backing)return;
+  lowerPane.append(backing);
+  const size=()=>{
+   const {width,height}=pane.getBoundingClientRect();
+   lowerPane.style.width=width+'px';
+   lowerPane.style.height=height+'px';
+  };
+  size();
+  lowerWrapper.append(lowerPane);
+  wrapper.before(lowerWrapper,veil);
+  const observer=new ResizeObserver(size);
+  observer.observe(pane);
+  return ()=>{
+   observer.disconnect();
+   lowerWrapper.remove();
+   veil.remove();
+  };
+ }
+
  ngOnDestroy(){this.http.accessSignal.removeEventListener('abort',this.retire);this.retire();}
 }
 

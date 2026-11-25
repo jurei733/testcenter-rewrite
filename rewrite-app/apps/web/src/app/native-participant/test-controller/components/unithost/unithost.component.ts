@@ -341,7 +341,8 @@ export class UnithostComponent implements OnInit, OnDestroy {
           this.mds.appError = new AppError({
             label: `Unit konnte nicht geladen werden. ${err.info}`,
             description: (err.info) ? err.info : err,
-            type: 'network'
+            type: 'network',
+            stackedBackdrop: err instanceof AppError && err.stackedBackdrop
           });
         },
         complete: () => {
