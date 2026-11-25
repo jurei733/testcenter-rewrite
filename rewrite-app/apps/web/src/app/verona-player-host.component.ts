@@ -148,7 +148,6 @@ type RetiredVeronaFrame = {
           [attr.inert]="status === 'running' || status === 'ready' ? null : ''"></div>
         <ng-content select="[original-player-sidebar]" />
       </div>
-      <ng-content select="[original-system-check-page-controls]" />
       <nav
         *ngIf="!originalUi && !originalSystemCheckUi && (showGlobalBackwardButton || showPageNavigation || showGlobalForwardButton)"
         class="verona-player-page-navigation"

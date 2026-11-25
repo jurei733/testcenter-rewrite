@@ -3003,6 +3003,19 @@ try {
       });
     }), true, "Both numbered page labels must remain inside the visible toggle group on mobile");
     if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-unit-mobile.png"), fullPage: true });
+    await page.setViewportSize({ width: 320, height: 844 });
+    const mobilePager = page.locator("#originalSystemCheckPageNavigation");
+    await mobilePager.locator("[data-cy='page-navigation-0'] button[aria-checked='true']").waitFor();
+    const pagerTop = await mobilePager.evaluate(nav => nav.getBoundingClientRect().top);
+    await mobilePager.getByRole("button", { name: "Nächste Seite" }).click();
+    await originalUnitFrame.getByRole("textbox", { name: "Second page answer" }).waitFor();
+    assert.ok(await mobilePager.evaluate((nav, top) =>
+      scrollY > 0 && nav.getBoundingClientRect().top < top,
+    pagerTop), "A wrapped page arrow scrolls the document, moving the pager above the embedded Player arrow");
+    await mobilePager.getByRole("button", { name: "Vorherige Seite" }).click();
+    await originalUnitFrame.locator("#var1").waitFor();
+    assert.equal(await originalUnitFrame.locator("#var1").inputValue(), "Original Systemcheck Unit answer");
+    await page.evaluate(() => scrollTo(0, 0));
     await page.setViewportSize(choiceViewport);
     await page.evaluate(() => {
       window.postMessage({ type: "vopRuntimeErrorNotification", code: "untrusted", message: "Wrong-source Systemcheck message" }, "*");

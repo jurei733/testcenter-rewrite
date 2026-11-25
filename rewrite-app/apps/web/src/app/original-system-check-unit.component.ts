@@ -18,18 +18,22 @@ import { OriginalSystemCheckPlayerControlsComponent } from "./original-system-ch
         <h2>{{ view.customText('syscheck_unitPrompt', 'Bitte prüfen Sie die folgenden Aufgaben-Elemente') }}</h2>
         <div class="mat-divider mat-divider-horizontal" role="separator" aria-orientation="horizontal"></div>
       </div>
-      <div class="unit-frame" [class.is-error]="!!unitError" [style.top.px]="frameOffset()" id="originalSystemCheckUnit">
-        <app-verona-player-host #player *ngIf="unit.playerHtml && unit.unitDefinition; else unavailable"
-          [originalSystemCheckUi]="true" [playerHtml]="unit.playerHtml!" [playerKey]="unit.playerKey || 'system-check-player'"
-          testRunId="system-check" [unitKey]="unit.unitKey" [unitTitle]="unit.displayLabel"
-          [unitDefinition]="unit.unitDefinition!" [unitDefinitionType]="unit.unitDefinitionType || ''"
-          [savedResponse]="view.unitResponse" [canComplete]="true" logPolicy="disabled"
-          [pageNavigationPrompt]="view.customText('login_pagesNaviPrompt', '')" (responseChange)="view.onUnitResponse($event)"
-          (viewStateChange)="unitError = player.errorMessage">
-          <app-original-system-check-player-controls original-system-check-page-controls [view]="player" />
-        </app-verona-player-host>
-        <ng-template #unavailable><p role="alert">Test-Aufgabe konnte nicht angezeigt werden: Unit oder Player ist nicht verfügbar.</p></ng-template>
-      </div>
+      @if (unit.playerHtml && unit.unitDefinition) {
+        <div class="unit-frame" [class.is-error]="!!unitError" [style.top.px]="frameOffset()" id="originalSystemCheckUnit">
+          <app-verona-player-host #player
+            [originalSystemCheckUi]="true" [playerHtml]="unit.playerHtml" [playerKey]="unit.playerKey || 'system-check-player'"
+            testRunId="system-check" [unitKey]="unit.unitKey" [unitTitle]="unit.displayLabel"
+            [unitDefinition]="unit.unitDefinition" [unitDefinitionType]="unit.unitDefinitionType || ''"
+            [savedResponse]="view.unitResponse" [canComplete]="true" logPolicy="disabled"
+            [pageNavigationPrompt]="view.customText('login_pagesNaviPrompt', '')" (responseChange)="view.onUnitResponse($event)"
+            (viewStateChange)="unitError = player.errorMessage" />
+        </div>
+        <app-original-system-check-player-controls [view]="player" />
+      } @else {
+        <div class="unit-frame" [style.top.px]="frameOffset()" id="originalSystemCheckUnit">
+          <p role="alert">Test-Aufgabe konnte nicht angezeigt werden: Unit oder Player ist nicht verfügbar.</p>
+        </div>
+      }
     </ng-container>
   `,
   styles: [`

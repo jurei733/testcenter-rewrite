@@ -38,9 +38,10 @@ import type { VeronaPlayerHostComponent } from "./verona-player-host.component";
   `,
   styles: [`
     :host { display:block; }
-    .pageNav { position:absolute; right:0; bottom:0; height:45px; padding:0 30px; font-size:1.2em; background:transparent; max-width:100%; overflow:auto; }
+    .pageNav { position:absolute; right:0; bottom:0; height:45px; padding:0 30px; font-size:1.2em; background:transparent; max-width:100%; }
+    .pageNav > span { overflow-wrap:anywhere; }
     button { height:34px !important; margin-bottom:2px; }
-    mat-button-toggle-group { height:34px; align-items:center; flex-shrink:0; }
+    mat-button-toggle-group { height:34px; align-items:center; max-width:100%; overflow:auto; vertical-align:middle; }
     mat-button-toggle.mat-button-toggle-checked { background-color:transparent; }
     /* Material's inner toggle button has no own radius or hover transform;
        do not let the Rewrite's generic capsule button clip its label. */
