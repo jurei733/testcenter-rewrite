@@ -303,6 +303,14 @@ try{
  const terminateProduced=monitor.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT'&&r.request().postDataJSON()?.keyword==='terminate');await monitor.locator('[data-cy=GM_end_button]').click();await monitor.locator('[data-cy=dialog-confirm]').click();assert.equal((await terminateProduced).status(),201);
  await page.waitForURL(/\/native-start(?:\?|$)/);await otherCard.waitFor();assert.equal(await page.locator('iframe').count(),0);assert.equal(await page.evaluate(()=>window.__remoteTerminatedFrame.isConnected),false);assert.equal(await otherCard.getByRole('button').isDisabled(),true);
  mark('actual-monitor-finish-locks-the-running-native-test-and-returns-to-Source-starter');
+ const starterLogo=page.getByRole('link',{name:'Gehe zur Startseite',exact:true}).locator('[data-cy=logo]');
+ const logoTooltip=page.locator('.mat-mdc-tooltip.original-application-logo-tooltip');
+ await starterLogo.hover();
+ await logoTooltip.waitFor();
+ assert.equal(await logoTooltip.innerText(),'Zur Startseite');
+ await otherCard.hover();
+ await logoTooltip.waitFor({state:'hidden'});
+ mark('native-starter-logo-shows-and-dismisses-the-source-tooltip');
  assert.equal((await terminalLog).status(),201);assert.deepEqual(errors.slice(commandErrorStart),[]);
  const terminalAttempts=await testReceipts('native-remote-termination','log');assert.deepEqual(terminalAttempts.map(row=>row.status),[503,201]);assert.equal(terminalAttempts[0].backendStatus,201);assert.equal(terminalAttempts[0].deliveryId,terminalAttempts[1].deliveryId);assert.match(terminalAttempts[0].deliveryId,/^[a-f0-9-]{36}$/);assert.equal(terminalAttempts[0].body,terminalAttempts[1].body);assert.equal(logCount('9007199254740995','command executed'),terminalLogBefore+1);mark('real-terminal-log-lost-ack-retries-once-after-native-run-retirement-without-a-duplicate');
  mark('remote-termination-persists-its-command-executed-log-after-the-owned-starter-navigation');

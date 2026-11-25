@@ -5,6 +5,7 @@ import {Component,effect,inject,signal,untracked} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {ActivatedRoute,Router,RouterLink} from '@angular/router';
 import {MatToolbar} from '@angular/material/toolbar';
+import {MatTooltip} from '@angular/material/tooltip';
 import {MatInput} from '@angular/material/input';
 import {MatFormField,MatLabel,MatSuffix} from '@angular/material/form-field';
 import {MatButton,MatIconButton} from '@angular/material/button';
@@ -34,14 +35,14 @@ import {NativePublicHeaderService} from '../native-public-header.service';
 import type {CodeInputType} from './app.interfaces';
 import {originalParticipantReturnPath} from './original-participant-bookmark';
 @Component({selector:'app-native-participant-entry',standalone:true,
- imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent,MatCard,MatCardActions,MatCardContent,MatCardHeader,MatCardTitle],
+ imports:[FormsModule,RouterLink,OriginalFooterComponent,NativeLoginBrowserNoticeComponent,AlertComponent,MatToolbar,MatTooltip,MatInput,MatFormField,MatLabel,MatSuffix,MatButton,MatIconButton,NativeAccountMenuComponent,MatIcon,OriginalOverlayStylesComponent,NativeStarterComponent,NativeCodeLoginComponent,MatCard,MatCardActions,MatCardContent,MatCardHeader,MatCardTitle],
  providers:[NativeLoginFailureService,AssetService,CustomtextService,NativeTestStarterService],styleUrls:['../native-monitor/native-monitor-entry.component.css','../original-login-theme.scss'],
  styles:`
   .missing-route { display: flex; justify-content: center; color: var(--mat-sys-on-surface); }
   .missing-route mat-card { width: 400px; max-width: 100%; margin-top: 80px; }
   .missing-route mat-card-content { overflow-wrap: anywhere; }
  `,
- template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(!session.busy()&&!explicitLogin&&!showCode){@if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a [routerLink]="logoDestination" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" alt="Logo der Anwendung" /></a></div></mat-toolbar></header>
+ template:`<app-original-overlay-styles /><header><mat-toolbar data-cy="header"><div class="side">@if(!session.busy()&&!explicitLogin&&!showCode){@if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}}</div><div class="center">@if(publicHeader.title();as title){<h1>{{title}}</h1>}</div><div class="side logo"><a [routerLink]="logoDestination" aria-label="Gehe zur Startseite" (click)="logoClick()"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" data-cy="logo" alt="Logo der Anwendung" matTooltip="Zur Startseite" matTooltipClass="original-application-logo-tooltip" /></a></div></mat-toolbar></header>
  @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
  @if(missingRoute!==null){
   <main class="missing-route">
