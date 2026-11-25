@@ -66,6 +66,7 @@ export class NativeOwnedDialog {
   const lowerPane=pane.cloneNode(false) as HTMLElement;
   const veil=backdrop.cloneNode(false) as HTMLElement;
   lowerPane.classList.remove('original-participant-stacked-error-dialog');
+  lowerPane.classList.add('original-participant-error-backing');
   lowerPane.removeAttribute('id');
   lowerWrapper.ariaHidden='true';
   lowerWrapper.inert=true;

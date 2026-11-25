@@ -142,6 +142,14 @@ app-root {
   display: none;
 }
 
+/* Match Material's small-dialog breakpoint when painting the decorative
+   error surface under the second backdrop. */
+@media (max-width: 599px) {
+  :root[data-interface-mode='original'] .original-participant-error-backing .mat-mdc-dialog-surface {
+    will-change: opacity;
+  }
+}
+
 /* Source html/body defaults must stay below CDK global-scrollblock specificity.
    Native modal scrollbars retain their actual layout and width. */
 :where(:root:has(app-native-monitor-entry), body:has(app-native-monitor-entry),
