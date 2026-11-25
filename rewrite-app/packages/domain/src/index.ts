@@ -1238,6 +1238,7 @@ export type OriginalTestResultState = {
     paused: boolean;
     resumeFromControllerRevision?: number;
     resumeParkedTimer?: { unitAlias: string; timerKey: string };
+    gotoRecovery?: { unitAlias: string; minutes?: number; unitRevision: number; controllerRevision: number };
     reopen?: { unitAlias: string; minutes: number; timerKey?: string } |
       { unitAlias: string; minutes: null; timerKey: string };
   };

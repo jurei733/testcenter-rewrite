@@ -260,6 +260,46 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    assert.equal(cancelled.status,'cancelled');
    assert.equal(cancelled.remainingMilliseconds,0);
   });
+  await t.test('an accepted native jump can finish after reopening an untimed Test',async()=>{
+   await upload('jump-recovery.xml',xml('Booklet','<Metadata><Id>ORACLE.POW.GOTO</Id><Label>Jump recovery</Label></Metadata><Units>'+
+    '<Unit id="ORACLE.POW.UNIT" alias="START" label="Start"/><Unit id="ORACLE.POW.UNIT" alias="NEXT" label="Next"/></Units>'));
+   const {person}=await authenticate('owned-command-canonical');
+   const testNumber=await services.originalTest.create({token:person.token,bookletName:'ORACLE.POW.GOTO'});
+   const read={token:person.token,testNumber,nativeStateProtocol:'1'};
+   const project=async(state)=>{
+    const {nativeStateBase}=await services.originalTest.read(read);
+    await services.originalTest.patchState({...read,stateBase:nativeStateBase,deliveryId:randomUUID(),
+     patch:Object.entries(state).map(([key,content])=>({key,content,timeStamp:Date.now()}))});
+   };
+   const command=async(keyword,args=[])=>{
+    await send({keyword,arguments:args,timestamp:clock+950,testIds:[Number(testNumber)]});
+    const [pending]=await repository.listOriginalCommands(await current(testNumber,person),null);
+    const acknowledgement=await services.originalCommand.acknowledge({...read,commandNumber:pending.id});
+    assert.equal(acknowledgement.reason,'OK');
+    return pending.id;
+   };
+   await project({CONTROLLER:'PAUSED',CURRENT_UNIT_ID:'START'});
+   const jump=await command('goto',['id','next','']);
+   await close();await open();
+   const recovered=await services.originalTest.read(read);
+   assert.deepEqual(recovered.nativeGotoPending,{unitAlias:'NEXT'});
+   assert.equal(recovered.laststate.CURRENT_UNIT_ID,'START');
+   assert.equal(recovered.laststate.CONTROLLER,'PAUSED');
+   assert.equal((await services.originalTest.read({token:person.token,testNumber})).nativeGotoPending,undefined);
+   assert.equal(await services.originalCommand.pending({token:person.token,testNumber}),'[]');
+   await project({CONTROLLER:'RUNNING'});
+   assert.deepEqual((await services.originalTest.read(read)).nativeGotoPending,{unitAlias:'NEXT'});
+   await project({CURRENT_UNIT_ID:'NEXT'});
+   assert.equal((await services.originalTest.read(read)).nativeGotoPending,undefined);
+   assert.equal((await services.originalCommand.acknowledge({...read,commandNumber:jump})).reason,'OK, was already marked as executed');
+   assert.equal((await services.originalTest.read(read)).nativeGotoPending,undefined);
+   await command('goto',['id','START','']);
+   assert.deepEqual((await services.originalTest.read(read)).nativeGotoPending,{unitAlias:'START'});
+   await command('pause');
+   assert.equal((await services.originalTest.read(read)).nativeGotoPending,undefined);
+   await command('goto',['id','REMOVED','']);
+   assert.equal((await services.originalTest.read(read)).nativeGotoPending,undefined);
+  });
   await t.test('a jump from Pause parks the old balance until the monitor jumps back to it',async()=>{
    const block=(id,minutes)=>`<Testlet id="${id}" label="${id}"><Restrictions><TimeMax minutes="${minutes}" leave="forbidden"/></Restrictions><Unit id="ORACLE.POW.UNIT" alias="${id}" label="Owned Unit"/></Testlet>`;
    await upload('parked-timers.xml',xml('Booklet','<Metadata><Id>ORACLE.POW.PARKED</Id><Label>Parked timers</Label></Metadata><Units>'+block('ALPHA',2)+block('BRAVO',1.5)+'</Units>'));

@@ -73,8 +73,19 @@ export class BackendService {
 
   getTestData(testId: string): Observable<TestData> {
     return this.http.get<TestData>(`${this.backendUrl}test/${testId}`,{nativeStateProtocol:true,observe:'response'}).pipe(
-      map(({body,headers}:HttpResponse<TestData>) =>
-        body && headers.get('X-Native-Resume-Pending')==='1' ? {...body,resumePending:true} : body!)
+      map(({body,headers}:HttpResponse<TestData>) => {
+        const data=body && headers.get('X-Native-Resume-Pending')==='1' ? {...body,resumePending:true} : body!;
+        const pending=headers.get('X-Native-Goto-Pending');
+        if (!body || !pending) return data;
+        try {
+          const gotoPending=JSON.parse(decodeURIComponent(pending)) as TestData['gotoPending'];
+          if (gotoPending && typeof gotoPending.unitAlias==='string' && gotoPending.unitAlias &&
+            (gotoPending.minutes===undefined || Number.isSafeInteger(gotoPending.minutes) && gotoPending.minutes>0)) {
+            return {...data,gotoPending};
+          }
+        } catch { /* The saved Test state is usable without a recovery hint. */ }
+        return data;
+      })
     );
   }
 

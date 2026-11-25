@@ -61,6 +61,7 @@ export async function handleOriginalTestHttp(input:{request:IncomingMessage;path
    const result=await input.services.originalTest.read({token,testNumber,nativeStateProtocol:input.request.headers['x-native-state-protocol']});
    if(result.nativeStateBase)input.header('X-Native-State-Base',JSON.stringify(result.nativeStateBase));
    if(result.nativeResumePending)input.header('X-Native-Resume-Pending','1');
+   if(result.nativeGotoPending)input.header('X-Native-Goto-Pending',encodeURIComponent(JSON.stringify(result.nativeGotoPending)));
    input.raw(200,formatOriginalTestReadJson(result),'application/json');return true;}
   // Select the progress budget only after decoded route, method and native
   // ownership checks. Unit logs and ordinary controller commands keep theirs.

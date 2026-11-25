@@ -27,7 +27,7 @@ function orderedName(input:string):{name:string;fileId:string;states:Map<string,
   return {fileId, name: fileId + (states.size ? '#' + [...states].map(([key, value]) => `${key}:${value}`).join(';') : ''), states};
 }
 export function parseOriginalTestName(input:string):{name:string;fileId:string;states:Record<string,string>}{const parsed=orderedName(input);return{...parsed,states:Object.fromEntries(parsed.states)};}
-export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode|NonNullable<ParticipantSession['originalOperationalMode']>;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>;nativeStateBase?:OriginalNativeStateWriteBase;nativeResumePending?:true};
+export type OriginalTestRead=OriginalBookletFiles&{mode:ParticipantExecutionMode|NonNullable<ParticipantSession['originalOperationalMode']>;laststate:Record<string,unknown>;firstStart:boolean;workspaceId:string;presetBookletStates:Map<string,string>;nativeStateBase?:OriginalNativeStateWriteBase;nativeResumePending?:true;nativeGotoPending?:{unitAlias:string;minutes?:number}};
 export function formatOriginalTestReadJson(value:OriginalTestRead):string{
  const resources=Object.entries(value.resources);
  const resourceJson=originalPhpMap(resources);
@@ -268,9 +268,19 @@ export function createOriginalTestPort(input: {
       const laststate=savedState(result.testRun),control=evidence?.nativeTimerControl;
       const nativeResumePending=nativeStateProtocol==='1'&&guard&&laststate.CONTROLLER==='PAUSED'&&
         control?.paused===false&&control.resumeFromControllerRevision===(guard.fields.CONTROLLER??0);
+      const recovery=control?.gotoRecovery;
+      const sameAlias=typeof laststate.CURRENT_UNIT_ID==='string'&&recovery&&
+        originalParticipantGroupKeysEqual(laststate.CURRENT_UNIT_ID,recovery.unitAlias);
+      // RUNNING may already have arrived while the destination Unit is still loading.
+      // A newer Unit write, Pause or terminal state supersedes the unfinished jump.
+      const nativeGotoPending=nativeStateProtocol==='1'&&guard&&control?.paused===false&&recovery&&
+        recovery.unitAlias.length<=255&&recovery.unitRevision===(guard.fields.CURRENT_UNIT_ID??0)&&
+        (laststate.CONTROLLER==='PAUSED'&&recovery.controllerRevision===(guard.fields.CONTROLLER??0)||
+         laststate.CONTROLLER==='RUNNING'&&!sameAlias)
+        ? {unitAlias:recovery.unitAlias,...(recovery.minutes===undefined?{}:{minutes:recovery.minutes})} : undefined;
       return{...files,workspaceId,mode:person.originalOperationalMode??entry?.executionMode??defaultParticipantExecutionMode,laststate,firstStart,presetBookletStates:orderedName(identity.bookletName).states,
         ...(nativeStateProtocol==='1'&&guard?{nativeStateBase:{version:1 as const,revision:guard.revision,controlEpoch:guard.controlEpoch}}:{}),
-        ...(nativeResumePending?{nativeResumePending:true as const}:{})};
+        ...(nativeResumePending?{nativeResumePending:true as const}:{}),...(nativeGotoPending?{nativeGotoPending}:{})};
     },
     async patchState({token,testNumber:raw,patch,deliveryId,stateBase}){
       const{run,testNumber}=await owned(token,raw);const entries=parseOriginalTestStatePatch(patch),base=parseOriginalNativeStateWriteBase(stateBase);

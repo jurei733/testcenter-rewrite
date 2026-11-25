@@ -33121,7 +33121,7 @@ export const createFirstSliceServices = (
         if(!unit)return undefined;
         const timerKey=resolveTimedTestletForUnit(booklet,unit.unitKey)?.testletKey??null;
         const immediateParent=unit.testletPath?.at(-1)??originalBookletRootTestletKey;
-        return {timerKey,inheritsTimer:timerKey!==null&&timerKey!==immediateParent};
+        return {unitAlias:unit.unitKey,timerKey,inheritsTimer:timerKey!==null&&timerKey!==immediateParent};
       }
     }),
     originalMonitor: createOriginalMonitorPort({auth:originalAuthentication,repository,now,id:idGenerator,

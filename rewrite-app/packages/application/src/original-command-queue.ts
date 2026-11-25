@@ -14,7 +14,7 @@ import type {OriginalNativeStateWriteBase} from '@testcenter-rewrite-app/domain'
 
 export type OriginalCommandActor=Pick<ParticipantSession,'tenantId'|'workspaceId'|'participantSessionId'|'groupKey'> & {originalLoginKey:string};
 export type OriginalCommandDelivery=OriginalTestNumberRecord & OriginalCommandPacket & {commanderParticipantSessionId:string|null;executed:boolean};
-export type OriginalTimerDestination={timerKey:string|null;inheritsTimer:boolean};
+export type OriginalTimerDestination={unitAlias:string;timerKey:string|null;inheritsTimer:boolean};
 export type OriginalTimerTransition={timestamp:string;destination?:OriginalTimerDestination};
 export type OriginalCommandRepository={
   reserveOriginalCommandNumber():Promise<string>;
@@ -114,14 +114,21 @@ export function prepareOriginalNativeTimerControl(
       reopen={unitAlias,timerKey,minutes};
     }
   }
-  if(!before.nativeTestletTimers&&!before.nativeTimerControl&&!reopen)return undefined;
   const timers=before.nativeTestletTimers;
   const guard=before.nativeWriteGuard;
+  const gotoRecovery=keyword==='goto'&&destination&&guard ? {
+    unitAlias:destination.unitAlias,
+    ...(typeof reopen?.minutes==='number'?{minutes:reopen.minutes}:{}),
+    unitRevision:guard.fields.CURRENT_UNIT_ID??0,
+    controllerRevision:guard.fields.CONTROLLER??0
+  } : undefined;
+  if(!timers&&!before.nativeTimerControl&&!reopen&&!gotoRecovery)return undefined;
   // A committed Resume can outlive its browser response. A controller write
   // accepted after this ACK takes precedence, including a late Pause response.
   const resumeFromControllerRevision=keyword==='resume'&&guard&&Object.values(timers??{}).some(timer=>timer.status==='paused'&&!timer.parkedByGoto)
     ? guard.fields.CONTROLLER??0 : undefined;
   const control={commandId:command.id,paused,...(reopen?{reopen}:{}),...(resumeParkedTimer?{resumeParkedTimer}:{}),
+    ...(gotoRecovery?{gotoRecovery}:{}),
     ...(resumeFromControllerRevision===undefined?{}:{resumeFromControllerRevision})};
   if(!timers||(keyword!=='pause'&&keyword!=='terminate'&&(keyword!=='goto'||!destination)))return {...before,nativeTimerControl:control};
   const stopped=Object.fromEntries(Object.entries(timers).map(([id,timer])=>{

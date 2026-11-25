@@ -55,6 +55,7 @@ export interface TestData {
   resources: TestDataResourcesMap;
   firstStart: boolean;
   resumePending?: boolean;
+  gotoPending?: {unitAlias: string; minutes?: number};
   workspaceId: string;
   presetBookletStates: { [ k :string]: string };
 }

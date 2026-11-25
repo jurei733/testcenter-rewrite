@@ -72,8 +72,7 @@ export function createOriginalCommandPort(input:{auth:OriginalAuthenticationPort
    if(native){
     const run=await input.repository.getTestRunById(scope.testRunId);
     let destination:OriginalTimerDestination|undefined;
-    const timerKnown=run?.originalResultState?.nativeTestletTimers||run?.originalTestState?.TESTLETS_TIMELEFT;
-    if(run&&timerKnown&&input.resolveTimerDestination){
+    if(run&&input.resolveTimerDestination){
      const command=(await input.repository.listOriginalCommands(scope,null)).find(row=>row.id===number);
      if(command?.keyword.toLowerCase()==='goto'&&command.arguments[0]==='id'&&command.arguments[1]){
       destination=await input.resolveTimerDestination(person,run,command.arguments[1]);

@@ -90,11 +90,13 @@ export class TestLoaderService extends BookletParserService<Unit, Testlet, Bookl
         .filter(x => !Number.isNaN(x));
 
     await this.loadUnits(testData);
-    this.prepareUnitContentLoadingQueueOrder(testData.laststate.CURRENT_UNIT_ID || '1');
+    const gotoPending=testData.gotoPending && Object.hasOwn(this.tcs.unitAliasMap,testData.gotoPending.unitAlias)
+      ? testData.gotoPending : undefined;
+    this.prepareUnitContentLoadingQueueOrder(gotoPending?.unitAlias || testData.laststate.CURRENT_UNIT_ID || '1');
     await this.loadResources(testData);
     this.updateVariablesInUnitsWithoutCodingScheme(testData);
     console.log({ loaded: (Date.now() - ts) });
-    return this.resumeTest(testData.laststate, testData.resumePending);
+    return this.resumeTest(testData.laststate, testData.resumePending, gotoPending);
   }
 
   reset(): void {
@@ -114,21 +116,22 @@ export class TestLoaderService extends BookletParserService<Unit, Testlet, Bookl
     this.loadingQueue = [];
   }
 
-  private async resumeTest(lastState: { [k in TestStateKey]?: string }, resumePending = false): Promise<boolean> {
+  private async resumeTest(lastState: { [k in TestStateKey]?: string }, resumePending = false,
+    gotoPending?: TestData['gotoPending']): Promise<boolean> {
     if (!this.tcs.booklet) {
       throw new AppError({ description: '', label: 'Booklet not loaded yet.', type: 'script' });
     }
 
     this.restoreLastState(lastState);
 
-    const currentUnitId = lastState.CURRENT_UNIT_ID;
+    const currentUnitId = gotoPending?.unitAlias ?? lastState.CURRENT_UNIT_ID;
     const resumeTargetUnitSequenceId = currentUnitId ? this.tcs.unitAliasMap[currentUnitId] : 1;
 
     const recoverResume = lastState.CONTROLLER === 'PAUSED' && resumePending;
-    if (lastState.CONTROLLER === 'TERMINATED_PAUSED' || lastState.CONTROLLER === 'PAUSED' && !recoverResume) {
+    if (lastState.CONTROLLER === 'TERMINATED_PAUSED' || lastState.CONTROLLER === 'PAUSED' && !recoverResume && !gotoPending) {
       return this.tcs.restorePausedTest(resumeTargetUnitSequenceId);
     }
-    this.tcs.state$.next('RUNNING');
+    if (!gotoPending) this.tcs.state$.next('RUNNING');
     // Wait for the starting unit's own block resources (definition/scheme) here, BEFORE
     // navigating - not just its unit/player data (already awaited above, via loadUnits()).
     try {
@@ -141,6 +144,9 @@ export class TestLoaderService extends BookletParserService<Unit, Testlet, Bookl
         type: 'network',
         stackedBackdrop: err instanceof AppError && err.stackedBackdrop
       });
+    }
+    if (gotoPending) {
+      return this.tcs.executeGotoCommand(['id',gotoPending.unitAlias,gotoPending.minutes?.toString() ?? '']);
     }
     return this.tcs.setUnitNavigationRequest(resumeTargetUnitSequenceId.toString(), recoverResume);
   }
