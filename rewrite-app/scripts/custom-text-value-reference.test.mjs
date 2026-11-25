@@ -178,14 +178,16 @@ export class NativeController {
     cts: { getCustomText: () => "Noch %s Minuten" },
     snackBar: { open: text => notices.push(text) }
   });
-  const tick = async (seconds, visible, expectedNotices) => {
-    await controller.handleTimer(new TimerData(seconds / 60, "block", "STEP"));
+  const tick = async (seconds, visible, expectedNotices, displayBalance) => {
+    await controller.handleTimer(new TimerData(seconds / 60, "block", "STEP", displayBalance));
     assert.equal(controller.timerValue.timeLeftString, visible);
     assert.equal(controller.tcs.timers.block, seconds / 60);
     assert.deepEqual(notices, expectedNotices);
   };
   await tick(62, "1:01", []);
   await tick(61, "1:00", ["Noch 1 Minuten"]);
+  // The stored clock can still have 62 seconds when the paused display was 1:00.
+  await tick(62, "0:59", ["Noch 1 Minuten"], 60);
   await tick(60, "0:59", ["Noch 1 Minuten"]);
   await tick(1, "0:00", ["Noch 1 Minuten", "Noch 0 Minuten"]);
   assert.deepEqual(writes, [["TESTLETS_TIMELEFT", { block: 1 }]]);

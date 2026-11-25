@@ -136,6 +136,8 @@ export class TestControllerService {
   timers: KeyValuePairNumber = {}; // TODO remove the redundancy with timers$
   currentTimerId = '';
   private timerUnitAlias?: string;
+  private visibleTimer?: TimerData;
+  private pausedTimer?: TimerData;
   private timerIntervalSubscription: Subscription | null = null;
   timerWarningPoints: number[] = [];
 
@@ -372,6 +374,7 @@ export class TestControllerService {
 
     this.currentUnitSequenceId = -Infinity;
     this.pausedResumeUnitSequenceId = undefined;
+    this.pausedTimer = undefined;
     this.unitContentReady$.next(false);
 
     this.booklet = null;
@@ -385,11 +388,7 @@ export class TestControllerService {
     this.timers = {};
     this.testState = {};
 
-    if (this.timerIntervalSubscription !== null) {
-      this.timerIntervalSubscription.unsubscribe();
-      this.timerIntervalSubscription = null;
-    }
-    this.currentTimerId = '';
+    this.finishTimer();
   }
 
   AddToUnitStateDataPartsBuffer(unitSequenceId: number, dataParts: KeyValuePairString, unitStateDataType: string): void {
@@ -564,6 +563,10 @@ export class TestControllerService {
       await this.pause();
       return false;
     }
+    // The Original resumes from the last displayed second. The server deadline
+    // still controls the stored balance and when this block expires.
+    const resumedDisplayBudget=this.pausedTimer?.id===testlet.id?this.pausedTimer.displayedSeconds:undefined;
+    this.pausedTimer=undefined;
     if(clock.status!=='running'||clock.remainingMilliseconds===0){
       if(!this.testMode.forceTimeRestrictions)return true;
       this.timers$.next(new TimerData(0,testlet.id,MaxTimerEvent.ENDED));
@@ -571,19 +574,23 @@ export class TestControllerService {
     }
     const timeBudget=clock.remainingMilliseconds;
     const deadline=performance.now()+timeBudget;
-    const remainingSeconds=()=>Math.max(0,Math.ceil((deadline-performance.now())/1000));
+    const publishTimer=(type:MaxTimerEvent,elapsedTicks=0)=>{
+      const remaining=Math.max(0,Math.ceil((deadline-performance.now())/1000));
+      const displayBalance=resumedDisplayBudget===undefined?undefined:Math.min(remaining,resumedDisplayBudget-elapsedTicks);
+      this.visibleTimer=new TimerData(remaining/60,testlet.id,type,displayBalance);
+      this.timers$.next(this.visibleTimer);
+    };
     this.currentTimerId = testlet.id;
     this.timerUnitAlias=unit.alias;
-    this.timers$.next(new TimerData(remainingSeconds()/60,testlet.id,MaxTimerEvent.STARTED));
+    publishTimer(MaxTimerEvent.STARTED);
 
     const timeTicker$ = createTicker();
     this.timerIntervalSubscription = this.owned(() => timeTicker$
       .pipe(
-        takeUntil(timer(timeBudget)),
-        map(remainingSeconds)
+        takeUntil(timer(timeBudget))
       ).subscribe({
-        next: val => {
-          this.timers$.next(new TimerData(val / 60, testlet.id, MaxTimerEvent.STEP));
+        next: elapsedTicks => {
+          publishTimer(MaxTimerEvent.STEP,elapsedTicks);
         },
         error: e => {
           throw e;
@@ -604,9 +611,11 @@ export class TestControllerService {
     this.timerIntervalSubscription = null;
     this.currentTimerId = '';
     this.timerUnitAlias=undefined;
+    this.visibleTimer=undefined;
   }
 
   cancelTimer(): void {
+    this.pausedTimer=undefined;
     if (this.currentTimerId) {
       this.timers$.next(new TimerData(0, this.currentTimerId, MaxTimerEvent.CANCELLED));
     }
@@ -735,6 +744,7 @@ export class TestControllerService {
   }
 
   pause(): Promise<boolean> {
+    if(this.visibleTimer)this.pausedTimer=this.visibleTimer;
     this.interruptTimer();
     this.state$.next('PAUSED');
     return this.setUnitNavigationRequest(UnitNavigationTarget.PAUSE, true);

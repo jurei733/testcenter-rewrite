@@ -38,7 +38,7 @@ export class TimerData {
     // The Original counts its first ticker update as the end of the first
     // displayed second. Keep that display convention separate from the clock.
     const elapsedDisplayTick = this.type === MaxTimerEvent.STEP ? 1 : 0;
-    return Math.max(0, Math.round(this.timeLeftSeconds) - elapsedDisplayTick);
+    return Math.max(0, (this.displayBalanceSeconds ?? Math.round(this.timeLeftSeconds)) - elapsedDisplayTick);
   }
 
   get timeLeftString(): string {
@@ -52,7 +52,8 @@ export class TimerData {
     return `${Math.round(this.timeLeftSeconds / 60).toString()} min`;
   }
 
-  constructor(timeMinutes: number, timerId: string, type: MaxTimerEvent) {
+  constructor(timeMinutes: number, timerId: string, type: MaxTimerEvent,
+              private readonly displayBalanceSeconds?: number) {
     this.timeLeftSeconds = timeMinutes * 60;
     this.id = timerId;
     this.type = type;
