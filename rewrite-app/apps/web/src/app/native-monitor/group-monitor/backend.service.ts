@@ -11,7 +11,7 @@ export class BackendService {
  private readonly session=inject(NativeMonitorSessionService);
  readonly connectionStatus$=new BehaviorSubject<ConnectionStatus>('initial');
  readonly problem$=new BehaviorSubject('');
- readonly snapshotOutage$=new Subject<{error:NativeMonitorHttpError;owner:AbortSignal}>();
+ readonly snapshotOutage$=new Subject<{error:NativeMonitorHttpError;owner:AbortSignal;accessRejected?:true}>();
  private readonly connectionClosed=new Subject<void>();
  readonly connectionClosed$=this.connectionClosed.asObservable();
  get cacheIdentity(){return this.session.access();}
@@ -36,7 +36,9 @@ export class BackendService {
   return observeNativeRealtime<TestSessionData[]>({channel:'test-sessions',scope,current:()=>scope===this.session.accessSignal&&!scope.aborted,
    read:async(signal)=>{
     let subscribeToken:string|null=null;
-    const text=await this.session.text('GET',path,undefined,undefined,false,signal,value=>{subscribeToken=value;})
+    const text=await this.session.monitorSnapshot(path,signal,value=>{subscribeToken=value;},(status,owner)=>{
+     this.snapshotOutage$.next({error:new NativeMonitorHttpError(status,''),owner,accessRejected:true});
+    })
      .catch(error=>{
       if(!(error instanceof TypeError)||signal.aborted)throw error;
       // Fetch reports a network outage as TypeError. Original XHR reports status 0.

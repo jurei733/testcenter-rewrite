@@ -42,6 +42,17 @@ test('a monitor outage passes the authenticated display name and retires with it
  f.snapshotOutage$.next({error,owner:new AbortController().signal});
  f.component.ngOnDestroy();assert.equal(f.presented[1][1].aborted,true);assert.equal(f.snapshotOutage$.observed,false);
 });
+test('a monitor rejection uses only the current anonymous scope and cannot replace new access',()=>{
+ const f=fixture(),error=new Error('owned rejection');
+ f.replace(null);const owner=f.session.accessSignal;
+ f.snapshotOutage$.next({error,owner,accessRejected:true});
+ assert.deepEqual(f.presented[0][3],{anonymous:true});
+ f.replace(access('replacement'));
+ assert.equal(f.presented[0][1].aborted,true);
+ f.snapshotOutage$.next({error,owner,accessRejected:true});
+ assert.equal(f.presented.length,1);
+ f.component.ngOnDestroy();
+});
 test('retiring the entry cancels its login owner and cannot open a late sole claim',async()=>{
  const f=fixture(),pending=deferred();let owner;f.session.login=(_name,_password,signal)=>{owner=signal;return pending.promise;};
  const submitting=f.component.submit();f.component.ngOnDestroy();pending.resolve(access('late'));await submitting;

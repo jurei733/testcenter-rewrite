@@ -201,15 +201,35 @@ try{
  // A live protected poll must retire the actual finish overlay as well as its command subscription.
  const beforeRetiredFinish=wire.length;
  await page.getByRole('button',{name:'Testung beenden',exact:true}).click();
- await page.getByRole('button',{name:'Ja, ich möchte die Testdurchführung beenden',exact:true}).waitFor();
+ const finishConfirmation=page.getByRole('button',{name:'Ja, ich möchte die Testdurchführung beenden',exact:true});
+ await finishConfirmation.waitFor();
  await reimport(peerRoster(true,'run-hot-return'));
- await page.locator('input[name=name]').waitFor({timeout:15000});await page.locator('mat-dialog-container').waitFor({state:'detached'});
+ await finishConfirmation.waitFor({state:'detached',timeout:15000});
+ const rejectedDialog=page.getByRole('dialog').filter({has:page.getByRole('heading',{name:/Bitte für diese Aktion erst anmelden!|Sitzung nicht mehr gültig\./})});
+ await rejectedDialog.waitFor();
+ assert.equal(await page.locator('tc-test-session').count(),0);
+ assert.equal(await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session')),null);
  assert.equal(await page.locator('[data-cy=header] h1').innerText(),publicTitle);
  assert.ok(!wire.slice(beforeRetiredFinish).some(r=>r.method==='PUT'&&r.path==='/monitor/command'));
  check('revoked-access-closes-finish-overlay-without-a-stale-command');
  await reimport(peerRoster(true));
- await page.locator('input[name=name]').fill(peerName);await page.locator('[data-cy=login-user]').click();await page.locator('input[name=password]').waitFor();await page.locator('input[name=password]').fill(password);await page.locator('[data-cy=login-user]').click();await chooseMonitor(page);await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),1);check('native-monitor-regrant-relogin-recovers-without-reloading');
+ await rejectedDialog.getByRole('button',{name:'Schließen und neu laden',exact:true}).click();
+ await page.waitForURL(url=>url.pathname==='/app/native-start');
+ await page.locator('input[name=name]').fill(peerName);await page.locator('[data-cy=login-user]').click();await page.locator('input[name=password]').waitFor();await page.locator('input[name=password]').fill(password);await page.locator('[data-cy=login-user]').click();await chooseMonitor(page);await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),1);check('native-monitor-regrant-relogin-recovers-through-public-reload');
  assert.ok((await page.locator('[data-cy=header] h1').innerText()).includes('Owned Peer Group'));check('private-header-retires-on-access-loss-and-rebinds-after-regrant');
+ // The following revocation check owns a dedicated monitor grant. Public
+ // sign-in can retain an independently valid participant grant after removal.
+ await openLogoutFromStarter();
+ await page.locator('[data-cy=dialog-confirm]').click();
+ await page.locator('input[name=name]').waitFor();
+ await page.goto(base+'/app/group-monitor?ui=original',{waitUntil:'domcontentloaded'});
+ await page.locator('input[name=name]').fill(peerName);
+ await page.locator('[data-cy=login-user]').click();
+ await page.locator('input[name=password]').fill(password);
+ await page.locator('[data-cy=login-user]').click();
+ await chooseMonitor(page);
+ await page.locator('tc-test-session').first().waitFor();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('testcenter-native-monitor-session-purpose')),null);
  // Standalone roster imports merge existing entries. Explicitly move this real
  // participant to another group, then prove the native API snapshot is empty.
  const movedRoster=peerRoster(false).replace('</Testtakers>',`<Group id="OWNED.UI.MOVED" label="Owned moved"><Login name="${peerPerson}" pw="${password}" mode="run-hot-return"><Booklet>OWNED.UI.BOOK</Booklet></Login></Group></Testtakers>`);

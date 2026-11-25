@@ -39,6 +39,32 @@ test('a current verification of revoked credentials retires the actor and a stal
 }));
 async function fixture(run,token){const oldFetch=globalThis.fetch,oldStorage=globalThis.localStorage,oldTabStorage=globalThis.sessionStorage,oldSecure=globalThis.isSecureContext,values=new Map(token?[[storageKey,token]]:[]),tabValues=new Map();globalThis.localStorage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};globalThis.sessionStorage={getItem:key=>tabValues.get(key)??null,setItem:(key,value)=>tabValues.set(key,value),removeItem:key=>tabValues.delete(key)};globalThis.isSecureContext=true;try{await run(values,tabValues);}finally{globalThis.fetch=oldFetch;globalThis.localStorage=oldStorage;globalThis.sessionStorage=oldTabStorage;globalThis.isSecureContext=oldSecure;}}
 
+for(const status of [401,403])test('monitor snapshot '+status+' clears access before reporting only the rejection status',()=>fixture(async values=>{
+ globalThis.fetch=async()=>response(access('current'));
+ const session=new NativeMonitorSessionService();await session.login('owned','password');
+ const previous=session.accessSignal,path='/monitor/group/private/test-sessions',info=[];
+ let cancelled=false;
+ const privateResponse=new Response(new ReadableStream({cancel(){cancelled=true;}}),{status});
+ globalThis.fetch=async()=>privateResponse;
+ await assert.rejects(session.monitorSnapshot(path,new AbortController().signal,()=>assert.fail('unexpected lease'),(code,owner)=>{
+  assert.equal(previous.aborted,true);assert.equal(session.access(),null);assert.equal(values.has(storageKey),false);
+  assert.equal(owner,session.accessSignal);assert.equal(owner.aborted,false);info.push([code,owner]);
+ }),error=>error.status===status&&error.message===''&&error.response===undefined);
+ assert.equal(cancelled,true);assert.equal(info[0][0],status);assert.equal(info.length,1);
+ globalThis.fetch=async()=>response(access('replacement'));
+ await session.login('owned','password');assert.equal(info[0][1].aborted,true);
+}));
+test('a retired snapshot view cannot clear current access or show a delayed rejection',()=>fixture(async values=>{
+ globalThis.fetch=async()=>response(access('current'));
+ const session=new NativeMonitorSessionService();await session.login('owned','password');
+ const scope=session.accessSignal,view=new AbortController(),pending=deferred();
+ globalThis.fetch=async()=>pending.promise;
+ const reading=session.monitorSnapshot('/monitor/group/retired/test-sessions',view.signal,()=>{},()=>assert.fail('retired snapshot'));
+ view.abort();pending.resolve(response('private payload',403));
+ await assert.rejects(reading,{name:'AbortError'});
+ assert.equal(session.accessSignal,scope);assert.equal(values.get(storageKey),'current');
+}));
+
 test('native terminal log delivery metadata is scoped to Test-log PUTs and retains the captured credential',()=>fixture(async()=>{
  const requests=[];globalThis.fetch=async(path,options)=>{requests.push({path,options});return path.startsWith('/session')?response(access('current')):response('');};
  const session=new NativeMonitorSessionService();await session.login('owned','password');const id='11111111-1111-4111-8111-111111111111',body=[{key:'command executed',content:'terminate lock',timeStamp:1}];

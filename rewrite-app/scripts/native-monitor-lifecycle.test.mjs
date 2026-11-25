@@ -47,7 +47,9 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 const clock=t=>t.mock.timers.enable({apis:['setTimeout','setInterval','Date']});
 function transport(){
  const controller=new AbortController(),access={token:'owned'};
- const session={access:()=>access,accessSignal:controller.signal,text:async()=>''};bindings.set(NativeMonitorSessionService,session);
+ const session={access:()=>access,accessSignal:controller.signal,text:async()=>''};
+ session.monitorSnapshot=(path,signal,subscribeToken)=>session.text('GET',path,undefined,undefined,false,signal,subscribeToken);
+ bindings.set(NativeMonitorSessionService,session);
  return {backend:new BackendService(),session,controller};
 }
 const finishPlans=new WeakMap();

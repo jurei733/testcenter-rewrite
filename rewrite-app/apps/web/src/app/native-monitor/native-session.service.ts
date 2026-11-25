@@ -132,9 +132,25 @@ export class NativeMonitorSessionService {
   const scope=token&&token===this.access()?.token?this.accessSignal:undefined;
   return this.readText(method,path,body,token,rawBody,signal,scope,true,subscribeToken,'application/json',false,deliveryId);
  }
- private async readText(method:string,path:string,body:unknown,token:string,rawBody:boolean,signal?:AbortSignal,scope?:AbortSignal,invalidate=true,subscribeToken?:(value:string|null)=>void,accept='application/json',preserveBom=false,deliveryId?:string):Promise<string>{
+ monitorSnapshot(path:string,signal:AbortSignal,subscribeToken:(value:string|null)=>void,rejected:(status:401|403,owner:AbortSignal)=>void):Promise<string>{
+  return this.readText('GET',path,undefined,this.access()?.token??'',false,signal,this.accessSignal,true,subscribeToken,
+   'application/json',false,undefined,rejected);
+ }
+ private async readText(method:string,path:string,body:unknown,token:string,rawBody:boolean,signal?:AbortSignal,scope?:AbortSignal,invalidate=true,subscribeToken?:(value:string|null)=>void,accept='application/json',preserveBom=false,deliveryId?:string,snapshotRejected?:(status:401|403,owner:AbortSignal)=>void):Promise<string>{
   const signals=[AbortSignal.timeout(20000),...(signal?[signal]:[]),...(scope?[scope]:[])];
   const response=await fetch(path,{method,headers:{Accept:accept,...(token?{AuthToken:token}:{}),...(body===undefined?{}:{'Content-Type':'application/json'}),...(deliveryId?{'X-Native-Delivery-Id':deliveryId}:{})},...(body===undefined?{}:{body:rawBody?String(body):JSON.stringify(body)}),signal:AbortSignal.any(signals),cache:'no-store',credentials:'omit',redirect:'error'});
+  const status=response.status;
+  if(snapshotRejected&&(status===401||status===403)){
+   void response.body?.cancel().catch(()=>{});
+   signal?.throwIfAborted();
+   scope?.throwIfAborted();
+   if(token&&token===this.access()?.token){
+    // The anonymous view receives only the status, after retiring the old access.
+    this.clear();
+    snapshotRejected(status,this.accessSignal);
+   }
+   throw new NativeMonitorHttpError(status,'');
+  }
   // Response.text() removes the Source CSV's UTF-8 BOM. Preserve it when
   // recreating that file; ordinary JSON/error text keeps its existing decoder.
   const text=preserveBom?new TextDecoder('utf-8',{ignoreBOM:true}).decode(await response.arrayBuffer()):await response.text();scope?.throwIfAborted();if(!response.ok){

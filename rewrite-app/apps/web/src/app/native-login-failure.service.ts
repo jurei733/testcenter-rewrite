@@ -18,10 +18,10 @@ export class NativeLoginFailureService implements OnDestroy {
  private close:(()=>void)|undefined;
  constructor(){inject(NativeErrorPresenterService).register(openNativeSystemCheckInstallationError);}
  async show(error:NativeMonitorHttpError,view:AbortSignal,copy?:{label:string;description:string},
-  context?:{login:string;returnPath:string}):Promise<void>{
-  if(this.destroyed)return;this.close?.();
+  context?:{login?:string;returnPath?:string;anonymous?:true}):Promise<void>{
   const scope=this.session.accessSignal;
-  if(view.aborted||scope.aborted)return;
+  if(this.destroyed||view.aborted||scope.aborted)return;
+  this.close?.();
   let retired=false,ref:MatDialogRef<NativeLoginErrorDialogComponent>|undefined;
   const current=()=>!retired&&!view.aborted&&!scope.aborted&&scope===this.session.accessSignal;
   const retire=()=>{
@@ -41,11 +41,12 @@ export class NativeLoginFailureService implements OnDestroy {
    if(copy)mapped=new AppError(copy);
    mapped.description=redactBugReportText(mapped.description);mapped.details=redactBugReportText(mapped.details??'');
    ref=this.dialogs.open(NativeLoginErrorDialogComponent,{panelClass:'original-native-login-error-dialog',disableClose:true,autoFocus:'dialog',
-    data:{error:mapped,url:redactBugReportText(window.location.href),timestamp:Date.now(),login:context?.login,reload:()=>{
+    data:{error:mapped,url:context?.anonymous?'':redactBugReportText(window.location.href),timestamp:Date.now(),
+    login:context?.anonymous?undefined:context?.login,reload:()=>{
      if(!current())return;
      retire();
      const expiredSession=mapped.type==='session';
-     if(expiredSession)this.session.clear();
+     if(expiredSession&&!context?.anonymous)this.session.clear();
      const returnPath=expiredSession?'native-start':context?.returnPath??'native-start';
      window.location.href=new URL(returnPath,document.baseURI).href;
     }}});

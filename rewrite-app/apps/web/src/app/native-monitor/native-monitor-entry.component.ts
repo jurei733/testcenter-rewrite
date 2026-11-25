@@ -58,10 +58,13 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
   const detector=inject(ChangeDetectorRef);
   this.backendSubscription.add(this.backend.problem$.subscribe(problem=>this.backendProblem.set(problem)));
-  this.backendSubscription.add(this.backend.snapshotOutage$.subscribe(({error,owner})=>{
+  this.backendSubscription.add(this.backend.snapshotOutage$.subscribe(({error,owner,accessRejected})=>{
    const access=this.session.access();
-   if(access)void this.loginFailure.show(error,AbortSignal.any([owner,this.view.signal]),undefined,
-    {login:access.displayName,returnPath:'group-monitor'});
+   if(owner.aborted)return;
+   const view=AbortSignal.any([owner,this.view.signal]);
+   if(accessRejected){
+    if(!access&&owner===this.session.accessSignal)void this.loginFailure.show(error,view,undefined,{anonymous:true});
+   }else if(access)void this.loginFailure.show(error,view,undefined,{login:access.displayName,returnPath:'group-monitor'});
   }));
   effect(()=>{if(!this.session.restoring())this.updatePublicHeader();});
   this.router.events.pipe(filter(event=>event instanceof NavigationEnd),takeUntil(fromEvent(this.view.signal,'abort'))).subscribe(()=>{

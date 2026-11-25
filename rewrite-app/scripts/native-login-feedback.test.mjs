@@ -246,6 +246,16 @@ for(const status of [410,429])test('a group monitor session error '+status+' rel
  data.reload();
  assert.equal(f.clears,1);assert.equal(f.closes,1);assert.equal(f.location,'http://owned.invalid/app/native-start');
 });
+test('an already rejected monitor grant presents a public dialog without its private URL or login',async t=>{
+ const f=dialogFixture(t);
+ window.location.href='http://owned.invalid/app/group-monitor/private';
+ await f.service.show(new HttpError(403),f.view.signal,undefined,{anonymous:true});
+ const {data}=f.opens[0].config;
+ assert.equal(data.error.label,'Sitzung nicht mehr gültig.');
+ assert.equal(data.url,'');assert.equal(data.login,undefined);
+ data.reload();
+ assert.equal(f.clears,0);assert.equal(f.location,'http://owned.invalid/app/native-start');
+});
 for(const retirement of ['view','session','service'])test('a pending login error presentation cannot open after '+retirement+' retirement',async t=>{
  const f=dialogFixture(t),pending=f.service.show(new HttpError(500),f.view.signal);
  if(retirement==='view')f.view.abort();else if(retirement==='session')f.replace();else f.service.ngOnDestroy();
