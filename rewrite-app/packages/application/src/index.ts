@@ -25135,25 +25135,26 @@ export const createFirstSliceServices = (
     workspace: Workspace;
     groupKeys: string[] | null;
     attachmentId: string;
-  }): Promise<WorkspaceAttachment> => {
-    const attachment = (await buildWorkspaceAttachments(input.workspace)).find(
-      candidate => candidate.attachmentId === input.attachmentId.trim()
+  }) => {
+    const attachmentId = input.attachmentId.trim();
+    const target = (await buildWorkspaceAttachmentTargets(input.workspace)).find(
+      ({attachment}) => attachment.attachmentId === attachmentId
     );
-    if (!attachment) {
+    if (!target) {
       throw new FirstSliceError(
         404,
         "attachment_not_found",
         "The requested attachment was not found."
       );
     }
-    if (input.groupKeys && !input.groupKeys.includes(attachment.groupKey)) {
+    if (input.groupKeys && !input.groupKeys.includes(target.attachment.groupKey)) {
       throw new FirstSliceError(
         403,
         "attachment_group_scope_forbidden",
         "The attachment is outside the monitor's assigned groups."
       );
     }
-    return attachment;
+    return target;
   };
 
   const normalizeAttachmentFileInput = (input: {
@@ -28412,7 +28413,8 @@ export const createFirstSliceServices = (
       updateApplicationSettings: input => updateApplicationSettings(input),
       patchOriginalApplicationSettings: input => updateApplicationSettings(input,true)
     };
-  const mutateAttachmentFile = async (attachment: WorkspaceAttachment, change: AttachmentFileChange, occurredAt: string) => {
+  const mutateAttachmentFile = async ({attachment, originalUnitId}: {attachment: WorkspaceAttachment; originalUnitId: string},
+    change: AttachmentFileChange, occurredAt: string) => {
     const run = (await repository.listOriginalPersonTestIdentities(attachment))
       .find(row => row.testRunId === attachment.testRunId);
     if (run?.originalResultState?.bookletName) {
@@ -28425,7 +28427,7 @@ export const createFirstSliceServices = (
           testRunId: run.testRunId, participantSessionId: attachment.participantSessionId,
           tenantId: attachment.tenantId, workspaceId: attachment.workspaceId, contentReleaseId: run.contentReleaseId,
           unitName: attachment.unitKey, attachmentId: attachment.attachmentId, variableId: attachment.variableId,
-          partId: [number.testNumber, attachment.unitKey, attachment.variableId].join(':'), occurredAt, change
+          testNumber: number.testNumber, originalUnitId, occurredAt, change
         });
         return;
       }
@@ -28464,22 +28466,24 @@ export const createFirstSliceServices = (
         ...input,
         write: false
       });
-      return requireScopedAttachment({
+      const {attachment} = await requireScopedAttachment({
         workspace: access.workspace,
         groupKeys: access.groupKeys,
         attachmentId: input.attachmentId
       });
+      return attachment;
     },
     async uploadAttachmentFile(input) {
       const access = await authorize({
         ...input,
         write: true
       });
-      const attachment = await requireScopedAttachment({
+      const target = await requireScopedAttachment({
         workspace: access.workspace,
         groupKeys: access.groupKeys,
         attachmentId: input.attachmentId
       });
+      const {attachment} = target;
       if (attachment.attachmentType !== "capture-image") {
         throw new FirstSliceError(
           409,
@@ -28498,7 +28502,7 @@ export const createFirstSliceServices = (
         dataBase64: normalizedFile.dataBase64,
         createdAt: now()
       };
-      await mutateAttachmentFile(attachment, {file: attachmentFile}, attachmentFile.createdAt);
+      await mutateAttachmentFile(target, {file: attachmentFile}, attachmentFile.createdAt);
       await recordWorkspaceActivity({
         tenantId: access.workspace.tenantId,
         workspaceId: access.workspace.workspaceId,
@@ -28518,18 +28522,19 @@ export const createFirstSliceServices = (
           mediaType: attachmentFile.mediaType
         }
       });
-      return requireScopedAttachment({
+      const current = await requireScopedAttachment({
         workspace: access.workspace,
         groupKeys: access.groupKeys,
         attachmentId: attachment.attachmentId
       });
+      return current.attachment;
     },
     async getAttachmentFile(input) {
       const access = await authorize({
         ...input,
         write: false
       });
-      const attachment = await requireScopedAttachment({
+      const {attachment} = await requireScopedAttachment({
         workspace: access.workspace,
         groupKeys: access.groupKeys,
         attachmentId: input.attachmentId
@@ -28556,11 +28561,12 @@ export const createFirstSliceServices = (
         ...input,
         write: true
       });
-      const attachment = await requireScopedAttachment({
+      const target = await requireScopedAttachment({
         workspace: access.workspace,
         groupKeys: access.groupKeys,
         attachmentId: input.attachmentId
       });
+      const {attachment} = target;
       const attachmentFile = await repository.getAttachmentFileById(
         input.attachmentFileId.trim()
       );
@@ -28576,7 +28582,7 @@ export const createFirstSliceServices = (
           "The requested attachment file was not found."
         );
       }
-      await mutateAttachmentFile(attachment, {deleteFileId: attachmentFile.attachmentFileId}, now());
+      await mutateAttachmentFile(target, {deleteFileId: attachmentFile.attachmentFileId}, now());
       await recordWorkspaceActivity({
         tenantId: access.workspace.tenantId,
         workspaceId: access.workspace.workspaceId,
@@ -28595,11 +28601,12 @@ export const createFirstSliceServices = (
           variableId: attachment.variableId
         }
       });
-      return requireScopedAttachment({
+      const current = await requireScopedAttachment({
         workspace: access.workspace,
         groupKeys: access.groupKeys,
         attachmentId: attachment.attachmentId
       });
+      return current.attachment;
     }
   });
   const attachments = attachmentOperations(requireAttachmentAccess);

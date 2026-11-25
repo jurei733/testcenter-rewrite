@@ -20,6 +20,7 @@ const schemas = {Unit:'unit-xml/17.6',Booklet:'testcenter-booklet-xml/18.0',Test
 const xml = (type, body) => `<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${schemas[type]}">${body}</${type}>`;
 const group = 'experimental-attachment';
 const unitId = 'OWNED.ATTACHMENT';
+const directUnitId = 'Owned.Direct';
 const alias = 'Page.Alias';
 const image = fileName => ({fileName, mediaType:'image/png',
   dataBase64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII='});
@@ -108,8 +109,10 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
   await upload('owned-attachment-player-1.0.html', '<html><script type="application/ld+json">' +
     JSON.stringify({id:'owned-attachment-player',version:'1.0.0',specVersion:'6.0',metadataVersion:'2.0',
       type:'player',name:[{lang:'de',value:'Owned Player'}]}) + '</script><main>Owned</main></html>', 'text/html');
-  await upload('unit.xml', xml('Unit', `<Metadata><Id>${unitId}</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-attachment-player@1.0.0">Owned</Definition><BaseVariables><Variable id="page" type="attachment" format="capture-image" /><Variable id="Page" type="attachment" format="capture-image" /></BaseVariables>`));
-  await upload('booklet.xml', xml('Booklet', `<Metadata><Id>OWNED.ATTACHMENT.BOOK</Id><Label>Owned Booklet</Label></Metadata><Units><Unit id="${unitId}" alias="${alias}" label="Owned Alias"/></Units>`));
+  const unitXml = id => xml('Unit', `<Metadata><Id>${id}</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-attachment-player@1.0.0">Owned</Definition><BaseVariables><Variable id="page" type="attachment" format="capture-image" /><Variable id="Page" type="attachment" format="capture-image" /></BaseVariables>`);
+  await upload('unit.xml', unitXml(unitId));
+  await upload('direct.xml', unitXml(directUnitId));
+  await upload('booklet.xml', xml('Booklet', `<Metadata><Id>OWNED.ATTACHMENT.BOOK</Id><Label>Owned Booklet</Label></Metadata><Units><Unit id="${unitId}" alias="${alias}" label="Owned Alias"/><Unit id="${directUnitId}" label="Owned Direct"/></Units>`));
   await services.workspaceAdminRead.importParticipantRoster({...scope, rosterText:xml('Testtakers',
     `<Metadata/><Group id="${group}" label="Owned"><Login name="owned-test" mode="run-trial"><Booklet>OWNED.ATTACHMENT.BOOK</Booklet></Login><Login name="owned-monitor" mode="monitor-group" /></Group><Group id="experimental-other" label="Other"><Login name="other-monitor" mode="monitor-group" /></Group>`)});
   const authenticate = name => services.originalSession.login({name, password:''});
@@ -150,9 +153,9 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     assert.deepEqual(await storage.repository.listAttachmentFilesByWorkspace(tenant.tenantId, workspace.workspaceId), []);
   });
   const requests = await services.originalAttachments.list(monitor.token);
-  assert.equal(requests.length, 1);
-  const [legacyRequest] = requests;
+  assert.equal(requests.length, 2);
   const originalQrTarget = {...target, attachmentId:[testNumber, unitId, 'page'].join(':')};
+  const legacyRequest = requests.find(request => request.attachmentId === originalQrTarget.attachmentId);
   assert.deepEqual(legacyRequest, {
     attachmentId:originalQrTarget.attachmentId, attachmentType:'capture-image', dataType:'missing', attachmentFileIds:[], lastModified:null,
     testLabel:'Owned Booklet', unitLabel:unitId, personLabel:'Owned/owned-test', variableId:'page'
@@ -164,7 +167,7 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
   assert.equal(printable.attachmentId, originalQrTarget.attachmentId);
   assert.equal(printable.unitKey, unitId);
   assert.equal(printable.bookletKey, 'OWNED.ATTACHMENT.BOOK');
-  assert.deepEqual(await services.originalAttachments.pages(monitor.token), [printable]);
+  assert.deepEqual((await services.originalAttachments.pages(monitor.token)).find(page => page.attachmentId === printable.attachmentId), printable);
   await assert.rejects(services.originalAttachments.get({...originalQrTarget,token:outsider.token}),
     rejected(404, 'original_attachment_not_found'));
   const inventory = await storage.repository.getOriginalTestAdministrationInventory(tenant.tenantId, workspace.workspaceId);
@@ -267,5 +270,45 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     await Promise.all([originalFirst,third].map(attachmentFileId => services.originalAttachments.delete({...target,attachmentFileId})));
     await verifyAttachment([], null);
     assert.deepEqual(await storage.repository.listAttachmentFilesByWorkspace(tenant.tenantId, workspace.workspaceId), []);
+  });
+  await t.test('a direct Unit uses its printed response ID and can update an older linked upload', async () => {
+    const selectedRun = inventory.numbers.find(row => row.testNumber === testNumber);
+    const directUnit = {...unit, unitName:directUnitId};
+    const directId = [testNumber, directUnitId.toUpperCase(), 'page'].join(':');
+    const oldId = [testNumber, directUnitId, 'page'].join(':');
+    const directTarget = {token:monitor.token,attachmentId:directId};
+    const oldFile = {...olderFile, attachmentId:'att-' + Buffer.from(JSON.stringify([testRunId,directUnitId,'page'])).toString('base64url')};
+    const currentDirect = () => services.originalAttachments.get(directTarget);
+    const directRead = async () => Object.fromEntries((await services.originalUnit.read(directUnit)).dataParts);
+    await services.originalUnit.patchState({...directUnit,body:{originalUnitId:directUnitId,newState:[]}});
+    await services.originalUnit.putResponse({...directUnit,body:{responseType:'owned@1.0',timeStamp:1,dataParts:{ordinary:'direct answer'}}});
+    await storage.repository.saveAttachmentFile(oldFile);
+    await services.originalUnit.putResponse({...directUnit,body:{responseType:'iqb-standard@1.0',timeStamp:2,
+      dataParts:{[oldId]:JSON.stringify([{id:'page',value:[oldFile.attachmentFileId],status:'VALUE_CHANGED'}])}}});
+    assert.deepEqual((await currentDirect()).attachmentFileIds,[oldFile.attachmentFileId]);
+    assert.ok((await directRead())[oldId]);
+
+    await services.originalAttachments.upload(directTarget,image('new-direct.png'));
+    const ids = (await currentDirect()).attachmentFileIds;
+    assert.equal(ids.length,2);
+    assert.equal(ids[0],oldFile.attachmentFileId);
+    assert.equal((await currentDirect()).lastModified,Date.parse(stamp.slice(0,19)+'Z'));
+    assert.equal((await services.originalAttachments.get({...directTarget,attachmentId:oldId})).attachmentId,directId);
+    const read = await directRead();
+    assert.deepEqual(Object.keys(read),['ordinary',directId]);
+    assert.equal(read.ordinary,'direct answer');
+    assert.deepEqual(JSON.parse(read[directId]),[{id:'page',value:ids,status:'VALUE_CHANGED'}]);
+    const persisted = await storage.repository.getOriginalUnit({...selectedRun,unitName:directUnitId});
+    assert.deepEqual(persisted.parts.map(part=>part.id),['ordinary',directId]);
+    const archive = await download();
+    const rows = JSON.parse(archiveText(archive.body,'responses.json'));
+    assert.ok(rows.some(row=>row.responses.some(part=>part.id===directId&&part.content===read[directId])));
+    assert.ok(rows.every(row=>row.responses.every(part=>part.id!==oldId)));
+
+    await storage.shutdown();
+    await open();
+    assert.deepEqual(await directRead(),read);
+    for(const attachmentFileId of ids)await services.originalAttachments.delete({...directTarget,attachmentFileId});
+    assert.deepEqual(await directRead(),{ordinary:'direct answer'});
   });
 });

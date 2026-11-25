@@ -4,7 +4,8 @@ import {FirstSliceError} from './first-slice-error.js';
 import type {AttachmentPort} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
 import type {OriginalTestAdministrationInventory} from './original-test-administration.js';
-import {orderedOriginalAttachmentFiles} from './original-attachment-response.js';
+import {isLinkedOriginalAttachmentPart, orderedOriginalAttachmentFiles,
+  originalAttachmentAddress as attachmentAddress, originalAttachmentUnitName as toOriginalUnitName} from './original-attachment-response.js';
 import {originalParticipantGroupKeysEqual} from './original-participant-group.js';
 
 export const isOriginalAttachmentGroup = (group: string): boolean => group.startsWith('experimental');
@@ -19,6 +20,7 @@ type NativeTarget = {
   legacyQrId: string;
   originalId: string;
   originalUnitName: string;
+  responseId: string;
 };
 type AttachmentRequest = {token: string; attachmentId: string};
 type NativeAccess = {workspace: Workspace & {tenantKey: string}; actorAdminUserId: string; groupKeys: string[]};
@@ -36,8 +38,6 @@ export type OriginalAttachmentPort = {
 };
 
 const validNumber = (id: string) => /^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= 9223372036854775807n;
-const toOriginalUnitName = (unit: string): string => unit.replace(/[a-z]/g, letter => letter.toUpperCase());
-const attachmentAddress = (number: string, unit: string, variable: string): string => [number, unit, variable].join(':');
 const indexAddress = (index: Map<string, NativeTarget | null>, key: string, target: NativeTarget) =>
   index.set(key, index.has(key) ? null : target);
 
@@ -107,7 +107,8 @@ export function createOriginalAttachmentPort(input: {
       };
       if (targets.has(legacyId)) throw new FirstSliceError(409, 'original_attachment_ambiguous', 'The attachment identity is ambiguous.');
       const target = {source, stored, contentReleaseId: run.contentReleaseId, bookletName: run.bookletName,
-        legacyId, legacyQrId, originalId, originalUnitName};
+        legacyId, legacyQrId, originalId, originalUnitName,
+        responseId: stored.unitKey === originalUnitId ? originalId : legacyId};
       targets.set(legacyId, target);
       indexAddress(legacyCodes, legacyQrId, target);
       if (originalUnitName && !/[:/\\\u0000-\u001f\u007f]/.test(originalUnitName)) indexAddress(originalCodes, originalId, target);
@@ -159,11 +160,14 @@ export function createOriginalAttachmentPort(input: {
       known.push(unit);
       unitsByRun.set(unit.testRunId, known);
     }
-    for (const {stored, source, contentReleaseId, legacyId} of withFiles) {
+    for (const {stored, source, contentReleaseId, legacyId, responseId} of withFiles) {
       const unit = unitsByRun.get(stored.testRunId)?.find(row =>
         row.participantSessionId === stored.participantSessionId && row.contentReleaseId === contentReleaseId &&
         !row.unknownHistory && originalParticipantGroupKeysEqual(row.unitName, stored.unitKey));
-      const part = unit?.parts.find(row => row.id === legacyId && row.responseType === 'iqb-standard@1.0');
+      const files = new Set(stored.attachmentFileIds);
+      const part = unit?.parts.find(row =>
+        row.id === responseId && isLinkedOriginalAttachmentPart(row, files, stored.variableId)
+      ) ?? unit?.parts.find(row => row.id === legacyId && row.responseType === 'iqb-standard@1.0');
       if (!part) {
         if (source.lastModified !== null) source.lastModified = Math.floor(source.lastModified / 1000) * 1000;
         continue;
