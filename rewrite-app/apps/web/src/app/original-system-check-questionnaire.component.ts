@@ -1,4 +1,4 @@
-import { Component, Input } from "@angular/core";
+import { Component, HostListener, Input } from "@angular/core";
 import { NgFor, NgIf, NgSwitch, NgSwitchCase, NgSwitchDefault } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { CdkTextareaAutosize } from "@angular/cdk/text-field";
@@ -37,7 +37,8 @@ import type { SystemCheckViewComponent } from "./system-check-view.component";
                 <mat-form-field *ngSwitchCase="'text'" appearance="outline">
                   <mat-label>{{ question.prompt }}</mat-label>
                   <textarea matInput data-cy="textarea" [id]="question.id" [(ngModel)]="view.answers[question.id]"
-                    cdkTextareaAutosize cdkAutosizeMinRows="4" class="formEntry"></textarea>
+                    cdkTextareaAutosize [cdkAutosizeMinRows]="view.native && !hasResized ? 0 : 4"
+                    [style.min-height.px]="view.native ? 64 : null" class="formEntry"></textarea>
                 </mat-form-field>
                 <mat-form-field *ngSwitchCase="'string'" appearance="outline">
                   <mat-label>{{ question.prompt }}</mat-label>
@@ -82,4 +83,11 @@ import type { SystemCheckViewComponent } from "./system-check-view.component";
 })
 export class OriginalSystemCheckQuestionnaireComponent {
   @Input({ required: true }) view!: SystemCheckViewComponent;
+  hasResized = false;
+
+  @HostListener("window:resize")
+  onResize(): void {
+    // The Original first measures the Material row height on window resize.
+    this.hasResized = true;
+  }
 }

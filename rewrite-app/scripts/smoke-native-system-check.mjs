@@ -143,6 +143,11 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     assert.ok(await forward.isDisabled());
     mark('native-system-check-opaque-player-handshake-response');
     await next('q'); await fillQuestions(); await page.screenshot({path: join(out, 'questionnaire.png')});
+    const notes = page.locator('textarea#notes');
+    assert.equal(await notes.evaluate(field => getComputedStyle(field).minHeight), '64px');
+    await page.setViewportSize({width: viewport.width + 2, height: viewport.height});
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('textarea#notes')).minHeight === '96px');
+    await page.setViewportSize(viewport);
     await next('r');
     await page.locator('#syscheck-previous-step').click(); await page.waitForURL(/\/q$/);
     assert.equal(await page.locator('#answer').inputValue(), 'Owned native answer');
