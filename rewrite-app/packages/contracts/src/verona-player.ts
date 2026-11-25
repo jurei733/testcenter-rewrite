@@ -133,7 +133,7 @@ export type VeronaStartCommand = {
   unitDefinitionType?: string;
   unitState: VeronaStartUnitState;
   playerState?: VeronaPlayerState;
-  playerConfig: VeronaPlayerConfig;
+  playerConfig: VeronaPlayerConfig | { logPolicy: "disabled" };
 };
 
 export type VeronaPlayerConfigChangedNotification = {

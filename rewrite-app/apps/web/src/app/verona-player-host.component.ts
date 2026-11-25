@@ -786,7 +786,7 @@ export class VeronaPlayerHostComponent
       ...(this.restoreCurrentPageOnReturn && persistedResponse?.playerState
         ? { playerState: persistedResponse.playerState }
         : {}),
-      playerConfig: this.createPlayerConfig()
+      playerConfig: this.originalSystemCheckUi ? { logPolicy: "disabled" } : this.createPlayerConfig()
     };
     this.frame?.contentWindow?.postMessage(command, "*");
     this.status = "running";
@@ -904,7 +904,7 @@ export class VeronaPlayerHostComponent
   }
 
   private updatePlayerConfig(): void {
-    if (this.status !== "running" || !this.frame?.contentWindow) {
+    if (this.originalSystemCheckUi || this.status !== "running" || !this.frame?.contentWindow) {
       return;
     }
     const notification: VeronaPlayerConfigChangedNotification = {

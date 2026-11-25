@@ -56,6 +56,9 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     const base = 'http://127.0.0.1:' + port, flow = '/app/check/' + setup.workspaceNumber + '/R101.FLOW/w';
     browser = await chromium.launch({headless: process.env.CI === 'true', channel: process.env.UI_SMOKE_BROWSER_CHANNEL || 'chrome'});
     page = await browser.newPage({viewport: {width: 1280, height: 850}}); page.setDefaultTimeout(20000);
+    await page.addInitScript(() => window.addEventListener('message', ({data}) => {
+      if (data?.type === 'vopStartCommand') window.ownedSystemCheckPlayerConfig = data.playerConfig;
+    }));
     page.on('pageerror', error => errors.push(String(error)));
     page.on('request', request => {
       const path = new URL(request.url()).pathname, headers = request.headers();
@@ -99,6 +102,7 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     await answer.fill('Owned opaque Player answer');
     const playerBody = playerFrame.locator('body');
     assert.equal(await playerBody.getAttribute('data-definition-type'), 'unspecified');
+    assert.deepEqual(await playerBody.evaluate(() => window.ownedSystemCheckPlayerConfig), {logPolicy: 'disabled'});
     const sandbox = await page.locator('app-original-system-check-unit iframe').getAttribute('sandbox');
     assert.ok(sandbox.includes('allow-scripts')); assert.ok(!sandbox.includes('allow-same-origin'));
     const viewport = page.viewportSize();
