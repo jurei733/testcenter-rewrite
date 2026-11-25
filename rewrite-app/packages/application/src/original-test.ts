@@ -13,6 +13,7 @@ import {defaultParticipantExecutionMode,participantExecutionModeDefinitions,type
 import {originalTestDelivery,prepareOriginalNativeDelivery} from './original-native-delivery.js';
 import type {OriginalNativeStateWriteBase, OriginalNativeStateWriteResult} from '@testcenter-rewrite-app/domain';
 import {parseOriginalNativeStateWriteBase, prepareOriginalNativeStateWrite} from './original-native-write-state.js';
+import {stopOriginalNativeTimer} from './original-command-queue.js';
 
 /** PHP TestName preserves first key position while duplicate values replace it. */
 function orderedName(input:string):{name:string;fileId:string;states:Map<string,string>}{
@@ -112,14 +113,17 @@ export function createOriginalTestPort(input: {
   return {
     async enterTimer({token,testNumber:raw,body}){
       const{person,run,testNumber}=await owned(token,raw);
-      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['unitAlias','action','previousStartedAt'].includes(key))||
+      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['unitAlias','action','previousStartedAt','gotoCommandId'].includes(key))||
         !('unitAlias' in body)||typeof body.unitAlias!=='string'||!body.unitAlias||body.unitAlias.length>255){
         throw new FirstSliceError(400,'native_timer_entry_invalid','A native timer entry requires a Unit alias.');
       }
       const action='action' in body?body.action:'enter';
       const previousStartedAt='previousStartedAt' in body?body.previousStartedAt:undefined;
+      const gotoCommandId='gotoCommandId' in body?body.gotoCommandId:undefined;
       if(typeof action!=='string'||!['enter','cancel','interrupt','expire','reenter'].includes(action)||
-        (action==='reenter'?typeof previousStartedAt!=='string'||previousStartedAt.length>32:previousStartedAt!==undefined)){
+        (action==='reenter'?typeof previousStartedAt!=='string'||previousStartedAt.length>32:previousStartedAt!==undefined)||
+        gotoCommandId!==undefined&&(action!=='enter'||typeof gotoCommandId!=='string'||
+          !/^[1-9][0-9]{0,18}$/.test(gotoCommandId)||BigInt(gotoCommandId)>9223372036854775807n)){
         throw new FirstSliceError(400,'native_timer_entry_invalid','Invalid native timer action.');
       }
       const unitAlias=body.unitAlias;
@@ -153,6 +157,14 @@ export function createOriginalTestPort(input: {
         const grantedMilliseconds=reopen?.minutes!=null?Math.min(durationMilliseconds,reopen.minutes*60000):durationMilliseconds;
         const running=testRun.originalTestState?.CONTROLLER==='RUNNING'&&!control?.paused;
         const activeAlias=testRun.originalTestState?.CURRENT_UNIT_ID;
+        // Command receipts can arrive in reverse order. Only an acknowledged
+        // jump to this still-parked balance may enter behind a newer jump.
+        const lateGoto=action==='enter'&&current?.status==='paused'&&current.parkedByGoto&&
+          current.remainingSeconds>0&&control?.gotoRecovery&&gotoCommandId!==undefined&&
+          BigInt(gotoCommandId)<BigInt(control.commandId)&&
+          !['TERMINATED','TERMINATED_PAUSED','ERROR'].includes(String(testRun.originalTestState?.CONTROLLER))&&
+          current.pendingGotoEntries?.some(entry=>entry.commandId===gotoCommandId&&
+            originalParticipantGroupKeysEqual(entry.unitAlias,unitAlias));
         let timer:OriginalNativeTestletTimer;
         let resumedFrom:OriginalNativeTestletTimer|undefined;
         if(action!=='enter'&&!current){
@@ -176,7 +188,7 @@ export function createOriginalTestPort(input: {
             });
           }
           const resume=current.status==='paused'&&!control?.paused&&(!current.parkedByGoto||
-            monitorResume||resumedFrom!==undefined);
+            monitorResume||lateGoto||resumedFrom!==undefined);
           remainingMilliseconds=current.status==='running'&&current.expiresAt ?
             Math.max(0,Date.parse(current.expiresAt)-now) : Math.max(0,Math.round(current.remainingSeconds*1000));
           if(!Number.isSafeInteger(remainingMilliseconds)){
@@ -209,7 +221,7 @@ export function createOriginalTestPort(input: {
               startedAt:timestamp,expiresAt:expires.toISOString(),updatedAt:timestamp,endedAt:null};
           }else if(action==='enter'&&(reopen||resume)){
             if(reopen)remainingMilliseconds=grantedMilliseconds;
-            const {parkedByGoto: _,expirySuccessor: _successor,...runningTimer}=current;
+            const {parkedByGoto: _,pendingGotoEntries: _entries,expirySuccessor: _successor,...runningTimer}=current;
             timer={...runningTimer,status:remainingMilliseconds===0?'expired':'running',remainingSeconds:remainingMilliseconds/1000,
               expiresAt:remainingMilliseconds===0?null:new Date(now+remainingMilliseconds).toISOString(),
               updatedAt:timestamp,endedAt:remainingMilliseconds===0?timestamp:null,
@@ -238,6 +250,11 @@ export function createOriginalTestPort(input: {
           };
         }
         const nextTimers={...timers,[block.key]:timer};
+        if(lateGoto){
+          for(const [key,clock] of Object.entries(timers)){
+            if(key!==block.key&&clock.status==='running')nextTimers[key]=stopOriginalNativeTimer(clock,timestamp);
+          }
+        }
         if(resumedFrom){
           const {expirySuccessor: _,...expiredTimer}=resumedFrom;
           nextTimers[expiredTimer.testletKey]=expiredTimer;

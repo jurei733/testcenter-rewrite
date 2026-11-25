@@ -90,8 +90,9 @@ export class BackendService {
   }
 
   timer(testId: string, unitAlias: string, action: 'enter'|'cancel'|'interrupt'|'expire'|'reenter',
-    previousStartedAt?: string): Observable<NativeTimerClock> {
-    return this.http.patch<NativeTimerClock>(`${this.backendUrl}test/${testId}/timer`, {unitAlias, action, previousStartedAt});
+    previousStartedAt?: string, gotoCommandId?: string): Observable<NativeTimerClock> {
+    return this.http.patch<NativeTimerClock>(`${this.backendUrl}test/${testId}/timer`,
+      {unitAlias, action, previousStartedAt, gotoCommandId});
   }
 
   prepareUnitJournal(saving:boolean):Promise<void>{return this.http.prepareUnitJournal(saving);}

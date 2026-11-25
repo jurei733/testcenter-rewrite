@@ -139,7 +139,7 @@ export class TestControllerComponent implements OnInit, OnDestroy {
         .subscribe((command: Command) => {
           const completion=command.keyword.toLowerCase()==='terminate'?
             this.terminalCompletions.begin(this.ownedTestId,CommandService.commandToString(command),this.nativeHttp.retainTestJournal()):undefined;
-          this.handleCommand(command.keyword, command.arguments)
+          this.handleCommand(command.keyword, command.arguments,typeof command.id==='string'?command.id:undefined)
             .then(() => {
               if(completion)return completion.complete();
               this.bs.addTestLog(this.tcs.testId, [{
@@ -287,7 +287,7 @@ export class TestControllerComponent implements OnInit, OnDestroy {
       });
   }
 
-  handleCommand(commandName: string, params: string[]): Promise<boolean> {
+  handleCommand(commandName: string, params: string[], commandId?: string): Promise<boolean> {
     switch (commandName.toLowerCase()) {
       case 'debug':
         return this.toggleDebugPane(params);
@@ -298,36 +298,10 @@ export class TestControllerComponent implements OnInit, OnDestroy {
       case 'terminate':
         return this.tcs.terminateTest('BOOKLETLOCKEDbyOPERATOR', true, params.indexOf('lock') > -1);
       case 'goto':
-        return this.goto(params);
+        return this.tcs.executeGotoCommand(params,commandId);
       default:
         return Promise.reject();
     }
-  }
-
-  private goto(params: string[]): Promise<boolean> {
-    this.tcs.state$.next('RUNNING');
-    // eslint-disable-next-line no-case-declarations
-    let gotoTarget: string = '';
-    if ((params.length > 1) && (params[0] === 'id')) {
-      gotoTarget = (this.tcs.unitAliasMap[params[1]]).toString(10);
-    } else if (params.length === 1) {
-      gotoTarget = params[0];
-    }
-    if (gotoTarget && gotoTarget !== '0') {
-      const targetUnit = this.tcs.units[parseInt(gotoTarget, 10)];
-      if (targetUnit) {
-        if (targetUnit.parent.timerId !== this.tcs.currentUnit?.parent.timerId) {
-          this.tcs.cancelTimer();
-          // parse the last word as integer
-          this.tcs.restoreTime(targetUnit.parent, parseInt(params[2].trim().split(' ').pop()!, 10));
-        }
-        this.tcs.updateSingleLock(targetUnit.parent, 'afterLeave', false);
-        targetUnit.lockedAfterLeaving = false;
-        this.tcs.clearCodeLock(targetUnit.parent.id);
-      }
-      return this.tcs.setUnitNavigationRequest(gotoTarget, true);
-    }
-    return Promise.reject();
   }
 
   private toggleDebugPane(params: string[]): Promise<boolean> {

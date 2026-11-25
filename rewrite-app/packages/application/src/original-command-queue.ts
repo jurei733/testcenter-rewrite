@@ -1,4 +1,4 @@
-import type {ParticipantSession,TestRun,OriginalLoginBinding,OriginalTestResultState,Tenant,Workspace} from '@testcenter-rewrite-app/domain';
+import type {ParticipantSession,TestRun,OriginalLoginBinding,OriginalNativeTestletTimer,OriginalTestResultState,Tenant,Workspace} from '@testcenter-rewrite-app/domain';
 import type {OriginalOperationalLogin} from './original-operational-login.js';
 import type {OriginalTestNumberRecord} from './original-test-number.js';
 import type {OriginalCommandPacket} from './original-command-codec.js';
@@ -87,6 +87,13 @@ export function selectOriginalCommands(rows:OriginalCommandDelivery[],lastComman
 export function listOriginalCommandsCollection(state:OriginalCommandCollections,scope:OriginalTestNumberRecord,lastCommandId:string|null):OriginalCommandPacket[]{
   currentMapping(state,scope);return selectOriginalCommands(values(state.originalNativeCommands).filter(row=>row.testNumber===scope.testNumber&&row.testRunId===scope.testRunId&&row.participantSessionId===scope.participantSessionId&&row.tenantId===scope.tenantId&&row.workspaceId===scope.workspaceId&&row.contentReleaseId===scope.contentReleaseId),lastCommandId);
 }
+export function stopOriginalNativeTimer(timer:OriginalNativeTestletTimer,timestamp:string,paused=false):OriginalNativeTestletTimer{
+  const {parkedByGoto: _,pendingGotoEntries: _entries,...stoppedTimer}=timer;
+  const remaining=timer.expiresAt?Math.max(0,(Date.parse(timer.expiresAt)-Date.parse(timestamp))/1000):timer.remainingSeconds;
+  if(remaining<=0)return {...stoppedTimer,status:'expired',remainingSeconds:0,updatedAt:timestamp,endedAt:timer.expiresAt??timestamp};
+  return {...stoppedTimer,status:paused?'paused':'cancelled',remainingSeconds:paused?remaining:0,
+    expiresAt:null,updatedAt:timestamp,endedAt:paused?null:timestamp};
+}
 export function prepareOriginalNativeTimerControl(
   before:TestRun['originalResultState'], command:Pick<OriginalCommandPacket,'id'|'keyword'|'arguments'>,
   {timestamp,destination}:OriginalTimerTransition
@@ -130,20 +137,22 @@ export function prepareOriginalNativeTimerControl(
   const control={commandId:command.id,paused,...(reopen?{reopen}:{}),...(resumeParkedTimer?{resumeParkedTimer}:{}),
     ...(gotoRecovery?{gotoRecovery}:{}),
     ...(resumeFromControllerRevision===undefined?{}:{resumeFromControllerRevision})};
-  if(!timers||(keyword!=='pause'&&keyword!=='terminate'&&(keyword!=='goto'||!destination)))return {...before,nativeTimerControl:control};
-  const stopped=Object.fromEntries(Object.entries(timers).map(([id,timer])=>{
-    if(keyword==='goto'&&id===destination?.timerKey)return [id,timer];
-    if(timer.status!=='running'&&(timer.status!=='paused'||paused))return [id,timer];
+  if(!timers)return {...before,nativeTimerControl:control};
+  const stopped=Object.fromEntries(Object.entries(timers).map(([id,prior])=>{
+    const {pendingGotoEntries,...withoutEntries}=prior;
+    const timer=keyword==='goto'||!pendingGotoEntries?prior:withoutEntries;
+    if(keyword==='goto'&&id===destination?.timerKey){
+      if(!resumeParkedTimer||!gotoRecovery||timer.remainingSeconds<=0)return [id,timer];
+      return [id,{...timer,pendingGotoEntries:[...(pendingGotoEntries??[]),{commandId:command.id,unitAlias:gotoRecovery.unitAlias}]}];
+    }
+    if(keyword==='resume'||keyword==='goto'&&!destination||
+      timer.status!=='running'&&(timer.status!=='paused'||paused))return [id,timer];
     // A jump from Pause leaves the old clock frozen. Only a later jump to
     // that block can activate it. A jump away from a running clock closes it.
     if(keyword==='goto'&&timer.status==='paused'&&timer.remainingSeconds>0){
       return [id,{...timer,parkedByGoto:true as const}];
     }
-    const {parkedByGoto: _,...stoppedTimer}=timer;
-    const remaining=timer.expiresAt?Math.max(0,(Date.parse(timer.expiresAt)-now)/1000):timer.remainingSeconds;
-    if(remaining<=0)return [id,{...stoppedTimer,status:'expired' as const,remainingSeconds:0,updatedAt:timestamp,endedAt:timer.expiresAt??timestamp}];
-    return [id,{...stoppedTimer,status:paused?'paused' as const:'cancelled' as const,
-      remainingSeconds:paused?remaining:0,expiresAt:null,updatedAt:timestamp,endedAt:paused?null:timestamp}];
+    return [id,stopOriginalNativeTimer(timer,timestamp,paused)];
   }));
   return {...before,nativeTimerControl:control,nativeTestletTimers:stopped};
 }

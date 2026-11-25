@@ -347,7 +347,7 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    let now=Date.now();
    const clockService=()=>createFirstSliceServices({repository,now:()=>new Date(now).toISOString(),originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
    let timed=clockService();
-   const enter=unitAlias=>timed.originalTest.enterTimer({...read,body:{unitAlias,action:'enter'}});
+   const enter=(unitAlias,gotoCommandId)=>timed.originalTest.enterTimer({...read,body:{unitAlias,action:'enter',gotoCommandId}});
    const control=async(keyword,args=[])=>{
     await send({keyword,arguments:args,timestamp:Math.floor(now/1000),testIds:[Number(testNumber)]});
     const [pending]=await repository.listOriginalCommands(await current(testNumber,person),null);
@@ -386,6 +386,46 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    assert.equal((await clocks()).ALPHA.status,'cancelled');
    await control('terminate');
    assert.equal((await clocks()).BRAVO.status,'cancelled');
+
+   // Reopen Alpha, park it, then accept both jumps before executing the earlier one.
+   await goto('ALPHA','| closed timeblock reopened - new remaining time 1');
+   const reopened=await enter('ALPHA');
+   now+=1000;
+   await control('pause');
+   const parked=await enter('ALPHA');
+   await goto('BRAVO','| closed timeblock reopened - new remaining time 1');
+   await enter('BRAVO');
+   const earlier=await goto('ALPHA');
+   const newer=await goto('BRAVO','| closed timeblock reopened - new remaining time 1');
+   assert.ok(BigInt(earlier)<BigInt(newer));
+   await close();await open();timed=clockService();
+   assert.equal((await enter('BRAVO',newer)).status,'running');
+   assert.equal((await enter('ALPHA',jumpBack)).status,'paused','Previously executed entry grants cannot be replayed');
+   assert.equal((await enter('ALPHA',newer)).status,'paused','A different destination has no grant');
+   const late=await enter('ALPHA',earlier);
+   assert.equal(late.startedAt,reopened.startedAt);
+   assert.equal(late.remainingMilliseconds,parked.remainingMilliseconds);
+   assert.equal(late.status,'running');
+   assert.equal((await clocks()).BRAVO.status,'cancelled');
+   assert.equal((await run(testNumber,person)).originalResultState.nativeTimerControl.commandId,newer);
+   assert.equal((await timed.originalCommand.acknowledge({...read,commandNumber:earlier})).reason,'OK, was already marked as executed');
+   assert.equal((await enter('ALPHA',earlier)).expiresAt,late.expiresAt);
+   await control('pause');
+   await goto('BRAVO','| closed timeblock reopened - new remaining time 1');
+   await enter('BRAVO');
+   assert.equal((await enter('ALPHA',earlier)).status,'paused');
+   const withheld=await goto('ALPHA');
+   await goto('BRAVO','| closed timeblock reopened - new remaining time 1');
+   await enter('BRAVO');
+   await control('pause');
+   assert.equal((await enter('ALPHA',withheld)).status,'paused');
+   assert.equal((await clocks()).ALPHA.pendingGotoEntries,undefined);
+   await control('resume');
+   assert.equal((await enter('ALPHA',withheld)).status,'paused');
+   const beforeTerminate=await goto('ALPHA');
+   await goto('BRAVO');
+   await control('terminate');
+   assert.equal((await enter('ALPHA',beforeTerminate)).status,'cancelled');
   });
   await t.test('server expiry restores only the first accessible parked successor and survives a restart',async()=>{
    const unit=alias=>`<Unit id="ORACLE.POW.UNIT" alias="${alias}" label="${alias}"/>`;

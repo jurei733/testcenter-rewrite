@@ -7,7 +7,7 @@ import {
 import { AsyncPipe, NgIf } from '@angular/common';
 import {MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle} from '@angular/material/card';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, type Params } from '@angular/router';
+import { ActivatedRoute, Router, type Params } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { distinctUntilChanged, map, withLatestFrom } from 'rxjs/operators';
 import { CustomtextPipe, MainDataService } from '../../../shared/shared.module';
@@ -50,6 +50,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
   private subscriptions: { [tag: string ]: Subscription } = {};
   private destroyed=false;
   private unitEntry=0;
+  private gotoCommandId:string|undefined;
   private changedUnit=false;
   private playerLease:NativePlayerLease|undefined;
   private initialization:ReturnType<typeof setTimeout>|undefined;
@@ -60,6 +61,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
   codeInputErrorText: string = '';
 
   private readonly fileServerUrl=inject(NATIVE_FILE_SERVER_URL);
+  private readonly router=inject(Router);
   constructor(public tcs: TestControllerService, private mds: MainDataService, private pageService: PageService,
               private apiService: VeronaAPIService,
 
@@ -312,6 +314,11 @@ export class UnithostComponent implements OnInit, OnDestroy {
     const previous=this.tcs.currentUnit;
     this.changedUnit=!!previous&&previous.sequenceId!==unitSequenceId;
     this.unitEntry+=1;
+    // The first subscription can run after navigation has completed. Router
+    // info is scoped to that navigation and never restored from history.
+    const navigation=this.router.currentNavigation()??this.router.lastSuccessfulNavigation();
+    const gotoEntry=navigation?.extras.info as {commandId:string;unitSequenceId:number}|undefined;
+    this.gotoCommandId=gotoEntry?.unitSequenceId===unitSequenceId?gotoEntry.commandId:undefined;
     this.tcs.currentUnitSequenceId = unitSequenceId;
 
     if (!this.tcs.currentUnit) {
@@ -391,7 +398,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
     const ownsEntry=()=>!this.destroyed&&this.unitEntry===entry&&this.mds.http.isCurrent&&this.tcs.currentUnit===unit;
     try{
       if(unit&&timerId&&timerId!==this.tcs.currentTimerId&&
-        !await this.tcs.startTimer(this.tcs.testlets[timerId],unit,this.changedUnit,ownsEntry))return;
+        !await this.tcs.startTimer(this.tcs.testlets[timerId],unit,this.changedUnit,ownsEntry,this.gotoCommandId))return;
     }catch(error){
       if(ownsEntry()){
         this.mds.appError=new AppError({label:'Die Testzeit konnte nicht geladen werden.',description:String(error),type:'network'});

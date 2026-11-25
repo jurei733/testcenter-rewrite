@@ -85,6 +85,7 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
   }
 
   private subscribeReceivedCommands(): Subscription {
+    let lastControllerCommand=0n;
     return this.commandReceived$.pipe(
       filter(command => this.tcs.testId===this.ownedTestId && this.http.isCurrent && !this.executedCommandIds.includes(command.id) && !this.pendingCommands.has(command.id)),
       tap(command => this.pendingCommands.add(command.id)),
@@ -101,7 +102,13 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
           finalize(() => this.pendingCommands.delete(command.id))
         )),
       takeUntil(fromEvent(this.http.accessSignal,'abort'))
-    ).subscribe(command => this.command$.next(command));
+    ).subscribe(command => {
+      const id=BigInt(command.id);
+      const keyword=command.keyword.toLowerCase();
+      if(keyword==='goto'&&id<lastControllerCommand)return;
+      if((keyword==='pause'||keyword==='resume'||keyword==='terminate')&&id>lastControllerCommand)lastControllerCommand=id;
+      this.command$.next(command);
+    });
   }
 
   private subscribeTestStarted(): Subscription {

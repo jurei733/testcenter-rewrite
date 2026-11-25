@@ -1247,6 +1247,8 @@ export type OriginalTestResultState = {
 export type OriginalNativeTestletTimer = TestletTimerState & {
   reopenCommandId?: string;
   parkedByGoto?: true;
+  /** Acknowledged jumps that can still enter this continuously parked clock. */
+  pendingGotoEntries?: { commandId: string; unitAlias: string }[];
   expirySuccessor?: {
     fromUnitAlias: string;
     unitAlias: string;

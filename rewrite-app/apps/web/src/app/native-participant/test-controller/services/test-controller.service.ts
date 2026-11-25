@@ -554,9 +554,9 @@ export class TestControllerService {
     this.updateSingleLock(testlet, 'time', false);
   }
 
-  async startTimer(testlet: Testlet, unit: Unit, changedUnit: boolean, ownsEntry: () => boolean): Promise<boolean> {
+  async startTimer(testlet: Testlet, unit: Unit, changedUnit: boolean, ownsEntry: () => boolean, gotoCommandId?: string): Promise<boolean> {
     const current=()=>this.nativeCurrent&&this.currentUnit===unit&&ownsEntry();
-    let clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter'),{defaultValue:null});
+    let clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter',undefined,gotoCommandId),{defaultValue:null});
     if(!current()||!clock)return false;
     if(clock.testletKey===testlet.id&&changedUnit&&!this.testMode.forceTimeRestrictions&&
       (clock.status==='expired'||clock.status==='cancelled')){
@@ -720,12 +720,12 @@ export class TestControllerService {
     return this.router.navigate(['/r/starter'], { state: { force: force } });
   }
 
-  async executeGotoCommand(params: string[]): Promise<boolean> {
+  async executeGotoCommand(params: string[], commandId?: string): Promise<boolean> {
     this.state$.next('RUNNING');
     let gotoTarget = '';
     if ((params.length > 1) && (params[0] === 'id')) {
       gotoTarget = (this.unitAliasMap[params[1]]).toString(10);
-    } else if (params.length >= 1) {
+    } else if (params.length === 1) {
       gotoTarget = params[0];
     }
     if (gotoTarget && gotoTarget !== '0') {
@@ -733,18 +733,20 @@ export class TestControllerService {
       if (targetUnit) {
         if (targetUnit.parent.timerId !== this.currentUnit?.parent.timerId) {
           this.cancelTimer();
-          this.restoreTime(targetUnit.parent, parseInt(params[2].trim().split(' ').pop()!, 10));
+          this.restoreTime(targetUnit.parent, parseInt(params[2]?.trim().split(' ').pop()??'', 10));
         }
         this.updateSingleLock(targetUnit.parent, 'afterLeave', false);
         targetUnit.lockedAfterLeaving = false;
         this.clearCodeLock(targetUnit.parent.id);
       }
-      return this.setUnitNavigationRequest(gotoTarget, true);
+      const gotoEntry=commandId&&targetUnit?{commandId,unitSequenceId:targetUnit.sequenceId}:undefined;
+      return this.setUnitNavigationRequest(gotoTarget, true, gotoEntry);
     }
     return Promise.reject();
   }
 
-  async setUnitNavigationRequest(navString: string, force = false): Promise<boolean> {
+  async setUnitNavigationRequest(navString: string, force = false,
+    gotoEntry?: {commandId:string;unitSequenceId:number}): Promise<boolean> {
     if (!this.booklet) {
       throw new AppError({
         label: 'Kein Booklet gefunden.',
@@ -784,6 +786,7 @@ export class TestControllerService {
         [`/native-test/${this.testId}/u/${navString}`],
         {
           state: { force },
+          info: gotoEntry,
           queryParams: targetIsCurrent ? { reload: Date.now() >> 11 } : {}
           //  unit shall be reloaded even if we are there already there
         }

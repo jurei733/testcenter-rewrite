@@ -13,7 +13,7 @@ const {signal}=await import(pathToFileURL(require.resolve('@angular/core')).href
 const http=await import(pathToFileURL(require.resolve('@angular/common/http')).href);
 class MaterialDialog{}class MaterialSnack{}class OwnedEnvironment{}class OwnedDocument{}
 const bindings=new Map(),cache=new Map();class Session{}class Tcs{}class HttpError extends Error{constructor(status,body){super(body);this.status=status;this.body=body;}}
-const navigationTypes={NavigationEnd:class{constructor(id){this.id=id;}},NavigationCancel:class{constructor(id){this.id=id;}},NavigationError:class{constructor(id){this.id=id;}}};
+const navigationTypes={Router:class{},NavigationEnd:class{constructor(id){this.id=id;}},NavigationCancel:class{constructor(id){this.id=id;}},NavigationError:class{constructor(id){this.id=id;}}};
 const angular={signal,EnvironmentInjector:OwnedEnvironment,Injectable:()=>value=>value,InjectionToken:class{constructor(name){this.name=name;}},inject:key=>{assert.ok(bindings.has(key),'missing '+String(key?.name));return bindings.get(key);}};
 function load(file){
  file=resolve(root,file);if(file.endsWith('.js'))return require(file);if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);
@@ -177,6 +177,7 @@ test('a delayed old native view cleanup cannot retire the replacement frame leas
 angular.Component=()=>value=>value;angular.ViewChild=()=>()=>{};
 const {VeronaAPIService}=load('test-controller/services/verona-api.service.ts'),{UnithostComponent}=load('test-controller/components/unithost/unithost.component.ts');
 function unitHost(){
+ bindings.set(navigationTypes.Router,{currentNavigation:()=>null,lastSuccessfulNavigation:()=>null});
  const owner=new AbortController(),client={accessSignal:owner.signal,get isCurrent(){return !owner.signal.aborted;}},sent=[];bindings.set(NativeHttpClient,client);bindings.set(tokens.NATIVE_FILE_SERVER_URL,'/');const api=new VeronaAPIService();
  const unit={alias:'UNIT_A',sequenceId:1,label:'Private A',definition:'<Unit>A raw Ω</Unit>',unitDefinitionType:'unit.test',dataParts:{a:'{"raw":true}'},state:{}},tcs={currentUnit:unit,currentUnitSequenceId:1,workspaceId:'9223372036854775807',booklet:{config:{}},sharedParameters:[],AddToUnitStateBuffer(){},testMode:{saveResponses:true}};let resolve,reject;const barrier=new Promise((a,b)=>{resolve=a;reject=b;});tcs.closeAllBuffers=()=>barrier;
  const mds={http:client,appConfig:{veronaPlayerApiVersionMin:2,veronaPlayerApiVersionMax:6},getAuthData:()=>({groupToken:'cap-A',viewSettings:{}})},host=new UnithostComponent(tcs,mds,{},api,{}, {},{backendUrl:'/'},{}),source={postMessage:(data,origin)=>sent.push({data,origin})},frame={contentWindow:source,isConnected:true,remove(){this.isConnected=false;}},lease=api.channel.bind(frame,unit.alias,()=>tcs.currentUnit===unit);host.playerLease=lease;
