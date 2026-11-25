@@ -73,3 +73,19 @@ test('native asset subscribers refresh assigned images and theme fallback for re
  f.session.access.set({...f.session.access(),viewSettings:{theme:'Sekundar'}});f.flush();assert.match(observed.at(-1)[0],/illustration-teens\.png$/);
  f.settings.setNativeAssetUrls({});f.flush();assert.equal(observed.at(-1)[1],'assets/images/IQB-Logo-2025.png');subscription.unsubscribe();f.owner.abort();
 });
+
+test('tab captions follow late public settings and a retired route cannot erase its successor',()=>{
+ const {settings,owner}=fixture();
+ const leaveMonitor=settings.claimTabSubtitle('Scoped monitor');
+ settings.applyServerSettings({...settings.settings(),appTitle:'Configured'});
+ assert.equal(document.title,'Configured | Scoped monitor');
+ const leaveChooser=settings.claimTabSubtitle('Scoped monitor');
+ leaveMonitor();
+ assert.equal(document.title,'Configured | Scoped monitor');
+ const leaveLogin=settings.claimTabSubtitle('Anmelden');
+ leaveChooser();
+ assert.equal(document.title,'Configured | Anmelden');
+ leaveLogin();
+ assert.equal(document.title,'Configured');
+ owner.abort();
+});

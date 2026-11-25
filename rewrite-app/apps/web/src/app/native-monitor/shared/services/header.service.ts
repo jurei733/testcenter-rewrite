@@ -1,5 +1,4 @@
-import {Injectable,effect,inject,signal} from '@angular/core';
-import {Title} from '@angular/platform-browser';
+import {Injectable,inject,signal} from '@angular/core';
 import type {ActivatedRouteSnapshot} from '@angular/router';
 import {defaultApplicationSettings} from '@testcenter-rewrite-app/domain';
 import {ApplicationSettingsService} from '../../../application-settings.service';
@@ -15,20 +14,10 @@ type HeadingSettings = { appTitle: string; globalSubtitle: string } | null;
 export class HeaderService {
  private readonly session=inject(NativeMonitorSessionService);
  private readonly settings=inject(ApplicationSettingsService);
- private readonly browserTitle=inject(Title);
- private readonly heading=signal<{caption:string;subtitle:string}|null>(null);
+ private readonly heading=signal('');
  private readonly routeSettings=new WeakMap<ActivatedRouteSnapshot,HeadingSettings>();
  private initialSettings:HeadingSettings|undefined;
  private release:(()=>void)|undefined;
- private installedTabTitle:string|undefined;
-
- constructor(){
-  effect(()=>{
-   const appTitle=this.settings.settings().appTitle;
-   const heading=this.heading();
-   if(heading)this.setTabTitle(appTitle,heading.subtitle);
-  });
- }
 
  captureInitialRoute(route:ActivatedRouteSnapshot):void{
   // A profile-only legacy bookmark can redirect during its first navigation.
@@ -46,24 +35,21 @@ export class HeaderService {
   const settings = captured === undefined ? this.readSettings() : captured;
   const subtitle = settings ? (access.customTexts?.['gm_headline'] ?? settings.globalSubtitle) : '';
   const appTitle=settings?.appTitle??defaultApplicationSettings.appTitle;
+  const releaseTab=this.settings.claimTabSubtitle(subtitle);
   const retire=()=>{
    if(this.release!==retire)return;
    scope.removeEventListener('abort',retire);
    this.release=undefined;
-   this.heading.set(null);
-   if(this.installedTabTitle!==undefined&&this.browserTitle.getTitle()===this.installedTabTitle){
-    this.browserTitle.setTitle(this.settings.settings().appTitle);
-   }
-   this.installedTabTitle=undefined;
+   this.heading.set('');
+   releaseTab();
   };
   this.release=retire;
   scope.addEventListener('abort',retire,{once:true});
-  this.heading.set({caption:`${appTitle} ${subtitle} - ${groupLabel}`,subtitle});
-  this.setTabTitle(this.settings.settings().appTitle,subtitle);
+  this.heading.set(`${appTitle} ${subtitle} - ${groupLabel}`);
   return retire;
  }
 
- get title(){return this.heading()?.caption??'';}
+ get title(){return this.heading();}
 
  private readSettings():HeadingSettings{
   if(!this.settings.loaded())return null;
@@ -74,8 +60,4 @@ export class HeaderService {
   };
  }
 
- private setTabTitle(appTitle:string,subtitle:string):void{
-  this.installedTabTitle=subtitle?`${appTitle} | ${subtitle}`:appTitle;
-  this.browserTitle.setTitle(this.installedTabTitle);
- }
 }

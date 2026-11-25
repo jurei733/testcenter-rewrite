@@ -10,6 +10,8 @@ import {MatButton} from '@angular/material/button';
 import {OriginalToastService} from '../../original-toast.service';
 import {OriginalToastContainerComponent} from '../../original-toast-container.component';
 import {downloadTextFile} from '../../download-text-file';
+import {ApplicationSettingsService} from '../../application-settings.service';
+import {customTextDefaults} from '../shared/objects/customTextDefaults';
 import {AssetService} from '../shared/services/asset.service';
 import {CustomtextService} from '../shared/services/customtext/customtext.service';
 import {CustomtextPipe} from '../shared/pipes/customtext/customtext.pipe';
@@ -35,14 +37,28 @@ export class NativeStarterComponent implements AfterViewInit {
  readonly ObjectKeys=Object.keys;
  readonly session=inject(NativeMonitorSessionService);readonly starter=inject(NativeTestStarterService);readonly assets=inject(AssetService);
  private readonly toast=inject(OriginalToastService);
+ private readonly settings=inject(ApplicationSettingsService);
  private readonly router=inject(Router);private readonly element=inject<ElementRef<HTMLElement>>(ElementRef);
  private readonly owner=new AbortController();private readonly scope=this.session.accessSignal;
  private readonly observer=new IntersectionObserver(([entry])=>this.showScrollButton.set(!entry.isIntersecting));
  @ViewChild('bottomSentinel',{static:true})private bottom!:ElementRef<HTMLElement>;
  readonly problem=signal('');readonly showScrollButton=signal(false);
  private verifyTimer:ReturnType<typeof setTimeout>|undefined;
- private readonly retire=()=>{if(this.verifyTimer!==undefined)clearTimeout(this.verifyTimer);this.verifyTimer=undefined;this.owner.abort();this.starter.ngOnDestroy();this.toast.ngOnDestroy();this.element.nativeElement.replaceChildren();};
- constructor(){this.scope.addEventListener('abort',this.retire,{once:true});this.scheduleAccessCheck();}
+ private releaseTab:(()=>void)|undefined;
+ private readonly retire=()=>{if(this.verifyTimer!==undefined)clearTimeout(this.verifyTimer);this.verifyTimer=undefined;this.releaseTab?.();this.releaseTab=undefined;this.owner.abort();this.starter.ngOnDestroy();this.toast.ngOnDestroy();this.element.nativeElement.replaceChildren();};
+ constructor(){
+  this.scope.addEventListener('abort',this.retire,{once:true});
+  if(!this.current)return;
+  const access=this.session.access();
+  const claims=this.claims;
+  const key=claims?.testGroupMonitor||claims?.attachmentManager?'gm_headline':claims?.test?'login_subtitle':undefined;
+  if(key){
+   // Source takes the chooser subtitle once the verified access arrives.
+   const configured=this.settings.loaded()?(this.settings.settings().customTexts[key]??customTextDefaults[key].defaultvalue):'';
+   this.releaseTab=this.settings.claimTabSubtitle(access?.customTexts[key]??configured);
+  }
+  this.scheduleAccessCheck();
+ }
  private scheduleAccessCheck(){
   if(!this.current)return;
   this.verifyTimer=setTimeout(async()=>{

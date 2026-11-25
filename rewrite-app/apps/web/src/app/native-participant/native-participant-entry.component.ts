@@ -65,6 +65,7 @@ import {originalParticipantReturnPath} from './original-participant-bookmark';
 export class NativeParticipantEntryComponent {
  readonly publicHeader=inject(NativePublicHeaderService);
  private clearStarterHeader:(()=>void)|undefined;
+ private releaseLoginTab:(()=>void)|undefined;
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
  private readonly cts=inject(CustomtextService);private readonly router=inject(Router);private readonly dialog=inject(MatDialog);
@@ -115,6 +116,9 @@ export class NativeParticipantEntryComponent {
   if(!access){this.clearStarterHeader=undefined;this.publicHeader.setTitle('Anmelden');}
   else if(!this.showCode)this.clearStarterHeader=this.publicHeader.setTitle('Übersicht');
   else{this.clearStarterHeader?.();this.clearStarterHeader=undefined;}
+  const loginTitle=!this.directLoginName&&(!access||(this.showCode&&this.publicHeader.title()==='Anmelden'));
+  if(loginTitle)this.releaseLoginTab??=this.settings.claimTabSubtitle('Anmelden');
+  else{this.releaseLoginTab?.();this.releaseLoginTab=undefined;}
  }
  async refreshStarter(){
   if(this.refreshing()||this.view.signal.aborted)return;
@@ -215,5 +219,5 @@ export class NativeParticipantEntryComponent {
   const retire=()=>{subscriptions.unsubscribe();ref.componentRef?.location.nativeElement.remove();ref.close();if(this.logoutCleanup===retire)this.logoutCleanup=undefined;};this.logoutCleanup=retire;subscriptions.add(fromEvent(scope,'abort').subscribe(retire));
   subscriptions.add(ref.afterClosed().pipe(take(1)).subscribe(result=>{retire();if(result&&!this.view.signal.aborted&&scope===this.session.accessSignal&&!scope.aborted){void this.session.logout().catch(error=>{if(!this.view.signal.aborted&&!this.session.access())this.problem.set(String(error));});}}));
  }
- ngOnDestroy(){this.view.abort();this.clearStarterHeader?.();this.logoutCleanup?.();this.textScope?.removeEventListener('abort',this.clearTexts);this.clearTexts();}
+ ngOnDestroy(){this.view.abort();this.clearStarterHeader?.();this.releaseLoginTab?.();this.logoutCleanup?.();this.textScope?.removeEventListener('abort',this.clearTexts);this.clearTexts();}
 }

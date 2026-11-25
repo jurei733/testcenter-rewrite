@@ -12,7 +12,7 @@
 </header>
 @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}
 @if(ready()){
- @if(session.restoring()){<p role="status">Sitzung wird geprüft …</p>}@else if(!session.access()){
+ @if(signingOut()){<p role="status">Abmeldung läuft …</p>}@else if(session.restoring()){<p role="status">Sitzung wird geprüft …</p>}@else if(!session.access()){
   <div class="native-login-outlet"><div class="native-login-host"><div class="login-page">
    <div class="welcome-section"><img [src]="settings.assetUrl('loginIllustration')" alt="" /><div><p class="heading">Willkommen im IQB‑Testcenter</p><p>Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.</p></div></div>
    <div class="login-section">@if(!passwordStep()){<form (ngSubmit)="submit()"><h2>Anmeldenamen eingeben</h2><mat-form-field appearance="outline"><mat-label>Anmeldename</mat-label><input matInput name="name" [(ngModel)]="name" required minlength="3" autocapitalize="off" autocomplete="username" /></mat-form-field>@if(loginProblem()){<tc-alert [attr.data-cy]="'login-problem:'+loginProblemCode()" [level]="loginProblemLevel()" [text]="loginProblem()" />}<button matButton="filled" class="login-submit" type="submit" data-cy="login-user" [disabled]="session.busy()||name.trim().length<3">@if(!passwordStep()){<mat-icon svgIcon="chevron_right" />}{{passwordStep()?'Anmelden':'Weiter'}}</button>

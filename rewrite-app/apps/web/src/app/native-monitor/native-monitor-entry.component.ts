@@ -37,6 +37,7 @@ import {NativePublicHeaderService} from '../native-public-header.service';
 export class NativeMonitorEntryComponent implements OnDestroy {
  private readonly publicHeader=inject(NativePublicHeaderService);
  private clearStarterHeader:(()=>void)|undefined;
+ private releaseLoginTab:(()=>void)|undefined;
  readonly backendProblem=signal('');
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
@@ -44,8 +45,9 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  private readonly backendSubscription=new Subscription();
  private readonly view=new AbortController();
  private retireLogout:(()=>void)|undefined;
- ngOnDestroy(){this.view.abort();this.clearStarterHeader?.();this.retireLogout?.();this.backendSubscription.unsubscribe();}
+ ngOnDestroy(){this.view.abort();this.clearStarterHeader?.();this.releaseLoginTab?.();this.retireLogout?.();this.backendSubscription.unsubscribe();}
  readonly ready=signal(false);readonly problem=signal('');readonly passwordStep=signal(false);
+ readonly signingOut=signal(false);
  readonly starterRefreshing=signal(false);readonly starterRefreshFailed=signal(false);
  private starterRefresh:{scope:AbortSignal}|undefined;
  name='';password='';showPassword=false;
@@ -75,8 +77,15 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  }
  private updatePublicHeader(){
   if(this.view.signal.aborted||this.session.restoring())return;
-  if(!this.session.access()){this.clearStarterHeader=undefined;this.publicHeader.setTitle('Anmelden');}
-  else if(!this.hasChild)this.clearStarterHeader=this.publicHeader.setTitle('Übersicht');
+  if(!this.session.access()){
+   this.clearStarterHeader=undefined;
+   this.publicHeader.setTitle('Anmelden');
+   this.releaseLoginTab??=this.settings.claimTabSubtitle('Anmelden');
+   return;
+  }
+  this.releaseLoginTab?.();
+  this.releaseLoginTab=undefined;
+  if(!this.hasChild)this.clearStarterHeader=this.publicHeader.setTitle('Übersicht');
   else{this.clearStarterHeader?.();this.clearStarterHeader=undefined;}
  }
  get hasChild(){return !!this.route.firstChild;}
@@ -115,7 +124,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   }}finally{if(!this.view.signal.aborted&&this.starterRefresh===attempt){this.starterRefresh=undefined;this.starterRefreshing.set(false);}}
  }
  logout(){
-  const scope=this.session.accessSignal;if(this.view.signal.aborted||scope.aborted||this.retireLogout)return;
+  const scope=this.session.accessSignal;if(this.view.signal.aborted||scope.aborted||this.retireLogout||this.signingOut())return;
   const ref=this.dialog.open(OriginalParticipantLogoutDialogComponent,{panelClass:'original-participant-logout-dialog',data:{safeMode:false},autoFocus:'dialog'});
   const subscription=new Subscription();
   const retire=()=>{subscription.unsubscribe();ref.close();if(this.retireLogout===retire)this.retireLogout=undefined;};
@@ -123,10 +132,12 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   subscription.add(fromEvent(scope,'abort').subscribe(retire));
   subscription.add(ref.afterClosed().pipe(take(1)).subscribe(confirmed=>{
    retire();if(!confirmed||this.view.signal.aborted||scope!==this.session.accessSignal||scope.aborted)return;
+   this.signingOut.set(true);
    const pending=this.session.logout(),clearedScope=this.session.accessSignal;
    const current=()=>!this.view.signal.aborted&&clearedScope===this.session.accessSignal&&!this.session.access()&&!this.session.busy();
-   void pending.then(()=>{if(current())return this.router.navigate(['/group-monitor']);return undefined;})
-    .catch(error=>{if(current())this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.');});
+   void pending.then(()=>{if(current())return this.router.navigate(['/native-start/login']);return undefined;})
+    .catch(error=>{if(current())this.problem.set(error instanceof Error?error.message:'Abmeldung fehlgeschlagen.');})
+    .finally(()=>{if(!this.view.signal.aborted)this.signingOut.set(false);});
   }));
  }
 }

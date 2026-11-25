@@ -30,6 +30,7 @@ const defaultApplicationAssetNames: Record<ApplicationAssetSlotName, string> = {
 @Injectable({ providedIn: "root" })
 export class ApplicationSettingsService {
   private readonly api = inject(RewriteAppApiService);
+  private tabSubtitle: { value: string } | undefined;
   private warningExpirationTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly participantThemeOverride = signal<ApplicationSettings["themeName"] | null>(null);
   // Undefined means no native view owns the theme. Null means an active native
@@ -150,10 +151,28 @@ export class ApplicationSettingsService {
   /** Accept an already verified, current-session response from a settings editor. */
   applyServerSettings(settings: ApplicationSettings): void { this.apply(settings); }
 
+  /** The active view owns the subtitle. A retired view cannot clear its successor. */
+  claimTabSubtitle(value: string): () => void {
+    const claim = { value };
+    this.tabSubtitle = claim;
+    this.syncDocumentTitle();
+    return () => {
+      if (this.tabSubtitle !== claim) return;
+      this.tabSubtitle = undefined;
+      this.syncDocumentTitle();
+    };
+  }
+
+  private syncDocumentTitle(): void {
+    const base = this.settings().appTitle;
+    const subtitle = this.tabSubtitle?.value;
+    document.title = subtitle ? `${base} | ${subtitle}` : base;
+  }
+
   private apply(settings: ApplicationSettings): void {
     this.settings.set({ ...settings, assetAssignments: settings.assetAssignments ?? {} });
     this.loaded.set(true);
-    document.title = settings.appTitle;
+    this.syncDocumentTitle();
     this.syncDocumentTheme();
     this.scheduleWarningExpiration();
   }

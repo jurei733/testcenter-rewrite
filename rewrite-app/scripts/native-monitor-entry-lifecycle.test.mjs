@@ -19,11 +19,14 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 const settle=()=>new Promise(done=>setImmediate(done));
 const access=token=>({token,claims:{testGroupMonitor:[{id:'owned',flags:[]}]}});
 function fixture(){
- const route={firstChild:null},nav=[],events=new rx.Subject(),closed=new rx.Subject(),problem$=new rx.BehaviorSubject(''),snapshotOutage$=new rx.Subject(),presented=[],calls=[];let scope=new AbortController(),closes=0,marks=0,tabTitle='Owned';
+ const route={firstChild:null},nav=[],events=new rx.Subject(),closed=new rx.Subject(),problem$=new rx.BehaviorSubject(''),snapshotOutage$=new rx.Subject(),presented=[],calls=[];let scope=new AbortController(),closes=0,marks=0,tabTitle='Owned',subtitleClaim;
  const settings=core.signal({appTitle:'Owned',customTexts:{}}),loaded=core.signal(true);
  const session={access:core.signal(access('original')),busy:core.signal(false),restoring:core.signal(false),problem:core.signal(''),get accessSignal(){return scope.signal;},login:async()=>session.access(),refresh:async()=>{},logout:()=>{calls.push('logout');replace(null);return Promise.resolve();}};
  const replace=value=>{const old=scope;scope=new AbortController();session.access.set(value);old.abort();};
- bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings,loaded},Title:{getTitle:()=>tabTitle,setTitle:value=>{tabTitle=value;}},HeaderService:{},BackendService:{problem$,snapshotOutage$},ChangeDetectorRef:{markForCheck(){marks++;}},Router:{events,navigate:async path=>{nav.push(path);return true;}},ActivatedRoute:route,MatDialog:{open:()=>({afterClosed:()=>closed,close:()=>{closes++;}})},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},NativeLoginFailureService:{show:async(...args)=>{presented.push(args);}}}));
+ bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings,loaded,claimTabSubtitle(subtitle){
+  const active={};subtitleClaim=active;tabTitle=subtitle?settings().appTitle+' | '+subtitle:settings().appTitle;
+  return()=>{if(subtitleClaim===active){subtitleClaim=undefined;tabTitle=settings().appTitle;}};
+ }},HeaderService:{},BackendService:{problem$,snapshotOutage$},ChangeDetectorRef:{markForCheck(){marks++;}},Router:{events,navigate:async path=>{nav.push(path);return true;}},ActivatedRoute:route,MatDialog:{open:()=>({afterClosed:()=>closed,close:()=>{closes++;}})},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},NativeLoginFailureService:{show:async(...args)=>{presented.push(args);}}}));
  bindings.set('NativePublicHeaderService',new NativePublicHeaderService());
  const header=new HeaderService();bindings.set('HeaderService',header);
  const component=new NativeMonitorEntryComponent();component.name='owned';return {component,header,route,session,nav,events,closed,calls,replace,problem$,snapshotOutage$,presented,settings,loaded,get tabTitle(){return tabTitle;},get marks(){return marks;},get closes(){return closes;}};
@@ -67,13 +70,13 @@ for(const transition of ['access','destroy'])test('logout confirmation is closed
  if(transition==='access')f.replace(access('replacement'));else f.component.ngOnDestroy();
  assert.equal(f.closed.observed,false);assert.equal(f.closes,1);f.closed.next(true);assert.deepEqual(f.calls,[]);assert.deepEqual(f.nav,[]);if(transition!=='destroy')f.component.ngOnDestroy();
 });
-test('confirmed logout keeps normal chooser navigation for the same retired access',async()=>{
- const f=fixture();f.component.logout();f.closed.next(true);f.closed.complete();await settle();assert.deepEqual(f.calls,['logout']);assert.deepEqual(f.nav,[['/group-monitor']]);assert.equal(f.closed.observed,false);f.component.ngOnDestroy();
+test('confirmed Monitor logout opens the shared sign-in for the same retired access',async()=>{
+ const f=fixture();f.component.logout();f.closed.next(true);f.closed.complete();await settle();assert.deepEqual(f.calls,['logout']);assert.deepEqual(f.nav,[['/native-start/login']]);assert.equal(f.closed.observed,false);f.component.ngOnDestroy();
 });
 for(const outcome of ['success','failure'])test('an old logout '+outcome+' cannot navigate or set errors in a replacement session',async()=>{
  const f=fixture(),pending=deferred();f.session.logout=()=>{f.calls.push('logout');f.replace(null);return pending.promise;};
- f.component.logout();f.closed.next(true);f.closed.complete();f.replace(access('replacement'));if(outcome==='success')pending.resolve();else pending.reject(Error('old logout failed'));await settle();
- assert.equal(f.session.access().token,'replacement');assert.deepEqual(f.nav,[]);assert.equal(f.component.problem(),'');f.component.ngOnDestroy();
+ f.component.logout();f.closed.next(true);f.closed.complete();assert.equal(f.component.signingOut(),true);f.replace(access('replacement'));if(outcome==='success')pending.resolve();else pending.reject(Error('old logout failed'));await settle();
+ assert.equal(f.session.access().token,'replacement');assert.deepEqual(f.nav,[]);assert.equal(f.component.problem(),'');assert.equal(f.component.signingOut(),false);f.component.ngOnDestroy();
 });
 
 test('replacement-login cancellation is silent even while the same entry view remains alive',async()=>{
