@@ -1,17 +1,20 @@
 import {productionApiRoutes,resolveRoutePath,type GetWorkspaceOverviewResponse,
  type GetSystemCheckReportStatisticsResponse,type DeleteSystemCheckReportsResponse} from '@testcenter-rewrite-app/contracts';
-import type {SystemCheckReportStatistics,WorkspaceOverview} from '@testcenter-rewrite-app/domain';
+import type {OriginalWorkspaceFileDeletionReport,SystemCheckReportStatistics,WorkspaceOverview} from '@testcenter-rewrite-app/domain';
 import type {OriginalWorkspaceFilesScope,OriginalWorkspaceFilesTransport} from './original-workspace-files-controller';
 
-type Owner={epoch:number;token:string;tenantKey:string;workspaceKey:string};
-type Scope=Pick<OriginalWorkspaceFilesScope,'token'|'tenantKey'|'workspaceKey'|'nativeRole'>;
+type Scope=Pick<OriginalWorkspaceFilesScope,'token'|'tenantKey'|'workspaceKey'|'nativeRole'|'workspaceNumber'>;
+type Owner=Omit<Scope,'nativeRole'>&{epoch:number};
+type NativeReportOverview={id:string;label:string;count:number;details:{os:Record<string,number>;browser:Record<string,number>}};
+export type SystemCheckTableRow=Pick<SystemCheckReportStatistics,'checkId'|'checkLabel'|'reportCount'|'operatingSystemVersions'|'browserVersions'>;
+const versions=(counts:Record<string,number>)=>Object.entries(counts).map(([value,count])=>({value,count}));
 const errorText=(error:unknown):string=>error && typeof error==='object' && 'message' in error && typeof error.message==='string'
  ? error.message : 'Die Berichte konnten nicht verarbeitet werden.';
 
 /** The native report selection belongs to one exact login/workspace. Neither
  * report payloads nor selection are written into persisted shell state. */
 export class OriginalSystemCheckReportsController {
- rows:SystemCheckReportStatistics[]=[];
+ rows:SystemCheckTableRow[]=[];
  overview:WorkspaceOverview|null=null;
  selected=new Set<string>();
  busy=false;
@@ -24,9 +27,13 @@ export class OriginalSystemCheckReportsController {
   private readonly current:()=>Scope,private readonly changed:()=>void){}
  private owns(owner:Owner):boolean {
   const scope=this.current();return !this.destroyed && this.owner===owner && this.epoch===owner.epoch &&
-   !!owner.token && owner.token===scope.token && owner.tenantKey===scope.tenantKey && owner.workspaceKey===scope.workspaceKey;
+   !!owner.token && owner.token===scope.token && owner.tenantKey===scope.tenantKey && owner.workspaceKey===scope.workspaceKey &&
+   owner.workspaceNumber===scope.workspaceNumber;
  }
  private path(owner:Owner,route:string):string {return resolveRoutePath(route,{tenantKey:owner.tenantKey,workspaceKey:owner.workspaceKey});}
+ private nativePath(owner:Owner,endpoint:string):string|null {
+  return owner.workspaceNumber ? '/workspace/'+encodeURIComponent(owner.workspaceNumber)+'/'+endpoint : null;
+ }
  private async request<T>(owner:Owner,method:string,route:string,body?:unknown):Promise<T>{
   if(!this.owns(owner))throw Error('Die Anmeldung oder der Arbeitsbereich hat sich geändert.');
   const result=await this.transport<T>(method,this.path(owner,route),body,owner.token);
@@ -42,17 +49,23 @@ export class OriginalSystemCheckReportsController {
   this.selected=this.allSelected?new Set():new Set(this.rows.map(row=>row.checkId));this.changed();
  }
  private async load(owner:Owner):Promise<void>{
-  const [scope,result]=await Promise.all([
+  const native=this.nativePath(owner,'sys-check/reports/overview');
+  const [scope,rows]=await Promise.all([
    this.request<GetWorkspaceOverviewResponse>(owner,'GET',productionApiRoutes.workspace.getWorkspaceOverview),
-   this.request<GetSystemCheckReportStatisticsResponse>(owner,'GET',productionApiRoutes.workspace.getSystemCheckReportStatistics)]);
+   native ? this.request<NativeReportOverview[]>(owner,'GET',native).then(items=>items.map(row=>({
+    checkId:row.id,checkLabel:row.label,reportCount:row.count,
+    operatingSystemVersions:versions(row.details.os),browserVersions:versions(row.details.browser)
+   }))) : this.request<GetSystemCheckReportStatisticsResponse>(owner,'GET',productionApiRoutes.workspace.getSystemCheckReportStatistics)
+    .then(result=>result.items)]);
   if(!this.owns(owner))return;
   const overview=scope.workspaceOverview;
   if(overview.tenant.tenantKey!==owner.tenantKey || overview.workspace.workspaceKey!==owner.workspaceKey ||
    overview.workspace.tenantId!==overview.tenant.tenantId)throw Error('Der Arbeitsbereich konnte nicht zugeordnet werden.');
-  this.overview=overview;this.rows=result.items;this.selected=new Set();
+  this.overview=overview;this.rows=rows;this.selected=new Set();
  }
  async connect():Promise<void>{
-  const scope=this.current(),owner={epoch:++this.epoch,token:scope.token,tenantKey:scope.tenantKey,workspaceKey:scope.workspaceKey};
+  const {token,tenantKey,workspaceKey,workspaceNumber}=this.current();
+  const owner={epoch:++this.epoch,token,tenantKey,workspaceKey,workspaceNumber};
   this.owner=owner;this.rows=[];this.selected=new Set();this.overview=null;this.problem='';this.notice='';
   this.busy=!!owner.token && !!owner.tenantKey && !!owner.workspaceKey;this.changed();if(!this.busy)return;
   try{await this.load(owner);}catch(error){if(this.owns(owner))this.problem=errorText(error);}
@@ -67,43 +80,57 @@ export class OriginalSystemCheckReportsController {
  async download(read:(path:string,token:string)=>Promise<Blob>):Promise<{blob:Blob;current:()=>boolean}|null>{
   const owner=this.owner;if(!owner || !this.owns(owner) || this.busy || !this.selected.size)return null;
   const ids=this.rows.filter(row=>this.selected.has(row.checkId)).map(row=>row.checkId);if(!ids.length)return null;
-  const query=new URLSearchParams();ids.forEach(id=>query.append('checkId',id));
+  const native=this.nativePath(owner,'report/sys-check');
+  const query=new URLSearchParams();
+  if(native && !ids.some(id=>id.includes(','))){
+   query.set('dataIds',ids.join(','));
+  }else{
+   ids.forEach(id=>query.append('checkId',id));
+  }
+  if(native)query.set('useNewVersion','false');
   this.busy=true;this.problem='';this.changed();
   try{
-   const blob=await read(this.path(owner,productionApiRoutes.workspace.exportSystemCheckReportsCsv)+'?'+query,owner.token);
+   const blob=await read((native??this.path(owner,productionApiRoutes.workspace.exportSystemCheckReportsCsv))+'?'+query,owner.token);
    if(!this.owns(owner))return null;
    this.selected=new Set();return {blob,current:()=>this.owns(owner)};
   }catch(error){if(this.owns(owner))this.problem=errorText(error);return null;}
   finally{if(this.owns(owner)){this.busy=false;this.changed();}}
  }
- captureDeletion():{ids:string[];current:()=>boolean;confirm:()=>Promise<boolean>}|null {
+ captureDeletion():{ids:string[];current:()=>boolean;confirm:(showNotice?:(message:string,action:string)=>void)=>Promise<boolean>}|null {
   const owner=this.owner;if(!owner || !this.owns(owner) || !this.overview || this.busy)return null;
   const ids=this.rows.filter(row=>this.selected.has(row.checkId)).map(row=>row.checkId);if(!ids.length)return null;
   let used=false;
-  return {ids:[...ids],current:()=>this.owns(owner),confirm:async()=>{
+  return {ids:[...ids],current:()=>this.owns(owner),confirm:async showNotice=>{
    if(used || !this.owns(owner) || this.busy)return false;used=true;
-   if(this.current().nativeRole==='RO'){
+   const native=this.nativePath(owner,'sys-check/reports');
+   if(!native && this.current().nativeRole==='RO'){
     this.problem='Der Arbeitsbereich ist schreibgeschützt.';
     this.changed();
     return false;
    }
-   this.busy=true;this.problem='';this.notice='';this.changed();let deleted=0,accepted=0,completed=false;
+   this.busy=true;this.problem='';this.notice='';this.changed();
+   let deleted=0,denied=0,accepted=0,completed=false;
    try{
-    // The protected API accepts at most 100 Check IDs per request. Capture all
-    // selected IDs once and retain their exact owner across every batch.
-    for(let offset=0;offset<ids.length;offset+=100){
-     // Source offers this confirmation to every authorized report reader.
-     // The protected API decides each write, including RO/revoked grants.
-     const result=await this.request<DeleteSystemCheckReportsResponse>(owner,'DELETE',productionApiRoutes.workspace.deleteSystemCheckReports,
-      {checkIds:ids.slice(offset,offset+100),confirmation:owner.workspaceKey});
-     accepted++;deleted+=result.deletion.deletedCount;
+    if(native){
+     const result=await this.request<OriginalWorkspaceFileDeletionReport>(owner,'DELETE',native,{checkIds:ids});
+     deleted=result.deleted.length;denied=result.not_allowed.length;
+    }else{
+     for(let offset=0;offset<ids.length;offset+=100){
+      const result=await this.request<DeleteSystemCheckReportsResponse>(owner,'DELETE',productionApiRoutes.workspace.deleteSystemCheckReports,
+       {checkIds:ids.slice(offset,offset+100),confirmation:owner.workspaceKey});
+      accepted++;deleted+=result.deletion.deletedCount;
+     }
     }
     completed=true;
    }catch(error){if(this.owns(owner))this.problem=errorText(error);}
    finally{
     if(this.owns(owner)){
      if(accepted || completed){
-      this.notice=`${deleted} Berichte erfolgreich gelöscht.`;
+      const messages=[];
+      if(deleted || !native)messages.push(`${deleted} Berichte erfolgreich gelöscht.`);
+      if(denied)messages.push(`${denied} Berichte konnten nicht gelöscht werden.`);
+      this.notice=messages.join('<br>');
+      if(this.notice)showNotice?.(this.notice,messages.length>1?'Achtung':'');
       this.rows=[];this.selected=new Set();this.changed();
       try{await this.load(owner);}catch(error){if(this.owns(owner))this.problem=this.problem || errorText(error);}
      }

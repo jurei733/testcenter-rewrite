@@ -152,6 +152,15 @@ for(const kind of kinds)test(kind+': actual protected native Systemcheck HTTP, p
    assert.deepEqual(remaining.map(report=>report.checkId).sort(),['R98.CHECK','R99.UNITCHECK','R99.UNITCHECK']);
    assert.ok(remaining.some(report=>report.systemCheckReportId===saved.report.systemCheckReportId));
    await http('GET',deletion,{status:404});
+   const stored=(await records()).find(event=>event.details.nativeImportDocument);
+   const commaId='R98.CHECK,R99.UNITCHECK',eventId=randomUUID(),reportId=randomUUID();
+   await repository.saveWorkspaceActivityEvent({...stored,activityEventId:eventId,subjectId:reportId,details:{
+    ...stored.details,report:{...stored.details.report,systemCheckReportId:reportId},
+    nativeImportDocument:{...stored.details.nativeImportDocument,checkId:commaId,title:'Exact archived comma ID'}
+   }});
+   const selected=(await http('GET',reports+'?'+new URLSearchParams({checkId:commaId}),{token:admin.token})).value;
+   assert.deepEqual(selected.map(row=>row.title),['Exact archived comma ID']);
+   await http('GET',reports+'?'+new URLSearchParams({checkId:commaId}),{token:actor.token,status:403});
 
    async function selectedDownload(){
     const response=await fetch(base+reports+'?dataIds=R98.CHECK',{headers:{AuthToken:admin.token,Accept:'text/csv'}});

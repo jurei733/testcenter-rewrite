@@ -195,7 +195,10 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
         if(type==='sys-check'){
           if(dataIds===null)throw new FirstSliceError(500,'original_report_query_invalid','Internal error.');
           const format=originalReportFormat(accept);
-          const body=await input.services.workspaceAdminRead.exportOriginalSystemCheckReports({...scope,checkIds:dataIds===''?null:dataIds.split(','),format});
+          // Repeated IDs keep archived identifiers containing a literal comma distinct.
+          const exactIds=params.getAll('checkId');
+          const checkIds=exactIds.length?exactIds:dataIds===''?null:dataIds.split(',');
+          const body=await input.services.workspaceAdminRead.exportOriginalSystemCheckReports({...scope,checkIds,format});
           await confirmScope();
           input.raw(200,body,format==='csv'?'text/csv;charset=UTF-8':'application/json');return true;
         }

@@ -83,7 +83,7 @@ export class OriginalWorkspaceResultsComponent implements OnChanges,OnDestroy {
    this.deletion=null;if(!accepted||this.destroyed||!captured.current())return;
    const outcome=await captured.confirm();
    if(this.destroyed)return;
-   const panelClass='original-workspace-results-snackbar';
+   const panelClass='original-workspace-report-snackbar';
    if(outcome==='deleted'&&this.controller.notice){
     this.snacks.open(this.controller.notice,groups?'OK':'Schließen',{panelClass,duration:groups?5000:3000});
    }else if(outcome==='failed'&&!groups){

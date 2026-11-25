@@ -22,7 +22,8 @@
       }
     } @else if (tab === 'syscheck') {
       @defer (when true) {
-        <app-original-system-check-reports [sessionToken]="sessionToken" [tenantKey]="tenantKey" [workspaceKey]="workspaceKey" [nativeRole]="nativeRole" />
+        <app-original-system-check-reports [sessionToken]="sessionToken" [tenantKey]="tenantKey" [workspaceKey]="workspaceKey"
+                                            [workspaceNumber]="workspaceNumber" [nativeRole]="nativeRole" />
       } @placeholder { <p role="status">Berichte werden geladen…</p> }
       @error {
         <p role="alert">Die Berichtsverwaltung konnte nicht geladen werden.</p>

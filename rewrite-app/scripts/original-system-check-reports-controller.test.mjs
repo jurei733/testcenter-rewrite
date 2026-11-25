@@ -15,6 +15,7 @@ const row=(id='CHECK.A')=>({checkId:id,checkLabel:'Owned '+id,reportCount:501,la
  operatingSystems:[{value:'Linux',count:501}],browsers:[{value:'Chromium',count:501}],
  operatingSystemVersions:[{value:'Linux 6',count:501}],browserVersions:[{value:'Chromium 130',count:501}],overallRatings:[]});
 const normal=(call,rows=[row()],key='a')=>call.path.endsWith('/statistics')?{items:rows}:overview(key);
+const nativeRow=(id='Exact.Mixed',count=3)=>({id,count,label:'Owned '+id,details:{os:{'Linux 6':count},browser:{'Chromium 130':count}}});
 const fixture=(handler=normal,initial=scope())=>{
  let current=initial;const calls=[];
  const controller=new Controller(async(method,path,body,token)=>{const call={method,path,body,token};calls.push(call);return handler(call);},()=>current,()=>{});
@@ -169,4 +170,55 @@ test('an accepted zero-count batch still refreshes concurrent deletion results a
  await f.controller.connect();f.controller.checkAll();assert.equal(await f.controller.captureDeletion().confirm(),false);
  assert.equal(attempts,2);assert.equal(f.controller.rows.length,105);assert.equal(f.controller.selected.size,0);
  assert.equal(f.controller.notice,'0 Berichte erfolgreich gelöscht.');assert.equal(f.controller.problem,'Permission revoked.');
+});
+test('numeric report screen uses exact native IDs and presents partial success before refreshing',async()=>{
+ const writes=[],messages=[],refresh=held(),number='9007199254740993';
+ const f=fixture(call=>{
+  if(call.method==='DELETE'){
+   writes.push(call);
+   return {deleted:['Exact.Mixed','Exact.Mixed'],not_allowed:['Exact.Mixed']};
+  }
+  if(call.path.endsWith('/sys-check/reports/overview'))return writes.length?refresh.promise:[nativeRow(),nativeRow('EXACT.MIXED')];
+  return overview();
+ },{...scope(),workspaceNumber:number});
+ await f.controller.connect();
+ assert.deepEqual(f.controller.rows.map(row=>row.checkId),['Exact.Mixed','EXACT.MIXED']);
+ assert.deepEqual(f.controller.rows[0].operatingSystemVersions,[{value:'Linux 6',count:3}]);
+ f.controller.check('Exact.Mixed',true);
+ const captured=f.controller.captureDeletion(),noticed=held();
+ const pending=captured.confirm((message,action)=>{messages.push({message,action});noticed.resolve();});
+ await noticed.promise;
+ assert.equal(writes.length,1);
+ assert.equal(writes[0].path,'/workspace/'+number+'/sys-check/reports');
+ assert.deepEqual(writes[0].body,{checkIds:['Exact.Mixed']});
+ assert.deepEqual(messages,[{message:'2 Berichte erfolgreich gelöscht.<br>1 Berichte konnten nicht gelöscht werden.',action:'Achtung'}]);
+ assert.equal(f.controller.busy,true);
+ refresh.resolve([nativeRow('Exact.Mixed',1),nativeRow('EXACT.MIXED')]);
+ assert.equal(await pending,true);
+ assert.deepEqual(f.controller.rows.map(row=>row.reportCount),[1,3]);
+ assert.equal(f.controller.selected.size,0);
+});
+test('numeric report requests keep exact CSV selection and do not publish a late receipt after changing numeric workspaces',async()=>{
+ const deletion=held(),number='10',ids=['CHECK.A,second','check.a'];
+ const f=fixture(call=>call.method==='DELETE'?deletion.promise:
+   call.path.endsWith('/sys-check/reports/overview')?ids.map(id=>nativeRow(id)):overview(),
+ {...scope(),workspaceNumber:number});
+ await f.controller.connect();
+ f.controller.checkAll();
+ await f.controller.download(async(path,token)=>{
+  const url=new URL('http://owned'+path);
+  assert.equal(url.pathname,'/workspace/10/report/sys-check');
+  assert.deepEqual(url.searchParams.getAll('checkId'),ids);
+  assert.equal(url.searchParams.has('dataIds'),false);
+  assert.equal(token,'owned-token');
+  return new Blob(['owned']);
+ });
+ f.controller.checkAll();
+ const pending=f.controller.captureDeletion().confirm(()=>assert.fail('Old workspace must not show a notice.'));
+ f.setScope({...scope(),workspaceNumber:'11'});await f.controller.connect();
+ deletion.resolve({deleted:ids,not_allowed:[]});
+ assert.equal(await pending,false);
+ assert.equal(f.controller.notice,'');
+ assert.deepEqual(f.controller.rows.map(row=>row.checkId),ids);
+ assert.equal(f.calls.some(call=>call.path==='/workspace/11/sys-check/reports/overview'),true);
 });
