@@ -16,6 +16,7 @@ type NativeTarget = {
   stored: WorkspaceAttachment;
   contentReleaseId: string;
   bookletName: string;
+  testNumber: string;
   legacyId: string;
   legacyQrId: string;
   originalId: string;
@@ -38,10 +39,27 @@ export type OriginalAttachmentPort = {
 };
 
 const validNumber = (id: string) => /^[1-9][0-9]{0,18}$/.test(id) && BigInt(id) <= 9223372036854775807n;
+const validDefinitionName = (unitName: string) => unitName.length > 0 && !/[:/\\\u0000-\u001f\u007f]/.test(unitName);
 const indexAddress = (index: Map<string, NativeTarget | null>, key: string, target: NativeTarget) =>
   index.set(key, index.has(key) ? null : target);
 
 type FindTarget = (attachmentId: string) => NativeTarget | null | undefined;
+
+function findEquivalentDefinition(targets: Iterable<NativeTarget>, testNumber: string, unitName: string,
+  variableId: string): NativeTarget | undefined {
+  if (!validDefinitionName(unitName)) return;
+  let match: NativeTarget | undefined;
+  for (const target of targets) {
+    if (target.testNumber !== testNumber || !originalParticipantGroupKeysEqual(target.stored.variableId, variableId)) continue;
+    const definition = validDefinitionName(target.originalUnitName) &&
+      originalParticipantGroupKeysEqual(target.originalUnitName, unitName);
+    if (!definition && !originalParticipantGroupKeysEqual(target.stored.unitKey, unitName)) continue;
+    // An equivalent occurrence alias may shadow a physical code, so require a single definition target.
+    if (match || !definition) return;
+    match = target;
+  }
+  return match;
+}
 
 export function createOriginalAttachmentPort(input: {
   auth: OriginalAuthenticationPort;
@@ -106,12 +124,12 @@ export function createOriginalAttachmentPort(input: {
         variableId: stored.variableId
       };
       if (targets.has(legacyId)) throw new FirstSliceError(409, 'original_attachment_ambiguous', 'The attachment identity is ambiguous.');
-      const target = {source, stored, contentReleaseId: run.contentReleaseId, bookletName: run.bookletName,
+      const target = {source, stored, contentReleaseId: run.contentReleaseId, bookletName: run.bookletName, testNumber: mapping.testNumber,
         legacyId, legacyQrId, originalId, originalUnitName,
         responseId: stored.unitKey === originalUnitId ? originalId : legacyId};
       targets.set(legacyId, target);
       indexAddress(legacyCodes, legacyQrId, target);
-      if (originalUnitName && !/[:/\\\u0000-\u001f\u007f]/.test(originalUnitName)) indexAddress(originalCodes, originalId, target);
+      if (validDefinitionName(originalUnitName)) indexAddress(originalCodes, originalId, target);
     }
     // Keep old addresses authoritative and publish a definition ID only if it selects this occurrence.
     const find: FindTarget = id => targets.get(id) ?? (legacyCodes.has(id) ? legacyCodes.get(id) : originalCodes.get(id));
@@ -124,12 +142,13 @@ export function createOriginalAttachmentPort(input: {
   };
 
   const resolve = async ({token, attachmentId}: AttachmentRequest) => {
-    const {workspace, find} = await scopedTargets(token);
+    const {workspace, targets, find} = await scopedTargets(token);
     const [number, unit, variable, extra] = attachmentId.split(':');
     if (!number || !validNumber(number) || !unit || !variable || extra !== undefined) {
       throw new FirstSliceError(400, 'original_attachment_invalid', 'Invalid attachment identifier.');
     }
-    const target = find(attachmentId);
+    const exact = find(attachmentId);
+    const target = exact === undefined ? findEquivalentDefinition(targets.values(), number, unit, variable) : exact;
     if (!target) throw missing();
     return {target, find, workspace, sessionToken: token, workspaceKey: workspace.workspaceKey, tenantKey: workspace.tenantKey,
       attachmentId: target.stored.attachmentId};

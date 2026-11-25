@@ -54,6 +54,7 @@ test('a physical code shared by two eligible occurrences cannot choose an attach
   });
   const reference = unit => ({token:'fixture-token',attachmentId:[testNumber,unit,'page'].join(':')});
   await assert.rejects(port.get(reference(unitId)),rejected(404,'original_attachment_not_found'));
+  await assert.rejects(port.get(reference(unitId.toLowerCase())),rejected(404,'original_attachment_not_found'));
   assert.deepEqual((await port.list('fixture-token')).map(row=>row.attachmentId),aliases.map(alias=>reference(alias).attachmentId));
   for (const alias of aliases) {
     const row = await port.get(reference(alias));
@@ -61,6 +62,11 @@ test('a physical code shared by two eligible occurrences cannot choose an attach
     assert.equal(printed.attachmentId,reference(alias.toUpperCase()).attachmentId);
     assert.deepEqual(await port.get(reference(alias.toUpperCase())),row);
   }
+  attachments.push(
+    {originalUnitId:'OTHER.DEFINITION',attachment:{...attachments[0].attachment,unitKey:'Chapter.Page',attachmentId:'stored-chapter'}},
+    {originalUnitId:'CHAPTER.PAGE',attachment:{...attachments[0].attachment,unitKey:'Separate.Page',attachmentId:'stored-separate'}}
+  );
+  await assert.rejects(port.preflight(reference('chapter.page')),rejected(404,'original_attachment_not_found'));
 });
 
 function archiveText(buffer, fileName) {
@@ -294,6 +300,8 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     assert.equal(ids[0],oldFile.attachmentFileId);
     assert.equal((await currentDirect()).lastModified,Date.parse(stamp.slice(0,19)+'Z'));
     assert.equal((await services.originalAttachments.get({...directTarget,attachmentId:oldId})).attachmentId,directId);
+    const olderSpelling = {...directTarget,attachmentId:[testNumber,directUnitId.toLowerCase(),'PAGE'].join(':')};
+    assert.deepEqual(await services.originalAttachments.get(olderSpelling),await currentDirect());
     const read = await directRead();
     assert.deepEqual(Object.keys(read),['ordinary',directId]);
     assert.equal(read.ordinary,'direct answer');
@@ -308,7 +316,7 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     await storage.shutdown();
     await open();
     assert.deepEqual(await directRead(),read);
-    for(const attachmentFileId of ids)await services.originalAttachments.delete({...directTarget,attachmentFileId});
+    for(const attachmentFileId of ids)await services.originalAttachments.delete({...olderSpelling,attachmentFileId});
     assert.deepEqual(await directRead(),{ordinary:'direct answer'});
   });
 });
