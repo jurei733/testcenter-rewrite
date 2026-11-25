@@ -10,9 +10,36 @@ async function readOriginalWorkspaceUpload(contentType:string,bytes:Buffer) {
   let form:FormData;
   try {form=await new Response(new Uint8Array(bytes),{headers:{'content-type':contentType}}).formData();}
   catch {throw new FirstSliceError(400,'original_workspace_multipart_invalid','Invalid multipart upload.');}
-  const array=form.getAll('fileforvo[]').filter(value=>typeof value!=='string');
-  const single=form.getAll('fileforvo').filter(value=>typeof value!=='string').at(-1);
-  const files=array.length?array:single?[single]:[];
+  // PHP assembles uploaded slots in multipart order. A scalar replaces an
+  // earlier array, and an indexed slot replaces its content in place.
+  const slots = new Map<string, File>();
+  const maxPhpIndex = (1n << 63n) - 1n;
+  let nextIndex: bigint | null = null;
+  let single: File | undefined;
+  for (const [field, file] of form) {
+    if (typeof file === 'string') continue;
+    if (field === 'fileforvo') {
+      slots.clear();
+      nextIndex = null;
+      single = file;
+      continue;
+    }
+    const slot = /^fileforvo\[([^\[\]]*)\]$/.exec(field)?.[1];
+    if (slot === undefined) continue;
+    single = undefined;
+    const appendIndex: bigint = nextIndex ?? 0n;
+    if (slot === '' && appendIndex > maxPhpIndex) continue;
+    const key = slot || appendIndex.toString();
+    slots.set(key, file);
+    if (/^(?:0|-?[1-9]\d{0,18})$/.test(key)) {
+      const index = BigInt(key);
+      if (index >= -maxPhpIndex - 1n && index <= maxPhpIndex &&
+          (nextIndex === null || index >= nextIndex)) {
+        nextIndex = index + 1n;
+      }
+    }
+  }
+  const files = single ? [single] : [...slots.values()];
   if(!files.length){
     // Original distinguishes a submitted form without any uploaded files
     // from a form whose files use a different field.
