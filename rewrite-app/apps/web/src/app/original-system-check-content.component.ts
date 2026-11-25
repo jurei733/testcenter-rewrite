@@ -4,6 +4,7 @@ import { MatFabButton } from "@angular/material/button";
 import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from "@angular/material/card";
 import { MatTooltip } from "@angular/material/tooltip";
 import type { SystemCheckViewComponent } from "./system-check-view.component";
+import { NativeMonitorIconComponent } from "./native-monitor/native-monitor-icon.component";
 import { OriginalSystemCheckQuestionnaireComponent } from "./original-system-check-questionnaire.component";
 import { OriginalSystemCheckNetworkComponent } from "./original-system-check-network.component";
 import { OriginalSystemCheckUnitComponent } from "./original-system-check-unit.component";
@@ -14,20 +15,22 @@ import { OriginalSystemCheckReportComponent } from "./original-system-check-repo
 // measurement and response; this surface does not create another check state.
 @Component({
   selector: "app-original-system-check-content", standalone: true,
-  imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle, MatTooltip, OriginalSystemCheckQuestionnaireComponent, OriginalSystemCheckNetworkComponent, OriginalSystemCheckUnitComponent, OriginalSystemCheckReportComponent],
+  imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle, MatTooltip, NativeMonitorIconComponent, OriginalSystemCheckQuestionnaireComponent, OriginalSystemCheckNetworkComponent, OriginalSystemCheckUnitComponent, OriginalSystemCheckReportComponent],
   template: `
-    <ng-container *ngIf="view.systemCheck as check">
+    @if (view.systemCheck || (view.native && view.canUseSystemChecks)) {
       <div class="header">
-        <h2>Systemcheck: {{ check.displayLabel }}</h2>
+        <h2>Systemcheck: {{ view.systemCheck?.displayLabel ?? view.native?.label() }}</h2>
         <button id="syscheck-previous-step" matFab matTooltip="Zurück" aria-label="Zurück"
-          [disabled]="view.stepIndex === 0 || view.busy || view.networkBusy" (click)="view.previousStep()">
-          <svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z" /></svg>
+          [disabled]="!view.systemCheck || view.stepIndex === 0 || view.busy || view.networkBusy" (click)="view.previousStep()">
+          <mat-icon svgIcon="keyboard_arrow_left" />
         </button>
         <button id="syscheck-next-step" matFab matTooltip="Weiter" aria-label="Weiter"
-          [disabled]="view.nextButtonDisabled || view.networkBusy" (click)="view.nextStep()">
-          <svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m400-240-56-56 184-184-184-184 56-56 240 240-240 240Z" /></svg>
+          [disabled]="!view.systemCheck || view.nextButtonDisabled || view.networkBusy" (click)="view.nextStep()">
+          <mat-icon svgIcon="keyboard_arrow_right" />
         </button>
       </div>
+    }
+    <ng-container *ngIf="view.systemCheck as check">
       @defer (when view.step === 'network') {
         @if (view.step === 'network') {
           <app-original-system-check-network [view]="view" />
@@ -85,7 +88,6 @@ import { OriginalSystemCheckReportComponent } from "./original-system-check-repo
     table, tbody, tr, td { box-sizing: content-box; }
     button.mat-mdc-fab { font: revert; }
     button.mat-mdc-fab:disabled { opacity: 1; }
-    svg { display: block; width: 24px; height: 24px; fill: currentColor; }
   `],
   styleUrl: "./original-system-check-content-theme.scss"
 })

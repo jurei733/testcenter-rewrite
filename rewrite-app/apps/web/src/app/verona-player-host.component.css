@@ -83,6 +83,12 @@
 .original-system-check-player > .verona-player-content,
 .original-system-check-player .verona-player-frame-host,
 .original-system-check-player .verona-player-frame { height: 100%; min-height: 0; }
+/* The Source Device Check gives the frame a content-box width and the browser's
+   inset frame edge. The frame itself is inserted after Angular creates the host. */
+.original-system-check-player .verona-player-frame {
+  box-sizing: content-box;
+  border: 2px inset;
+}
 .original-system-check-player.has-system-check-error > .verona-player-content { display: none; }
 
 .verona-player-page-navigation {

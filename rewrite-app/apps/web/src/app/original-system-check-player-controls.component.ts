@@ -18,17 +18,17 @@ import type { VeronaPlayerHostComponent } from "./verona-player-host.component";
       <span style="color:white; padding-right:8px;">{{ view.pageNavigationPrompt }}</span>
       <button mat-stroked-button data-cy="page-navigation-backward" aria-label="Vorherige Seite"
         [disabled]="!view.hasPreviousPage" (click)="view.goToRelativePage(-1)">
-        <svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z" /></svg>
+        <i class="material-icons" aria-hidden="true">&lt;</i>
       </button>
       <mat-button-toggle-group [value]="view.currentPageIndex" [hideSingleSelectionIndicator]="true" aria-label="Seite auswählen">
         @for (page of view.pages; track page.id; let index = $index) {
-          <mat-button-toggle [class.selected-value]="view.currentPageIndex === index" [matTooltip]="page.label"
+          <mat-button-toggle [matTooltip]="page.label"
             [attr.data-cy]="'page-navigation-' + index" [value]="index" (change)="view.goToPage(index)">{{ index + 1 }}</mat-button-toggle>
         }
       </mat-button-toggle-group>
       <button mat-stroked-button data-cy="page-navigation-forward" aria-label="Nächste Seite"
         [disabled]="!view.hasNextPage" (click)="view.goToRelativePage(1)">
-        <svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m400-240-56-56 184-184-184-184 56-56 240 240-240 240Z" /></svg>
+        <i class="material-icons" aria-hidden="true">&gt;</i>
       </button>
     </nav>
     <mat-card appearance="outlined" *ngIf="view.errorMessage" id="originalSystemCheckUnitError" role="alert">
@@ -38,17 +38,14 @@ import type { VeronaPlayerHostComponent } from "./verona-player-host.component";
   `,
   styles: [`
     :host { display:block; }
-    .pageNav { position:absolute; right:0; bottom:0; height:45px; padding:0 30px; font-size:1.2em; background:transparent; display:flex; align-items:center; }
-    .selected-value { background-color:var(--accent) !important; }
+    .pageNav { position:absolute; right:0; bottom:0; height:45px; padding:0 30px; font-size:1.2em; background:transparent; max-width:100%; overflow:auto; }
     button { height:34px !important; margin-bottom:2px; }
     mat-button-toggle-group { height:34px; align-items:center; flex-shrink:0; }
-    .pageNav > span { min-width:0; overflow:hidden; }
+    mat-button-toggle.mat-button-toggle-checked { background-color:transparent; }
     /* Material's inner toggle button has no own radius or hover transform;
        do not let the Rewrite's generic capsule button clip its label. */
     :host ::ng-deep .mat-button-toggle-button { border-radius:0; transform:none; }
-    svg { width:24px; height:24px; fill:currentColor; }
     mat-card { width:700px; max-width:100%; margin:auto; }
-    @media(max-width:640px) { .pageNav { max-width:100%; padding:0 8px; overflow:auto; } }
   `],
   styleUrl: "./original-login-theme.scss"
 })

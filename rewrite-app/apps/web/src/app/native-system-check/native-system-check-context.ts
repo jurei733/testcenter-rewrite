@@ -43,9 +43,13 @@ export class NativeSystemCheckContext {
   readonly bindings = signal<NativeSystemCheckBinding[]>([]);
   readonly requestedStep = signal('w');
   readonly problem = signal('');
+  private readonly currentLabel = signal('');
+  readonly label = this.currentLabel.asReadonly();
+  private releaseTab: (() => void) | undefined;
   private verifyTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
+    this.presentLabel('');
     effect(() => {
       const params = this.parameters(), access = this.session.access();
       const pending = this.session.busy() || this.session.restoring();
@@ -57,7 +61,7 @@ export class NativeSystemCheckContext {
         if (current?.workspaceId === params.workspaceId && current.name === params.name) {
           this.requestedStep.set(params.step); return;
         }
-        this.retire(); this.problem.set('');
+        this.retire(); this.presentLabel(''); this.problem.set('');
         if (params.step !== 'w') { void this.exit(); return; }
         if (!/^[1-9][0-9]*$/.test(params.workspaceId) || !params.name || /[\/\\\u0000-\u001f\u007f]/.test(params.name)) {
           this.problem.set('Ungültiger Systemcheck.'); return;
@@ -71,8 +75,7 @@ export class NativeSystemCheckContext {
           authenticated: !!access, actor: this.session.accessSignal, owner: new AbortController()
         };
         binding.actor.addEventListener('abort', () => {
-          binding.owner.abort();
-          if (this.bindings()[0] === binding) { this.bindings.set([]); void this.exit(); }
+          if (this.bindings()[0] === binding) { this.retire(); void this.exit(); }
         }, {once: true, signal: binding.owner.signal});
         this.requestedStep.set('w'); this.bindings.set([binding]); this.scheduleVerification(binding);
       });
@@ -80,6 +83,12 @@ export class NativeSystemCheckContext {
   }
 
   configure(workspaceId: string, name: string, step: string) { this.parameters.set({workspaceId, name, step}); }
+  private presentLabel(label: string): void {
+    this.currentLabel.set(label);
+    this.releaseTab?.();
+    this.releaseTab = this.settings.claimTabSubtitle(label ? `Systemcheck ${label}` : 'Systemcheck');
+  }
+
   get directReports():boolean{return this.installation.loginRequired()!==false;}
   current(binding: NativeSystemCheckBinding): boolean {
     return !this.view.signal.aborted && !binding.owner.signal.aborted && !binding.actor.aborted && binding.actor === this.session.accessSignal;
@@ -108,6 +117,9 @@ export class NativeSystemCheckContext {
     // lookup. An unknown mode keeps its private report default; the server
     // still checks every save against the current actor and configuration.
     const config = JSON.parse(await this.request(binding, 'GET', '')) as Configuration;
+    if (!this.current(binding)) throw new DOMException('Systemcheck view retired.', 'AbortError');
+    // The caption comes from configuration even if the optional Unit is pending.
+    this.presentLabel(config.label);
     const unit = config.hasUnit ? JSON.parse(await this.request(binding, 'GET', '/unit-and-player')) as Unit : null;
     this.networkConfigs.set(binding, config);
     binding.owner.signal.addEventListener('abort', () => this.networkConfigs.delete(binding), {once: true});
@@ -116,8 +128,11 @@ export class NativeSystemCheckContext {
       canSave: config.canSave, skipNetwork: config.skipNetwork,
       questions: config.questions, downloadSpeed: speedParameters(config.downloadSpeed), uploadSpeed: speedParameters(config.uploadSpeed),
       customTexts: Object.fromEntries(Object.values(config.customTexts).map(item => [item.key, item.value])),
+      // The native Systemcheck response supplies the opaque definition without
+      // a Verona definition type. Forwarding a guessed MIME type can make the
+      // Player reject an otherwise valid definition.
       unit: unit ? {unitKey: unit.key ?? config.name, displayLabel: unit.label ?? config.label, playerKey: unit.player_id, playerHtml: unit.player,
-        unitDefinition: unit.def, unitDefinitionType: unit.def.trimStart().startsWith('<') ? 'application/xml' : 'application/json'} : null
+        unitDefinition: unit.def} : null
     };
   }
   async serverTime(binding: NativeSystemCheckBinding): Promise<{timestamp: number; timezone: string}> {
@@ -186,6 +201,8 @@ export class NativeSystemCheckContext {
     if (this.verifyTimer !== undefined) clearTimeout(this.verifyTimer);
     this.verifyTimer = undefined;
     const bindings = this.bindings(); this.bindings.set([]);
+    this.currentLabel.set('');
+    this.releaseTab?.(); this.releaseTab = undefined;
     for (const binding of bindings) binding.owner.abort();
   }
   ngOnDestroy() { this.view.abort(); this.retire(); }

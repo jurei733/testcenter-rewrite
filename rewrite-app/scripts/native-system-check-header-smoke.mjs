@@ -136,6 +136,12 @@ export async function runNativeSystemCheckHeaderChecks({browser,out,mark}){
     await page.getByRole('button',{name:'Owned public header check',exact:true}).click();
     assert.equal((await config).status(),200);await page.locator('#syscheck-next-step:enabled').waitFor();
     assert.equal(await page.locator('[data-cy=header] .center').innerText(),'Systemcheck');
+    assert.equal(await page.title(),'IQB-Testcenter | Systemcheck Owned public header check');
+    await page.locator('[data-cy=header] [data-cy=logo]').hover();
+    const tooltip=page.locator('.mat-mdc-tooltip').filter({hasText:'Zur Startseite'});
+    await tooltip.waitFor();
+    await page.mouse.move(0,0);
+    await tooltip.waitFor({state:'hidden'});
     await directoryReady(()=>navigation.send('Page.navigateToHistoryEntry',{entryId:selectionEntry}));
     assert.equal(await page.locator('[data-cy=header] .center').innerText(),'Systemcheck');
     assert.equal(await page.evaluate(()=>performance.timeOrigin),documentTime);
