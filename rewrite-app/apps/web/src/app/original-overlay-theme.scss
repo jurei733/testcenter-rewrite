@@ -3,25 +3,28 @@
 
 // CDK overlays live under body, outside the component's themed host.
 // Scope their theme explicitly; never affect a Rewrite menu or dialog.
-:root[data-interface-mode='original'] .original-participant-account-menu,
-:root[data-interface-mode='original'] .original-native-account-menu,
-:root[data-interface-mode='original'] .original-administration-settings-overlay,
-:root[data-interface-mode='original'] .original-administration-editor-dialog,
-:root[data-interface-mode='original'] .original-participant-logout-dialog,
-:root[data-interface-mode='original'] .original-system-check-save-report-dialog,
-:root[data-interface-mode='original'] .original-system-check-saved-dialog,
-:root[data-interface-mode='original'] .original-password-confirmation-dialog,
-:root[data-interface-mode='original'] .original-player-menu,
-:root[data-interface-mode='original'] .original-native-monitor-menu,
-:root[data-interface-mode='original'] .original-native-monitor-filter-dialog,
-:root[data-interface-mode='original'] .original-native-monitor-time-dialog,
-:root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog,
-:root[data-interface-mode='original'] .original-native-monitor-filter-options,
-:root[data-interface-mode='original'] .original-application-logo-tooltip,
-:root[data-interface-mode='original'] .original-native-login-error-dialog,
-:root[data-interface-mode='original'] .original-participant-error-dialog,
-:root[data-interface-mode='original'] .original-native-participant-snackbar,
-:root[data-interface-mode='original'] .original-participant-confirmation-dialog {
+:root[data-interface-mode='original'] :is(
+  .original-participant-account-menu,
+  .original-native-account-menu,
+  .original-administration-settings-overlay,
+  .original-administration-editor-dialog,
+  .original-participant-logout-dialog,
+  .original-system-check-save-report-dialog,
+  .original-system-check-saved-dialog,
+  .original-password-confirmation-dialog,
+  .original-player-menu,
+  .original-native-monitor-menu,
+  .original-native-monitor-filter-dialog,
+  .original-native-monitor-time-dialog,
+  .original-native-monitor-confirmation-dialog,
+  .original-native-monitor-filter-options,
+  .original-application-logo-tooltip,
+  .original-native-login-error-dialog,
+  .original-participant-error-dialog,
+  .original-native-participant-snackbar,
+  .original-workspace-results-snackbar,
+  .original-participant-confirmation-dialog
+) {
   @include theme.apply();
 }
 

@@ -8,6 +8,7 @@ export type OriginalResultsScope={token:string;tenantKey:string;workspaceKey:str
 export type OriginalResultRow=OriginalGroupResult&{checked:boolean};
 export type OriginalTestRow=OriginalAdminTestSession&{checked:boolean};
 type Owner=OriginalResultsScope&{epoch:number;abort:AbortController};
+type DeletionOutcome='deleted'|'failed'|'stale';
 const object=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const problem=(e:unknown)=>e instanceof Error?e.message:'Die Ergebnisverwaltung konnte nicht geladen werden.';
 
@@ -121,20 +122,34 @@ export class OriginalWorkspaceResultsController {
   }catch(e){if(this.owns(o))this.problem=problem(e);return null;}
   finally{if(this.owns(o))this.changed();}
  }
- captureDeletion():{count:number;groups:string[];current:()=>boolean;confirm:()=>Promise<boolean>}|null{
+ captureDeletion():{count:number;groups:string[];current:()=>boolean;confirm:()=>Promise<DeletionOutcome>}|null{
   const o=this.owner;if(!o||!this.canWrite||this.busy||!this.selectedCount)return null;
   const revision=this.selection,groups=this.selectedGroups.map(row=>row.groupName),tests=this.selectedTests.map(row=>({
    loginName:row.loginName,code:row.code,nameSuffix:row.nameSuffix,bookletName:row.bookletName}));
   let consumed=false;const current=()=>this.owns(o)&&this.selection===revision&&!consumed;
   return {count:o.view==='results'?groups.length:tests.length,groups,current,confirm:async()=>{
-   if(!current()||this.busy||!this.canWrite)return false;
+   if(!current()||this.busy||!this.canWrite)return 'stale';
    consumed=true;this.busy=true;this.problem='';this.notice='';this.changed();
    try{
     await this.request(o,'DELETE','/workspace/'+this.nativeId+'/responses'+(o.view==='tests'?'/detailed':''),o.view==='results'?{groups}:{personSessions:tests});
-    this.clear();this.notice=o.view==='results'?'Löschen erfolgreich.':`${tests.length} Test-Session(s) erfolgreich gelöscht`;
-    try{await this.load(o);}catch(e){if(this.owns(o))this.problem='Die Daten wurden gelöscht. Die Liste konnte nicht neu geladen werden.';}
-    return this.owns(o);
-   }catch(e){if(this.owns(o))this.problem=problem(e);return false;}
+    // Source leaves the disabled Tests list mounted while it reloads. Keeping
+    // the panels in the DOM lets the browser retain and clamp their scroll position.
+    if(o.view==='results')this.clear();
+    this.notice=o.view==='results'?'Löschen erfolgreich.':`${tests.length} Test-Session(s) erfolgreich gelöscht`;
+    try{
+     await this.load(o);
+    }catch{
+     if(this.owns(o)){
+      if(o.view==='tests')this.clear();
+      this.problem='Die Daten wurden gelöscht. Die Liste konnte nicht neu geladen werden.';
+     }
+    }
+    return this.owns(o)?'deleted':'stale';
+   }catch(e){
+    if(!this.owns(o))return 'stale';
+    if(o.view==='results')this.problem=problem(e);
+    return 'failed';
+   }
    finally{if(this.owns(o)){this.busy=false;this.changed();}}
   }};
  }

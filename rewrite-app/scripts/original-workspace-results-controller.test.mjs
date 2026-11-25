@@ -33,9 +33,9 @@ test('actual Source116 grouped tests preserve all four deletion identity fields 
  for(const g of f.c.groups)assert.deepEqual(g.rows.map(({checked,...r})=>r),sessions[g.name]);
  const g=f.c.groups[0];f.c.checkAll(true,g.name);assert.equal(f.c.all(g.name),true);assert.equal(f.c.some(f.c.groups[1].name),false);
  const expected=g.rows.map(({loginName,code,nameSuffix,bookletName})=>({loginName,code,nameSuffix,bookletName}));
- const deletion=f.c.captureDeletion();assert.equal(deletion.count,expected.length);assert.equal(await deletion.confirm(),true);
+ const deletion=f.c.captureDeletion();assert.equal(deletion.count,expected.length);assert.equal(await deletion.confirm(),'deleted');
  const request=f.calls.find(c=>c.method==='DELETE');assert.equal(request.path,'/workspace/9007199254740993/responses/detailed');assert.deepEqual(request.body,{personSessions:expected});
- assert.equal(await deletion.confirm(),false,'One dialog cannot issue the acknowledged deletion twice.');
+ assert.equal(await deletion.confirm(),'stale','One dialog cannot issue the acknowledged deletion twice.');
 });
 for(const [type,enhanced]of [['response',false],['log',false],['review',false],['review',true]])test(type+' '+enhanced+' keeps exact selected native CSV bytes',async()=>{
  const bytes=Buffer.from('\ufeffA;B\r\n"Ω";"x;\ny"\r\n');
@@ -52,7 +52,7 @@ for(const change of ['token','workspaceKey','tenantKey','view','destroy'])test('
 for(const change of ['token','workspaceKey','tenantKey','view','selection','destroy'])test('captured destructive selection is inert after '+change,async()=>{
  const f=fixture();await f.c.connect();f.c.check(f.c.rows[0],true);const action=f.c.captureDeletion();
  if(change==='destroy')f.c.destroy();else if(change==='selection')f.c.check(f.c.rows[1],true);else f.setScope({[change]:'other'});
- assert.equal(action.current(),false);assert.equal(await action.confirm(),false);assert.equal(f.calls.some(c=>c.method==='DELETE'),false);
+ assert.equal(action.current(),false);assert.equal(await action.confirm(),'stale');assert.equal(f.calls.some(c=>c.method==='DELETE'),false);
 });
 test('late previous scope list cannot replace a new native view',async()=>{
  const gate=held();let first=true;const f=fixture(call=>{if(first){first=false;return gate.promise;}return [row('new')];});
@@ -66,13 +66,62 @@ test('read-only permits selected CSV but never captures a deletion; empty select
 });
 test('a failed refresh after acknowledged deletion preserves success and cannot repeat the write',async()=>{
  let deleted=false;const f=fixture(call=>{if(call.method==='DELETE'){deleted=true;return;}if(deleted)throw Error('owned list offline');return [row()];});
- await f.c.connect();f.c.checkAll(true);const action=f.c.captureDeletion();assert.equal(await action.confirm(),true);
+ await f.c.connect();f.c.checkAll(true);const action=f.c.captureDeletion();assert.equal(await action.confirm(),'deleted');
  assert.equal(f.c.notice,'Löschen erfolgreich.');assert.match(f.c.problem,/wurden gelöscht/);assert.equal(f.c.selectedCount,0);assert.equal(f.c.canWrite,false);
- assert.equal(await action.confirm(),false);assert.equal(f.calls.filter(c=>c.method==='DELETE').length,1);
+ assert.equal(await action.confirm(),'stale');assert.equal(f.calls.filter(c=>c.method==='DELETE').length,1);
 });
 test('failed deletion retains the selected rows for a fresh reviewed retry',async()=>{
  const f=fixture(call=>{if(call.method==='DELETE')throw Error('owned denied');return [row()];});await f.c.connect();f.c.checkAll(true);
- assert.equal(await f.c.captureDeletion().confirm(),false);assert.equal(f.c.selectedCount,1);assert.equal(f.c.problem,'owned denied');assert.ok(f.c.captureDeletion());
+ assert.equal(await f.c.captureDeletion().confirm(),'failed');assert.equal(f.c.selectedCount,1);assert.equal(f.c.problem,'owned denied');assert.ok(f.c.captureDeletion());
+});
+test('a refused Test deletion keeps selection and leaves the list error clear',async()=>{
+ const f=fixture(call=>{if(call.method==='DELETE')throw Error('owned denial');return sessions;},'tests');
+ await f.c.connect();
+ f.c.check(f.c.groups[0].rows[0],true);
+ const action=f.c.captureDeletion();
+ assert.equal(await action.confirm(),'failed');
+ assert.equal(f.c.problem,'');
+ assert.equal(f.c.selectedCount,1);
+ assert.equal(await action.confirm(),'stale');
+ assert.ok(f.c.captureDeletion());
+});
+test('a late Test deletion failure cannot announce itself in a newly opened view',async()=>{
+ const pending=held();
+ const f=fixture(call=>call.method==='DELETE'?pending.promise:sessions,'tests');
+ await f.c.connect();
+ f.c.check(f.c.groups[0].rows[0],true);
+ const former=f.c.captureDeletion().confirm();
+ f.setScope({workspaceKey:'another'});
+ await f.c.connect();
+ pending.reject(Error('owned retired request'));
+ assert.equal(await former,'stale');
+ assert.equal(f.c.problem,'');
+ assert.equal(f.c.selectedCount,0);
+});
+for(const reloadFails of [false,true])test('Test deletion keeps the disabled panels mounted until refresh '+(reloadFails?'fails':'completes'),async()=>{
+ const pending=held(),refreshStarted=held();let acknowledged=false;
+ const f=fixture(call=>{
+  if(call.method==='DELETE'){acknowledged=true;return;}
+  if(!acknowledged)return sessions;
+  refreshStarted.resolve();return pending.promise;
+ },'tests');
+ await f.c.connect();
+ f.c.check(f.c.groups[0].rows[0],true);
+ const group=f.c.groups[0];
+ const result=f.c.captureDeletion().confirm();
+ await refreshStarted.promise;
+ assert.equal(f.c.busy,true);
+ assert.equal(f.c.groups[0],group);
+ assert.equal(f.c.loaded,true);
+ assert.equal(f.c.captureDeletion(),null);
+ if(reloadFails)pending.reject(Error('owned refresh failure'));
+ else pending.resolve([]);
+ assert.equal(await result,'deleted');
+ assert.deepEqual(f.c.groups,[]);
+ assert.equal(f.c.selectedCount,0);
+ assert.equal(f.c.loaded,!reloadFails);
+ assert.equal(f.c.notice,'1 Test-Session(s) erfolgreich gelöscht');
+ assert.equal(f.c.problem,reloadFails?'Die Daten wurden gelöscht. Die Liste konnte nicht neu geladen werden.':'');
 });
 test('prototype-looking and contiguous numeric PHP group keys remain data',async()=>{
  const example=Object.values(sessions)[0][0];
@@ -123,7 +172,7 @@ test('one Original Test sort applies to every group and survives deletion refres
  f.c.setTestSort('login','desc');assert.deepEqual(f.c.groups.map(g=>({name:g.name,rows:g.rows.map(({checked,...r})=>r)})),expected);
  const group=f.c.groups[0];f.c.check(group.rows[0],true);const selected=group.rows[0];
  f.c.setTestSort('booklet','asc');assert.equal(f.c.selectedTests[0],selected,'Sorting retains the exact selected row.');
- f.c.setTestSort('login','desc');assert.equal(await f.c.captureDeletion().confirm(),true);
+ f.c.setTestSort('login','desc');assert.equal(await f.c.captureDeletion().confirm(),'deleted');
  assert.deepEqual(f.c.groups.map(g=>({name:g.name,rows:g.rows.map(({checked,...r})=>r)})),expected,'Source reapplies the last sort after deletion refresh.');
  f.setScope({workspaceKey:'new'});await f.c.connect();assert.deepEqual(f.c.groups.map(g=>g.rows.map(r=>r.loginName)),expected.map(g=>g.rows.map(r=>r.loginName)));
  f.setScope({view:'results'});await f.c.connect();f.setScope({view:'tests'});await f.c.connect();

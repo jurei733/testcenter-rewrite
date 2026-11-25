@@ -81,7 +81,14 @@ export class OriginalWorkspaceResultsComponent implements OnChanges,OnDestroy {
     cancelLabel:'Abbrechen',safeMode:false}});
   this.deletion.afterClosed().subscribe(async accepted=>{
    this.deletion=null;if(!accepted||this.destroyed||!captured.current())return;
-   if(await captured.confirm()&&!this.destroyed&&this.controller.notice)this.snacks.open(this.controller.notice,groups?'OK':'Schließen',{duration:groups?5000:3000});
+   const outcome=await captured.confirm();
+   if(this.destroyed)return;
+   const panelClass='original-workspace-results-snackbar';
+   if(outcome==='deleted'&&this.controller.notice){
+    this.snacks.open(this.controller.notice,groups?'OK':'Schließen',{panelClass,duration:groups?5000:3000});
+   }else if(outcome==='failed'&&!groups){
+    this.snacks.open('Fehler beim Löschen der Test-Sessions','Schließen',{panelClass});
+   }
   });
  }
 }
