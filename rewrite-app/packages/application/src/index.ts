@@ -202,6 +202,13 @@ import type {
   Element as XmlElement
 } from "@xmldom/xmldom";
 import { formatOriginalReportCsv, formatOriginalParticipantLogEntry } from "./original-report-csv.js";
+import {
+  formatOriginalSystemCheckReports,
+  originalSystemCheckDigest,
+  summarizeOriginalSystemCheckReports,
+  type OriginalSystemCheckReportOverview,
+  type OriginalSystemCheckSections
+} from "./original-system-check-report-wire.js";
 import { selectOriginalSavedUnitKeys, originalReviewUnitEventTypes } from "./original-saved-unit-projection.js";
 import type {
   OriginalXmlRoot, OriginalXmlSchemaValidator, XmlSchemaProfile
@@ -808,6 +815,16 @@ export type WorkspaceAdminReadPort = {
     checkIds?: string[];
     limit?: number;
   }): Promise<string>;
+  exportOriginalSystemCheckReports(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkIds: string[] | null;
+    format: "csv" | "json";
+  }): Promise<string>;
+  listOriginalSystemCheckReportOverview(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<OriginalSystemCheckReportOverview[]>;
   getSystemCheckReportStatistics(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -26727,7 +26744,12 @@ export const createFirstSliceServices = (
     checkId?: string;
     checkIds?: string[];
     limit?: number;
-  }): Promise<Array<{ activityEventId: string; report: SystemCheckReport }>> => {
+    originalCheckIds?: string[] | null;
+  }): Promise<Array<{
+    activityEventId: string;
+    report: SystemCheckReport;
+    nativeSections?: OriginalSystemCheckSections;
+  }>> => {
     const workspace = await requireWorkspace(
       repository,
       input.tenantKey,
@@ -26743,6 +26765,8 @@ export const createFirstSliceServices = (
     const keys = [...(input.checkId?.trim() ? [input.checkId] : []), ...(input.checkIds ?? [])];
     const selectedCheckIds = input.checkIds === undefined && keys.length === 0 ? null
       : new Set(keys.map(key => key.trim().toUpperCase()));
+    const native = input.originalCheckIds !== undefined;
+    const originalCheckIds = input.originalCheckIds ? new Set(input.originalCheckIds) : null;
     const events = await repository.listWorkspaceActivityEventsByWorkspace(
       workspace.tenantId,
       workspace.workspaceId
@@ -26750,18 +26774,22 @@ export const createFirstSliceServices = (
     const records = events
       .filter(event => event.eventType === "system_check_report_saved")
       .flatMap(event => {
-        const report = event.details.report;
-        return report && typeof report === "object" && !Array.isArray(report)
-          ? [{
-              activityEventId: event.activityEventId,
-              report: normalizeStoredSystemCheckReport(report as SystemCheckReport)
-            }]
-          : [];
+        const stored = event.details.report;
+        if (!stored || typeof stored !== "object" || Array.isArray(stored)) return [];
+        const report = normalizeStoredSystemCheckReport(stored as SystemCheckReport);
+        if (native && typeof (stored as SystemCheckReport).sourceDate === "string") {
+          report.sourceDate = (stored as SystemCheckReport).sourceDate;
+        }
+        return [{
+          activityEventId: event.activityEventId,
+          report,
+          nativeSections: native ? event.details.nativeSections as OriginalSystemCheckSections | undefined : undefined
+        }];
       })
       .filter(
         record =>
-          selectedCheckIds === null ||
-          selectedCheckIds.has(record.report.checkId.toUpperCase())
+          native ? originalCheckIds === null || originalCheckIds.has(record.report.checkId) :
+            selectedCheckIds === null || selectedCheckIds.has(record.report.checkId.toUpperCase())
       )
       .sort((left, right) =>
         right.report.createdAt.localeCompare(left.report.createdAt)
@@ -26818,8 +26846,6 @@ export const createFirstSliceServices = (
     // SysCheckReportFile::getDigest uses exact authored labels, not entry IDs.
     // Preserve its literal separator even when either field is absent; keep
     // the established name-only canonical distributions independently intact.
-    const originalEnvironment = (report: SystemCheckReport, label: string): string =>
-      String(report.environment.find(entry => entry.label === label)?.value ?? "");
     const byCheckId = new Map<string, SystemCheckReport[]>();
     for (const report of reports) {
       const key = report.checkId.toUpperCase();
@@ -26839,10 +26865,8 @@ export const createFirstSliceServices = (
         browsers: breakdown(
           group.map(report => entryValue(report, "environment", ["browser"], ["browser"]))
         ),
-        operatingSystemVersions: breakdown(group.map(report =>
-          originalEnvironment(report, "Betriebssystem") + " " + originalEnvironment(report, "Betriebssystemversion")), false),
-        browserVersions: breakdown(group.map(report =>
-          originalEnvironment(report, "Browser") + " " + originalEnvironment(report, "Browserversion")), false),
+        operatingSystemVersions: breakdown(group.map(report => originalSystemCheckDigest(report).os), false),
+        browserVersions: breakdown(group.map(report => originalSystemCheckDigest(report).browser), false),
         overallRatings: breakdown(
           group.map(report =>
             entryValue(report, "network", ["nw-overall"], ["gesamtbewertung"])
@@ -31946,6 +31970,13 @@ export const createFirstSliceServices = (
       },
       async exportSystemCheckReportsJson(input) {
         return exportSystemCheckReportsJson(input);
+      },
+      async exportOriginalSystemCheckReports({checkIds,format,...scope}) {
+        const records = await readSystemCheckReportRecords({...scope, originalCheckIds: checkIds});
+        return formatOriginalSystemCheckReports(records, format, legacySystemCheckFileData);
+      },
+      async listOriginalSystemCheckReportOverview(scope) {
+        return summarizeOriginalSystemCheckReports(await readSystemCheckReportRecords({...scope, originalCheckIds: null}));
       },
       async getSystemCheckReportStatistics(input) {
         return buildSystemCheckReportStatistics(input);

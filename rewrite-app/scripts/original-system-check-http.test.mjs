@@ -29,6 +29,7 @@ for(const kind of kinds)test(kind+': actual protected native Systemcheck HTTP, p
   if(pg){pool=new Pool({connectionString:process.env.FIRST_SLICE_POSTGRES_URL});await pool.query('CREATE SCHEMA "'+namespace+'"');}
   storage=pg?await createPostgresFirstSliceStorage(pg.toString()):createSqliteFirstSliceStorage(environment.FIRST_SLICE_SQLITE_FILE);repository=storage.repository;services=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
   const setup=await setupNativeSystemCheck(services,repository),{scope,ids,workspaceNumber}=setup;
+  const adminCredentials={username:'owned-http-syscheck-root',password:'Owned HTTP syscheck root password'};
   const records=async()=>(await repository.listWorkspaceActivityEventsByWorkspace(ids.tenantId,ids.workspaceId)).filter(event=>event.eventType==='system_check_report_saved');
   const http=async(method,path,{token,body,status=200}={})=>{
    const response=await fetch(base+path,{method,headers:{...(token!==undefined?{AuthToken:token}:{}),...(body!==undefined?{'content-type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
@@ -76,6 +77,36 @@ for(const kind of kinds)test(kind+': actual protected native Systemcheck HTTP, p
    await http('PUT',path+'/report',{body:{...body,keyPhrase:'owned-key',title:'Owned anonymous'},status:201});assert.equal((await records()).length,2);
    const wrong=await http('PUT',path+'/report',{body:{...body,keyPhrase:' OWNED-KEY '},status:403});assert.equal(wrong.text,sourceWireReply('save-key-space-anonymous').rawText);
   });
+  await t.test('native Systemcheck report overview and exports use current workspace rights and hide the save key',async()=>{
+   await services.adminAuth.bootstrapAdminUser(adminCredentials);
+   const admin=(await http('PUT','/session/admin',{body:{name:adminCredentials.username,password:adminCredentials.password}})).value;
+   await http('PATCH','/user/'+admin.id+'/workspaces',{token:admin.token,body:{ws:[{id:Number(workspaceNumber),role:'RW'}]}});
+   const reports='/workspace/'+workspaceNumber+'/report/sys-check';
+   const overview='/workspace/'+workspaceNumber+'/sys-check/reports/overview';
+   await http('GET',reports,{status:401});
+   await http('GET',overview,{token:actor.token,status:403});
+   const exported=(await http('GET',reports+'?dataIds=R99.UNITCHECK',{token:admin.token})).value;
+   assert.equal(exported.length,2);
+   assert.ok(exported.every(report=>report.keyPhrase===''&&report.fileData.length===3));
+   assert.deepEqual(new Set(exported.map(report=>report.title)),new Set(['r98-syscheck','Owned anonymous']));
+   assert.equal((await http('GET',reports+'?dataIds=r99.unitcheck',{token:admin.token})).text,'');
+   const csv=await fetch(base+reports,{headers:{AuthToken:admin.token,Accept:'text/csv, application/json'}});
+   assert.equal(csv.status,200);
+   assert.equal(csv.headers.get('content-type'),'text/csv;charset=UTF-8');
+   assert.match(await csv.text(),/^"Titel";"SysCheck-Id";"SysCheck";"Responses";"DatumTS";"Datum";"FileName"/);
+   const items=(await http('GET',overview,{token:admin.token})).value;
+   assert.equal(items.length,1);
+   assert.deepEqual({id:items[0].id,count:items[0].count,details:items[0].details},{
+    id:'R99.UNITCHECK',count:2,details:{os:{' ':2},browser:{' ':2}}
+   });
+   await services.workspaceResults.importSystemCheckReport({...scope,fileName:'report_old.json',report:{
+    checkId:'R98.CHECK',title:'Imported legacy report',envData:[{id:'browser',label:'Browser',value:'Legacy'}]
+   }});
+   const [old]=(await http('GET',reports+'?dataIds=R98.CHECK',{token:admin.token})).value;
+   assert.equal(old.title,'Imported legacy report');
+   assert.equal(old.environment[0].value,'Legacy');
+   assert.equal(old.keyPhrase,'');
+  });
   await t.test('server restart retains the native credential and report evidence',async()=>{
    const before=await records();await close();await start();assert.deepEqual((await http('GET','/session',{token:actor.token})).value.claims,actor.claims);assert.deepEqual(await records(),before);
    assert.deepEqual((await http('GET',path+'/unit-and-player',{token:actor.token})).value,sourceReply('unit-with-player').value);
@@ -116,7 +147,7 @@ for(const kind of kinds)test(kind+': actual protected native Systemcheck HTTP, p
    await repository.updateParticipantSessionValidity({...person,validUntil:null});
   });
   await t.test('enabling dedicated login during a real anonymous body wait blocks the otherwise valid key',async()=>{
-   const credentials={username:'owned-http-syscheck-root',password:'Owned HTTP syscheck root password'};await services.adminAuth.bootstrapAdminUser(credentials);const {adminUser}=await services.adminAuth.signIn(credentials);
+   const {adminUser}=await services.adminAuth.signIn(adminCredentials);
    await delayed(()=>repository.saveAdminRoleAssignment({roleAssignmentId:randomUUID(),adminUserId:adminUser.adminUserId,role:'system_check',accessMode:'read_write',tenantId:ids.tenantId,workspaceId:ids.workspaceId,groupKey:null,createdAt:new Date().toISOString()}),401,{token:undefined,body:{...body,keyPhrase:'OWNED-KEY'}});
    await http('PUT',path+'/report',{token:actor.token,body,status:201});
   });

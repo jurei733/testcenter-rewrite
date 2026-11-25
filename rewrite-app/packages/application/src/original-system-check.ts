@@ -55,13 +55,17 @@ export function transactOriginalSystemCheckCollections<Value>(state:OriginalSyst
 type Request={token?:string;workspaceNumber:string;checkName:string};
 export type OriginalSystemCheckPort={mode():Promise<boolean>;list():Promise<string|null>;authorize(input:Request&{write:boolean}):Promise<void>;config(input:Request):Promise<string>;unit(input:Request):Promise<{player_id:string;def:string;player:string}>;saveReport(input:Request&{body:unknown}):Promise<void>};
 const invalid=()=>new FirstSliceError(403,'original_system_check_forbidden','A current Systemcheck person for this workspace is required.');
-function entries(section:string,value:unknown):SystemCheckReportEntry[]{
+function entries(section:string,value:unknown,wire:Array<Record<string,unknown>>):SystemCheckReportEntry[]{
  if(value==null)return[];
  if(!Array.isArray(value)||value.length>200)throw new FirstSliceError(400,'system_check_report_invalid','Invalid Systemcheck report section: '+section);
  return value.map((item,index)=>{
   if(!item||typeof item!=='object'||Array.isArray(item))throw new FirstSliceError(400,'system_check_report_invalid','Invalid Systemcheck report entry.');
   const row=item as Record<string,unknown>;
   if(typeof row.label!=='string'||!row.label.trim()||!['string','number','boolean'].includes(typeof row.value)&&row.value!==null||typeof row.value==='number'&&!Number.isFinite(row.value))throw new FirstSliceError(400,'system_check_report_invalid','Invalid Systemcheck report entry.');
+  wire.push(Object.fromEntries(Object.entries(row).filter(([key,field])=>
+   ['id','type','label','value','warning'].includes(key)&&
+   (field===null||typeof field==='string'||typeof field==='boolean'||typeof field==='number'&&Number.isFinite(field))
+  )));
   return{id:typeof row.id==='string'?row.id:String(index),type:typeof row.type==='string'?row.type:section,label:row.label,value:row.value as SystemCheckReportEntry['value'],warning:Boolean(row.warning)};
  });
 }
@@ -105,16 +109,18 @@ export function createOriginalSystemCheckPort(deps:{repository:OriginalSystemChe
    if(!person&&originalSystemCheckUpper(key)!==check.saveKey)throw new FirstSliceError(403,'system_check_save_key_invalid','Wrong key `'+key+'`');
    for(const name of ['title','date'] as const)if(body[name]!=null&&typeof body[name]!=='string')throw new FirstSliceError(400,'system_check_report_invalid','Invalid Systemcheck report '+name+'.');
    const timestamp=deps.now(),id=deps.id(),responses=body.responses;
+   const nativeSections={environment:[],network:[],questionnaire:[],unit:[]};
    const report:SystemCheckReport={systemCheckReportId:id,tenantId:target.tenantId,workspaceId:target.workspaceId,sourcePackageId:check.sourcePackageId,
     // Source DataCollection retains an explicit empty string, but treats the
     // string "0" as false and keeps the constructor's default value instead.
     originalFileName:'report_'+id+'.json',fileModifiedAt:timestamp,sourceDate:typeof body.date==='string'&&body.date!=='0'?body.date:deps.date(timestamp),
     checkId:check.name,checkLabel:check.label,title:person?person.loginKey:typeof body.title==='string'&&body.title!=='0'?body.title:'',
     responses:responses==null||responses===false||responses===0||responses==='0'||Array.isArray(responses)&&responses.length===0?'':responses,
-    environment:entries('environment',body.environment),network:entries('network',body.network),questionnaire:entries('questionnaire',body.questionnaire),unit:entries('unit',body.unit),createdAt:timestamp};
+    environment:entries('environment',body.environment,nativeSections.environment),network:entries('network',body.network,nativeSections.network),
+    questionnaire:entries('questionnaire',body.questionnaire,nativeSections.questionnaire),unit:entries('unit',body.unit,nativeSections.unit),createdAt:timestamp};
    encodeOriginalReportJson(report);
    return{value:undefined,event:{activityEventId:deps.id(),tenantId:target.tenantId,workspaceId:target.workspaceId,eventType:'system_check_report_saved',actorId:person?.participantSessionId??null,
-    subjectType:'system_check_report',subjectId:id,occurredAt:timestamp,summary:`System-check report '${report.title}' saved for '${report.checkId}'.`,details:{report}}};
+    subjectType:'system_check_report',subjectId:id,occurredAt:timestamp,summary:`System-check report '${report.title}' saved for '${report.checkId}'.`,details:{report,nativeSections}}};
   });}
  };
 }

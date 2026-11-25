@@ -1,9 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import type {IncomingMessage} from 'node:http';
-import {FirstSliceError,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,findOriginalWorkspaceFile,projectOriginalWorkspaceFileDigests,readOriginalWorkspaceFileSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
+import {FirstSliceError,originalReportFormat,originalReportQuery,decodeOriginalTestLogJson,encodeOriginalReportJson,formatOriginalTestAdministrationJson,findOriginalWorkspaceFile,projectOriginalWorkspaceFileDigests,readOriginalWorkspaceFileSelection,type FirstSliceServices} from '@testcenter-rewrite-app/application';
 import {deleteOriginalWorkspaceFiles,readOriginalWorkspaceFileDeletion} from '@testcenter-rewrite-app/application';
 
-const route=/^\/workspace\/([^/]+)\/(files(?:-dependencies)?|results|responses(?:\/detailed)?|report\/([^/]+)|file(?:\/([^/]+)\/([^/]+))?)$/;
+const route=/^\/workspace\/([^/]+)\/(files(?:-dependencies)?|results|responses(?:\/detailed)?|report\/([^/]+)|file(?:\/([^/]+)\/([^/]+))?|sys-check\/reports\/overview)$/;
 const contextRoute=/^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/original-administration$/;
 async function readOriginalWorkspaceUpload(contentType:string,bytes:Buffer) {
   if(!bytes.length)throw new FirstSliceError(400,'original_workspace_upload_missing','No Upload File.');
@@ -87,7 +87,7 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
   const upload=operation==='file';
   const deleteFiles=operation==='files'&&input.request.method==='DELETE';
   const methods=operation==='files-dependencies'||upload?['POST']
-    :download||operation==='results'||match[3]?['GET']:operation==='responses'?['DELETE']:['GET','DELETE'];
+    :download||operation==='results'||operation==='sys-check/reports/overview'||match[3]?['GET']:operation==='responses'?['DELETE']:['GET','DELETE'];
   const readJson=async(decode:(payload:Uint8Array)=>unknown)=>{
     try{return await input.readBody(decode);}
     catch(error){if(error instanceof SyntaxError)throw new FirstSliceError(500,'original_workspace_json_invalid','Internal error.');throw error;}
@@ -169,9 +169,23 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
       return true;
     }
     if(input.request.method==='GET'){
+      if(operation==='sys-check/reports/overview'){
+        const rows=await input.services.workspaceAdminRead.listOriginalSystemCheckReportOverview(scope);
+        await confirmScope();
+        input.raw(200,encodeOriginalReportJson(rows),'application/json');return true;
+      }
       if(match[3]){
-        const type=match[3];if(type!=='response'&&type!=='log'&&type!=='review')throw new FirstSliceError(404,'original_report_type_missing',"Report type '"+type+"' not found.");
-        const params=input.searchParams??new URLSearchParams(),result=await input.services.originalWorkspaceReport.read({...scope,type,dataIds:originalReportQuery(params,'dataIds'),accept:input.request.headers.accept??'',useNewVersion:originalReportQuery(params,'useNewVersion')==='true'});
+        const type=match[3],params=input.searchParams??new URLSearchParams();
+        const dataIds=originalReportQuery(params,'dataIds'),accept=input.request.headers.accept??'';
+        if(type==='sys-check'){
+          if(dataIds===null)throw new FirstSliceError(500,'original_report_query_invalid','Internal error.');
+          const format=originalReportFormat(accept);
+          const body=await input.services.workspaceAdminRead.exportOriginalSystemCheckReports({...scope,checkIds:dataIds===''?null:dataIds.split(','),format});
+          await confirmScope();
+          input.raw(200,body,format==='csv'?'text/csv;charset=UTF-8':'application/json');return true;
+        }
+        if(type!=='response'&&type!=='log'&&type!=='review')throw new FirstSliceError(404,'original_report_type_missing',"Report type '"+type+"' not found.");
+        const result=await input.services.originalWorkspaceReport.read({...scope,type,dataIds,accept,useNewVersion:originalReportQuery(params,'useNewVersion')==='true'});
         input.raw(200,result.body,result.contentType);return true;
       }
       if(operation==='results'){

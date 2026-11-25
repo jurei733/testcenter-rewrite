@@ -77,6 +77,19 @@ for(const kind of kinds)test(kind+': selected Original Systemcheck exports retai
    assert.deepEqual(await json({checkId:'CHECK.A',checkIds:['CHECK.B']}),completeSelection);
    assert.deepEqual(await json({checkIds:['CHECK.A']}),await json({checkId:'check.a'}));
   });
+  await t.test('native exports keep all exact selections and never render a foreign report',async()=>{
+   const exportNative=(checkIds,format='json')=>selected().exportOriginalSystemCheckReports({...scope,checkIds,format});
+   const rows=JSON.parse(await exportNative(['CHECK.B','CHECK.A','CHECK.B']));
+   assert.deepEqual(rows.map(row=>row.title),selectedTitles);
+   assert.ok(rows.every(row=>row.keyPhrase===''&&row.fileData.length===3));
+   assert.equal(await exportNative(['check.a']),'');
+   assert.equal(await exportNative([],'csv'),'');
+   const csv=await exportNative(['CHECK.A'],'csv');
+   assert.equal((csv.match(/owned-title-/g)??[]).length,501);
+   assert.ok(!csv.includes('foreign-private'));
+   const overview=await selected().listOriginalSystemCheckReportOverview(scope);
+   assert.deepEqual(new Map(overview.map(row=>[row.id,row.count])),new Map([['CHECK.A',501],['CHECK.B',3],['CHECK.C',1]]));
+  });
   await t.test('explicit empty and unknown selections cannot accidentally export every workspace report',async()=>{
    assert.deepEqual(await json({checkIds:[]}),[]);
    assert.deepEqual(await json({checkIds:['MISSING']}),[]);
