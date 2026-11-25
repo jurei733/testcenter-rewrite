@@ -524,6 +524,14 @@ export class VeronaPlayerHostComponent
     this.mountPlayer();
   }
 
+  @HostListener("window:resize")
+  onWindowResize(): void {
+    if (this.originalSystemCheckUi && this.status === "running" && this.frame) {
+      // The Original sets the Systemcheck frame five pixels shorter on resize.
+      this.frame.style.height = "calc(100% - 5px)";
+    }
+  }
+
   @HostListener("window:message", ["$event"])
   onWindowMessage(event: MessageEvent): void {
     const activeFrame = this.frame?.contentWindow;

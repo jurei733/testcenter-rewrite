@@ -101,6 +101,16 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     assert.equal(await playerBody.getAttribute('data-definition-type'), 'unspecified');
     const sandbox = await page.locator('app-original-system-check-unit iframe').getAttribute('sandbox');
     assert.ok(sandbox.includes('allow-scripts')); assert.ok(!sandbox.includes('allow-same-origin'));
+    const viewport = page.viewportSize();
+    await page.setViewportSize({width: 390, height: 844});
+    await page.waitForFunction(() => {
+      const host = document.querySelector('#originalSystemCheckUnit');
+      const title = document.querySelector('#originalSystemCheckUnitTitle');
+      const iframe = host?.querySelector('iframe');
+      return iframe && title && iframe.clientHeight === host.clientHeight - 5 &&
+        title.getBoundingClientRect().bottom <= iframe.getBoundingClientRect().top;
+    });
+    await page.setViewportSize(viewport);
     await playerBody.evaluate(() => {
       const validPages = [{id: '1', label: 'First page'}, {id: '2', label: 'Second page'}];
       const publishPage = currentPage => window.parent.postMessage({
