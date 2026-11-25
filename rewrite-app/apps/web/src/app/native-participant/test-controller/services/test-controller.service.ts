@@ -84,6 +84,7 @@ export class TestControllerService {
   private readonly nativeHttp=inject(NativeHttpClient);
   private readonly nativeTestId=inject(NATIVE_RUN_TEST_ID);
   private readonly pausedTimerKey=`testcenter:native-paused-timer:${this.nativeTestId}`;
+  private readonly resumedTimerKey=`testcenter:native-resumed-timer:${this.nativeTestId}`;
   private readonly nativeSubscriptions=new Subscription();
   private readonly nativeRetired$=new Subject<void>();
   private readonly nativeCloseTimers=new Set<ReturnType<typeof setTimeout>>();
@@ -571,14 +572,13 @@ export class TestControllerService {
       await this.pause();
       return false;
     }
-    // The Original resumes from the last displayed second. The server deadline
-    // still controls the stored balance and when this block expires.
-    const resumedDisplayBudget=this.consumePausedTimerDisplay(clock);
+    const pausedDisplay=this.consumePausedTimerDisplay(clock);
     if(clock.status!=='running'||clock.remainingMilliseconds===0){
       if(!this.testMode.forceTimeRestrictions)return true;
       this.timers$.next(new TimerData(0,testlet.id,MaxTimerEvent.ENDED));
       return false;
     }
+    const resumedDisplayBudget=this.restoreResumedTimerDisplay(clock,pausedDisplay);
     const timeBudget=clock.remainingMilliseconds;
     const deadline=performance.now()+timeBudget;
     const publishTimer=(type:MaxTimerEvent,elapsedTicks=0)=>{
@@ -623,6 +623,26 @@ export class TestControllerService {
       return saved.displayedSeconds;
     }
     return undefined;
+  }
+
+  private restoreResumedTimerDisplay(clock:NativeTimerClock,pausedDisplay:number|undefined):number|undefined {
+    if(!clock.expiresAt)return pausedDisplay;
+    // Keep the displayed balance of a resumed countdown through a document
+    // reload. The server deadline still caps the display and owns expiry.
+    try {
+      const {testletKey,startedAt,expiresAt}=clock;
+      if(pausedDisplay!==undefined){
+        sessionStorage.setItem(this.resumedTimerKey,JSON.stringify({testletKey,startedAt,expiresAt,displayedSeconds:pausedDisplay}));
+        return pausedDisplay;
+      }
+      const saved=JSON.parse(sessionStorage.getItem(this.resumedTimerKey)??'null') as
+        (PausedTimerDisplay & {expiresAt:string}) | null;
+      if(saved?.testletKey===testletKey&&saved.startedAt===startedAt&&saved.expiresAt===expiresAt&&
+        Number.isSafeInteger(saved.displayedSeconds)&&saved.displayedSeconds>=0){
+        return saved.displayedSeconds;
+      }
+    } catch { /* Countdown presentation still works without browser storage. */ }
+    return pausedDisplay;
   }
 
   private readPausedTimerDisplays(): PausedTimerDisplay[] {
