@@ -6,6 +6,11 @@ import type {OriginalWorkspaceFilesScope,OriginalWorkspaceFilesTransport} from '
 type Scope=Pick<OriginalWorkspaceFilesScope,'token'|'tenantKey'|'workspaceKey'|'nativeRole'|'workspaceNumber'>;
 type Owner=Omit<Scope,'nativeRole'>&{epoch:number};
 type NativeReportOverview={id:string;label:string;count:number;details:{os:Record<string,number>;browser:Record<string,number>}};
+type ReportDeletionConfirmation={
+ ids:string[];
+ current:()=>boolean;
+ confirm:(showNotice?:(message:string,action:string)=>void,showFailure?:(error:unknown,path:string)=>void)=>Promise<boolean>;
+};
 export type SystemCheckTableRow=Pick<SystemCheckReportStatistics,'checkId'|'checkLabel'|'reportCount'|'operatingSystemVersions'|'browserVersions'>;
 const versions=(counts:Record<string,number>)=>Object.entries(counts).map(([value,count])=>({value,count}));
 const errorText=(error:unknown):string=>error && typeof error==='object' && 'message' in error && typeof error.message==='string'
@@ -96,11 +101,11 @@ export class OriginalSystemCheckReportsController {
   }catch(error){if(this.owns(owner))this.problem=errorText(error);return null;}
   finally{if(this.owns(owner)){this.busy=false;this.changed();}}
  }
- captureDeletion():{ids:string[];current:()=>boolean;confirm:(showNotice?:(message:string,action:string)=>void)=>Promise<boolean>}|null {
+ captureDeletion():ReportDeletionConfirmation|null {
   const owner=this.owner;if(!owner || !this.owns(owner) || !this.overview || this.busy)return null;
   const ids=this.rows.filter(row=>this.selected.has(row.checkId)).map(row=>row.checkId);if(!ids.length)return null;
   let used=false;
-  return {ids:[...ids],current:()=>this.owns(owner),confirm:async showNotice=>{
+  return {ids:[...ids],current:()=>this.owns(owner),confirm:async (showNotice,showFailure)=>{
    if(used || !this.owns(owner) || this.busy)return false;used=true;
    const native=this.nativePath(owner,'sys-check/reports');
    if(!native && this.current().nativeRole==='RO'){
@@ -122,7 +127,12 @@ export class OriginalSystemCheckReportsController {
      }
     }
     completed=true;
-   }catch(error){if(this.owns(owner))this.problem=errorText(error);}
+   }catch(error){
+    if(this.owns(owner)){
+     if(native && showFailure)showFailure(error,native);
+     else this.problem=errorText(error);
+    }
+   }
    finally{
     if(this.owns(owner)){
      if(accepted || completed){

@@ -222,3 +222,36 @@ test('numeric report requests keep exact CSV selection and do not publish a late
  assert.deepEqual(f.controller.rows.map(row=>row.checkId),ids);
  assert.equal(f.calls.some(call=>call.path==='/workspace/11/sys-check/reports/overview'),true);
 });
+test('numeric report rejection presents one current native failure while retaining the table and selection',async()=>{
+ const error={statusCode:403,message:'Read-only workspace.',response:{errorId:'owned-denial'}};
+ const f=fixture(call=>{
+  if(call.method==='DELETE')throw error;
+  return call.path.endsWith('/overview')?[nativeRow()]:overview();
+ },{...scope(),nativeRole:'RO',workspaceNumber:'12'});
+ await f.controller.connect();f.controller.checkAll();
+ const report=f.controller.captureDeletion(),errors=[];
+ const failure=(received,path)=>errors.push({received,path,current:report.current()});
+ assert.equal(await report.confirm(()=>assert.fail('A rejection cannot announce a deletion.'),failure),false);
+ assert.equal(await report.confirm(undefined,failure),false);
+ assert.deepEqual(errors,[{received:error,path:'/workspace/12/sys-check/reports',current:true}]);
+ assert.deepEqual([...f.controller.selected],['Exact.Mixed']);
+ assert.equal(f.controller.rows[0].reportCount,3);
+ assert.equal(f.controller.problem,'');
+ assert.equal(f.controller.busy,false);
+});
+test('retired native report failures cannot present an error for a new token or workspace',async()=>{
+ for(const next of [{...scope('a','owned-new-token'),workspaceNumber:'12'},{...scope(),workspaceNumber:'21'}]){
+  const request=held();
+  const f=fixture(call=>call.method==='DELETE'?request.promise:
+    call.path.endsWith('/overview')?[nativeRow()]:overview(),{...scope(),workspaceNumber:'12'});
+  await f.controller.connect();f.controller.checkAll();
+  const report=f.controller.captureDeletion();
+  const result=report.confirm(undefined,()=>assert.fail('A retired workspace cannot present a failure.'));
+  f.setScope(next);await f.controller.connect();
+  request.reject({statusCode:403,message:'Old request.'});
+  assert.equal(await result,false);
+  assert.equal(report.current(),false);
+  assert.equal(f.controller.problem,'');
+  assert.equal(f.controller.rows[0].reportCount,3);
+ }
+});
