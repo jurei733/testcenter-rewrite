@@ -71,12 +71,19 @@ type LeaveCheckResult =
   // block unless the user explicitly confirms leaving
   | { kind: 'confirm'; title: string; content: string; onConfirmed: () => string | undefined | Promise<void> };
 
+interface PausedTimerDisplay {
+  testletKey: string;
+  startedAt: string;
+  displayedSeconds: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class TestControllerService {
   private readonly nativeHttp=inject(NativeHttpClient);
   private readonly nativeTestId=inject(NATIVE_RUN_TEST_ID);
+  private readonly pausedTimerKey=`testcenter:native-paused-timer:${this.nativeTestId}`;
   private readonly nativeSubscriptions=new Subscription();
   private readonly nativeRetired$=new Subject<void>();
   private readonly nativeCloseTimers=new Set<ReturnType<typeof setTimeout>>();
@@ -137,8 +144,8 @@ export class TestControllerService {
   timers: KeyValuePairNumber = {}; // TODO remove the redundancy with timers$
   currentTimerId = '';
   private timerUnitAlias?: string;
-  private visibleTimer?: TimerData;
-  private pausedTimer?: TimerData;
+  private visibleTimer?: { startedAt: string; data: TimerData };
+  private pausedTimer?: PausedTimerDisplay;
   private timerIntervalSubscription: Subscription | null = null;
   timerWarningPoints: number[] = [];
 
@@ -566,8 +573,7 @@ export class TestControllerService {
     }
     // The Original resumes from the last displayed second. The server deadline
     // still controls the stored balance and when this block expires.
-    const resumedDisplayBudget=this.pausedTimer?.id===testlet.id?this.pausedTimer.displayedSeconds:undefined;
-    this.pausedTimer=undefined;
+    const resumedDisplayBudget=this.consumePausedTimerDisplay(clock);
     if(clock.status!=='running'||clock.remainingMilliseconds===0){
       if(!this.testMode.forceTimeRestrictions)return true;
       this.timers$.next(new TimerData(0,testlet.id,MaxTimerEvent.ENDED));
@@ -578,8 +584,9 @@ export class TestControllerService {
     const publishTimer=(type:MaxTimerEvent,elapsedTicks=0)=>{
       const remaining=Math.max(0,Math.ceil((deadline-performance.now())/1000));
       const displayBalance=resumedDisplayBudget===undefined?undefined:Math.min(remaining,resumedDisplayBudget-elapsedTicks);
-      this.visibleTimer=new TimerData(remaining/60,testlet.id,type,displayBalance);
-      this.timers$.next(this.visibleTimer);
+      const data=new TimerData(remaining/60,testlet.id,type,displayBalance);
+      this.visibleTimer={startedAt:clock.startedAt,data};
+      this.timers$.next(data);
     };
     this.currentTimerId = testlet.id;
     this.timerUnitAlias=unit.alias;
@@ -607,6 +614,26 @@ export class TestControllerService {
       }
     }));
     return true;
+  }
+
+  private consumePausedTimerDisplay(clock: NativeTimerClock): number | undefined {
+    let saved=this.pausedTimer;
+    try {
+      saved??=JSON.parse(sessionStorage.getItem(this.pausedTimerKey) ?? 'null') as PausedTimerDisplay | undefined;
+    } catch {
+      // A browser may disable storage. In that case the server balance can still be shown.
+    }
+    this.clearPausedTimerDisplay();
+    if(saved?.testletKey===clock.testletKey&&saved.startedAt===clock.startedAt&&
+      Number.isSafeInteger(saved.displayedSeconds)&&saved.displayedSeconds>=0){
+      return saved.displayedSeconds;
+    }
+    return undefined;
+  }
+
+  private clearPausedTimerDisplay(): void {
+    this.pausedTimer=undefined;
+    try { sessionStorage.removeItem(this.pausedTimerKey); } catch {}
   }
 
   private confirmTimerExpiry(unitAlias: string, clock: NativeTimerClock): Observable<NativeTimerClock> {
@@ -638,7 +665,7 @@ export class TestControllerService {
   }
 
   cancelTimer(): void {
-    this.pausedTimer=undefined;
+    this.clearPausedTimerDisplay();
     if (this.currentTimerId) {
       this.timers$.next(new TimerData(0, this.currentTimerId, MaxTimerEvent.CANCELLED));
     }
@@ -767,7 +794,11 @@ export class TestControllerService {
   }
 
   pause(): Promise<boolean> {
-    if(this.visibleTimer)this.pausedTimer=this.visibleTimer;
+    if(this.visibleTimer){
+      const {startedAt,data}=this.visibleTimer;
+      this.pausedTimer={testletKey:data.id,startedAt,displayedSeconds:data.displayedSeconds};
+      try { sessionStorage.setItem(this.pausedTimerKey,JSON.stringify(this.pausedTimer)); } catch {}
+    }
     this.interruptTimer();
     this.state$.next('PAUSED');
     return this.setUnitNavigationRequest(UnitNavigationTarget.PAUSE, true);

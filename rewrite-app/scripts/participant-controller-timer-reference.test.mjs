@@ -153,14 +153,14 @@ function extractNativeMethods(file, className, names) {
 }
 
 const nativeTimerSource = `
-export const load = ({firstValueFrom, concat, defer, EMPTY, timer, createTicker, performance, AppError,
+export const load = ({firstValueFrom, concat, defer, EMPTY, timer, createTicker, performance, AppError, sessionStorage,
   MaxTimerEvent, concatMap, expand, filter, ignoreElements, take, takeUntil, tap}) => {
  class TimerData {
   ${extractNativeMethods('classes/test-controller.classes.ts', 'TimerData', ['constructor', 'displayedSeconds'])}
  }
  return class NativeTestController {
   ${extractNativeMethods('services/test-controller.service.ts', 'TestControllerService',
-    ['startTimer', 'confirmTimerExpiry', 'finishTimer', 'interruptTimer'])}
+    ['startTimer', 'consumePausedTimerDisplay', 'clearPausedTimerDisplay', 'confirmTimerExpiry', 'finishTimer', 'interruptTimer'])}
  };
 };`;
 const nativeTimerOutput = ts.transpileModule(nativeTimerSource, {
@@ -168,23 +168,27 @@ const nativeTimerOutput = ts.transpileModule(nativeTimerSource, {
 }).outputText;
 const nativeTimerModule = await import('data:text/javascript;base64,' + Buffer.from(nativeTimerOutput).toString('base64'));
 
-async function nativeExpiryFixture(replies) {
+async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDisplay}={}) {
  const scheduler = new TestScheduler(assert.deepEqual);
+ const startedAt = '2026-11-25T12:00:00.000Z';
  const clock = {
-  testletKey: 'timed', status: 'running', remainingMilliseconds: 1000,
-  startedAt: '2026-11-25T12:00:00.000Z', expiresAt: '2026-11-25T12:00:01.000Z',
+  testletKey: 'timed', status: 'running', remainingMilliseconds, startedAt,
+  expiresAt: new Date(Date.parse(startedAt)+remainingMilliseconds).toISOString(),
  };
+ const pausedTimerKey = 'owned-paused-timer';
+ const savedTimers = new Map(savedDisplay ? [[pausedTimerKey, JSON.stringify(savedDisplay)]] : []);
  const Controller = nativeTimerModule.load({
   firstValueFrom, concat, defer, EMPTY, timer: delay => timer(delay, scheduler),
   createTicker: () => interval(100, scheduler), performance: {now: () => scheduler.now()}, AppError: Error,
   MaxTimerEvent: {STARTED: 'STARTED', STEP: 'STEP', ENDED: 'ENDED', INTERRUPTED: 'INTERRUPTED'},
   concatMap, expand, filter, ignoreElements, take, takeUntil, tap,
+  sessionStorage: {getItem: key => savedTimers.get(key), removeItem: key => savedTimers.delete(key)},
  });
  const controller = new Controller();
  const unit = {alias: 'owned-unit'};
  const events = [], expirations = [];
  Object.assign(controller, {
-  nativeCurrent: true, currentUnit: unit, testMode: {forceTimeRestrictions: true},
+  nativeCurrent: true, currentUnit: unit, testMode: {forceTimeRestrictions: true}, pausedTimerKey,
   currentTimerId: '', timerIntervalSubscription: null, timers$: new Subject(), owned: subscribe => subscribe(), mds: {},
   bs: {timer: (_id, _alias, action) => {
    if (action === 'enter') return of(clock);
@@ -200,8 +204,22 @@ async function nativeExpiryFixture(replies) {
  });
  assert.equal(await controller.startTimer({id: 'timed'}, unit, false, () => true), true);
  const advance = frame => {scheduler.maxFrames = frame;scheduler.flush();};
- return {controller, expirations, events, advance};
+ return {controller, expirations, events, advance, savedTimers};
 }
+
+test('a reloaded timer restores the display only for the same server clock', async () => {
+ const matching = {testletKey:'timed', startedAt:'2026-11-25T12:00:00.000Z', displayedSeconds:2};
+ const different = {...matching, startedAt:'2026-11-25T11:59:00.000Z', displayedSeconds:0};
+ const replies = [{status:'expired', remainingMilliseconds:0}];
+ for(const [savedDisplay, expectedDisplay] of [[matching,2],[different,3]]){
+  const fixture = await nativeExpiryFixture(replies,{remainingMilliseconds:2460,savedDisplay});
+  assert.equal(fixture.controller.visibleTimer.data.displayedSeconds,expectedDisplay);
+  assert.equal(fixture.savedTimers.size,0);
+  fixture.advance(2460);
+  assert.deepEqual(fixture.expirations,[2460]);
+  assert.deepEqual(fixture.events,[[0,'STARTED'],[2460,'ENDED']]);
+ }
+});
 
 test('native countdown waits for the authoritative remaining milliseconds before advancing', async () => {
  const fixture = await nativeExpiryFixture([{remainingMilliseconds: 18}, {status:'expired',remainingMilliseconds:0}]);
