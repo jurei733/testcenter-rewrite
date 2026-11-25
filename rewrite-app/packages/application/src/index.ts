@@ -9093,12 +9093,13 @@ const normalizeUnitCodingScheme = (value: unknown): UnitCodingScheme | null => {
 };
 
 const normalizeUnitAttachmentRequests = (
-  value: unknown
+  value: unknown,
+  fromOriginalXml = false
 ): UnitAttachmentRequest[] => {
   if (!Array.isArray(value)) {
     return [];
   }
-  const requests = new Map<string, UnitAttachmentRequest>();
+  const requests: UnitAttachmentRequest[] = [];
   for (const candidate of value) {
     if (typeof candidate !== "object" || candidate === null) {
       continue;
@@ -9109,12 +9110,19 @@ const normalizeUnitAttachmentRequests = (
     if (!variableId) {
       continue;
     }
-    requests.set(variableId.toLowerCase(), {
-      variableId,
-      attachmentType
-    });
+    requests.push({variableId, attachmentType});
   }
-  return [...requests.values()];
+  if (!fromOriginalXml) {
+    return [...new Map(requests.map(request => [request.variableId.toLowerCase(), request])).values()];
+  }
+  // Stable sorting groups equivalent IDs while keeping their first XML declaration first.
+  const byVariableId = [...requests].sort((left, right) =>
+    compareOriginalParticipantGroupKeys(left.variableId, right.variableId)
+  );
+  const firstDeclarations = new Set(byVariableId.filter((request, index) =>
+    index === 0 || compareOriginalParticipantGroupKeys(byVariableId[index - 1]!.variableId, request.variableId) !== 0
+  ));
+  return requests.filter(request => firstDeclarations.has(request));
 };
 
 const normalizeSourcePackageUnitEntry = (
@@ -18729,7 +18737,8 @@ const extractZipUnitAttachmentRequests = (
       .map(variable => ({
         variableId: variable.getAttribute("id"),
         attachmentType: variable.getAttribute("format")
-      }))
+      })),
+    true
   );
 };
 

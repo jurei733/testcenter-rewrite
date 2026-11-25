@@ -108,7 +108,7 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
   await upload('owned-attachment-player-1.0.html', '<html><script type="application/ld+json">' +
     JSON.stringify({id:'owned-attachment-player',version:'1.0.0',specVersion:'6.0',metadataVersion:'2.0',
       type:'player',name:[{lang:'de',value:'Owned Player'}]}) + '</script><main>Owned</main></html>', 'text/html');
-  await upload('unit.xml', xml('Unit', `<Metadata><Id>${unitId}</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-attachment-player@1.0.0">Owned</Definition><BaseVariables><Variable id="page" type="attachment" format="capture-image" /></BaseVariables>`));
+  await upload('unit.xml', xml('Unit', `<Metadata><Id>${unitId}</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-attachment-player@1.0.0">Owned</Definition><BaseVariables><Variable id="page" type="attachment" format="capture-image" /><Variable id="Page" type="attachment" format="capture-image" /></BaseVariables>`));
   await upload('booklet.xml', xml('Booklet', `<Metadata><Id>OWNED.ATTACHMENT.BOOK</Id><Label>Owned Booklet</Label></Metadata><Units><Unit id="${unitId}" alias="${alias}" label="Owned Alias"/></Units>`));
   await services.workspaceAdminRead.importParticipantRoster({...scope, rosterText:xml('Testtakers',
     `<Metadata/><Group id="${group}" label="Owned"><Login name="owned-test" mode="run-trial"><Booklet>OWNED.ATTACHMENT.BOOK</Booklet></Login><Login name="owned-monitor" mode="monitor-group" /></Group><Group id="experimental-other" label="Other"><Login name="other-monitor" mode="monitor-group" /></Group>`)});
@@ -149,7 +149,9 @@ for (const kind of kinds) test(`${kind}: Original attachment writes update Unit 
     assert.equal((await metadata()).dataType, 'missing');
     assert.deepEqual(await storage.repository.listAttachmentFilesByWorkspace(tenant.tenantId, workspace.workspaceId), []);
   });
-  const [legacyRequest] = await services.originalAttachments.list(monitor.token);
+  const requests = await services.originalAttachments.list(monitor.token);
+  assert.equal(requests.length, 1);
+  const [legacyRequest] = requests;
   const originalQrTarget = {...target, attachmentId:[testNumber, unitId, 'page'].join(':')};
   assert.deepEqual(legacyRequest, {
     attachmentId:originalQrTarget.attachmentId, attachmentType:'capture-image', dataType:'missing', attachmentFileIds:[], lastModified:null,
