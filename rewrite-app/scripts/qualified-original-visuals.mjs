@@ -40,9 +40,11 @@ export async function loadOriginalVisualReference(name) {
   assert.match(name, /^original-[a-z-]+$/);
   const base = await read(name);
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase()) || process.env.CI !== "true";
-  const macReviewToasts = name === "original-starter-review-toasts" && process.platform === "darwin" &&
-    process.arch === "arm64" && !headful && !process.env.UI_SMOKE_BROWSER_CHANNEL;
-  if (process.platform !== "linux" && !macReviewToasts) return base;
+  const macHeadless = process.platform === "darwin" && process.arch === "arm64" &&
+    !headful && !process.env.UI_SMOKE_BROWSER_CHANNEL;
+  const macReviewToasts = macHeadless && name === "original-starter-review-toasts";
+  const macSystemCheck = macHeadless && name === "original-system-check-welcome";
+  if (process.platform !== "linux" && !macReviewToasts && !macSystemCheck) return base;
   const profile = await read("original-linux-chromium147");
   const source = await read("original-browser-source");
   const browserPackage = JSON.parse(await readFile(new URL("../node_modules/playwright/package.json", import.meta.url), "utf8"));
@@ -51,8 +53,8 @@ export async function loadOriginalVisualReference(name) {
   assert.ok(!process.env.UI_SMOKE_BROWSER_CHANNEL, "The qualified reference uses the lockfile's Chromium, not an alternate browser channel.");
   assert.ok(Object.hasOwn(profile.fixtures, name), `No qualified Original visual fixture ${name}`);
   let qualification = profile;
-  if (macReviewToasts) {
-    qualification = await read("original-macos-arm64-starter-review-toasts");
+  if (macReviewToasts || macSystemCheck) {
+    qualification = await read(name.replace("original-", "original-macos-arm64-"));
     assert.equal(qualification.version, 1);
     assert.deepEqual(qualification.source, source);
     assert.deepEqual(profile.source, source);
@@ -60,11 +62,16 @@ export async function loadOriginalVisualReference(name) {
   } else {
     validateOriginalVisualProfile(profile, source, environment);
   }
-  const reference = overlayOriginalVisuals(base, profile.fixtures[name]);
+  const reference = overlayOriginalVisuals(base, macSystemCheck ? qualification.visualOverrides : profile.fixtures[name]);
   if (macReviewToasts) {
     // Independent captures of all 18 macOS states matched these shared values.
     const statesHash = createHash("sha256").update(JSON.stringify(reference.states)).digest("hex");
     assert.equal(statesHash, qualification.referenceStatesSha256);
+  }
+  if (macSystemCheck) {
+    assert.equal(reference.referenceRevision, source.commit);
+    const measurementsHash = createHash("sha256").update(JSON.stringify(reference.measurements)).digest("hex");
+    assert.equal(measurementsHash, qualification.referenceMeasurementsSha256);
   }
   reference.visualProfile = { source: qualification.source, platform: qualification.platform, browserVersion: qualification.browserVersion,
     browserMode: qualification.browserMode, provenance: qualification.provenance };

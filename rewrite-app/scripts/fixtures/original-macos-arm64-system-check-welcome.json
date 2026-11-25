@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "platform": "darwin",
+  "architecture": "arm64",
+  "nodeMajor": 22,
+  "browserPackage": "1.59.1",
+  "browserVersion": "147.0.7727.15",
+  "browserMode": "headless",
+  "source": {
+    "repository": "iqb-berlin/testcenter",
+    "commit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+    "frontendLockSha256": "69322fcf80bc8f6431e4725225458c74b4a6e6e6215e2c6b5d64e55b1b43ca29"
+  },
+  "provenance": {
+    "capturedSourceSha256": {
+      "Primar": "5dd600ca8cc2ccb076c091dd2497efda14d136aca7c54ad10de0768719f2e25e",
+      "Sekundar": "f8f5fe6c4288598032cf7d81417bfa22b60b6ce519443e76434d31914a9066a9",
+      "Erwachsene": "949a2db43dc2b18ca89c4a068b8a3233ff5c823d21cefef7c625d658217842d6"
+    },
+    "pinnedAssetSha256": "0e0621c1625b8351672c0b7cf1f68308e12025b165c2afd350b83c8c494d4043"
+  },
+  "visualOverrides": {
+    "measurements": {
+      "Primar-mobile": {
+        "logoSize": [
+          92.859375,
+          40
+        ]
+      },
+      "Primar-toolbar-small": {
+        "logoSize": [
+          92.859375,
+          40
+        ]
+      },
+      "Sekundar-mobile": {
+        "logoSize": [
+          92.859375,
+          40
+        ]
+      },
+      "Sekundar-toolbar-small": {
+        "logoSize": [
+          92.859375,
+          40
+        ]
+      },
+      "Erwachsene-mobile": {
+        "logoSize": [
+          92.859375,
+          40
+        ]
+      },
+      "Erwachsene-toolbar-small": {
+        "logoSize": [
+          92.859375,
+          40
+        ]
+      }
+    }
+  },
+  "referenceMeasurementsSha256": "752b0f288effa01eacebdf773d7938d5854b2dbeb206e7fa687385a9149caa5b"
+}

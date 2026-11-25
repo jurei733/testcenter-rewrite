@@ -16,6 +16,22 @@ test("the independent macOS Review toast capture qualifies all shared states", a
   assert.equal(Object.keys(states).length, 18);
   assert.equal(createHash("sha256").update(JSON.stringify(states)).digest("hex"), mac.referenceStatesSha256);
 });
+test("the macOS headless Systemcheck capture qualifies only the small-toolbar logo", async () => {
+  const base = await read("original-system-check-welcome");
+  const mac = await read("original-macos-arm64-system-check-welcome");
+  const themes = ["Primar", "Sekundar", "Erwachsene"];
+  assert.deepEqual(mac.source, source);
+  assert.equal(mac.browserVersion, "147.0.7727.15");
+  assert.deepEqual(Object.keys(mac.provenance.capturedSourceSha256), themes);
+  for (const sha of [...Object.values(mac.provenance.capturedSourceSha256), mac.provenance.pinnedAssetSha256]) {
+    assert.match(sha, /^[a-f0-9]{64}$/);
+  }
+  const overrides = Object.fromEntries(themes.flatMap(theme => ["mobile", "toolbar-small"].map(screen =>
+    [`${theme}-${screen}`, { logoSize: [92.859375, 40] }])));
+  assert.deepEqual(mac.visualOverrides, { measurements: overrides });
+  const { measurements } = overlayOriginalVisuals(base, mac.visualOverrides);
+  assert.equal(createHash("sha256").update(JSON.stringify(measurements)).digest("hex"), mac.referenceMeasurementsSha256);
+});
 test("the verified Source capture qualifies the Linux renderer without relabeling its behavioral reference", async () => {
   validateOriginalVisualProfile(profile, source, environment);
   for (const [name, overlay] of Object.entries(profile.fixtures)) {
