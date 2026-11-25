@@ -15,7 +15,7 @@ import { OriginalSystemCheckSaveReportComponent } from "./original-system-check-
     @let confirmationOpen = view.native?.savedReportConfirmationOpen() ?? false;
     @let controlsBusy = view.busy && !confirmationOpen;
     <div class="sys-check-body flex-row-center" id="originalSystemCheckReport">
-      <mat-card appearance="raised" [attr.inert]="confirmationOpen ? '' : null">
+      <mat-card appearance="raised" [class.native-report]="view.native" [attr.inert]="confirmationOpen ? '' : null">
         <mat-card-header><mat-card-title>Bericht</mat-card-title></mat-card-header>
         <mat-card-content>
           <section id="systemCheckQuestionnaireWarnings" *ngIf="view.unansweredRequiredQuestions.length > 0">
@@ -59,7 +59,8 @@ import { OriginalSystemCheckSaveReportComponent } from "./original-system-check-
     :host { display:block; min-width:0; }
     .sys-check-body { padding:5px; }
     .flex-row-center { display:flex; flex-direction:row; justify-content:center; }
-    mat-card { width:810px; min-width:0; max-width:100%; }
+    mat-card { width:810px; }
+    mat-card:not(.native-report) { min-width:0; max-width:100%; }
     ul li { word-break:break-all; margin:3px; }
     #systemCheckReportQuestionnaire > ul { margin-block-end: 0; }
     .warning-text { color:red; font-weight:bold; }

@@ -50,6 +50,17 @@ export async function runNativeNetworkChecks({page, base, server, mark, reportBo
         assert.equal(await page.locator('#syscheck-next-step').isEnabled(), row.networkState.canContinue);
         await page.locator('#syscheck-next-step').click(); await page.waitForURL(/\/q$/); await page.locator('#feedback').fill('Owned network feedback');
         await page.locator('#syscheck-next-step').click(); await page.waitForURL(/\/r$/);
+        if (row.id === 'DEFAULT') {
+          const viewport = page.viewportSize();
+          await page.setViewportSize({width: 320, height: viewport.height});
+          await page.waitForFunction(() => {
+            const card = document.querySelector('#originalSystemCheckReport > mat-card');
+            const box = card?.getBoundingClientRect();
+            return box && box.width > innerWidth && Math.abs(box.left + box.right - innerWidth) < 1 &&
+              document.documentElement.scrollWidth === innerWidth;
+          });
+          await page.setViewportSize(viewport);
+        }
         const before = reportBodies.length;
         await page.locator('#saveSystemCheckReportButton').click(); await page.locator('#globalConfirmationTitle').waitFor();
         const actual = reportBodies[before].network.slice(0, 7), expected = row.network.slice(0, 7);
