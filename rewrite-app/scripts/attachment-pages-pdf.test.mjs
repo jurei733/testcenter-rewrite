@@ -93,19 +93,31 @@ const longLabel = "Teilnehmendengruppe Abschlussprüfung Lesen und Schreiben im 
 const longWord = "Wörterbuchübersetzungsmöglichkeiten".repeat(2);
 for (const [name, labelTemplate, expected] of [
   ["unbroken soft hyphen", `${longLabel} Lesekompetenz\u00adprüfung`, [
-    [48.518, 801.804, longLabel], [234.938, 786.804, "Lesekompetenzprüfung"]
+    [48.518, 801.804, longLabel], [234.938, 786.803999, "Lesekompetenzprüfung"]
   ]],
   ["soft hyphen at a wrap", `${longWord}\u00adMehrsprachigkeitsstudie`, [
-    [88.232, 801.804, `${longWord}-`], [232.952, 786.804, "Mehrsprachigkeitsstudie"]
+    [88.232, 801.804, `${longWord}-`], [232.952, 786.803999, "Mehrsprachigkeitsstudie"]
   ]],
   ["narrow no-break spaces", `${longLabel}\u202fNord\u202fWest`, [
-    [32.180, 801.804, `${longLabel}?Nord`], [283.970, 786.804, "West"]
+    [32.180, 801.804, `${longLabel}?Nord`], [283.970, 786.803999, "West"]
   ]],
   ["legacy no-break spaces", `${longLabel}\u00a0Nord\u00a0West`, [
-    [88.208, 801.804, longLabel.replace(" Sonnenschein", "")], [229.610, 786.804, "Sonnenschein Nord West"]
+    [88.208, 801.804, longLabel.replace(" Sonnenschein", "")], [229.610, 786.803999, "Sonnenschein Nord West"]
   ]],
   ["tabs and a blank line", "Müller\tNord\tWest\n\nTeilnahme Ä Ö Ü", [
-    [248.636, 801.804, "Müller\tNord\tWest"], [251.624, 771.804, "Teilnahme Ä Ö Ü"]
+    [248.636, 801.804, "Müller\tNord\tWest"], [251.624, 771.803998, "Teilnahme Ä Ö Ü"]
+  ]],
+  ["mixed separators and a vertical tab", "\u00a0\u202f\u2009\tNord\u00a0Süd\x0b\u202f\u00a0", [
+    [252.950, 801.804, " ??\tNord Süd\x0b? "]
+  ]],
+  ["raw bytes for C1 separators", "\x85\u2003Nord\u3000\x85", [
+    [265.964, 801.804, "\x85?Nord?\x85"]
+  ]],
+  ["C0 control bytes and WinAnsi fallback", "Nord\0Süd\tWest\ufffd\x07👩🏿\nSonderzeichen\x1b und\x9c", [
+    [244.622, 801.804, "Nord\0Süd\tWest\x07??"], [237.314, 786.803999, "Sonderzeichen\x1b und\x9c"]
+  ]],
+  ["the NEL byte both before and after a line break", `${longLabel}\x85Nord\x85West`, [
+    [48.518, 801.804, longLabel], [264.968, 786.803999, "Nord\x85West"]
   ]]
 ]) test(`Original PDF preserves ${name}`, async () => {
   const [{ content }] = await rendered({ attachments: [attachment], layout: "original", labelTemplate });

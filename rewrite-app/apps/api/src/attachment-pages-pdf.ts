@@ -10,12 +10,14 @@ const DEFAULT_LABEL_TEMPLATE = "%TESTTAKER% | %BOOKLET% | %UNIT% | %VAR%";
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
 const PAGE_MARGIN = 56.69;
+const POINTS_PER_MILLIMETER = 72 / 25.4;
 // TCPDF's serialized A4 width and default cell metrics, independently checked
 // against unmodified Source AttachmentTemplate output (TCPDF 6.10.0).
 const ORIGINAL_PAGE_WIDTH = 595.276;
 const ORIGINAL_CELL_MARGIN = 28.35;
 const ORIGINAL_CELL_PADDING = 2.835;
-const ORIGINAL_LINE_HEIGHT = 15;
+// TCPDF rounds the 15-point cell height to six decimals in millimeters.
+const ORIGINAL_LINE_HEIGHT = 5.291667 * POINTS_PER_MILLIMETER;
 const ORIGINAL_BASELINE_FROM_TOP = 40.086;
 const ORIGINAL_LINES_PER_PAGE = 50;
 const ORIGINAL_LABEL_SIZE = 12;
@@ -24,16 +26,36 @@ const SOFT_HYPHEN = "\u00ad";
 const NO_BREAK_SPACE = "\u00a0";
 const UNICODE_SPACE = /[\p{White_Space}\p{Z}]/u;
 const ORIGINAL_WRAP_SPACE = /(?!\u00a0)[\p{White_Space}\p{Z}]/u;
-const POINTS_PER_MILLIMETER = 72 / 25.4;
 const ORIGINAL_HELVETICA_DEFAULT_WIDTH = 513;
+const ORIGINAL_HELVETICA_UNMAPPED_BYTE_WIDTH = 500;
+// WinAnsi bytes 0x80–0x9F. Unassigned bytes retain their control code.
+const WIN_ANSI_HIGH_BYTES = "€\x81‚ƒ„…†‡ˆ‰Š‹Œ\x8dŽ\x8f\x90‘’“”•–—˜™š›œ\x9džŸ";
 // TCPDF 6.10's built-in Helvetica positioning differs from AFM widths
 // for these printable WinAnsi characters. Units are thousandths of an em.
 const ORIGINAL_CHARACTER_WIDTHS: Readonly<Record<string, number>> = {
-  "\t": 500,
   "]": 277, "¡": 278, "«": 448, "°": 606, "²": 350, "³": 350, "¹": 350, "»": 448,
   "¼": 869, "½": 869, "¾": 879, "¿": 556, "Þ": 666, "æ": 896,
   "ì": 251, "í": 251, "î": 251, "ï": 251, "þ": 555,
   "€": 655, "Ÿ": 667, "ƒ": 278, "‹": 250, "›": 250, "œ": 938, "’": 221
+};
+
+// TCPDF passes authored Latin-1 bytes through and maps other characters to
+// their WinAnsi byte where available. Use a byte string before building the
+// PDF hex string so that control bytes cannot become PDF syntax.
+const encodeOriginalLine = (line: string): string => {
+  let encoded = "";
+  for (const character of line) {
+    if (character === SOFT_HYPHEN || character === "\ufffd") continue;
+    if (character === NO_BREAK_SPACE) {
+      encoded += " ";
+    } else if (character.codePointAt(0)! <= 0xff) {
+      encoded += character;
+    } else {
+      const index = WIN_ANSI_HIGH_BYTES.indexOf(character);
+      encoded += index < 0 ? "?" : String.fromCharCode(0x80 + index);
+    }
+  }
+  return encoded;
 };
 
 // TCPDF omits U+200B when serializing UTF-16 metadata strings.
@@ -289,14 +311,15 @@ export const createAttachmentPagesPdf = async (input: {
   const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
   const originalCharacters = new Set(regularFont.getCharacterSet());
-  const characterWidths = new Map<string, number>();
-  const measureOriginalCharacter = (character: string): number => {
-    const cached = characterWidths.get(character);
+  const byteWidths: number[] = [];
+  const measureOriginalByte = (byte: number): number => {
+    const cached = byteWidths[byte];
     if (cached !== undefined) return cached;
-    const units = ORIGINAL_CHARACTER_WIDTHS[character];
-    const width = units === undefined ? regularFont.widthOfTextAtSize(character, ORIGINAL_LABEL_SIZE)
-      : units * ORIGINAL_LABEL_SIZE / 1000;
-    characterWidths.set(character, width);
+    const character = WIN_ANSI_HIGH_BYTES[byte - 0x80] ?? String.fromCharCode(byte);
+    const units = ORIGINAL_CHARACTER_WIDTHS[character] ?? (originalCharacters.has(character.charCodeAt(0))
+      ? regularFont.widthOfTextAtSize(character, 1000) : ORIGINAL_HELVETICA_UNMAPPED_BYTE_WIDTH);
+    const width = units * ORIGINAL_LABEL_SIZE / 1000;
+    byteWidths[byte] = width;
     return width;
   };
   // TCPDF wraps Unicode before converting the line to Helvetica's WinAnsi
@@ -304,15 +327,14 @@ export const createAttachmentPagesPdf = async (input: {
   const measureOriginalWrapCharacter = (character: string): number => {
     if (character === SOFT_HYPHEN) return 0;
     const code = character.codePointAt(0)!;
-    return (code <= 255 && originalCharacters.has(code)) || character === "\t" ? measureOriginalCharacter(character)
+    return code <= 0xff ? measureOriginalByte(code)
       : ORIGINAL_HELVETICA_DEFAULT_WIDTH * ORIGINAL_LABEL_SIZE / 1000;
   };
-  const encodeOriginalLine = (line: string): string =>
-    Array.from(line.replaceAll("\uFFFD", "").replaceAll(SOFT_HYPHEN, "").replaceAll("\u00a0", " "), character =>
-      character === "\t" || originalCharacters.has(character.codePointAt(0)!) ? character : "?"
-    ).join("");
-  const measureOriginalLine = (line: string): number =>
-    Array.from(line).reduce((width, character) => width + measureOriginalCharacter(character), 0);
+  const measureOriginalLine = (line: string): number => {
+    let width = 0;
+    for (let index = 0; index < line.length; index += 1) width += measureOriginalByte(line.charCodeAt(index));
+    return width;
+  };
   const bookmarks: Array<{ title: string; page: PDFRef; height: number }> = [];
 
   for (const [index, attachment] of input.attachments.entries()) {
@@ -343,14 +365,13 @@ export const createAttachmentPagesPdf = async (input: {
         }
         if (!line) return;
         const x = (page.getWidth() - measureOriginalLine(line)) / 2;
-        // The core font retains the tab byte. WinAnsi's encoder rejects it,
-        // so encode the printable runs and join them with the original byte.
-        const encoded = PDFHexString.of(line.split("\t").map(part => regularFont.encodeText(part).asString()).join("09"));
+        const y = A4_HEIGHT - ORIGINAL_BASELINE_FROM_TOP - (lineIndex % ORIGINAL_LINES_PER_PAGE) * ORIGINAL_LINE_HEIGHT;
+        const encoded = PDFHexString.of(Buffer.from(line, "latin1").toString("hex"));
         page.node.setFontDictionary(ORIGINAL_LABEL_FONT, regularFont.ref);
         page.pushOperators(...drawPdfText(encoded, {
           // TCPDF serializes glyph origins to six decimals.
           x: Number(x.toFixed(6)),
-          y: A4_HEIGHT - ORIGINAL_BASELINE_FROM_TOP - (lineIndex % ORIGINAL_LINES_PER_PAGE) * ORIGINAL_LINE_HEIGHT,
+          y: Number(y.toFixed(6)),
           size: ORIGINAL_LABEL_SIZE, font: ORIGINAL_LABEL_FONT, color: rgb(0, 0, 0),
           rotate: degrees(0), xSkew: degrees(0), ySkew: degrees(0)
         }));
