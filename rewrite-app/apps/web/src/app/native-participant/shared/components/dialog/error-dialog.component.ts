@@ -1,5 +1,4 @@
 import { ChangeDetectorRef,Component, inject, type OnInit } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { AppError } from '../../../app.interfaces';
 import { TestControllerService } from '../../../test-controller';
 import { MainDataService } from '../../services/maindata/maindata.service';
@@ -9,6 +8,7 @@ import { MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } fr
 import UAParser from 'ua-parser-js';
 import { MatButton } from '@angular/material/button';
 import {NativeMonitorIconComponent as MatIcon} from '../../../../native-monitor/native-monitor-icon.component';
+import {originalErrorTimestamp} from '../../../../original-error-timestamp';
 
 @Component({
   selector: 'app-error',
@@ -17,7 +17,6 @@ import {NativeMonitorIconComponent as MatIcon} from '../../../../native-monitor/
     MatExpansionPanel,
     MatExpansionPanelHeader,
     MatExpansionPanelTitle,
-    DatePipe,
     MatButton,
     MatIcon,
     MatDialogContent,
@@ -66,7 +65,7 @@ import {NativeMonitorIconComponent as MatIcon} from '../../../../native-monitor/
         @if (error?.errorId) {
           <p><b>Error-Id:</b> {{error?.errorId}}</p>
         }
-        <p><b>Zeitpunkt:</b> {{timestamp | date:'medium'}}</p>
+        <p><b>Zeitpunkt:</b> {{timestamp}}</p>
         <p><b>Url: </b>{{url}}</p>
         <p><b>Browser: </b>{{browser?.browser?.name}} {{browser?.browser?.version}}</p>
         <p><b>Betriebssystem: </b>{{browser?.os?.name}} {{browser?.os?.version}}</p>
@@ -117,7 +116,7 @@ export class ErrorDialogComponent implements OnInit {
   error: AppError | null = null;
   errorBuffer: AppError[] = [];
   loginName: string = '??';
-  timestamp: number = -1;
+  timestamp = originalErrorTimestamp(-1);
   url: string = '';
   browser: UAParser.IResult | null = null;
 
@@ -138,7 +137,7 @@ export class ErrorDialogComponent implements OnInit {
         this.error = err;
 
         this.url = window.location.href;
-        this.timestamp = Date.now();
+        this.timestamp = originalErrorTimestamp(Date.now());
         this.detector.markForCheck();
       });
   }
