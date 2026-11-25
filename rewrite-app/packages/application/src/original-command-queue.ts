@@ -122,11 +122,11 @@ export function prepareOriginalNativeTimerControl(
     unitRevision:guard.fields.CURRENT_UNIT_ID??0,
     controllerRevision:guard.fields.CONTROLLER??0
   } : undefined;
-  if(!timers&&!before.nativeTimerControl&&!reopen&&!gotoRecovery)return undefined;
-  // A committed Resume can outlive its browser response. A controller write
-  // accepted after this ACK takes precedence, including a late Pause response.
-  const resumeFromControllerRevision=keyword==='resume'&&guard&&Object.values(timers??{}).some(timer=>timer.status==='paused'&&!timer.parkedByGoto)
-    ? guard.fields.CONTROLLER??0 : undefined;
+  // Native controller commands must retain their order even without a timer.
+  // A controller write accepted after Resume still supersedes the ACK.
+  const controllerCommand=guard&&keyword!=='goto';
+  if(!timers&&!before.nativeTimerControl&&!reopen&&!gotoRecovery&&!controllerCommand)return undefined;
+  const resumeFromControllerRevision=keyword==='resume'&&guard ? guard.fields.CONTROLLER??0 : undefined;
   const control={commandId:command.id,paused,...(reopen?{reopen}:{}),...(resumeParkedTimer?{resumeParkedTimer}:{}),
     ...(gotoRecovery?{gotoRecovery}:{}),
     ...(resumeFromControllerRevision===undefined?{}:{resumeFromControllerRevision})};

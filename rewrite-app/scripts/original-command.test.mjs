@@ -260,6 +260,44 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    assert.equal(cancelled.status,'cancelled');
    assert.equal(cancelled.remainingMilliseconds,0);
   });
+  await t.test('an accepted native Resume can finish after reopening an untimed Test',async()=>{
+   const {person}=await authenticate('owned-command-canonical');
+   const testNumber=await create('untimed:resume-recovery',person);
+   const read={token:person.token,testNumber,nativeStateProtocol:'1'};
+   const scope=()=>current(testNumber,person);
+   const project=async(content)=>{
+    const {nativeStateBase}=await services.originalTest.read(read);
+    await services.originalTest.patchState({...read,stateBase:nativeStateBase,deliveryId:randomUUID(),
+     patch:[{key:'CONTROLLER',content,timeStamp:Date.now()}]});
+   };
+   const sendControl=keyword=>send({keyword,arguments:[],timestamp:clock+949,testIds:[Number(testNumber)]});
+   const acknowledge=command=>services.originalCommand.acknowledge({...read,commandNumber:command.id});
+   await project('PAUSED');
+   await sendControl('resume');
+   await sendControl('pause');
+   const [earlierResume,laterPause]=await repository.listOriginalCommands(await scope(),null);
+   assert.equal(earlierResume.keyword,'resume');
+   assert.equal(laterPause.keyword,'pause');
+   assert.equal((await acknowledge(laterPause)).reason,'OK');
+   assert.equal((await acknowledge(earlierResume)).reason,'OK');
+   assert.equal((await services.originalTest.read(read)).nativeResumePending,undefined);
+   assert.equal((await run(testNumber,person)).originalResultState.nativeTestletTimers,undefined);
+
+   await sendControl('resume');
+   const [resume]=await repository.listOriginalCommands(await scope(),null);
+   assert.equal((await acknowledge(resume)).reason,'OK');
+   await close();await open();
+   const recovered=await services.originalTest.read(read);
+   assert.equal(recovered.laststate.CONTROLLER,'PAUSED');
+   assert.equal(recovered.nativeResumePending,true);
+   assert.equal((await services.originalTest.read({token:person.token,testNumber})).nativeResumePending,undefined);
+   assert.equal(await services.originalCommand.pending({token:person.token,testNumber}),'[]');
+   await project('RUNNING');
+   assert.equal((await services.originalTest.read(read)).nativeResumePending,undefined);
+   await project('PAUSED');
+   assert.equal((await acknowledge(resume)).reason,'OK, was already marked as executed');
+   assert.equal((await services.originalTest.read(read)).nativeResumePending,undefined);
+  });
   await t.test('an accepted native jump can finish after reopening an untimed Test',async()=>{
    await upload('jump-recovery.xml',xml('Booklet','<Metadata><Id>ORACLE.POW.GOTO</Id><Label>Jump recovery</Label></Metadata><Units>'+
     '<Unit id="ORACLE.POW.UNIT" alias="START" label="Start"/><Unit id="ORACLE.POW.UNIT" alias="NEXT" label="Next"/></Units>'));
