@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
-import {BehaviorSubject,Subject,interval,timer,lastValueFrom,of,Observable} from 'rxjs';
-import {map,takeUntil} from 'rxjs/operators';
+import {BehaviorSubject,Subject,interval,timer,lastValueFrom,firstValueFrom,of,Observable,concat,defer,EMPTY} from 'rxjs';
+import {map,takeUntil,concatMap,expand,filter,ignoreElements,take,tap} from 'rxjs/operators';
 import {TestScheduler} from 'rxjs/testing';
 
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/original-controller-timer-lifetime.json',import.meta.url),'utf8'));
@@ -140,4 +140,93 @@ for(const [balance,enforce] of [[0,true],[0,false],[2,true]])test(`actual Origin
   assert.equal(await f.root.handleCommand('resume',[]),true);assert.equal(f.service.state$.getValue(),'RUNNING');assert.equal(prepared,1);
   assert.equal(f.service.timers.timed*60,balance||5);assert.equal(f.service.currentTimerId,'timed');assert.equal(f.timerEvents.at(-1).type,'STARTED');assert.equal(parent.locks.time,false);
  }finally{f.cleanup();}
+});
+
+function extractNativeMethods(file, className, names) {
+ const url = new URL('../apps/web/src/app/native-participant/test-controller/' + file, import.meta.url);
+ const source = ts.createSourceFile(file, readFileSync(url, 'utf8'), ts.ScriptTarget.Latest, true);
+ const definition = source.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === className);
+ const methods = definition.members.filter(member =>
+  names.includes(ts.isConstructorDeclaration(member) ? 'constructor' : member.name?.getText(source)));
+ assert.equal(methods.length, names.length);
+ return methods.map(member => member.getText(source)).join('\n');
+}
+
+const nativeTimerSource = `
+export const load = ({firstValueFrom, concat, defer, EMPTY, timer, createTicker, performance, AppError,
+  MaxTimerEvent, concatMap, expand, filter, ignoreElements, take, takeUntil, tap}) => {
+ class TimerData {
+  ${extractNativeMethods('classes/test-controller.classes.ts', 'TimerData', ['constructor', 'displayedSeconds'])}
+ }
+ return class NativeTestController {
+  ${extractNativeMethods('services/test-controller.service.ts', 'TestControllerService',
+    ['startTimer', 'confirmTimerExpiry', 'finishTimer', 'interruptTimer'])}
+ };
+};`;
+const nativeTimerOutput = ts.transpileModule(nativeTimerSource, {
+ compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext},
+}).outputText;
+const nativeTimerModule = await import('data:text/javascript;base64,' + Buffer.from(nativeTimerOutput).toString('base64'));
+
+async function nativeExpiryFixture(replies) {
+ const scheduler = new TestScheduler(assert.deepEqual);
+ const clock = {
+  testletKey: 'timed', status: 'running', remainingMilliseconds: 1000,
+  startedAt: '2026-11-25T12:00:00.000Z', expiresAt: '2026-11-25T12:00:01.000Z',
+ };
+ const Controller = nativeTimerModule.load({
+  firstValueFrom, concat, defer, EMPTY, timer: delay => timer(delay, scheduler),
+  createTicker: () => interval(100, scheduler), performance: {now: () => scheduler.now()}, AppError: Error,
+  MaxTimerEvent: {STARTED: 'STARTED', STEP: 'STEP', ENDED: 'ENDED', INTERRUPTED: 'INTERRUPTED'},
+  concatMap, expand, filter, ignoreElements, take, takeUntil, tap,
+ });
+ const controller = new Controller();
+ const unit = {alias: 'owned-unit'};
+ const events = [], expirations = [];
+ Object.assign(controller, {
+  nativeCurrent: true, currentUnit: unit, testMode: {forceTimeRestrictions: true},
+  currentTimerId: '', timerIntervalSubscription: null, timers$: new Subject(), owned: subscribe => subscribe(), mds: {},
+  bs: {timer: (_id, _alias, action) => {
+   if (action === 'enter') return of(clock);
+   assert.equal(action, 'expire');
+   const reply = replies[expirations.length];
+   assert.ok(reply, 'unexpected extra expiry request');
+   expirations.push(scheduler.now());
+   return of({...clock, ...reply});
+  }},
+ });
+ controller.timers$.subscribe(event => {
+  if (event.type !== 'STEP') events.push([scheduler.now(), event.type]);
+ });
+ assert.equal(await controller.startTimer({id: 'timed'}, unit, false, () => true), true);
+ const advance = frame => {scheduler.maxFrames = frame;scheduler.flush();};
+ return {controller, expirations, events, advance};
+}
+
+test('native countdown waits for the authoritative remaining milliseconds before advancing', async () => {
+ const fixture = await nativeExpiryFixture([{remainingMilliseconds: 18}, {status:'expired',remainingMilliseconds:0}]);
+ fixture.advance(1017);
+ assert.deepEqual(fixture.expirations, [1000]);
+ assert.deepEqual(fixture.events, [[0,'STARTED']]);
+ fixture.advance(1018);
+ assert.deepEqual(fixture.expirations, [1000,1018]);
+ assert.deepEqual(fixture.events, [[0,'STARTED'],[1018,'ENDED']]);
+ assert.equal(fixture.controller.currentTimerId, '');
+});
+
+test('interrupting the native countdown retires a pending expiry retry', async () => {
+ const fixture = await nativeExpiryFixture([{remainingMilliseconds: 18}]);
+ fixture.advance(1000);
+ fixture.controller.interruptTimer();
+ fixture.advance(1030);
+ assert.deepEqual(fixture.expirations, [1000]);
+ assert.deepEqual(fixture.events, [[0,'STARTED'],[1000,'INTERRUPTED']]);
+});
+
+test('a late expiry response for a replaced server deadline cannot advance the old clock', async () => {
+ const fixture = await nativeExpiryFixture([{status:'expired',remainingMilliseconds:0,expiresAt:'2026-11-25T12:00:02.000Z'}]);
+ fixture.advance(1030);
+ assert.deepEqual(fixture.expirations, [1000]);
+ assert.deepEqual(fixture.events, [[0,'STARTED']]);
+ fixture.controller.interruptTimer();
 });

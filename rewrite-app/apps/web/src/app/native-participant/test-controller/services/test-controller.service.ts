@@ -1,8 +1,9 @@
 import {
-  bufferWhen, concatMap, filter, last, map, scan, share, shareReplay, take, takeUntil, takeWhile, tap, timeout, withLatestFrom
+  bufferWhen, concatMap, expand, filter, ignoreElements, last, map, scan, share, shareReplay, take, takeUntil, takeWhile,
+  tap, timeout, withLatestFrom
 } from 'rxjs/operators';
 import {
-  BehaviorSubject, combineLatest, firstValueFrom, forkJoin, from,
+  BehaviorSubject, combineLatest, concat, defer, EMPTY, firstValueFrom, forkJoin, from,
   lastValueFrom, merge, Observable, of, Subject,
   Subscription, timer
 } from 'rxjs';
@@ -40,7 +41,7 @@ import {
   type UnitStateUpdate,
   type WindowFocusState
 } from '../interfaces/test-controller.interfaces';
-import { BackendService } from './backend.service';
+import { BackendService, type NativeTimerClock } from './backend.service';
 import {
   BookletConfig,
   CustomtextService,
@@ -584,24 +585,46 @@ export class TestControllerService {
     this.timerUnitAlias=unit.alias;
     publishTimer(MaxTimerEvent.STARTED);
 
-    const timeTicker$ = createTicker();
-    this.timerIntervalSubscription = this.owned(() => timeTicker$
-      .pipe(
-        takeUntil(timer(timeBudget))
-      ).subscribe({
-        next: elapsedTicks => {
-          publishTimer(MaxTimerEvent.STEP,elapsedTicks);
-        },
-        error: e => {
-          throw e;
-        },
-        complete: () => {
-          this.finishTimer();
-          this.timers$.next(new TimerData(0, testlet.id, MaxTimerEvent.ENDED));
-          this.owned(()=>this.bs.timer(this.nativeTestId,unit.alias,'expire').subscribe({error:()=>{}}));
-        }
-      }));
+    this.timerIntervalSubscription = this.owned(() => concat(
+      createTicker().pipe(
+        takeUntil(timer(timeBudget)),
+        tap(elapsedTicks => publishTimer(MaxTimerEvent.STEP, elapsedTicks)),
+        ignoreElements()
+      ),
+      this.confirmTimerExpiry(unit.alias, clock)
+    ).subscribe({
+      next: () => {
+        this.finishTimer();
+        this.timers$.next(new TimerData(0, testlet.id, MaxTimerEvent.ENDED));
+      },
+      error: (error: unknown) => {
+        this.finishTimer();
+        this.mds.appError = error instanceof AppError ? error : new AppError({
+          label: 'Die Testzeit konnte nicht geprüft werden.',
+          description: String(error),
+          type: 'backend'
+        });
+      }
+    }));
     return true;
+  }
+
+  private confirmTimerExpiry(unitAlias: string, clock: NativeTimerClock): Observable<NativeTimerClock> {
+    const read = () => this.bs.timer(this.nativeTestId, unitAlias, 'expire');
+    const sameClock = (result: NativeTimerClock) => result.testletKey === clock.testletKey &&
+      result.startedAt === clock.startedAt && result.expiresAt === clock.expiresAt;
+    return defer(read).pipe(
+      expand(result => {
+        // Pause, cancellation or a new deadline belongs to the Monitor command path.
+        if (!sameClock(result) || result.status !== 'running') return EMPTY;
+        if (!Number.isSafeInteger(result.remainingMilliseconds) || result.remainingMilliseconds <= 0) {
+          throw new Error('Ungültige serverseitige Restzeit.');
+        }
+        return timer(result.remainingMilliseconds).pipe(concatMap(read));
+      }),
+      filter(result => sameClock(result) && result.status === 'expired' && result.remainingMilliseconds === 0),
+      take(1)
+    );
   }
 
   private finishTimer() {

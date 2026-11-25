@@ -15,6 +15,7 @@ export interface NativeTimerClock {
   status: 'running'|'paused'|'expired'|'cancelled';
   remainingMilliseconds: number;
   startedAt: string;
+  expiresAt: string | null;
 }
 
 @Injectable({
