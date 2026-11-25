@@ -19,17 +19,28 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 const settle=()=>new Promise(done=>setImmediate(done));
 const access=token=>({token,claims:{testGroupMonitor:[{id:'owned',flags:[]}]}});
 function fixture(){
- const route={firstChild:null},nav=[],events=new rx.Subject(),closed=new rx.Subject(),problem$=new rx.BehaviorSubject(''),calls=[];let scope=new AbortController(),closes=0,marks=0;
+ const route={firstChild:null},nav=[],events=new rx.Subject(),closed=new rx.Subject(),problem$=new rx.BehaviorSubject(''),snapshotOutage$=new rx.Subject(),presented=[],calls=[];let scope=new AbortController(),closes=0,marks=0;
  const session={access:core.signal(access('original')),busy:core.signal(false),restoring:core.signal(false),problem:core.signal(''),get accessSignal(){return scope.signal;},login:async()=>session.access(),refresh:async()=>{},logout:()=>{calls.push('logout');replace(null);return Promise.resolve();}};
  const replace=value=>{const old=scope;scope=new AbortController();session.access.set(value);old.abort();};
- bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$},ChangeDetectorRef:{markForCheck(){marks++;}},Router:{events,navigate:async path=>{nav.push(path);return true;}},ActivatedRoute:route,MatDialog:{open:()=>({afterClosed:()=>closed,close:()=>{closes++;}})},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},NativeLoginFailureService:{show:async()=>{}}}));
+ bindings=new Map(Object.entries({NativeMonitorSessionService:session,NativeAssetContext:{activate:owner=>owner.throwIfAborted()},NativeThemeContext:{activate:owner=>owner.throwIfAborted()},ApplicationSettingsService:{settings:()=>({appTitle:'Owned'})},HeaderService:{},BackendService:{problem$,snapshotOutage$},ChangeDetectorRef:{markForCheck(){marks++;}},Router:{events,navigate:async path=>{nav.push(path);return true;}},ActivatedRoute:route,MatDialog:{open:()=>({afterClosed:()=>closed,close:()=>{closes++;}})},InterfaceModeService:{select(){}},MainDataService:{appTitle$:new rx.BehaviorSubject('')},NativeLoginFailureService:{show:async(...args)=>{presented.push(args);}}}));
  bindings.set('NativePublicHeaderService',new NativePublicHeaderService());
  const header=new HeaderService();bindings.set('HeaderService',header);
- const component=new NativeMonitorEntryComponent();component.name='owned';return {component,header,route,session,nav,events,closed,calls,replace,problem$,get marks(){return marks;},get closes(){return closes;}};
+ const component=new NativeMonitorEntryComponent();component.name='owned';return {component,header,route,session,nav,events,closed,calls,replace,problem$,snapshotOutage$,presented,get marks(){return marks;},get closes(){return closes;}};
 }
 test('monitor route changes notify the retained chooser view and stop notifying after view retirement',()=>{
  const f=fixture();assert.equal(f.component.allowedChild,false);monitorRoute(f);f.events.next(new imports.NavigationEnd());assert.equal(f.component.allowedChild,true);assert.equal(f.marks,1);
  f.component.ngOnDestroy();assert.equal(f.events.observed,false);f.events.next(new imports.NavigationEnd());assert.equal(f.marks,1);
+});
+test('a monitor outage passes the authenticated display name and retires with its view or read',()=>{
+ const f=fixture(),error=new Error('Owned outage'),read=new AbortController();
+ f.replace({...f.session.access(),displayName:'Owned monitor'});
+ f.snapshotOutage$.next({error,owner:read.signal});
+ const [[actualError,owner,copy,context]]=f.presented;
+ assert.equal(actualError,error);assert.equal(copy,undefined);
+ assert.deepEqual(context,{login:'Owned monitor',returnPath:'group-monitor'});
+ assert.equal(owner.aborted,false);read.abort();assert.equal(owner.aborted,true);
+ f.snapshotOutage$.next({error,owner:new AbortController().signal});
+ f.component.ngOnDestroy();assert.equal(f.presented[1][1].aborted,true);assert.equal(f.snapshotOutage$.observed,false);
 });
 test('retiring the entry cancels its login owner and cannot open a late sole claim',async()=>{
  const f=fixture(),pending=deferred();let owner;f.session.login=(_name,_password,signal)=>{owner=signal;return pending.promise;};

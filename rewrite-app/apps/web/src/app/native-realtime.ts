@@ -5,7 +5,8 @@ export interface NativeRealtimeOptions<T>{
  read:(signal:AbortSignal)=>Promise<{data:T;subscribeToken:string|null}>;
  decode:(wire:string)=>T|undefined;status:(status:NativeConnectionStatus)=>void;
  onConnecting?:()=>void;
- error?:(error:unknown)=>void;revalidate?:()=>Promise<void>;pollingInterval?:number;retry?:Observable<unknown>;
+ error?:(error:unknown,owner:AbortSignal)=>void|'wait-for-reload';
+ revalidate?:()=>Promise<void>;pollingInterval?:number;retry?:Observable<unknown>;
 }
 /** One subscriber owns its HTTP read, socket, reconnect timer and private data. */
 export function observeNativeRealtime<T>(options:NativeRealtimeOptions<T>):Observable<T>{
@@ -52,7 +53,10 @@ export function observeNativeRealtime<T>(options:NativeRealtimeOptions<T>):Obser
     const response=await options.read(signal);if(!current())return;subscriber.next(response.data);if(!current())return;
     if(response.subscribeToken&&/^[A-Za-z0-9_-]{20,128}$/.test(response.subscribeToken))connect(response.subscribeToken);
     else{options.status('polling-sleep');schedule();}
-   }catch(error){if(current()){options.status('error');options.error?.(error);schedule();}}finally{reading=false;}
+   }catch(error){
+    if(!current()||options.error?.(error,signal)==='wait-for-reload'||!current())return;
+    options.status('error');schedule();
+   }finally{reading=false;}
   };
   const recovery=options.retry?.subscribe(()=>{if(socket)fallback(socket);});
   options.scope.addEventListener('abort',retire,{once:true});

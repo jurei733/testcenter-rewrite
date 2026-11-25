@@ -36,7 +36,7 @@ function load(relative){
  });return exports;
 }
 const {BackendService}=load('group-monitor/backend.service.ts');
-const {NativeMonitorSessionService}=load('native-session.service.ts');
+const {NativeMonitorHttpError,NativeMonitorSessionService}=load('native-session.service.ts');
 const {BookletService}=load('group-monitor/booklet/booklet.service.ts');
 const {TestSessionManager}=load('group-monitor/test-session-manager/test-session-manager.service.ts');
 const {GROUP_MONITOR_CONFIG}=load('group-monitor/group-monitor.config.ts');
@@ -88,6 +88,21 @@ test('snapshot failure is not a successful empty snapshot and a later tick can r
  session.text=async()=>{if(!count++)throw Error('Owned timeout');return '[]';};const sub=backend.observeSessionsMonitor('owned').subscribe(value=>rows.push(value));
  t.mock.timers.tick(0);await settle();assert.deepEqual(rows,[]);assert.equal(backend.connectionStatus$.value,'error');assert.equal(backend.problem$.value,'Owned timeout');
  t.mock.timers.tick(5000);await settle();assert.deepEqual(rows,[[]]);assert.equal(backend.problem$.value,'');sub.unsubscribe();
+});
+test('an unavailable monitor snapshot retains its rows and awaits an owned reload',async t=>{
+ clock(t);const {backend,session}=transport(),rows=[],outages=[];let reads=0;
+ const error=new NativeMonitorHttpError(503,'Owned temporary outage');
+ session.text=async()=>{if(++reads===2)throw error;return '[]';};
+ backend.snapshotOutage$.subscribe(value=>outages.push(value));
+ const sub=backend.observeSessionsMonitor('owned').subscribe(value=>rows.push(value));
+ await settle();t.mock.timers.tick(5000);await settle();
+ assert.deepEqual(rows,[[]]);
+ assert.equal(backend.connectionStatus$.value,'polling-fetch');
+ assert.equal(backend.problem$.value,'');
+ assert.equal(outages.length,1);assert.equal(outages[0].error,error);
+ assert.equal(outages[0].owner.aborted,false);
+ t.mock.timers.tick(15000);await settle();assert.equal(reads,2);
+ backend.cutConnection();assert.equal(outages[0].owner.aborted,true);assert.equal(sub.closed,true);
 });
 test('Booklet errors retry while successful results remain shared and scoped',async()=>{
  let count=0;const backend={cacheIdentity:{owned:1},accessSignal:new AbortController().signal,connectionClosed$:new rx.Subject(),getBooklet:()=>rx.defer(()=>{count++;return rx.of(count===1?{error:'general',species:null}:'owned XML');})};

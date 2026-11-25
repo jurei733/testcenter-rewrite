@@ -1,16 +1,17 @@
 import {observeNativeRealtime} from '../../native-realtime';
 import {Injectable,inject} from '@angular/core';
-import {BehaviorSubject,EMPTY,Observable,of,Subject,timer} from 'rxjs';
+import {BehaviorSubject,Observable,of,Subject} from 'rxjs';
 import {catchError,map,tap,takeUntil} from 'rxjs/operators';
 import type {BookletError,CommandResponse,Profile,TestSessionData} from './group-monitor.interfaces';
 import type {ConnectionStatus} from '../shared/shared.module';
-import {NativeMonitorSessionService} from '../native-session.service';
+import {NativeMonitorHttpError,NativeMonitorSessionService} from '../native-session.service';
 import {parseNativeMonitorBroadcast,parseNativeMonitorSnapshot,nativeMonitorSelectionBody,nativeMonitorBookletFileId} from '../native-monitor-wire';
 @Injectable()
 export class BackendService {
  private readonly session=inject(NativeMonitorSessionService);
  readonly connectionStatus$=new BehaviorSubject<ConnectionStatus>('initial');
  readonly problem$=new BehaviorSubject('');
+ readonly snapshotOutage$=new Subject<{error:NativeMonitorHttpError;owner:AbortSignal}>();
  private readonly connectionClosed=new Subject<void>();
  readonly connectionClosed$=this.connectionClosed.asObservable();
  get cacheIdentity(){return this.session.access();}
@@ -36,7 +37,14 @@ export class BackendService {
    decode:parseNativeMonitorBroadcast,revalidate:()=>this.session.verifyAccess(scope),
    onConnecting:()=>this.connectionStatus$.next('ws-offline'),
    status:status=>{this.connectionStatus$.next(status);if(status==='polling-sleep'||status==='ws-online')this.problem$.next('');},
-   error:error=>this.problem$.next(error instanceof Error?error.message:'Verbindungsfehler')
+   error:(error,owner)=>{
+    // The Original leaves the current work visible behind its reload dialog
+    // when the authenticated monitor snapshot is temporarily unavailable.
+    if(error instanceof NativeMonitorHttpError&&(error.status===502||error.status===503)){
+     this.snapshotOutage$.next({error,owner});return 'wait-for-reload';
+    }
+    this.problem$.next(error instanceof Error?error.message:'Verbindungsfehler');
+   }
   }).pipe(takeUntil(this.connectionClosed));
  }
  cutConnection(){this.connectionClosed.next();this.connectionStatus$.next('initial');this.problem$.next('');}

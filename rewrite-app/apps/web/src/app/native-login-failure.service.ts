@@ -9,7 +9,7 @@ import {AppError} from './native-participant/app.interfaces';
 import {NativeErrorPresenterService} from './native-error-presenter.service';
 import {openNativeSystemCheckInstallationError} from './native-system-check/native-system-check-installation-error';
 
-/** Source's global error dialog, owned by this unauthenticated entry view. */
+/** Source's global error dialog, owned by the view that made the request. */
 @Injectable()
 export class NativeLoginFailureService implements OnDestroy {
  private readonly dialogs=inject(MatDialog);
@@ -17,7 +17,8 @@ export class NativeLoginFailureService implements OnDestroy {
  private destroyed=false;
  private close:(()=>void)|undefined;
  constructor(){inject(NativeErrorPresenterService).register(openNativeSystemCheckInstallationError);}
- async show(error:NativeMonitorHttpError,view:AbortSignal,copy?:{label:string;description:string}):Promise<void>{
+ async show(error:NativeMonitorHttpError,view:AbortSignal,copy?:{label:string;description:string},
+  context?:{login:string;returnPath:string}):Promise<void>{
   if(this.destroyed)return;this.close?.();
   const scope=this.session.accessSignal;
   if(view.aborted||scope.aborted)return;
@@ -40,8 +41,9 @@ export class NativeLoginFailureService implements OnDestroy {
    if(copy)mapped=new AppError(copy);
    mapped.description=redactBugReportText(mapped.description);mapped.details=redactBugReportText(mapped.details??'');
    ref=this.dialogs.open(NativeLoginErrorDialogComponent,{panelClass:'original-native-login-error-dialog',disableClose:true,autoFocus:'dialog',
-    data:{error:mapped,url:redactBugReportText(window.location.href),timestamp:Date.now(),reload:()=>{
-     if(!current())return;retire();if(mapped.type==='session')this.session.clear();window.location.href=new URL('native-start',document.baseURI).href;
+    data:{error:mapped,url:redactBugReportText(window.location.href),timestamp:Date.now(),login:context?.login,reload:()=>{
+     if(!current())return;retire();if(mapped.type==='session')this.session.clear();
+     window.location.href=new URL(context?.returnPath??'native-start',document.baseURI).href;
     }}});
    ref.afterClosed().subscribe(retire);
    if(!current())retire();

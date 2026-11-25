@@ -42,7 +42,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
  readonly header=inject(HeaderService);readonly backend=inject(BackendService);
- private readonly backendSubscription=this.backend.problem$.subscribe(problem=>this.backendProblem.set(problem));
+ private readonly backendSubscription=new Subscription();
  private readonly view=new AbortController();
  private retireLogout:(()=>void)|undefined;
  ngOnDestroy(){this.view.abort();this.clearStarterHeader?.();this.retireLogout?.();this.backendSubscription.unsubscribe();}
@@ -57,6 +57,12 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  private readonly router=inject(Router);private readonly route=inject(ActivatedRoute);private readonly dialog=inject(MatDialog);
  constructor(){this.assets.activate(this.view.signal);inject(NativeThemeContext).activate(this.view.signal);inject(InterfaceModeService).select('original');inject(MainDataService).appTitle$.next(this.settings.settings().appTitle);
   const detector=inject(ChangeDetectorRef);
+  this.backendSubscription.add(this.backend.problem$.subscribe(problem=>this.backendProblem.set(problem)));
+  this.backendSubscription.add(this.backend.snapshotOutage$.subscribe(({error,owner})=>{
+   const access=this.session.access();
+   if(access)void this.loginFailure.show(error,AbortSignal.any([owner,this.view.signal]),undefined,
+    {login:access.displayName,returnPath:'group-monitor'});
+  }));
   effect(()=>{if(!this.session.restoring())this.updatePublicHeader();});
   this.router.events.pipe(filter(event=>event instanceof NavigationEnd),takeUntil(fromEvent(this.view.signal,'abort'))).subscribe(()=>{
    this.updatePublicHeader();
