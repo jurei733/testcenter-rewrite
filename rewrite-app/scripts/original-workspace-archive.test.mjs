@@ -12,6 +12,7 @@ import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
 import {createPostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
 import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
+import {decodeWorkspaceBzip2Member} from '../packages/application/dist/packages/application/src/original-workspace-archive.js';
 
 const root=new URL('../test-fixtures/original-testcenter/source-workspace-results/native-workspace-zip-http/',import.meta.url);
 const source=JSON.parse(await readFile(new URL('observations.json',root))),inputs=JSON.parse(await readFile(new URL('inputs.json',root)));
@@ -119,6 +120,44 @@ for(const kind of kinds)test(kind+': ordinary native ZIPs materialize physical f
   }finally{await storage?.shutdown();if(control){await control.query('DROP SCHEMA "'+schema+'" CASCADE');await control.end();}await rm(directory,{recursive:true,force:true});}
 });
 
+
+
+test('a standard BZIP2-compressed workspace ZIP imports the exact archived bytes',async()=>{
+  const repository=createInMemoryFirstSliceRepository();
+  const services=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+  const tenant=await services.platform.createTenant({tenantKey:'zip-bzip2',displayName:'Owned BZIP2 import'});
+  const workspace=await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:'owned',displayName:'Owned workspace'});
+  // Created independently with Python zipfile's ZIP_BZIP2 compression.
+  const archive=
+    'UEsDBC4AAAAMAOBhQV2qzi2DyAAAACANAAAZAAAASW1wb3J0L0xlc2V0ZXh0LUJaSVAyLnR4dEJaaDkxQVkmU1lb' +
+    'tQdJAAFn37wAEEADEAAQoFQQPmeeAAAAgCARAAgBMAE4AMYTEyYCYAAxhMTJgJgAApVCjJo0aek0ZoajTIJwE5Cc' +
+    'xOImgmgnQTITaJ3E3iaiZibBMBN4nuJyCYCcQnyJiEzE6BMRNBMBMxMxPYTITQTUTsJ+CdhNonmJgJsE0E6ibhPU' +
+    'TmJ6CdgmIq1E4iYidRMBMhMBO4mImQmQTgJiJgJuE3iaibhP4TwEwE8CfAmwJ/i7kinChILdqDpIUEsBAi4DLgAA' +
+    'AAwA4GFBXarOLYPIAAAAIA0AABkAAAAAAAAAAAAAAIABAAAAAEltcG9ydC9MZXNldGV4dC1CWklQMi50eHRQSwUG' +
+    'AAAAAAEAAQBHAAAA/wAAAAAA';
+  const scope={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey};
+  const result=await services.contentIntake.uploadWorkspaceFile({...scope,fileName:'zusatz-kompression.zip',
+    mediaType:'application/zip',sourceDocument:'data:application/zip;base64,'+archive});
+  const [member]=result.archiveReport.entries;
+  assert.equal(result.archiveReport.importedCount,1);
+  assert.equal(member.entryName,'Import/Lesetext-BZIP2.txt');
+  const catalog=await services.workspaceAdminRead.getWorkspaceFileCatalog(scope);
+  assert.equal(catalog.totalCount,1);
+  assert.equal(catalog.items[0].fileName,'Resource/Lesetext-BZIP2.txt');
+  assert.equal(catalog.items[0].uploadedAt,'2026-10-01T12:15:00.000Z');
+  const physical=await repository.getSourcePackageById(member.sourcePackageId);
+  const expected='BZIP2-Ressource aus dem Testcenter ZIP. Größe und Inhalt bleiben erhalten. Ω β.\n'.repeat(40);
+  assert.deepEqual(Buffer.from(physical.sourceDocument.split(',')[1],'base64'),Buffer.from(expected,'utf8'));
+});
+
+test('BZIP2 decoding enforces the declared length and the complete compressed stream',()=>{
+  const expected=Buffer.from('Owned BZIP2 length check.');
+  const compressed=Buffer.from('QlpoOTFBWSZTWR9pShcAAAOfgEABEAAQIMAQDs0EgCAAMU0yMTExCINGnqMnqaB1gY2wCugJr4pmWmfi7kinChID7SlC4A==','base64');
+  assert.deepEqual(decodeWorkspaceBzip2Member(compressed,expected.length),expected);
+  assert.throws(()=>decodeWorkspaceBzip2Member(compressed,expected.length-1),/exceeds its declared length/);
+  assert.throws(()=>decodeWorkspaceBzip2Member(compressed.subarray(0,-1),expected.length),/Incomplete BZIP2 member/);
+  assert.equal(decodeWorkspaceBzip2Member(compressed,expected.length+1),null);
+});
 
 test('complete ZIP preflight rejects late corruption, unsafe paths and budgets before any member or event is persisted',async t=>{
   const repository=createInMemoryFirstSliceRepository(),services=createFirstSliceServices({repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});

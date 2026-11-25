@@ -12,6 +12,7 @@
     "@testcenter-rewrite-app/contracts": "0.0.0",
     "@testcenter-rewrite-app/domain": "0.0.0",
     "@xmldom/xmldom": "^0.9.12",
-    "libxml2-wasm": "0.7.2"
+    "libxml2-wasm": "0.7.2",
+    "seek-bzip": "2.0.0"
   }
 }

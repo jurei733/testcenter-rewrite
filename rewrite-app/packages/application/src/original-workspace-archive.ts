@@ -1,4 +1,5 @@
 import type {SourcePackage,WorkspaceActivityEvent} from '@testcenter-rewrite-app/domain';
+import bunzip from 'seek-bzip';
 import {FirstSliceError} from './first-slice-error.js';
 
 type Entry={fileName:string;uncompressedSize:number;modifiedAt?:string};
@@ -21,6 +22,32 @@ export function assertWorkspaceUploadName(value:unknown):asserts value is string
     throw new FirstSliceError(400,'workspace_file_name_invalid','A workspace file requires a basename without paths or control characters.');
   if(Buffer.byteLength(value,'utf8')>120)throw new FirstSliceError(400,'source_package_file_name_too_long',
     'Source package file names must not exceed 120 UTF-8 bytes.');
+}
+
+/** The ZIP reader has already checked the declared length against its limit. */
+export function decodeWorkspaceBzip2Member(compressed: Buffer, expectedSize: number): Buffer | null {
+  const output = Buffer.alloc(expectedSize);
+  let inputOffset = 0;
+  let outputOffset = 0;
+  bunzip.decode({
+    read(target, offset, length) {
+      const end = Math.min(inputOffset + length, compressed.length);
+      const count = compressed.copy(target, offset, inputOffset, end);
+      inputOffset += count;
+      return count;
+    },
+    readByte() {
+      // Require a complete stream footer, even after reading the expected data.
+      if (inputOffset === compressed.length) throw new RangeError('Incomplete BZIP2 member.');
+      return compressed[inputOffset++]!;
+    }
+  }, {
+    writeByte(byte) {
+      if (outputOffset === output.length) throw new RangeError('BZIP2 member exceeds its declared length.');
+      output[outputOffset++] = byte;
+    }
+  });
+  return inputOffset === compressed.length && outputOffset === output.length ? output : null;
 }
 
 /** Validate the complete container before publishing any physical member.

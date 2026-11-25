@@ -10,7 +10,7 @@ import {applicationAssetImageType} from './application-asset-image.js';
 export {prepareOriginalApplicationAssets,originalApplicationAssetScope} from './original-application-asset.js';
 export type {OriginalApplicationAssetIdentity,OriginalApplicationAssetSummary,OriginalApplicationAsset,OriginalApplicationAssetContext} from './original-application-asset.js';
 import {readWorkspaceFileReport,appendWorkspaceFileReport,workspaceFileReportErrors} from './original-workspace-file-report.js';
-import {createOriginalWorkspaceArchives,assertWorkspaceUploadName,applyWorkspaceArchiveTimestamps,type WorkspaceArchiveOrigin} from './original-workspace-archive.js';
+import {createOriginalWorkspaceArchives,assertWorkspaceUploadName,applyWorkspaceArchiveTimestamps,decodeWorkspaceBzip2Member,type WorkspaceArchiveOrigin} from './original-workspace-archive.js';
 import {originalResourceMediaType} from './original-resource-media-type.js';
 import type {OriginalWorkspaceUploadReport} from '@testcenter-rewrite-app/domain';
 import type {WorkspaceArchiveUploadReport} from '@testcenter-rewrite-app/domain';
@@ -15962,7 +15962,8 @@ const readZipEntries = (zipBuffer: Buffer, maximumEntries = Number.MAX_SAFE_INTE
 const readZipEntryBuffer = (
   zipBuffer: Buffer,
   entry: ZipEntry,
-  maxOutputBytes: number
+  maxOutputBytes: number,
+  allowBzip2 = false
 ): Buffer | null => {
   if (
     entry.uncompressedSize > maxOutputBytes ||
@@ -16042,14 +16043,17 @@ const readZipEntryBuffer = (
   const compressedData = zipBuffer.subarray(dataStart, dataEnd);
   let data: Buffer | null = null;
   try {
-    data =
-      entry.compressionMethod === 0
-        ? compressedData
-        : entry.compressionMethod === 8
-          ? inflateRawSync(compressedData, {
-              maxOutputLength: maxOutputBytes + 1
-            })
-          : null;
+    switch (entry.compressionMethod) {
+      case 0:
+        data = compressedData;
+        break;
+      case 8:
+        data = inflateRawSync(compressedData, { maxOutputLength: maxOutputBytes + 1 });
+        break;
+      case 12:
+        if (allowBzip2) data = decodeWorkspaceBzip2Member(compressedData, entry.uncompressedSize);
+        break;
+    }
   } catch {
     return null;
   }
@@ -27512,7 +27516,8 @@ export const createFirstSliceServices = (
       'A current file of the same type already uses this identifier.',{conflictingSourcePackageId:duplicate.sourcePackageId});
   };
   const workspaceArchives=createOriginalWorkspaceArchives({decode:decodePersistedSourceDocument,
-    entries:readZipEntries,read:readZipEntryBuffer,safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath});
+    entries:readZipEntries,read:(zip,entry,limit)=>readZipEntryBuffer(zip,entry,limit,true),
+    safe:isSafeRelativeArchivePath,normalize:normalizeZipEntryPath});
   type WorkspaceUploadScope = {tenantKey:string; workspaceKey:string};
   type WorkspaceUploadMember = {entryName:string; fileName:string; bytes:Uint8Array; archiveOrigin?:WorkspaceArchiveOrigin};
   type WorkspaceUploadOptions = {archiveOrigin?:WorkspaceArchiveOrigin; authority?:OriginalWorkspaceWriteAuthority; deferAvailability?:boolean};
