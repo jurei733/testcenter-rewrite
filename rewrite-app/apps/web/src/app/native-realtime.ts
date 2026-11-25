@@ -4,6 +4,7 @@ export interface NativeRealtimeOptions<T>{
  channel:'commands'|'test-sessions';scope:AbortSignal;current:()=>boolean;
  read:(signal:AbortSignal)=>Promise<{data:T;subscribeToken:string|null}>;
  decode:(wire:string)=>T|undefined;status:(status:NativeConnectionStatus)=>void;
+ onConnecting?:()=>void;
  error?:(error:unknown)=>void;revalidate?:()=>Promise<void>;pollingInterval?:number;retry?:Observable<unknown>;
 }
 /** One subscriber owns its HTTP read, socket, reconnect timer and private data. */
@@ -38,6 +39,7 @@ export function observeNativeRealtime<T>(options:NativeRealtimeOptions<T>):Obser
    };
    ws.onerror=()=>fallback(ws);
    ws.onclose=event=>fallback(ws,event.code===1008);
+   options.onConnecting?.();
   };
   const poll=async()=>{
    if(!current()||reading)return;reading=true;stopSocket();options.status('polling-fetch');

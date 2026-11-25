@@ -269,6 +269,10 @@
   margin-left: 15px;
 }
 
+.toolbar .control:disabled {
+  opacity: 1;
+}
+
 .min-height-section {
   min-height: 3em;
 }

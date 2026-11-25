@@ -29,6 +29,17 @@ test('view teardown aborts the real read signal and a late HTTP payload cannot c
 test('failed HTTP reads remain errors while later polling can recover without a fabricated empty snapshot',async t=>{
  let reads=0;const f=setup(t,async()=>{if(++reads===1)throw Error('Owned failure');return{data:['real'],subscribeToken:null};});await flush();assert.deepEqual(f.data,[]);assert.equal(f.errors.length,1);t.mock.timers.tick(5000);await flush();assert.deepEqual(f.data,[['real']]);assert.equal(f.statuses.at(-1),'polling-sleep');
 });
+test('an opening socket can be shown separately from initial polling and the authenticated live stream',async t=>{
+ const f=setup(t,async()=>({data:[],subscribeToken:'a'.repeat(43)}),{
+  channel:'test-sessions',onConnecting:()=>f.statuses.push('ws-offline')
+ });
+ await flush();
+ assert.deepEqual(f.statuses,['polling-fetch','ws-offline']);
+ assert.deepEqual(f.sockets[0].sent,[]);
+ f.sockets[0].open();
+ assert.deepEqual(f.statuses,['polling-fetch','ws-offline','ws-online']);
+ assert.deepEqual(f.sockets[0].sent,['{"event":"subscribe:test-sessions"}']);
+});
 test('failed-ACK recovery leaves the open socket and returns to authenticated polling without reusing its capability',async t=>{
  const retry=new Subject();let reads=0;const f=setup(t,async()=>({data:[++reads],subscribeToken:'a'.repeat(43)}),{retry});await flush();f.sockets[0].open();retry.next();assert.equal(f.sockets[0].closed,true);t.mock.timers.tick(5000);await flush();assert.equal(reads,2);assert.equal(f.sockets.length,2);
 });

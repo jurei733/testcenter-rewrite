@@ -34,6 +34,7 @@ export class BackendService {
   return observeNativeRealtime<TestSessionData[]>({channel:'test-sessions',scope,current:()=>scope===this.session.accessSignal&&!scope.aborted,
    read:async(signal)=>{let subscribeToken:string|null=null;const text=await this.session.text('GET','/monitor/group/'+encodeURIComponent(groupName)+'/test-sessions',undefined,undefined,false,signal,value=>{subscribeToken=value;});return{data:parseNativeMonitorSnapshot(text),subscribeToken};},
    decode:parseNativeMonitorBroadcast,revalidate:()=>this.session.verifyAccess(scope),
+   onConnecting:()=>this.connectionStatus$.next('ws-offline'),
    status:status=>{this.connectionStatus$.next(status);if(status==='polling-sleep'||status==='ws-online')this.problem$.next('');},
    error:error=>this.problem$.next(error instanceof Error?error.message:'Verbindungsfehler')
   }).pipe(takeUntil(this.connectionClosed));
