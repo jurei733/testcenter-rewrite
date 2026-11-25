@@ -1,4 +1,7 @@
-import { PDFDocument, PDFHexString, PDFName, type PDFPage, type PDFRef, StandardFonts, rgb } from "pdf-lib";
+import {
+  PDFDocument, PDFHexString, PDFName, type PDFPage, type PDFRef, StandardFonts,
+  degrees, drawText as drawPdfText, rgb
+} from "pdf-lib";
 import QRCode from "qrcode";
 
 import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
@@ -16,11 +19,15 @@ const ORIGINAL_LINE_HEIGHT = 15;
 const ORIGINAL_BASELINE_FROM_TOP = 40.086;
 const ORIGINAL_LINES_PER_PAGE = 50;
 const ORIGINAL_LABEL_SIZE = 12;
+const ORIGINAL_LABEL_FONT = PDFName.of("Helvetica");
+const SOFT_HYPHEN = "\u00ad";
+const ORIGINAL_WRAP_SPACE = /(?!\u00a0)[\p{White_Space}\p{Z}]/u;
 const POINTS_PER_MILLIMETER = 72 / 25.4;
 const ORIGINAL_HELVETICA_DEFAULT_WIDTH = 513;
 // TCPDF 6.10's built-in Helvetica positioning differs from AFM widths
 // for these printable WinAnsi characters. Units are thousandths of an em.
 const ORIGINAL_CHARACTER_WIDTHS: Readonly<Record<string, number>> = {
+  "\t": 500,
   "]": 277, "¡": 278, "«": 448, "°": 606, "²": 350, "³": 350, "¹": 350, "»": 448,
   "¼": 869, "½": 869, "¾": 879, "¿": 556, "Þ": 666, "æ": 896,
   "ì": 251, "í": 251, "î": 251, "ï": 251, "þ": 555,
@@ -65,7 +72,8 @@ const applyAttachmentLabelTemplate = (
 
 const wrapOriginalPdfText = (
   text: string,
-  measureCharacter: (value: string) => number
+  measureCharacter: (value: string) => number,
+  measureEncodedLine: (value: string) => number
 ): string[] => {
   // Source preserves authored spaces/newlines and does not apply AFM kerning
   // or the Rewrite's four-line ellipsis. Its empty MultiCell prints a space.
@@ -88,14 +96,26 @@ const wrapOriginalPdfText = (
     }
     const hyphen = character === "-" && /\p{L}/u.test(characters[index - 1] ?? "")
       && /\p{L}/u.test(characters[index + 1] ?? "");
-    if (character === " " || hyphen) separator = index;
     width += measureCharacter(character);
-    if (width <= maxWidth || index === start) continue;
+    const softHyphen = character === SOFT_HYPHEN;
+    const hyphenatedWidth = softHyphen && characters[index - 1] !== "-" ? width + measureCharacter("-") : width;
+    if (ORIGINAL_WRAP_SPACE.test(character) || hyphen || (softHyphen && hyphenatedWidth <= maxWidth)) {
+      separator = index;
+    }
+    if ((width <= maxWidth && !(softHyphen && hyphenatedWidth >= maxWidth)) || index === start) continue;
 
-    const nextWord = separator < start ? "" : slice(separator + 1).split(/\s/, 1)[0]!;
-    const nextWordWidth = Array.from(nextWord).reduce((sum, part) => sum + measureCharacter(part), 0);
+    let nextWordWidth = 0;
+    if (separator >= start) {
+      let wordStart = separator;
+      while (wordStart < characters.length && ORIGINAL_WRAP_SPACE.test(characters[wordStart]!)) wordStart += 1;
+      let wordEnd = wordStart;
+      while (wordEnd < characters.length && !ORIGINAL_WRAP_SPACE.test(characters[wordEnd]!)) wordEnd += 1;
+      nextWordWidth = measureEncodedLine(slice(wordStart, wordEnd));
+    }
     if (separator >= start && nextWordWidth <= pageWidth) {
-      lines.push(slice(start, separator + (characters[separator] === "-" ? 1 : 0)));
+      const breakAtHyphen = characters[separator] === "-" || characters[separator] === SOFT_HYPHEN;
+      const ending = breakAtHyphen && characters[separator - 1] !== "-" ? "-" : "";
+      lines.push(slice(start, separator) + ending);
       start = separator + 1;
     } else {
       lines.push(slice(start, index));
@@ -221,14 +241,17 @@ export const createAttachmentPagesPdf = async (input: {
   // TCPDF wraps Unicode before converting the line to Helvetica's WinAnsi
   // encoding. Characters outside the legacy width table use its default width.
   const measureOriginalWrapCharacter = (character: string): number => {
+    if (character === SOFT_HYPHEN) return 0;
     const code = character.codePointAt(0)!;
-    return code <= 255 && originalCharacters.has(code) ? measureOriginalCharacter(character)
+    return (code <= 255 && originalCharacters.has(code)) || character === "\t" ? measureOriginalCharacter(character)
       : ORIGINAL_HELVETICA_DEFAULT_WIDTH * ORIGINAL_LABEL_SIZE / 1000;
   };
   const encodeOriginalLine = (line: string): string =>
-    Array.from(line.replaceAll("\uFFFD", ""), character =>
-      originalCharacters.has(character.codePointAt(0)!) ? character : "?"
+    Array.from(line.replaceAll("\uFFFD", "").replaceAll(SOFT_HYPHEN, "").replaceAll("\u00a0", " "), character =>
+      character === "\t" || originalCharacters.has(character.codePointAt(0)!) ? character : "?"
     ).join("");
+  const measureOriginalLine = (line: string): number =>
+    Array.from(line).reduce((width, character) => width + measureOriginalCharacter(character), 0);
   const bookmarks: Array<{ title: string; page: PDFRef; height: number }> = [];
 
   for (const [index, attachment] of input.attachments.entries()) {
@@ -238,14 +261,12 @@ export const createAttachmentPagesPdf = async (input: {
       title: originalBookmarkTitle(authoredLabel), page: page.ref, height: page.getHeight()
     });
     // Unmodified Source AttachmentTemplate uses TCPDF's regular Helvetica 12.
-    const labelSize = originalLayout ? ORIGINAL_LABEL_SIZE : 16;
-    const labelFont = originalLayout ? regularFont : boldFont;
-    const measureLine = (value: string): number => originalLayout
-      ? Array.from(value).reduce((width, character) => width + measureOriginalCharacter(character), 0)
-      : labelFont.widthOfTextAtSize(value, labelSize);
+    const labelSize = 16;
+    const measureRewriteLine = (value: string): number => boldFont.widthOfTextAtSize(value, labelSize);
     const labelLines = originalLayout
-      ? wrapOriginalPdfText(authoredLabel, measureOriginalWrapCharacter).map(encodeOriginalLine)
-      : wrapPdfText(toPdfSafeText(authoredLabel), A4_WIDTH - PAGE_MARGIN * 2, measureLine);
+      ? wrapOriginalPdfText(authoredLabel, measureOriginalWrapCharacter,
+        line => measureOriginalLine(encodeOriginalLine(line))).map(encodeOriginalLine)
+      : wrapPdfText(toPdfSafeText(authoredLabel), A4_WIDTH - PAGE_MARGIN * 2, measureRewriteLine);
 
     if (!originalLayout) page.drawText("Attachment capture page", {
       x: PAGE_MARGIN,
@@ -255,22 +276,31 @@ export const createAttachmentPagesPdf = async (input: {
       color: rgb(0.28, 0.34, 0.44)
     });
     labelLines.forEach((line, lineIndex) => {
-      if (originalLayout && lineIndex > 0 && lineIndex % ORIGINAL_LINES_PER_PAGE === 0) {
-        page = pdf.addPage([ORIGINAL_PAGE_WIDTH, A4_HEIGHT]);
+      if (originalLayout) {
+        if (lineIndex > 0 && lineIndex % ORIGINAL_LINES_PER_PAGE === 0) {
+          page = pdf.addPage([ORIGINAL_PAGE_WIDTH, A4_HEIGHT]);
+        }
+        if (!line) return;
+        const x = (page.getWidth() - measureOriginalLine(line)) / 2;
+        // The core font retains the tab byte. WinAnsi's encoder rejects it,
+        // so encode the printable runs and join them with the original byte.
+        const encoded = PDFHexString.of(line.split("\t").map(part => regularFont.encodeText(part).asString()).join("09"));
+        page.node.setFontDictionary(ORIGINAL_LABEL_FONT, regularFont.ref);
+        page.pushOperators(...drawPdfText(encoded, {
+          // TCPDF serializes glyph origins to six decimals.
+          x: Number(x.toFixed(6)),
+          y: A4_HEIGHT - ORIGINAL_BASELINE_FROM_TOP - (lineIndex % ORIGINAL_LINES_PER_PAGE) * ORIGINAL_LINE_HEIGHT,
+          size: ORIGINAL_LABEL_SIZE, font: ORIGINAL_LABEL_FONT, color: rgb(0, 0, 0),
+          rotate: degrees(0), xSkew: degrees(0), ySkew: degrees(0)
+        }));
+        return;
       }
-      if (originalLayout && !line) return;
-      const lineWidth = measureLine(line);
-      const x = (page.getWidth() - lineWidth) / 2;
       page.drawText(line, {
-        // TCPDF serializes glyph origins to six decimals. Keeping that
-        // rounding also preserves rasterization at subpixel boundaries.
-        x: originalLayout ? Number(x.toFixed(6)) : x,
-        y: originalLayout
-          ? A4_HEIGHT - ORIGINAL_BASELINE_FROM_TOP - (lineIndex % ORIGINAL_LINES_PER_PAGE) * ORIGINAL_LINE_HEIGHT
-          : A4_HEIGHT - PAGE_MARGIN - 38 - lineIndex * 22,
+        x: (page.getWidth() - measureRewriteLine(line)) / 2,
+        y: A4_HEIGHT - PAGE_MARGIN - 38 - lineIndex * 22,
         size: labelSize,
-        font: labelFont,
-        color: originalLayout ? rgb(0, 0, 0) : rgb(0.06, 0.09, 0.15)
+        font: boldFont,
+        color: rgb(0.06, 0.09, 0.15)
       });
     });
 

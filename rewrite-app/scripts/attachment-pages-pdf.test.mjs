@@ -88,6 +88,37 @@ test("Original wraps the authored Unicode before measuring the encoded line for 
   near(Number(content.match(/1 0 0 1 ([-\d.]+) [-\d.]+ Tm/)?.[1]),31.172);
 });
 
+// Text bytes and positions from the pinned Original's authenticated /attachment/:id/page response.
+const longLabel = "Teilnehmendengruppe Abschlussprüfung Lesen und Schreiben im Frühjahr bei Sonnenschein";
+const longWord = "Wörterbuchübersetzungsmöglichkeiten".repeat(2);
+for (const [name, labelTemplate, expected] of [
+  ["unbroken soft hyphen", `${longLabel} Lesekompetenz\u00adprüfung`, [
+    [48.518, 801.804, longLabel], [234.938, 786.804, "Lesekompetenzprüfung"]
+  ]],
+  ["soft hyphen at a wrap", `${longWord}\u00adMehrsprachigkeitsstudie`, [
+    [88.232, 801.804, `${longWord}-`], [232.952, 786.804, "Mehrsprachigkeitsstudie"]
+  ]],
+  ["narrow no-break spaces", `${longLabel}\u202fNord\u202fWest`, [
+    [32.180, 801.804, `${longLabel}?Nord`], [283.970, 786.804, "West"]
+  ]],
+  ["legacy no-break spaces", `${longLabel}\u00a0Nord\u00a0West`, [
+    [88.208, 801.804, longLabel.replace(" Sonnenschein", "")], [229.610, 786.804, "Sonnenschein Nord West"]
+  ]],
+  ["tabs and a blank line", "Müller\tNord\tWest\n\nTeilnahme Ä Ö Ü", [
+    [248.636, 801.804, "Müller\tNord\tWest"], [251.624, 771.804, "Teilnahme Ä Ö Ü"]
+  ]]
+]) test(`Original PDF preserves ${name}`, async () => {
+  const [{ content }] = await rendered({ attachments: [attachment], layout: "original", labelTemplate });
+  const lines = [...content.matchAll(/1 0 0 1 ([-\d.]+) ([-\d.]+) Tm\n<([a-f\d]+)> Tj/gi)];
+  assert.equal(lines.length, expected.length);
+  for (const [index, [, x, y, encoded]] of lines.entries()) {
+    const [expectedX, expectedY, expectedText] = expected[index];
+    near(Number(x), expectedX);
+    near(Number(y), expectedY);
+    assert.equal(Buffer.from(encoded, "hex").toString("latin1"), expectedText);
+  }
+});
+
 test("Original printed QR occupies the Source 20/20/40/40 mm region on each attachment's final label page",async()=>{
   const attachments = [attachment,{...attachment,attachmentId:"second-owned-qr"}];
   const rows = await rendered({attachments,layout:"original",labelTemplate:"Own long label ".repeat(30)});
