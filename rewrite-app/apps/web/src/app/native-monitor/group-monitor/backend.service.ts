@@ -1,17 +1,18 @@
 import {observeNativeRealtime} from '../../native-realtime';
 import {Injectable,inject} from '@angular/core';
-import {BehaviorSubject,Observable,of,Subject} from 'rxjs';
-import {catchError,map,tap,takeUntil} from 'rxjs/operators';
+import {BehaviorSubject,defer,Observable,of,Subject} from 'rxjs';
+import {catchError,filter,map,tap,takeUntil} from 'rxjs/operators';
 import type {BookletError,CommandResponse,Profile,TestSessionData} from './group-monitor.interfaces';
 import type {ConnectionStatus} from '../shared/shared.module';
 import {NativeMonitorHttpError,NativeMonitorSessionService} from '../native-session.service';
-import {parseNativeMonitorBroadcast,parseNativeMonitorSnapshot,nativeMonitorSelectionBody,nativeMonitorBookletFileId} from '../native-monitor-wire';
+import {parseNativeMonitorBroadcast,parseNativeMonitorObservedSnapshot,parseNativeMonitorSnapshot,nativeMonitorSelectionBody,nativeMonitorBookletFileId} from '../native-monitor-wire';
+import {AppError} from '../../native-participant/app.interfaces';
 @Injectable()
 export class BackendService {
  private readonly session=inject(NativeMonitorSessionService);
  readonly connectionStatus$=new BehaviorSubject<ConnectionStatus>('initial');
  readonly problem$=new BehaviorSubject('');
- readonly snapshotOutage$=new Subject<{error:NativeMonitorHttpError;owner:AbortSignal;accessRejected?:true}>();
+ readonly snapshotOutage$=new Subject<{error:NativeMonitorHttpError|AppError;owner:AbortSignal;accessRejected?:true}>();
  private readonly connectionClosed=new Subject<void>();
  readonly connectionClosed$=this.connectionClosed.asObservable();
  get cacheIdentity(){return this.session.access();}
@@ -33,7 +34,9 @@ export class BackendService {
  observeSessionsMonitor(groupName:string):Observable<TestSessionData[]>{
   const scope=this.session.accessSignal;
   const path='/monitor/group/'+encodeURIComponent(groupName)+'/test-sessions';
-  return observeNativeRealtime<TestSessionData[]>({channel:'test-sessions',scope,current:()=>scope===this.session.accessSignal&&!scope.aborted,
+  return defer(()=>{
+   let projectionFailed=false;
+   return observeNativeRealtime<TestSessionData[]>({channel:'test-sessions',scope,current:()=>scope===this.session.accessSignal&&!scope.aborted,
    read:async(signal)=>{
     let subscribeToken:string|null=null;
     const text=await this.session.monitorSnapshot(path,signal,value=>{subscribeToken=value;},(status,owner)=>{
@@ -44,7 +47,22 @@ export class BackendService {
       // Fetch reports a network outage as TypeError. Original XHR reports status 0.
       throw new NativeMonitorHttpError(0,'error',{url:path,statusText:'Unknown Error'});
      });
-    return {data:parseNativeMonitorSnapshot(text),subscribeToken};
+    signal.throwIfAborted();
+    try{
+     const data=parseNativeMonitorObservedSnapshot(text);
+     return data===null?null:{data,subscribeToken};
+    }catch(error){
+     if(error instanceof SyntaxError){
+      throw new AppError({label:'Unbekanntes Verbindungsproblem',type:'network',
+       description:'Die Antwort enthält kein gültiges JSON.',details:'Http failure during parsing for '+path});
+     }
+     // Original loses the row projection after a type error but keeps the
+     // authenticated transport running until the Monitor is reopened.
+     projectionFailed=true;
+     this.snapshotOutage$.next({error:new AppError({label:'Programmfehler: TypeError',type:'script',
+      description:'Die Antwort enthält ungültige Sitzungsdaten.',details:'Erwartet wurde eine Liste gültiger Sitzungen.'}),owner:signal});
+     return {data:undefined,subscribeToken};
+    }
    },
    decode:parseNativeMonitorBroadcast,revalidate:()=>this.session.verifyAccess(scope),
    onConnecting:()=>this.connectionStatus$.next('ws-offline'),
@@ -52,12 +70,13 @@ export class BackendService {
    error:(error,owner)=>{
     // A failed HTTP snapshot waits for the Original's explicit reload.
     // A revoked access is already retired by the request before this runs.
-    if(error instanceof NativeMonitorHttpError){
+    if(error instanceof NativeMonitorHttpError||error instanceof AppError){
      this.snapshotOutage$.next({error,owner});return 'wait-for-reload';
     }
     this.problem$.next(error instanceof Error?error.message:'Verbindungsfehler');
    }
-  }).pipe(takeUntil(this.connectionClosed));
+   }).pipe(filter(()=>!projectionFailed),takeUntil(this.connectionClosed));
+  });
  }
  cutConnection(){this.connectionClosed.next();this.connectionStatus$.next('initial');this.problem$.next('');}
  getBooklet(name:string):Observable<string|BookletError>{return this.request('GET','/booklet/'+encodeURIComponent(nativeMonitorBookletFileId(name))).pipe(catchError(error=>of({error:error.status===404?'missing-file':'general',species:null} as BookletError)));}

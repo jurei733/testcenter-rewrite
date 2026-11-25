@@ -17,7 +17,7 @@ export class NativeLoginFailureService implements OnDestroy {
  private destroyed=false;
  private close:(()=>void)|undefined;
  constructor(){inject(NativeErrorPresenterService).register(openNativeSystemCheckInstallationError);}
- async show(error:NativeMonitorHttpError,view:AbortSignal,copy?:{label:string;description:string},
+ async show(error:NativeMonitorHttpError|AppError,view:AbortSignal,copy?:{label:string;description:string},
   context?:{login?:string;returnPath?:string;anonymous?:true}):Promise<void>{
   const scope=this.session.accessSignal;
   if(this.destroyed||view.aborted||scope.aborted)return;
@@ -35,9 +35,13 @@ export class NativeLoginFailureService implements OnDestroy {
    // Preserve the asynchronous owner-retirement boundary with preloaded UI.
    await Promise.resolve();
    if(!current())return;
-   let payload:unknown=error.message;try{payload=JSON.parse(error.message);}catch{}
-   let mapped=nativeRequestError(new HttpErrorResponse({status:error.status,error:payload,
-    statusText:error.response?.statusText,url:error.response?.url,headers:new HttpHeaders({...error.response?.errorId?{'error-id':error.response.errorId}:{},...error.response?.testMode?{'test-mode':error.response.testMode}:{}})}));
+   let mapped:AppError;
+   if(error instanceof AppError)mapped=error;
+   else{
+    let payload:unknown=error.message;try{payload=JSON.parse(error.message);}catch{}
+    mapped=nativeRequestError(new HttpErrorResponse({status:error.status,error:payload,
+     statusText:error.response?.statusText,url:error.response?.url,headers:new HttpHeaders({...error.response?.errorId?{'error-id':error.response.errorId}:{},...error.response?.testMode?{'test-mode':error.response.testMode}:{}})}));
+   }
    if(copy)mapped=new AppError(copy);
    mapped.description=redactBugReportText(mapped.description);mapped.details=redactBugReportText(mapped.details??'');
    ref=this.dialogs.open(NativeLoginErrorDialogComponent,{panelClass:'original-native-login-error-dialog',disableClose:true,autoFocus:'dialog',

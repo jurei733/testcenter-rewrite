@@ -91,6 +91,47 @@ test('snapshot failure is not a successful empty snapshot and a later tick can r
  t.mock.timers.tick(0);await settle();assert.deepEqual(rows,[]);assert.equal(backend.connectionStatus$.value,'error');assert.equal(backend.problem$.value,'Owned timeout');
  t.mock.timers.tick(5000);await settle();assert.deepEqual(rows,[[]]);assert.equal(backend.problem$.value,'');sub.unsubscribe();
 });
+const validMonitorSnapshot='[{"testId":9007199254740993,"personId":7,"groupName":"Owned","personLabel":"One","timestamp":1793210400,"testState":{},"unitState":{}}]';
+test('a malformed JSON snapshot keeps the last signed-int64 rows and waits for explicit reload',async t=>{
+ clock(t);const {backend,session}=transport(),rows=[],outages=[];let reads=0;
+ session.text=async()=>++reads===1?validMonitorSnapshot:'{"rawOwnedPayload":';
+ backend.snapshotOutage$.subscribe(value=>outages.push(value));
+ const sub=backend.observeSessionsMonitor('owned').subscribe(value=>rows.push(value));
+ await settle();t.mock.timers.tick(5000);await settle();
+ assert.deepEqual(rows.map(snapshot=>snapshot.map(row=>row.testId)),[['9007199254740993']]);
+ assert.equal(backend.connectionStatus$.value,'polling-fetch');
+ assert.equal(outages.length,1);
+ const error=outages[0].error;
+ assert.equal(error.label,'Unbekanntes Verbindungsproblem');assert.equal(error.type,'network');
+ assert.ok(!Object.values(error).some(value=>String(value).includes('rawOwnedPayload')));
+ t.mock.timers.tick(15000);await settle();assert.equal(reads,2);sub.unsubscribe();
+});
+test('a wrong-shaped snapshot stops row updates while the transport continues until reopening',async t=>{
+ clock(t);const {backend,session}=transport(),rows=[],outages=[],bodies=[validMonitorSnapshot,'[{"personId":7}]','[]'];
+ session.text=async()=>bodies.shift();
+ backend.snapshotOutage$.subscribe(value=>outages.push(value));
+ const sub=backend.observeSessionsMonitor('owned').subscribe(value=>rows.push(value));
+ await settle();t.mock.timers.tick(5000);await settle();
+ assert.equal(rows.length,1);assert.equal(backend.connectionStatus$.value,'polling-sleep');
+ assert.equal(outages.length,1);assert.equal(outages[0].error.label,'Programmfehler: TypeError');
+ t.mock.timers.tick(5000);await settle();
+ assert.equal(bodies.length,0);
+ assert.deepEqual(rows.map(snapshot=>snapshot.map(row=>row.testId)),[['9007199254740993']]);
+ sub.unsubscribe();
+ bodies.push('[]');
+ const reopened=backend.observeSessionsMonitor('owned').subscribe(value=>rows.push(value));
+ await settle();assert.deepEqual(rows.at(-1),[]);reopened.unsubscribe();
+});
+test('a contentless snapshot leaves valid rows in place without a further poll or a fabricated empty list',async t=>{
+ clock(t);const {backend,session}=transport(),rows=[],outages=[];let reads=0;
+ session.text=async()=>++reads===1?validMonitorSnapshot:'null';
+ backend.snapshotOutage$.subscribe(value=>outages.push(value));
+ const sub=backend.observeSessionsMonitor('owned').subscribe(value=>rows.push(value));
+ await settle();t.mock.timers.tick(5000);await settle();
+ assert.equal(rows.length,1);assert.equal(backend.connectionStatus$.value,'polling-fetch');
+ t.mock.timers.tick(15000);await settle();
+ assert.equal(reads,2);assert.deepEqual(outages,[]);sub.unsubscribe();
+});
 for(const status of [404,410,500,503,504])test('HTTP '+status+' retains the previous monitor snapshot and awaits an owned reload',async t=>{
  clock(t);const {backend,session}=transport(),rows=[],outages=[];let reads=0;
  const error=new NativeMonitorHttpError(status,'Owned snapshot failure');

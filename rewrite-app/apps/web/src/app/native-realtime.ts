@@ -2,7 +2,7 @@ import {Observable} from 'rxjs';
 export type NativeConnectionStatus='initial'|'polling-fetch'|'polling-sleep'|'ws-online'|'ws-offline'|'error';
 export interface NativeRealtimeOptions<T>{
  channel:'commands'|'test-sessions';scope:AbortSignal;current:()=>boolean;
- read:(signal:AbortSignal)=>Promise<{data:T;subscribeToken:string|null}>;
+ read:(signal:AbortSignal)=>Promise<{data:T|undefined;subscribeToken:string|null}|null>;
  decode:(wire:string)=>T|undefined;status:(status:NativeConnectionStatus)=>void;
  onConnecting?:()=>void;
  error?:(error:unknown,owner:AbortSignal)=>void|'wait-for-reload';
@@ -50,7 +50,12 @@ export function observeNativeRealtime<T>(options:NativeRealtimeOptions<T>):Obser
   const poll=async()=>{
    if(!current()||reading)return;reading=true;stopSocket();options.status('polling-fetch');
    try{
-    const response=await options.read(signal);if(!current())return;subscriber.next(response.data);if(!current())return;
+    const response=await options.read(signal);
+    // No response body stops Original polling. An unusable snapshot can
+    // allow the transport to continue without updating the retained state.
+    if(!current()||response===null)return;
+    if(response.data!==undefined)subscriber.next(response.data);
+    if(!current())return;
     if(response.subscribeToken&&/^[A-Za-z0-9_-]{20,128}$/.test(response.subscribeToken))connect(response.subscribeToken);
     else{options.status('polling-sleep');schedule();}
    }catch(error){
