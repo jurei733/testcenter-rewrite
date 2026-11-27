@@ -346,19 +346,33 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       const original=JSON.parse(readFileSync(join(sourceFixture,'observations.json'))).rows.find(row=>row.label===archiveInput.label);
       assert.deepEqual(await send([[archiveInput.name,archive]],201),original.value);
 
-      await t.test('same-basename ZIP Units warn only on the remaining cache entry',async()=>{
+      await t.test('same-basename ZIP Units keep one overwrite warning on the current catalog revision',async()=>{
         const fileName='bestand.xml';
-        const unitRevision=label=>Buffer.from(xml('Unit','ZIP.UNIT',
+        const unitId='ZIP.UNIT';
+        const unitRevision=(label,id=unitId)=>Buffer.from(xml('Unit',id,
           '<Definition player="catalog-player@1.2.9">owned</Definition>',`<Label>${label}</Label>`));
+        const catalogUnits=async()=>{
+          const response=await fetch(base+workspace+'/files',{headers:{AuthToken:reader}});
+          assert.equal(response.status,200);
+          assert.equal(response.headers.get('cache-control'),'private, no-store');
+          return (await response.json()).Unit.filter(row=>row.name===fileName);
+        };
+        const hoverWarnings=async()=>{
+          const catalog=await api(scoped+'/files',undefined,'GET',200,reader);
+          const unit=catalog.items.find(row=>row.fileName==='Unit/'+fileName);
+          return unit?.validationDiagnostics?.filter(row=>row.severity==='warning').map(row=>row.message)??[];
+        };
         const first=['z-alpha/'+fileName,unitRevision('Alpha')];
         const second=['a-beta/'+fileName,unitRevision('Beta')];
         const seed=unitRevision('Initial');
         assert.deepEqual(await send([[fileName,seed]],201),{[fileName]:{warning:['Unit is never used']}});
+        assert.deepEqual((await catalogUnits()).map(row=>row.report.warning),[[]]);
+        assert.deepEqual(await hoverWarnings(),[]);
         assert.deepEqual(await download('Unit',fileName,reader),seed);
 
         const actualReports=[],expectedReports=[];
-        const overwritten='File of name `bestand.xml` did already exist and was overwritten.';
-        for(const [zipName,members] of [['first.zip',[first,second]],['reverse.zip',[second,first]]]){
+        const overwritten='File of name `'+fileName+'` did already exist and was overwritten.';
+        for(const [zipName,members,activeLabel] of [['first.zip',[first,second],'Beta'],['reverse.zip',[second,first],'Alpha']]){
           const upload=[[zipName,workspaceZip(members,{deflate:true})]];
           await send(upload,403,reader);
           actualReports.push(await send(upload,201));
@@ -377,8 +391,42 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
           }
           assert.deepEqual(await download('Unit',fileName),members[1][1]);
           assert.deepEqual(await download('Unit',fileName,reader),members[1][1]);
+
+          const current=await catalogUnits();
+          assert.deepEqual(current.map(row=>[row.id,row.info.label,row.report.warning]),[[unitId,activeLabel,[overwritten]]]);
+          assert.deepEqual(await hoverWarnings(),[overwritten]);
+          if(zipName==='first.zip'){
+            assert.deepEqual(await send(upload,201),actualReports.at(-1));
+            assert.deepEqual(await catalogUnits(),current);
+            assert.deepEqual(await hoverWarnings(),[overwritten]);
+            assert.deepEqual(await download('Unit',fileName,reader),members[1][1]);
+          }
         }
         assert.deepEqual(actualReports,expectedReports);
+
+        const otherId='ZIP.OTHER';
+        const otherBytes=unitRevision('Other',otherId);
+        const otherPath='new/'+fileName;
+        const otherUpload=[['other.zip',workspaceZip([[otherPath,otherBytes]],{deflate:true})]];
+        const current=await catalogUnits();
+        const otherReportPath='other.zip_Extract/'+otherPath;
+        const rejected=(await send(otherUpload,207))[otherReportPath];
+        assert.match(rejected.error[0],/new file's ID .* differs from old one/);
+        assert.deepEqual(rejected.warning,['Unit is never used']);
+        assert.deepEqual(await catalogUnits(),current);
+        assert.deepEqual(await hoverWarnings(),[overwritten]);
+        assert.deepEqual(await download('Unit',fileName,reader),first[1]);
+
+        const path='Unit/'+fileName;
+        const deleted=await fetch(base+workspace+'/files',{method:'DELETE',
+          headers:{AuthToken:writer,'Content-Type':'application/json'},body:JSON.stringify({f:[path]})});
+        assert.equal(deleted.status,207);
+        assert.deepEqual((await deleted.json()).deleted,[path]);
+        assert.deepEqual(await catalogUnits(),[]);
+        assert.deepEqual(await send(otherUpload,201),{[otherReportPath]:{warning:['Unit is never used']}});
+        assert.deepEqual((await catalogUnits()).map(row=>[row.id,row.info.label,row.report.warning]),[[otherId,'Other',[]]]);
+        assert.deepEqual(await hoverWarnings(),[]);
+        assert.deepEqual(await download('Unit',fileName,reader),otherBytes);
       });
     });
     const replacement=await api(scope+'/source-packages/'+created[1].sourcePackageId+'/replacements',{

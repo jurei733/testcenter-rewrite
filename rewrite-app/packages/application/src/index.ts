@@ -9,7 +9,7 @@ export type {OriginalAssetPort} from './original-asset.js';
 import {applicationAssetImageType} from './application-asset-image.js';
 export {prepareOriginalApplicationAssets,originalApplicationAssetScope} from './original-application-asset.js';
 export type {OriginalApplicationAssetIdentity,OriginalApplicationAssetSummary,OriginalApplicationAsset,OriginalApplicationAssetContext} from './original-application-asset.js';
-import {readWorkspaceFileReport,appendWorkspaceFileReport,workspaceFileReportErrors} from './original-workspace-file-report.js';
+import {readWorkspaceFileReport,appendWorkspaceFileReport,workspaceFileReportErrors,workspaceFileOverwriteWarning} from './original-workspace-file-report.js';
 import {createOriginalWorkspaceArchives,assertWorkspaceUploadName,applyWorkspaceArchiveTimestamps,decodeWorkspaceBzip2Member,type WorkspaceArchiveOrigin} from './original-workspace-archive.js';
 import {originalResourceMediaType} from './original-resource-media-type.js';
 import type {OriginalWorkspaceUploadReport} from '@testcenter-rewrite-app/domain';
@@ -27645,7 +27645,7 @@ export const createFirstSliceServices = (
         if(failed)for(const message of messages.length?messages:['Import fehlgeschlagen.']){
           appendWorkspaceFileReport(validationReport,'error',message);
         }
-        if(status==='replaced')appendWorkspaceFileReport(validationReport,'warning',`File of name \`${member.fileName}\` did already exist and was overwritten.`);
+        if(status==='replaced')appendWorkspaceFileReport(validationReport,'warning',workspaceFileOverwriteWarning(member.fileName));
         entries.push({entryName:member.entryName,fileName:member.fileName,status,validationReport,sourcePackageId:result.sourcePackage.sourcePackageId,
           message:failed?messages.join('\n')||'Import fehlgeschlagen.':status==='replaced'?'Datei aktualisiert.':'Datei hochgeladen.',...(failed?{errorCode:'workspace_archive_member_import_failed'}:{})});
       }catch(error){
@@ -30938,18 +30938,26 @@ export const createFirstSliceServices = (
         const workspace = await requireWorkspace(repository, input.tenantKey, input.workspaceKey);
         const [sourcePackages, activityEvents] = await Promise.all([
           repository.listSourcePackagesByWorkspace(workspace.tenantId, workspace.workspaceId),
-          repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId, workspace.workspaceId)
+          repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId, workspace.workspaceId, [
+            'source_package_created', 'source_package_replaced', 'source_package_assembled'
+          ])
         ]);
         // Assemblies and replaced immutable revisions stay available through
         // canonical history/download APIs, but are not current loose files.
-        const sourceFileIds = new Set(activityEvents.flatMap(event=>
-          event.eventType==='source_package_created' && event.details.intakeMode==='workspace_file' ? [event.subjectId] :
-          event.eventType==='source_package_replaced' && event.details.replacementMode==='workspace_file' &&
-            typeof event.details.replacementSourcePackageId==='string' ? [event.details.replacementSourcePackageId] : []));
+        const sourceFileEvents = new Map<string, 'created' | 'replaced'>();
+        for (const event of activityEvents) {
+          if (event.eventType === 'source_package_created' && event.details.intakeMode === 'workspace_file') {
+            sourceFileEvents.set(event.subjectId, 'created');
+          }
+          if (event.eventType === 'source_package_replaced' && event.details.replacementMode === 'workspace_file' &&
+              typeof event.details.replacementSourcePackageId === 'string') {
+            sourceFileEvents.set(event.details.replacementSourcePackageId, 'replaced');
+          }
+        }
         const currentFiles=selectCurrentWorkspaceFiles(sourcePackages,activityEvents);
         const catalog=buildWorkspaceFileCatalog(applyWorkspaceArchiveTimestamps(currentFiles
           .map(source => {
-            if (sourceFileIds.has(source.sourcePackageId)) return projectWorkspaceFile(source);
+            if (sourceFileEvents.has(source.sourcePackageId)) return projectWorkspaceFile(source);
             const decoded = decodePersistedSourceDocument(source);
             return {sourcePackageId: source.sourcePackageId, fileName: source.fileName,
               fileType: classifyWorkspaceSourcePackage(source, decoded), status: source.status,
@@ -31002,6 +31010,16 @@ export const createFirstSliceServices = (
           for(const level of ['warning','info'] as const)for(const message of notices[level]??[]){
             file.validationDiagnostics.push({code:'workspace_xml_'+level,severity:level,message});
           }
+        }
+        // The replacement event commits with the new physical revision. Only
+        // the catalog's current revision can carry its overwrite warning.
+        for (const file of catalog.items) {
+          if (file.status === 'rejected' || sourceFileEvents.get(file.sourcePackageId) !== 'replaced') continue;
+          (file.validationDiagnostics ??= []).push({
+            code: 'workspace_file_overwritten',
+            severity: 'warning',
+            message: workspaceFileOverwriteWarning(file.fileName)
+          });
         }
         return catalog;
       },

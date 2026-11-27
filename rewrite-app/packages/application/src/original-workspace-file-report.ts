@@ -4,13 +4,17 @@ import type {WorkspaceFileValidationReport} from '@testcenter-rewrite-app/domain
 import {normalizeWorkspacePlayerResourceId,type WorkspaceCatalogInput} from './workspace-file-catalog.js';
 import {originalXmlSchemaPolicy} from './original-xml-schema.js';
 
-/** Source File::report keeps four messages and an aggregate in position five.
- * Reports belong to the authenticated upload response, never the public catalog. */
+/** Source File::report keeps four messages and an aggregate in position five. */
 export function appendWorkspaceFileReport(report:WorkspaceFileValidationReport,level:'error'|'warning'|'info',message:string):void {
   const rows=report[level]??=[];
   if(rows.length===5){const prior=/^(\d+) more (?:error|warning|info)s\.$/.exec(rows[4]!);rows[4]=`${prior?Number(prior[1])+1:2} more ${level}s.`;}
   else rows.push(message);
   report[level]=rows;
+}
+
+export function workspaceFileOverwriteWarning(fileName: string): string {
+  const name = fileName.split(/[\\/]/).at(-1);
+  return `File of name \`${name}\` did already exist and was overwritten.`;
 }
 
 export function readWorkspaceFileReport(input:WorkspaceCatalogInput,{unused=false,archiveEntries}:{unused?:boolean;archiveEntries?:number}={}):WorkspaceFileValidationReport {
