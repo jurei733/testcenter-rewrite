@@ -272,6 +272,8 @@ try {
     const expected=Buffer.concat([Buffer.from([255,254]),Buffer.from('<?xml version="1.0" encoding="UTF-16"?>'+unitSource.replace('private-unit-bytes','new-private-unit-bytes'),'utf16le')]);
     assert.deepEqual(await readFile(saved),expected);
     if(theme==='Primar' && width===1280) {
+      await readPage.goto(base+'/app/content?ui=original');
+      await readPage.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
       const currentUnit=(await api(scope+'/files')).items.find(value=>value.metadata.identifier==='NATIVE.UNIT');
       const route=base+scope+'/files/'+currentUnit.sourcePackageId+'/download';
       let requestStarted;const started=new Promise(done=>{requestStarted=done;});

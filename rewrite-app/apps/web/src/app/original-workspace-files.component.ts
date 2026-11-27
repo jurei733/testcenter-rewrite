@@ -188,7 +188,7 @@ export class OriginalWorkspaceFilesComponent implements AfterViewInit,OnChanges,
  async download(file:OriginalWorkspaceFile):Promise<void> {
    const captured=this.controller.captureDownload(file);if(!captured)return;
    try {
-     const result=await this.api.download(captured.path,{authorization:'Bearer '+captured.token});
+     const result=await this.api.download(captured.path,captured.headers);
      if(!captured.current() || this.destroyed)return;
      const url=URL.createObjectURL(result.blob),link=document.createElement('a');link.href=url;link.download=captured.name;
      document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);

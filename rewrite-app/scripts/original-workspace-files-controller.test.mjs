@@ -253,6 +253,25 @@ test('native deletion conflict reports server diagnostics only while the capture
  held.reject(conflict);
  assert.equal(await stale,false);assert.equal(current(),false);assert.equal(f.controller.problem,'');
 });
+test('numeric Files resolves current physical bytes by native type and escaped name',async()=>{
+ const name='Überblick #1?.xml';
+ const unit=file('historical-id','Unit/'+name);
+ const pkg=file('package-id','package.zip','Package');
+ const native={...scope('a','read-token',[role('a','read_only')]),nativeRole:'RO',workspaceNumber:'17'};
+ const f=fixture(call=>normal(call,[unit,pkg]),native);
+ await f.controller.connect();
+ const [download,packageDownload]=[unit,pkg].map(item=>f.controller.captureDownload(
+   f.controller.files.find(row=>row.sourcePackageId===item.sourcePackageId)));
+ assert.equal(download.path,'/workspace/17/file/Unit/%C3%9Cberblick%20%231%3F.xml');
+ assert.deepEqual(download.headers,{AuthToken:'read-token'});
+ assert.equal(download.name,name);
+ assert.equal(packageDownload.path,'/api/v1/tenants/a/workspaces/a/files/package-id/download');
+ assert.deepEqual(packageDownload.headers,{authorization:'Bearer read-token'});
+ f.setScope({...native,token:'new-token'});
+ assert.equal(download.current(),false);
+ assert.equal(packageDownload.current(),false);
+});
+
 test('old confirmation and download ownership are invalid after workspace change, logout or destruction',async()=>{
  for(const transition of ['scope','logout','destroy']){
   const f=fixture(call=>normal(call));await f.controller.connect();f.controller.checkAll('Unit',true);

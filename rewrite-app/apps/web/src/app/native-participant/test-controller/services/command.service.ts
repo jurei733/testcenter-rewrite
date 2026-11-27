@@ -17,6 +17,7 @@ import {
   tap
 } from 'rxjs/operators';
 import {NativeHttpClient as HttpClient} from '../../native-http-client';
+import { AppError } from '../../app.interfaces';
 import {
   type Command, type CommandKeyword, commandKeywords, isKnownCommand, type TcPublicApi, type TestControllerState
 } from '../interfaces/test-controller.interfaces';
@@ -41,6 +42,7 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
   private testStartedSubscription: Subscription | null = null;
   private executedCommandIds: Array<string | number> = [];
   private readonly pendingCommands = new Set<string | number>();
+  private readonly unconfirmedAcks = new Map<Command['id'], Command>();
   private debugCommands: TcPublicApi | undefined;
 
   readonly isProductionMode=inject(NATIVE_PRODUCTION);
@@ -81,7 +83,8 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
       this.testStartedSubscription.unsubscribe();
     }
     if(this.debugCommands && (window as any).tc===this.debugCommands) delete (window as any).tc;
-    this.pendingCommands.clear();this.command$.complete();this.commandReceived$.complete();super.ngOnDestroy();
+    this.pendingCommands.clear();this.unconfirmedAcks.clear();
+    this.command$.complete();this.commandReceived$.complete();super.ngOnDestroy();
   }
 
   private subscribeReceivedCommands(): Subscription {
@@ -97,8 +100,17 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
           filter(() => this.http.isCurrent && testId === this.tcs.testId),
           map(() => command),tap(value => this.executedCommandIds.push(value.id))
         ) : EMPTY).pipe(
-          // A failed ACK has no local effect and remains eligible for a later poll.
-          catchError(() => {this.connectionStatus$.next('error');this.recoverPolling();return EMPTY;}),
+          catchError((error: unknown) => {
+            // The server may have committed the ACK before the connection broke.
+            // It then omits the command from future snapshots. Retry the same
+            // idempotent ACK when an owned command snapshot arrives again.
+            if (error instanceof AppError && [0, 502, 503, 504].includes(error.code ?? -1)) {
+              this.unconfirmedAcks.set(command.id, command);
+            }
+            this.connectionStatus$.next('error');
+            this.recoverPolling();
+            return EMPTY;
+          }),
           finalize(() => this.pendingCommands.delete(command.id))
         )),
       takeUntil(fromEvent(this.http.accessSignal,'abort'))
@@ -128,10 +140,15 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
           if (this.pollingEndpoint) {
             return this.observeEndpointAndChannel();
           }
+          this.unconfirmedAcks.clear();
           this.cutConnection();
           return of([]);
         }),
-        switchMap(commands => of(...commands)),
+        switchMap(commands => {
+          const unconfirmed = [...this.unconfirmedAcks.values()];
+          this.unconfirmedAcks.clear();
+          return of(...unconfirmed, ...commands);
+        }),
         takeUntil(fromEvent(this.http.accessSignal,'abort'))
       ).subscribe(this.commandReceived$);
   }

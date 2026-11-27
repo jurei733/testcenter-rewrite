@@ -277,10 +277,17 @@ export class OriginalWorkspaceFilesController {
       finally{if(this.owns(owner)){this.busy=false;this.changed();}}
     }};
   }
-  captureDownload(file:OriginalWorkspaceFile):{path:string;name:string;token:string;current:()=>boolean}|null {
+  captureDownload(file:OriginalWorkspaceFile):{path:string;name:string;headers:Record<string,string>;current:()=>boolean}|null {
     const owner=this.owner;if(!owner || !this.owns(owner) || !this.files.includes(file))return null;
-    return {path:this.path(owner,productionApiRoutes.workspace.downloadWorkspaceFile,file.sourcePackageId),name:file.name,token:owner.token,
-      current:()=>this.owns(owner)};
+    if(owner.workspaceNumber && file.fileType!=='Package'){
+      // The native address resolves the published file when the operator clicks,
+      // including a revision published since this tab last loaded the catalog.
+      const path='/workspace/'+encodeURIComponent(owner.workspaceNumber)+'/file/'+
+        encodeURIComponent(file.fileType)+'/'+encodeURIComponent(file.name);
+      return {path,name:file.name,headers:{AuthToken:owner.token},current:()=>this.owns(owner)};
+    }
+    const path=this.path(owner,productionApiRoutes.workspace.downloadWorkspaceFile,file.sourcePackageId);
+    return {path,name:file.name,headers:{authorization:'Bearer '+owner.token},current:()=>this.owns(owner)};
   }
   destroy():void {
     this.destroyed=true;this.epoch++;this.owner=null;

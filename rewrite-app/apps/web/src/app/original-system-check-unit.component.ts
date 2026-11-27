@@ -21,7 +21,8 @@ import { OriginalSystemCheckPlayerControlsComponent } from "./original-system-ch
       @if (unit.playerHtml && unit.unitDefinition) {
         <div class="unit-frame" [class.is-error]="!!unitError" [style.top.px]="frameOffset()" id="originalSystemCheckUnit">
           <app-verona-player-host #player
-            [originalSystemCheckUi]="true" [playerHtml]="unit.playerHtml" [playerKey]="unit.playerKey || 'system-check-player'"
+            [originalSystemCheckUi]="true" [systemCheckResponseSnapshot]="!!view.native"
+            [playerHtml]="unit.playerHtml" [playerKey]="unit.playerKey || 'system-check-player'"
             testRunId="system-check" [unitKey]="unit.unitKey" [unitTitle]="unit.displayLabel"
             [unitDefinition]="unit.unitDefinition" [unitDefinitionType]="unit.unitDefinitionType || ''"
             [savedResponse]="view.unitResponse" [canComplete]="true" logPolicy="disabled"

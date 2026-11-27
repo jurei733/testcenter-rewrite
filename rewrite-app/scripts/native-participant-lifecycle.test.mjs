@@ -5,6 +5,7 @@ import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
+import {brotliDecompressSync} from 'node:zlib';
 const app=fileURLToPath(new URL('..',import.meta.url));
 const root=resolve(app,'apps/web/src/app/native-participant');
 const require=createRequire(resolve(app,'package.json')),ts=require('typescript'),rx=require('rxjs'),ops=require('rxjs/operators');
@@ -33,6 +34,20 @@ function load(file){
  });return exports;
 }
 const tokens=load('native-tokens.ts'),{NativeHttpClient}=load('native-http-client.ts'),{CommandService}=load('test-controller/services/command.service.ts');
+
+test('only the exact Lottie 1.2.2 release resolves the download URL inside the opaque Player',async()=>{
+ const {prepareNativePlayerHtml}=load('native-player-html.ts');
+ const fixture=resolve(app,'test-fixtures/original-testcenter/players/iqb-player-lottie-1.2.2.html.br.base64');
+ const published=brotliDecompressSync(Buffer.from(readFileSync(fixture,'utf8'),'base64')).toString('utf8');
+ const previous='new URL(t,parent.location.origin)';
+ const replacement='new URL(t)';
+ assert.equal(published.split(previous).length,2);
+ assert.equal(await prepareNativePlayerHtml(published),published.replace(previous,replacement));
+ const alternate=published+'<!-- local edition -->';
+ assert.equal(await prepareNativePlayerHtml(alternate),alternate);
+ const other='<p>Another Player</p>';
+ assert.equal(await prepareNativePlayerHtml(other),other);
+});
 test('destroying the actual owned injector retires only its Router adapter and preserves global navigation',async()=>{
  const core=await import(pathToFileURL(require.resolve('@angular/core')).href),{nativeOwnedRouter}=load('native-owned-router.ts');
  const {DefaultUrlSerializer}=await import(pathToFileURL(require.resolve('@angular/router')).href);const serializer=new DefaultUrlSerializer();
@@ -142,6 +157,35 @@ test('native ACK starts one second apart, overlaps, deduplicates pending packets
 test('a failed native ACK produces no effect and a later poll can retry it',t=>{
  const f=commands(t);f.send('1');f.started[0].response.error(Error('HTTP500'));assert.deepEqual(f.effects,[]);f.send('1');t.mock.timers.tick(1000);assert.equal(f.started.length,2);f.started[1].response.next(null);f.started[1].response.complete();assert.deepEqual(f.effects.map(x=>x.id),['1']);
 });
+for(const [code,retry] of [[0,true],[503,true],[404,false]])test(`native ACK recovery after HTTP ${code} waits for the command transport to recover`,t=>{
+ const f=commands(t),packets=new rx.Subject(),{AppError}=load('app.interfaces.ts');
+ f.service.observeEndpointAndChannel=()=>packets;
+ f.tcs.testMode.receiveRemoteCommands=true;f.tcs.state$.next('RUNNING');
+ const command={id:'1',keyword:'pause',arguments:[],timestamp:'1'};
+ packets.next([command]);
+ f.started[0].response.error(new AppError({code,label:'Owned failure',description:''}));
+ t.mock.timers.tick(20000);
+ assert.equal(f.started.length,1);assert.deepEqual(f.effects,[]);
+ // The persisted ACK has already removed this command from the queue.
+ packets.next([]);
+ assert.equal(f.started.length,retry?2:1);
+ if(!retry)return;
+ assert.equal(f.started[1].path,f.started[0].path);
+ packets.next([command]);
+ t.mock.timers.tick(10000);assert.equal(f.started.length,2);assert.deepEqual(f.effects,[]);
+ f.started[1].response.next(null);f.started[1].response.complete();
+ packets.next([]);packets.next([command]);
+ t.mock.timers.tick(10000);assert.equal(f.started.length,2);
+ assert.deepEqual(f.effects.map(value=>value.id),['1']);
+});
+test('access retirement drops an ambiguous ACK before the next command snapshot',t=>{
+ const f=commands(t),packets=new rx.Subject(),{AppError}=load('app.interfaces.ts');
+ f.service.observeEndpointAndChannel=()=>packets;
+ f.tcs.testMode.receiveRemoteCommands=true;f.tcs.state$.next('RUNNING');
+ f.send('1');f.started[0].response.error(new AppError({code:0,label:'Owned failure',description:''}));
+ f.scope.abort();packets.next([]);t.mock.timers.tick(10000);
+ assert.equal(f.started.length,1);assert.deepEqual(f.effects,[]);
+});
 test('access retirement cancels pending native ACKs and queued starts',t=>{
  const f=commands(t);f.send('1');f.send('2');f.scope.abort();f.started[0].response.next(null);t.mock.timers.tick(10000);assert.equal(f.started.length,1);assert.deepEqual(f.effects,[]);
 });
@@ -183,8 +227,18 @@ function unitHost(){
  const mds={http:client,appConfig:{veronaPlayerApiVersionMin:2,veronaPlayerApiVersionMax:6},getAuthData:()=>({groupToken:'cap-A',viewSettings:{}})},host=new UnithostComponent(tcs,mds,{},api,{}, {},{backendUrl:'/'},{}),source={postMessage:(data,origin)=>sent.push({data,origin})},frame={contentWindow:source,isConnected:true,remove(){this.isConnected=false;}},lease=api.channel.bind(frame,unit.alias,()=>tcs.currentUnit===unit);host.playerLease=lease;
  return{owner,api,unit,tcs,mds,host,source,frame,lease,sent,resolve,reject,event:{source,origin:'null',data:{type:'vopReadyNotification',metadata:{specVersion:'6.0'}}}};
 }
-test('the actual Source Unit host starts only its own ready frame with opaque session and unchanged definition/state',async()=>{
- const f=unitHost(),pending=f.host.handleIncomingMessage(f.event);assert.equal(f.sent.length,0);f.resolve({targets:{}});await pending;assert.equal(f.sent.length,1);assert.equal(f.sent[0].data.sessionId,f.lease.nonce);assert.equal(f.sent[0].data.unitDefinition,f.unit.definition);assert.deepEqual(f.sent[0].data.unitState.dataParts,f.unit.dataParts);f.host.ngOnDestroy();f.api.ngOnDestroy();
+test('the actual Source Unit host starts only its own ready frame with opaque session and unchanged definition/state',async t=>{
+ const browserOrigin='https://owned.invalid';
+ const previousWindow=Object.getOwnPropertyDescriptor(globalThis,'window');
+ Object.defineProperty(globalThis,'window',{configurable:true,value:{location:{origin:browserOrigin}}});
+ t.after(()=>{if(previousWindow)Object.defineProperty(globalThis,'window',previousWindow);else delete globalThis.window;});
+ const f=unitHost(),pending=f.host.handleIncomingMessage(f.event);assert.equal(f.sent.length,0);f.resolve({targets:{}});await pending;
+ assert.equal(f.sent.length,1);
+ const {data}=f.sent[0];
+ assert.equal(data.sessionId,f.lease.nonce);assert.equal(data.unitDefinition,f.unit.definition);
+ assert.deepEqual(data.unitState.dataParts,f.unit.dataParts);
+ assert.equal(data.playerConfig.directDownloadUrl,browserOrigin+'/file/cap-A/ws_9223372036854775807/Resource');
+ f.host.ngOnDestroy();f.api.ngOnDestroy();
 });
 for(const failure of [false,true])test('the actual Unit host drops late '+(failure?'failed':'successful')+' ready work after unit replacement',async()=>{
  const f=unitHost(),pending=f.host.handleIncomingMessage(f.event);f.tcs.currentUnit={...f.unit,alias:'UNIT_B',sequenceId:2,definition:'B secret'};const nextFrame={contentWindow:{postMessage(){}},isConnected:true,remove(){this.isConnected=false;}};f.api.channel.bind(nextFrame,'UNIT_B',()=>true);

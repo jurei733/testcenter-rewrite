@@ -282,6 +282,7 @@ export class VeronaPlayerHostComponent
   @Input() unitCount = 1;
   @Input() originalUi = false;
   @Input() originalSystemCheckUi = false;
+  @Input() systemCheckResponseSnapshot = false;
   @Input() unitNavigationLabelMode: "hidden" | "index" | "label" | "label_short" = "index";
   @Input() unitNavigationLabel = "";
   @Input() unitNavigationControls: "both" | "forward_only" | "hidden" = "both";
@@ -585,12 +586,20 @@ export class VeronaPlayerHostComponent
             entries: logEntries
           });
         }
-        this.latestResponse = mergeCapturedVeronaUnitResponse(this.latestResponse, {
-          unitState: notification.unitState,
-          playerState: notification.playerState,
-          captureTimestamp: Date.now(),
-          storedFieldTimestamps: this.frameResponseTimestamps
-        });
+        if (this.systemCheckResponseSnapshot) {
+          const dataParts = notification.unitState?.dataParts;
+          if (dataParts && typeof dataParts === "object" && !Array.isArray(dataParts)) {
+            // The native Systemcheck replaces its report parts on each snapshot, including an empty one.
+            this.latestResponse = serializeVeronaUnitResponse({ unitState: notification.unitState });
+          }
+        } else {
+          this.latestResponse = mergeCapturedVeronaUnitResponse(this.latestResponse, {
+            unitState: notification.unitState,
+            playerState: notification.playerState,
+            captureTimestamp: Date.now(),
+            storedFieldTimestamps: this.frameResponseTimestamps
+          });
+        }
         this.responseChange.emit(this.latestResponse);
         this.responseUpdate.emit({
           testRunId: this.frameTestRunId,

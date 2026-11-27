@@ -37,7 +37,37 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     await setup.upload('people.xml',systemCheckRoster());
     await prepareNativeNetworkChecks(setup);
     const metadata = {$schema: 'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json', id: 'owned-native-syscheck-player', version: '1.0.0', specVersion: '6.0', metadataVersion: '2.0', type: 'player', name: [{lang: 'de', value: 'Owned native Systemcheck Player'}]};
-    const player = '<!doctype html><html><script type="application/ld+json">' + JSON.stringify(metadata) + '</script><body><label>Owned Systemcheck answer<input aria-label="Owned Systemcheck answer" disabled></label><script>let sessionId;addEventListener("message",event=>{if(event.data?.type==="vopStartCommand"){sessionId=event.data.sessionId;document.body.dataset.definitionType=event.data.unitDefinitionType??"unspecified";document.querySelector("input").disabled=false;document.body.dataset.started="true";}});document.querySelector("input").addEventListener("input",event=>parent.postMessage({type:"vopStateChangedNotification",sessionId,unitState:{dataParts:{answer:event.target.value},unitStateDataType:"owned-syscheck-response",responseProgress:"complete",presentationProgress:"complete"}},"*"));parent.postMessage({type:"vopReadyNotification",metadata:{specVersion:"6.0"}},"*");</script></body></html>';
+    const player = `<!doctype html>
+      <html><script type="application/ld+json">${JSON.stringify(metadata)}</script>
+      <body>
+        <label>Owned Systemcheck answer<input aria-label="Owned Systemcheck answer" disabled></label>
+        <button type="button" disabled>Keep only the current answer</button>
+        <script>
+          let sessionId;
+          const input = document.querySelector("input");
+          const keep = document.querySelector("button");
+          addEventListener("message", event => {
+            if (event.data?.type !== "vopStartCommand") return;
+            sessionId = event.data.sessionId;
+            document.body.dataset.definitionType = event.data.unitDefinitionType ?? "unspecified";
+            input.disabled = false;
+            keep.disabled = false;
+            document.body.dataset.started = "true";
+          });
+          const send = unitState => parent.postMessage({type:"vopStateChangedNotification", sessionId, unitState}, "*");
+          input.addEventListener("input", () => send({
+            dataParts: {answer: input.value, preview: "Temporary response"},
+            unitStateDataType: "owned-syscheck-preview",
+            responseProgress: "complete",
+            presentationProgress: "complete"
+          }));
+          keep.addEventListener("click", () => send({
+            dataParts: {answer: input.value},
+            unitStateDataType: "owned-syscheck-response"
+          }));
+          parent.postMessage({type:"vopReadyNotification", metadata:{specVersion:"6.0"}}, "*");
+        </script>
+      </body></html>`;
     await setup.upload('owned-native-syscheck-player-1.0.html', player, 'text/html');
     await setup.upload('flow-unit.xml', systemCheckXml('Unit', '<Metadata><Id>R101.UNIT</Id><Label>Owned Systemcheck Unit</Label></Metadata><Definition player="owned-native-syscheck-player-1.0">{"owned":true}</Definition>'));
     const questions = '<Q id="heading" type="header" prompt="Owned questions"/><Q id="answer" type="string" prompt="Owned required answer" required="true"/><Q id="agree" type="check" prompt="Owned required agreement" required="true"/><Q id="choice" type="select" prompt="Owned selection">A#B</Q><Q id="radio" type="radio" prompt="Owned radio">C#D</Q><Q id="notes" type="text" prompt="Owned notes"/>';
@@ -141,6 +171,7 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     await pageButton(1).and(page.locator('[aria-checked="true"]')).waitFor();
     assert.ok(await backward.isEnabled());
     assert.ok(await forward.isDisabled());
+    await playerFrame.getByRole('button', {name: 'Keep only the current answer'}).click();
     mark('native-system-check-opaque-player-handshake-response');
     await next('q'); await fillQuestions(); await page.screenshot({path: join(out, 'questionnaire.png')});
     const notes = page.locator('textarea#notes');
@@ -170,7 +201,9 @@ if (!isSupervisedSmokeChild(import.meta.url)) {
     }
     const saved = await reports(); assert.equal(saved.length, 1);
     assert.equal(saved[0].details.report.title, 'r98-syscheck');
-    assert.ok(saved[0].details.report.responses.some(row => row.id === 'answer' && row.content === 'Owned opaque Player answer'));
+    assert.deepEqual(saved[0].details.report.responses.map(({id, content, responseType}) => ({id, content, responseType})), [
+      {id: 'answer', content: 'Owned opaque Player answer', responseType: 'owned-syscheck-response'}
+    ]);
     assert.ok(saved[0].details.report.questionnaire.some(row => row.id === 'agree' && row.value === true));
     assert.ok(!Object.hasOwn(reportBodies[0], 'keyPhrase')); assert.ok(!Object.hasOwn(reportBodies[0], 'title'));
     await page.screenshot({path: join(out, 'saved-dialog.png')});

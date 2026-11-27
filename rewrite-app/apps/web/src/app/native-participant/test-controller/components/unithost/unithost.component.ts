@@ -1,4 +1,5 @@
 import type {NativePlayerLease} from '../../../native-player-channel';
+import { prepareNativePlayerHtml } from '../../../native-player-html';
 import {NATIVE_FILE_SERVER_URL} from '../../../native-tokens';
 import { merge, Subscription } from 'rxjs';
 import {
@@ -405,12 +406,14 @@ export class UnithostComponent implements OnInit, OnDestroy {
       }
       return;
     }
+    if(!unit||!ownsEntry())return;
+    const playerHtml = await prepareNativePlayerHtml(this.tcs.getPlayer(unit.playerFileName));
     if(!ownsEntry())return;
-    this.prepareIframe();
+    this.prepareIframe(playerHtml);
     this.tcs.updateNavigationState();
   }
 
-  private prepareIframe(): void {
+  private prepareIframe(playerHtml: string): void {
     if (!this.tcs.currentUnit) {
       return;
     }
@@ -430,7 +433,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
     this.iFrameHostElement.nativeElement.appendChild(this.iFrameItemplayer);
     const unit=this.tcs.currentUnit;
     this.playerLease=this.apiService.channel.bind(this.iFrameItemplayer,unit.alias,()=>!this.destroyed&&this.tcs.currentUnit===unit);
-    this.iFrameItemplayer.setAttribute('srcdoc', this.tcs.getPlayer(this.tcs.currentUnit.playerFileName));
+    this.iFrameItemplayer.setAttribute('srcdoc', playerHtml);
   }
 
   private reload(): void {
@@ -456,7 +459,10 @@ export class UnithostComponent implements OnInit, OnDestroy {
       unitTitle: this.tcs.currentUnit.label,
       unitId: this.tcs.currentUnit.alias,
       stateReportPolicy: 'eager', // for pre-verona-4-players which does not report by default
-      directDownloadUrl: `${resourceUri}file/${groupToken}/ws_${this.tcs.workspaceId}/Resource`,
+      directDownloadUrl: new URL(
+        `${resourceUri}file/${groupToken}/ws_${this.tcs.workspaceId}/Resource`,
+        window.location.origin
+      ).href,
       sharedParameters: this.tcs.sharedParameters
     };
     if (
