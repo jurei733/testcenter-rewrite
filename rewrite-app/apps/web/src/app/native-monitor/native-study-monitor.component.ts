@@ -171,7 +171,14 @@ export class NativeStudyMonitorComponent {
         this.data.data = [];
         this.retryCurrent = undefined;
       }, {once: true});
-      onCleanup(() => view.abort());
+      // Route params change before the view effect's cleanup runs.
+      const routeChanges = this.route.paramMap.subscribe(params => {
+        if (params.get('workspace') !== workspace) view.abort();
+      });
+      onCleanup(() => {
+        routeChanges.unsubscribe();
+        view.abort();
+      });
 
       const load = async () => {
         if (scope.aborted || this.refreshing()) return;
@@ -209,12 +216,16 @@ export class NativeStudyMonitorComponent {
 
   private expireSession(workspace: string): void {
     this.expiredWorkspace = workspace;
+    const routeParams = this.params();
     const focused = this.document.activeElement;
     const tableWasFocused = this.studyTable()?.nativeElement.contains(focused);
     this.session.clear();
+    const anonymousScope = this.session.accessSignal;
     if (tableWasFocused) {
       afterNextRender({write: () => {
-        if (this.expiredWorkspace === workspace && this.status() === 'expired' && this.document.activeElement === focused) {
+        if (!anonymousScope.aborted && this.params() === routeParams &&
+            this.expiredWorkspace === workspace && this.status() === 'expired' &&
+            this.document.activeElement === focused) {
           this.signInLink()?.nativeElement.focus();
         }
       }}, {injector: this.injector});
