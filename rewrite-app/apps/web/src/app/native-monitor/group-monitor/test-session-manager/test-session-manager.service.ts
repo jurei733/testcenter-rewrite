@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import {
-  BehaviorSubject, combineLatest, defer, EMPTY, fromEvent, interval, Observable, of, Subject, Subscription, zip
+  BehaviorSubject, combineLatest, defer, EMPTY, fromEvent, interval, Observable, of, Subject, Subscription, throwError, zip
 } from 'rxjs';
 import type { Sort } from '@angular/material/sort';
 import {
@@ -12,7 +12,6 @@ import { TestSessionUtil } from '../test-session/test-session.util';
 import {
   type CheckingOptions,
   type CommandResponse,
-  type GotoCommandData,
   type GroupMonitorConfig,
   isBooklet,
   type Selected,
@@ -26,6 +25,8 @@ import {
 import { BookletUtil } from '../booklet/booklet.util';
 import { GROUP_MONITOR_CONFIG } from '../group-monitor.config';
 import type { TestSessionByDataTestId } from './test-session-manager.interfaces';
+
+type GotoDestination = {testId: string; alias: string; reopenLimit: number | null};
 
 @Injectable()
 export class TestSessionManager {
@@ -317,8 +318,12 @@ export class TestSessionManager {
     this.send(this.bs.command('resume', [], testIds));
   }
 
-  testCommandGoto(selection: Selected, newTimeLeft: number, targets: TestSession[] = this.checked): Observable<true> {
-    const destinations = Object.entries(TestSessionManager.groupForGoto(targets, selection));
+  getGotoReopenLimit(selection: Selected, targets: TestSession[]): number | null {
+    return TestSessionManager.reopenLimit(TestSessionManager.gotoDestinations(targets, selection));
+  }
+
+  testCommandGoto(selection: Selected, newTimeLeft: number | undefined, targets: TestSession[] = this.checked): Observable<true> {
+    const destinations = TestSessionManager.gotoDestinations(targets, selection);
     const group = this.groupName;
     const revision = this.connectionRevision;
     const scope = this.bs.accessSignal;
@@ -329,9 +334,23 @@ export class TestSessionManager {
         this._commandResponses$.next({commandType: 'goto', testIds: []});
         return EMPTY;
       }
-      return zip(destinations.map(([unitAlias, destination]) => this.bs.command(
+      const reopenLimit = TestSessionManager.reopenLimit(destinations);
+      if (reopenLimit !== null && (newTimeLeft === undefined || !Number.isFinite(newTimeLeft) ||
+        newTimeLeft <= 0 || newTimeLeft > reopenLimit)) {
+        return throwError(() => new Error('Die verfügbare Zeit des Zielblocks hat sich geändert.'));
+      }
+      const batches = new Map<string, {alias: string; description: string; ids: string[]}>();
+      for (const destination of destinations) {
+        const description = destination.reopenLimit === null ? '' :
+          `| closed timeblock reopened - new remaining time ${newTimeLeft}`;
+        const key = JSON.stringify([destination.alias, description]);
+        const batch = batches.get(key);
+        if (batch) batch.ids.push(destination.testId);
+        else batches.set(key, {alias: destination.alias, description, ids: [destination.testId]});
+      }
+      return zip([...batches.values()].map(destination => this.bs.command(
         'goto',
-        ['id', unitAlias, destination.isClosed ? `| closed timeblock reopened - new remaining time ${newTimeLeft}` : ''],
+        ['id', destination.alias, destination.description],
         destination.ids
       ))).pipe(
         takeUntil(this.disconnected$),
@@ -527,53 +546,35 @@ export class TestSessionManager {
     this.replaceCheckedSessions([]);
   }
 
-  getMaxTimeAcrossAllSessions(selected: Selected): number {
-    const sessions = this.sessions;
-    let lowestTime: number = 0;
-    sessions.forEach(session => {
-      let maxTime;
-      if ('units' in session.booklet) {
-        const blocks = session.booklet.units.children.filter(testletOrUnit => testletOrUnit.id === selected.element?.id
-        );
-        if (blocks.length > 0 && 'restrictions' in blocks[0]) {
-          maxTime = blocks[0].restrictions.timeMax?.minutes;
-        }
+  private static reopenLimit(destinations: GotoDestination[]): number | null {
+    let limit: number | null = null;
+    for (const destination of destinations) {
+      if (destination.reopenLimit !== null) {
+        limit = limit === null ? destination.reopenLimit : Math.min(limit, destination.reopenLimit);
       }
-      if (maxTime && lowestTime === 0) {
-        lowestTime = maxTime;
-      }
-      if (maxTime && maxTime < lowestTime) {
-        lowestTime = maxTime;
-      }
-    });
-
-    return lowestTime;
+    }
+    return limit;
   }
 
-  private static groupForGoto(sessionsSet: TestSession[], selection: Selected): GotoCommandData {
-    const groupedByTargetUnitAlias: GotoCommandData = {};
-    sessionsSet.forEach(session => {
-      if (!session.data.bookletName || !isBooklet(session.booklet)) return;
+  private static gotoDestinations(sessions: TestSession[], selection: Selected): GotoDestination[] {
+    const blockId = selection.element?.blockId;
+    if (!blockId) return [];
+    const destinations: GotoDestination[] = [];
+    for (const session of sessions) {
+      if (!session.data.bookletName || !isBooklet(session.booklet)) continue;
 
       const ignoreTestlet = (testlet: Testlet) => !!testlet.restrictions.show &&
         !!session.bookletStates &&
         (session.bookletStates[testlet.restrictions.show.if] !== testlet.restrictions.show.is);
-      const firstUnit = selection.element?.blockId ?
-        BookletUtil.getFirstUnitOfBlock(selection.element.blockId, session.booklet, ignoreTestlet) :
-        null;
-      if (!firstUnit) return;
-
-      if (!Object.keys(groupedByTargetUnitAlias).includes(firstUnit.alias)) {
-        groupedByTargetUnitAlias[firstUnit.alias] = { ids: [session.data.testId], isClosed: undefined };
-      } else {
-        groupedByTargetUnitAlias[firstUnit.alias].ids.push(session.data.testId);
-      }
-
-      if (session.timeLeft && selection.element && Object.keys(session.timeLeft).includes(selection.element.id)) {
-        groupedByTargetUnitAlias[firstUnit.alias].isClosed = true;
-      }
-    });
-    return groupedByTargetUnitAlias;
+      const destination = BookletUtil.getFirstUnitOfBlock(blockId, session.booklet, ignoreTestlet);
+      if (!destination) continue;
+      const timer = destination.timer;
+      const remaining = timer ? session.timeLeft?.[timer.id] : undefined;
+      const reopenLimit = typeof remaining === 'number' && remaining <= 0 ?
+        timer?.restrictions.timeMax?.minutes ?? null : null;
+      destinations.push({testId: session.data.testId, alias: destination.unit.alias, reopenLimit});
+    }
+    return destinations;
   }
 
   private static getEmptyStats(): TestSessionSetStat {

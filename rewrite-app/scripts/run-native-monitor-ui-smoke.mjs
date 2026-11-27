@@ -156,8 +156,13 @@ try{
  await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:join(artifacts,'native-monitor-desktop.png'),fullPage:false});await page.reload({waitUntil:'domcontentloaded'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);check('native-bearer-restores-on-reload');
  // Exercise the real time confirmation and native Goto producer.
  await page.evaluate(()=>{window.__ownedTimerEvents=[];for(const type of ['input','change','focus','blur','click'])document.addEventListener(type,event=>{const element=event.target;if(element?.id!=='setTimer'&&!element?.closest?.('time-restriction-dialog'))return;const input=document.querySelector('#setTimer');window.__ownedTimerEvents.push({type,trusted:event.isTrusted,target:element.tagName,value:input?.value,classes:input?.className,at:performance.now()});if(window.__ownedTimerEvents.length>200)window.__ownedTimerEvents.shift();},true);});
- await native('PATCH','/test/'+firstId+'/state',people[0].token,[{key:'TESTLETS_TIMELEFT',content:JSON.stringify({B1:0}),timeStamp:260}]);
- await page.locator('tc-test-session [svgicon=timer_off]').first().waitFor({timeout:15000});await page.locator('tc-test-session[data-test-id="'+firstId+'"] [data-cy=gm-testlet-select]').first().click();
+ for(const [index,id] of [firstId,secondId].entries()){
+  await native('PATCH','/test/'+id+'/state',people[index].token,[{key:'TESTLETS_TIMELEFT',content:JSON.stringify({B1:0}),timeStamp:260}]);
+ }
+ for(const id of [firstId,secondId]){
+  await page.locator('tc-test-session[data-test-id="'+id+'"] [svgicon=timer_off]').first().waitFor({timeout:15000});
+ }
+ await page.locator('tc-test-session[data-test-id="'+firstId+'"] [data-cy=gm-testlet-select]').first().click();
  const beforeGoto=wire.length;await page.locator('[data-cy=GM_jump_button]').click();await page.locator('#setTimer').waitFor();await page.getByRole('dialog').getByRole('button',{name:'Abbrechen',exact:true}).click();await page.locator('mat-dialog-container').waitFor({state:'detached'});assert.ok(!wire.slice(beforeGoto).some(r=>r.method==='PUT'&&r.path==='/monitor/command'));check('native-goto-time-confirmation-cancel-sends-no-command');
  const wentTo=page.waitForResponse(r=>new URL(r.url()).pathname==='/monitor/command'&&r.request().method()==='PUT');void wentTo.catch(()=>{});await page.locator('[data-cy=GM_jump_button]').click();await page.locator('#setTimer').fill('5');assert.equal(await page.locator('#setTimer').inputValue(),'5');await page.getByRole('dialog').getByRole('button',{name:'OK',exact:true}).click();assert.equal((await wentTo).status(),201);
  for(let i=0;i<2;i++){const command=(await native('GET','/test/'+[firstId,secondId][i]+'/commands',people[i].token)).at(-1);assert.equal(command.keyword,'goto');assert.equal(command.arguments[1],'OWNED.UI.UNIT');assert.ok(command.arguments[2].includes('new remaining time 5'));}check('native-goto-confirmation-sends-original-int64-targets');

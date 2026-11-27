@@ -66,7 +66,7 @@ function componentFixture(){
  const params=new rx.Subject(),profiles=new Map(),connected=[],navigated=[],confirmations=new rx.Subject(),gotoDialog=new rx.Subject(),gotos=[];let finishes=0,dialogRenders=0,gotoCloses=0,finishCloses=0;
  const controller=new AbortController();const backend={accessSignal:controller.signal,connectionStatus$:new rx.BehaviorSubject('initial'),getProfile(id){const stream=new rx.Subject();profiles.set(id,stream);return stream;}};
  const empty=()=>({allChecked:false,numberOfSessions:0,differentBooklets:0,differentBookletSpecies:0,pausedSessions:0,lockedSessions:0,bookletStateLabels:{}});
- const tsm={checked:[],getMaxTimeAcrossAllSessions:()=>10,testCommandGoto(selection,time,targets){gotos.push({selection,time,targets});return rx.of(true);},sessions$:new rx.BehaviorSubject([]),sessionsStats$:new rx.BehaviorSubject(empty()),checkedStats$:new rx.BehaviorSubject(empty()),commandResponses$:new rx.Subject(),checkingOptions:{enableAutoCheckAll:true},filterOptions:{},connect(group){connected.push(group);},disconnect(){},resetFilters(){this.filterOptions={quick:{selected:false,filter:{value:''}}};},refreshFilters(){},commandFinishEverything(){finishes++;return rx.of({commandType:'terminate',testIds:['1']});}};
+ const tsm={checked:[],getGotoReopenLimit:()=>10,testCommandGoto(selection,time,targets){gotos.push({selection,time,targets});return rx.of(true);},sessions$:new rx.BehaviorSubject([]),sessionsStats$:new rx.BehaviorSubject(empty()),checkedStats$:new rx.BehaviorSubject(empty()),commandResponses$:new rx.Subject(),checkingOptions:{enableAutoCheckAll:true},filterOptions:{},connect(group){connected.push(group);},disconnect(){},resetFilters(){this.filterOptions={quick:{selected:false,filter:{value:''}}};},refreshFilters(){},commandFinishEverything(){finishes++;return rx.of({commandType:'terminate',testIds:['1']});}};
  const filterDialog=new rx.Subject(),filterOpen=[];let filterCloses=0;const filterOverlay={open:(component,config)=>{filterOpen.push(config);return {afterClosed:()=>filterDialog,close:()=>{filterCloses++;}};}};
  const cts={getCustomText:()=>null};bindings.set(shared.CustomtextService,cts);
  bindings.set(token('MatDialog'),{open:()=>({afterClosed:()=>confirmations,close:()=>{finishCloses++;}})});const messages=new MessageService();
@@ -283,7 +283,7 @@ test('finish locks started offline tests and leaves allocated pending tests unto
 });
 test('the actual Goto producer uses captured targets and cannot start after its group was retired',()=>{
  const f=managerFixture();f.manager.connect('A');
- const block={id:'B1',blockId:'B1',restrictions:{},children:[{id:'UNIT',alias:'owned-target',label:'Owned'}]};
+ const block={id:'B1',blockId:'B1',restrictions:{timeMax:{minutes:8}},children:[{id:'UNIT',alias:'owned-target',label:'Owned'}]};
  const row=id=>({data:{testId:id,bookletName:'BOOK'},booklet:{species:'owned',states:{},units:{children:[block]}},timeLeft:{B1:0}});
  const a=row('9007199254740993'),b=row('9007199254740994'),selection={element:block};
  f.manager._checked={other:b};f.manager.testCommandGoto(selection,7,[a]).subscribe();assert.deepEqual(f.writes[0],{type:'goto',args:['id','owned-target','| closed timeblock reopened - new remaining time 7'],ids:['9007199254740993']});
@@ -300,6 +300,28 @@ test('Goto reports the actual destinations and does not dispatch a hidden adapti
  assert.deepEqual(responses,[{commandType:'goto',testIds:['9007199254740993']}]);
  f.manager.testCommandGoto(selection,7,[hidden]).subscribe({next:()=>assert.fail('No destination was sent')});
  assert.equal(f.writes.length,1);assert.deepEqual(responses[1],{commandType:'goto',testIds:[]});f.manager.disconnect();
+});
+test('Goto reopens only expired destination timers, including a differently authored nested block',async()=>{
+ const f=managerFixture();f.manager.connect('A');
+ const unit=alias=>({id:'UNIT',alias,label:alias});
+ const timed=(id,minutes,alias)=>({id,blockId:'2',restrictions:{timeMax:{minutes}},children:[unit(alias)]});
+ const alpha=timed('alpha-clock',7,'shared'),beta=timed('beta-clock',4,'shared');
+ const delta={id:'delta',blockId:'2',restrictions:{},children:[timed('nested-clock',3,'alternate')]};
+ const row=(testId,block,timeLeft)=>({data:{testId,bookletName:'BOOK'},booklet:{species:'owned',states:{},units:{children:[block]}},timeLeft});
+ const targets=[row('1',alpha,null),row('2',beta,{'beta-clock':0}),row('3',alpha,{'alpha-clock':2.5}),row('4',delta,{'nested-clock':0})];
+ const selection={element:alpha};
+ assert.equal(f.manager.getGotoReopenLimit(selection,targets),3);
+ for(const time of [undefined,4]){
+  await assert.rejects(rx.firstValueFrom(f.manager.testCommandGoto(selection,time,targets)),/verfügbare Zeit/);
+ }
+ assert.deepEqual(f.writes,[]);
+ await rx.firstValueFrom(f.manager.testCommandGoto(selection,2,targets));
+ assert.deepEqual(f.writes,[
+  {type:'goto',args:['id','shared',''],ids:['1','3']},
+  {type:'goto',args:['id','shared','| closed timeblock reopened - new remaining time 2'],ids:['2']},
+  {type:'goto',args:['id','alternate','| closed timeblock reopened - new remaining time 2'],ids:['4']}
+ ]);
+ f.manager.disconnect();
 });
 for(const action of ['Pause','Resume','Unlock'])for(const transition of ['group','access'])test(action+' cannot outlive its '+transition+' context',()=>{
  const f=managerFixture(),pending=new rx.Subject();f.backend.command=()=>pending;f.backend.unlock=()=>pending;f.manager.connect('A');

@@ -339,12 +339,8 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
     if (scope.aborted) return;
     const current = () => this.currentlySelected === selection && scope === this.bs.accessSignal && !scope.aborted &&
       JSON.stringify(this.tsm.checked.map(session => session.data.testId)) === JSON.stringify(ids);
-    this.subscriptions.push((targets
-      .some(testSession => isBooklet(testSession.booklet) &&
-          selection.element &&
-          testSession.timeLeft &&
-          (testSession.timeLeft[selection.element.id] <= 0)
-      ) ?
+    const reopenLimit = this.tsm.getGotoReopenLimit(selection, targets);
+    this.subscriptions.push((reopenLimit !== null ?
       this.observeDialog(this.dialog.open(
         TimeRestrictionDialogComponent, {
           width: 'auto',
@@ -356,15 +352,17 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
                 this.cts.getCustomText('gm_control_goto_unlock_blocks_confirm_text'),
             confirmbuttonlabel: 'OK',
             showcancel: true,
-            remainingTime: this.tsm.getMaxTimeAcrossAllSessions(selection)
+            remainingTime: reopenLimit
           }
         }
       )) :
-      of(1) // 1 as in 'true'
+      of(true)
     ).pipe(
       take(1),
       filter((confirmed?: number | boolean) => !!confirmed && current()),
-      switchMap(confirmed => this.tsm.testCommandGoto(selection, Number(confirmed), this.tsm.checked)),
+      switchMap(confirmed => this.tsm.testCommandGoto(
+        selection, typeof confirmed === 'number' ? confirmed : undefined, this.tsm.checked
+      )),
       takeUntil(this.routeChanged$),
       takeUntil(fromEvent(scope, 'abort'))
     ).subscribe({

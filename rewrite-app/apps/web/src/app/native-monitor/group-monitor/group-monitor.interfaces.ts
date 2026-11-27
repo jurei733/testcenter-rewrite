@@ -177,15 +177,6 @@ export interface CommandResponse {
   testIds: string[];
 }
 
-export interface GotoCommandData {
-  [firstUnitId: string]: CommandParameter;
-}
-
-interface CommandParameter {
-  ids: string[];
-  isClosed?: boolean;
-}
-
 export type Unit = UnitDef;
 
 export interface Booklet extends BookletDef<Testlet, BookletState> {
